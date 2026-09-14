@@ -53,6 +53,8 @@ import { PresentationLineIcon } from '../../icons-v2-generated/charts/presentati
 import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
+import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
+import { ChatQuoteIcon } from '../../icons-v2-generated/communication/chat-quote-icon';
 import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
 import { ClipboardListIcon } from '../../icons-v2-generated/documents/clipboard-list-icon';
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon';
@@ -1345,25 +1347,51 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
 interface GlyphCardConfig {
   label: string;
   icon: () => React.ReactNode;
+  /**
+   * Video-bearing ref types: render the media card (cover from the ref's
+   * `metadata.videoPoster`, else the host's OG placeholder; the type label as the
+   * status pill; the glyph only when neither cover exists) instead of the plain
+   * glyph card. The player itself is promoted below the card by
+   * `ChatCardLoader` from the same metadata, exactly as for customer interviews.
+   */
+  media?: boolean;
 }
 /** Product-hub internal objects hydrated by their per-object card routes
- *  (`/api/design-docs`, `/api/openframe-tenants` — ChatRef-shaped items,
+ *  (`/api/design-docs`, `/api/openframe-tenants`, `/api/prospect-calls` — ChatRef-shaped items,
  *  same preset as github / slack). Adding one = one line here + the
  *  `list-url.ts` builder + the `source-icons.ts` label / icon / type entries. */
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
   openframe_tenant: { label: 'OpenFrame tenant', icon: () => <BuildingsIcon size={24} /> },
+  prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
-    refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
-      <GlyphChatCard chatRef={displayRef} icon={cfg.icon()} isNewTab={opts.isNewTab} discuss={opts.discuss} />
-    )),
+    refHydratedEntry(docType, cfg.label, (displayRef, opts) =>
+      cfg.media ? (
+        <EntityMingoCard
+          title={displayRef.title}
+          description={displayRef.preview ?? undefined}
+          cover={entityCover(
+            displayRef.metadata?.videoPoster,
+            opts.extras?.buildOgPlaceholderUrl?.(displayRef.title ?? '') ?? null,
+          )}
+          fallbackIcon={cfg.icon()}
+          status={{ label: cfg.label, variant: 'grey' }}
+          chatRef={displayRef}
+          isNewTab={opts.isNewTab}
+          discuss={opts.discuss}
+          menuAriaLabel={`${cfg.label} actions`}
+        />
+      ) : (
+        <GlyphChatCard chatRef={displayRef} icon={cfg.icon()} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+      ),
+    ),
   );
 }
 
 /** People-hub employee feeds hydrate from their EXISTING list APIs
- *  (`/api/what-i-shipped?ids=`, `/api/how-i-work?ids=`) — entry-shaped rows
+ *  (`/api/what-i-shipped?ids=`, `/api/how-i-work?ids=`, `/api/prompts?ids=`) — entry-shaped rows
  *  (title / summary / author), not ChatRefs, hence the bespoke row→display
  *  mapping (the FAQ precedent). The destination comes from the ref (the
  *  server-resolved entry url) or, on a bare marker, the host's
@@ -1379,6 +1407,7 @@ function fetchedEmployeeEntryDisplayRef(item: unknown, chatRef: ChatRef): ChatRe
 const EMPLOYEE_ENTRY_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   what_i_shipped: { label: 'What I Shipped', icon: () => <Rocket02Icon size={24} /> },
   how_i_work: { label: 'How I Work', icon: () => <ClipboardListIcon size={24} /> },
+  ai_prompt: { label: 'Squawkbox', icon: () => <ChatQuoteIcon size={24} /> },
 };
 function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(EMPLOYEE_ENTRY_CARD_CONFIGS, (cfg, docType) => ({
@@ -1675,6 +1704,15 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   },
   ...roadmapRegistryEntries(),
 };
+
+/**
+ * The human label a chat card shows for a document type, or `undefined` for an
+ * unregistered type. `CHAT_CARD_REGISTRY` stays module-private; this accessor is
+ * how a host pins its own label constants to the lib's by value in a test.
+ */
+export function chatCardLabel(docType: string): string | undefined {
+  return CHAT_CARD_REGISTRY[docType]?.label;
+}
 
 // =============================================================================
 // ChatCardNavWrap — click-capture interceptor that routes inner-anchor

@@ -1,0 +1,308 @@
+# Coverage plan — the backlog of test work that closes gaps in the API coverage matrix.
+#
+# coverage_matrix.py scores every item on each run (see the "Plan" section of coverage.md):
+# an item is proved `done` only when every op it lists is reached by a direct, enabled test.
+# Effort is computed from the fixtures still missing; you do not estimate it here.
+#
+# Fields
+#   id          stable, CP-<n>; referenced from commits, PRs and the report
+#   title       one line
+#   status      proposed | planned | in-progress | done | dropped   (human-owned; the analyser never changes it)
+#   priority    P1 | P2 | P3
+#   ops         matrix keys this item closes: "query:<field>", "mutation:<field>", "<METHOD> <service path>"
+#   test_class  target class under tests/ (existing or new); used for the effort model
+#   tags        JUnit tags the new cases carry; phase follows from them (see prompt.md Step 4)
+#   depends_on  other CP ids that must be done first (fixtures they create)
+#   needs       preconditions or decisions the item waits on (free text)
+#   source      where the item came from (report date and proposal number)
+#   owner / branch / pr / clickup / notes   optional bookkeeping
+#
+# The headless run may append new items with status = "proposed" and may add to `notes` and `needs`;
+# it never edits status, priority or ops of an existing item. Promote `proposed` → `planned` by hand.
+
+[[items]]
+id = "CP-1"
+title = "Script-schedule lifecycle"
+status = "done"
+priority = "P1"
+ops = [
+  "mutation:createScriptSchedule", "mutation:updateScriptSchedule", "mutation:archiveScriptSchedule",
+  "mutation:unarchiveScriptSchedule", "query:scriptSchedule", "query:scriptSchedules", "query:scriptScheduleFilters",
+]
+test_class = "ScriptScheduleTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #1"
+branch = "test/coverage-script-schedules"
+notes = "Done 2026-09-13: ScriptScheduleTest, 5 cases, green on qa test-env in 11 s (commit ec439d06a). Decision: schedules take the nearest 30-minute slot at least 3 min ahead (ScriptScheduleGenerator.nextSlot); no devices are assigned, so nothing dispatches. New ScriptScheduleApi, ScriptScheduleQueries, DTOs under data/dto/schedule; the legacy data/dto/script/ScriptSchedule*.java are Tactical-RMM shaped and were left untouched. deleteScriptSchedule is used for cleanup."
+
+[[items]]
+id = "CP-2"
+title = "Script-schedule device targeting"
+status = "done"
+priority = "P1"
+ops = [
+  "mutation:addDevicesToSchedule", "mutation:removeDevicesFromSchedule", "mutation:addAllDevicesToSchedule",
+  "mutation:removeAllDevicesFromSchedule", "mutation:setScheduleDeviceCriteria",
+]
+test_class = "ScriptScheduleDevicesTest"
+tags = ["saas", "feature"]
+depends_on = ["CP-1"]
+needs = []
+source = "report 2026-09-12 #2"
+branch = "test/coverage-script-schedules"
+notes = "Done 2026-09-13: ScriptScheduleDevicesTest, 6 cases, green on qa test-env in 13 s. Also covers setScriptScheduleDevices (Edit Devices, PUT semantics). The schedule sits a day out and is deleted afterwards, so assigning a real device never dispatches. Undocumented rule found: a schedule's supportedPlatforms must be supported by every script it runs (createScriptSchedule fails with 'Scripts do not support the schedule's platform(s)'), so ScriptGenerator.createScriptRequest(osType) now builds the script for the device's OS; the tenant's first listed device is a Mac, so the test prefers a Windows box and falls back to any device. The platform-mismatch case needs a second script for the other OS."
+
+[[items]]
+id = "CP-3"
+title = "Take over a ticket"
+status = "done"
+priority = "P1"
+ops = ["mutation:takeOverTicket"]
+test_class = "TicketsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #3"
+branch = "test/coverage-tickets"
+notes = "Done 2026-09-13: TicketsTest 'Take over a ticket in one operation' (Order 6), green on qa test-env in 9 s. Creates its own ticket, takes it over to TECH_REQUIRED assigned to the caller, asserts the persisted status and assignee, then proves a take-over straight to ARCHIVED is refused with the ticket unchanged; resolves and archives the ticket in @AfterAll. The refusal may arrive as a top-level TICKET_INVALID_TRANSITION error or as userErrors — TicketApi.attemptTakeOverTicketMessages collects both."
+
+[[items]]
+id = "CP-4"
+title = "Reopen a resolved ticket"
+status = "done"
+priority = "P1"
+ops = ["mutation:requestTicketReopen"]
+test_class = "FaeTicketReopenTest"
+tags = ["ai", "fae"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #4"
+branch = "test/coverage-tickets"
+notes = "Done 2026-09-13: FaeTicketReopenTest, green on qa test-env in 16 s against the qa pipeline box vm115982 (configs/qa/openframe-saas-test.yml holds its SSH coordinates). requestTicketReopen is client-only, so the case lives in the Fae phase: the agent opens a client dialog, whose auto-created ticket is read from dialog.ticketId (the tickets list leaves dialog null), the technician resolves it, an ADMIN reopen attempt is refused, the client reopen routes it to TECH_REQUIRED, a second reopen is idempotent, and the ticket is resolved and archived afterwards. Needs the x-machine-id header fix, now its own PR (flamingo-stack/openframe-oss-lib#2173, branch test/fae-x-machine-id-header) — with it the agent session works on qa; a Fae device case passed too. Until that PR merges, Fae cases (this one included) cannot run from this branch alone."
+
+[[items]]
+id = "CP-5"
+title = "Notification read state"
+status = "done"
+priority = "P1"
+ops = [
+  "mutation:markNotificationAsRead", "mutation:markAllNotificationsAsRead", "mutation:deleteNotification",
+  "mutation:deleteAllReadNotifications", "mutation:markNotificationsReadForEntity",
+  "query:notifications", "query:unreadCountsByCategory",
+]
+test_class = "NotificationsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #5"
+branch = "test/coverage-time-notifications"
+notes = "Done 2026-09-13: NotificationsTest, 4 cases, green on qa test-env in ~9 s; also covers hasUnreadNotifications. Decision (owner, 2026-09-13): the bulk operations run on every tenant, the shared one included — the last case empties the test user's inbox. The product never notifies a user about their own actions (ticket assignment and status changes skip the actor), so the class cannot mint a notification for itself: 'Mark a notification read, then delete it' works on whatever the inbox holds and self-skips with a reason when it is empty (expected on a fresh nightly tenant and after this class has run once). The Relay node field does not resolve Notification ('Unknown Node type'), so single notifications are found through the list with a title search."
+
+[[items]]
+id = "CP-6"
+title = "Time-tracking timers and entries"
+status = "done"
+priority = "P1"
+ops = [
+  "mutation:startTimer", "mutation:pauseTimer", "mutation:resumeTimer", "mutation:stopTimer", "mutation:cancelTimer",
+  "mutation:createTimeEntry", "mutation:updateTimeEntry", "mutation:deleteTimeEntry",
+  "query:currentTimer", "query:myTimeEntries", "query:employeeTimeEntries", "query:employeeTimeStats",
+]
+test_class = "TimeTrackingTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #6"
+branch = "test/coverage-time-notifications"
+notes = "Done 2026-09-13 (coverage): TimeTrackingTest, 5 cases on qa test-env in ~18 s, 4 green; 'Manual entry rejects a non-positive duration' fails by design until the product is fixed: createTimeEntry with durationSeconds 0 answers HTTP 502 (Bean Validation @Positive on the api-service DTO fires before the data fetcher and is not mapped to a GraphQL error), while the service-layer rule 'Duration must be positive' never runs. Report to the api-service owner. Also covers timeEntry. Findings not in the schema: every id in inputs and filters is a Relay global id (helpers/RelayIds, unpadded Base64 of Typename:rawId) while TimeEntry.userId/user.id are raw; a stopped or manual entry must carry a ticket or notes; a second timer, a pause with none, and editing a running timer are refused as conflicts; deleteTimeEntry is false the second time. The class cancels any leftover timer first and deletes what it created. unlinkTicketFromTimeEntry still open (needs a ticket)."
+
+[[items]]
+id = "CP-7"
+title = "AI guardrail policies (REST)"
+status = "dropped"
+priority = "P1"
+ops = [
+  "GET api/v1/policies", "GET api/v1/policies/{}", "PUT api/v1/policies/custom", "POST api/v1/policies/{}/activate",
+]
+test_class = "AiPolicyTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #7"
+notes = "Postponed by the owner on 2026-09-13: a new version of the AI policies API is coming, so covering the current endpoints makes no sense. Re-propose when it lands; excluded from the open lists by KG-15 until then."
+
+[[items]]
+id = "CP-8"
+title = "Assistant AI settings"
+status = "done"
+priority = "P1"
+ops = [
+  "query:adminAiConfig", "query:clientAiConfig", "query:clientView",
+  "mutation:updateAdminAiConfig", "mutation:updateClientAiConfig", "mutation:updateClientView", "mutation:resetClientView",
+]
+test_class = "AiSettingsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #8"
+branch = "test/coverage-ai-settings"
+notes = "Done 2026-09-13: AiSettingsTest, 4 cases, green on qa test-env in ~11 s. Decision (owner, 2026-09-13): the tenant-wide configs are read and written back unchanged, asserting the echo — behaviour-neutral by construction (updates are partial: an omitted field keeps its value; quickActionsIsDefault is sent only together with the list so a legacy null flag is left alone). On a tenant that never saved a config the write-back persists the synthetic default, which is what the UI's first save does. The client view is overridden, partially updated and reset on a throwaway organization that is archived afterwards."
+
+[[items]]
+id = "CP-9"
+title = "Knowledge-base tags and unpublish"
+status = "done"
+priority = "P2"
+ops = [
+  "mutation:addTagToKnowledgeBaseItem", "mutation:removeTagFromKnowledgeBaseItem", "mutation:unpublishArticle",
+  "query:knowledgeBaseTags",
+]
+test_class = "KnowledgeBaseTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #9"
+branch = "test/coverage-kb-tags-rest"
+notes = "Done 2026-09-13: KnowledgeBaseTest 'Tag an article, then remove the tag' and 'Unpublish a published article' (Orders 19-20), green on qa test-env in 7 s. The tag path that #1278 left commented out works: TagApi.createTag(key, KNOWLEDGE_ARTICLE) plus addTagToKnowledgeBaseItem, verified on the item, on knowledgeBaseTags(null) and on the folder subtree, then removed; an unknown tag id is refused. The @Disabled 'Get all knowledge base tags' case (no reason recorded) was deleted — its assertions now run inside the tag case with data the case creates. Articles are archived in @AfterAll."
+
+[[items]]
+id = "CP-10"
+title = "Return-leg mutations: device nickname, unarchive script"
+status = "done"
+priority = "P2"
+ops = ["mutation:updateDeviceNickname", "mutation:unarchiveScript"]
+test_class = "DevicesTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "report 2026-09-12 #10"
+branch = "test/coverage-scripts-executions"
+notes = "Done 2026-09-13: DevicesTest 'Update and restore a device nickname' (set, clear with null, restore the original in finally; nickname added to the device queries and the Machine DTO) and ScriptsTest 'Unarchive an archived script' (own script: archive, unarchive, back in the ACTIVE list, idempotent, deleted in finally). Both green on qa test-env."
+
+[[items]]
+id = "CP-11"
+title = "Ticket notes and attachments"
+status = "done"
+priority = "P1"
+ops = [
+  "mutation:addTicketNote", "mutation:updateTicketNote", "mutation:deleteTicketNote",
+  "mutation:createTempAttachmentUploadUrl", "mutation:deleteTempAttachment", "mutation:deleteTicketAttachment",
+  "query:ticketAttachmentDownloadUrl",
+]
+test_class = "TicketsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "owner request 2026-09-13 (open ticket cluster)"
+branch = "test/coverage-tickets"
+notes = "Done 2026-09-13: TicketsTest 'Add, edit and delete a ticket note; stage, attach, download and delete a file' (Order 7), green on qa test-env. Own ticket; a note added, edited, deleted; a file staged through createTempAttachmentUploadUrl, PUT to the presigned URL, linked with updateTicket(tempAttachmentIds), downloaded through ticketAttachmentDownloadUrl and compared byte for byte, deleted; a second staged file discarded. Notes and attachments are read through a dedicated GET_TICKET_DETAILS query because the plain ticket selection carries neither."
+
+[[items]]
+id = "CP-12"
+title = "Ticket edit, assignment and links"
+status = "done"
+priority = "P1"
+ops = [
+  "mutation:updateTicket", "mutation:assignTicket", "mutation:unassignTicket",
+  "mutation:unlinkDeviceFromTicket", "mutation:unlinkOrganizationFromTicket",
+]
+test_class = "TicketsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "owner request 2026-09-13 (open ticket cluster)"
+branch = "test/coverage-tickets"
+notes = "Done 2026-09-13: TicketsTest 'Edit, reassign and unlink a ticket' (Order 8), green on qa test-env. Own ticket on the pipeline-scoped device: title and description edited with the device kept (partial update), unassigned then assigned to the caller, device unlinked with the organization kept, organization unlinked, all re-read."
+
+[[items]]
+id = "CP-13"
+title = "Ticket status definitions, transition rules and statistics"
+status = "done"
+priority = "P2"
+ops = [
+  "mutation:updateTicketStatus", "mutation:reorderTicketStatus", "query:ticketStatusTransitionRules", "query:ticketStatistics",
+]
+test_class = "TicketsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "owner request 2026-09-13 (open ticket cluster)"
+branch = "test/coverage-tickets"
+notes = "Done 2026-09-13: TicketsTest 'Edit and reorder a custom ticket status; read the transition rules and statistics' (Order 9), green on qa test-env. Two own custom statuses: one renamed and recoloured, moved after and back before the other (order checked on ticketStatuses); the transition matrix must let RESOLVED reach ARCHIVED and must not let TECH_REQUIRED reach ARCHIVED (the rule the take-over case relies on); statistics counts are non-negative and never exceed the total. Statuses deleted in @AfterAll."
+
+[[items]]
+id = "CP-14"
+title = "Bulk archive of resolved tickets"
+status = "proposed"
+priority = "P3"
+ops = ["mutation:archiveResolvedTickets"]
+test_class = "TicketsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = ["decision: archiveResolvedTickets archives every RESOLVED ticket of the tenant it runs on — on the shared qa tenant that touches other people's tickets; allow (with a filter narrowing to the test's own organization, if the filter supports it), or forbid outside pipeline-owned tenants"]
+source = "left out of CP-11..13 on 2026-09-13 on purpose"
+notes = "The UI calls it from the board's bulk action. BulkOperationPayload returns count + userErrors. A safe shape: create two own resolved tickets, call with a filter restricted to the test organization, assert count == 2 and both ARCHIVED — only if TicketFilterInput can scope by organization on this endpoint."
+
+[[items]]
+id = "CP-15"
+title = "Tag definitions and suggestions"
+status = "done"
+priority = "P2"
+ops = [
+  "mutation:updateTag", "mutation:deleteTag", "query:tagKeySuggestions", "query:tagValueSuggestions",
+  "query:tagsByEntityType", "query:scriptsTags",
+]
+test_class = "TagsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "owner request 2026-09-13 (cheap batch)"
+branch = "test/coverage-kb-tags-rest"
+notes = "Done 2026-09-13: TagsTest, 3 cases, green on qa test-env in 5 s. An own DEVICE tag is edited (omitted key kept), listed under DEVICE and not under SCRIPT or the scripts tag list, suggested by key (the key suggestions are scoped to device tags, tenant-wide), and deleted. Value suggestions are checked on the own key (none) and on an existing key with values when one exists."
+
+[[items]]
+id = "CP-16"
+title = "Dialog management"
+status = "done"
+priority = "P2"
+ops = ["query:dialogs", "query:dialogStatistics", "mutation:renameDialog", "mutation:unarchiveDialog"]
+test_class = "DialogsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "owner request 2026-09-13 (cheap batch)"
+branch = "test/coverage-tickets"
+notes = "Done 2026-09-13: DialogsTest, 3 cases, green on qa test-env in 4 s. An own ADMIN/AI dialog (no message sent) is renamed, listed under MY ACTIVE and found by title search, archived, listed under ARCHIVED, unarchived; the statistics are consistent. DialogApi's REST path constant DIALOGS shadowed the GraphQL document of the same name — the document is DIALOGS_QUERY."
+
+[[items]]
+id = "CP-17"
+title = "Script execution history and schedule runs"
+status = "done"
+priority = "P2"
+ops = [
+  "query:scriptExecutions", "query:scriptExecutionFilters", "query:scheduleExecutions", "query:scheduleExecutionFilters",
+  "query:scheduleRuns", "query:scheduleRunFilters",
+]
+test_class = "ScriptExecutionHistoryTest"
+tags = ["saas", "feature"]
+depends_on = ["CP-1"]
+needs = []
+source = "owner request 2026-09-13 (cheap batch)"
+branch = "test/coverage-scripts-executions"
+notes = "Done 2026-09-13: ScriptExecutionHistoryTest, 2 read cases, green on qa test-env. The script side prefers a script that already has history (the AI suites leave some) and checks the connection against its facets; the schedule side uses an own schedule a day out whose history is legitimately empty. Nothing is dispatched. ScriptExecution.scriptId is the raw id while Script.id is global (RelayIds.decode compares them); the status enum is QUEUED/DISPATCHED/RUNNING/SUCCESS/…"
+
+[[items]]
+id = "CP-18"
+title = "Organization can-archive and invitation resend"
+status = "done"
+priority = "P3"
+ops = ["GET organizations/{}/can-archive", "POST invitations/{}/resend"]
+test_class = "OrganizationsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "owner request 2026-09-13 (cheap batch)"
+branch = "test/coverage-kb-tags-rest"
+notes = "Done 2026-09-13: OrganizationsTest 'Check whether an organization can be archived' (own org, no devices → true, then archived) and UserInvitationsTest 'Resending an invitation that has not expired is refused' (InvitationService.renewInvitation only renews expired pending invitations, a fresh one gets 409; the suite cannot age an invitation, so the refusal is the pinned contract). The extractor now resolves method-local path variables (final String X = BASE.concat(...)), which also turned PUT organizations/{id}, PATCH organizations/{id}/status and DELETE invitations/{id} from false gaps into covered."

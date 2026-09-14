@@ -108,10 +108,12 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   // the related-content rail + author page), entry-shaped rows.
   what_i_shipped: (ids, b) => `${b}/api/what-i-shipped?ids=${ids.join(',')}&limit=${ids.length}`,
   how_i_work: (ids, b) => `${b}/api/how-i-work?ids=${ids.join(',')}&limit=${ids.length}`,
+  ai_prompt: (ids, b) => `${b}/api/prompts?ids=${ids.join(',')}&limit=${ids.length}`,
   // Product-hub internal objects — per-object card-hydration routes
   // (ChatRef-shaped items, `handleEntityCardList`), like github / slack.
   design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
   openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
+  prospect_call: (ids, b) => `${b}/api/prospect-calls?ids=${ids.join(',')}`,
 };
 
 /**

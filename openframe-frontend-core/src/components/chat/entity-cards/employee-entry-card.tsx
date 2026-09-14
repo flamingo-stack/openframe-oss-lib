@@ -1,6 +1,7 @@
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
 import { getProxiedImageUrl } from '../../../utils/image-proxy-stub';
+import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
 import { AdminContentCard } from './admin-content-card';
 
 /** The fields every people-hub employee entry shares. Entity-specific bindings
@@ -35,26 +36,23 @@ export interface EmployeeEntryCardProps {
   className?: string;
 }
 
-const STATUS_BADGE_CLASS: Record<string, string> = {
-  published: 'bg-ods-success-secondary text-ods-success',
-  draft: 'bg-ods-warning-secondary text-ods-warning',
-  archived: 'bg-ods-border text-ods-text-secondary',
+/** Entry lifecycle → the standard badge colour scheme (the same ODS pairs every status badge uses). */
+const STATUS_BADGE_SCHEME: Record<string, NonNullable<StatusBadgeProps['colorScheme']>> = {
+  published: 'success',
+  draft: 'warning',
+  archived: 'default',
   // Design-doc lifecycle (product-hub) — same ODS pairs, no new palette.
-  in_review: 'bg-ods-warning-secondary text-ods-warning',
-  approved: 'bg-ods-success-secondary text-ods-success',
-  building: 'bg-ods-success-secondary text-ods-success',
-  shipped: 'bg-ods-success-secondary text-ods-success',
-  abandoned: 'bg-ods-border text-ods-text-secondary',
+  in_review: 'warning',
+  approved: 'success',
+  building: 'success',
+  shipped: 'success',
+  abandoned: 'default',
 };
 
-/** Shared badge treatment so an entity's own badges (discipline, level) sit
- *  flush with the status badge instead of re-deriving the classes per card. */
-export function EmployeeEntryBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded border border-ods-border bg-ods-card px-2 py-1 text-xs font-medium text-ods-text-secondary">
-      {children}
-    </span>
-  );
+/** An entity's own badge (discipline, level, step count): the standard `StatusBadge`
+ *  stamp, so it sits at exactly the size and height of the status badge beside it. */
+export function EmployeeEntryBadge({ children }: { children: string }) {
+  return <StatusBadge text={children} colorScheme="default" variant="button" singleLine />;
 }
 
 /**
@@ -86,13 +84,12 @@ export function EmployeeEntryCard({
         entry.status || extraBadges ? (
           <>
             {entry.status ? (
-              <span
-                className={`rounded px-2 py-1 text-xs font-medium ${
-                  STATUS_BADGE_CLASS[entry.status] ?? 'border border-ods-border bg-ods-card text-ods-text-secondary'
-                }`}
-              >
-                {entry.status}
-              </span>
+              <StatusBadge
+                text={entry.status}
+                colorScheme={STATUS_BADGE_SCHEME[entry.status] ?? 'default'}
+                variant="button"
+                singleLine
+              />
             ) : null}
             {extraBadges}
           </>

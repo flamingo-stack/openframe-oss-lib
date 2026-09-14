@@ -3,6 +3,7 @@ package com.openframe.client.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore;
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore.RetryState;
+import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ScriptDeliveryRetry;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.repository.rmm.ScriptDeliveryRetryRepository;
@@ -39,12 +40,12 @@ class ScriptDeliveryRetryStoreTest {
     }
 
     @Test
-    @DisplayName("store: upserts {id, retryCount=0, messageJson} under (executionId, machineId) with an expiresAt ~ now + TTL")
+    @DisplayName("store: upserts {id, retryCount=0, channel, messageJson} under (executionId, machineId) with an expiresAt ~ now + TTL")
     void store_writesInitialStateWithTtl() {
         Instant approxNow = Instant.now();
         ScriptScheduleExecutionMessage msg = ScriptScheduleExecutionMessage.builder().executionId("e-1").machineId("m-1").build();
 
-        store.store("e-1", "m-1", msg);
+        store.store("e-1", "m-1", DeliveryChannel.SCHEDULE, msg);
 
         ArgumentCaptor<ScriptDeliveryRetry> captor = ArgumentCaptor.forClass(ScriptDeliveryRetry.class);
         verify(repository).save(captor.capture());
@@ -53,23 +54,31 @@ class ScriptDeliveryRetryStoreTest {
         assertThat(saved.getExecutionId()).isEqualTo("e-1");
         assertThat(saved.getMachineId()).isEqualTo("m-1");
         assertThat(saved.getRetryCount()).isZero();
+        assertThat(saved.getChannel()).isEqualTo(DeliveryChannel.SCHEDULE);
+        assertThat(saved.getMessageJson()).contains("\"executionId\":\"e-1\"");
         assertThat(saved.getExpiresAt()).isBetween(approxNow.plusSeconds(3595), approxNow.plusSeconds(3605));
-        RetryState written = readState(saved);
-        assertThat(written.retryCount()).isZero();
-        assertThat(written.message().getExecutionId()).isEqualTo("e-1");
     }
 
     @Test
-    @DisplayName("get: deserializes the stored retry state")
-    void get_returnsDeserializedState() throws Exception {
-        RetryState stored = new RetryState(2, ScriptScheduleExecutionMessage.builder().machineId("m-1").build());
-        when(repository.findById(ID)).thenReturn(Optional.of(row(2, objectMapper.writeValueAsString(stored.message()))));
+    @DisplayName("get: returns retryCount + channel + raw messageJson (deserialization is the republisher's job)")
+    void get_returnsState() {
+        when(repository.findById(ID)).thenReturn(Optional.of(row(2, DeliveryChannel.SOFTWARE, "{\"x\":1}")));
 
         Optional<RetryState> got = store.get("e-1", "m-1");
 
         assertThat(got).isPresent();
         assertThat(got.get().retryCount()).isEqualTo(2);
-        assertThat(got.get().message().getMachineId()).isEqualTo("m-1");
+        assertThat(got.get().channel()).isEqualTo(DeliveryChannel.SOFTWARE);
+        assertThat(got.get().messageJson()).isEqualTo("{\"x\":1}");
+    }
+
+    @Test
+    @DisplayName("get: a document written before software delivery-retry (null channel) defaults to SCHEDULE")
+    void get_nullChannel_defaultsToSchedule() {
+        when(repository.findById(ID)).thenReturn(Optional.of(row(0, null, "{}")));
+
+        assertThat(store.get("e-1", "m-1")).get()
+                .extracting(RetryState::channel).isEqualTo(DeliveryChannel.SCHEDULE);
     }
 
     @Test
@@ -81,17 +90,9 @@ class ScriptDeliveryRetryStoreTest {
     }
 
     @Test
-    @DisplayName("get: corrupt JSON payload → empty (no throw)")
-    void get_corrupt_returnsEmpty() {
-        when(repository.findById(ID)).thenReturn(Optional.of(row(1, "{not-json")));
-
-        assertThat(store.get("e-1", "m-1")).isEmpty();
-    }
-
-    @Test
-    @DisplayName("incrementRetryCount: upserts retryCount+1 (keeping the message) and returns the new count")
+    @DisplayName("incrementRetryCount: upserts retryCount+1 keeping the channel + messageJson, and returns the new count")
     void increment_bumpsAndReturns() {
-        RetryState current = new RetryState(1, ScriptScheduleExecutionMessage.builder().executionId("e-1").build());
+        RetryState current = new RetryState(1, DeliveryChannel.SOFTWARE, "{\"executionId\":\"e-1\"}");
 
         int next = store.incrementRetryCount("e-1", "m-1", current);
 
@@ -99,9 +100,9 @@ class ScriptDeliveryRetryStoreTest {
         ArgumentCaptor<ScriptDeliveryRetry> captor = ArgumentCaptor.forClass(ScriptDeliveryRetry.class);
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getId()).isEqualTo(ID);
-        RetryState written = readState(captor.getValue());
-        assertThat(written.retryCount()).isEqualTo(2);
-        assertThat(written.message().getExecutionId()).isEqualTo("e-1");
+        assertThat(captor.getValue().getRetryCount()).isEqualTo(2);
+        assertThat(captor.getValue().getChannel()).isEqualTo(DeliveryChannel.SOFTWARE);
+        assertThat(captor.getValue().getMessageJson()).isEqualTo("{\"executionId\":\"e-1\"}");
     }
 
     @Test
@@ -111,21 +112,11 @@ class ScriptDeliveryRetryStoreTest {
         verify(repository).deleteById(ID);
     }
 
-    private static ScriptDeliveryRetry row(int retryCount, String messageJson) {
+    private static ScriptDeliveryRetry row(int retryCount, DeliveryChannel channel, String messageJson) {
         return ScriptDeliveryRetry.builder()
                 .id(ID).executionId("e-1").machineId("m-1")
-                .retryCount(retryCount).messageJson(messageJson)
+                .retryCount(retryCount).channel(channel).messageJson(messageJson)
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();
-    }
-
-    private RetryState readState(ScriptDeliveryRetry saved) {
-        try {
-            ScriptScheduleExecutionMessage message =
-                    objectMapper.readValue(saved.getMessageJson(), ScriptScheduleExecutionMessage.class);
-            return new RetryState(saved.getRetryCount(), message);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

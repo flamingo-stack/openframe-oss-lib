@@ -6,33 +6,36 @@ import { Button } from './ui/button';
 import { UserSummary } from './user-summary-stub';
 import { VendorDisplayButton } from './vendor-display-button';
 
-interface CommentCardProps {
-  comment: {
-    id: string;
-    content: string;
-    title?: string;
-    type?: 'pro' | 'con';
-    importance?: 'Critical' | 'Important' | 'Nice-to-have';
-    createdAt: string;
-    vendor?: {
-      id: number;
-      title: string;
-      slug: string;
-      logo: string | null;
-      category?: string | null;
-    };
-    user?: {
-      id: string;
-      name: string;
-      profilePicture: string | null;
-      msp?: {
-        id: string | number;
-        name?: string | null;
-        icon_url?: string | null;
-      };
-    };
-    canDelete?: boolean;
+/** The comment shape every comment surface renders (vendor reviews, design-doc and prompt threads). */
+export interface CommentCardComment {
+  id: string;
+  content: string;
+  title?: string;
+  type?: 'pro' | 'con';
+  importance?: 'Critical' | 'Important' | 'Nice-to-have';
+  createdAt: string;
+  vendor?: {
+    id: number;
+    title: string;
+    slug: string;
+    logo: string | null;
+    category?: string | null;
   };
+  user?: {
+    id: string;
+    name: string;
+    profilePicture: string | null;
+    msp?: {
+      id: string | number;
+      name?: string | null;
+      icon_url?: string | null;
+    };
+  };
+  canDelete?: boolean;
+}
+
+interface CommentCardProps {
+  comment: CommentCardComment;
   onViewProduct?: (vendorSlug: string) => void;
   onDeleteComment?: (commentId: string) => void;
   /** @deprecated Superseded by `leadWith`; the component ignores it. */

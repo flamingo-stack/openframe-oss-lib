@@ -47,7 +47,7 @@ export function FilterListItem({
         'outline-none transition-colors',
         'focus-visible:ring-2 focus-visible:ring-ods-accent',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-ods-bg-hover',
-        selected ? 'bg-[var(--ods-open-yellow-secondary)] hover:bg-[var(--ods-open-yellow-secondary)]' : 'bg-ods-bg',
+        selected ? 'bg-ods-accent-secondary hover:bg-ods-accent-secondary' : 'bg-ods-bg',
         className,
       )}
     >
