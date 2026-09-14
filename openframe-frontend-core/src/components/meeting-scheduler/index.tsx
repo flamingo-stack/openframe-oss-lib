@@ -143,9 +143,26 @@ export interface HubSpotMeetingSchedulerProps {
    * can pass it across the RSC boundary where a component cannot.
    */
   detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent'>;
+  /**
+   * `flow="details-first"` only: the slot click does NOT book. It opens the
+   * same details form again — every answer from step one prefilled, the chosen
+   * instant in its summary line, "Confirm Booking" as the submit — and that
+   * submit books. Campaign pages whose design draws a confirm step after the
+   * calendar opt in; without it the slot click stays the submit.
+   */
+  confirmBeforeBooking?: boolean;
+  /**
+   * Fires with the current step on mount and on every change. The step state
+   * stays internal (it is a state machine with locks); this only lets a host
+   * restyle what sits AROUND the card, e.g. a heading that differs between the
+   * form and the calendar.
+   */
+  onStepChange?: (step: SchedulerStep) => void;
 }
 
-type Step = 'slot' | 'details' | 'confirmed';
+type Step = 'slot' | 'details' | 'confirm' | 'confirmed';
+/** The scheduler's steps as reported by `onStepChange`. `confirm` exists only under `confirmBeforeBooking`. */
+export type SchedulerStep = Step;
 
 /** Values collected at the details step, held until a slot picks the instant. */
 type StashedDetails = {
@@ -404,6 +421,8 @@ export function HubSpotMeetingScheduler({
   flow = DEFAULT_SCHEDULER_FLOW,
   detailsForm: DetailsForm = BookingForm,
   detailsFormProps,
+  confirmBeforeBooking = false,
+  onStepChange,
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -418,6 +437,8 @@ export function HubSpotMeetingScheduler({
   } = useMeetingBooking({ meetingId, apiBaseUrl, initialAvailability });
 
   const detailsFirst = flow === 'details-first';
+  /** details-first with a confirm form after the calendar — the slot click selects instead of submitting. */
+  const confirmAfterSlot = detailsFirst && confirmBeforeBooking;
 
   // Zone resolution happens POST-mount (Intl) unless the embedder pins one —
   // the initial (server) render stays deterministic; time labels appear once
@@ -443,6 +464,15 @@ export function HubSpotMeetingScheduler({
 
   const preset = SCHEDULER_FLOW_PRESETS[flow];
   const [step, setStep] = useState<Step>(preset.initialStep);
+  // Latest-callback ref, so a host passing an inline function does not re-fire
+  // the report on every render — it fires on step changes only.
+  const onStepChangeRef = useRef(onStepChange);
+  useEffect(() => {
+    onStepChangeRef.current = onStepChange;
+  }, [onStepChange]);
+  useEffect(() => {
+    onStepChangeRef.current?.(step);
+  }, [step]);
   // State, not a ref: the link-swap reset below writes it DURING RENDER, and
   // this file's own rule forbids writing a ref there. "Frozen" means written
   // once at Continue, not `useRef`.
@@ -639,15 +669,19 @@ export function HubSpotMeetingScheduler({
         // `getSignals()` is never consulted again — but `resetSignals()` also
         // re-stamps `startedAtRef`, which would make a LATER Continue (after a
         // VALIDATION round-trip) read as too-fast against the min-fill floor.
-        if (!detailsFirst) resetSignals();
+        // A confirm step submits from a live form, so it reads fresh signals
+        // exactly as slot-first does.
+        if (!detailsFirst || confirmAfterSlot) resetSignals();
         void refetchAvailability();
       } else {
         // details-first: the chip that submitted is un-picked on EVERY failure —
         // selection means submit in this flow, so a rejected chip must not sit
         // in the selected variant (and the form's summary must never show a
         // slot the server did not accept).
-        if (detailsFirst) setSelectedSlot(null);
-        if (detailsFirst && (code === 'VALIDATION' || code === 'INVALID_EMAIL')) {
+        // Not with a confirm step: there the slot is a selection the form is
+        // showing, and the form stays mounted to take the correction.
+        if (detailsFirst && !confirmAfterSlot) setSelectedSlot(null);
+        if (detailsFirst && !confirmAfterSlot && (code === 'VALIDATION' || code === 'INVALID_EMAIL')) {
           // DETAILS errors: the form is unmounted by now, so send the visitor
           // back to it (the stash repopulates every answer).
           setStep('details');
@@ -662,7 +696,7 @@ export function HubSpotMeetingScheduler({
         });
       }
     },
-    [book, bookingError, detailsFirst, onBooked, refetchAvailability, resetSignals, toast],
+    [book, bookingError, detailsFirst, confirmAfterSlot, onBooked, refetchAvailability, resetSignals, toast],
   );
 
   const escapeHatch = fallbackUrl ? (
@@ -676,7 +710,15 @@ export function HubSpotMeetingScheduler({
   /** The card's ONE back edge, per flow and step — the skeleton and the loaded
    *  panel wire the same one, so a month load can never swap it for the host's
    *  exit under a details-first visitor. */
-  const backEdge = detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack;
+  const backEdge = detailsFirst
+    ? step === 'slot'
+      ? backToDetails
+      : step === 'confirm'
+        ? backToSlot
+        : onBack
+    : step === 'details'
+      ? backToSlot
+      : onBack;
 
   /**
    * The card states ONE height and everything inside derives from it (see
@@ -780,7 +822,7 @@ export function HubSpotMeetingScheduler({
             // a POST is in flight: a mid-flight change would clear the slot
             // under the spinner while the body already built carries the old
             // duration — and unmounting the row would shift the grid under it.
-            locked={detailsFirst ? step === 'confirmed' : step !== 'slot'}
+            locked={detailsFirst ? step === 'confirmed' || step === 'confirm' : step !== 'slot'}
             disabled={detailsFirst && isSubmitting}
             // The zone still governs every time on screen — including the
             // summary line on the form — so the picker stays until there is
@@ -798,15 +840,16 @@ export function HubSpotMeetingScheduler({
             <div className={stepPanelClass}>
               <Confirmation confirmation={confirmation} timezone={timezone} />
             </div>
-          ) : step === 'details' &&
-            (detailsFirst
-              ? // The form is step ONE here: no slot yet, and `timezone` is null
-                // on the server render, so neither may gate the PANEL. A link
-                // publishing no durations has no form worth showing; it gets the
-                // "nothing published" message below at every moment, refetch or
-                // not — never a calendar skeleton in the form-only layout.
-                durations.length > 0
-              : durationMs != null && selectedSlot != null && timezone) ? (
+          ) : (step === 'confirm' && durationMs != null && selectedSlot != null && timezone) ||
+            (step === 'details' &&
+              (detailsFirst
+                ? // The form is step ONE here: no slot yet, and `timezone` is null
+                  // on the server render, so neither may gate the PANEL. A link
+                  // publishing no durations has no form worth showing; it gets the
+                  // "nothing published" message below at every moment, refetch or
+                  // not — never a calendar skeleton in the form-only layout.
+                  durations.length > 0
+                : durationMs != null && selectedSlot != null && timezone)) ? (
             <div className={cn(stepPanelClass, 'gap-[var(--spacing-system-m)]')}>
               {/* Top-aligned, and no back edge of its own: the ONE back edge
                   lives in the context panel at every step (the `onBack` wired on `SchedulerContextPanel`),
@@ -837,12 +880,12 @@ export function HubSpotMeetingScheduler({
                 startTimeMs={selectedSlot ?? undefined}
                 durationMs={durationMs ?? undefined}
                 timezone={timezone}
-                deferSlot={detailsFirst}
-                submitLabel={preset.submitLabel}
-                footerNote={preset.footerNote}
+                deferSlot={formOnly}
+                submitLabel={step === 'confirm' ? DEFAULT_SUBMIT_LABEL : preset.submitLabel}
+                footerNote={step === 'confirm' ? undefined : preset.footerNote}
                 initialValues={detailsFirst ? stash?.payload : undefined}
                 isSubmitting={isSubmitting}
-                onSubmit={detailsFirst ? stashDetails : handleSubmit}
+                onSubmit={formOnly ? stashDetails : handleSubmit}
                 honeypotInputProps={honeypotInputProps}
                 getSignals={getSignals}
               />
@@ -883,6 +926,13 @@ export function HubSpotMeetingScheduler({
                       setStep('details');
                       return;
                     }
+                    if (confirmAfterSlot) {
+                      // The slot is a selection here; the confirm form books.
+                      if (!stash) return;
+                      setSelectedSlot(ms);
+                      setStep('confirm');
+                      return;
+                    }
                     // details-first: the slot IS the submit. The step stays
                     // 'slot' for the whole POST — moving it here would unmount
                     // the chip the spinner lives on and fight the SLOT_TAKEN
@@ -920,7 +970,7 @@ export function HubSpotMeetingScheduler({
                   // Distinct from `isLoading`, which swaps the whole times
                   // column for a skeleton: the grid must stay up with the
                   // clicked chip spinning.
-                  isSubmitting={detailsFirst ? isSubmitting : undefined}
+                  isSubmitting={detailsFirst && !confirmAfterSlot ? isSubmitting : undefined}
                 />
               ) : durations.length === 0 && (!isFetchingAvailability || formOnly) ? (
                 // The LINK publishes nothing at all — a different thing from a

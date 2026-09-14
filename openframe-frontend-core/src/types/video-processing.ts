@@ -32,6 +32,19 @@ export interface VideoTeaser {
 /**
  * Speaker identification for transcription
  */
+/**
+ * A short customer quote pulled from a video entity (case study, customer
+ * interview) — a headline line in the customer's own words. Attribution is NOT
+ * stored on the item: it is the entity's customer (`user_id` → profile + MSP).
+ * `key` is stable across edits so list editors can reconcile rows.
+ */
+export interface EntityQuote {
+  key: string;
+  text: string;
+  /** `ai` while the text is exactly what Transcribe & Summarize extracted; an editor edit makes it `manual`. */
+  source?: 'ai' | 'manual';
+}
+
 export interface Speaker {
   label: string;
   name?: string;

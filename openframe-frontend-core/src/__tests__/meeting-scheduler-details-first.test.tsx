@@ -107,3 +107,58 @@ describe('HubSpotMeetingScheduler — details-first flow', () => {
     expect(chips.every(b => (b as HTMLButtonElement).disabled)).toBe(true);
   });
 });
+
+describe('HubSpotMeetingScheduler — details-first with confirmBeforeBooking', () => {
+  const onStepChange = vi.fn();
+  const confirmScheduler = () => (
+    <HubSpotMeetingScheduler
+      meetingId="1"
+      flow="details-first"
+      confirmBeforeBooking
+      onStepChange={onStepChange}
+      initialAvailability={availability}
+    />
+  );
+
+  beforeEach(() => onStepChange.mockClear());
+
+  async function toConfirmStep() {
+    render(confirmScheduler());
+    await screen.findByLabelText(/^Email/);
+    fillIdentity();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('button', { name: 'Back' });
+    fireEvent.click(await timeChip());
+    await screen.findByRole('button', { name: 'Confirm Booking' });
+  }
+
+  it('the slot click selects; the prefilled confirm form books with the chosen instant', async () => {
+    book.mockResolvedValue({
+      ok: true,
+      confirmation: { meetingId: '1', title: 'Intro', startTimeMs: SLOT_MS, durationMs: 1_800_000 },
+    });
+    await toConfirmStep();
+    expect(book).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/^Email/)).toHaveValue('a@b.co');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
+    await waitFor(() => expect(book).toHaveBeenCalledTimes(1));
+    expect(book).toHaveBeenCalledWith(expect.objectContaining({ email: 'a@b.co', startTimeMs: SLOT_MS }));
+    expect(onStepChange.mock.calls.map(([s]) => s)).toEqual(['details', 'slot', 'confirm', 'confirmed']);
+  });
+
+  it('Back from the confirm form returns to the calendar', async () => {
+    await toConfirmStep();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Confirm Booking' })).not.toBeInTheDocument());
+    expect(await timeChip()).toBeInTheDocument();
+  });
+
+  it('VALIDATION keeps the visitor on the populated confirm form', async () => {
+    book.mockResolvedValue({ ok: false, code: 'VALIDATION' });
+    await toConfirmStep();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Booking failed' })));
+    expect(screen.getByRole('button', { name: 'Confirm Booking' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Email/)).toHaveValue('a@b.co');
+  });
+});
