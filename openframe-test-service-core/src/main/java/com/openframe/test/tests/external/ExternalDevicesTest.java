@@ -36,6 +36,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Slf4j
 public class ExternalDevicesTest extends ExternalApiBaseTest {
 
+    /** The one device status a live tenant reliably has; transient ones make a flaky fixture. */
+    private static final String ONLINE_STATUS = "ONLINE";
+
     private static final String UNKNOWN_MACHINE_ID = "00000000-0000-0000-0000-000000000000";
 
     @Tag("feature")
@@ -149,15 +152,19 @@ public class ExternalDevicesTest extends ExternalApiBaseTest {
             return;
         }
 
-        // An advertised option is not a promise that rows exist: the API lists every status it knows
-        // about and reports a count per option, so a status no device currently holds comes back with
-        // count 0. Pick one the tenant actually has. Asserting on the first option regardless only
-        // passed while stale PENDING_DELETION devices happened to be lying around, and broke the
-        // moment they were cleaned up.
-        DeviceFilterItem option = filters.getStatuses().stream()
+        // Prefer ONLINE. An advertised option is not a promise that rows exist -- the API lists every
+        // status it knows and reports a count per option, so a status no device holds comes back with
+        // count 0 -- but picking whichever option came first landed on PENDING_DELETION, a transient
+        // status whose count came from rows nothing had cleaned up. ONLINE is the one status a live
+        // tenant genuinely has and keeps, which is what this case is really about. Anything with a
+        // positive count still serves if ONLINE is not advertised, e.g. on a tenant with no live box.
+        List<DeviceFilterItem> populated = filters.getStatuses().stream()
                 .filter(item -> item.getCount() != null && item.getCount() > 0)
+                .toList();
+        DeviceFilterItem option = populated.stream()
+                .filter(item -> ONLINE_STATUS.equals(item.getValue()))
                 .findFirst()
-                .orElse(null);
+                .orElse(populated.isEmpty() ? null : populated.getFirst());
         if (option == null) {
             log.info("No advertised device status has any devices on this tenant; nothing to filter by");
             return;
