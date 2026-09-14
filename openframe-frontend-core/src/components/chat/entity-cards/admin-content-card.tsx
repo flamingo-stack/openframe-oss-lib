@@ -35,6 +35,13 @@ interface AdminContentCardProps {
   meta?: React.ReactNode;
   /** Action buttons row */
   actions?: React.ReactNode;
+  /**
+   * Keep every row's space even when its content is short or absent: a two-line
+   * title, the subtitle line, a two-line summary, a 28px badges row and the meta
+   * line. Every card in a grid is then the same height, which is what
+   * `AdminContentCardGrid` and `AdminContentCardSkeleton` reserve. Default false.
+   */
+  reserveRows?: boolean;
   /** Additional class names */
   className?: string;
 }
@@ -49,6 +56,7 @@ export function AdminContentCard({
   badges,
   meta,
   actions,
+  reserveRows = false,
   className,
 }: AdminContentCardProps) {
   const [imageError, setImageError] = useState(false);
@@ -103,17 +111,21 @@ export function AdminContentCard({
       {/* Content */}
       <div className="flex flex-1 flex-col gap-3 p-5">
         {/* Title */}
-        <h3 className="line-clamp-2 break-words text-ods-text-primary text-h3">{title}</h3>
+        <h3 className={cn('line-clamp-2 break-words text-ods-text-primary text-h3', reserveRows && 'min-h-[2lh]')}>{title}</h3>
 
         {/* Subtitle (optional) */}
-        {subtitle && <p className="truncate text-ods-text-secondary text-h6">{subtitle}</p>}
+        {(subtitle || reserveRows) && (
+          <p className={cn('truncate text-ods-text-secondary text-h6', reserveRows && 'min-h-[1lh]')}>{subtitle}</p>
+        )}
 
         {/* Summary */}
-        {summary && <p className="line-clamp-2 text-ods-text-secondary text-h6">{summary}</p>}
+        {(summary || reserveRows) && (
+          <p className={cn('line-clamp-2 text-ods-text-secondary text-h6', reserveRows && 'min-h-[2lh]')}>{summary}</p>
+        )}
 
         {/* Badges row */}
-        {(Number(platforms?.length) > 0 || badges) && (
-          <div className="flex flex-wrap items-center gap-2">
+        {(Number(platforms?.length) > 0 || badges || reserveRows) && (
+          <div className={cn('flex flex-wrap items-center gap-2', reserveRows && 'min-h-7')}>
             {platforms?.map(p => (
               <PlatformBadge
                 key={p.platform_id || p.id}
@@ -126,7 +138,9 @@ export function AdminContentCard({
         )}
 
         {/* Meta row */}
-        {meta && <div className="flex items-center gap-3 text-ods-text-secondary text-h6">{meta}</div>}
+        {(meta || reserveRows) && (
+          <div className={cn('flex items-center gap-3 text-ods-text-secondary text-h6', reserveRows && 'min-h-[1lh]')}>{meta}</div>
+        )}
 
         {/* Actions — pushed to bottom */}
         {actions && (

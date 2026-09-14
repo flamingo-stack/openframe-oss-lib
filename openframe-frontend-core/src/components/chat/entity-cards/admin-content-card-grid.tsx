@@ -8,11 +8,12 @@ export const ADMIN_CONTENT_CARD_GRID_CLASS =
   'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--spacing-system-lf)]';
 
 /**
- * One `AdminContentCard`-shaped placeholder. It mirrors the card box for box (3:2
- * cover, then a `gap-3 p-5` column: two-line title, subtitle, two-line summary,
- * badges row, meta row, bordered actions row) so a skeleton, a real card and a
- * reserved slot are the same height. `p-5` has no ODS token (20px); it is the
- * card's own padding and must match it exactly.
+ * One `AdminContentCard reserveRows`-shaped placeholder. It mirrors that card box
+ * for box (3:2 cover, then a `gap-3 p-5` column: two-line title, subtitle line,
+ * two-line summary, 28px badges row, meta line, bordered actions row), each text
+ * row sized in its own typography's line height, so a skeleton, a real card and a
+ * reserved slot are the same height at every breakpoint. `p-5` has no ODS token
+ * (20px); it is the card's own padding and must match it exactly.
  */
 export function AdminContentCardSkeleton({ className }: { className?: string }) {
   return (
@@ -24,14 +25,14 @@ export function AdminContentCardSkeleton({ className }: { className?: string }) 
     >
       <div className="aspect-[3/2] w-full shrink-0 bg-ods-border/20" />
       <div className="flex flex-1 flex-col gap-[var(--spacing-system-sf)] p-5">
-        <div className="h-12 w-full rounded bg-ods-border" />
-        <div className="h-5 w-1/2 rounded bg-ods-border" />
-        <div className="h-10 w-full rounded bg-ods-border" />
-        <div className="flex items-center gap-[var(--spacing-system-xsf)]">
+        <div className="text-h3 h-[2lh] w-full rounded bg-ods-border" />
+        <div className="text-h6 h-[1lh] w-1/2 rounded bg-ods-border" />
+        <div className="text-h6 h-[2lh] w-full rounded bg-ods-border" />
+        <div className="flex h-7 items-center gap-[var(--spacing-system-xsf)]">
           <div className="h-5 w-20 rounded-full bg-ods-border" />
           <div className="h-5 w-24 rounded-full bg-ods-border" />
         </div>
-        <div className="h-5 w-32 rounded bg-ods-border" />
+        <div className="text-h6 h-[1lh] w-32 rounded bg-ods-border" />
         <div className="mt-auto flex items-center justify-between border-t border-ods-border pt-[var(--spacing-system-sf)]">
           <div className="h-10 w-24 rounded bg-ods-border" />
           <div className="flex gap-[var(--spacing-system-xsf)]">
@@ -65,6 +66,8 @@ export interface AdminContentCardGridProps<T> {
 /**
  * A paginated card grid that is ONE height in every state: the card-grid
  * counterpart of the admin `Table`'s `skeletonRows` + `keepHeightWhenEmpty`.
+ * `AdminContentCard`s rendered in it pass `reserveRows`, so a full page is the
+ * height of the reserved one.
  *
  *  - loading: `pageSize` skeleton cards;
  *  - a short page: the cards, then invisible skeleton-shaped slots up to `pageSize`;

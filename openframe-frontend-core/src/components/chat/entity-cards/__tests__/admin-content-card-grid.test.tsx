@@ -11,6 +11,7 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { AdminContentCard } from '../admin-content-card';
 import { AdminContentCardGrid } from '../admin-content-card-grid';
 
 type Row = { id: number; name: string };
@@ -54,5 +55,15 @@ describe('AdminContentCardGrid', () => {
     render(<AdminContentCardGrid {...base} items={rows(6)} loading={false} />);
     expect(screen.getByText('Row 6')).toBeTruthy();
     expect(skeletons()).toHaveLength(0);
+  });
+
+  it('AdminContentCard reserveRows keeps the title, subtitle, summary and meta rows when they are empty', () => {
+    const { unmount } = render(<AdminContentCard title="Short" reserveRows />);
+    expect(screen.getByRole('heading', { name: 'Short' }).className).toContain('min-h-[2lh]');
+    expect(screen.getAllByRole('paragraph')).toHaveLength(2);
+    unmount();
+    render(<AdminContentCard title="Loose" />);
+    expect(screen.getByRole('heading', { name: 'Loose' }).className).not.toContain('min-h-[2lh]');
+    expect(screen.queryAllByRole('paragraph')).toHaveLength(0);
   });
 });
