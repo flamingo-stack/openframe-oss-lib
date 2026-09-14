@@ -44,12 +44,12 @@ public class TimeTrackingApi {
 
     /** The caller's active (running or paused) timer, or null. */
     public static TimeEntry currentTimer() {
-        return query(CURRENT_TIMER, Map.of()).getObject("data.currentTimer", TimeEntry.class);
+        return object(CURRENT_TIMER, "currentTimer", Map.of(), TimeEntry.class);
     }
 
     /** One entry by id, or null when absent. */
     public static TimeEntry getTimeEntry(String id) {
-        return query(TIME_ENTRY, Map.of("id", id)).getObject("data.timeEntry", TimeEntry.class);
+        return object(TIME_ENTRY, "timeEntry", Map.of("id", id), TimeEntry.class);
     }
 
     /** The caller's own entries; {@code period} and {@code search} may be null. */
@@ -62,7 +62,7 @@ public class TimeTrackingApi {
         if (search != null) {
             variables.put("search", search);
         }
-        return query(MY_TIME_ENTRIES, variables).getObject("data.myTimeEntries", TimeEntryConnection.class);
+        return object(MY_TIME_ENTRIES, "myTimeEntries", variables, TimeEntryConnection.class);
     }
 
     /** Tenant-wide entries narrowed by {@code filter} (employee / organization global ids, period). */
@@ -75,7 +75,7 @@ public class TimeTrackingApi {
         if (search != null) {
             variables.put("search", search);
         }
-        return query(EMPLOYEE_TIME_ENTRIES, variables).getObject("data.employeeTimeEntries", TimeEntryConnection.class);
+        return object(EMPLOYEE_TIME_ENTRIES, "employeeTimeEntries", variables, TimeEntryConnection.class);
     }
 
     public static EmployeeTimeStats employeeTimeStats(TimeEntryFilterInput filter) {
@@ -83,7 +83,7 @@ public class TimeTrackingApi {
         if (filter != null) {
             variables.put("filter", filter);
         }
-        return query(EMPLOYEE_TIME_STATS, variables).getObject("data.employeeTimeStats", EmployeeTimeStats.class);
+        return object(EMPLOYEE_TIME_STATS, "employeeTimeStats", variables, EmployeeTimeStats.class);
     }
 
     // ---- timer ----
@@ -116,7 +116,7 @@ public class TimeTrackingApi {
 
     /** Discards the active timer; false when there was none. */
     public static boolean cancelTimer() {
-        return Boolean.TRUE.equals(query(CANCEL_TIMER, Map.of()).getObject("data.cancelTimer", Boolean.class));
+        return flag(CANCEL_TIMER, "cancelTimer", Map.of());
     }
 
     // ---- manual entries ----
@@ -145,7 +145,7 @@ public class TimeTrackingApi {
 
     /** True when the entry existed and was deleted; false for an unknown or already-deleted id. */
     public static boolean deleteTimeEntry(String id) {
-        return Boolean.TRUE.equals(query(DELETE_TIME_ENTRY, Map.of("id", id)).getObject("data.deleteTimeEntry", Boolean.class));
+        return flag(DELETE_TIME_ENTRY, "deleteTimeEntry", Map.of("id", id));
     }
 
     // ---- plumbing ----
@@ -163,7 +163,23 @@ public class TimeTrackingApi {
     }
 
     private static TimeEntry entry(String document, String field, Map<String, Object> variables) {
-        return query(document, variables).getObject("data." + field, TimeEntry.class);
+        return object(document, field, variables, TimeEntry.class);
+    }
+
+    /**
+     * Reads one object out of a document's answer. The response is held in a named local before a
+     * field is read out of it, so a failure says which step produced nothing.
+     */
+    private static <T> T object(String document, String field, Map<String, Object> variables, Class<T> type) {
+        JsonPath response = query(document, variables);
+        return response.getObject("data." + field, type);
+    }
+
+    /** A mutation that answers a bare Boolean; a null answer counts as false. */
+    private static boolean flag(String document, String field, Map<String, Object> variables) {
+        JsonPath response = query(document, variables);
+        Boolean answered = response.getObject("data." + field, Boolean.class);
+        return Boolean.TRUE.equals(answered);
     }
 
     /**

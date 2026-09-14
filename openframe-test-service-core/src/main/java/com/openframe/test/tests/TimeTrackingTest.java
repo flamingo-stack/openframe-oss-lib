@@ -57,6 +57,14 @@ public class TimeTrackingTest extends BaseTest {
     }
 
     @Tag("feature")
+    /**
+     * The three waits are load-bearing, not padding. The server measures the timer from its own
+     * clock — {@code breakSeconds} is the wall-clock gap between the pause and resume calls, and
+     * {@code durationSeconds} is the elapsed time minus that break — so the only way to give the
+     * case something to assert is to let real time pass. Each wait is twice the one second the
+     * assertions need, and a round trip is added to the interval rather than taken from it, so
+     * whole-second truncation cannot bring either value under the threshold.
+     */
     @Test
     @DisplayName("Run a timer through pause, resume and stop")
     @Order(1)
