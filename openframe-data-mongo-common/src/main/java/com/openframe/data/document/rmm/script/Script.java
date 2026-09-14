@@ -103,10 +103,12 @@ public class Script implements TenantScoped {
     @Indexed
     @Builder.Default
     private ScriptStatus status = ScriptStatus.ACTIVE;
+
+    @Builder.Default
+    private ScriptType type = ScriptType.USER;
     /**
      * Timestamp of the most recent {@link #status} transition.
      */
     private Instant statusChangedAt;
-    private Boolean system;
     private String contentHash;
 }

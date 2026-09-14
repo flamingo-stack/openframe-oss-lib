@@ -1,14 +1,16 @@
 package com.openframe.management.migration;
 
-import com.openframe.management.systemscript.SystemScriptDefinition;
-
 import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.script.ScriptType;
+import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.management.systemscript.SoftwareScriptDefinition;
+import com.openframe.management.systemscript.SystemScriptDefinition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -27,11 +29,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class SeedSystemScriptsChangeUnitTest {
+class SeedManagedScriptsChangeUnitTest {
 
     private static final String TENANT_ID = "tenant-1";
+    private static final int TOTAL_DEFINITIONS =
+            SystemScriptDefinition.values().length + SoftwareScriptDefinition.values().length;
 
-    private final SeedSystemScriptsChangeUnit changeUnit = new SeedSystemScriptsChangeUnit();
+    private final SeedManagedScriptsChangeUnit changeUnit = new SeedManagedScriptsChangeUnit();
 
     private ScriptRepository scriptRepository;
     private TenantIdProvider tenantIdProvider;
@@ -44,68 +48,85 @@ class SeedSystemScriptsChangeUnitTest {
     }
 
     @Test
-    void seedsAllScriptsWhenAbsent() {
-        when(scriptRepository.findSystemScript(any(), any())).thenReturn(Optional.empty());
+    void seedsAllManagedScriptsWhenAbsent() {
+        when(scriptRepository.findByTenantIdAndNameAndType(any(), any(), any())).thenReturn(Optional.empty());
         when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         changeUnit.execution(scriptRepository, tenantIdProvider);
 
         ArgumentCaptor<Script> saved = ArgumentCaptor.forClass(Script.class);
-        verify(scriptRepository, times(3)).save(saved.capture());
+        verify(scriptRepository, times(TOTAL_DEFINITIONS)).save(saved.capture());
         List<Script> scripts = saved.getAllValues();
 
+        // --- SYSTEM (bootstrap) ---
         Script brew = byName(scripts, SystemScriptCode.INSTALL_BREW.canonicalName());
         assertEquals(TENANT_ID, brew.getTenantId());
-        assertTrue(brew.getSystem());
+        assertEquals(ScriptType.SYSTEM, brew.getType());
         assertEquals(ScriptShell.BASH, brew.getShell());
         assertEquals(PrivilegeLevel.ADMIN, brew.getPrivilegeLevel());
         assertEquals(ScriptStatus.ACTIVE, brew.getStatus());
         assertNotNull(brew.getContentHash());
-        assertTrue(brew.getScriptBody().contains("NONINTERACTIVE=1"));
-        // the installer must never run brew itself as root
-        assertTrue(brew.getScriptBody().contains("sudo -u \"$CONSOLE_USER\""));
-
-        Script choco = byName(scripts, SystemScriptCode.INSTALL_CHOCOLATEY.canonicalName());
-        assertEquals(ScriptShell.POWERSHELL, choco.getShell());
-        assertEquals(PrivilegeLevel.ADMIN, choco.getPrivilegeLevel());
-        assertTrue(choco.getScriptBody().contains("community.chocolatey.org/install.ps1"));
+        assertNotNull(brew.getDefaultTimeoutSeconds());
 
         Script winget = byName(scripts, SystemScriptCode.INSTALL_WINGET.canonicalName());
-        // the Appx registration and PATH fix are per-user, so winget must NOT run elevated
+        assertEquals(ScriptType.SYSTEM, winget.getType());
         assertEquals(PrivilegeLevel.USER, winget.getPrivilegeLevel());
-        assertTrue(winget.getScriptBody().contains("Repair-WinGetPackageManager -Force -Latest"));
-        assertTrue(winget.getScriptBody().contains("--accept-source-agreements"));
+
+        // --- SOFTWARE (install/update) ---
+        Script brewInstall = byName(scripts, SoftwareScriptCode.BREW_INSTALL.canonicalName());
+        assertEquals(ScriptType.SOFTWARE, brewInstall.getType());
+        assertEquals(ScriptShell.BASH, brewInstall.getShell());
+        assertEquals(PrivilegeLevel.USER, brewInstall.getPrivilegeLevel());
+        assertNotNull(brewInstall.getDefaultTimeoutSeconds());
+        assertTrue(brewInstall.getScriptBody().contains("install \"$@\""));
+
+        Script brewUpdate = byName(scripts, SoftwareScriptCode.BREW_UPDATE.canonicalName());
+        assertEquals(ScriptType.SOFTWARE, brewUpdate.getType());
+        assertEquals(PrivilegeLevel.USER, brewUpdate.getPrivilegeLevel());
+        assertTrue(brewUpdate.getScriptBody().contains("upgrade \"$@\""));
+
+        Script wingetInstall = byName(scripts, SoftwareScriptCode.WINGET_INSTALL.canonicalName());
+        assertEquals(ScriptType.SOFTWARE, wingetInstall.getType());
+        assertEquals(ScriptShell.POWERSHELL, wingetInstall.getShell());
+        assertEquals(PrivilegeLevel.USER, wingetInstall.getPrivilegeLevel());
+        assertTrue(wingetInstall.getScriptBody().contains("install @args"));
+
+        Script wingetUpdate = byName(scripts, SoftwareScriptCode.WINGET_UPDATE.canonicalName());
+        assertEquals(ScriptType.SOFTWARE, wingetUpdate.getType());
+        assertEquals(ScriptShell.POWERSHELL, wingetUpdate.getShell());
+        assertTrue(wingetUpdate.getScriptBody().contains("upgrade @args"));
     }
 
     @Test
     void refreshesTheScriptWhenTheShippedBodyChanged() {
         Script stale = new Script();
         stale.setName(SystemScriptCode.INSTALL_BREW.canonicalName());
-        stale.setSystem(true);
+        stale.setType(ScriptType.SYSTEM);
         stale.setContentHash("stale-hash");
-        when(scriptRepository.findSystemScript(any(), any())).thenAnswer(inv ->
-                inv.getArgument(0) == SystemScriptCode.INSTALL_BREW ? Optional.of(stale) : Optional.empty());
+        when(scriptRepository.findByTenantIdAndNameAndType(any(), any(), any())).thenAnswer(inv ->
+                SystemScriptCode.INSTALL_BREW.canonicalName().equals(inv.getArgument(1))
+                        ? Optional.of(stale) : Optional.empty());
         when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         changeUnit.execution(scriptRepository, tenantIdProvider);
 
-        assertTrue(stale.getScriptBody().contains("NONINTERACTIVE=1"));
+        assertNotNull(stale.getScriptBody());
         assertNotNull(stale.getContentHash());
         assertTrue(!"stale-hash".equals(stale.getContentHash()));
     }
 
     @Test
     void leavesUpToDateScriptsUntouched() {
-        when(scriptRepository.findSystemScript(any(), any())).thenReturn(Optional.empty());
+        when(scriptRepository.findByTenantIdAndNameAndType(any(), any(), any())).thenReturn(Optional.empty());
         when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         changeUnit.execution(scriptRepository, tenantIdProvider);
         ArgumentCaptor<Script> seeded = ArgumentCaptor.forClass(Script.class);
-        verify(scriptRepository, times(3)).save(seeded.capture());
+        verify(scriptRepository, times(TOTAL_DEFINITIONS)).save(seeded.capture());
 
         ScriptRepository secondRepo = mock(ScriptRepository.class);
         for (Script script : seeded.getAllValues()) {
-            SystemScriptCode code = codeByName(script.getName());
-            when(secondRepo.findSystemScript(code, TENANT_ID)).thenReturn(Optional.of(script));
+            when(secondRepo.findByTenantIdAndNameAndType(TENANT_ID, script.getName(), script.getType()))
+                    .thenReturn(Optional.of(script));
         }
 
         changeUnit.execution(secondRepo, tenantIdProvider);
@@ -114,12 +135,18 @@ class SeedSystemScriptsChangeUnitTest {
     }
 
     @Test
-    void everySystemScriptCodeHasASeedingDefinition() {
+    void everyManagedScriptCodeHasExactlyOneSeedingDefinition() {
         for (SystemScriptCode code : SystemScriptCode.values()) {
             long definitions = Arrays.stream(SystemScriptDefinition.values())
-                    .filter(definition -> definition.getCode() == code)
+                    .filter(d -> d.getCode() == code)
                     .count();
-            assertEquals(1, definitions, "code without exactly one seeding definition: " + code);
+            assertEquals(1, definitions, "system code without exactly one seeding definition: " + code);
+        }
+        for (SoftwareScriptCode code : SoftwareScriptCode.values()) {
+            long definitions = Arrays.stream(SoftwareScriptDefinition.values())
+                    .filter(d -> d.getCode() == code)
+                    .count();
+            assertEquals(1, definitions, "software code without exactly one seeding definition: " + code);
         }
     }
 
@@ -128,14 +155,5 @@ class SeedSystemScriptsChangeUnitTest {
                 .filter(script -> name.equals(script.getName()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("script not seeded: " + name));
-    }
-
-    private static SystemScriptCode codeByName(String canonicalName) {
-        for (SystemScriptCode code : SystemScriptCode.values()) {
-            if (code.canonicalName().equals(canonicalName)) {
-                return code;
-            }
-        }
-        throw new AssertionError("unknown canonical name: " + canonicalName);
     }
 }

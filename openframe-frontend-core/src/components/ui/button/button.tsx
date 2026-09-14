@@ -32,6 +32,7 @@ const buttonVariants = cva(
         warning: buttonSurfaceClasses.warning,
         glyph: buttonSurfaceClasses.glyph,
         overlay: buttonSurfaceClasses.overlay,
+        link: buttonSurfaceClasses.link,
       },
       size: {
         default: 'h-11 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 md:h-12',

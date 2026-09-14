@@ -13,8 +13,11 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.script.ScriptType;
+import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -28,25 +31,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Application-level operations on RMM scripts.
- *
- * <p>Tenant scoping is resolved internally via {@link TenantIdProvider} — the
- * pod's physical tenant id (DB-per-tenant architecture). Callers do not pass
- * tenantId; we deliberately do NOT trust JWT claims for tenant scoping because
- * a super-admin token can carry a foreign tenant id but writes still have to
- * land in this pod's tenant data. Mirrors the {@code LogService} /
- * {@code DeviceFilterService} pattern.
- *
- * <p>All reads and writes go through {@link ScriptRepository} (every call is
- * tenant-scoped via the resolved id). Document &harr; DTO translation is
- * delegated to {@link ScriptMapper}. This service enforces name uniqueness
- * within the tenant on create / update, and treats
- * {@link ScriptStatus#DELETED} as "doesn't exist" for {@link #get(String)} and
- * {@link #update(UpdateScriptInput)} — soft-deleted scripts are
- * invisible from the standard API surface but the documents remain so
- * historic execution records keep resolving.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -61,12 +45,6 @@ public class ScriptService {
     private final ScriptTagService scriptTagService;
     private final ScriptTimeoutValidator timeoutValidator;
 
-    /**
-     * Create a new script in the current pod's tenant.
-     *
-     * @throws ConflictException if a script with the same name already exists
-     *         in the tenant.
-     */
     public ScriptResponse create(CreateScriptInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
@@ -85,36 +63,17 @@ public class ScriptService {
         return scriptMapper.toResponse(saved);
     }
 
-    /**
-     * Get a single script by id within the current pod's tenant.
-     *
-     * @throws NotFoundException if the script does not exist, belongs to a
-     *         different tenant, or has been soft-deleted.
-     */
     public ScriptResponse get(String id) {
         Script entity = loadVisibleOrThrow(tenantIdProvider.getTenantId(), id);
         return scriptMapper.toResponse(entity);
     }
 
-    /**
-     * Optional, non-throwing lookup — empty for a missing, soft-deleted, or
-     * other-tenant script. Mirrors the {@code Optional}-returning finders the
-     * other entities expose for Relay {@code node(id)} refetch.
-     */
     public Optional<ScriptResponse> findById(String id) {
         return scriptRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
                 .filter(script -> script.getStatus() != ScriptStatus.DELETED)
                 .map(scriptMapper::toResponse);
     }
 
-    /**
-     * Batch lookup of scripts by id in the current pod's tenant — backs the
-     * {@code scriptDataLoader} that resolves {@code Execution.scriptName} at read
-     * time. Unlike {@link #findById(String)} this deliberately INCLUDES
-     * soft-deleted scripts: a History row must keep resolving its script's name
-     * even after the script is deleted. Unknown ids are simply absent from the
-     * result (no placeholder), so callers map by {@link ScriptResponse#getId()}.
-     */
     public List<ScriptResponse> getScriptsByIds(Collection<String> ids) {
         if (ids == null || ids.isEmpty()) {
             return List.of();
@@ -124,17 +83,22 @@ public class ScriptService {
                 .toList();
     }
 
-    /**
-     * Cursor-paginated list of scripts in the current pod's tenant, with
-     * optional filter / search / sort.
-     *
-     * <p>Default order is newest-first (by {@code _id} desc); pass a
-     * {@link SortInput} to override. Sort-field validation is delegated to the
-     * repository (any field not in the allowlist falls back to the default
-     * with a warn-level log). Uses the standard "fetch limit + 1" trick to
-     * detect {@code hasNextPage} / {@code hasPreviousPage} without an extra
-     * count query.
-     */
+    public ScriptResponse getSystemScript(SystemScriptCode code) {
+        String tenantId = tenantIdProvider.getTenantId();
+        return scriptRepository.findByTenantIdAndNameAndType(tenantId, code.canonicalName(), ScriptType.SYSTEM)
+                .map(scriptMapper::toResponse)
+                .orElseThrow(() -> new NotFoundException(
+                        "System script not provisioned for this tenant: " + code.canonicalName()));
+    }
+
+    public ScriptResponse getSoftwareScript(SoftwareScriptCode code) {
+        String tenantId = tenantIdProvider.getTenantId();
+        return scriptRepository.findByTenantIdAndNameAndType(tenantId, code.canonicalName(), ScriptType.SOFTWARE)
+                .map(scriptMapper::toResponse)
+                .orElseThrow(() -> new NotFoundException(
+                        "Software script not provisioned for this tenant: " + code.canonicalName()));
+    }
+
     public CountedGenericQueryResult<ScriptResponse> list(ScriptFilterInput filter,
                                                           String search,
                                                           SortInput sort,
@@ -193,7 +157,6 @@ public class ScriptService {
         return Sort.Direction.DESC;
     }
 
-    /** Translate the API-layer filter into the data-layer's repository filter. */
     private static ScriptQueryFilter toQueryFilter(ScriptFilterInput input) {
         if (input == null) {
             return null;
@@ -208,14 +171,6 @@ public class ScriptService {
                 .build();
     }
 
-    /**
-     * Full replacement of an existing script (PUT semantics).
-     *
-     * @throws NotFoundException if the script does not exist or has been
-     *         soft-deleted in the tenant.
-     * @throws ConflictException if the supplied name collides with another
-     *         script in the same tenant.
-     */
     public ScriptResponse update(UpdateScriptInput input) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
@@ -239,16 +194,6 @@ public class ScriptService {
         return scriptMapper.toResponse(saved);
     }
 
-    /**
-     * Soft-delete a script: transition status to {@link ScriptStatus#DELETED}
-     * and stamp {@code statusChangedAt}. The document itself remains so that
-     * historic execution records continue to resolve.
-     *
-     * <p>Idempotent on already-deleted scripts (no-op + debug log).
-     *
-     * @return the id of the deleted script (same id on the idempotent no-op path).
-     * @throws NotFoundException if the script id does not exist in the tenant.
-     */
     public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadOrThrow(tenantId, id);
@@ -266,34 +211,14 @@ public class ScriptService {
         return existing.getId();
     }
 
-    /**
-     * Archive a script: transition status to {@link ScriptStatus#ARCHIVED} and stamp
-     * {@code statusChangedAt}. Idempotent on already-archived scripts (no-op + debug log).
-     *
-     * @return the updated script.
-     * @throws NotFoundException if the script id does not exist or is soft-deleted in the tenant.
-     */
     public ScriptResponse archive(String id) {
         return transitionTo(id, ScriptStatus.ARCHIVED);
     }
 
-    /**
-     * Restore an archived script back to {@link ScriptStatus#ACTIVE} and stamp
-     * {@code statusChangedAt}. Idempotent on scripts already in the target state (no-op + debug log).
-     *
-     * @return the updated script.
-     * @throws NotFoundException if the script id does not exist or is soft-deleted in the tenant.
-     */
     public ScriptResponse unarchive(String id) {
         return transitionTo(id, ScriptStatus.ACTIVE);
     }
 
-    /**
-     * Move a visible (non-deleted) script to {@code target}, stamping {@code statusChangedAt}.
-     * Idempotent: a script already in {@code target} is returned unchanged (no save). Backs
-     * {@link #archive(String)} / {@link #unarchive(String)} — soft-delete keeps its own path
-     * ({@code DELETED} is set via {@link #delete(String)}, never reached here as a target).
-     */
     private ScriptResponse transitionTo(String id, ScriptStatus target) {
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadVisibleOrThrow(tenantId, id);
@@ -311,13 +236,10 @@ public class ScriptService {
         return scriptMapper.toResponse(saved);
     }
 
-    /** Load by id regardless of status — used by {@link #delete(String)}. */
-    // system scripts back platform features (package-manager bootstrap) — letting a technician
-    // edit or delete one silently breaks the feature for the whole tenant
     private static void requireUserScript(Script script) {
-        if (Boolean.TRUE.equals(script.getSystem())) {
+        if (script.getType() != ScriptType.USER) {
             throw new IllegalArgumentException(
-                    "System scripts are managed by OpenFrame and cannot be modified or deleted");
+                    "Managed scripts (system / software) are provisioned by OpenFrame and cannot be modified or deleted");
         }
     }
 
@@ -326,12 +248,6 @@ public class ScriptService {
                 .orElseThrow(() -> new NotFoundException("Script not found: " + id));
     }
 
-    /**
-     * Load by id, treating {@link ScriptStatus#DELETED} documents as not
-     * found. Used by {@link #get(String)} and
-     * {@link #update(UpdateScriptInput)} so soft-deleted scripts are
-     * invisible from the standard API surface.
-     */
     private Script loadVisibleOrThrow(String tenantId, String id) {
         Script script = loadOrThrow(tenantId, id);
         if (script.getStatus() == ScriptStatus.DELETED) {
