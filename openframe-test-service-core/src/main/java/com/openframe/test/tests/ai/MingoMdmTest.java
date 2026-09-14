@@ -1,8 +1,6 @@
 package com.openframe.test.tests.ai;
 
-import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.MonitoringApi;
-import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.policy.CreatePolicyRequest;
 import com.openframe.test.data.dto.policy.Policy;
@@ -19,17 +17,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.openframe.test.data.generator.DeviceGenerator.getFleetId;
-import static com.openframe.test.data.generator.DeviceGenerator.osAndStatusDevicesFilter;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * AI assistant Fleet MDM E2E (no machine command required): the assistant creates/updates/assigns/deletes
+ * AI assistant Fleet MDM E2E: the assistant creates/updates/assigns/deletes
  * Fleet policies via its bulk MDM tools (each a mutation requiring an ADMIN approval, auto-approved by the
  * runner), verified through the Fleet MDM server's own policy API ({@link MonitoringApi}). Assertions are on
  * the persisted policy, never on the assistant's prose.
  *
- * <p>Immune to the searchMachines online-flap — no machine command is involved (POL-03 references a device
- * only to resolve its Fleet host id).
+ * <p>Every prompt here names the online box. The assistant tests a policy's or query's SQL on a real
+ * machine before saving it to the library, and will not choose one itself -- asked without a machine it
+ * replies "which machine should I use to test this?" and stops, leaving nothing created. That is what
+ * failed the create and update cases on stage on 2026-09-14 while the assign case, which already named
+ * the box, passed.
  */
 @Tag("ai")
 @Tag("mingo")
@@ -47,8 +47,10 @@ public class MingoMdmTest extends MingoBaseTest {
         RunId runId = RunId.next();
         String name = "E2E-" + runId;
 
+        Machine target = onlineWindowsDevice();
         RunResult result = prompt("Create a Fleet MDM policy named exactly \"" + name + "\" that checks whether"
-                + " the operating system major version is at least 10, using an osquery SQL query.");
+                + " the operating system major version is at least 10, using an osquery SQL query."
+                + " Test the query on the online machine " + target.getHostname() + " before saving.");
 
         Policy policy = MonitoringGenerator.findPolicyByName(MonitoringApi.getPolicies(), name).orElse(null);
         assertThat(policy).as("A Fleet policy named %s should exist.\n%s", name, result).isNotNull();
@@ -65,8 +67,11 @@ public class MingoMdmTest extends MingoBaseTest {
         Policy seed = seedPolicy(name);
         String desc = "UPDATED-" + runId;
 
+        Machine target = onlineWindowsDevice();
         RunResult result = prompt("Update the Fleet MDM policy named \"" + name
-                + "\" so that its description is exactly " + desc + ".");
+                + "\" so that its description is exactly " + desc + "."
+                + " Use the online machine " + target.getHostname() + " for any verification you need"
+                + " before saving.");
 
         Policy after = MonitoringApi.getPolicy(seed.getId());
         assertThat(after).as("Original policy id should still exist.\n%s", result).isNotNull();
@@ -128,8 +133,10 @@ public class MingoMdmTest extends MingoBaseTest {
         RunId runId = RunId.next();
         String name = "E2E-" + runId;
 
+        Machine target = onlineWindowsDevice();
         RunResult result = prompt("Create a Fleet MDM scheduled query named exactly \"" + name
-                + "\" that runs the osquery SQL 'SELECT hostname FROM system_info' every hour (3600 seconds).");
+                + "\" that runs the osquery SQL 'SELECT hostname FROM system_info' every hour (3600 seconds)."
+                + " Test the query on the online machine " + target.getHostname() + " before saving.");
 
         ScheduledQuery query = MonitoringApi.getScheduledQueries().stream()
                 .filter(q -> name.equals(q.getName()))
@@ -180,12 +187,6 @@ public class MingoMdmTest extends MingoBaseTest {
         ScheduledQuery query = MonitoringApi.createScheduledQuery(name, "SELECT hostname FROM system_info", 3600);
         queryIds.add(query.getId());
         return query;
-    }
-
-    private Machine onlineWindowsDevice() {
-        List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
-        assertThat(devices).as("Expected at least one online Windows device with a Fleet connection").isNotEmpty();
-        return DeviceApi.getDevice(devices.getFirst().getMachineId());
     }
 
     @AfterEach
