@@ -4,6 +4,7 @@ import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
 import { Button } from '../ui/button';
+import { ScrollShadow } from '../ui/scroll-fade';
 
 export interface CommandBoxAction {
   /** Button label */
@@ -35,6 +36,14 @@ export interface CommandBoxProps {
   commandClassName?: string;
   /** Maximum lines to show (uses line-clamp, 0 for unlimited) */
   maxLines?: number;
+  /**
+   * Fixed height for the command area, in lines of `text-code`; longer text
+   * scrolls inside it with the ODS scroll fade. Unlike `maxLines`, the box is
+   * this tall whatever the content: every box in a list lines up, and text
+   * that changes live (a template being filled in) never moves the layout.
+   * Takes precedence over `maxLines`. Nothing is hidden from `onCopy`.
+   */
+  visibleLines?: number;
   /** When set, shows a copy icon button in the top-right corner of the box */
   onCopy?: () => void;
   /** Accessible label for the corner copy button */
@@ -92,23 +101,39 @@ export function CommandBox({
   className,
   commandClassName,
   maxLines = 0,
+  visibleLines,
   onCopy,
   copyAriaLabel = 'Copy command',
 }: CommandBoxProps) {
+  const fixedHeight = visibleLines !== undefined && visibleLines > 0;
   // Get static line-clamp class or undefined for unlimited
-  const lineClampClass = maxLines > 0 ? lineClampClasses[maxLines] : undefined;
+  const lineClampClass = !fixedHeight && maxLines > 0 ? lineClampClasses[maxLines] : undefined;
 
-  const commandText = (
+  const text = (
     <div
       className={cn(
         'break-all text-ods-text-primary text-code',
-        onCopy && 'min-w-0 flex-1',
+        !fixedHeight && onCopy && 'min-w-0 flex-1',
         lineClampClass,
         commandClassName,
       )}
     >
       {command}
     </div>
+  );
+
+  // The height is N rows of the `text-code` line height token, so it follows
+  // the responsive type scale instead of a pixel guess.
+  const commandText = fixedHeight ? (
+    <ScrollShadow
+      className={cn(onCopy && 'min-w-0 flex-1')}
+      scrollClassName="h-full overscroll-contain"
+      style={{ height: `calc(${visibleLines} * var(--font-line-space-h6-caption))` }}
+    >
+      {text}
+    </ScrollShadow>
+  ) : (
+    text
   );
 
   return (
