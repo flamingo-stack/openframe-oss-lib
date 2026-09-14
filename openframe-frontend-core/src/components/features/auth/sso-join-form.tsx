@@ -31,6 +31,8 @@ export interface SsoJoinFormProps {
   backLabel?: string;
   termsUrl?: string;
   privacyPolicyUrl?: string;
+  /** Closing words of the consent label, leading space included. Defaults to " by signing up." */
+  termsSuffix?: string;
   /** Held while the submit navigates away: everything locks and the submit spins. */
   loading?: boolean;
   disabled?: boolean;
@@ -62,6 +64,7 @@ export function SsoJoinForm({
   backLabel = 'Back to Login',
   termsUrl,
   privacyPolicyUrl,
+  termsSuffix,
   loading = false,
   disabled = false,
   className,
@@ -107,7 +110,7 @@ export function SsoJoinForm({
 
       <CheckboxBlock
         id="sso-join-terms"
-        label={<TermsAgreementLabel termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
+        label={<TermsAgreementLabel termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} suffix={termsSuffix} />}
         checked={agreedToTerms}
         disabled={fieldsDisabled}
         onCheckedChange={onAgreedToTermsChange}

@@ -114,7 +114,7 @@ function DirectoryRow({
         {/* Hosts stay visible on mobile too — the facepile is the row's "who
             you're booking with" signal; only the chip and next-available meta
             collapse on narrow widths. */}
-        <AvatarStack people={link.hosts} max={3} size="md" className="flex shrink-0" />
+        <AvatarStack people={link.hosts} max={3} size="md" label="Hosts" className="flex shrink-0" />
 
         <div className="hidden w-44 shrink-0 flex-col items-end justify-center md:flex">
           <p className="text-ods-text-secondary text-h6">Next available</p>
