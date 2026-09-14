@@ -13,7 +13,7 @@ import {
 export interface AiPromptCardData extends EmployeeEntryCardData {
   published_at?: string | null;
   /** The department the prompt is for, surfaced as THE department badge (the library's filter axis). */
-  department?: { name?: string | null; slug?: string | null } | null;
+  department?: { name?: string | null; color?: string | null } | null;
   /** How many steps the prompt has. A chain (more than one) is badged. */
   step_count?: number | null;
 }
@@ -47,7 +47,7 @@ export function AiPromptCard({ entry, placeholderUrl, actions, anchorProps, clas
       extraBadges={
         <>
           {departmentName ? (
-            <DepartmentBadge department={{ name: departmentName, slug: entry.department?.slug ?? null }} />
+            <DepartmentBadge department={{ name: departmentName, color: entry.department?.color ?? null }} />
           ) : null}
           {steps > 1 ? <EmployeeEntryBadge>{`${steps} steps`}</EmployeeEntryBadge> : null}
         </>

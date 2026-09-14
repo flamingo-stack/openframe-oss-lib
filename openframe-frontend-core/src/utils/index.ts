@@ -23,6 +23,7 @@ export {
   // Custom-color helpers so consumers (e.g. the chat client's accent theming)
   // reuse the design-system math instead of re-implementing darken/hex utils.
   getReadableTextColor,
+  randomIdentityColor,
   hexToRgb,
   rgbToHex,
   deriveHoverColor,

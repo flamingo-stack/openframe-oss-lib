@@ -347,3 +347,14 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
     b: Math.round(hue2rgb(hk - 1 / 3) * 255),
   };
 }
+
+/**
+ * A random, saturated, mid-lightness colour (`#rrggbb`) for data that needs its
+ * own identity colour, such as a department's badge. Assigned ONCE when the row
+ * is created and stored on it; only the hue is random, so every colour reads on
+ * both themes and `getReadableTextColor` picks its label colour.
+ */
+export function randomIdentityColor(random: () => number = Math.random): string {
+  const { r, g, b } = hslToRgb(Math.floor(random() * 360), 65, 55);
+  return rgbToHex(r, g, b);
+}
