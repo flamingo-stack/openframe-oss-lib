@@ -64,6 +64,11 @@ export function FadePreview({
   children,
 }: FadePreviewProps) {
   const [expanded, setExpanded] = useState(false);
+  // Overflow is a MEASUREMENT (text wraps to the live width), so it is unknown
+  // until the first layout pass. Nothing about the block's HEIGHT depends on it:
+  // the collapsed height is in the markup and the toggle row is always
+  // reserved. Only the fade and the toggle's visibility wait for the measure,
+  // which on the client happens before paint.
   const [overflows, setOverflows] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -134,8 +139,11 @@ export function FadePreview({
         className="overflow-hidden transition-[max-height,height] duration-500"
         style={{
           transitionTimingFunction: 'cubic-bezier(0.33, 1, 0.68, 1)',
-          // `maxHeight` / `height` are intentionally absent — the layout effect
-          // above owns them, because the expanded value is a live DOM measurement.
+          // Fixed mode renders the collapsed height INTO the markup, so the
+          // server-rendered block is already clamped and hydration never shrinks
+          // it. The expanded value is a live DOM measurement, so the layout
+          // effect above owns it (and `maxHeight` in the counted mode).
+          ...(fixedHeight && !expanded ? { height: cssLength(collapsedHeight) } : {}),
           ...(!expanded && needsFade
             ? {
                 maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',

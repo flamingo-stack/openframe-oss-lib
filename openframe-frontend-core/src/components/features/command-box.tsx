@@ -128,6 +128,10 @@ export function CommandBox({
   // the responsive type scale instead of a pixel guess.
   const commandText = fixedHeight ? (
     <div className={cn(onCopy && 'min-w-0 flex-1')}>
+      {/* No `resetKey`: the text of a live template changes on every keystroke,
+          and collapsing on each one would fold an expanded box under the
+          typist, the exact jump this mode exists to prevent. Nothing goes stale
+          without it: the expanded height is re-measured on every commit. */}
       <FadePreview
         fixedHeight
         collapsedHeight={`calc(${visibleLines} * var(--font-line-space-h6-caption))`}
