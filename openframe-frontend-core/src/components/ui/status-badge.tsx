@@ -26,6 +26,11 @@ const statusBadgeVariants = cva('inline-flex items-center justify-center rounded
       yellow: 'border border-ods-border bg-ods-accent text-ods-text-on-accent',
       green: 'bg-ods-success text-ods-text-on-accent',
       purple: 'bg-ods-flamingo-pink text-ods-text-on-accent',
+      // Solid and soft ODS palette fills (`BADGE_PALETTE`): tokens only, no hex.
+      cyanSoft: 'bg-ods-flamingo-cyan-secondary text-ods-flamingo-cyan',
+      pinkSoft: 'bg-ods-flamingo-pink-secondary text-ods-flamingo-pink',
+      openYellow: 'bg-ods-open-yellow text-ods-text-on-accent',
+      red: 'bg-ods-error text-ods-text-on-accent',
       success: 'bg-ods-success-secondary text-ods-success',
       error: 'bg-ods-error-secondary text-ods-error',
       warning: 'bg-ods-warning-secondary text-ods-warning',

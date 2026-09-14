@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import { cn } from '../../utils/cn';
-import { COLOR_PRESETS, type ColorPreset } from '../../utils/color-presets';
 import { HEX_PATTERN, hexToRgb, hslToRgb, rgbToHex, rgbToHsl } from '../../utils/ods-color-utils';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { Popover, PopoverContent, PopoverTrigger } from '../popover';
@@ -12,10 +11,27 @@ import { ColorSwatch } from './color-swatch';
 import { Input } from './input';
 import { InputTrigger } from './input-trigger';
 
-export type { ColorPreset } from '../../utils/color-presets';
-export { COLOR_PRESETS } from '../../utils/color-presets';
-/** The palette ticket statuses pick from: the shared `COLOR_PRESETS`. */
-export const TICKET_STATUS_COLOR_PRESETS = COLOR_PRESETS;
+export interface ColorPreset {
+  key: string;
+  label: string;
+  color: string;
+}
+
+// Ticket-status palette.
+export const TICKET_STATUS_COLOR_PRESETS: readonly ColorPreset[] = [
+  { key: 'green', label: 'Green', color: '#5ea62e' },
+  { key: 'lime', label: 'Lime', color: '#8bc34a' },
+  { key: 'teal', label: 'Teal', color: '#4db6ac' },
+  { key: 'sky', label: 'Sky', color: '#4fc3f7' },
+  { key: 'periwinkle', label: 'Periwinkle', color: '#7e9cd8' },
+  { key: 'lavender', label: 'Lavender', color: '#b39ddb' },
+  { key: 'yellow', label: 'Yellow', color: '#e1b32f' },
+  { key: 'sand', label: 'Sand', color: '#f0c674' },
+  { key: 'peach', label: 'Peach', color: '#f39c7a' },
+  { key: 'red', label: 'Red', color: '#f36666' },
+  { key: 'pink', label: 'Pink', color: '#e988a8' },
+  { key: 'neutral', label: 'Neutral', color: '#b0b0b0' },
+];
 
 export const CUSTOM_PRESET_KEY = 'custom';
 export const DEFAULT_CUSTOM_STATUS_COLOR = '#888888';
