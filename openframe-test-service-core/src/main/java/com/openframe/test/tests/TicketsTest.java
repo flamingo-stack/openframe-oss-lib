@@ -341,6 +341,12 @@ public class TicketsTest extends BaseTest {
     private static final RunId RUN_ID = RunId.next();
     private static final List<Ticket> createdTickets = new ArrayList<>();
     private static final List<String> createdStatusIds = new ArrayList<>();
+    /**
+     * Staged files, recorded the moment they exist. A staged file is attached to nothing, so an
+     * assertion that throws between staging and discarding would leave it in the tenant's storage
+     * with no owner to clean it up. Teardown discards whatever is still here.
+     */
+    private static final List<String> stagedAttachmentIds = new ArrayList<>();
 
     /** A ticket of this run's own, on the pipeline-scoped device and its organization, with one tag. */
     private static Ticket newOwnTicket(String assigneeId) {
@@ -422,6 +428,7 @@ public class TicketsTest extends BaseTest {
         Path file = attachmentFile();
         CreateTempAttachmentInput input = CreateTempAttachmentInput.forFile(file, "text/plain");
         TempAttachment staged = TicketApi.createTempAttachmentUploadUrl(input);
+        stagedAttachmentIds.add(staged.getId());
         assertThat(staged.getId()).as("A staged file has an id").isNotBlank();
         assertThat(staged.getUploadUrl()).as("A staged file has a presigned upload URL").isNotBlank();
         assertThat(staged.getFileName()).as("The file name is echoed").isEqualTo(input.getFileName());
@@ -447,6 +454,7 @@ public class TicketsTest extends BaseTest {
                 .as("The attachment left the ticket").doesNotContain(attachment.getId());
 
         TempAttachment discarded = TicketApi.createTempAttachmentUploadUrl(CreateTempAttachmentInput.forFile(file, "text/plain"));
+        stagedAttachmentIds.add(discarded.getId());
         MutationDeletePayload deletedTemp = TicketApi.deleteTempAttachment(discarded.getId());
         assertThat(deletedTemp.getUserErrors()).as("Discarding a staged file reports no userErrors").isNullOrEmpty();
         assertThat(deletedTemp.getDeletedId()).as("The discarded staged file id is echoed").isEqualTo(discarded.getId());
@@ -540,6 +548,13 @@ public class TicketsTest extends BaseTest {
 
     @AfterAll
     public static void cleanupOwnTicketsAndStatuses() {
+        for (String id : stagedAttachmentIds) {
+            try {
+                TicketApi.deleteTempAttachment(id);
+            } catch (RuntimeException ignored) {
+                // best effort: already discarded by the case, or gone with its ticket
+            }
+        }
         for (Ticket ticket : createdTickets) {
             try {
                 Ticket current = TicketApi.getTicket(ticket.getId());
