@@ -14,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -156,6 +157,7 @@ class NotificationNatsPublisherTest {
         assertThat(published.getSeverity()).isEqualTo(stored.getSeverity());
         assertThat(published.getType()).isEqualTo(stored.getType());
         assertThat(published.getAttributes()).isSameAs(stored.getAttributes());
+        assertThat(published.getContext()).containsExactly(entry("type", "TICKET_ESCALATED_BY_USER"));
         assertThat(published.getCategory()).isEqualTo(NotificationCategory.TICKETS);
         assertThat(published.getEventType()).isEqualTo(NotificationEventType.CREATED);
     }
