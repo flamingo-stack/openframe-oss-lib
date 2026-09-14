@@ -18,6 +18,7 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -123,6 +124,26 @@ class OrganizationQueryServiceTest {
         OrganizationQueryFilter forwarded = captor.getValue();
         assertThat(forwarded.getLastActivityFrom()).isEqualTo(from);
         assertThat(forwarded.getLastActivityTo()).isEqualTo(to);
+    }
+
+    @Test
+    @DisplayName("excludeOrganizationIds on the FilterOptions must reach the repository — the directory connection picker relies on it to hide customers that already have a connection")
+    void excludeOrganizationIdsIsForwardedToRepository() {
+        when(repository.countOrganizations(any())).thenReturn(0L);
+        when(repository.findOrganizationsWithCursor(any(), any(), anyInt(), any(), any()))
+                .thenReturn(List.of());
+
+        Set<String> excluded = Set.of("org-a", "org-b");
+        OrganizationFilterOptions options = OrganizationFilterOptions.builder()
+                .excludeOrganizationIds(excluded)
+                .build();
+
+        service.queryOrganizations(options, page(20), null, lastActivity(SortDirection.DESC));
+
+        ArgumentCaptor<OrganizationQueryFilter> captor = ArgumentCaptor.forClass(OrganizationQueryFilter.class);
+        verify(repository).buildOrganizationQuery(captor.capture(), any());
+        OrganizationQueryFilter forwarded = captor.getValue();
+        assertThat(forwarded.getExcludeOrganizationIds()).containsExactlyInAnyOrderElementsOf(excluded);
     }
 
     @Test
