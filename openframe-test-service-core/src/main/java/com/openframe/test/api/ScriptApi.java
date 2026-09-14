@@ -1,5 +1,7 @@
 package com.openframe.test.api;
 
+import com.openframe.test.data.dto.execution.ScriptExecutionConnection;
+import com.openframe.test.data.dto.execution.ScriptExecutionFilters;
 import com.openframe.test.data.dto.script.*;
 
 import java.util.List;
@@ -10,6 +12,8 @@ import static com.openframe.test.api.graphql.ScriptQueries.CREATE_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.DELETE_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.GET_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.SCRIPTS_TABLE_RELAY_QUERY;
+import static com.openframe.test.api.graphql.ScriptQueries.SCRIPT_EXECUTIONS;
+import static com.openframe.test.api.graphql.ScriptQueries.SCRIPT_EXECUTION_FILTERS;
 import static com.openframe.test.api.graphql.ScriptQueries.UNARCHIVE_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.UPDATE_SCRIPT;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
@@ -97,5 +101,22 @@ public class ScriptApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.unarchiveScript", Script.class);
+    }
+
+    /** Execution history of one script, newest first. */
+    public static ScriptExecutionConnection getExecutions(String scriptId, int first) {
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", SCRIPT_EXECUTIONS, "variables", Map.of("scriptId", scriptId, "first", first)))
+                .post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.scriptExecutions", ScriptExecutionConnection.class);
+    }
+
+    public static ScriptExecutionFilters getExecutionFilters(String scriptId) {
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", SCRIPT_EXECUTION_FILTERS, "variables", Map.of("scriptId", scriptId)))
+                .post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.scriptExecutionFilters", ScriptExecutionFilters.class);
     }
 }

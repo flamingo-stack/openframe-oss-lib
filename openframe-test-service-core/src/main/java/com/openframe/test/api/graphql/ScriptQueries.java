@@ -135,4 +135,27 @@ public class ScriptQueries {
                 }
             }
             """;
+
+    private static final String EXECUTION_NODE = "id executionId scriptId scriptName scheduleId source status dispatchedAt statusChangedAt";
+
+    public static final String SCRIPT_EXECUTIONS = """
+            query ScriptExecutions($scriptId: ID!, $first: Int) {
+                scriptExecutions(scriptId: $scriptId, first: $first) {
+                    filteredCount
+                    edges { node { %s } cursor }
+                    pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
+                }
+            }
+            """.formatted(EXECUTION_NODE);
+
+    public static final String SCRIPT_EXECUTION_FILTERS = """
+            query ScriptExecutionFilters($scriptId: ID!) {
+                scriptExecutionFilters(scriptId: $scriptId) {
+                    initiators { value label count }
+                    statuses { value label count }
+                    machines { value label count }
+                    filteredCount
+                }
+            }
+            """;
 }
