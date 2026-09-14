@@ -137,3 +137,9 @@ confirmed by the suite owner. Confirm, reclassify, or delete.
   that should be revisited, not a dismissal. The library already has `pages/SsoLoginPage.java` and
   `UILoginFlow`, so the cheaper path may be a Playwright case in the `device` phase rather than API
   tests. Decide which before writing anything.
+
+## KG-15 — AI guardrail policy REST endpoints — DEFERRED(the replacement API version) — decided
+- **Ops:** every mapping of `AIPolicyController` (openframe-saas-ai-agent: /api/v1/policies,
+  /api/v1/policies/{policyId}, /api/v1/policies/custom, /api/v1/policies/{policyId}/activate).
+- **Why:** owner's decision, 2026-09-13: a new version of the policies API is coming, so covering the
+  current endpoints makes no sense (plan item CP-7 dropped). Re-propose when the replacement lands.

@@ -115,6 +115,27 @@ REST (4), assignment (3), guardrails (3), push (3, deferred — KG-9), AI config
 Tickets: the UI uses 28 of 41 operations, 9 are covered. A software-schedule schema (10 mutations)
 landed in oss-lib on the day of the run with no UI usage and no tests yet.
 
+## After the first day of plan work — 2026-09-13
+
+| surface | operations | covered | gap-ui | gap-api | used by UI | UI-used and covered |
+|---|---|---|---|---|---|---|
+| all | 452 | 224 | 64 | 164 | 210 | 146 |
+
+Of the 64 UI-used operations still uncovered, 21 are excluded by decision in `known-gaps.md`
+(billing 11, mobile push 4, AI policies 4, plumbing 1, image upload 1), 1 sits in a plan item awaiting
+a decision (CP-14, bulk archive of resolved tickets), and 43 are open outside the plan: onboarding 8,
+SSO configuration REST 5, organization AI settings 4, user management REST 4, assignments 3,
+organization guardrails 3, AI configuration REST 3, and smaller clusters. Plan items CP-1 … CP-18 are
+done except CP-7 (dropped, postponed) and CP-14; see `coverage-plan.toml`. The jump from 185 to 224
+covered on the last run of the day is partly the extractor learning to resolve method-local path
+variables, which revealed REST endpoints that had been tested all along.
+
+The tests behind those numbers are split across review branches, one per area, each named in the
+`branch` field of its plan item: `test/coverage-script-schedules`, `test/coverage-time-notifications`,
+`test/coverage-ai-settings`, `test/coverage-tickets`, `test/coverage-scripts-executions` and
+`test/coverage-kb-tags-rest`. Reproducing the table takes a `--test-ref` pointing at a tree that has
+all of them; scoring one branch alone reports only that branch's share.
+
 ## Known gaps and limits
 
 - **UI ref vs deployed UI.** The app is read at `origin/main`; the deployed frontend image
