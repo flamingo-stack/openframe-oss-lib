@@ -11,6 +11,7 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { AdminContentCard } from '../admin-content-card';
 import { AdminContentCardGrid } from '../admin-content-card-grid';
 
 type Row = { id: number; name: string };
@@ -27,7 +28,7 @@ const base = {
 };
 
 const skeletons = () => screen.queryAllByTestId('skeleton');
-const invisible = () => skeletons().filter((el) => el.className.includes('invisible'));
+const invisible = () => skeletons().filter(el => el.className.includes('invisible'));
 
 describe('AdminContentCardGrid', () => {
   it('renders pageSize visible skeletons while loading', () => {
@@ -54,5 +55,17 @@ describe('AdminContentCardGrid', () => {
     render(<AdminContentCardGrid {...base} items={rows(6)} loading={false} />);
     expect(screen.getByText('Row 6')).toBeTruthy();
     expect(skeletons()).toHaveLength(0);
+  });
+
+  it('AdminContentCard reserveRows holds the title, subtitle and summary rows at their reserved heights', () => {
+    const { unmount } = render(<AdminContentCard title="Short" subtitle="Acme" summary="One line." reserveRows />);
+    expect(screen.getByRole('heading', { name: 'Short' }).className).toContain('min-h-[2lh]');
+    expect(screen.getByText('Acme').className).toContain('min-h-[1lh]');
+    expect(screen.getByText('One line.').className).toContain('min-h-[2lh]');
+    unmount();
+    render(<AdminContentCard title="Loose" subtitle="Acme" summary="One line." />);
+    expect(screen.getByRole('heading', { name: 'Loose' }).className).not.toContain('min-h-[2lh]');
+    expect(screen.getByText('Acme').className).not.toContain('min-h-[1lh]');
+    expect(screen.getByText('One line.').className).not.toContain('min-h-[2lh]');
   });
 });
