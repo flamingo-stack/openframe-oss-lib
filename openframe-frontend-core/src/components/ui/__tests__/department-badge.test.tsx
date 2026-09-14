@@ -10,9 +10,16 @@ describe('PaletteBadge', () => {
     expect(screen.getByText('Teal')).toHaveStyle({ backgroundColor: 'rgb(77, 182, 172)' });
   });
 
-  it('renders neutral for an unknown colour', () => {
-    render(<PaletteBadge text="Other" color="not-a-colour" />);
+  it('renders the unfilled default badge for an unknown or missing colour', () => {
+    const { rerender } = render(<PaletteBadge text="Other" color="not-a-colour" />);
     expect(screen.getByText('Other')).not.toHaveAttribute('style');
+    rerender(<PaletteBadge text="Other" color={null} />);
+    expect(screen.getByText('Other')).not.toHaveAttribute('style');
+  });
+
+  it('fills the neutral preset like any other key', () => {
+    render(<PaletteBadge text="Grey" color="neutral" />);
+    expect(screen.getByText('Grey')).toHaveStyle({ backgroundColor: 'rgb(176, 176, 176)' });
   });
 });
 

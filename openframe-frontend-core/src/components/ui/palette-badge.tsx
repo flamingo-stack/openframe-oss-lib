@@ -6,7 +6,11 @@ import { StatusBadge, type StatusBadgeProps } from './status-badge';
 
 export interface PaletteBadgeProps {
   text: string;
-  /** A `COLOR_PRESETS` key (or a `#rrggbb` custom colour). Unknown or missing renders neutral. */
+  /**
+   * A `COLOR_PRESETS` key (the `neutral` key included) or a `#rrggbb` custom colour.
+   * Unknown or missing renders the standard unfilled `default` badge, not the
+   * `neutral` preset's fill, so an uncoloured row looks like every other plain badge.
+   */
   color?: string | null;
   className?: string;
   /** Defaults to the dense `button` stamp, the size every inline badge beside it uses. */
