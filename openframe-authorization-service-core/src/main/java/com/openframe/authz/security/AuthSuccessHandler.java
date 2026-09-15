@@ -48,7 +48,7 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
                 maybeMarkEmailVerifiedFromSso(authentication, tenantId, email);
             }
         } catch (Exception e) {
-            log.warn("Failed to update lastLogin on authentication success: {}", e.getMessage());
+            log.warn("Failed to update lastLogin on authentication success", e);
         }
 
         ssoFlowSuccessHandler.onAuthenticationSuccess(request, response, authentication);
@@ -67,7 +67,8 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         }
 
         // Best practice: only mark verified if the IdP asserts it (when claim is present).
-        // Google typically provides email_verified. Microsoft may omit it; we treat omission as verified for trusted providers.
+        // Google typically provides email_verified. Microsoft may omit it; we treat omission as verified only for
+        // providers explicitly allowlisted in ssoProviderRegistry as trusted to omit this claim.
         if (authentication.getPrincipal() instanceof OidcUser oidcUser
                 && !OidcUserUtils.emailVerifiedClaimAllows(oidcUser)) {
             return;
