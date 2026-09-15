@@ -3,6 +3,7 @@ package com.openframe.management.scheduler;
 import com.openframe.management.service.DeviceHeartbeatOfflineDetectionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,8 @@ public class DeviceHeartbeatOfflineDetectionScheduler {
     private final DeviceHeartbeatOfflineDetectionService offlineDetectionService;
 
     @Scheduled(fixedDelayString = "${openframe.device.heartbeat.offline-detection.interval:60000}")
+    @SchedulerLock(name = "DeviceHeartbeatOfflineDetectionScheduler_detectOfflineDevices",
+            lockAtMostFor = "PT5M", lockAtLeastFor = "PT10S")
     public void detectOfflineDevices() {
         log.info("Running heartbeat offline detection sweep");
         try {
@@ -26,3 +29,4 @@ public class DeviceHeartbeatOfflineDetectionScheduler {
         }
     }
 }
+
