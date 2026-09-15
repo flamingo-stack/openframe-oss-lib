@@ -49,12 +49,11 @@ const BASELINE: Record<string, string> = {
   balance_sheet: '/api/financials/balance-sheet?ids=a,b',
   cash_flow: '/api/financials/cash-flow?ids=a,b',
   // 2026-09: hub-internal chat sources (people-hub feeds via their list APIs,
-  // product-hub design docs + tenants via per-object card routes).
+  // product-hub design docs via per-object card routes).
   what_i_shipped: '/api/what-i-shipped?ids=a,b&limit=2',
   how_i_work: '/api/how-i-work?ids=a,b&limit=2',
   ai_prompt: '/api/prompts?ids=a,b&limit=2',
   design_doc: '/api/design-docs?ids=a,b',
-  openframe_tenant: '/api/openframe-tenants?ids=a,b',
   prospect_call: '/api/prospect-calls?ids=a,b',
 };
 

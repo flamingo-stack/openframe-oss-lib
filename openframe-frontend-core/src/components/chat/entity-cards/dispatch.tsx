@@ -45,7 +45,6 @@ import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
-import { BuildingsIcon } from '../../icons-v2-generated/buildings/buildings-icon';
 import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon';
 import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon';
 import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentation-bar-icon';
@@ -1357,12 +1356,11 @@ interface GlyphCardConfig {
   media?: boolean;
 }
 /** Product-hub internal objects hydrated by their per-object card routes
- *  (`/api/design-docs`, `/api/openframe-tenants`, `/api/prospect-calls` — ChatRef-shaped items,
+ *  (`/api/design-docs`, `/api/prospect-calls` — ChatRef-shaped items,
  *  same preset as github / slack). Adding one = one line here + the
  *  `list-url.ts` builder + the `source-icons.ts` label / icon / type entries. */
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
-  openframe_tenant: { label: 'OpenFrame tenant', icon: () => <BuildingsIcon size={24} /> },
   prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {

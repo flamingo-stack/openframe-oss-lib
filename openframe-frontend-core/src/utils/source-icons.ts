@@ -77,7 +77,6 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
 
   // Product-hub internal
   'design-docs': 'file-text',
-  'openframe-tenants': 'globe',
   'prospect-calls': 'phone',
 };
 
@@ -159,7 +158,6 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
 
   // Product-hub internal
   'design-docs': 'Design Docs',
-  'openframe-tenants': 'OpenFrame Tenants',
   'prospect-calls': 'Prospect calls',
 };
 
@@ -243,7 +241,6 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
 
   // Product-hub internal
   design_doc: 'design-docs',
-  openframe_tenant: 'openframe-tenants',
   prospect_call: 'prospect-calls',
 };
 
