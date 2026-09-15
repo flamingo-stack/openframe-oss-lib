@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HubSpotMeetingScheduler, type HubSpotMeetingSchedulerProps } from '../components/meeting-scheduler';
+import {
+  HubSpotMeetingScheduler,
+  type HubSpotMeetingSchedulerProps,
+  type SchedulerStage,
+} from '../components/meeting-scheduler';
 import type { MeetingAvailability } from '../schemas/meeting-booking-schema';
 import { availabilityWith, fillIdentity } from './fixtures/meeting-booking';
 
@@ -112,7 +116,7 @@ describe('HubSpotMeetingScheduler — details-first flow', () => {
   });
 
   it('onStageChange reports the form, then the calendar, then the form again on Back', async () => {
-    const onStageChange = vi.fn();
+    const onStageChange = vi.fn<(stage: SchedulerStage) => void>();
     await continueFromDetails({ onStageChange });
     expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual(['details', 'slot']);
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
@@ -122,7 +126,7 @@ describe('HubSpotMeetingScheduler — details-first flow', () => {
 
   it("onStageChange reports 'unavailable' when the degraded box replaces the flow", async () => {
     hookState.availabilityError = 'Failed to load availability';
-    const onStageChange = vi.fn();
+    const onStageChange = vi.fn<(stage: SchedulerStage) => void>();
     render(scheduler({ onStageChange }));
     await screen.findByText(/couldn't load available call times/);
     expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual(['unavailable']);
