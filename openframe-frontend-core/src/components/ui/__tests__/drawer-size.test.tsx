@@ -28,4 +28,11 @@ describe('DrawerContent size', () => {
     expect(panel).not.toHaveClass('w-[90vw]');
     expect(panel).not.toHaveClass('h-[90vh]');
   });
+
+  it('cannot combine a size preset with the resize handle', () => {
+    // Type-level contract: a resizable panel sizes itself inline, so `wide` would be silently dropped.
+    // @ts-expect-error size="wide" and resizable are mutually exclusive
+    const props: Parameters<typeof DrawerContent>[0] = { size: 'wide', resizable: true };
+    expect(props.resizable).toBe(true);
+  });
 });

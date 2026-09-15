@@ -316,19 +316,12 @@ function DrawerResizeHandle({ side, size, minSize, maxSize, onSize, ariaLabel }:
   );
 }
 
-interface DrawerContentProps
+interface DrawerContentBaseProps
   extends Omit<ComponentPropsWithoutRef<typeof DialogPrimitive.Content>, 'style'>, VariantProps<typeof drawerVariants> {
   /** Remove outer wrapper padding and panel rounded/border/padding so the
    *  panel attaches flush to the viewport edge. Use for full-height side
    *  panels (e.g. the embedded chat). */
   flush?: boolean;
-  /** Panel size preset (`wide` = 90% of the viewport). Use it instead of a
-   *  width/height class; ignored while `resizable` sizes the panel inline. */
-  size?: 'default' | 'wide';
-  /** Enable the drag-to-resize handle on the inside-facing edge. Only
-   *  active for `side="left"` / `side="right"` (or `top`/`bottom`) on
-   *  non-mobile viewports. */
-  resizable?: boolean;
   /** Minimum allowed size (px) when resizable. */
   minSize?: number;
   /** Maximum allowed size (px) when resizable. Also clamped by viewport. */
@@ -358,6 +351,28 @@ interface DrawerContentProps
    *  Measured live via ResizeObserver so it tracks height changes. */
   offsetHeader?: boolean;
 }
+
+/**
+ * The panel's size has ONE owner: a `size` preset OR the drag-to-resize handle.
+ * A resizable panel sizes itself inline, which would silently override `wide`,
+ * so the two cannot be combined (a type error, not a runtime surprise).
+ */
+type DrawerContentSizing =
+  | {
+      /** Panel size preset (`wide` = 90% of the viewport). Use it instead of a
+       *  width/height class. */
+      size?: 'default' | 'wide';
+      resizable?: false;
+    }
+  | {
+      size?: 'default';
+      /** Enable the drag-to-resize handle on the inside-facing edge. Only
+       *  active for `side="left"` / `side="right"` (or `top`/`bottom`) on
+       *  non-mobile viewports. The handle owns the size, so no `size` preset. */
+      resizable: true;
+    };
+
+type DrawerContentProps = DrawerContentBaseProps & DrawerContentSizing;
 
 const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, DrawerContentProps>(
   (
