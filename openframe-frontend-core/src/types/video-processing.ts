@@ -47,6 +47,9 @@ export interface EntityQuote {
   source?: 'ai' | 'manual';
 }
 
+/** The caption every quote list carries: the admin editor and the `EntityQuotesPanel` display. */
+export const ENTITY_QUOTES_TITLE = 'Key Quotes';
+
 export interface Speaker {
   label: string;
   name?: string;
