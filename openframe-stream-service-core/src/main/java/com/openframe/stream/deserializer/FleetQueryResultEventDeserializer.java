@@ -8,6 +8,7 @@ import com.openframe.data.model.enums.MessageType;
 import com.openframe.sdk.fleetmdm.model.Query;
 import com.openframe.stream.service.ClusterTenantIdResolver;
 import com.openframe.stream.service.FleetMdmCacheService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -218,8 +219,9 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
 
             return query;
         } catch (Exception e) {
-            log.error("Error fetching query info for query_id: {}", queryIdNode.asText(), e);
+            log.error("Error fetching query info for query_id: {}. This may indicate a cache lookup failure or downstream Fleet API error, not merely a missing query.", queryIdNode.asText(), e);
             return null;
         }
     }
 }
+CURRENT>>>
