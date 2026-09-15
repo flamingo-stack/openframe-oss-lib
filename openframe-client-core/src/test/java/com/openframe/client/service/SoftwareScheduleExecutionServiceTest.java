@@ -43,7 +43,7 @@ class SoftwareScheduleExecutionServiceTest {
                 .build();
         when(scheduleRepository.findByStatusAndNextRunAtLessThanEqual(eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of(schedule));
-        when(targetResolver.resolveMachineIds(TENANT, "ss-1")).thenReturn(List.of("m-1", "m-2"));
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-1", "m-2"));
 
         service.runDueSchedules();
 
@@ -63,7 +63,7 @@ class SoftwareScheduleExecutionServiceTest {
                 .build();
         when(scheduleRepository.findByStatusAndNextRunAtLessThanEqual(eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of(schedule));
-        when(targetResolver.resolveMachineIds(TENANT, "ss-1")).thenReturn(List.of("m-1"));
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-1"));
 
         service.runDueSchedules();
 

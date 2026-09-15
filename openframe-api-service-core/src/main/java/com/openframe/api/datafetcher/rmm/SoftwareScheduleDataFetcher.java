@@ -18,6 +18,7 @@ import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareScheduleInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.rmm.schedule.ScheduleDeviceCriteriaInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
@@ -25,6 +26,7 @@ import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.software.SoftwareScheduleService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -116,6 +118,18 @@ public class SoftwareScheduleDataFetcher {
         String rawScheduleId = decodeId(scheduleId);
         scheduleService.removeDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
         return scheduleService.get(rawScheduleId);
+    }
+
+    @DgsMutation
+    public SoftwareScheduleResponse setSoftwareScheduleDeviceCriteria(@InputArgument @NotBlank String scheduleId,
+                                                                     @InputArgument @Valid ScheduleDeviceCriteriaInput criteria,
+                                                                     @AuthenticationPrincipal AuthPrincipal principal) {
+        ScheduleDeviceCriteria domainCriteria = ScheduleDeviceCriteria.builder()
+                .organizationIds(criteria.getOrganizationIds())
+                .deviceTypes(criteria.getDeviceTypes())
+                .osTypes(criteria.getOsTypes())
+                .build();
+        return scheduleService.setDeviceCriteria(decodeId(scheduleId), domainCriteria, principal.getId());
     }
 
     @DgsData(parentType = "SoftwareSchedule", field = "id")
