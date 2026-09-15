@@ -17,7 +17,11 @@ impl ManagerUpdater for Brew {
     }
 
     fn update_script(&self) -> String {
-        "#!/bin/bash\nif ! command -v brew >/dev/null 2>&1; then echo __NOT_PRESENT__; exit 0; fi\nbrew update".to_string()
+        r#"#!/bin/bash
+BREW="$( [ -x /opt/homebrew/bin/brew ] && echo /opt/homebrew/bin/brew || echo /usr/local/bin/brew )"
+export NONINTERACTIVE=1
+"$BREW" update"#
+            .to_string()
     }
 
     fn interpret(&self, result: &ExecResult) -> UpdateOutcome {
