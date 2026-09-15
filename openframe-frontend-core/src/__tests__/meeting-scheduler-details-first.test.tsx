@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HubSpotMeetingScheduler } from '../components/meeting-scheduler';
+import { HubSpotMeetingScheduler, type HubSpotMeetingSchedulerProps } from '../components/meeting-scheduler';
 import type { MeetingAvailability } from '../schemas/meeting-booking-schema';
 import { availabilityWith, fillIdentity } from './fixtures/meeting-booking';
 
@@ -14,8 +14,11 @@ const availability: MeetingAvailability = {
 const book = vi.fn<(payload: Record<string, unknown>) => Promise<unknown>>();
 const refetchAvailability = vi.fn(() => Promise.resolve());
 const toast = vi.fn();
-/** Mutable so a test can flip the hook's in-flight flag between renders. */
-const hookState = { isSubmitting: false };
+/** Mutable so a test can flip the hook's in-flight flag or fail the load between renders. */
+const hookState: { isSubmitting: boolean; availabilityError: string | null } = {
+  isSubmitting: false,
+  availabilityError: null,
+};
 
 vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
   // The sentinel keeps its ONE owner: only the hook itself is replaced.
@@ -24,7 +27,7 @@ vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
     availability,
     isLoadingAvailability: false,
     isFetchingAvailability: false,
-    availabilityError: null,
+    availabilityError: hookState.availabilityError,
     monthOffset: 0,
     setMonthOffset: vi.fn(),
     refetchAvailability,
@@ -35,12 +38,12 @@ vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
 vi.mock('../hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
 // A factory, not a shared element: React bails out of re-rendering the SAME element object.
-const scheduler = () => (
-  <HubSpotMeetingScheduler meetingId="1" flow="details-first" initialAvailability={availability} />
+const scheduler = (props: Partial<HubSpotMeetingSchedulerProps> = {}) => (
+  <HubSpotMeetingScheduler meetingId="1" flow="details-first" initialAvailability={availability} {...props} />
 );
 
-async function continueFromDetails() {
-  const view = render(scheduler());
+async function continueFromDetails(props: Partial<HubSpotMeetingSchedulerProps> = {}) {
+  const view = render(scheduler(props));
   await screen.findByLabelText(/^Email/);
   fillIdentity();
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
@@ -61,6 +64,7 @@ const timeChip = async () => {
 
 beforeEach(() => {
   hookState.isSubmitting = false;
+  hookState.availabilityError = null;
   book.mockReset();
   refetchAvailability.mockClear();
   toast.mockClear();
@@ -105,5 +109,22 @@ describe('HubSpotMeetingScheduler — details-first flow', () => {
     const chips = screen.getAllByRole('button').filter(b => /\d{1,2}:\d{2}/.test(b.textContent ?? ''));
     expect(chips.length).toBeGreaterThan(0);
     expect(chips.every(b => (b as HTMLButtonElement).disabled)).toBe(true);
+  });
+
+  it('onStageChange reports the form, then the calendar, then the form again on Back', async () => {
+    const onStageChange = vi.fn();
+    await continueFromDetails({ onStageChange });
+    expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual(['details', 'slot']);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByLabelText(/^Email/);
+    expect(onStageChange).toHaveBeenLastCalledWith('details');
+  });
+
+  it("onStageChange reports 'unavailable' when the degraded box replaces the flow", async () => {
+    hookState.availabilityError = 'Failed to load availability';
+    const onStageChange = vi.fn();
+    render(scheduler({ onStageChange }));
+    await screen.findByText(/couldn't load available call times/);
+    expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual(['unavailable']);
   });
 });
