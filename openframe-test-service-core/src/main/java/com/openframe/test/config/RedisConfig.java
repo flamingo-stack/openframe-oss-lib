@@ -25,6 +25,7 @@ public class RedisConfig {
 
     private static volatile String nodes;
     private static volatile String tenant;
+    private static volatile String caCertificate;
 
     public static void setNodes(String csvNodes) {
         nodes = csvNodes;
@@ -32,6 +33,22 @@ public class RedisConfig {
 
     public static void setTenant(String tenantNamespace) {
         tenant = tenantNamespace;
+    }
+
+    /**
+     * PEM of the CA that signed the server certificate. Present only where the cluster runs with
+     * in-transit encryption (Memorystore); a plain in-cluster Redis leaves it unset and the client
+     * connects without TLS.
+     */
+    public static void setCaCertificate(String pem) {
+        caCertificate = pem;
+    }
+
+    public static String getCaCertificate() {
+        String pem = (caCertificate != null && !caCertificate.trim().isEmpty())
+                ? caCertificate
+                : System.getenv("REDIS_SERVER_CA");
+        return (pem != null && !pem.trim().isEmpty()) ? pem : null;
     }
 
     public static Set<HostAndPort> getClusterNodes() {
