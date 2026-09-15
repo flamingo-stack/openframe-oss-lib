@@ -1,4 +1,5 @@
 pub mod binary_writer;
+pub mod client_update_probe;
 pub mod console;
 pub mod directories;
 pub mod dmg_extractor;
@@ -8,10 +9,9 @@ pub mod installation_detector;
 pub mod machine_info_persistence;
 pub mod permissions;
 pub mod system_service;
+pub mod tool_ops_marker;
 pub mod tool_updater;
 pub mod uninstall;
-pub mod update_scripts;
-pub mod updater_launcher;
 pub mod user_session;
 
 #[cfg(target_os = "windows")]
@@ -25,6 +25,7 @@ pub mod windows_path_migration;
 
 // Re-export commonly used items
 pub use binary_writer::{set_executable_permissions, write_executable};
+pub use client_update_probe::{in_flight_client_update_phase, UPDATER_TOOL_AGENT_ID};
 pub use console::configure_console;
 #[cfg(target_os = "macos")]
 pub use directories::{remove_app_bundle, remove_app_bundle_path};
@@ -39,6 +40,7 @@ pub use installation_detector::detect_actual_installation;
 pub use permissions::{Capability, PermissionError, PermissionUtils, Permissions};
 #[cfg(target_os = "windows")]
 pub use powershell::get_powershell_path;
+pub use tool_ops_marker::write_in_flight_tool_ops;
 pub(crate) use tool_updater::clear_aside_binary;
 pub use tool_updater::{
     create_migrator, create_updater, needs_migration, run_migration, run_update, ToolUpdater,
