@@ -45,6 +45,10 @@ public class DeviceLogService {
     static final Duration DEFAULT_LOOKBACK = Duration.ofDays(7);
     static final Duration MAX_RANGE = Duration.ofDays(30);
     static final int MAX_SEARCH_LENGTH = 256;
+    static final int DEFAULT_PAGE_SIZE = 100;
+    static final int MAX_PAGE_SIZE = 500;
+    // Loki's max_entries_limit_per_query on prod
+    static final int MAX_LINES_PER_TIMESTAMP = 5000;
 
     private static final String AGENT_LOGS_JOB = "agent-logs";
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
@@ -68,7 +72,7 @@ public class DeviceLogService {
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
 
         DeviceLogFilterCriteria criteria = filter != null ? filter : new DeviceLogFilterCriteria();
-        CursorPaginationCriteria page = (pagination != null ? pagination : new CursorPaginationCriteria()).normalize();
+        CursorPaginationCriteria page = pagination != null ? pagination : new CursorPaginationCriteria();
         DeviceLogCursor after = DeviceLogCursor.fromRaw(page.getCursor());
         validateSearch(criteria.getSearch());
 
@@ -77,28 +81,27 @@ public class DeviceLogService {
         validateRange(from, to);
 
         long startNanos = toNanos(from);
-        // Loki's end is exclusive while both the filter's upper bound and the cursor entry are inclusive
+        // Loki's end is exclusive: 1 ns past the inclusive upper bound, or the cursor's timestamp itself, whose lines
+        // the previous page returned in full
         long endNanos = toNanos(to) + 1;
-        int skip = 0;
         if (after != null) {
-            if (after.timestampNanos() < startNanos) {
+            if (after.timestampNanos() <= startNanos) {
                 return result(List.of(), false, true);
             }
-            endNanos = Math.min(endNanos, after.timestampNanos() + 1);
-            skip = after.skip();
+            endNanos = Math.min(endNanos, after.timestampNanos());
         }
 
         String query = buildQuery(resolveTenantDomain(), machineId, criteria);
-        int pageSize = page.getLimit();
+        int pageSize = pageSize(page.getLimit());
         log.debug("Querying device logs for machineId: {}, query: {}, start: {}, end: {}", machineId, query, startNanos, endNanos);
 
-        // One extra entry tells whether there is a next page
-        List<LokiLogEntry> entries = lokiClient.queryRange(query, startNanos, endNanos, pageSize + skip + 1,
-                LokiDirection.BACKWARD);
-        List<LokiLogEntry> remaining = dropReturned(entries, after);
+        // One extra line tells whether there is a next page
+        int queryLimit = pageSize + 1;
+        List<LokiLogEntry> entries = lokiClient.queryRange(query, startNanos, endNanos, queryLimit, LokiDirection.BACKWARD);
+        List<LokiLogEntry> pageEntries = wholeTimestampsOnly(entries, pageSize, query);
+        List<DeviceLogEntry> items = toItems(pageEntries);
 
-        return result(toItems(remaining.subList(0, Math.min(pageSize, remaining.size())), after),
-                remaining.size() > pageSize, after != null);
+        return result(items, entries.size() > pageSize, after != null);
     }
 
     static String buildQuery(String tenantDomain, String machineId, DeviceLogFilterCriteria criteria) {
@@ -139,30 +142,28 @@ public class DeviceLogService {
     }
 
     /**
-     * Drops the entries at the cursor's timestamp that earlier pages already returned; they come first
-     * because the query ends right after that timestamp.
+     * Loki cuts a result at the limit without regard to timestamps, and does not guarantee which of the lines sharing
+     * the cut timestamp it keeps. The page therefore ends before that timestamp, and the next page starts with all of
+     * its lines. When one timestamp fills the whole page, its lines are fetched in full instead.
      */
-    private static List<LokiLogEntry> dropReturned(List<LokiLogEntry> entries, DeviceLogCursor after) {
-        int index = 0;
-        if (after != null) {
-            while (index < entries.size() && index < after.skip()
-                    && entries.get(index).timestampNanos() == after.timestampNanos()) {
-                index++;
-            }
+    private List<LokiLogEntry> wholeTimestampsOnly(List<LokiLogEntry> entries, int pageSize, String query) {
+        if (entries.size() <= pageSize) {
+            return entries;
         }
-        return entries.subList(index, entries.size());
+        long cutNanos = entries.get(pageSize).timestampNanos();
+        int end = pageSize;
+        while (end > 0 && entries.get(end - 1).timestampNanos() == cutNanos) {
+            end--;
+        }
+        if (end > 0) {
+            return entries.subList(0, end);
+        }
+        return lokiClient.queryRange(query, cutNanos, cutNanos + 1, MAX_LINES_PER_TIMESTAMP, LokiDirection.BACKWARD);
     }
 
-    private static List<DeviceLogEntry> toItems(List<LokiLogEntry> entries, DeviceLogCursor after) {
+    private static List<DeviceLogEntry> toItems(List<LokiLogEntry> entries) {
         List<DeviceLogEntry> items = new ArrayList<>(entries.size());
-        long runTimestamp = after != null ? after.timestampNanos() : Long.MIN_VALUE;
-        int runLength = after != null ? after.skip() : 0;
         for (LokiLogEntry entry : entries) {
-            if (entry.timestampNanos() != runTimestamp) {
-                runTimestamp = entry.timestampNanos();
-                runLength = 0;
-            }
-            runLength++;
             items.add(DeviceLogEntry.builder()
                     .timestamp(entry.timestamp())
                     .agentTimestamp(parseInstant(entry.labels().get("agent_ts")))
@@ -170,7 +171,7 @@ public class DeviceLogService {
                     .message(entry.line())
                     .hostname(entry.labels().get("hostname"))
                     .count(parseLong(entry.labels().get("count")))
-                    .cursor(new DeviceLogCursor(runTimestamp, runLength).encode())
+                    .cursor(new DeviceLogCursor(entry.timestampNanos()).encode())
                     .build());
         }
         return items;
@@ -187,6 +188,17 @@ public class DeviceLogService {
                         .endCursor(items.isEmpty() ? null : items.get(items.size() - 1).getCursor())
                         .build())
                 .build();
+    }
+
+    /**
+     * Larger than the shared 100-item cap: the agent ships up to 50 lines a minute per device, so 100 lines cover
+     * only a couple of minutes of a busy device.
+     */
+    private static int pageSize(Integer requested) {
+        if (requested == null) {
+            return DEFAULT_PAGE_SIZE;
+        }
+        return Math.min(Math.max(requested, 1), MAX_PAGE_SIZE);
     }
 
     private static void validateSearch(String search) {

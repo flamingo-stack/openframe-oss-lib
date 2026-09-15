@@ -3,16 +3,13 @@ package com.openframe.api.service.device;
 import com.openframe.api.dto.shared.CursorCodec;
 
 /**
- * Position in a newest-first device log listing: the Loki timestamp of the last returned entry and how many
- * entries at exactly that timestamp have been returned so far. Loki has no offsets, so the next page is read
- * up to and including that timestamp and the already returned entries at it are skipped.
+ * Position in a newest-first device log listing: the Loki timestamp of the last returned line. A page never splits
+ * the lines that share a timestamp, so the next page is read from strictly before it.
  */
-record DeviceLogCursor(long timestampNanos, int skip) {
-
-    static final int MAX_SKIP = 1000;
+record DeviceLogCursor(long timestampNanos) {
 
     String encode() {
-        return CursorCodec.encode(timestampNanos + ":" + skip);
+        return CursorCodec.encode(String.valueOf(timestampNanos));
     }
 
     /**
@@ -23,13 +20,11 @@ record DeviceLogCursor(long timestampNanos, int skip) {
             return null;
         }
         try {
-            int separator = raw.indexOf(':');
-            long timestampNanos = Long.parseLong(raw.substring(0, separator));
-            int skip = Integer.parseInt(raw.substring(separator + 1));
-            if (timestampNanos > 0 && skip >= 0 && skip <= MAX_SKIP) {
-                return new DeviceLogCursor(timestampNanos, skip);
+            long timestampNanos = Long.parseLong(raw);
+            if (timestampNanos > 0) {
+                return new DeviceLogCursor(timestampNanos);
             }
-        } catch (RuntimeException ignored) {
+        } catch (NumberFormatException ignored) {
             // fall through to the rejection below
         }
         throw new IllegalArgumentException("Invalid cursor");
