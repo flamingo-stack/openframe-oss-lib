@@ -2,6 +2,7 @@ package com.openframe.client.service.rmm.delivery;
 
 import com.openframe.client.service.rmm.delivery.DeliveryProperties.Policy;
 import com.openframe.data.document.rmm.delivery.DeliveryKind;
+import com.openframe.data.document.rmm.delivery.MachineDelivery;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ class DeliveryPropertiesTest {
     private static final long DEFAULT_RESULT_TIMEOUT = 600L;
     private static final long DEFAULT_TTL = 604_800L;
     private static final int UNINSTALL_MAX_ATTEMPTS = 5;
+    private static final long ROW_RECONNECT_WINDOW = 3_600L;
 
     private DeliveryProperties properties;
 
@@ -77,5 +79,43 @@ class DeliveryPropertiesTest {
 
         // verifications
         assertThat(resolved.getOfflineBehavior()).isEqualTo(ScheduleOfflineBehavior.SKIP);
+    }
+
+    @Test
+    void resolve_rowWithoutOverrides_kindPolicyReturned() {
+        // setup
+        Policy uninstall = new Policy();
+        uninstall.setMaxAttempts(UNINSTALL_MAX_ATTEMPTS);
+        properties.setKinds(Map.of(DeliveryKind.CLIENT_UNINSTALL, uninstall));
+        MachineDelivery delivery = MachineDelivery.builder().kind(DeliveryKind.CLIENT_UNINSTALL).build();
+
+        // execution
+        Policy resolved = properties.resolve(delivery);
+
+        // verifications
+        assertThat(resolved.getMaxAttempts()).isEqualTo(UNINSTALL_MAX_ATTEMPTS);
+        assertThat(resolved.getOfflineBehavior()).isEqualTo(ScheduleOfflineBehavior.RETRY_ON_RECONNECT);
+        assertThat(resolved.getReconnectWindowSeconds()).isEqualTo(DEFAULT_RECONNECT_WINDOW);
+    }
+
+    @Test
+    void resolve_rowOverridesOfflineFields_rowWinsOverKind() {
+        // setup
+        Policy scripts = new Policy();
+        scripts.setOfflineBehavior(ScheduleOfflineBehavior.SKIP);
+        properties.setKinds(Map.of(DeliveryKind.SCRIPT_SCHEDULE, scripts));
+        MachineDelivery delivery = MachineDelivery.builder()
+                .kind(DeliveryKind.SCRIPT_SCHEDULE)
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT)
+                .reconnectWindowSeconds(ROW_RECONNECT_WINDOW)
+                .build();
+
+        // execution
+        Policy resolved = properties.resolve(delivery);
+
+        // verifications
+        assertThat(resolved.getOfflineBehavior()).isEqualTo(ScheduleOfflineBehavior.RETRY_ON_RECONNECT);
+        assertThat(resolved.getReconnectWindowSeconds()).isEqualTo(ROW_RECONNECT_WINDOW);
+        assertThat(resolved.getMaxAttempts()).isEqualTo(DEFAULT_MAX_ATTEMPTS);
     }
 }

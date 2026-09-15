@@ -1,6 +1,7 @@
 package com.openframe.client.service.rmm.delivery;
 
 import com.openframe.data.document.rmm.delivery.DeliveryKind;
+import com.openframe.data.document.rmm.delivery.MachineDelivery;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -37,6 +38,15 @@ public class DeliveryProperties {
             return defaults;
         }
         return override.mergeOver(defaults);
+    }
+
+    // row-level overrides come from ScheduleScript (per-schedule offline behaviour) and win over the kind policy
+    public Policy resolve(MachineDelivery delivery) {
+        Policy kindPolicy = resolve(delivery.getKind());
+        Policy rowOverride = new Policy();
+        rowOverride.setOfflineBehavior(delivery.getOfflineBehavior());
+        rowOverride.setReconnectWindowSeconds(delivery.getReconnectWindowSeconds());
+        return rowOverride.mergeOver(kindPolicy);
     }
 
     @Getter

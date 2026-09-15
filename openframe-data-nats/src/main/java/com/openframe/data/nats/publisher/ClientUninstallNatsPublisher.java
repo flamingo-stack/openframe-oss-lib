@@ -21,10 +21,13 @@ public class ClientUninstallNatsPublisher {
     private final NatsMessagePublisher natsMessagePublisher;
 
     public void publish(String machineId) {
-        String topicName = format(TOPIC_NAME_TEMPLATE, machineId);
         ClientUninstallMessage message = buildMessage();
-        natsMessagePublisher.publishPersistent(topicName, message);
+        publish(machineId, message);
+    }
 
+    public void publish(String machineId, ClientUninstallMessage message) {
+        String topicName = format(TOPIC_NAME_TEMPLATE, machineId);
+        natsMessagePublisher.publishPersistent(topicName, message);
         log.info("Published client uninstall command for machine {}", machineId);
     }
 
