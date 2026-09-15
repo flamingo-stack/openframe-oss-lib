@@ -85,6 +85,20 @@ public class DeviceApi {
                 .extract().jsonPath().getObject("data.device", Machine.class);
     }
 
+    /** Sets or, with a null {@code nickname}, clears the device's nickname; returns the updated device. */
+    public static Machine updateDeviceNickname(String machineId, String nickname) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("machineId", machineId);
+        variables.put("nickname", nickname);
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", UPDATE_DEVICE_NICKNAME);
+        body.put("variables", variables);
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.updateDeviceNickname", Machine.class);
+    }
+
     public static Machine getAnyDevice(DeviceFilterInput... filters) {
         for (DeviceFilterInput filter : filters) {
             List<Machine> devices = getDevices(filter);

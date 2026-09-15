@@ -42,6 +42,7 @@ public class DeviceQueries {
                 device(machineId: $machineId) {
                     id
                     machineId
+                    nickname
                     ip
                     macAddress
                     osUuid
@@ -99,6 +100,7 @@ public class DeviceQueries {
                         node {
                             id
                             machineId
+                            nickname
                             hostname
                             displayName
                             ip
@@ -181,6 +183,18 @@ public class DeviceQueries {
                 deviceFilters(filter: $filter) {
                     statuses { value count }
                     filteredCount
+                }
+            }
+            """;
+
+    /** {@code nickname} is nullable: passing null clears it. {@code machineId} is the raw machine id. */
+    public static final String UPDATE_DEVICE_NICKNAME = """
+            mutation UpdateDeviceNickname($machineId: String!, $nickname: String) {
+                updateDeviceNickname(machineId: $machineId, nickname: $nickname) {
+                    id
+                    machineId
+                    hostname
+                    nickname
                 }
             }
             """;

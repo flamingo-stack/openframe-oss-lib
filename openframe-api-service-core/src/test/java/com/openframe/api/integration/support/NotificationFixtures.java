@@ -1,6 +1,5 @@
 package com.openframe.api.integration.support;
 
-import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
 
 import java.time.Instant;
@@ -14,7 +13,7 @@ public final class NotificationFixtures {
         return Notification.builder()
                 .title("Welcome aboard")
                 .createdAt(Instant.now())
-                .context(GenericContext.builder().type("welcome").payload("{}").build())
+                .type("welcome")
                 .build();
     }
 
@@ -22,7 +21,7 @@ public final class NotificationFixtures {
         return Notification.builder()
                 .title(type)
                 .createdAt(Instant.now())
-                .context(GenericContext.builder().type(type).payload("{}").build())
+                .type(type)
                 .build();
     }
 }
