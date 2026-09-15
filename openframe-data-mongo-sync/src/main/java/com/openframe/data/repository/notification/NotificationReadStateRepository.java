@@ -20,6 +20,9 @@ import java.util.List;
 public interface NotificationReadStateRepository
         extends MongoRepository<NotificationReadState, String>, CustomNotificationReadStateRepository {
 
+    // ARCHIVED is not yet read: any mark-read turns it into READ.
+    String UNREAD_OR_ARCHIVED = "['UNREAD', 'ARCHIVED']";
+
     boolean existsByRecipientIdAndRecipientTypeAndStatus(String recipientId,
                                                          RecipientType recipientType,
                                                          ReadStatus status);
@@ -30,11 +33,15 @@ public interface NotificationReadStateRepository
                                                                            RecipientType recipientType,
                                                                            ReadStatus status);
 
-    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': 'UNREAD' }")
+    List<NotificationReadState> findByRecipientIdAndRecipientTypeAndStatusIn(String recipientId,
+                                                                             RecipientType recipientType,
+                                                                             Collection<ReadStatus> statuses);
+
+    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': { '$in': " + UNREAD_OR_ARCHIVED + " } }")
     @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
     long markAsRead(String recipientId, RecipientType recipientType, String notificationId);
 
-    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'status': 'UNREAD' }")
+    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'status': { '$in': " + UNREAD_OR_ARCHIVED + " } }")
     @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
     long markAllAsRead(String recipientId, RecipientType recipientType);
 
@@ -88,17 +95,24 @@ public interface NotificationReadStateRepository
                                               @Param("entityIds") Collection<String> entityIds,
                                               @Param("tenantId") String tenantId);
 
-    @Query("{ 'tenantId': ?5, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, 'entityId': ?3, 'status': ?4 }")
+    @Query("{ 'tenantId': ?2, 'entityType': ?0, 'entityId': ?1, 'status': 'UNREAD' }")
+    List<NotificationReadState> findUnreadByEntity(NotificationEntityType entityType, String entityId, String tenantId);
+
+    @Query("{ 'tenantId': ?2, 'entityType': ?0, 'entityId': ?1, 'status': 'UNREAD' }")
+    @Update(pipeline = "{ '$set': { 'status': 'ARCHIVED', 'readAt': '$$NOW' } }")
+    long archiveUnreadByEntity(NotificationEntityType entityType, String entityId, String tenantId);
+
+    @Query("{ 'tenantId': ?5, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, 'entityId': ?3, 'status': { '$in': ?4 } }")
     List<NotificationReadState> findByRecipientIdAndRecipientTypeAndEntity(String recipientId,
                                                                           RecipientType recipientType,
                                                                           NotificationEntityType entityType,
                                                                           String entityId,
-                                                                          ReadStatus status,
+                                                                          Collection<ReadStatus> statuses,
                                                                           String tenantId);
 
     // Flips exactly the ids the caller snapshotted, never "everything still unread on that entity":
     // a notification arriving mid-call would otherwise turn read without anyone retracting its push.
-    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'notificationId': { '$in': ?3 }, 'status': 'UNREAD' }")
+    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'notificationId': { '$in': ?3 }, 'status': { '$in': " + UNREAD_OR_ARCHIVED + " } }")
     @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
     long markAsReadByIds(String tenantId,
                          String recipientId,
