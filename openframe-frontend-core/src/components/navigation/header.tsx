@@ -351,9 +351,13 @@ export function Header({ config }: HeaderProps) {
           </>
         }
         logo={
-          <Link href={config.logo.href} className="transition-opacity duration-200 hover:opacity-80">
-            {config.logo.element}
-          </Link>
+          config.logo.href ? (
+            <Link href={config.logo.href} className="transition-opacity duration-200 hover:opacity-80">
+              {config.logo.element}
+            </Link>
+          ) : (
+            config.logo.element
+          )
         }
         // Big-bar rule (Figma 2936-6812): 24px fixed left inset on the logo
         // zone at every breakpoint — the same 24px also reads as the gap
