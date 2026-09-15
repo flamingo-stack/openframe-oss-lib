@@ -32,11 +32,11 @@ export interface LogSeverityDotProps {
 }
 
 export const LOG_SEVERITY_COLORS: Record<LogSeverity, string> = {
-  DEBUG: '#888888',
-  INFO: '#888888',
-  WARNING: '#e1b32f',
-  ERROR: '#f36666',
-  CRITICAL: '#b43b3b',
+  DEBUG: 'var(--text-ods-secondary)',
+  INFO: 'var(--text-ods-secondary)',
+  WARNING: 'var(--text-ods-warning)',
+  ERROR: 'var(--text-ods-error)',
+  CRITICAL: 'var(--text-ods-error)',
 };
 
 export const LOG_SEVERITY_LABELS: Record<LogSeverity, string> = {
@@ -46,3 +46,4 @@ export const LOG_SEVERITY_LABELS: Record<LogSeverity, string> = {
   ERROR: 'Error',
   CRITICAL: 'Critical',
 };
+

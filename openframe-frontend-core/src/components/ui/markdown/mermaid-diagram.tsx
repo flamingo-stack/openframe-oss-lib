@@ -84,11 +84,28 @@ export const MERMAID_SECURITY_OPTIONS = {
 
 /** Upper bound on a single `mermaid.render`. Generous enough that no honest
  *  diagram hits it; short enough that a wedged render becomes a visible error
- *  instead of a permanent skeleton. */
+ *  instead of a permanent skeleton.
+ *
+ *  NOTE: `Promise.race` below only stops the CALLER from waiting past this
+ *  bound — it cannot cancel `mermaid.render` itself (mermaid exposes no abort
+ *  hook), so a pathological diagram keeps burning CPU in the background after
+ *  the UI has already moved to the error state. See `withRenderTimeout`. */
 export const MERMAID_RENDER_TIMEOUT_MS = 15_000;
 
 /** `Promise.race` with a rejecting timer, timer always cleared. Kept local —
- *  the only caller is the render below. */
+ *  the only caller is the render below.
+ *
+ *  LIMITATION (tracked, not fixed here): this races the render, it does not
+ *  abort it. `mermaid.render` has no cancellation API, so on timeout the
+ *  underlying work keeps running to completion (or forever) even though the
+ *  caller has already stopped waiting and shown an error. On the chat surface
+ *  the diagram source is untrusted (model output), so a diagram engineered to
+ *  be pathologically slow to render (e.g. very large node/edge counts) can
+ *  still consume CPU/memory per message after its own timeout fires, and
+ *  repeated messages each spawn an independent, uncancelled render. A
+ *  complete fix needs an actual cancellation mechanism (e.g. running
+ *  `mermaid.render` in a Worker that can be terminated, or upstream support
+ *  for aborting a render) — out of scope for this component alone. */
 async function withRenderTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -118,10 +135,22 @@ async function withRenderTimeout<T>(promise: Promise<T>, ms: number): Promise<T>
  * parity, not new divergence; the missing categorical-ramp tokens are
  * flagged here for addition to ODS.
  *
+ * MULTIPLA-002 tracking: this is a DOCUMENTED, INTENTIONAL exemption, not a
+ * silent violation — per MULTIPLA-002 any hardcoded hex needs a tracked
+ * ESLint-allowlist justification rather than only an inline comment.
+ * `eslint-disable` markers below are that formal record (in addition to this
+ * comment) for every raw hex/px/font-family literal in this file's mermaid
+ * config surface, so tooling can enforce/allowlist this exemption instead of
+ * relying on convention. Follow-up: add the missing categorical-ramp tokens
+ * to ODS and replace the `eslint-disable` markers with real token refs.
+ *
  * Scope: this exemption covers THIS file only, and only the mermaid config
  * surface. Do NOT copy this pattern — every other style in the markdown
  * module uses ODS semantic classes.
  */
+/* eslint-disable multipla-002/no-hardcoded-colors -- ODS-TOKENS FLAG: mermaid
+   themeCSS/SVG output has no CSS var resolution; see comment above. Tracked
+   exemption, not a silent bypass. */
 export const mermaidStyles = `
   .mermaid-svg-container svg {
     max-width: 100% !important;
@@ -169,6 +198,7 @@ export const mermaidStyles = `
     .mermaid-svg-container .edgeLabel text { font-size: 16px !important; }
   }
 `;
+/* eslint-enable multipla-002/no-hardcoded-colors */
 
 /** Monotonic render id. `Date.now()` was ambiguous: two renders started in the
  *  same millisecond (routine while a diagram streams in) share an id, and
@@ -210,6 +240,7 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
         mermaid.initialize({
           startOnLoad: false,
           theme: 'dark' as const,
+          // eslint-disable-next-line multipla-002/no-hardcoded-colors -- ODS-TOKENS FLAG: mermaid `themeVariables` is baked into SVG attribute strings, not CSS — `var()` does not resolve here. See file-level exemption note above.
           themeVariables: {
             primaryColor: '#FFC008',
             primaryTextColor: '#FAFAFA',

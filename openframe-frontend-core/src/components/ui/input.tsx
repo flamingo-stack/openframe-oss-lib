@@ -57,15 +57,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           type="range"
           className={cn(
-            'h-1 w-full cursor-pointer appearance-none rounded-full bg-white/30',
+            'h-1 w-full cursor-pointer appearance-none rounded-full bg-ods-card',
             // Webkit (Chrome/Safari) thumb
             '[&::-webkit-slider-thumb]:appearance-none',
             '[&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3',
-            '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white',
+            '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-ods-text-primary',
             '[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm',
             // Firefox thumb
             '[&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3',
-            '[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white',
+            '[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-ods-text-primary',
             '[&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0',
             // Firefox track
             '[&::-moz-range-track]:bg-transparent',
