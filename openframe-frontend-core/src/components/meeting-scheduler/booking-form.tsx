@@ -683,19 +683,22 @@ export function BookingFormSkeleton({
   consent?: boolean;
   footerNote?: string;
 }) {
+  // `rowCount` rows are one full-width slot each; host rows (or the built-in
+  // layout) go through the loaded form's normalisation (`normalizeFieldRows`).
+  const rows =
+    rowCount !== undefined
+      ? Array.from({ length: rowCount }, (_, index): BookingFieldRow => [{ name: `skeleton-row-${index}` }])
+      : skeletonRows(fieldRows ?? DEFAULT_FIELD_ROWS);
   return (
     <div className={cn('flex-1', FORM_STACK)}>
-      {/* The host's rows (or the built-in layout) through the SAME grid, column
-          rule and normalisation as the loaded form — see `normalizeFieldRows`. */}
-      {rowCount !== undefined
-        ? Array.from({ length: rowCount }, (_, index) => <Skeleton key={index} className={FIELD_SKELETON_CLASS} />)
-        : skeletonRows(fieldRows ?? DEFAULT_FIELD_ROWS).map(row => (
-            <div key={row.map(s => s.name).join('|')} className={ROW_GRID}>
-              {row.map((slot, slotIndex) => (
-                <Skeleton key={slot.name} className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))} />
-              ))}
-            </div>
+      {/* Every row through the SAME grid and column rule as the loaded form. */}
+      {rows.map(row => (
+        <div key={row.map(s => s.name).join('|')} className={ROW_GRID}>
+          {row.map((slot, slotIndex) => (
+            <Skeleton key={slot.name} className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))} />
           ))}
+        </div>
+      ))}
       {/* Without rows there is no telling how many questions the link declares: one long answer stands for them. */}
       {rowCount === undefined && !fieldRows && <Skeleton className="h-[7.75rem] w-full" />}
       {consent && <Skeleton className="h-[4.25rem] w-full" />}
