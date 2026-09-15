@@ -46,6 +46,8 @@ public class ActivityEnrichmentService {
 
     private static final Duration JOIN_WINDOW_DURATION = Duration.ofSeconds(5);
 
+    private static final String TYPE_ID_HEADER = "__TypeId__";
+
     @Bean
     public KStream<String, ActivityMessage> buildActivityEnrichmentStream(StreamsBuilder builder) {
         log.info("Building activity enrichment stream (Spring Kafka Streams style)");
@@ -131,7 +133,7 @@ public class ActivityEnrichmentService {
         public void process(FixedKeyRecord<String, ActivityMessage> record) {
             MessageType messageType = resolveMessageType(record.value());
             record.headers().add(MESSAGE_TYPE_HEADER, messageType.name().getBytes(StandardCharsets.UTF_8));
-            record.headers().add("__TypeId__", "com.openframe.kafka.model.debezium.CommonDebeziumMessage".getBytes(StandardCharsets.UTF_8));
+            record.headers().add(TYPE_ID_HEADER, "com.openframe.kafka.model.debezium.CommonDebeziumMessage".getBytes(StandardCharsets.UTF_8));
             context.forward(record);
         }
 
