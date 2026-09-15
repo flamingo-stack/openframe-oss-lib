@@ -9,7 +9,6 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
-import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.NotificationPage;
 import com.openframe.data.repository.notification.NotificationRepository;
@@ -67,7 +66,7 @@ public class NotificationService {
         }
 
         List<NotificationView> views = items.stream()
-                .map(item -> notificationMapper.toView(item.notification(), item.status() == ReadStatus.READ))
+                .map(item -> notificationMapper.toView(item.notification(), item.status()))
                 .toList();
 
         return GenericQueryResult.<NotificationView>builder()

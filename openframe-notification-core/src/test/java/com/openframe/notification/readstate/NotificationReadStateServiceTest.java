@@ -67,7 +67,7 @@ class NotificationReadStateServiceTest {
     @Test
     @DisplayName("Given several UNREAD rows, when markAllAsRead flips them, then their ids ride in ONE bulk event, snapshot taken before the flip")
     void mark_all_as_read_publishes_one_bulk_event() {
-        when(repository.findByRecipientIdAndRecipientTypeAndStatus(ALICE, U, ReadStatus.UNREAD))
+        when(repository.findByRecipientIdAndRecipientTypeAndStatusIn(ALICE, U, List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED)))
                 .thenReturn(List.of(row(ALICE, U, "n-1", ReadStatus.UNREAD), row(ALICE, U, "n-2", ReadStatus.UNREAD)));
         when(repository.markAsReadByIds(any(), eq(ALICE), eq(U), anyCollection())).thenReturn(2L);
 
@@ -81,12 +81,24 @@ class NotificationReadStateServiceTest {
     @Test
     @DisplayName("Given nothing unread, when markAllAsRead runs, then no event fires")
     void mark_all_as_read_with_nothing_unread_stays_silent() {
-        when(repository.findByRecipientIdAndRecipientTypeAndStatus(ALICE, U, ReadStatus.UNREAD))
+        when(repository.findByRecipientIdAndRecipientTypeAndStatusIn(ALICE, U, List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED)))
                 .thenReturn(List.of());
 
         assertThat(service.markAllAsRead(ALICE, U)).isZero();
 
         assertThat(listener.events).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Given an UNREAD and an ARCHIVED row, when markAllAsRead runs, then both ride in the bulk event — an archived row turns read on interaction like an unread one")
+    void mark_all_as_read_flips_archived_rows_too() {
+        when(repository.findByRecipientIdAndRecipientTypeAndStatusIn(ALICE, U, List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED)))
+                .thenReturn(List.of(row(ALICE, U, "n-1", ReadStatus.UNREAD), row(ALICE, U, "n-2", ReadStatus.ARCHIVED)));
+        when(repository.markAsReadByIds(any(), eq(ALICE), eq(U), anyCollection())).thenReturn(2L);
+
+        assertThat(service.markAllAsRead(ALICE, U)).isEqualTo(2L);
+
+        assertThat(listener.events.get(0).notificationIds()).containsExactly("n-1", "n-2");
     }
 
     @Test
