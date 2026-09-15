@@ -84,7 +84,7 @@ class DeviceLogServiceTest {
         verify(lokiClient).queryRange(
                 "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\", level=~\"ERROR|WARN\"}"
                         + " |~ \"(?i)a\\\"b\" | machine_id=\"machine-1\"",
-                FROM_NANOS, TO_NANOS + 1, 21, LokiDirection.BACKWARD);
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD);
     }
 
     @Test
@@ -93,7 +93,16 @@ class DeviceLogServiceTest {
 
         verify(lokiClient).queryRange(
                 "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"} | machine_id=\"machine-1\"",
-                TO_NANOS - Duration.ofDays(7).toNanos(), TO_NANOS + 1, 21, LokiDirection.BACKWARD);
+                TO_NANOS - Duration.ofDays(7).toNanos(), TO_NANOS + 1, 101, LokiDirection.BACKWARD);
+    }
+
+    @Test
+    void clampsThePageSizeBetweenOneAndFiveHundredLines() {
+        service.queryDeviceLogs(MACHINE_ID, window(), page(1000, null));
+        service.queryDeviceLogs(MACHINE_ID, window(), page(0, null));
+
+        verify(lokiClient).queryRange(anyString(), anyLong(), anyLong(), eq(501), eq(LokiDirection.BACKWARD));
+        verify(lokiClient).queryRange(anyString(), anyLong(), anyLong(), eq(2), eq(LokiDirection.BACKWARD));
     }
 
     @Test
@@ -147,30 +156,55 @@ class DeviceLogServiceTest {
         assertThat(result.getItems()).extracting(DeviceLogEntry::getMessage).containsExactly("c", "b");
         assertThat(result.getPageInfo().isHasNextPage()).isTrue();
         assertThat(result.getPageInfo().isHasPreviousPage()).isFalse();
-        assertThat(result.getPageInfo().getStartCursor()).isEqualTo(CursorCodec.encode("300:1"));
-        assertThat(result.getPageInfo().getEndCursor()).isEqualTo(CursorCodec.encode("200:1"));
+        assertThat(result.getPageInfo().getStartCursor()).isEqualTo(CursorCodec.encode("300"));
+        assertThat(result.getPageInfo().getEndCursor()).isEqualTo(CursorCodec.encode("200"));
     }
 
     @Test
-    void nextPageSkipsEntriesAlreadyReturnedAtTheCursorTimestamp() {
+    void nextPageEndsJustBeforeTheCursorTimestamp() {
         long cursorNanos = TO_NANOS - 500;
-        when(lokiClient.queryRange(anyString(), eq(FROM_NANOS), eq(cursorNanos + 1), eq(4), eq(LokiDirection.BACKWARD)))
-                .thenReturn(List.of(entry(cursorNanos, "b1"), entry(cursorNanos, "b2"), entry(cursorNanos - 1, "a")));
+        when(lokiClient.queryRange(anyString(), eq(FROM_NANOS), eq(cursorNanos), eq(3), eq(LokiDirection.BACKWARD)))
+                .thenReturn(List.of(entry(cursorNanos - 1, "b"), entry(cursorNanos - 2, "a")));
 
         GenericQueryResult<DeviceLogEntry> result =
-                service.queryDeviceLogs(MACHINE_ID, window(), page(2, cursorNanos + ":1"));
+                service.queryDeviceLogs(MACHINE_ID, window(), page(2, String.valueOf(cursorNanos)));
 
-        assertThat(result.getItems()).extracting(DeviceLogEntry::getMessage).containsExactly("b2", "a");
-        assertThat(result.getItems()).extracting(DeviceLogEntry::getCursor)
-                .containsExactly(CursorCodec.encode(cursorNanos + ":2"), CursorCodec.encode((cursorNanos - 1) + ":1"));
+        assertThat(result.getItems()).extracting(DeviceLogEntry::getMessage).containsExactly("b", "a");
         assertThat(result.getPageInfo().isHasNextPage()).isFalse();
         assertThat(result.getPageInfo().isHasPreviousPage()).isTrue();
     }
 
     @Test
+    void endsAPageBeforeLinesThatShareTheCutTimestamp() {
+        // Loki cut the lines at 200 ns at the limit, keeping whichever it chose
+        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD)))
+                .thenReturn(List.of(entry(300, "c"), entry(200, "b1"), entry(200, "b2")));
+
+        GenericQueryResult<DeviceLogEntry> result = service.queryDeviceLogs(MACHINE_ID, window(), page(2, null));
+
+        assertThat(result.getItems()).extracting(DeviceLogEntry::getMessage).containsExactly("c");
+        assertThat(result.getPageInfo().isHasNextPage()).isTrue();
+        assertThat(result.getPageInfo().getEndCursor()).isEqualTo(CursorCodec.encode("300"));
+    }
+
+    @Test
+    void returnsEveryLineOfATimestampThatFillsTheWholePage() {
+        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD)))
+                .thenReturn(List.of(entry(200, "a"), entry(200, "b"), entry(200, "c")));
+        when(lokiClient.queryRange(anyString(), eq(200L), eq(201L), eq(5000), eq(LokiDirection.BACKWARD)))
+                .thenReturn(List.of(entry(200, "a"), entry(200, "b"), entry(200, "c"), entry(200, "d")));
+
+        GenericQueryResult<DeviceLogEntry> result = service.queryDeviceLogs(MACHINE_ID, window(), page(2, null));
+
+        assertThat(result.getItems()).extracting(DeviceLogEntry::getMessage).containsExactly("a", "b", "c", "d");
+        assertThat(result.getPageInfo().isHasNextPage()).isTrue();
+        assertThat(result.getPageInfo().getEndCursor()).isEqualTo(CursorCodec.encode("200"));
+    }
+
+    @Test
     void cursorBeforeTheWindowReturnsAnEmptyPageWithoutQuerying() {
         GenericQueryResult<DeviceLogEntry> result =
-                service.queryDeviceLogs(MACHINE_ID, window(), page(2, (FROM_NANOS - 1) + ":1"));
+                service.queryDeviceLogs(MACHINE_ID, window(), page(2, String.valueOf(FROM_NANOS - 1)));
 
         assertThat(result.getItems()).isEmpty();
         assertThat(result.getPageInfo().isHasNextPage()).isFalse();

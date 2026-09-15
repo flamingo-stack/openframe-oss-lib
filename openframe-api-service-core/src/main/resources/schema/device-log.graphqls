@@ -4,7 +4,7 @@ extend type Query {
     deviceLogs(
         machineId: String!
         filter: DeviceLogFilterInput
-        first: Int
+        first: Int       # Lines per page: 1-500, default 100
         after: String
     ): DeviceLogConnection!
 }
