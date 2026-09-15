@@ -4,6 +4,9 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.WaitForSelectorState;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * Page Object for the Scripts section.
  * URL: /scripts/                       → Scripts List tab
@@ -41,6 +44,9 @@ public class ScriptsPage {
     private static final String SEARCH_INPUT = "input[placeholder='Search for Scripts']";
     private static final String OPEN_FILTERS_BTN = "button[aria-label='Open filters']";
     private static final String RESULTS_COUNT = "main span:text-matches('^Showing \\d+ results$')";
+
+    // Pattern used to extract the numeric count from the "Showing N results" label.
+    private static final Pattern RESULTS_COUNT_PATTERN = Pattern.compile("^Showing (\\d+) results$");
 
     // Script rows: the card wrapper
     private static final String SCRIPT_ROW = "main div.relative.cursor-pointer";
@@ -317,9 +323,12 @@ public class ScriptsPage {
      * Parses and returns the integer from "Showing N results".
      */
     public int getResultsCount() {
-        return Integer.parseInt(
-                resultsCount().innerText().trim().replaceAll("\\D+", "")
-        );
+        String text = resultsCount().innerText().trim();
+        Matcher matcher = RESULTS_COUNT_PATTERN.matcher(text);
+        if (!matcher.matches()) {
+            throw new IllegalStateException("Unexpected results-count text: '" + text + "'");
+        }
+        return Integer.parseInt(matcher.group(1));
     }
 
     /**

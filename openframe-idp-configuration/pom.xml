@@ -35,7 +35,6 @@
         <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-spring</artifactId>
-            <version>5.10.2</version>
         </dependency>
     </dependencies>
 </project>

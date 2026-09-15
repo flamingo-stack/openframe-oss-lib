@@ -24,8 +24,11 @@ export function isCrossOriginUrl(url: string | null | undefined): boolean {
   // (`?tab=x`) resolves against the current page and can never leave
   // the origin.
   if (url.startsWith('#') || url.startsWith('?')) return false;
-  // Relative URL — by definition same origin.
-  if (url.startsWith('/') && !url.startsWith('//')) return false;
+  // Relative URL — by definition same origin. Guard against
+  // backslash-leading variants (e.g. `/\evil.com`, `/\/evil.com`) which
+  // browsers normalize to `//evil.com` (protocol-relative, cross-origin)
+  // even though a naive leading-slash check would treat them as relative.
+  if (url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\')) return false;
   // Anything else — absolute URL (http(s)://) or protocol-relative (//)
   // — is treated as cross-origin.
   return true;

@@ -27,6 +27,12 @@ public class SshMachineVerifier {
 
     private static final int EXEC_TIMEOUT_SECONDS = 30;
 
+    // SECURITY: host key verification is intentionally not pinned here. This connects to a real,
+    // password-authenticated fleet machine (see MachineConfig), so accepting any host key is a
+    // MITM risk on an untrusted network. TODO: replace with a known-hosts / pinned-key verifier
+    // once the test infra's network trust model is reviewed.
+    private static final PromiscuousVerifier HOST_KEY_VERIFIER = new PromiscuousVerifier();
+
     private final String host;
     private final int port;
     private final String user;
@@ -102,7 +108,7 @@ public class SshMachineVerifier {
         String actual = os == MachineOs.WINDOWS ? wrapPowerShell(command) : command;
         SSHClient ssh = new SSHClient();
         try {
-            ssh.addHostKeyVerifier(new PromiscuousVerifier());
+            ssh.addHostKeyVerifier(HOST_KEY_VERIFIER);
             ssh.connect(host, port);
             ssh.authPassword(user, password);
             try (Session session = ssh.startSession()) {

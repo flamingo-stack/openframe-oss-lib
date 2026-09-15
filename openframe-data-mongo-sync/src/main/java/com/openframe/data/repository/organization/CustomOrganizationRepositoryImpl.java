@@ -2,6 +2,7 @@ package com.openframe.data.repository.organization;
 
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
+import com.openframe.data.repository.support.MongoKeysetCriteriaBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
@@ -188,18 +189,7 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
             ObjectId cursorId = new ObjectId(parts[1]);
             boolean ascending = !SORT_DESC.equalsIgnoreCase(sortDirection);
 
-            Criteria pastValue = ascending
-                    ? Criteria.where(UPDATED_AT_FIELD).gt(value)
-                    : Criteria.where(UPDATED_AT_FIELD).lt(value);
-            Criteria sameValuePastId = new Criteria().andOperator(
-                    Criteria.where(UPDATED_AT_FIELD).is(value),
-                    ascending ? Criteria.where(ID_FIELD).gt(cursorId) : Criteria.where(ID_FIELD).lt(cursorId));
-
-            // Use a $or-keyed criteria (not the keyless Criteria.orOperator) so it
-            // does not clash with the base filter's keyless $and — MongoDB Query
-            // rejects a second keyless criteria. Mirrors CustomMachineRepositoryImpl.
-            query.addCriteria(Criteria.where("$or").is(
-                    List.of(pastValue.getCriteriaObject(), sameValuePastId.getCriteriaObject())));
+            MongoKeysetCriteriaBuilder.applyKeysetOr(query, UPDATED_AT_FIELD, ID_FIELD, value, cursorId, ascending);
         } catch (IllegalArgumentException ex) {
             log.warn("Invalid compound cursor format: {}", cursor);
         }

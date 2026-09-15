@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.IntStream;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -57,7 +58,12 @@ public class TicketReadService {
         Map<String, List<TicketAttachment>> attachmentsByTicket = ticketAttachmentRepository.findByTicketIdIn(ticketIds)
                 .stream()
                 .collect(Collectors.groupingBy(TicketAttachment::getTicketId));
+        Set<String> statusIds = tickets.stream()
+                .map(Ticket::getStatusId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
         Map<String, TicketStatusDefinition> statusesById = ticketStatusService.list().stream()
+                .filter(status -> statusIds.contains(status.getId()))
                 .collect(Collectors.toMap(TicketStatusDefinition::getId, Function.identity(), (a, b) -> a));
         return IntStream.range(0, tickets.size())
                 .mapToObj(i -> {
@@ -74,3 +80,4 @@ public class TicketReadService {
                 .toList();
     }
 }
+

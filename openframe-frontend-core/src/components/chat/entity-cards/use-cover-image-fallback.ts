@@ -15,7 +15,7 @@
  * with no reset effect, and a URL that failed once isn't retried in a loop.
  */
 
-import { useCallback, useState, type SyntheticEvent } from 'react';
+import { useCallback, useState } from 'react';
 
 export interface CoverImageFallback {
   /** Resolved source: first non-failed of [imageUrl, placeholderUrl], else null. */
@@ -43,8 +43,12 @@ export function useCoverImageFallback(imageUrl?: string | null, placeholderUrl?:
 }
 
 /** Fallback for cards with NO placeholder chain (compact/sm image slots):
- *  a broken cover simply disappears, leaving the slot's background. */
-export const hideOnError = (e: SyntheticEvent<HTMLImageElement>) => {
-  const img = e.currentTarget;
-  img.style.display = 'none';
-};
+ *  a broken cover simply disappears, leaving the slot's background.
+ *
+ *  Implemented on top of `useCoverImageFallback` (with no placeholder) so
+ *  the failure state lives in React state instead of an imperative DOM
+ *  mutation, keeping a single fallback strategy across the file. */
+export function useHideOnErrorImage(imageUrl?: string | null): CoverImageFallback {
+  return useCoverImageFallback(imageUrl, null);
+}
+

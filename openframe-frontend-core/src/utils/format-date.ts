@@ -1,6 +1,7 @@
-// Locale-aware date/time formatters — mirrors openframe-frontend
-// `src/lib/format-date.ts`. Formats follow the user's locale
-// (e.g. MM/DD/YYYY in en-US vs DD.MM.YYYY in european locales).
+// Locale-aware date/time formatters. This is the canonical implementation for
+// this ecosystem; openframe-frontend `src/lib/format-date.ts` should import
+// from this package rather than maintain a separate copy. Formats follow the
+// user's locale (e.g. MM/DD/YYYY in en-US vs DD.MM.YYYY in european locales).
 
 type DateInput = string | number | Date;
 

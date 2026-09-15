@@ -28,7 +28,15 @@ public class LogGenerator {
     }
 
     public static String searchTerm(String summary) {
-        String[] words = summary.split(" ");
+        if (summary == null) {
+            return "";
+        }
+        String trimmed = summary.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        String[] words = trimmed.split("\\s+");
         return words[0];
     }
 }
+
