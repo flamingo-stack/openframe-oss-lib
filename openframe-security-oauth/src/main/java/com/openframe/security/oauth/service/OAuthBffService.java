@@ -28,6 +28,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -430,8 +431,13 @@ public class OAuthBffService {
         }
     }
 
+    /**
+     * RFC 6749 §2.3.1: client id and secret are form-urlencoded before Base64, and the authorization
+     * server decodes them. Sent raw, a '+' in the secret arrives as a space and every token request
+     * fails with invalid_client.
+     */
     private String basicAuth(String clientId, String clientSecret) {
-        String raw = clientId + ":" + clientSecret;
+        String raw = URLEncoder.encode(clientId, UTF_8) + ":" + URLEncoder.encode(clientSecret, UTF_8);
         return "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(UTF_8));
     }
 
