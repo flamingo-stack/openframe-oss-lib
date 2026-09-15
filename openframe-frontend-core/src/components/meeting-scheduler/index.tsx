@@ -143,12 +143,6 @@ export interface HubSpotMeetingSchedulerProps {
    * can pass it across the RSC boundary where a component cannot.
    */
   detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent'>;
-  /**
-   * `flow="details-first"`: how many full-width field rows the cold-start form
-   * skeleton draws (see `BookingFormSkeleton`'s `rowCount`). Omit for the
-   * `fieldRows` / built-in footprint.
-   */
-  skeletonRowCount?: number;
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
@@ -396,7 +390,6 @@ export function HubSpotMeetingScheduler({
   flow = DEFAULT_SCHEDULER_FLOW,
   detailsForm: DetailsForm = BookingForm,
   detailsFormProps,
-  skeletonRowCount,
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -725,7 +718,6 @@ export function HubSpotMeetingScheduler({
               <div className={stepPanelClass}>
                 <BookingFormSkeleton
                   fieldRows={detailsFormProps?.fieldRows}
-                  rowCount={skeletonRowCount}
                   consent={Boolean(detailsFormProps?.consent)}
                   footerNote={preset.footerNote}
                 />
