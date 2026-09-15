@@ -302,6 +302,22 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
         assertThat(statusOf("n2")).isEqualTo(ReadStatus.ARCHIVED);
     }
 
+    @Test
+    @DisplayName("Given two notifications about one ticket unread for two users and a machine, plus another ticket, when archiveEntityForAllRecipients runs for the first ticket, then every row on it is ARCHIVED and the other ticket stays unread")
+    void archive_entity_for_all_recipients_archives_every_row_on_the_entity() {
+        NotificationEntityRef ticket = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-1").orElseThrow();
+        NotificationEntityRef other = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-2").orElseThrow();
+        service.createForAudience("n1", CAT_TICKETS, "title", ticket, U, Set.of(ALICE, BOB));
+        service.createForAudience("n2", CAT_TICKETS, "title", ticket, M, Set.of(MACHINE_1));
+        service.createForAudience("n3", CAT_TICKETS, "title", other, U, Set.of(ALICE));
+
+        assertThat(service.archiveEntityForAllRecipients(NotificationEntityType.TICKET, "ticket-1")).isEqualTo(3L);
+
+        assertThat(statusOf("n2")).isEqualTo(ReadStatus.ARCHIVED);
+        assertThat(service.hasUnread(BOB, U)).isFalse();
+        assertThat(service.unreadCountsByEntity(ALICE, U, NotificationEntityType.TICKET)).containsOnly(entry("ticket-2", 1L));
+    }
+
     private void archive(String notificationId) {
         mongoTemplate.updateMulti(query(where("notificationId").is(notificationId)),
                 Update.update("status", ReadStatus.ARCHIVED), NotificationReadState.class);

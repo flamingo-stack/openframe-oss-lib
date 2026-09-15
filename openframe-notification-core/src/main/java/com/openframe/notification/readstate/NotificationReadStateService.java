@@ -122,6 +122,17 @@ public class NotificationReadStateService {
         return flipped;
     }
 
+    public long archiveEntityForAllRecipients(@NotNull NotificationEntityType entityType, @NotBlank String entityId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<NotificationReadState> unreadRows = repository.findUnreadByEntity(entityType, entityId, tenantId);
+        long archived = repository.archiveUnreadByEntity(entityType, entityId, tenantId);
+        for (NotificationReadState row : unreadRows) {
+            publish(row.getRecipientId(), row.getRecipientType(),
+                    List.of(row.getNotificationId()), NotificationReadEvent.Transition.ARCHIVED);
+        }
+        return archived;
+    }
+
     public boolean deleteNotification(@NotBlank String recipientId,
                                       @NotNull RecipientType recipientType,
                                       @NotBlank String notificationId) {

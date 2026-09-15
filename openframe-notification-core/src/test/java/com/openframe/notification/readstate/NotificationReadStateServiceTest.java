@@ -1,5 +1,6 @@
 package com.openframe.notification.readstate;
 
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
@@ -145,6 +146,32 @@ class NotificationReadStateServiceTest {
             assertThat(event.notificationIds()).containsExactly("n-1");
             assertThat(event.transition()).isEqualTo(NotificationReadEvent.Transition.READ);
         });
+    }
+
+    @Test
+    @DisplayName("Given two notifications about one ticket unread for a user and a machine, when archiveEntityForAllRecipients runs, then both rows are archived and each recipient gets an ARCHIVED event")
+    void archive_entity_for_all_recipients_publishes_per_unread_row() {
+        when(repository.findUnreadByEntity(NotificationEntityType.TICKET, "ticket-1", null)).thenReturn(List.of(
+                row(ALICE, U, "n-1", ReadStatus.UNREAD),
+                row("machine-1", RecipientType.MACHINE, "n-2", ReadStatus.UNREAD)));
+        when(repository.archiveUnreadByEntity(NotificationEntityType.TICKET, "ticket-1", null)).thenReturn(2L);
+
+        assertThat(service.archiveEntityForAllRecipients(NotificationEntityType.TICKET, "ticket-1")).isEqualTo(2L);
+
+        assertThat(listener.events).extracting(NotificationReadEvent::recipientId)
+                .containsExactly(ALICE, "machine-1");
+        assertThat(listener.events).extracting(NotificationReadEvent::transition)
+                .containsOnly(NotificationReadEvent.Transition.ARCHIVED);
+    }
+
+    @Test
+    @DisplayName("Given nothing unread about the ticket, when archiveEntityForAllRecipients runs, then nothing is archived and no event fires")
+    void archive_entity_for_all_recipients_with_nothing_unread_stays_silent() {
+        when(repository.findUnreadByEntity(NotificationEntityType.TICKET, "ticket-1", null)).thenReturn(List.of());
+
+        assertThat(service.archiveEntityForAllRecipients(NotificationEntityType.TICKET, "ticket-1")).isZero();
+
+        assertThat(listener.events).isEmpty();
     }
 
     @Test
