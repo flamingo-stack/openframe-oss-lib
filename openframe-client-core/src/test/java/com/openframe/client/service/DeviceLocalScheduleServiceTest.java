@@ -11,7 +11,6 @@ import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
-import com.openframe.data.nats.publisher.MachineTimezoneRequestNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
@@ -49,14 +48,13 @@ class DeviceLocalScheduleServiceTest {
     @Mock private MachineRepository machineRepository;
     @Mock private ScheduleDeviceLocalDispatchRepository dispatchRepository;
     @Mock private ScheduleFireDispatcher fireDispatcher;
-    @Mock private MachineTimezoneRequestNatsPublisher timezoneRequestPublisher;
 
     private DeviceLocalScheduleService service;
 
     @BeforeEach
     void setUp() {
         service = new DeviceLocalScheduleService(scheduleRepository, targetResolver, machineRepository,
-                dispatchRepository, fireDispatcher, timezoneRequestPublisher);
+                dispatchRepository, fireDispatcher);
         ReflectionTestUtils.setField(service, "catchupSeconds", RECONNECT_WINDOW);
     }
 
@@ -70,7 +68,6 @@ class DeviceLocalScheduleServiceTest {
 
         service.runDueDeviceLocalSchedules(now);
 
-        verify(timezoneRequestPublisher).request("m-kyiv", SCHEDULE_ID);
         verify(fireDispatcher).dispatch(any(ScheduleScript.class), eq(List.of("m-kyiv")), eq(now));
         ScheduleLocalMachineTimeDispatch saved = capturedSave();
         assertThat(saved.getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.FIRED);
@@ -92,7 +89,7 @@ class DeviceLocalScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("recurring current occurrence already recorded: not re-fired (but timezone kept refreshed)")
+    @DisplayName("recurring current occurrence already recorded: not re-fired")
     void recurringCurrentAlreadyHandled_notReFired() {
         Instant now = Instant.parse("2026-09-15T09:05:00Z");
         stubScheduleNoDispatchStub(skip(3600L), List.of("m-kyiv"));
@@ -103,13 +100,12 @@ class DeviceLocalScheduleServiceTest {
 
         service.runDueDeviceLocalSchedules(now);
 
-        verify(timezoneRequestPublisher).request("m-kyiv", SCHEDULE_ID);
         verifyNoInteractions(fireDispatcher);
         verify(dispatchRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("online device whose occurrence has not arrived yet: re-requested, not fired")
+    @DisplayName("online device whose occurrence has not arrived yet: not fired, not recorded")
     void notYet_requestedNotFired() {
         Instant now = Instant.parse("2026-09-15T06:05:00Z");
         stubSchedule(skip(null), List.of("m-ny"));
@@ -118,13 +114,12 @@ class DeviceLocalScheduleServiceTest {
 
         service.runDueDeviceLocalSchedules(now);
 
-        verify(timezoneRequestPublisher).request("m-ny", SCHEDULE_ID);
         verifyNoInteractions(fireDispatcher);
         verify(dispatchRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("online device with no known timezone yet: requested and deferred — not fired, not recorded")
+    @DisplayName("online device with no reported timezone yet: skipped this tick — not fired, not recorded")
     void noStoredTimezone_deferred() {
         Instant now = Instant.parse("2026-09-15T06:05:00Z");
         stubSchedule(skip(null), List.of("m-new"));
@@ -133,13 +128,12 @@ class DeviceLocalScheduleServiceTest {
 
         service.runDueDeviceLocalSchedules(now);
 
-        verify(timezoneRequestPublisher).request("m-new", SCHEDULE_ID);
         verifyNoInteractions(fireDispatcher);
         verify(dispatchRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("one-shot already handled: skipped entirely — no refresh, no fire")
+    @DisplayName("one-shot already handled: skipped entirely — no fire")
     void oneShotAlreadyHandled_skipped() {
         Instant now = Instant.parse("2026-09-15T06:05:00Z");
         stubScheduleNoDispatchStub(skip(null), List.of("m-kyiv"));
@@ -150,7 +144,6 @@ class DeviceLocalScheduleServiceTest {
 
         service.runDueDeviceLocalSchedules(now);
 
-        verifyNoInteractions(timezoneRequestPublisher);
         verifyNoInteractions(fireDispatcher);
         verify(dispatchRepository, never()).save(any());
     }
