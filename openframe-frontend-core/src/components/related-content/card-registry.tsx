@@ -306,6 +306,7 @@ const CUSTOMER_INTERVIEW_ROW_DEFAULTS: CustomerInterview = {
   user_id: null,
   main_video_url: null,
   teasers: [],
+  quotes: [],
   case_study_id: null,
   seo_title: null,
   seo_description: null,

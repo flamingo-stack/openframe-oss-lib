@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useEffect, useState, useRef } from 'react';
 import {
-  ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
   ApprovalRequestNotificationTile,
+  MINGO_APPROVAL_REQUEST_TYPE,
   NotificationDrawer,
   NotificationPopups,
   NotificationTile,
@@ -70,7 +70,7 @@ const approvalSeed = (
   createdAt: Date.now() - 1_000 * 60 * minutesAgo,
   read: false,
   meta: {
-    contextType: ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
+    notificationType: MINGO_APPROVAL_REQUEST_TYPE,
     approvalRequestId: `seed-req-${n}`,
     approvalType: 'ADMIN',
     resolution,
@@ -491,7 +491,7 @@ function PlaygroundControls() {
       title,
       description,
       meta: {
-        contextType: ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
+        notificationType: MINGO_APPROVAL_REQUEST_TYPE,
         approvalRequestId: `req-${n}`,
         approvalType: 'ADMIN',
         toolCalls: toolCalls.map((tc, i) => ({
