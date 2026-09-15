@@ -66,6 +66,7 @@ public class TicketService {
     private final TicketNumberService ticketNumberService;
     private final TicketTagService ticketTagService;
     private final TicketIdsForFilter ticketIdsForFilter;
+    private final TicketStalenessResolver ticketStalenessResolver;
     private final MachineRepository machineRepository;
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
@@ -560,6 +561,7 @@ public class TicketService {
                 .statusIds(filter.getStatusIds())
                 .organizationIds(filter.getOrganizationIds())
                 .assigneeIds(filter.getAssigneeIds())
+                .activity(ticketStalenessResolver.resolve(filter.getActivity()))
                 .build();
     }
 
