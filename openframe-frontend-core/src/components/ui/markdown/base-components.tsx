@@ -367,8 +367,17 @@ export function buildBaseComponents({
     ul: ({ children }: MdRenderProps<'ul'>) => (
       <ul className="my-4 ml-8 list-outside list-disc space-y-2 text-ods-text-primary">{children}</ul>
     ),
-    ol: ({ children }: MdRenderProps<'ol'>) => (
-      <ol className="my-4 ml-8 list-outside list-decimal space-y-2 text-ods-text-primary">{children}</ol>
+    // `start` is forwarded because a list does not always begin at 1 in the
+    // SOURCE the renderer sees. Anything that renders one markdown document in
+    // pieces — the streaming block splitter, the chat bubble hoisting a card out
+    // at its marker — hands the renderer a continuation that opens on `2.`, and
+    // dropping `start` renumbered every such piece "1." (reported as "cards are
+    // always number 1"). Only `start` is forwarded: the rest of the props carry
+    // react-markdown's `node`, which must not reach the DOM.
+    ol: ({ children, start }: MdRenderProps<'ol'>) => (
+      <ol start={start} className="my-4 ml-8 list-outside list-decimal space-y-2 text-ods-text-primary">
+        {children}
+      </ol>
     ),
     li: ({ children }: MdRenderProps<'li'>) => <li className={cn('pl-2 leading-relaxed', textSizes.li)}>{children}</li>,
 
