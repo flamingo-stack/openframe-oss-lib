@@ -104,8 +104,19 @@ const drawerPanelVariants = cva(
         false: 'gap-4 rounded-md border border-ods-border p-4',
         true: '',
       },
+      /** Panel size along the axis the drawer slides on. `default` leaves it to
+       *  the content (or `resizable`); `wide` is the admin detail panel, 90% of
+       *  the viewport. Set the size here, never with a width class. */
+      size: {
+        default: '',
+        wide: '',
+      },
     },
     compoundVariants: [
+      { side: 'right', size: 'wide', class: 'w-[90vw]' },
+      { side: 'left', size: 'wide', class: 'w-[90vw]' },
+      { side: 'top', size: 'wide', class: 'h-[90vh]' },
+      { side: 'bottom', size: 'wide', class: 'h-[90vh]' },
       // flush=true → drops inner padding/gap so the consumer fully owns
       // internal layout, BUT preserves the card chrome (rounded + border)
       // on desktop so the panel still reads as an elevated card.
@@ -118,6 +129,7 @@ const drawerPanelVariants = cva(
     defaultVariants: {
       side: 'right',
       flush: false,
+      size: 'default',
     },
   },
 );
@@ -310,6 +322,9 @@ interface DrawerContentProps
    *  panel attaches flush to the viewport edge. Use for full-height side
    *  panels (e.g. the embedded chat). */
   flush?: boolean;
+  /** Panel size preset (`wide` = 90% of the viewport). Use it instead of a
+   *  width/height class; ignored while `resizable` sizes the panel inline. */
+  size?: 'default' | 'wide';
   /** Enable the drag-to-resize handle on the inside-facing edge. Only
    *  active for `side="left"` / `side="right"` (or `top`/`bottom`) on
    *  non-mobile viewports. */
@@ -349,6 +364,7 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
     {
       side = 'right',
       flush = false,
+      size = 'default',
       resizable = false,
       minSize = 320,
       maxSize = 1280,
@@ -383,7 +399,7 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
       return () => mq.removeEventListener('change', update);
     }, [mobileBreakpoint]);
 
-    const { size, setSize } = useResizableSize({
+    const { size: resizedSize, setSize } = useResizableSize({
       enabled: resizable,
       isHorizontal,
       minSize,
@@ -393,7 +409,11 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
     });
 
     const applyInlineSize = resizable && !isMobile;
-    const sizeStyle: CSSProperties = applyInlineSize ? (isHorizontal ? { width: size } : { height: size }) : {};
+    const sizeStyle: CSSProperties = applyInlineSize
+      ? isHorizontal
+        ? { width: resizedSize }
+        : { height: resizedSize }
+      : {};
 
     return (
       <DrawerPortal>
@@ -410,7 +430,7 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
           {applyInlineSize ? (
             <DrawerResizeHandle
               side={resolvedSide}
-              size={size}
+              size={resizedSize}
               minSize={minSize}
               maxSize={maxSize}
               onSize={setSize}
@@ -418,7 +438,7 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
             />
           ) : null}
           <div
-            className={cn(drawerPanelVariants({ side, flush }), className, panelClassName)}
+            className={cn(drawerPanelVariants({ side, flush, size }), className, panelClassName)}
             style={{ ...sizeStyle, ...panelStyle }}
           >
             {children}
