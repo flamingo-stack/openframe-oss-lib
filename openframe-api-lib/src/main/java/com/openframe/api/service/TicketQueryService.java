@@ -28,6 +28,10 @@ public class TicketQueryService {
         return ticketRepository.findById(ticketId);
     }
 
+    public Optional<Ticket> findByTicketNumber(Integer ticketNumber) {
+        return ticketRepository.findByTicketNumber(ticketNumber);
+    }
+
     public List<Ticket> searchTickets(TicketQueryFilter filter, String search, int limit) {
         Query query = ticketRepository.buildTicketQuery(filter, search, null, null);
         return ticketRepository.findTicketsWithCursor(
