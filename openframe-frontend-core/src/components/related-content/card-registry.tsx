@@ -48,6 +48,7 @@ import type { CustomerInterview } from '../../types/customer-interview';
 import type { EntityAuthor } from '../../types/entity-author';
 import type { MSP } from '../../types/stack';
 import type { UserProfile } from '../../types/user';
+import { AiPromptCard, AiPromptCardSkeleton, type AiPromptCardData } from '../chat/entity-cards/ai-prompt-card';
 // DEEP card imports — NOT the `../chat` barrel. See the import note in
 // `related-content-section.tsx`: the barrel statically reaches
 // @tanstack/react-query, deep paths keep this module's source graph free of it.
@@ -305,6 +306,7 @@ const CUSTOMER_INTERVIEW_ROW_DEFAULTS: CustomerInterview = {
   user_id: null,
   main_video_url: null,
   teasers: [],
+  quotes: [],
   case_study_id: null,
   seo_title: null,
   seo_description: null,
@@ -511,8 +513,10 @@ function decodeProgramRow(row: unknown): BaseProgramItem & Record<string, unknow
 /** The two employee-entry cards already declare MINIMAL row shapes
  *  (`EmployeeEntryCardData` + one date column each), so their decoders read
  *  exactly the card's fields with nothing left over. */
-function decodeEmployeeEntryRow(row: unknown): WhatIShippedCardData & HowIWorkCardData {
+function decodeEmployeeEntryRow(row: unknown): WhatIShippedCardData & HowIWorkCardData & AiPromptCardData {
   const record = asRecord(row);
+  const department = asRecord(record.department);
+  const stepCount = record.step_count;
   return {
     title: strOrNull(record, 'title'),
     summary: strOrNull(record, 'summary'),
@@ -523,6 +527,11 @@ function decodeEmployeeEntryRow(row: unknown): WhatIShippedCardData & HowIWorkCa
     entry_month: strOrNull(record, 'entry_month'),
     session_date: strOrNull(record, 'session_date'),
     discipline: strOrNull(record, 'discipline'),
+    published_at: strOrNull(record, 'published_at'),
+    department: record.department
+      ? { name: strOrNull(department, 'name'), color: strOrNull(department, 'color') }
+      : null,
+    step_count: typeof stepCount === 'number' ? stepCount : null,
   };
 }
 
@@ -763,6 +772,19 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
     decode: decodeEmployeeEntryRow,
     render: (entry, ctx) => (
       <HowIWorkCard
+        entry={entry}
+        placeholderUrl={ctx.placeholderUrl}
+        anchorProps={ctx.linkProps ?? (ctx.href ? { href: ctx.href, ...ctx.anchorAttrs } : undefined)}
+      />
+    ),
+  }),
+
+  /** Same shared employee-entry shape + anchor contract as What I Shipped. */
+  ai_prompt: cardEntry({
+    skeleton: () => <AiPromptCardSkeleton />,
+    decode: decodeEmployeeEntryRow,
+    render: (entry, ctx) => (
+      <AiPromptCard
         entry={entry}
         placeholderUrl={ctx.placeholderUrl}
         anchorProps={ctx.linkProps ?? (ctx.href ? { href: ctx.href, ...ctx.anchorAttrs } : undefined)}

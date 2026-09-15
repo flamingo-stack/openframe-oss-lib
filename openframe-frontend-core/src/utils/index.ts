@@ -132,6 +132,7 @@ export {
   formatLargeNumber,
   formatAbbreviatedNumber,
   nameInitials,
+  personFirstName,
   personInitials,
   singleInitial,
   formatDurationMMSS,
@@ -390,3 +391,5 @@ export * from './ods-spacing';
 export * from './csv';
 // Social platform vocabulary, host table, link type, picker.
 export * from './social-platforms';
+// The ODS badge palette a row whose colour is data picks from (departments).
+export { BADGE_PALETTE, isBadgePaletteKey, pickBadgePaletteColor, type BadgePaletteKey } from './badge-palette';

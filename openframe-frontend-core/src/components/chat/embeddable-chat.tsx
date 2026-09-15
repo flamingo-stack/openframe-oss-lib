@@ -97,7 +97,10 @@ import type { ChatDialogCapabilities, UnifiedChatState } from './types/unified-c
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
+import { FALLBACK_TOP_RETRIEVED, splitCitedSources } from './utils/cited-sources';
 import { executeNavigation } from './utils/execute-navigation';
+import { flattenAssistantContent } from './utils/flatten-assistant-content';
+import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
@@ -434,12 +437,6 @@ const mentionTokenOf = (key: string, markerByType: Map<string, string>): string 
   const id = ci === -1 ? '' : key.slice(ci + 1);
   return `${markerByType.get(type) ?? type.toLowerCase()}:${id}`;
 };
-
-/**
- * Fallback fan-out when the model didn't cite any source. Show the top-N
- * retrieved sources instead of zero chips. Mirrors Perplexity's behavior.
- */
-const FALLBACK_TOP_RETRIEVED = 3;
 
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
@@ -1539,56 +1536,12 @@ function EmbeddableChatInner({
       : undefined;
   const guideUserAvatar = activeMode === 'guide' ? identityUser?.avatarUrl?.trim() || undefined : undefined;
 
-  // Map docMessages → lib's Message type, forwarding scrollAnchor.
+  // Map the host's rows → the lib's Message type. The mapping itself lives in
+  // `mapHostMessage`, which is where its pass-through list is pinned by tests.
   const messages: Message[] = useMemo(() => {
-    const cache = timestampCache;
-    const seenIds = new Set<string>();
-
-    const mapped = rawMessages.map(m => {
-      seenIds.add(m.id);
-      let timestamp: Date;
-      if (m.timestamp != null) {
-        timestamp = new Date(m.timestamp);
-      } else {
-        const cached = cache.get(m.id);
-        timestamp = cached ?? new Date();
-        if (!cached) cache.set(m.id, timestamp);
-      }
-
-      return {
-        id: m.id,
-        role: m.role,
-        // Host-supplied per-message name/avatar win (e.g. the signed-in user's
-        // full name + photo on a `user` bubble); fall back to the role default
-        // when the host doesn't provide them.
-        name: m.name ?? (m.role === 'assistant' ? 'Mingo' : (guideUserName ?? 'You')),
-        avatar: m.avatar ?? (m.role === 'user' ? (guideUserAvatar ?? null) : null),
-        // Forward the host's authorType so user bubbles get the same accent
-        // name color as the standalone /mingo page (user → 'admin').
-        ...(m.authorType ? { authorType: m.authorType } : {}),
-        content: m.segments && m.segments.length > 0 ? m.segments : m.content,
-        timestamp,
-        assistantType: m.role === 'assistant' ? ('mingo' as const) : undefined,
-        // `hidden` is load-bearing, NOT cosmetic: it carries synthetic rows
-        // (e.g. an auto-continuation directive) that the LLM must see but the
-        // reader must not. Dropping it here made the raw directive text render
-        // as an ordinary bubble. This field-by-field rebuild has to forward it
-        // explicitly — see `Message.hidden` and `chat-message-list`'s skip.
-        ...(m.hidden ? { hidden: true } : {}),
-        ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
-        // Forward attached context items so the user bubble renders its chips.
-        ...(m.contextItems && m.contextItems.length > 0 ? { contextItems: m.contextItems } : {}),
-      };
-    });
-
-    // Drop cached fallbacks for messages no longer present so the map can't
-    // grow unbounded across a long-lived session.
-    if (cache.size > seenIds.size) {
-      for (const id of cache.keys()) {
-        if (!seenIds.has(id)) cache.delete(id);
-      }
-    }
-
+    const options = { userName: guideUserName, userAvatar: guideUserAvatar, timestampCache };
+    const mapped = rawMessages.map(m => mapHostMessage(m, options));
+    pruneTimestampCache(timestampCache, new Set(rawMessages.map(m => m.id)));
     return mapped;
   }, [rawMessages, guideUserName, guideUserAvatar, timestampCache]);
 
@@ -1836,24 +1789,44 @@ function EmbeddableChatInner({
     return out;
   }, [commandsById, enabledSet]);
 
-  // Find sources for the last assistant message; split into cited / uncited.
-  const lastAssistantMsg = [...rawMessages].reverse().find(m => m.role === 'assistant');
-  const lastSources = useMemo(() => {
-    if (chatLoading) return undefined;
-    const sources = lastAssistantMsg?.sources;
-    if (!sources || sources.length === 0) return undefined;
-    const content = lastAssistantMsg?.content || '';
-    const citationOrder = [...content.matchAll(/\[(\d+)\]/g)].map(m => parseInt(m[1], 10));
-    const seenOrder = new Map<number, number>();
-    citationOrder.forEach(idx => {
-      if (!seenOrder.has(idx)) seenOrder.set(idx, seenOrder.size);
-    });
-    const cited = sources
-      .filter(s => seenOrder.has(s.index))
-      .sort((a, b) => (seenOrder.get(a.index) ?? 0) - (seenOrder.get(b.index) ?? 0));
-    const uncited = sources.filter(s => !seenOrder.has(s.index));
-    return { cited, uncited };
-  }, [lastAssistantMsg, chatLoading]);
+  /**
+   * Source chips, under the answer that cited them.
+   *
+   * Per message, not once per thread. The strip names where THAT answer came
+   * from, and a conversation holds several answers — pinning one strip to the
+   * bottom of the thread attributes the newest answer's sources to whichever
+   * answer the reader is looking at. Both transports produce them now, so this
+   * is no longer a Guide-mode-only affordance either.
+   */
+  const renderMessageSources = useCallback(
+    (message: Message, index: number) => {
+      if (message.role !== 'assistant') return null;
+      // Suppressed only on the answer still being written: the citation markers
+      // the order is derived from arrive WITH the text, so a strip rendered
+      // mid-turn reshuffles under the reader as more sentences land.
+      //
+      // Scoped to the trailing row on purpose. `chatLoading` is a property of
+      // the THREAD, so testing it alone pulls the strips off every earlier
+      // answer too — a reader scrolled up watches finished citations blink out
+      // for the duration of an unrelated turn.
+      if (chatLoading && index === messages.length - 1) return null;
+      const { cited, uncited } = splitCitedSources(message.sources, flattenAssistantContent(message.content));
+      if (cited.length === 0 && uncited.length === 0) return null;
+      return (
+        <div className="pb-2">
+          <SourceChips
+            cited={cited}
+            uncited={uncited}
+            baseRoute={resolvedBaseRoute}
+            chipBasePlatform={chipBasePlatform}
+            onClose={handleNavigationClose}
+            onDiscuss={discussRef}
+          />
+        </div>
+      );
+    },
+    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, discussRef],
+  );
 
   // Host node for in-panel Radix portals (see the body wrapper below).
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
@@ -2434,6 +2407,7 @@ function EmbeddableChatInner({
                                   resolveContextIcon={resolveContextIcon}
                                   renderContextItem={renderContextItem}
                                   renderMention={renderMention}
+                                  renderAfterMessage={renderMessageSources}
                                   // Gated on `chatLoading` for the same reason the composer
                                   // is: no second send while a turn is in flight. Passive
                                   // demo hosts (previewMode) stay read-only.
@@ -2471,20 +2445,6 @@ function EmbeddableChatInner({
                                   onLoadMore={loadMoreMessages}
                                 />
                               )}
-                              {lastSources &&
-                                (lastSources.cited.length > 0 || lastSources.uncited.length > 0) &&
-                                !chatLoading && (
-                                  <div className="flex-shrink-0 pb-2">
-                                    <SourceChips
-                                      cited={lastSources.cited}
-                                      uncited={lastSources.uncited}
-                                      baseRoute={resolvedBaseRoute}
-                                      chipBasePlatform={chipBasePlatform}
-                                      onClose={handleNavigationClose}
-                                      onDiscuss={discussRef}
-                                    />
-                                  </div>
-                                )}
                             </div>
                           ) : activeMode === 'mingo' ? (
                             /* Figma node 7532:222444 — default (Mingo-mode) empty state:

@@ -42,7 +42,7 @@ const ASSIGNEES = [
 const BASE_TICKET: BoardTicket = {
   id: 'ticket-1',
   title: 'VPN connection drops every few minutes',
-  ticketNumber: '#1042',
+  ticketNumber: '1042',
   status: 'TECH_REQUIRED',
   deviceHostnames: ['MBP-15'],
   organizationName: 'Acme Corp',
@@ -99,7 +99,7 @@ export const Minimal: Story = {
     ticket: {
       id: 'ticket-min',
       title: 'How to install Teams',
-      ticketNumber: '#1001',
+      ticketNumber: '1001',
       status: 'ACTIVE',
     },
   },

@@ -117,7 +117,7 @@ class CommandResultListenerTest {
 
     private MessageHandler captureSubscribedHandler() {
         when(natsConnection.createDispatcher()).thenReturn(dispatcher);
-        listener.subscribeToCommandResults();
+        listener.subscribe();
 
         ArgumentCaptor<MessageHandler> handlerCaptor = ArgumentCaptor.forClass(MessageHandler.class);
         verify(dispatcher).subscribe(eq(SUBJECT), handlerCaptor.capture());

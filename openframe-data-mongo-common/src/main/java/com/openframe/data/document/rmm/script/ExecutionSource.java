@@ -4,5 +4,6 @@ public enum ExecutionSource {
     MANUAL,
     SCHEDULED,
     AI_ASSISTANT,
-    SYSTEM_BOOTSTRAP
+    SYSTEM_BOOTSTRAP,
+    PACKAGE_INSTALLATION
 }
