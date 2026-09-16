@@ -1,0 +1,54 @@
+package com.openframe.data.document.delivery;
+
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.Instant;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "machine_delivery")
+@CompoundIndex(name = "machine_delivery_sweep", def = "{'type': 1, 'status': 1, 'lastAttemptAt': 1}")
+public class MachineDelivery {
+
+    private static final String ID_SEPARATOR = ":";
+
+    @Id
+    private String id;
+
+    private DeliveryType type;
+    private String targetId;
+    private String machineId;
+    private String tenantId;
+
+    private DeliveryStatus status;
+    private int attempts;
+    private String payloadJson;
+
+    private Instant dispatchedAt;
+    private Instant lastAttemptAt;
+    private Instant ackedAt;
+    private Instant finishedAt;
+
+    private DeliveryFailure failure;
+    private String error;
+
+    private ScheduleOfflineBehavior offlineBehavior;
+    private Long reconnectWindowSeconds;
+
+    @Indexed(name = "machine_delivery_ttl", expireAfterSeconds = 0)
+    private Instant expiresAt;
+
+    public static String id(DeliveryType type, String targetId, String machineId) {
+        return type.name() + ID_SEPARATOR + targetId + ID_SEPARATOR + machineId;
+    }
+}

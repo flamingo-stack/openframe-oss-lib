@@ -1,10 +1,10 @@
 package com.openframe.client.service;
 
 import com.openframe.client.exception.MachineNotFoundException;
-import com.openframe.client.service.rmm.delivery.DeliveryTracker;
+import com.openframe.delivery.DeliveryTracker;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
-import com.openframe.data.document.rmm.delivery.DeliveryKind;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.installedagents.InstalledAgentRepository;
@@ -68,7 +68,7 @@ class InstalledAgentServiceTest {
         verify(installedAgentRepository).save(installedAgentCaptor.capture());
         assertThat(installedAgentCaptor.getValue().getVersion()).isEqualTo(VERSION);
         assertThat(installedAgentCaptor.getValue().getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
-        verify(deliveryTracker).complete(DeliveryKind.TOOL_INSTALLATION, AGENT_TYPE, MACHINE_ID);
+        verify(deliveryTracker).complete(DeliveryType.TOOL_INSTALLATION, AGENT_TYPE, MACHINE_ID);
     }
 
     @Test
@@ -84,7 +84,7 @@ class InstalledAgentServiceTest {
         assertThat(existing.getVersion()).isEqualTo(VERSION);
         assertThat(existing.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
         verify(installedAgentRepository).save(existing);
-        verify(deliveryTracker).complete(DeliveryKind.TOOL_INSTALLATION, AGENT_TYPE, MACHINE_ID);
+        verify(deliveryTracker).complete(DeliveryType.TOOL_INSTALLATION, AGENT_TYPE, MACHINE_ID);
     }
 
     @Test

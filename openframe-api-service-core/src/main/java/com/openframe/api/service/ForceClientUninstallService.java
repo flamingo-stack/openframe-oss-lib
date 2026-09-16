@@ -5,11 +5,10 @@ import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponseItem;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.delivery.DeliveryKind;
-import com.openframe.data.nats.delivery.DeliveryDispatch;
-import com.openframe.data.nats.delivery.DeliveryRequest;
+import com.openframe.data.nats.delivery.ClientUninstallDeliverySpec;
 import com.openframe.data.nats.model.ClientUninstallMessage;
-import com.openframe.data.nats.publisher.ClientUninstallNatsPublisher;
+import com.openframe.delivery.DeliveryDispatch;
+import com.openframe.delivery.DeliveryRequest;
 import com.openframe.data.repository.device.MachineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +26,7 @@ import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 @Slf4j
 public class ForceClientUninstallService {
 
-    private final ClientUninstallNatsPublisher clientUninstallNatsPublisher;
+    private final ClientUninstallDeliverySpec clientUninstallDeliverySpec;
     private final MachineRepository machineRepository;
     private final DeliveryDispatch deliveryDispatch;
 
@@ -74,14 +73,8 @@ public class ForceClientUninstallService {
     }
 
     private void publishUninstall(String machineId) {
-        ClientUninstallMessage message = clientUninstallNatsPublisher.buildMessage();
-        DeliveryRequest request = DeliveryRequest.builder()
-                .kind(DeliveryKind.CLIENT_UNINSTALL)
-                .targetId(machineId)
-                .machineId(machineId)
-                .payload(message)
-                .build();
-        deliveryDispatch.send(request, () -> clientUninstallNatsPublisher.publish(machineId, message));
+        DeliveryRequest<ClientUninstallMessage> request = clientUninstallDeliverySpec.request(machineId);
+        deliveryDispatch.send(request);
     }
 
     private void markPendingDeletion(Machine machine) {

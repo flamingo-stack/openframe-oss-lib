@@ -2,8 +2,8 @@ package com.openframe.client.listener.rmm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.rmm.ScriptExecutionAcknowledgeService;
-import com.openframe.client.service.rmm.delivery.DeliveryTracker;
-import com.openframe.data.document.rmm.delivery.DeliveryKind;
+import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.DeliveryTracker;
 import com.openframe.data.nats.rmm.model.ScriptExecutionAcknowledgeMessage;
 import io.nats.client.Connection;
 import io.nats.client.Message;
@@ -31,9 +31,9 @@ class ScriptExecutionAcknowledgeListenerTest {
     private static final String LEGACY_SCRIPT_ACK =
             "{\"executionId\":\"exec-1\",\"machineId\":\"mach-42\",\"scriptIds\":[\"s1\"]}";
     private static final String TOOL_INSTALLATION_ACK =
-            "{\"kind\":\"TOOL_INSTALLATION\",\"targetId\":\"tactical-agent\",\"machineId\":\"mach-42\"}";
+            "{\"type\":\"TOOL_INSTALLATION\",\"targetId\":\"tactical-agent\",\"machineId\":\"mach-42\"}";
     private static final String SCRIPT_SCHEDULE_ACK =
-            "{\"kind\":\"SCRIPT_SCHEDULE\",\"targetId\":\"exec-1\",\"executionId\":\"exec-1\",\"machineId\":\"mach-42\",\"scriptIds\":[\"s1\"]}";
+            "{\"type\":\"SCRIPT_SCHEDULE\",\"targetId\":\"exec-1\",\"executionId\":\"exec-1\",\"machineId\":\"mach-42\",\"scriptIds\":[\"s1\"]}";
     private static final String MALFORMED = "not json";
 
     @Mock private Connection natsConnection;
@@ -74,13 +74,13 @@ class ScriptExecutionAcknowledgeListenerTest {
         listener.handleMessage(message);
 
         // verifications
-        verify(deliveryTracker).acknowledge(DeliveryKind.TOOL_INSTALLATION, TOOL_AGENT_ID, MACHINE_ID);
+        verify(deliveryTracker).acknowledge(DeliveryType.TOOL_INSTALLATION, TOOL_AGENT_ID, MACHINE_ID);
         verifyNoInteractions(acknowledgeService);
         verify(message).ack();
     }
 
     @Test
-    void handleMessage_scriptScheduleAckWithKind_trackerAndScriptService() {
+    void handleMessage_scriptScheduleAckWithType_trackerAndScriptService() {
         // setup
         stubPayload(SCRIPT_SCHEDULE_ACK);
 
@@ -88,7 +88,7 @@ class ScriptExecutionAcknowledgeListenerTest {
         listener.handleMessage(message);
 
         // verifications
-        verify(deliveryTracker).acknowledge(DeliveryKind.SCRIPT_SCHEDULE, EXECUTION_ID, MACHINE_ID);
+        verify(deliveryTracker).acknowledge(DeliveryType.SCRIPT_SCHEDULE, EXECUTION_ID, MACHINE_ID);
         verify(acknowledgeService).acknowledge(ackCaptor.capture());
         assertThat(ackCaptor.getValue().getExecutionId()).isEqualTo(EXECUTION_ID);
         verify(message).ack();

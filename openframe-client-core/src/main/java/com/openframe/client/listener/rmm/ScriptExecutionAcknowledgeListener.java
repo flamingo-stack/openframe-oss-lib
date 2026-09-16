@@ -2,8 +2,8 @@ package com.openframe.client.listener.rmm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.rmm.ScriptExecutionAcknowledgeService;
-import com.openframe.client.service.rmm.delivery.DeliveryTracker;
-import com.openframe.data.document.rmm.delivery.DeliveryKind;
+import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.DeliveryTracker;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.data.nats.rmm.model.ScriptExecutionAcknowledgeMessage;
 import io.nats.client.Connection;
@@ -64,7 +64,7 @@ public class ScriptExecutionAcknowledgeListener extends AbstractJetStreamPushLis
         try {
             ScriptExecutionAcknowledgeMessage ack = objectMapper.readValue(payload, ScriptExecutionAcknowledgeMessage.class);
             if (isDeliveryAck(ack)) {
-                deliveryTracker.acknowledge(ack.getKind(), ack.getTargetId(), ack.getMachineId());
+                deliveryTracker.acknowledge(ack.getType(), ack.getTargetId(), ack.getMachineId());
             }
             if (isScriptAck(ack)) {
                 acknowledgeService.acknowledge(ack);
@@ -76,10 +76,10 @@ public class ScriptExecutionAcknowledgeListener extends AbstractJetStreamPushLis
     }
 
     private static boolean isDeliveryAck(ScriptExecutionAcknowledgeMessage ack) {
-        return ack.getKind() != null && ack.getTargetId() != null;
+        return ack.getType() != null && ack.getTargetId() != null;
     }
 
     private static boolean isScriptAck(ScriptExecutionAcknowledgeMessage ack) {
-        return ack.getKind() == null || ack.getKind() == DeliveryKind.SCRIPT_SCHEDULE;
+        return ack.getType() == null || ack.getType() == DeliveryType.SCRIPT_SCHEDULE;
     }
 }

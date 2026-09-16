@@ -6,17 +6,14 @@ import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponseItem;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.delivery.DeliveryKind;
-import com.openframe.data.nats.delivery.DeliveryDispatch;
-import com.openframe.data.nats.delivery.DeliveryRequest;
+import com.openframe.data.nats.delivery.ClientUninstallDeliverySpec;
 import com.openframe.data.nats.model.ClientUninstallMessage;
-import com.openframe.data.nats.publisher.ClientUninstallNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.delivery.DeliveryDispatch;
+import com.openframe.delivery.DeliveryRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,18 +31,15 @@ class ForceClientUninstallServiceTest {
 
     private static final String MACHINE_ID = "mach-42";
 
-    @Mock private ClientUninstallNatsPublisher clientUninstallNatsPublisher;
+    @Mock private ClientUninstallDeliverySpec clientUninstallDeliverySpec;
     @Mock private MachineRepository machineRepository;
     @Mock private DeliveryDispatch deliveryDispatch;
-
-    @Captor private ArgumentCaptor<DeliveryRequest> requestCaptor;
-    @Captor private ArgumentCaptor<Runnable> publishCaptor;
 
     @InjectMocks private ForceClientUninstallService service;
 
     private Machine machine;
     private ForceClientUninstallRequest request;
-    private ClientUninstallMessage message;
+    private DeliveryRequest<ClientUninstallMessage> deliveryRequest;
 
     @BeforeEach
     void setUp() {
@@ -54,26 +48,27 @@ class ForceClientUninstallServiceTest {
         machine.setStatus(DeviceStatus.ONLINE);
         request = new ForceClientUninstallRequest();
         request.setMachineIds(List.of(MACHINE_ID));
-        message = new ClientUninstallMessage();
+        deliveryRequest = DeliveryRequest.<ClientUninstallMessage>builder()
+                .spec(clientUninstallDeliverySpec)
+                .targetId(MACHINE_ID)
+                .machineId(MACHINE_ID)
+                .payload(new ClientUninstallMessage())
+                .build();
     }
 
     @Test
     void process_onlineMachine_dispatchedAndMarkedPendingDeletion() {
         // setup
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
-        when(clientUninstallNatsPublisher.buildMessage()).thenReturn(message);
+        when(clientUninstallDeliverySpec.request(MACHINE_ID)).thenReturn(deliveryRequest);
 
         // execution
         ForceClientUninstallResponse response = service.process(request);
 
         // verifications
-        verify(deliveryDispatch).send(requestCaptor.capture(), publishCaptor.capture());
-        assertThat(requestCaptor.getValue().getKind()).isEqualTo(DeliveryKind.CLIENT_UNINSTALL);
-        assertThat(requestCaptor.getValue().getTargetId()).isEqualTo(MACHINE_ID);
-        assertThat(requestCaptor.getValue().getPayload()).isSameAs(message);
-        publishCaptor.getValue().run();
-        verify(clientUninstallNatsPublisher).publish(MACHINE_ID, message);
+        verify(deliveryDispatch).send(deliveryRequest);
         assertThat(machine.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
+        verify(machineRepository).save(machine);
         assertThat(response.getItems())
                 .extracting(ForceClientUninstallResponseItem::getStatus)
                 .containsExactly(ForceAgentStatus.PROCESSED);
@@ -90,6 +85,7 @@ class ForceClientUninstallServiceTest {
 
         // verifications
         verifyNoInteractions(deliveryDispatch);
+        verifyNoInteractions(clientUninstallDeliverySpec);
         assertThat(response.getItems())
                 .extracting(ForceClientUninstallResponseItem::getStatus)
                 .containsExactly(ForceAgentStatus.FAILED);

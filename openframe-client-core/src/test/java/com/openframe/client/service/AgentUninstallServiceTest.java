@@ -1,11 +1,11 @@
 package com.openframe.client.service;
 
-import com.openframe.client.service.rmm.delivery.DeliveryTracker;
+import com.openframe.delivery.DeliveryTracker;
 import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
-import com.openframe.data.document.rmm.delivery.DeliveryKind;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +64,7 @@ class AgentUninstallServiceTest {
         verify(machineRepository).save(machine);
         verify(toolConnectionService).disconnectAll(MACHINE_ID);
         verify(installedAgentService).disconnectAll(MACHINE_ID);
-        verify(deliveryTracker).complete(DeliveryKind.CLIENT_UNINSTALL, MACHINE_ID, MACHINE_ID);
+        verify(deliveryTracker).complete(DeliveryType.CLIENT_UNINSTALL, MACHINE_ID, MACHINE_ID);
     }
 
     @Test

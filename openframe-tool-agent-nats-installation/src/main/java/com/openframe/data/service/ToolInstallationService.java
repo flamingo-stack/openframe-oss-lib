@@ -2,11 +2,10 @@ package com.openframe.data.service;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
-import com.openframe.data.document.rmm.delivery.DeliveryKind;
-import com.openframe.data.nats.delivery.DeliveryDispatch;
-import com.openframe.data.nats.delivery.DeliveryRequest;
+import com.openframe.data.nats.delivery.ToolInstallationDeliverySpec;
 import com.openframe.data.nats.model.ToolInstallationMessage;
-import com.openframe.data.nats.publisher.ToolInstallationNatsPublisher;
+import com.openframe.delivery.DeliveryDispatch;
+import com.openframe.delivery.DeliveryRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,7 +23,7 @@ public class ToolInstallationService {
 
     private final IntegratedToolService integratedToolService;
     private final ToolCommandParamsResolver toolCommandParamsResolver;
-    private final ToolInstallationNatsPublisher toolInstallationNatsPublisher;
+    private final ToolInstallationDeliverySpec toolInstallationDeliverySpec;
     private final DeliveryDispatch deliveryDispatch;
 
     public void process(String machineId, IntegratedToolAgent toolAgent) {
@@ -46,14 +45,8 @@ public class ToolInstallationService {
             List<String> runCommandArgs = toolAgent.getRunCommandArgs();
             toolAgent.setRunCommandArgs(toolCommandParamsResolver.process(toolId, runCommandArgs));
 
-            ToolInstallationMessage message = toolInstallationNatsPublisher.buildMessage(toolAgent, tool, reinstall);
-            DeliveryRequest request = DeliveryRequest.builder()
-                    .kind(DeliveryKind.TOOL_INSTALLATION)
-                    .targetId(toolAgent.getKey())
-                    .machineId(machineId)
-                    .payload(message)
-                    .build();
-            deliveryDispatch.send(request, () -> toolInstallationNatsPublisher.publish(machineId, message));
+            DeliveryRequest<ToolInstallationMessage> request = toolInstallationDeliverySpec.request(machineId, toolAgent, tool, reinstall);
+            deliveryDispatch.send(request);
             log.info("Published {} agent installation message for machine {}", toolId, machineId);
         } catch (Exception e) {
             // TODO: add fallback mechanism
