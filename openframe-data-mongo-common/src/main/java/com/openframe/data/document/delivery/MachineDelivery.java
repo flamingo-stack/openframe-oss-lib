@@ -20,8 +20,6 @@ import java.time.Instant;
 @CompoundIndex(name = "machine_delivery_sweep", def = "{'type': 1, 'status': 1, 'lastAttemptAt': 1}")
 public class MachineDelivery {
 
-    private static final String ID_SEPARATOR = ":";
-
     @Id
     private String id;
 
@@ -47,8 +45,4 @@ public class MachineDelivery {
 
     @Indexed(name = "machine_delivery_ttl", expireAfterSeconds = 0)
     private Instant expiresAt;
-
-    public static String id(DeliveryType type, String targetId, String machineId) {
-        return type.name() + ID_SEPARATOR + targetId + ID_SEPARATOR + machineId;
-    }
 }

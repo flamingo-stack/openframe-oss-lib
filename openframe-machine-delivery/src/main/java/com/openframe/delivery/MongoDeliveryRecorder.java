@@ -31,7 +31,7 @@ public class MongoDeliveryRecorder implements DeliveryRecorder {
 
     private MachineDelivery pendingRow(DeliveryRequest<?> request) {
         Instant now = Instant.now();
-        String id = MachineDelivery.id(request.getType(), request.getTargetId(), request.getMachineId());
+        String id = DeliveryId.of(request.getType(), request.getTargetId(), request.getMachineId());
         String payloadJson = toJson(request.getPayload());
         return MachineDelivery.builder()
                 .id(id)

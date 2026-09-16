@@ -23,7 +23,7 @@ class MongoDeliveryTrackerTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String TARGET_ID = "tactical-agent";
-    private static final String DELIVERY_ID = MachineDelivery.id(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+    private static final String DELIVERY_ID = DeliveryId.of(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
 
     @Mock private MachineDeliveryRepository repository;
 

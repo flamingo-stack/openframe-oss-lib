@@ -55,7 +55,7 @@ class DeliverySweepServiceTest {
     void setUp() {
         Instant dispatchedAt = Instant.now().minusSeconds(ACK_THRESHOLD * 2);
         delivery = MachineDelivery.builder()
-                .id(MachineDelivery.id(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID))
+                .id(DeliveryId.of(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID))
                 .type(DeliveryType.TOOL_INSTALLATION)
                 .targetId(TARGET_ID)
                 .machineId(MACHINE_ID)

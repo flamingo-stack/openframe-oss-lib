@@ -23,7 +23,7 @@ public class MongoDeliveryTracker implements DeliveryTracker {
 
     @Override
     public void acknowledge(DeliveryType type, String targetId, String machineId) {
-        String id = MachineDelivery.id(type, targetId, machineId);
+        String id = DeliveryId.of(type, targetId, machineId);
         repository.findById(id)
                 .filter(MongoDeliveryTracker::isPending)
                 .ifPresent(this::markAcked);
@@ -31,7 +31,7 @@ public class MongoDeliveryTracker implements DeliveryTracker {
 
     @Override
     public void complete(DeliveryType type, String targetId, String machineId) {
-        String id = MachineDelivery.id(type, targetId, machineId);
+        String id = DeliveryId.of(type, targetId, machineId);
         repository.findById(id)
                 .filter(MongoDeliveryTracker::isOpen)
                 .ifPresent(this::markDone);
