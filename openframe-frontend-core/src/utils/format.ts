@@ -395,8 +395,11 @@ export function formatProgramDate(at: ProgramInstant, style: ZonedDateStyle = 'm
  * from a row whose `end_at` preceded its `start_at`, and the clock renderer
  * printed "11:00 PM - 9:00 PM" from the same shape. Both refuse it here.
  *
- * Exported so a consumer enforcing the same rule at INGEST (the hub drops such
- * an `end_at` rather than storing it) can state it the same way.
+ * The host app enforces the same rule at INGEST (it drops such an `end_at`
+ * rather than storing it) and states the comparison itself, because the module
+ * that owns it there is a dependency-free leaf its mapper tests rely on. Two
+ * statements of one comparison, across a package boundary, knowingly — if this
+ * one changes, that one has to.
  */
 export function isOrderedRange(from: Date | string | null | undefined, to: Date | string | null | undefined): boolean {
   if (!from || !to) return false;

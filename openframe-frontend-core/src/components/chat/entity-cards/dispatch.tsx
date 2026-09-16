@@ -35,13 +35,9 @@ import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { formatDateShort } from '../../../utils/date-formatters';
 import { faqItemAnchor } from '../../../utils/faq-anchor';
-import {
-  formatDateUTC as formatDate,
-  formatDurationCompact,
-  formatProgramDate,
-  formatWebinarTimeMeta,
-} from '../../../utils/format';
+import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
+import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
 import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
@@ -1111,15 +1107,7 @@ function ProgramChatCard({
   // the DATE in the VIEWER's zone (`timezone: 'local'`) beside a time in the
   // EVENT's zone, and it labelled the zone on a different condition. The type
   // label itself lives in the status pill, so it is omitted here.
-  const { line: meta } = programMetaLine(
-    item ?? {},
-    configKey,
-    programMetaFormatters({
-      date: formatProgramDate,
-      duration: formatDurationCompact,
-      webinarMeta: formatWebinarTimeMeta,
-    }),
-  );
+  const { line: meta } = programMetaLine(item ?? {}, configKey, programMetaFormatters(PROGRAM_META_RENDERERS));
 
   return (
     <EntityMingoCard
