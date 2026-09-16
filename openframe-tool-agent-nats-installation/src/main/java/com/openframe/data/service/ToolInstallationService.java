@@ -2,8 +2,7 @@ package com.openframe.data.service;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
-import com.openframe.data.nats.delivery.ToolInstallationDeliverySpec;
-import com.openframe.delivery.DeliveryDispatcher;
+import com.openframe.data.nats.publisher.ToolInstallationNatsPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,7 +20,7 @@ public class ToolInstallationService {
 
     private final IntegratedToolService integratedToolService;
     private final ToolCommandParamsResolver toolCommandParamsResolver;
-    private final DeliveryDispatcher deliveryDispatcher;
+    private final ToolInstallationNatsPublisher toolInstallationNatsPublisher;
 
     public void process(String machineId, IntegratedToolAgent toolAgent) {
         process(machineId, toolAgent, false);
@@ -42,8 +41,7 @@ public class ToolInstallationService {
             List<String> runCommandArgs = toolAgent.getRunCommandArgs();
             toolAgent.setRunCommandArgs(toolCommandParamsResolver.process(toolId, runCommandArgs));
 
-            ToolInstallationDeliverySpec.Seed seed = new ToolInstallationDeliverySpec.Seed(machineId, toolAgent, tool, reinstall);
-            deliveryDispatcher.dispatch(seed);
+            toolInstallationNatsPublisher.publish(machineId, toolAgent, tool, reinstall);
             log.info("Published {} agent installation message for machine {}", toolId, machineId);
         } catch (Exception e) {
             // TODO: add fallback mechanism

@@ -5,8 +5,7 @@ import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponseItem;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.nats.delivery.ClientUninstallDeliverySpec;
-import com.openframe.delivery.DeliveryDispatcher;
+import com.openframe.data.nats.publisher.ClientUninstallNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,8 +23,8 @@ import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 @Slf4j
 public class ForceClientUninstallService {
 
+    private final ClientUninstallNatsPublisher clientUninstallNatsPublisher;
     private final MachineRepository machineRepository;
-    private final DeliveryDispatcher deliveryDispatcher;
 
     public ForceClientUninstallResponse process(ForceClientUninstallRequest request) {
         List<String> machineIds = request.getMachineIds();
@@ -58,7 +57,7 @@ public class ForceClientUninstallService {
                 return buildResponseItem(machineId, ForceAgentStatus.FAILED);
             }
 
-            publishUninstall(machineId);
+            clientUninstallNatsPublisher.publish(machineId);
 
             markPendingDeletion(machine);
 
@@ -67,11 +66,6 @@ public class ForceClientUninstallService {
             log.error("Failed to publish client uninstall command for machine {}", machineId, e);
             return buildResponseItem(machineId, ForceAgentStatus.FAILED);
         }
-    }
-
-    private void publishUninstall(String machineId) {
-        ClientUninstallDeliverySpec.Seed seed = new ClientUninstallDeliverySpec.Seed(machineId);
-        deliveryDispatcher.dispatch(seed);
     }
 
     private void markPendingDeletion(Machine machine) {
