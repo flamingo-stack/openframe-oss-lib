@@ -330,11 +330,13 @@ export function formatTimeWithTimezone(
  *
  * Returns: "Mar 19, 2026"
  */
-export type ZonedDateStyle = 'medium' | 'weekday';
+export type ZonedDateStyle = 'medium' | 'weekday' | 'long';
 
 const ZONED_DATE_STYLES: Record<ZonedDateStyle, Intl.DateTimeFormatOptions> = {
   medium: { year: 'numeric', month: 'short', day: 'numeric' },
   weekday: { weekday: 'long', day: 'numeric', month: 'long' },
+  // Spelled-out month, no weekday — what an SEO description reads best as.
+  long: { year: 'numeric', month: 'long', day: 'numeric' },
 };
 
 export function formatDateWithTimezone(
@@ -857,17 +859,19 @@ export function formatProgramTimeRange(
   // that rule for every clock this package renders — `formatWebinarTimeMeta`
   // composes over this rather than repeating it.
   if (at.dateOnly) return '';
-  const label = { withZoneLabel: opts.withZoneLabel === true };
   // `instant` is null when the row declares no zone; `utcDate` is the canonical
   // value then, and the formatter's own UTC pin renders it deterministically.
-  const from = formatTimeWithTimezone(at.instant ?? at.utcDate ?? opts.startAt, at.timezone, label);
-  const end = opts.endAt ? formatTimeWithTimezone(opts.endAt, at.timezone, label) : '';
+  // Resolved ONCE — spelling this chain twice is how the previous version of
+  // this pair drifted apart.
+  const source = at.instant ?? at.utcDate ?? opts.startAt;
+  const clock = (withZoneLabel: boolean) => formatTimeWithTimezone(source, at.timezone, { withZoneLabel });
+  const label = opts.withZoneLabel === true;
+  const end = opts.endAt ? formatTimeWithTimezone(opts.endAt, at.timezone, { withZoneLabel: label }) : '';
   // An end with no usable start is not a range, and rendering it alone puts a
   // FINISH time where the reader expects a start. Say nothing instead.
-  if (!from) return '';
-  if (!end) return from;
-  // Only the last clock carries the label, so a range reads "9:00 AM - 5:00 PM EDT".
-  return `${formatTimeWithTimezone(at.instant ?? at.utcDate ?? opts.startAt, at.timezone)} - ${end}`;
+  if (!clock(false)) return '';
+  // Only the LAST clock carries the label, so a range reads "9:00 AM - 5:00 PM EDT".
+  return end ? `${clock(false)} - ${end}` : clock(label);
 }
 
 /**

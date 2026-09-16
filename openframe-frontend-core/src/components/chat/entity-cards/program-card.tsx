@@ -26,7 +26,7 @@ import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
 import { formatDurationCompact, formatProgramDate, formatWebinarTimeMeta } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
-import { programMetaLine, webinarTiming } from '../../../utils/program-instant';
+import { programMetaLine } from '../../../utils/program-instant';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -338,32 +338,35 @@ export function ProgramCard<T extends BaseProgramItem>({
 
   const dateFormat = formatProgramDate(zonedDate, 'weekday');
 
+  // The same dispatch as the compact densities — WHICH value a type shows is
+  // decided once, by `programMetaLine`. Only the presentation differs here
+  // (an icon, and the zone as its own styled span rather than inline), which is
+  // why this asks for an unlabelled webinar value. Restating the dispatch is
+  // how the two ended up with three conditions that disagreed: the podcast one
+  // dropped the `> 0` check, and the event one dropped the non-empty check.
+  const { typeMeta: defaultTypeMeta } = programMetaLine(item, config.type, {
+    date: () => '',
+    duration: formatDurationCompact,
+    webinarMeta: (at, opts) => formatWebinarTimeMeta(at, opts),
+  });
+
   const defaultRenderMeta = () => {
-    if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {
-      const dur = item.duration_seconds;
-      return (
+    if (config.type === 'podcast') {
+      return defaultTypeMeta ? (
         <>
           <Clock className="h-4 w-4 text-ods-text-secondary" />
-          <span className="font-body text-ods-text-secondary">
-            {formatDurationCompact(typeof dur === 'number' ? dur : null)}
-          </span>
+          <span className="font-body text-ods-text-secondary">{defaultTypeMeta}</span>
         </>
-      );
+      ) : null;
     }
     if (config.type === 'event' && 'location_name' in item) {
-      const loc = item.location_name;
-      return (
-        <span className="font-body text-ods-text-secondary">{(typeof loc === 'string' && loc) || 'Location TBD'}</span>
-      );
+      return <span className="font-body text-ods-text-secondary">{defaultTypeMeta || 'Location TBD'}</span>;
     }
-    if (config.type === 'webinar' && 'start_at' in item) {
-      const { startAt, endAt } = webinarTiming(item);
+    if (config.type === 'webinar' && (defaultTypeMeta || zonedDate.timezone)) {
       return (
         <>
           <Video className="h-4 w-4 text-ods-text-secondary" />
-          <span className="font-body text-ods-text-secondary">
-            {formatWebinarTimeMeta(zonedDate, { startAt, endAt })}
-          </span>
+          {defaultTypeMeta && <span className="font-body text-ods-text-secondary">{defaultTypeMeta}</span>}
           {zonedDate.timezone && <span className="text-ods-text-secondary text-h6">({zonedDate.timezone})</span>}
         </>
       );
