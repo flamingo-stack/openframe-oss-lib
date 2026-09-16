@@ -82,7 +82,7 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
     @Override
     public void publish(String machineId, ToolInstallationMessage payload) {
         String subject = format(SUBJECT_TEMPLATE, machineId);
-        natsMessagePublisher.publishPersistent(subject, payload);
+        natsMessagePublisher.publish(subject, payload);
     }
 
     @Override

@@ -98,6 +98,6 @@ class ToolInstallationDeliverySpecTest {
         spec.publish(MACHINE_ID, message);
 
         // verifications
-        verify(natsMessagePublisher).publishPersistent("machine.mach-42.tool-installation", message);
+        verify(natsMessagePublisher).publish("machine.mach-42.tool-installation", message);
     }
 }
