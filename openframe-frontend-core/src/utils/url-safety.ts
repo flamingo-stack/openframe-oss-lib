@@ -5,12 +5,11 @@
  * have no business in an href" had two copies once, and a security predicate
  * kept in sync by a comment drifts.
  *
- * `isSameOriginPath` is used by the RENDER-time guard only. It answers "does
- * this path stay on our origin", which is only a meaningful question where the
- * page rendering the href IS the origin the path belongs to — the hub's own
- * chat cards. The wire decoder does not ask it: its consumer has no hub origin,
- * so a relative path there is not a same-origin link but a broken one, and the
- * decoder accepts absolute https only.
+ * `isSameOriginPath` answers "does this path stay on our origin" for the
+ * render-time `safeHref` — the ONE gate every chat href passes. The wire decoder
+ * does not judge links at all: it carries them, because resolving a link is a
+ * client decision (only the rendering page knows where it is embedded), and a
+ * second, stricter gate there only dropped links it could not resolve itself.
  *
  * Pure and dependency-free, so the server-safe `chat-protocol` leaf and the
  * client-side card utils can both import it directly.

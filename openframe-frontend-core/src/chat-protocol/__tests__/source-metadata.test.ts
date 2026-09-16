@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { safeHref } from '../../components/chat/utils/compact-card-classes';
 import { decodeNatsChunk } from '../nats-decoder';
 import { mergeSourceMetadata, sourceMetadataEvent, youtubeVideoId } from '../source-metadata';
 
@@ -110,18 +111,11 @@ describe('sourceMetadataEvent', () => {
     expect(event?.sources?.[0].name).toBe('First');
   });
 
-  it('drops a non-https external URL but keeps the source', () => {
-    const event = sourceMetadataEvent({
-      sources: [{ index: 1, name: 'Doc', path: 'docs/x', documentType: 'markdown', externalUrl: 'http://x.test/x' }],
-    });
-    expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
-  });
-
-  // A root-relative href is NOT a same-origin link for this payload: its
-  // consumer (the dashboard) has no hub origin, so `/onboarding-guides/x` would
-  // resolve against the dashboard's own domain and 404. The producer absolutises;
-  // anything relative that still arrives is dropped rather than rendered broken.
-  it('drops a root-relative external URL instead of rendering a broken link', () => {
+  // Links are CARRIED, not judged here: resolving a link is a client decision
+  // (only the rendering page knows where it is embedded), and safety is enforced
+  // once, at render, by `safeHref`. This decoder used to drop what it could not
+  // resolve on its own, which is what left chips with a name and no destination.
+  it('carries a root-relative external URL for the client to resolve', () => {
     const event = sourceMetadataEvent({
       sources: [
         {
@@ -130,15 +124,15 @@ describe('sourceMetadataEvent', () => {
           path: 'onboarding-guides/x',
           documentType: 'onboarding_guide',
           externalUrl: '/onboarding-guides/x',
+          targetPlatform: 'openframe',
         },
       ],
     });
-    // The source itself survives — only the unresolvable href is dropped.
-    expect(event?.sources?.[0].name).toBe('Guide');
-    expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
+    expect(event?.sources?.[0].externalUrl).toBe('/onboarding-guides/x');
+    expect(event?.sources?.[0].targetPlatform).toBe('openframe');
   });
 
-  it('drops a root-relative external URL on a grouped item', () => {
+  it('carries a root-relative external URL on a grouped item', () => {
     const event = sourceMetadataEvent({
       sources: [
         {
@@ -148,32 +142,18 @@ describe('sourceMetadataEvent', () => {
         },
       ],
     });
-    expect(event?.sources?.[0].items?.[0]).not.toHaveProperty('externalUrl');
+    expect(event?.sources?.[0].items?.[0].externalUrl).toBe('/onboarding-guides/a');
   });
 
-  it('keeps an absolute https external URL, which is what the producer emits', () => {
-    const event = sourceMetadataEvent({
-      sources: [{ index: 1, name: 'Guide', externalUrl: 'https://hub.example/onboarding-guides/x' }],
-    });
-    expect(event?.sources?.[0].externalUrl).toBe('https://hub.example/onboarding-guides/x');
-  });
-
-  it('drops a protocol-relative URL, which is a third-party origin and not a path', () => {
-    const event = sourceMetadataEvent({
-      sources: [{ index: 1, name: 'Doc', path: 'docs/x', documentType: 'markdown', externalUrl: '//evil.test/x' }],
-    });
-    expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
-  });
-
-  it('drops an href carrying control or zero-width characters', () => {
+  it('carries absolute http and https links alike', () => {
     const event = sourceMetadataEvent({
       sources: [
-        { index: 1, name: 'A', externalUrl: '/docs/\u200bx' },
-        { index: 2, name: 'B', externalUrl: 'https://x.test/\u0000y' },
+        { index: 1, name: 'A', externalUrl: 'https://hub.example/x' },
+        { index: 2, name: 'B', externalUrl: 'http://legacy.example/y' },
       ],
     });
-    expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
-    expect(event?.sources?.[1]).not.toHaveProperty('externalUrl');
+    expect(event?.sources?.[0].externalUrl).toBe('https://hub.example/x');
+    expect(event?.sources?.[1].externalUrl).toBe('http://legacy.example/y');
   });
 
   it('preserves an explicit null targetPlatform, which means "no destination"', () => {
@@ -302,23 +282,29 @@ describe('mergeSourceMetadata', () => {
 });
 
 /**
- * Paths that masquerade as same-origin. None can survive: the decoder accepts
- * only absolute https, so an origin escape (`/\evil.test/x` resolves to
- * `https://evil.test/x`) is rejected for the same reason an honest relative
- * path is — this payload has no origin for either to be relative TO.
+ * Hostile hrefs. The decoder carries them like any other string; the safety
+ * decision is made once, at render, where `safeHref` resolves the candidate and
+ * rejects anything that is not a same-origin path or an allowed scheme. Pinned
+ * here end to end so removing the decoder's second gate cannot quietly let one
+ * reach an anchor.
  */
-describe('relative and path-shaped hrefs are all dropped', () => {
-  const hrefs = [
+describe('hostile hrefs are neutralised at the render gate', () => {
+  const hostile = [
     '/\\evil.test/x',
     '/\\\\evil.test/x',
     '//evil.test/x',
     '/\\/evil.test/x',
-    '/onboarding-guides/set-up-sso',
+    'javascript:alert(1)',
+    'data:text/html,<script>alert(1)</script>',
+    '/docs/\u200bx',
   ];
-  it.each(hrefs)('drops %s', href => {
-    const event = sourceMetadataEvent({
-      sources: [{ index: 1, name: 'Doc', path: 'docs/x', documentType: 'markdown', externalUrl: href }],
-    });
-    expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
+  it.each(hostile)('%j never becomes an href', href => {
+    const event = sourceMetadataEvent({ sources: [{ index: 1, name: 'Doc', externalUrl: href }] });
+    expect(safeHref(event?.sources?.[0].externalUrl ?? null)).toBeNull();
+  });
+
+  it('a genuine relative link survives the gate for the client to resolve', () => {
+    const event = sourceMetadataEvent({ sources: [{ index: 1, name: 'Doc', externalUrl: '/onboarding-guides/x' }] });
+    expect(safeHref(event?.sources?.[0].externalUrl ?? null)).toBe('/onboarding-guides/x');
   });
 });
