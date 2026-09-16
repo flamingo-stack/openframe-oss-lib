@@ -26,7 +26,7 @@ import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
 import { formatDurationCompact, formatProgramDate, formatWebinarTimeMeta } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
-import { programDateInstant, programStr } from '../../../utils/program-instant';
+import { programDateInstant, webinarTiming } from '../../../utils/program-instant';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -155,24 +155,6 @@ function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string
     console.warn('Failed to parse hosts data:', error);
   }
   return [];
-}
-
-/**
- * Webinar scheduling columns, read off a `BaseProgramItem` that has already
- * been `in`-guarded for `start_at`. Each field is validated rather than
- * asserted — the generic item type does not declare them.
- */
-function webinarTiming(item: BaseProgramItem): {
-  startAt: string | null;
-  endAt: string | null;
-} {
-  // No `timezone` here on purpose: it would be a second derivation of what
-  // `programDateInstant` already resolved (and the un-nulled one, so a call
-  // site could reintroduce a zone the day-valued rule just dropped).
-  return {
-    startAt: 'start_at' in item ? programStr(item.start_at) : null,
-    endAt: 'end_at' in item ? programStr(item.end_at) : null,
-  };
 }
 
 function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string }) {

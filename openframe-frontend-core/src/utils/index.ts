@@ -141,6 +141,7 @@ export {
   formatDateWithTimezone,
   formatWebinarTimeMeta,
   formatProgramDate,
+  formatProgramTimeRange,
   type ZonedDateStyle,
   formatDurationFromRange,
   type FormatDateUTCOptions,
@@ -402,5 +403,5 @@ export { BADGE_PALETTE, isBadgePaletteKey, pickBadgePaletteColor, type BadgePale
 // clock" — THE resolver every webinar/event/podcast surface reads, in this
 // package and in the hub. Exported because the hub re-derived it by hand while
 // it was package-private, and the copies drifted.
-export { programDateInstant, programStr } from './program-instant';
+export { programDateInstant, programStr, webinarTiming } from './program-instant';
 export type { ProgramDateFields, ProgramInstant } from './program-instant';

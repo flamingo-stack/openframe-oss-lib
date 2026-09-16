@@ -44,8 +44,11 @@
  * rule just suppressed. Three surfaces had to remember that gate; two forgot,
  * and one of them rendered a bare IANA string under an empty heading. A rule
  * enforced by the shape of the data cannot be forgotten by the next call site.
- * The row's raw zone stays available as `rowTimezone` for the rare consumer
- * that needs to state it as data rather than as a label.
+ *
+ * There is deliberately NO escape hatch back to the un-nulled zone. One was
+ * added ("for the rare consumer that needs it as data") and no consumer ever
+ * wanted it — an un-nulled copy hanging off the resolved value is just the
+ * mistake again, one property away.
  */
 
 /** Read a string field off an item type that does not declare it. */
@@ -79,6 +82,7 @@ export interface ProgramInstant {
 export interface ProgramDateFields {
   date?: unknown;
   start_at?: unknown;
+  end_at?: unknown;
   timezone?: unknown;
   date_is_display_override?: unknown;
 }
@@ -100,4 +104,25 @@ export function programDateInstant(item: ProgramDateFields): ProgramInstant {
     dateOnly,
     utcDate: date ?? startAt,
   };
+}
+
+/**
+ * The scheduling columns the DURATION is measured from — the pair that rides
+ * beside a resolved instant.
+ *
+ * Here rather than at each surface because five call sites projected these two
+ * columns in four different shapes (`programStr`, raw reads, `?? null`, and an
+ * `in`-guarded cast), which is the same defect one field-pair down from the one
+ * this module exists to fix. They are read off the row, never off the resolved
+ * instant, because elapsed time is not a display date: an override moves the
+ * day shown, and a webinar still runs for 45 minutes.
+ */
+export function webinarTiming(item: ProgramDateFields): {
+  startAt: string | null;
+  endAt: string | null;
+} {
+  // No `timezone` here on purpose: it would be a second derivation of what
+  // `programDateInstant` already resolved (and the UN-NULLED one, so a call
+  // site could reintroduce a zone the day-valued rule just dropped).
+  return { startAt: programStr(item.start_at), endAt: programStr(item.end_at) };
 }

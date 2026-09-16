@@ -41,7 +41,7 @@ import {
   formatProgramDate,
   formatWebinarTimeMeta,
 } from '../../../utils/format';
-import { programDateInstant } from '../../../utils/program-instant';
+import { programDateInstant, webinarTiming } from '../../../utils/program-instant';
 import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
@@ -1130,8 +1130,7 @@ function ProgramChatCard({
   if (configKey === 'webinar' && item?.start_at) {
     typeMeta =
       formatWebinarTimeMeta(zoned, {
-        startAt: item.start_at,
-        endAt: item.end_at ?? null,
+        ...webinarTiming(item ?? {}),
         // Labelled unconditionally, like the public card it mirrors. Deriving
         // this from the zone meant a zoneless webinar read "4:00 PM" here and
         // "4:00 PM UTC" there, for the same row.

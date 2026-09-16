@@ -835,6 +835,36 @@ export function formatBioText(aboutHtml: string | null | undefined, fallback: st
 }
 
 /**
+ * THE program CLOCK — one time, or a start–end range, in the resolved zone.
+ *
+ * The third member of the set beside `formatProgramDate` (the day) and
+ * `formatWebinarTimeMeta` (time + duration), and it exists because the page
+ * header rebuilt it locally: an `instant ?? utcDate` fallback, a `dateOnly`
+ * suppression and a zone-labelled render — the same three things the meta
+ * helper owns, re-applied at the call site, which is exactly what that
+ * helper's docblock says goes wrong. The header also appended the RAW IANA
+ * name while the slot beneath it used the short name, so one component
+ * printed "America/New_York" and "EDT" six lines apart.
+ *
+ * Only the LAST clock carries the zone label, so a range reads
+ * "9:00 AM - 5:00 PM EDT" rather than labelling both ends.
+ */
+export function formatProgramTimeRange(
+  at: ProgramInstant,
+  opts: { endAt?: string | null; withZoneLabel?: boolean } = {},
+): string {
+  // A chosen display day has no clock the admin meant — the same rule, and the
+  // same single owner, as the one `formatWebinarTimeMeta` applies.
+  if (at.dateOnly) return '';
+  const start = at.instant ?? at.utcDate;
+  const label = { withZoneLabel: opts.withZoneLabel === true };
+  const end = opts.endAt ? formatTimeWithTimezone(opts.endAt, at.timezone, label) : '';
+  if (!end) return formatTimeWithTimezone(start, at.timezone, label);
+  const from = formatTimeWithTimezone(start, at.timezone);
+  return from ? `${from} - ${end}` : end;
+}
+
+/**
  * "4:00 PM EDT · 45m" — a webinar's time and duration as one meta string.
  *
  * Extracted because this exact three-line composition existed in the chat card
