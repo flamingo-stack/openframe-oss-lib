@@ -4,6 +4,8 @@ import com.openframe.client.exception.InvalidAgentIdException;
 import com.openframe.client.exception.MachineNotFoundException;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.tool.ConnectionStatus;
+import com.openframe.client.service.rmm.delivery.DeliveryTracker;
+import com.openframe.data.document.rmm.delivery.DeliveryKind;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.installedagents.InstalledAgentRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ public class InstalledAgentService {
 
     private final InstalledAgentRepository installedAgentRepository;
     private final MachineRepository machineRepository;
+    private final DeliveryTracker deliveryTracker;
 
     @Transactional
     public void addInstalledAgent(String machineId, String agentType, String version, boolean lastAttempt) {
@@ -36,6 +39,7 @@ public class InstalledAgentService {
                         installedAgent -> updateExistingInstalledAgent(installedAgent, version, machineId, agentType),
                         () -> addNewInstalledAgent(machineId, agentType, version)
                 );
+        deliveryTracker.complete(DeliveryKind.TOOL_INSTALLATION, agentType, machineId);
     }
 
     @Transactional

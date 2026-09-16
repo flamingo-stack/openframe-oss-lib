@@ -1,5 +1,6 @@
 package com.openframe.data.nats.rmm.model;
 
+import com.openframe.data.document.rmm.delivery.DeliveryKind;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,4 +20,8 @@ public class ScriptExecutionAcknowledgeMessage {
     private String machineId;
     private String scheduleId;
     private List<String> scriptIds;
+
+    // delivery kinds other than scripts ack through the same subject; null = legacy script ack
+    private DeliveryKind kind;
+    private String targetId;
 }

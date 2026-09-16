@@ -15,6 +15,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.MachineDeliveryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -26,6 +27,7 @@ import static java.util.stream.Collectors.toSet;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "openframe.rmm.delivery.enabled", havingValue = "true")
 public class DeliverySweepService {
 
     private final MachineDeliveryRepository repository;

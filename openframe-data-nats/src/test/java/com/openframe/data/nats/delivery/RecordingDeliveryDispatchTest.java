@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-class DeliveryDispatchTest {
+class RecordingDeliveryDispatchTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String ISSUED_AT = "2026-09-15T10:00:00Z";
@@ -29,11 +29,11 @@ class DeliveryDispatchTest {
 
     @Captor private ArgumentCaptor<MachineDelivery> deliveryCaptor;
 
-    private DeliveryDispatch dispatch;
+    private RecordingDeliveryDispatch dispatch;
 
     @BeforeEach
     void setUp() {
-        dispatch = new DeliveryDispatch(repository, new ObjectMapper());
+        dispatch = new RecordingDeliveryDispatch(repository, new ObjectMapper());
     }
 
     @Test

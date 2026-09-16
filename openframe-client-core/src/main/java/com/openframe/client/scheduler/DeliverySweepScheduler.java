@@ -23,11 +23,23 @@ public class DeliverySweepScheduler {
             lockAtMostFor = "${openframe.rmm.delivery.lock-at-most-for}",
             lockAtLeastFor = "${openframe.rmm.delivery.lock-at-least-for}")
     public void tick() {
+        retryPending();
+        reapAcked();
+    }
+
+    private void retryPending() {
         try {
             sweepService.retryPending();
+        } catch (Exception e) {
+            log.error("Delivery sweep failed", e);
+        }
+    }
+
+    private void reapAcked() {
+        try {
             watchdogService.reapAcked();
         } catch (Exception e) {
-            log.error("Delivery sweep tick failed", e);
+            log.error("Delivery watchdog failed", e);
         }
     }
 }

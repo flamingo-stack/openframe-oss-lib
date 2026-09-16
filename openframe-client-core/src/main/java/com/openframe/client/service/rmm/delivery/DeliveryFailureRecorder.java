@@ -9,6 +9,7 @@ import com.openframe.data.document.rmm.delivery.MachineDelivery;
 import com.openframe.data.repository.rmm.MachineDeliveryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -16,6 +17,7 @@ import java.time.Instant;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "openframe.rmm.delivery.enabled", havingValue = "true")
 public class DeliveryFailureRecorder {
 
     private final MachineDeliveryRepository repository;

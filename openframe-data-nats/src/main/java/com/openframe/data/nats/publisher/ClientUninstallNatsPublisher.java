@@ -31,7 +31,7 @@ public class ClientUninstallNatsPublisher {
         log.info("Published client uninstall command for machine {}", machineId);
     }
 
-    private ClientUninstallMessage buildMessage() {
+    public ClientUninstallMessage buildMessage() {
         ClientUninstallMessage message = new ClientUninstallMessage();
         message.setIssuedAt(Instant.now().toString());
         return message;

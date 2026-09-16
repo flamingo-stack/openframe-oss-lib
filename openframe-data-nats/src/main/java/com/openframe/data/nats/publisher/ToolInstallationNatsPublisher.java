@@ -52,7 +52,7 @@ public class ToolInstallationNatsPublisher {
         return buildMessage(toolAgent, tool, false);
     }
 
-    private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
+    public ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
         ToolInstallationMessage message = new ToolInstallationMessage();
         message.setToolAgentId(toolAgent.getKey());
         // TODO: need refactoring

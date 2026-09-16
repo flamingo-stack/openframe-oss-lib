@@ -20,7 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class DeliveryTrackerTest {
+class MongoDeliveryTrackerTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String TOOL_AGENT_ID = "tactical-agent";
@@ -29,7 +29,7 @@ class DeliveryTrackerTest {
 
     @Mock private MachineDeliveryRepository repository;
 
-    private DeliveryTracker tracker;
+    private MongoDeliveryTracker tracker;
 
     private MachineDelivery delivery;
 
@@ -53,7 +53,7 @@ class DeliveryTrackerTest {
                 .status(DeliveryStatus.PENDING)
                 .build();
 
-        tracker = new DeliveryTracker(repository, properties);
+        tracker = new MongoDeliveryTracker(repository, properties);
     }
 
     @Test
