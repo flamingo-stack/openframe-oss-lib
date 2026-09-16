@@ -70,6 +70,26 @@ function httpsUrl(value: unknown): string | undefined {
 }
 
 /**
+ * Is this a path that stays on the CURRENT origin?
+ *
+ * Decided by RESOLVING it, not by inspecting the prefix. A prefix test is what
+ * a reader reaches for — `startsWith('//')` — and it is not sufficient: the URL
+ * parser treats a backslash as a slash in the authority position, so
+ * `/\\evil.test/x` resolves to `https://evil.test/x` while passing every
+ * "starts with one slash" check. `/%2F`, `/%5C` and any future parser quirk
+ * fall to the same class. Asking the parser which origin it lands on cannot
+ * drift from what the browser will actually do with the href.
+ */
+function sameOriginPath(candidate: string): boolean {
+  const base = 'https://_sameorigin_.invalid';
+  try {
+    return new URL(candidate, base).origin === base;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * A URL that is safe to render as a source chip's href: an absolute https URL,
  * or a ROOT-RELATIVE path (`/onboarding-guides/foo`).
  *
@@ -90,9 +110,7 @@ function httpsUrl(value: unknown): string | undefined {
 function linkUrl(value: unknown): string | undefined {
   const candidate = text(value);
   if (!candidate || UNSAFE_URL_CHARS.test(candidate)) return undefined;
-  // Same-origin path. `//host` is protocol-relative, not a path — it would
-  // resolve to a THIRD-PARTY origin, so it is rejected with the rest.
-  if (candidate.startsWith('/')) return candidate.startsWith('//') ? undefined : candidate;
+  if (candidate.startsWith('/')) return sameOriginPath(candidate) ? candidate : undefined;
   return httpsUrl(candidate);
 }
 

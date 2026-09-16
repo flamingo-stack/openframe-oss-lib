@@ -290,3 +290,30 @@ describe('mergeSourceMetadata', () => {
     expect(mergeSourceMetadata(null, { type: 'sources' })).toEqual({});
   });
 });
+
+/**
+ * Origin-escape via the URL parser's backslash handling.
+ *
+ * `/\evil.test/x` starts with exactly one slash, so every prefix-based
+ * "is this same-origin" test accepts it — and then the parser resolves it to
+ * `https://evil.test/x`, because a backslash is a slash in the authority
+ * position. The href lands in a real `<a>` in the chat panel, built from a
+ * remote MCP server's output. Resolving the candidate and comparing origins is
+ * the only check that cannot disagree with what the browser will do.
+ */
+describe('linkUrl rejects origin escapes that look like paths', () => {
+  const escapes = ['/\\evil.test/x', '/\\\\evil.test/x', '//evil.test/x', '/\\/evil.test/x'];
+  it.each(escapes)('drops %s', href => {
+    const event = sourceMetadataEvent({
+      sources: [{ index: 1, name: 'Doc', path: 'docs/x', documentType: 'markdown', externalUrl: href }],
+    });
+    expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
+  });
+
+  it('still keeps a genuine same-origin path', () => {
+    const event = sourceMetadataEvent({
+      sources: [{ index: 1, name: 'Guide', externalUrl: '/onboarding-guides/set-up-sso' }],
+    });
+    expect(event?.sources?.[0].externalUrl).toBe('/onboarding-guides/set-up-sso');
+  });
+});

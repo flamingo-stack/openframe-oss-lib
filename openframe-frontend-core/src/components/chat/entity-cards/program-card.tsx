@@ -208,8 +208,18 @@ function webinarTiming(item: BaseProgramItem): {
  * come from `item.date` pinned to UTC while the time printed beside it came
  * from `start_at` in the event's own IANA zone, so a webinar at
  * `2026-03-20T01:18Z` / `America/New_York` read "Mar 20, 2026 · 9:18 PM" — a
- * date and a time that never coexisted. Where the row carries a zone, the date
- * is now derived from the SAME instant the time is, in that same zone.
+ * date and a time that never coexisted.
+ *
+ * `item.date` IS the instant to render. The host resolves it once — applying
+ * any admin display override — and hands the same resolved value to this card,
+ * to the model's context and to the API wire. Preferring `start_at` here
+ * instead looks like it buys intra-card coherence, and it does, but it buys it
+ * by ignoring the override: the card would then show the schedule while the
+ * assistant beside it shows the override. That is the page-versus-assistant
+ * divergence this whole change exists to remove, re-introduced one layer down.
+ * Both halves read `item.date`, so the card is internally coherent AND agrees
+ * with everything else. `start_at` remains the source for DURATION, which is an
+ * elapsed time rather than a display date.
  *
  * A row with no zone keeps the UTC pin (`formatUtc`). That pin is the React
  * #418 hydration fix, not an oversight: do not "fix the timezone" by making it
@@ -219,10 +229,8 @@ function webinarTiming(item: BaseProgramItem): {
 function programDateInstant(item: BaseProgramItem): { instant: string | null; timezone: string | null } {
   const timezone = 'timezone' in item ? programStr(item.timezone) : null;
   if (!timezone) return { instant: null, timezone: null };
-  // Prefer the scheduling instant the TIME is read from, so the two halves
-  // cannot disagree even if `item.date` carries a display override upstream.
   const startAt = 'start_at' in item ? programStr(item.start_at) : null;
-  return { instant: startAt ?? programStr(item.date), timezone };
+  return { instant: programStr(item.date) ?? startAt, timezone };
 }
 
 function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string }) {
@@ -313,6 +321,8 @@ export function ProgramCard<T extends BaseProgramItem>({
   // below is followed by a real type check instead of a cast.
   const isScheduled = 'status' in item && item.status === 'scheduled';
 
+  const zonedDate = programDateInstant(item);
+
   // Compact per-type meta (duration / location / start time) — shared by the
   // `sm` and `portrait` densities.
   const compactTypeMeta = (): string | null => {
@@ -326,13 +336,14 @@ export function ProgramCard<T extends BaseProgramItem>({
       const { startAt, endAt, timezone } = webinarTiming(item);
       // Compact densities join plain strings, so the zone rides inline here;
       // the default density renders it as its own styled span instead.
-      const time = formatTimeWithTimezone(startAt, timezone, { withZoneLabel: true });
+      // Read from the SAME resolved instant the date is (see
+      // `programDateInstant`) so the two halves cannot name different moments.
+      const time = formatTimeWithTimezone(zonedDate.instant ?? startAt, timezone, { withZoneLabel: true });
       const dur = formatDurationFromRange(startAt, endAt);
       return dur ? `${time} · ${dur}` : time;
     }
     return null;
   };
-  const zonedDate = programDateInstant(item);
   const compactDate = zonedDate.instant
     ? formatDateWithTimezone(zonedDate.instant, zonedDate.timezone, 'medium')
     : formatUtc(new Date(item.date), 'MMM d, yyyy');
@@ -443,7 +454,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         <>
           <Video className="h-4 w-4 text-ods-text-secondary" />
           <span className="font-body text-ods-text-secondary">
-            {formatTimeWithTimezone(startAt, timezone)}
+            {formatTimeWithTimezone(zonedDate.instant ?? startAt, timezone)}
             {duration && ` · ${duration}`}
           </span>
           {timezone && <span className="text-ods-text-secondary text-h6">({timezone})</span>}

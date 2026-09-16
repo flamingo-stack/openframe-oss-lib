@@ -324,7 +324,7 @@ export function formatTimeWithTimezone(
  *
  * `style` picks the two shapes the program cards actually render:
  * `'medium'` → "Mar 19, 2026" (compact densities), `'weekday'` →
- * "Thursday 19 March" (default density).
+ * "Thursday, March 19" (default density).
  *
  * Returns: "Mar 19, 2026"
  */

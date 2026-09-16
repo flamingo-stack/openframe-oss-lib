@@ -76,8 +76,18 @@ export function safeHref(url: string | null | undefined): string | null {
   if (/[\u0000-\u001f\u007f\u200b-\u200d\u2028\u2029\ufeff]/.test(url)) return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
-  // Pure same-origin path.
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed;
+  // Pure same-origin path — decided by RESOLVING it, not by prefix. The URL
+  // parser treats a backslash as a slash in the authority position, so
+  // `/\\evil.test/x` lands on a THIRD-PARTY origin while passing a
+  // `startsWith('//')` test. Ask the parser where it actually goes.
+  if (trimmed.startsWith('/')) {
+    const sameOriginBase = 'https://_safehref_base.invalid';
+    try {
+      return new URL(trimmed, sameOriginBase).origin === sameOriginBase ? trimmed : null;
+    } catch {
+      return null;
+    }
+  }
   if (trimmed.startsWith('#')) return trimmed;
   // Reject bare scheme-only inputs.
   if (/^[a-z][a-z0-9+.-]*:$/i.test(trimmed)) return null;
