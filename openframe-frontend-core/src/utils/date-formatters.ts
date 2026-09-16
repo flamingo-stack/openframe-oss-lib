@@ -1,24 +1,22 @@
 /**
- * Shared Date Formatting Utilities
- * Single source of truth for date formatting across the application
+ * Calendar-date presets.
+ *
+ * These format the DAY AS WRITTEN — the `YYYY-MM-DD` head of the input — so a
+ * `"2025-11-11"` never renders as Nov 10 west of UTC. The rendering itself is
+ * `formatDateWithTimezone` in `./format`: the day head is a UTC midnight
+ * rendered UTC-pinned, which is exactly the day written, on any machine. They
+ * used to look month names up in their own arrays.
  */
 
-const MONTHS_LONG = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-] as const;
+import { type ZonedDateStyle, formatDateWithTimezone } from './format';
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+/** Render the calendar day an ISO date/date-time string names, or return the
+ *  input unchanged if it has no `YYYY-MM-DD` head. */
+function formatDayHead(dateString: string, style: ZonedDateStyle): string {
+  const ymd = splitYmd(dateString);
+  if (!ymd) return dateString;
+  return formatDateWithTimezone(ymd.join('-'), null, style) || dateString;
+}
 
 /**
  * Split an ISO date / date-time string into `[year, month, day]` strings.
@@ -37,10 +35,7 @@ function splitYmd(dateString: string): [string, string, string] | null {
  * @returns e.g. `"November 11, 2025"`
  */
 export function formatReleaseDate(dateString: string): string {
-  const ymd = splitYmd(dateString);
-  if (!ymd) return dateString;
-  const [year, month, day] = ymd;
-  return `${MONTHS_LONG[parseInt(month) - 1]} ${parseInt(day)}, ${year}`;
+  return formatDayHead(dateString, 'long');
 }
 
 /**
@@ -51,10 +46,7 @@ export function formatReleaseDate(dateString: string): string {
  * lib chat cards (campaign-card-admin).
  */
 export function formatDateShort(dateString: string): string {
-  const ymd = splitYmd(dateString);
-  if (!ymd) return dateString;
-  const [year, month, day] = ymd;
-  return `${MONTHS_SHORT[parseInt(month) - 1]} ${parseInt(day)}, ${year}`;
+  return formatDayHead(dateString, 'medium');
 }
 
 /**
@@ -63,8 +55,5 @@ export function formatDateShort(dateString: string): string {
  * interview cards where the compact MM/DD/YYYY layout is desired.
  */
 export function formatDateSlashUTC(dateString: string): string {
-  const ymd = splitYmd(dateString);
-  if (!ymd) return dateString;
-  const [year, month, day] = ymd;
-  return `${month}/${day}/${year}`;
+  return formatDayHead(dateString, 'numeric');
 }

@@ -3,6 +3,7 @@
 import { ChevronRight } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { cn } from '../../utils/cn';
+import { formatDateWithTimezone, formatTimeWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention';
 import { Button, DatePickerCalendar, Skeleton } from '../ui';
 
@@ -89,7 +90,7 @@ function dateFromDayKey(key: string): Date {
 }
 
 function timeLabelInZone(ms: number, timeZone: string): string {
-  return new Intl.DateTimeFormat(undefined, { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(ms));
+  return formatTimeWithTimezone(ms, timeZone, { viewerLocale: true });
 }
 
 /**
@@ -211,7 +212,7 @@ const COLUMN_DIVIDER = 'border-b border-ods-border md:border-b-0 md:border-r lg:
 export function monthLabelFor(offset: number): string {
   const now = new Date();
   const month = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(month);
+  return formatDateWithTimezone(month, VIEWER_TIMEZONE, 'monthYear');
 }
 
 /** Nothing is bookable yet — used while a month is still loading. */
@@ -386,11 +387,7 @@ export function SlotPicker({
             <p className={COLUMN_HEADING_CLASS}>
               {/* Format the DAY-KEY itself (plain calendar date) — re-zoning a
                   local instant could label an adjacent day. */}
-              {new Intl.DateTimeFormat(undefined, {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-              }).format(dateFromDayKey(selectedDay))}
+              {formatDateWithTimezone(dateFromDayKey(selectedDay), VIEWER_TIMEZONE, 'weekday', { viewerLocale: true })}
             </p>
             <div className={CHIP_GRID_CLASS}>
               {daySlots.map(ms => {

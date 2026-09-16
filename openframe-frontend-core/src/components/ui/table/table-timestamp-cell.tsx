@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
+import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../../utils/format';
 
 /** @deprecated Use `data-table` instead. */
 export interface TableTimestampCellProps {
@@ -28,6 +29,11 @@ export interface TableTimestampCellProps {
   formatTimestamp?: boolean;
 }
 
+/** The viewer's own date-time shape, in their zone and locale — the meaning of a
+ *  dashboard table timestamp. Rendered by the one renderer, not `toLocaleString`. */
+const formatLocalTimestamp = (date: Date): string =>
+  formatDateWithTimezone(date, VIEWER_TIMEZONE, 'localeDateTime', { viewerLocale: true });
+
 /**
  * Formats a timestamp for display
  * If already formatted (contains space or comma), returns as-is
@@ -35,7 +41,7 @@ export interface TableTimestampCellProps {
  */
 function formatTimestampValue(timestamp: string | Date): string {
   if (timestamp instanceof Date) {
-    return timestamp.toLocaleString();
+    return formatLocalTimestamp(timestamp);
   }
 
   // If it looks like an ISO string, format it
@@ -48,7 +54,7 @@ function formatTimestampValue(timestamp: string | Date): string {
     // Try to parse and format ISO strings
     const date = new Date(timestamp);
     if (!isNaN(date.getTime())) {
-      return date.toLocaleString();
+      return formatLocalTimestamp(date);
     }
   }
 
