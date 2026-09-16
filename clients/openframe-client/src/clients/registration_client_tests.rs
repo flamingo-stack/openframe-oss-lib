@@ -1,5 +1,42 @@
 use super::*;
 
+fn persisted_info() -> PersistedMachineInfo {
+    PersistedMachineInfo {
+        machine_id: "server-machine-id".to_string(),
+        client_secret: "secret".to_string(),
+        user_id: None,
+    }
+}
+
+#[test]
+fn fresh_register_sends_local_machine_id_header() {
+    let headers = build_register_headers("key", None, Some("local-machine-id")).unwrap();
+    assert_eq!(headers.get("X-Machine-Id").unwrap(), "local-machine-id");
+    assert_eq!(headers.get("X-Initial-Key").unwrap(), "key");
+    assert_eq!(headers.get("Content-Type").unwrap(), "application/json");
+    assert!(headers.get("X-Client-Secret").is_none());
+}
+
+#[test]
+fn fresh_register_without_local_machine_id_omits_header() {
+    let headers = build_register_headers("key", None, None).unwrap();
+    assert!(headers.get("X-Machine-Id").is_none());
+}
+
+#[test]
+fn reinstall_sends_server_assigned_credentials() {
+    let headers =
+        build_register_headers("key", Some(persisted_info()), Some("local-machine-id")).unwrap();
+    assert_eq!(headers.get("X-Machine-Id").unwrap(), "server-machine-id");
+    assert_eq!(headers.get("X-Client-Secret").unwrap(), "secret");
+    assert_eq!(headers.get("X-Initial-Key").unwrap(), "key");
+}
+
+#[test]
+fn rejects_unparseable_local_machine_id() {
+    assert!(build_register_headers("key", None, Some("bad\nid")).is_err());
+}
+
 #[test]
 fn detects_client_secret_invalid() {
     let body = r#"{"code":"CLIENT_SECRET_INVALID","message":"Invalid client secret"}"#;

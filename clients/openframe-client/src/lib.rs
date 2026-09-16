@@ -252,8 +252,12 @@ impl Client {
         );
 
         // Initialize registration client
-        let registration_client = RegistrationClient::new(http_url.clone(), http_client.clone())
-            .context("Failed to create registration client")?;
+        let registration_client = RegistrationClient::new(
+            http_url.clone(),
+            http_client.clone(),
+            Some(machine_id.clone()),
+        )
+        .context("Failed to create registration client")?;
 
         // Initialize device data fetcher
         let device_data_fetcher = DeviceDataFetcher::new();
@@ -409,8 +413,11 @@ impl Client {
                 .context("Failed to initialize OpenFrame client info service")?;
 
         // Initialize GitHub download service (used by update and installation services)
-        let github_download_service =
-            GithubDownloadService::new(download_client.clone(), DmgExtractor::new());
+        let github_download_service = GithubDownloadService::new(
+            download_client.clone(),
+            Some(machine_id),
+            DmgExtractor::new(),
+        );
 
         // Initialize update state and cleanup services (needed by update service)
         let update_state_service = UpdateStateService::new(directory_manager.clone())

@@ -42,13 +42,20 @@ pub enum DeregistrationOutcome {
 pub struct RegistrationClient {
     http_client: Client,
     base_url: String,
+    /// Local id from `MachineIdService`, sent on fresh `/register` calls that have no server-assigned id yet.
+    local_machine_id: Option<String>,
 }
 
 impl RegistrationClient {
-    pub fn new(base_url: String, http_client: Client) -> Result<Self> {
+    pub fn new(
+        base_url: String,
+        http_client: Client,
+        local_machine_id: Option<String>,
+    ) -> Result<Self> {
         Ok(Self {
             http_client,
             base_url,
+            local_machine_id,
         })
     }
 
@@ -64,26 +71,8 @@ impl RegistrationClient {
             format!("{}/clients/api/agents/register", self.base_url)
         };
 
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "X-Initial-Key",
-            initial_key
-                .parse()
-                .context("Failed to parse initial key header")?,
-        );
-        if let Some(machine_info) = machine_info {
-            let parsed_client_secret = machine_info
-                .client_secret
-                .parse()
-                .context("Failed to parse client secret header")?;
-            let parsed_machine_id = machine_info
-                .machine_id
-                .parse()
-                .context("Failed to parse machine id header")?;
-            headers.insert("X-Client-Secret", parsed_client_secret);
-            headers.insert("X-Machine-Id", parsed_machine_id);
-        }
-        headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+        let headers =
+            build_register_headers(initial_key, machine_info, self.local_machine_id.as_deref())?;
 
         let response = self
             .http_client
@@ -169,6 +158,42 @@ impl RegistrationClient {
             body
         ))
     }
+}
+
+/// Reinstalls send the server-assigned id + secret; fresh registrations send the local machine id.
+fn build_register_headers(
+    initial_key: &str,
+    machine_info: Option<PersistedMachineInfo>,
+    local_machine_id: Option<&str>,
+) -> Result<HeaderMap> {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "X-Initial-Key",
+        initial_key
+            .parse()
+            .context("Failed to parse initial key header")?,
+    );
+    if let Some(machine_info) = machine_info {
+        let parsed_client_secret = machine_info
+            .client_secret
+            .parse()
+            .context("Failed to parse client secret header")?;
+        let parsed_machine_id = machine_info
+            .machine_id
+            .parse()
+            .context("Failed to parse machine id header")?;
+        headers.insert("X-Client-Secret", parsed_client_secret);
+        headers.insert("X-Machine-Id", parsed_machine_id);
+    } else if let Some(local_machine_id) = local_machine_id {
+        headers.insert(
+            "X-Machine-Id",
+            local_machine_id
+                .parse()
+                .context("Failed to parse local machine id header")?,
+        );
+    }
+    headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+    Ok(headers)
 }
 
 /// Statuses proving a retry cannot help: the platform already forgot this machine

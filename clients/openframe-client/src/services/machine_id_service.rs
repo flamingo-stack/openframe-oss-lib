@@ -9,6 +9,17 @@ use crate::platform::DirectoryManager;
 
 pub const MACHINE_ID_HEADER: &str = "x-machine-id";
 
+/// Sets the machine id header explicitly so the request does not depend on the client's default headers.
+pub fn with_machine_id(
+    request: reqwest::RequestBuilder,
+    machine_id: Option<&str>,
+) -> reqwest::RequestBuilder {
+    match machine_id {
+        Some(id) => request.header(MACHINE_ID_HEADER, id),
+        None => request,
+    }
+}
+
 // Locally generated machine identity, distinct from the server-assigned machine_id in agent config.
 // Persisted in the shared app-support dir so integrated tool agents (mesh, fleet) can read it.
 #[derive(Clone)]
@@ -71,3 +82,7 @@ impl MachineIdService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "machine_id_service_tests.rs"]
+mod tests;

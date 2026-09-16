@@ -36,7 +36,8 @@ impl DeregistrationService {
             .context("Failed to create HTTP client")?;
 
         let base_url = format!("https://{}", initial_config_service.get_server_url()?);
-        let registration_client = RegistrationClient::new(base_url, http_client)
+        // No local machine id: deregister() only ever sends the saved server-assigned credentials.
+        let registration_client = RegistrationClient::new(base_url, http_client, None)
             .context("Failed to create registration client")?;
 
         // Loaded up front so the final retry still has them once the on-disk copy is wiped.

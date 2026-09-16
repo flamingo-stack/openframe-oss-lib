@@ -59,7 +59,7 @@ pub use last_known_good_service::LastKnownGoodService;
 pub use local_tls_config_provider::LocalTlsConfigProvider;
 pub use machine_heartbeat_publisher::MachineHeartbeatPublisher;
 pub use machine_heartbeat_run_manager::MachineHeartbeatRunManager;
-pub use machine_id_service::{MachineIdService, MACHINE_ID_HEADER};
+pub use machine_id_service::{with_machine_id, MachineIdService, MACHINE_ID_HEADER};
 pub use nats_connection_manager::NatsConnectionManager;
 pub use nats_message_publisher::NatsMessagePublisher;
 pub use openframe_client_info_service::OpenFrameClientInfoService;

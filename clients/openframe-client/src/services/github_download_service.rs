@@ -3,6 +3,7 @@ use crate::config::update_config::{
 };
 use crate::models::download_configuration::DownloadConfiguration;
 use crate::platform::binary_writer;
+use crate::services::with_machine_id;
 use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use reqwest::Client;
@@ -14,14 +15,21 @@ use tracing::{info, warn};
 #[derive(Clone)]
 pub struct GithubDownloadService {
     http_client: Client,
+    /// Sent on every download so gateway-fronted asset links (`/v0/api/assets/download`) carry the machine id.
+    local_machine_id: Option<String>,
     #[allow(dead_code)] // read only by macos-only dmg extraction path
     dmg_extractor: crate::platform::DmgExtractor,
 }
 
 impl GithubDownloadService {
-    pub fn new(http_client: Client, dmg_extractor: crate::platform::DmgExtractor) -> Self {
+    pub fn new(
+        http_client: Client,
+        local_machine_id: Option<String>,
+        dmg_extractor: crate::platform::DmgExtractor,
+    ) -> Self {
         Self {
             http_client,
+            local_machine_id,
             dmg_extractor,
         }
     }
@@ -173,9 +181,7 @@ impl GithubDownloadService {
 
     /// Downloads file from URL and returns bytes
     async fn download(&self, url: &str) -> Result<Bytes> {
-        let response = self
-            .http_client
-            .get(url)
+        let response = with_machine_id(self.http_client.get(url), self.local_machine_id.as_deref())
             .send()
             .await
             .context("Failed to send download request")?;

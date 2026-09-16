@@ -5,7 +5,7 @@ use std::time::Duration;
 use super::{CheckCategory, CheckResult};
 use crate::installation_initial_config_service::InstallConfigParams;
 use crate::platform::permissions::PermissionUtils;
-use crate::services::MACHINE_ID_HEADER;
+use crate::services::with_machine_id;
 
 pub fn check_required_args(params: &InstallConfigParams) -> CheckResult {
     let mut missing = Vec::new();
@@ -206,17 +206,6 @@ pub fn check_tcp_connect(server_url: &str) -> CheckResult {
             &format!("Network: TCP {}:{}", strip_port(host), port_display),
             format!("Cannot resolve '{}' for TCP connection.", host),
         ),
-    }
-}
-
-/// The platform firewall drops client requests without it, so probes must carry it to reach the gateway.
-fn with_machine_id(
-    request: reqwest::RequestBuilder,
-    machine_id: Option<&str>,
-) -> reqwest::RequestBuilder {
-    match machine_id {
-        Some(id) => request.header(MACHINE_ID_HEADER, id),
-        None => request,
     }
 }
 
