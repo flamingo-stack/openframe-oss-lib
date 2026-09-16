@@ -126,3 +126,45 @@ export function webinarTiming(item: ProgramDateFields): {
   // site could reintroduce a zone the day-valued rule just dropped).
   return { startAt: programStr(item.start_at), endAt: programStr(item.end_at) };
 }
+
+/**
+ * THE compact meta line a program renders under its title:
+ * `"<day> · <type-specific>"` — podcast duration, event location, or webinar
+ * time + duration.
+ *
+ * The public card and the chat card built this separately, under a comment
+ * saying the second "mirrors" the first. That is the arrangement this module
+ * exists to end: the mirror drifted twice (the chat card rendered the day in
+ * the VIEWER's zone, and the two disagreed about labelling the zone on a
+ * zoneless row), each time only on the copy nobody was looking at.
+ *
+ * `kind` rather than the caller's config object, because the two callers key
+ * off differently-shaped configs for the same three types.
+ */
+export function programMetaLine(
+  item: ProgramDateFields & {
+    status?: unknown;
+    duration_seconds?: unknown;
+    location_name?: unknown;
+  },
+  kind: 'podcast' | 'event' | 'webinar' | (string & {}),
+  fmt: {
+    date: (at: ProgramInstant) => string;
+    duration: (seconds: number) => string;
+    webinarMeta: (at: ProgramInstant, opts: { startAt: string | null; endAt: string | null }) => string;
+  },
+): { at: ProgramInstant; typeMeta: string | null; line: string } {
+  const at = programDateInstant(item);
+  // A scheduled podcast has not aired, so its stored duration is not elapsed
+  // time yet and must not be shown as one.
+  const isScheduled = item.status === 'scheduled';
+  let typeMeta: string | null = null;
+  if (kind === 'podcast' && typeof item.duration_seconds === 'number' && item.duration_seconds > 0 && !isScheduled) {
+    typeMeta = fmt.duration(item.duration_seconds);
+  } else if (kind === 'event' && typeof item.location_name === 'string' && item.location_name.trim().length > 0) {
+    typeMeta = item.location_name;
+  } else if (kind === 'webinar' && programStr(item.start_at)) {
+    typeMeta = fmt.webinarMeta(at, webinarTiming(item)) || null;
+  }
+  return { at, typeMeta, line: [fmt.date(at), typeMeta].filter(Boolean).join(' · ') };
+}

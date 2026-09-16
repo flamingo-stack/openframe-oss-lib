@@ -26,7 +26,7 @@ import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
 import { formatDurationCompact, formatProgramDate, formatWebinarTimeMeta } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
-import { programDateInstant, webinarTiming } from '../../../utils/program-instant';
+import { programMetaLine, webinarTiming } from '../../../utils/program-instant';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -245,27 +245,19 @@ export function ProgramCard<T extends BaseProgramItem>({
   // below is followed by a real type check instead of a cast.
   const isScheduled = 'status' in item && item.status === 'scheduled';
 
-  const zonedDate = programDateInstant(item);
-
-  // Compact per-type meta (duration / location / start time) — shared by the
-  // `sm` and `portrait` densities.
-  const compactTypeMeta = (): string | null => {
-    if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {
-      const dur = item.duration_seconds;
-      if (typeof dur === 'number' && dur > 0) return formatDurationCompact(dur);
-    } else if (config.type === 'event' && 'location_name' in item) {
-      const loc = item.location_name;
-      if (typeof loc === 'string' && loc.trim().length > 0) return loc;
-    } else if (config.type === 'webinar' && 'start_at' in item) {
-      const { startAt, endAt } = webinarTiming(item);
-      // Compact densities join plain strings, so the zone rides inline here;
-      // the default density renders it as its own styled span instead.
-      // Read from the SAME resolved instant the date is (see
-      // `programDateInstant`) so the two halves cannot name different moments.
-      return formatWebinarTimeMeta(zonedDate, { startAt, endAt, withZoneLabel: true });
-    }
-    return null;
-  };
+  // The compact meta line, built by the ONE shared function — the chat card
+  // renders the same string from the same code rather than mirroring it.
+  const {
+    at: zonedDate,
+    typeMeta: compactTypeMetaValue,
+    line: compactMetaLine,
+  } = programMetaLine(item, config.type, {
+    date: at => formatProgramDate(at, 'medium'),
+    duration: formatDurationCompact,
+    // Compact densities join plain strings, so the zone rides inline here; the
+    // default density renders it as its own styled span instead.
+    webinarMeta: (at, opts) => formatWebinarTimeMeta(at, { ...opts, withZoneLabel: true }),
+  });
   const compactDate = formatProgramDate(zonedDate, 'medium');
 
   if (size === 'portrait') {
@@ -275,7 +267,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     // host); the date · duration meta line fills the subtitle when the
     // profile has no job title.
     const profile = programItemToStripProfile(item);
-    const dateMeta = [compactDate, compactTypeMeta()].filter(Boolean).join(' · ');
+    const dateMeta = compactMetaLine;
     return (
       <EntityPortraitCard
         href={href}
@@ -300,7 +292,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   if (size === 'sm') {
     const itemDate = compactDate;
     const compactCover = coverImage || placeholderUrl || null;
-    const typeMeta = compactTypeMeta();
+    const typeMeta = compactTypeMetaValue;
     const subtitleParts = [itemDate, typeMeta, config.labels?.singular].filter(
       (s): s is string => typeof s === 'string' && s.length > 0,
     );

@@ -851,17 +851,23 @@ export function formatBioText(aboutHtml: string | null | undefined, fallback: st
  */
 export function formatProgramTimeRange(
   at: ProgramInstant,
-  opts: { endAt?: string | null; withZoneLabel?: boolean } = {},
+  opts: { startAt?: string | null; endAt?: string | null; withZoneLabel?: boolean } = {},
 ): string {
-  // A chosen display day has no clock the admin meant — the same rule, and the
-  // same single owner, as the one `formatWebinarTimeMeta` applies.
+  // A chosen display day has no clock the admin meant. THE one statement of
+  // that rule for every clock this package renders — `formatWebinarTimeMeta`
+  // composes over this rather than repeating it.
   if (at.dateOnly) return '';
-  const start = at.instant ?? at.utcDate;
   const label = { withZoneLabel: opts.withZoneLabel === true };
+  // `instant` is null when the row declares no zone; `utcDate` is the canonical
+  // value then, and the formatter's own UTC pin renders it deterministically.
+  const from = formatTimeWithTimezone(at.instant ?? at.utcDate ?? opts.startAt, at.timezone, label);
   const end = opts.endAt ? formatTimeWithTimezone(opts.endAt, at.timezone, label) : '';
-  if (!end) return formatTimeWithTimezone(start, at.timezone, label);
-  const from = formatTimeWithTimezone(start, at.timezone);
-  return from ? `${from} - ${end}` : end;
+  // An end with no usable start is not a range, and rendering it alone puts a
+  // FINISH time where the reader expects a start. Say nothing instead.
+  if (!from) return '';
+  if (!end) return from;
+  // Only the last clock carries the label, so a range reads "9:00 AM - 5:00 PM EDT".
+  return `${formatTimeWithTimezone(at.instant ?? at.utcDate ?? opts.startAt, at.timezone)} - ${end}`;
 }
 
 /**
@@ -895,12 +901,12 @@ export function formatWebinarTimeMeta(
   at: ProgramInstant,
   opts: { startAt: string | null; endAt: string | null; withZoneLabel?: boolean },
 ): string {
+  // The CLOCK is `formatProgramTimeRange`'s, not a second rendering of it: this
+  // function restated the same three decisions (the `dateOnly` gate, the
+  // instant fallback, the labelled render) thirty lines below the sibling that
+  // owns them, and the two had already drifted apart on the fallback chain.
+  // Only the DURATION is this function's own contribution.
   const duration = formatDurationFromRange(opts.startAt, opts.endAt);
-  if (at.dateOnly) return duration;
-  // `instant` is null when the row declares no zone; `utcDate` is then the
-  // canonical value, and the formatter's own UTC pin renders it deterministically.
-  const time = formatTimeWithTimezone(at.instant ?? at.utcDate ?? opts.startAt, at.timezone, {
-    withZoneLabel: opts.withZoneLabel === true,
-  });
+  const time = formatProgramTimeRange(at, { startAt: opts.startAt, withZoneLabel: opts.withZoneLabel });
   return [time, duration].filter(Boolean).join(' · ');
 }

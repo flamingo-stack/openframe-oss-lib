@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDateWithTimezone, formatProgramDate, formatTimeWithTimezone } from '../format';
-import { programDateInstant } from '../program-instant';
+import {
+  formatDateWithTimezone,
+  formatDurationCompact,
+  formatProgramDate,
+  formatProgramTimeRange,
+  formatTimeWithTimezone,
+  formatWebinarTimeMeta,
+} from '../format';
+import { programDateInstant, programMetaLine } from '../program-instant';
 
 /**
  * The rule every program surface renders by. It lived as prose in two
@@ -81,5 +88,75 @@ describe('programDateInstant', () => {
 
   it('treats a real timestamp as an instant', () => {
     expect(programDateInstant(zoned).dateOnly).toBe(false);
+  });
+});
+
+/**
+ * The compact meta line. The public card and the chat card built this
+ * separately, under a comment saying the second "mirrors" the first — and it
+ * drifted twice, each time only on the copy nobody was looking at.
+ */
+describe('programMetaLine', () => {
+  const FMT = {
+    date: (at: ReturnType<typeof programDateInstant>) => formatProgramDate(at, 'medium'),
+    duration: formatDurationCompact,
+    webinarMeta: (at: ReturnType<typeof programDateInstant>, o: { startAt: string | null; endAt: string | null }) =>
+      formatWebinarTimeMeta(at, { ...o, withZoneLabel: true }),
+  };
+
+  it('a webinar: day, clock and duration, all from one instant', () => {
+    const { line } = programMetaLine(
+      {
+        date: '2026-03-20T01:18:00.000Z',
+        start_at: '2026-03-20T01:18:00.000Z',
+        end_at: '2026-03-20T02:03:00.000Z',
+        timezone: 'America/New_York',
+      },
+      'webinar',
+      FMT,
+    );
+    expect(line).toBe('Mar 19, 2026 · 9:18 PM EDT · 45m');
+  });
+
+  it('an overridden webinar: the chosen day, no clock, no zone', () => {
+    const { line } = programMetaLine(
+      {
+        date: '2026-01-05T00:00:00.000Z',
+        start_at: '2026-03-20T01:18:00.000Z',
+        end_at: '2026-03-20T02:03:00.000Z',
+        timezone: 'America/New_York',
+        date_is_display_override: true,
+      },
+      'webinar',
+      FMT,
+    );
+    expect(line).toBe('Jan 5, 2026 · 45m');
+  });
+
+  it('a scheduled podcast does not present its stored duration as elapsed time', () => {
+    const row = { date: '2026-03-20T01:18:00.000Z', duration_seconds: 1800 };
+    expect(programMetaLine(row, 'podcast', FMT).typeMeta).not.toBeNull();
+    expect(programMetaLine({ ...row, status: 'scheduled' }, 'podcast', FMT).typeMeta).toBeNull();
+  });
+
+  it('an event falls back to nothing rather than a blank separator', () => {
+    const { line } = programMetaLine({ date: '2026-03-20T01:18:00.000Z', location_name: '   ' }, 'event', FMT);
+    // No zone on this row, so the day is UTC-pinned (the React #418 rule) —
+    // and a whitespace-only location contributes nothing at all.
+    expect(line).toBe('Mar 20, 2026');
+  });
+});
+
+describe('formatProgramTimeRange', () => {
+  it('an end with no usable start says nothing, rather than showing a FINISH as a start', () => {
+    const at = programDateInstant({ timezone: 'America/New_York' });
+    expect(formatProgramTimeRange(at, { endAt: '2026-03-20T17:00:00Z' })).toBe('');
+  });
+
+  it('labels only the last clock of a range', () => {
+    const at = programDateInstant({ date: '2026-03-20T13:00:00Z', timezone: 'America/New_York' });
+    expect(formatProgramTimeRange(at, { endAt: '2026-03-20T17:00:00Z', withZoneLabel: true })).toBe(
+      '9:00 AM - 1:00 PM EDT',
+    );
   });
 });

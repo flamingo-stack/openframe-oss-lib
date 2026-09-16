@@ -41,7 +41,7 @@ import {
   formatProgramDate,
   formatWebinarTimeMeta,
 } from '../../../utils/format';
-import { programDateInstant, webinarTiming } from '../../../utils/program-instant';
+import { programMetaLine } from '../../../utils/program-instant';
 import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
@@ -1106,39 +1106,16 @@ function ProgramChatCard({
       <MicrophoneIcon size={24} />
     );
 
-  // Rich meta line mirroring ProgramCard's compact subtitle: "date · <typeMeta>"
-  // where typeMeta is podcast duration / event location / webinar time·duration.
-  // The type label itself already lives in the status pill, so it's omitted here.
-  const isScheduled = item?.status === 'scheduled';
-  let typeMeta: string | undefined;
-  if (
-    configKey === 'podcast' &&
-    typeof item?.duration_seconds === 'number' &&
-    item.duration_seconds > 0 &&
-    !isScheduled
-  ) {
-    typeMeta = formatDurationCompact(item.duration_seconds);
-  } else if (configKey === 'event' && typeof item?.location_name === 'string' && item.location_name.trim().length > 0) {
-    typeMeta = item.location_name;
-  }
-  // ONE instant, ONE zone — the same rule the public card uses, via the shared
-  // `programDateInstant`. This block used to render the DATE in the VIEWER's
-  // zone (`timezone: 'local'`) beside a time in the EVENT's zone: a pairing
-  // that names no real moment, is wrong for every viewer outside that zone, and
-  // is a React #418 hydration mismatch besides.
-  const zoned = programDateInstant(item ?? {});
-  if (configKey === 'webinar' && item?.start_at) {
-    typeMeta =
-      formatWebinarTimeMeta(zoned, {
-        ...webinarTiming(item ?? {}),
-        // Labelled unconditionally, like the public card it mirrors. Deriving
-        // this from the zone meant a zoneless webinar read "4:00 PM" here and
-        // "4:00 PM UTC" there, for the same row.
-        withZoneLabel: true,
-      }) || undefined;
-  }
-  const itemDate = formatProgramDate(zoned, 'medium');
-  const meta = [itemDate, typeMeta].filter(Boolean).join(' · ');
+  // The compact meta line, built by the SAME function the public card uses.
+  // This block used to mirror that one in prose — and drifted twice: it rendered
+  // the DATE in the VIEWER's zone (`timezone: 'local'`) beside a time in the
+  // EVENT's zone, and it labelled the zone on a different condition. The type
+  // label itself lives in the status pill, so it is omitted here.
+  const { line: meta } = programMetaLine(item ?? {}, configKey, {
+    date: at => formatProgramDate(at, 'medium'),
+    duration: formatDurationCompact,
+    webinarMeta: (at, opts) => formatWebinarTimeMeta(at, { ...opts, withZoneLabel: true }),
+  });
 
   return (
     <EntityMingoCard
