@@ -1,19 +1,30 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.ScriptApi;
+import com.openframe.test.api.ScriptScheduleApi;
+import com.openframe.test.data.dto.execution.ScheduleRunConnection;
+import com.openframe.test.data.dto.execution.ScheduleRunFilters;
 import com.openframe.test.data.dto.execution.ScriptExecution;
 import com.openframe.test.data.dto.execution.ScriptExecutionConnection;
 import com.openframe.test.data.dto.execution.ScriptExecutionFilters;
 import com.openframe.test.data.dto.shared.FilterOption;
+import com.openframe.test.data.dto.schedule.ScriptSchedule;
 import com.openframe.test.data.dto.script.Script;
+import com.openframe.test.data.generator.ScriptGenerator;
+import com.openframe.test.data.generator.ScriptScheduleGenerator;
+import com.openframe.test.helpers.ai.RunId;
 import com.openframe.test.helpers.RelayIds;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
+import static com.openframe.test.data.generator.ScriptScheduleGenerator.nextSlot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -25,14 +36,21 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * in a tenant where something has already dispatched a script. When nothing has, it says so and skips
  * rather than asserting a page of zero rows against a facet block of zero counts and passing hollowly.
  *
- * <p>The schedule half of CP-17 (schedule executions, runs and their facets) is not here: it needs the
- * script-schedule client, which is still on its own review branch.
+ * <p>The schedule half reads the same two lists for a schedule, plus its runs — a run being one firing
+ * across the schedule's devices, with the executions as its per-device legs. That half creates a
+ * schedule of its own a day out and asserts the empty case, which is a real contract: a schedule that
+ * has never fired must answer with empty pages and empty facets rather than an error or a null.
  */
+@Slf4j
 @Tag("saas")
 @DisplayName("Script execution history")
 public class ScriptExecutionHistoryTest extends BaseTest {
 
+    private static final RunId RUN_ID = RunId.next();
     private static final Set<String> STATUSES = Set.of("QUEUED", "RUNNING", "SUCCESS", "FAILED");
+
+    private static Script ownScript;
+    private static ScriptSchedule ownSchedule;
 
     @Tag("feature")
     @Tag("read")
@@ -71,6 +89,35 @@ public class ScriptExecutionHistoryTest extends BaseTest {
         assertThat(statusSum).as("Status facet counts add up to the total").isEqualTo(total);
     }
 
+    @Tag("feature")
+    @Tag("read")
+    @Test
+    @DisplayName("Read a schedule's executions, runs and facets")
+    public void testScheduleExecutionsAndRuns() {
+        ownScript = ScriptApi.createScript(ScriptGenerator.createScriptRequest());
+        ownSchedule = ScriptScheduleApi.createSchedule(ScriptScheduleGenerator.dateTimeSchedule(
+                "E2E-" + RUN_ID + " history", ownScript.getId(), nextSlot(Duration.ofDays(1)), null));
+        String id = ownSchedule.getId();
+
+        ScriptExecutionConnection executions = ScriptScheduleApi.getScheduleExecutions(id, 20);
+        assertThat(executions.getFilteredCount()).as("A schedule that never fired has no executions").isZero();
+        assertThat(executions.nodes()).as("No execution rows").isEmpty();
+        assertThat(executions.getPageInfo()).as("A connection carries pageInfo even when empty").isNotNull();
+
+        ScriptExecutionFilters executionFacets = ScriptScheduleApi.getScheduleExecutionFilters(id);
+        assertThat(executionFacets.getFilteredCount()).as("The execution facets agree with the list").isZero();
+        assertThat(executionFacets.getStatuses()).as("No status facet without executions").isEmpty();
+
+        ScheduleRunConnection runs = ScriptScheduleApi.getScheduleRuns(id, 20);
+        assertThat(runs.getFilteredCount()).as("A schedule that never fired has no runs").isZero();
+        assertThat(runs.nodes()).as("No run rows").isEmpty();
+
+        ScheduleRunFilters runFacets = ScriptScheduleApi.getScheduleRunFilters(id);
+        assertThat(runFacets.getFilteredCount()).as("The run facets agree with the list").isZero();
+        assertThat(runFacets.getStatuses()).as("No status facet without runs").isEmpty();
+        assertThat(runFacets.getInitiators()).as("No initiator facet without runs").isEmpty();
+    }
+
     /**
      * First script in the tenant that has been dispatched at least once, or null when none has. Each
      * candidate costs one facet call, so the result is held for the run.
@@ -85,4 +132,21 @@ public class ScriptExecutionHistoryTest extends BaseTest {
         return null;
     }
 
+    @AfterAll
+    public static void cleanup() {
+        if (ownSchedule != null) {
+            try {
+                ScriptScheduleApi.deleteSchedule(ownSchedule.getId());
+            } catch (RuntimeException e) {
+                log.warn("Failed to delete schedule {} — it is left in the tenant: {}", ownSchedule.getId(), e.getMessage());
+            }
+        }
+        if (ownScript != null) {
+            try {
+                ScriptApi.deleteScript(ownScript.getId());
+            } catch (RuntimeException e) {
+                log.warn("Failed to delete script {} — it is left in the tenant: {}", ownScript.getId(), e.getMessage());
+            }
+        }
+    }
 }

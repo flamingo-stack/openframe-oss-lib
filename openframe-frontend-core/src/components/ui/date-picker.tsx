@@ -6,6 +6,7 @@ import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { DayPicker, type DateRange, type DayPickerProps, type Matcher } from 'react-day-picker';
 import { useMdUp } from '../../hooks';
 import { cn } from '../../utils/cn';
+import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
@@ -60,13 +61,10 @@ export type DatePickerProps = SingleDatePickerProps | RangeDatePickerProps;
 // Helper functions
 // ============================================================================
 
-const defaultFormatDate = (date: Date): string => {
-  return date.toLocaleDateString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric',
-  });
-};
+// A picked date is a LOCAL calendar date (the grid builds it from y/m/d in the
+// browser's zone), so it renders in the viewer's zone — UTC would move it a day
+// for anyone east of Greenwich.
+const defaultFormatDate = (date: Date): string => formatDateWithTimezone(date, VIEWER_TIMEZONE, 'numeric');
 
 const formatDateRange = (range: DateRange | undefined, formatFn: (date: Date) => string): string => {
   if (!range?.from) return '';
@@ -465,12 +463,7 @@ export function DatePickerCalendar({
   const handlePreviousMonth = () => shiftMonth(-1);
   const handleNextMonth = () => shiftMonth(1);
 
-  const formatMonthYear = (date: Date): string => {
-    return date.toLocaleDateString('en-US', {
-      month: 'long',
-      year: 'numeric',
-    });
-  };
+  const formatMonthYear = (date: Date): string => formatDateWithTimezone(date, VIEWER_TIMEZONE, 'monthYear');
 
   const getSecondMonth = (date: Date): Date => {
     const next = new Date(date);
