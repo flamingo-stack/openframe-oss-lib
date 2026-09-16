@@ -138,7 +138,15 @@ export {
   formatDurationMMSS,
   formatDurationCompact,
   formatTimeWithTimezone,
+  formatDateWithTimezone,
+  formatDateTimeYmd,
+  VIEWER_TIMEZONE,
+  formatWebinarTimeMeta,
+  formatProgramDate,
+  formatProgramTimeRange,
+  type ZonedDateStyle,
   formatDurationFromRange,
+  isOrderedRange,
   type FormatDateUTCOptions,
   formatDateUTC,
   formatEntryMonthUTC,
@@ -393,3 +401,19 @@ export * from './csv';
 export * from './social-platforms';
 // The ODS badge palette a row whose colour is data picks from (departments).
 export { BADGE_PALETTE, isBadgePaletteKey, pickBadgePaletteColor, type BadgePaletteKey } from './badge-palette';
+
+// "Which instant does a program render, in which zone, and does it have a
+// clock" — THE resolver every webinar/event/podcast surface reads, in this
+// package and in the hub. Exported because the hub re-derived it by hand while
+// it was package-private, and the copies drifted.
+export {
+  programDateInstant,
+  programMetaFormatters,
+  programMetaLine,
+  programStr,
+  webinarTiming,
+} from './program-instant';
+// The concrete renderer bundle, so every surface in BOTH repos builds its meta
+// line from one set rather than mirroring the triple.
+export { PROGRAM_META_RENDERERS } from './program-meta-renderers';
+export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './program-instant';
