@@ -63,20 +63,27 @@ public class Redis {
     }
 
     /**
-     * TLS only where a CA is published; an in-cluster Redis without in-transit encryption stays plain.
+     * Auth and TLS are independent and both optional: a token is sent only where the cluster runs with
+     * basic token-based auth, TLS only where a CA is published. A plain in-cluster Redis has neither.
      *
      * <p>The client is built per call rather than cached: a caller polls at most a few dozen times, and
      * a cached static client would trade those handshakes for a topology-staleness problem.
      */
     private static JedisClientConfig clientConfig() throws GeneralSecurityException, IOException {
-        String ca = RedisConfig.getCaCertificate();
-        if (ca == null) {
-            return DefaultJedisClientConfig.builder().build();
+        DefaultJedisClientConfig.Builder builder = DefaultJedisClientConfig.builder();
+
+        String token = RedisConfig.getAuthToken();
+        if (token != null) {
+            // Password with no user is AUTH <token>, which is how Memorystore authenticates `default`.
+            builder.password(token);
         }
-        return DefaultJedisClientConfig.builder()
-                .ssl(true)
-                .sslSocketFactory(sslSocketFactory(ca))
-                .build();
+
+        String ca = RedisConfig.getCaCertificate();
+        if (ca != null) {
+            builder.ssl(true).sslSocketFactory(sslSocketFactory(ca));
+        }
+
+        return builder.build();
     }
 
     /** Trust exactly the published CA - a managed Redis signs with a private one the JVM has never seen. */
