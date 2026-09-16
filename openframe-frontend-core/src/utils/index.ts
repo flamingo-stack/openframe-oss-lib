@@ -403,4 +403,4 @@ export { BADGE_PALETTE, isBadgePaletteKey, pickBadgePaletteColor, type BadgePale
 // package and in the hub. Exported because the hub re-derived it by hand while
 // it was package-private, and the copies drifted.
 export { programDateInstant, programStr } from './program-instant';
-export type { ProgramInstant } from './program-instant';
+export type { ProgramDateFields, ProgramInstant } from './program-instant';

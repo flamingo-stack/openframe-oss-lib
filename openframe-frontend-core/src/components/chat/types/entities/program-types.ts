@@ -166,6 +166,25 @@ export interface BaseProgramItem {
   description: string | null;
   cover_url: string | null; // Primary image
   date: string; // ISO date string - maps to: start_at, published_at
+  /**
+   * True when an admin DISPLAY OVERRIDE supplied `date`, rather than the row's
+   * own schedule — the flag `programDateInstant` reads to decide that this
+   * value is a chosen DAY, rendered UTC-pinned with no clock and no zone.
+   *
+   * Declared HERE, on the type `ProgramCard` actually consumes, because while
+   * it lived only in the host app's copy of this interface every consumer had
+   * to cast past the type to read it — so the compiler could not tell anyone
+   * when a producer forgot to set it.
+   *
+   * NOT the same as "is it a calendar date": the override column is
+   * `timestamptz` and the host normalizes through `toISOString()`, so an
+   * override always arrives as a full instant. An earlier attempt keyed off
+   * value precision and could therefore never fire.
+   */
+  date_is_display_override?: boolean;
+  /** The event's IANA zone, when the row declares one. Read through
+   *  `programDateInstant`, never directly — see that module on why. */
+  timezone?: string | null;
   external_url?: string | null; // Registration/play link
   hosts?: ProgramHost[] | null; // Speakers/hosts
   // Platform tagging lives in the host app's `entity_platforms` array (exposed

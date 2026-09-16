@@ -165,12 +165,13 @@ function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string
 function webinarTiming(item: BaseProgramItem): {
   startAt: string | null;
   endAt: string | null;
-  timezone: string | null;
 } {
+  // No `timezone` here on purpose: it would be a second derivation of what
+  // `programDateInstant` already resolved (and the un-nulled one, so a call
+  // site could reintroduce a zone the day-valued rule just dropped).
   return {
     startAt: 'start_at' in item ? programStr(item.start_at) : null,
     endAt: 'end_at' in item ? programStr(item.end_at) : null,
-    timezone: 'timezone' in item ? programStr(item.timezone) : null,
   };
 }
 
@@ -262,7 +263,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   // below is followed by a real type check instead of a cast.
   const isScheduled = 'status' in item && item.status === 'scheduled';
 
-  const zonedDate = programDateInstant(item as unknown as Record<string, unknown>);
+  const zonedDate = programDateInstant(item);
 
   // Compact per-type meta (duration / location / start time) — shared by the
   // `sm` and `portrait` densities.
@@ -274,19 +275,12 @@ export function ProgramCard<T extends BaseProgramItem>({
       const loc = item.location_name;
       if (typeof loc === 'string' && loc.trim().length > 0) return loc;
     } else if (config.type === 'webinar' && 'start_at' in item) {
-      const { startAt, endAt, timezone } = webinarTiming(item);
+      const { startAt, endAt } = webinarTiming(item);
       // Compact densities join plain strings, so the zone rides inline here;
       // the default density renders it as its own styled span instead.
       // Read from the SAME resolved instant the date is (see
       // `programDateInstant`) so the two halves cannot name different moments.
-      return formatWebinarTimeMeta({
-        instant: zonedDate.instant,
-        startAt,
-        endAt,
-        timezone,
-        withZoneLabel: true,
-        dateOnly: zonedDate.dateOnly,
-      });
+      return formatWebinarTimeMeta(zonedDate, { startAt, endAt, withZoneLabel: true });
     }
     return null;
   };
@@ -389,18 +383,12 @@ export function ProgramCard<T extends BaseProgramItem>({
       );
     }
     if (config.type === 'webinar' && 'start_at' in item) {
-      const { startAt, endAt, timezone } = webinarTiming(item);
+      const { startAt, endAt } = webinarTiming(item);
       return (
         <>
           <Video className="h-4 w-4 text-ods-text-secondary" />
           <span className="font-body text-ods-text-secondary">
-            {formatWebinarTimeMeta({
-              instant: zonedDate.instant,
-              startAt,
-              endAt,
-              timezone,
-              dateOnly: zonedDate.dateOnly,
-            })}
+            {formatWebinarTimeMeta(zonedDate, { startAt, endAt })}
           </span>
           {zonedDate.timezone && <span className="text-ods-text-secondary text-h6">({zonedDate.timezone})</span>}
         </>

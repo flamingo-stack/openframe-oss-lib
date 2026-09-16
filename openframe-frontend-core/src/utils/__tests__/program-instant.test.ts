@@ -60,13 +60,12 @@ describe('programDateInstant', () => {
     // one. Three surfaces had to remember that gate and two forgot; nulling it
     // makes the mistake unrepresentable rather than merely documented.
     expect(r.timezone).toBeNull();
-    expect(r.rowTimezone).toBe('America/New_York');
     // The admin who asked for March 19 sees March 19 — not March 18 at 8 PM,
     // which is what a zoned render of UTC midnight gives.
     expect(formatProgramDate(r)).toBe('Mar 19, 2026');
-    // ...and that is true precisely BECAUSE the zone was dropped: the row's own
-    // zone, if a consumer reached past the rule for it, still says the 18th.
-    expect(formatDateWithTimezone(r.utcDate, r.rowTimezone)).toBe('Mar 18, 2026');
+    // ...and that is true precisely BECAUSE the zone was dropped: rendering the
+    // same value in the row's declared zone still lands on the 18th.
+    expect(formatDateWithTimezone(r.utcDate, 'America/New_York')).toBe('Mar 18, 2026');
   });
 
   it('renders the same shape whether or not the row declares a zone', () => {

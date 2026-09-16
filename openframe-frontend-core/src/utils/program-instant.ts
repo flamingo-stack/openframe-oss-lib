@@ -66,14 +66,26 @@ export interface ProgramInstant {
    *  Kept on the resolved value so the UTC fallback is not re-derived (and
    *  re-formatted differently) at each call site. */
   utcDate: string | null;
-  /** The zone the ROW declares, whatever the render rule decided. For a
-   *  consumer stating the zone as data; never for a label beside a clock. */
-  rowTimezone: string | null;
+}
+
+/**
+ * The columns this rule reads. Declared structurally rather than as a
+ * `Record<string, unknown>` so a caller holding a real `BaseProgramItem` can
+ * pass it straight in: while the parameter was a bare record, every one of the
+ * four call sites wrote `as unknown as Record<string, unknown>`, and a cast at
+ * every call site is how a producer that forgets to set the flag goes
+ * unnoticed by the compiler.
+ */
+export interface ProgramDateFields {
+  date?: unknown;
+  start_at?: unknown;
+  timezone?: unknown;
+  date_is_display_override?: unknown;
 }
 
 /** Resolve what a program item should render. */
-export function programDateInstant(item: Record<string, unknown>): ProgramInstant {
-  const rowTimezone = programStr(item.timezone);
+export function programDateInstant(item: ProgramDateFields): ProgramInstant {
+  const declaredZone = programStr(item.timezone);
   const dateOnly = item.date_is_display_override === true;
   const date = programStr(item.date);
   const startAt = programStr(item.start_at);
@@ -81,12 +93,11 @@ export function programDateInstant(item: Record<string, unknown>): ProgramInstan
   // A day-valued row has no zone to render in, and a row that declares none
   // keeps the caller's UTC pin — which is the React #418 fix and must not be
   // "fixed" into a viewer-local render.
-  const timezone = dateOnly ? null : rowTimezone;
+  const timezone = dateOnly ? null : declaredZone;
   return {
     instant: timezone ? (date ?? startAt) : null,
     timezone,
     dateOnly,
     utcDate: date ?? startAt,
-    rowTimezone,
   };
 }

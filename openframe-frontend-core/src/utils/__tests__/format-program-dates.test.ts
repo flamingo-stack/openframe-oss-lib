@@ -104,31 +104,53 @@ describe('formatDateWithTimezone / formatTimeWithTimezone agree on the zone', ()
  * display-override rule. The rule now lives here, so it is tested here.
  */
 describe('formatWebinarTimeMeta', () => {
-  const base = { startAt: '2026-03-20T01:18:00Z', endAt: '2026-03-20T02:18:00Z', timezone: 'America/New_York' };
+  const RANGE = { startAt: '2026-03-20T01:18:00Z', endAt: '2026-03-20T02:18:00Z' };
+  // Built through the resolver, never hand-assembled: the helper takes the
+  // RESOLVED value precisely so a caller cannot invent a combination the
+  // resolver would never produce (which is how four call sites disagreed).
+  const zonedRow = { date: RANGE.startAt, start_at: RANGE.startAt, timezone: 'America/New_York' };
 
   it('renders the time from the resolved instant and the duration from the range', () => {
-    expect(formatWebinarTimeMeta({ ...base, instant: base.startAt })).toBe('9:18 PM · 1h');
+    expect(formatWebinarTimeMeta(programDateInstant(zonedRow), RANGE)).toBe('9:18 PM · 1h');
   });
 
   it('labels the zone when asked', () => {
-    expect(formatWebinarTimeMeta({ ...base, instant: base.startAt, withZoneLabel: true })).toBe('9:18 PM EDT · 1h');
+    expect(formatWebinarTimeMeta(programDateInstant(zonedRow), { ...RANGE, withZoneLabel: true })).toBe(
+      '9:18 PM EDT · 1h',
+    );
   });
 
   it('drops the CLOCK for a display override, keeping the duration', () => {
     // A chosen display date has no time of day the admin meant.
-    expect(formatWebinarTimeMeta({ ...base, instant: '2026-03-19T00:00:00Z', dateOnly: true })).toBe('1h');
+    const at = programDateInstant({ ...zonedRow, date: '2026-03-19T00:00:00Z', date_is_display_override: true });
+    expect(formatWebinarTimeMeta(at, RANGE)).toBe('1h');
   });
 
   it('leaves no dangling separator when either side is missing', () => {
-    expect(formatWebinarTimeMeta({ ...base, endAt: null, instant: base.startAt })).toBe('9:18 PM');
+    const at = programDateInstant(zonedRow);
+    expect(formatWebinarTimeMeta(at, { ...RANGE, endAt: null })).toBe('9:18 PM');
     // An inverted range yields no duration — and must not leave a trailing " · ".
-    expect(formatWebinarTimeMeta({ ...base, endAt: '2026-03-20T00:00:00Z', instant: base.startAt })).toBe('9:18 PM');
+    expect(formatWebinarTimeMeta(at, { ...RANGE, endAt: '2026-03-20T00:00:00Z' })).toBe('9:18 PM');
     // An unrenderable time must not leave a LEADING " · " either.
-    expect(formatWebinarTimeMeta({ ...base, instant: 'not-a-date' })).toBe('1h');
+    expect(
+      formatWebinarTimeMeta(programDateInstant({ ...zonedRow, date: 'not-a-date', start_at: 'not-a-date' }), RANGE),
+    ).toBe('1h');
   });
 
-  it('falls back to start_at when no resolved instant is supplied', () => {
-    expect(formatWebinarTimeMeta({ ...base, instant: null })).toBe('9:18 PM · 1h');
+  it('a zoneless row still renders a deterministic UTC clock, not nothing', () => {
+    // `instant` is null without a zone (the React #418 pin), so the helper must
+    // fall through to the canonical value rather than dropping the time.
+    const at = programDateInstant({ date: RANGE.startAt, start_at: RANGE.startAt });
+    expect(at.instant).toBeNull();
+    expect(formatWebinarTimeMeta(at, RANGE)).toBe('1:18 AM · 1h');
+  });
+
+  it('the two compact surfaces that mirror each other label the zone alike', () => {
+    // They took `withZoneLabel` from different expressions, so a zoneless
+    // webinar read "1:18 AM UTC" on the public card and "1:18 AM" on the chat
+    // card — for one row, on two cards built to look the same.
+    const at = programDateInstant({ date: RANGE.startAt, start_at: RANGE.startAt });
+    expect(formatWebinarTimeMeta(at, { ...RANGE, withZoneLabel: true })).toBe('1:18 AM UTC · 1h');
   });
 });
 
@@ -145,21 +167,13 @@ describe('a day-valued row leaves nothing for a consumer to mislabel', () => {
     const at = programDateInstant({
       date: '2026-03-19T00:00:00.000Z',
       start_at: '2026-03-20T01:18:00.000Z',
-      end_at: null,
       timezone: 'America/New_York',
       date_is_display_override: true,
     });
     expect(at.timezone).toBeNull();
-    expect(
-      formatWebinarTimeMeta({
-        instant: at.instant ?? at.utcDate,
-        startAt: '2026-03-20T01:18:00.000Z',
-        endAt: null,
-        timezone: at.timezone,
-        withZoneLabel: true,
-        dateOnly: at.dateOnly,
-      }),
-    ).toBe('');
+    expect(formatWebinarTimeMeta(at, { startAt: '2026-03-20T01:18:00.000Z', endAt: null, withZoneLabel: true })).toBe(
+      '',
+    );
     // ...while the DATE is still stated, and states the day the admin chose.
     expect(formatProgramDate(at, 'weekday')).toBe('Thursday, March 19');
   });

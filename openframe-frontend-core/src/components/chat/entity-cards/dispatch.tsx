@@ -1126,16 +1126,16 @@ function ProgramChatCard({
   // zone (`timezone: 'local'`) beside a time in the EVENT's zone: a pairing
   // that names no real moment, is wrong for every viewer outside that zone, and
   // is a React #418 hydration mismatch besides.
-  const zoned = programDateInstant((item ?? {}) as Record<string, unknown>);
+  const zoned = programDateInstant(item ?? {});
   if (configKey === 'webinar' && item?.start_at) {
     typeMeta =
-      formatWebinarTimeMeta({
-        instant: zoned.instant,
+      formatWebinarTimeMeta(zoned, {
         startAt: item.start_at,
         endAt: item.end_at ?? null,
-        timezone: zoned.timezone,
-        withZoneLabel: Boolean(zoned.timezone),
-        dateOnly: zoned.dateOnly,
+        // Labelled unconditionally, like the public card it mirrors. Deriving
+        // this from the zone meant a zoneless webinar read "4:00 PM" here and
+        // "4:00 PM UTC" there, for the same row.
+        withZoneLabel: true,
       }) || undefined;
   }
   const itemDate = formatProgramDate(zoned, 'medium');

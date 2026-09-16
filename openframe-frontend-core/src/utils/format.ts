@@ -852,18 +852,24 @@ export function formatBioText(aboutHtml: string | null | undefined, fallback: st
  * caller applied it, two of the three forgot and the surfaces disagreed about
  * the same row. A chosen display date has no clock the admin meant, so the time
  * half is dropped and only the duration remains.
+ *
+ * It takes the RESOLVED `ProgramInstant`, exactly as `formatProgramDate` does,
+ * for the same reason. While it took `instant` / `timezone` / `dateOnly` as
+ * loose fields, all four callers re-projected them off the same resolved value
+ * and no two projections matched — so a zoneless webinar rendered "4:00 PM UTC"
+ * on the public card and "4:00 PM" on the chat card, which exist to mirror each
+ * other, and the detail page fell back to a different source instant from the
+ * card's. Taking the value whole is what makes those disagreements unsayable.
  */
-export function formatWebinarTimeMeta(opts: {
-  instant: Date | string | null;
-  startAt: string | null;
-  endAt: string | null;
-  timezone: string | null;
-  withZoneLabel?: boolean;
-  dateOnly?: boolean;
-}): string {
+export function formatWebinarTimeMeta(
+  at: ProgramInstant,
+  opts: { startAt: string | null; endAt: string | null; withZoneLabel?: boolean },
+): string {
   const duration = formatDurationFromRange(opts.startAt, opts.endAt);
-  if (opts.dateOnly === true) return duration;
-  const time = formatTimeWithTimezone(opts.instant ?? opts.startAt, opts.timezone, {
+  if (at.dateOnly) return duration;
+  // `instant` is null when the row declares no zone; `utcDate` is then the
+  // canonical value, and the formatter's own UTC pin renders it deterministically.
+  const time = formatTimeWithTimezone(at.instant ?? at.utcDate ?? opts.startAt, at.timezone, {
     withZoneLabel: opts.withZoneLabel === true,
   });
   return [time, duration].filter(Boolean).join(' · ');
