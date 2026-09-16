@@ -13,13 +13,8 @@
  * Lifted from `lib/types/program-types.ts` in the hub.
  *
  * The pure row→item transform helpers that used to live here are GONE. They
- * had no caller in this package or in the host app, and the webinar one
- * hand-rolled `display_date_override ?? start_at` — the expression
- * `programDateInstant` exists to own — without setting the
- * `date_is_display_override` flag it needs, so an overridden webinar built
- * through it rendered with the clock and zone label the rule suppresses
- * everywhere else. A dead PUBLIC export that contradicts the rule is worse
- * than no export. The host app keeps its own transforms, which resolve.
+ * had no caller in this package or in the host app. The host app keeps its
+ * own transforms, which resolve the date.
  */
 
 import type { ReactNode } from 'react';
@@ -172,22 +167,6 @@ export interface BaseProgramItem {
   description: string | null;
   cover_url: string | null; // Primary image
   date: string; // ISO date string - maps to: start_at, published_at
-  /**
-   * True when an admin DISPLAY OVERRIDE supplied `date`, rather than the row's
-   * own schedule — the flag `programDateInstant` reads to decide that this
-   * value is a chosen DAY, rendered UTC-pinned with no clock and no zone.
-   *
-   * Declared HERE, on the type `ProgramCard` actually consumes, because while
-   * it lived only in the host app's copy of this interface every consumer had
-   * to cast past the type to read it — so the compiler could not tell anyone
-   * when a producer forgot to set it.
-   *
-   * NOT the same as "is it a calendar date": the override column is
-   * `timestamptz` and the host normalizes through `toISOString()`, so an
-   * override always arrives as a full instant. An earlier attempt keyed off
-   * value precision and could therefore never fire.
-   */
-  date_is_display_override?: boolean;
   /** The event's IANA zone, when the row declares one. Read through
    *  `programDateInstant`, never directly — see that module on why. */
   timezone?: string | null;

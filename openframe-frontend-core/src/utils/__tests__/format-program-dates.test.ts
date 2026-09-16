@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   formatDateWithTimezone,
   formatDurationFromRange,
-  formatProgramDate,
   formatTimeWithTimezone,
   formatWebinarTimeMeta,
 } from '../format';
@@ -100,8 +99,8 @@ describe('formatDateWithTimezone / formatTimeWithTimezone agree on the zone', ()
 /**
  * The webinar time+duration composition. These exact three lines existed in
  * three surfaces and drifted twice — once so the page read the raw `start_at`
- * while the card read the resolved instant, once so two of three applied the
- * display-override rule. The rule now lives here, so it is tested here.
+ * while the card read the resolved instant, once so the zone label differed.
+ * The rule now lives here, so it is tested here.
  */
 describe('formatWebinarTimeMeta', () => {
   const RANGE = { startAt: '2026-03-20T01:18:00Z', endAt: '2026-03-20T02:18:00Z' };
@@ -118,12 +117,6 @@ describe('formatWebinarTimeMeta', () => {
     expect(formatWebinarTimeMeta(programDateInstant(zonedRow), { ...RANGE, withZoneLabel: true })).toBe(
       '9:18 PM EDT · 1h',
     );
-  });
-
-  it('drops the CLOCK for a display override, keeping the duration', () => {
-    // A chosen display date has no time of day the admin meant.
-    const at = programDateInstant({ ...zonedRow, date: '2026-03-19T00:00:00Z', date_is_display_override: true });
-    expect(formatWebinarTimeMeta(at, RANGE)).toBe('1h');
   });
 
   it('leaves no dangling separator when either side is missing', () => {
@@ -151,30 +144,5 @@ describe('formatWebinarTimeMeta', () => {
     // card — for one row, on two cards built to look the same.
     const at = programDateInstant({ date: RANGE.startAt, start_at: RANGE.startAt });
     expect(formatWebinarTimeMeta(at, { ...RANGE, withZoneLabel: true })).toBe('1:18 AM UTC · 1h');
-  });
-});
-
-describe('a day-valued row leaves nothing for a consumer to mislabel', () => {
-  // The worst shape this rule can produce, and the one three surfaces rendered:
-  // an override supplies the day (so no clock), `end_at` is null (so no
-  // duration), and the composition is EMPTY — beside which two of the three
-  // surfaces still printed the row's bare IANA zone, captioning nothing.
-  //
-  // `end_at` being null is not hypothetical: the Livestorm ingest guard nulls
-  // it on an inverted range, which is exactly the corrupt-row case that guard
-  // was added for.
-  it('empty meta and no zone, so the slot renders nothing at all', () => {
-    const at = programDateInstant({
-      date: '2026-03-19T00:00:00.000Z',
-      start_at: '2026-03-20T01:18:00.000Z',
-      timezone: 'America/New_York',
-      date_is_display_override: true,
-    });
-    expect(at.timezone).toBeNull();
-    expect(formatWebinarTimeMeta(at, { startAt: '2026-03-20T01:18:00.000Z', endAt: null, withZoneLabel: true })).toBe(
-      '',
-    );
-    // ...while the DATE is still stated, and states the day the admin chose.
-    expect(formatProgramDate(at, 'weekday')).toBe('Thursday, March 19');
   });
 });

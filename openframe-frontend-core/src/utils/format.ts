@@ -482,7 +482,7 @@ export function formatTimeWithTimezone(
  * cannot name different moments.
  *
  * Every program surface used to write this branch itself:
- * `zoned.instant && !zoned.dateOnly ? formatDateWithTimezone(...) :
+ * `zoned.instant ? formatDateWithTimezone(...) :
  * formatUtc(new Date(item.date), 'EEEE d MMMM')` — four copies, and they did
  * not agree. Three stated the condition off the resolved instant and the
  * fourth off a local timezone variable; worse, the two branches rendered
@@ -963,8 +963,8 @@ export function formatBioText(aboutHtml: string | null | undefined, fallback: st
  *
  * The third member of the set beside `formatProgramDate` (the day) and
  * `formatWebinarTimeMeta` (time + duration), and it exists because the page
- * header rebuilt it locally: an `instant ?? utcDate` fallback, a `dateOnly`
- * suppression and a zone-labelled render — the same three things the meta
+ * header rebuilt it locally: an `instant ?? utcDate` fallback and a
+ * zone-labelled render — the same things the meta
  * helper owns, re-applied at the call site, which is exactly what that
  * helper's docblock says goes wrong. The header also appended the RAW IANA
  * name while the slot beneath it used the short name, so one component
@@ -977,10 +977,6 @@ export function formatProgramTimeRange(
   at: ProgramInstant,
   opts: { startAt?: string | null; endAt?: string | null; withZoneLabel?: boolean } = {},
 ): string {
-  // A chosen display day has no clock the admin meant. THE one statement of
-  // that rule for every clock this package renders — `formatWebinarTimeMeta`
-  // composes over this rather than repeating it.
-  if (at.dateOnly) return '';
   // `instant` is null when the row declares no zone; `utcDate` is the canonical
   // value then, and the formatter's own UTC pin renders it deterministically.
   // Resolved ONCE — spelling this chain twice is how the previous version of
@@ -1011,22 +1007,15 @@ export function formatProgramTimeRange(
  *
  * Extracted because this exact three-line composition existed in the chat card
  * and the public page header, and they DRIFTED: the card was corrected to read
- * the resolved display instant while the page still read the raw `start_at`, so
- * an admin override printed two different clock times for one webinar. One
- * review round apart, on the same three lines.
+ * the resolved display instant while the page still read the raw `start_at`.
  *
- * The split is the point: the TIME comes from the resolved display `instant`
- * (which carries any override), the DURATION from `startAt`/`endAt`, because
- * elapsed time is not a display date. Both sides of the separator are gated, so
- * neither a suppressed duration nor an unrenderable time can leave one dangling.
+ * The split is the point: the TIME comes from the resolved `instant`, the
+ * DURATION from `startAt`/`endAt`, because elapsed time is not a display date.
+ * Both sides of the separator are gated, so neither a suppressed duration nor
+ * an unrenderable time can leave one dangling.
  *
- * `dateOnly` lives in HERE rather than at the call sites on purpose: when each
- * caller applied it, two of the three forgot and the surfaces disagreed about
- * the same row. A chosen display date has no clock the admin meant, so the time
- * half is dropped and only the duration remains.
- *
- * It takes the RESOLVED `ProgramInstant`, exactly as `formatProgramDate` does,
- * for the same reason. While it took `instant` / `timezone` / `dateOnly` as
+ * It takes the RESOLVED `ProgramInstant`, exactly as `formatProgramDate` does.
+ * While it took `instant` / `timezone` as
  * loose fields, all four callers re-projected them off the same resolved value
  * and no two projections matched — so a zoneless webinar rendered "4:00 PM UTC"
  * on the public card and "4:00 PM" on the chat card, which exist to mirror each
@@ -1038,8 +1027,8 @@ export function formatWebinarTimeMeta(
   opts: { startAt: string | null; endAt: string | null; withZoneLabel?: boolean },
 ): string {
   // The CLOCK is `formatProgramTimeRange`'s, not a second rendering of it: this
-  // function restated the same three decisions (the `dateOnly` gate, the
-  // instant fallback, the labelled render) thirty lines below the sibling that
+  // function restated the same decisions (the instant fallback, the labelled
+  // render) thirty lines below the sibling that
   // owns them, and the two had already drifted apart on the fallback chain.
   // Only the DURATION is this function's own contribution.
   const duration = formatDurationFromRange(opts.startAt, opts.endAt);

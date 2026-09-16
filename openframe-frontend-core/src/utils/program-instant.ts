@@ -21,34 +21,16 @@
  *
  * THE RULE:
  *
- * - `item.date` IS the instant to render. The host resolves it once, applying
- *   any admin display override, and hands the same value to the card, the
- *   model's context and the API wire. Preferring `start_at` looks like it buys
- *   intra-card coherence — it does, by disagreeing with everything else.
+ * - `item.date` IS the instant to render. The host resolves it once and hands
+ *   the same value to the card, the model's context and the API wire.
+ *   Preferring `start_at` looks like it buys intra-card coherence — it does, by
+ *   disagreeing with everything else.
  * - `start_at` / `end_at` remain the source for DURATION, which is elapsed time
  *   rather than a display date.
- * - A DISPLAY OVERRIDE is a chosen date, not a moment. An admin backdating in a
- *   `datetime-local` control gets `00:00`, so "show this as March 19" is stored
- *   at UTC midnight; rendering that in a west-of-UTC zone shows March 18 at
- *   8 PM — a day early, at a time nobody chose. Such a value renders UTC-pinned
- *   with no clock and WITHOUT A ZONE LABEL.
  *
- *   The discriminator is "did an override supply this", NOT the value's
- *   precision. The override column is `timestamptz` and the host normalizes it
- *   through `toISOString()`, so it is always a full instant — an earlier
- *   attempt keyed on precision and could therefore never fire.
+ * `timezone` here is "the zone this value renders in and may be labelled with".
+ * A row that declares none keeps the UTC pin (the React #418 fix).
  *
- * THE ZONE IS NULLED RATHER THAN FLAGGED, deliberately. `timezone` here is "the
- * zone this value renders in and may be labelled with", so a day-valued row
- * carries none and a consumer CANNOT print `America/New_York` under a clock the
- * rule just suppressed. Three surfaces had to remember that gate; two forgot,
- * and one of them rendered a bare IANA string under an empty heading. A rule
- * enforced by the shape of the data cannot be forgotten by the next call site.
- *
- * There is deliberately NO escape hatch back to the un-nulled zone. One was
- * added ("for the rare consumer that needs it as data") and no consumer ever
- * wanted it — an un-nulled copy hanging off the resolved value is just the
- * mistake again, one property away.
  */
 
 /** Read a string field off an item type that does not declare it. */
@@ -59,12 +41,8 @@ export interface ProgramInstant {
    *  to `utcDate`. */
   instant: string | null;
   /** The zone this value RENDERS IN and may be LABELLED with. Null when the row
-   *  declares none, and null when the value is day-valued — see the note above
-   *  on why this is nulled rather than flagged. */
+   *  declares none. */
   timezone: string | null;
-  /** True when an admin display override supplied the value: render the day
-   *  UTC-pinned, with no clock. */
-  dateOnly: boolean;
   /** The row's canonical date string, used when there is no zone to render in.
    *  Kept on the resolved value so the UTC fallback is not re-derived (and
    *  re-formatted differently) at each call site. */
@@ -75,33 +53,26 @@ export interface ProgramInstant {
  * The columns this rule reads. Declared structurally rather than as a
  * `Record<string, unknown>` so a caller holding a real `BaseProgramItem` can
  * pass it straight in: while the parameter was a bare record, every one of the
- * four call sites wrote `as unknown as Record<string, unknown>`, and a cast at
- * every call site is how a producer that forgets to set the flag goes
- * unnoticed by the compiler.
+ * four call sites wrote `as unknown as Record<string, unknown>`.
  */
 export interface ProgramDateFields {
   date?: unknown;
   start_at?: unknown;
   end_at?: unknown;
   timezone?: unknown;
-  date_is_display_override?: unknown;
 }
 
 /** Resolve what a program item should render. */
 export function programDateInstant(item: ProgramDateFields): ProgramInstant {
-  const declaredZone = programStr(item.timezone);
-  const dateOnly = item.date_is_display_override === true;
+  const timezone = programStr(item.timezone);
   const date = programStr(item.date);
   const startAt = programStr(item.start_at);
 
-  // A day-valued row has no zone to render in, and a row that declares none
-  // keeps the caller's UTC pin — which is the React #418 fix and must not be
-  // "fixed" into a viewer-local render.
-  const timezone = dateOnly ? null : declaredZone;
+  // A row that declares no zone keeps the caller's UTC pin — which is the
+  // React #418 fix and must not be "fixed" into a viewer-local render.
   return {
     instant: timezone ? (date ?? startAt) : null,
     timezone,
-    dateOnly,
     utcDate: date ?? startAt,
   };
 }
@@ -114,16 +85,14 @@ export function programDateInstant(item: ProgramDateFields): ProgramInstant {
  * columns in four different shapes (`programStr`, raw reads, `?? null`, and an
  * `in`-guarded cast), which is the same defect one field-pair down from the one
  * this module exists to fix. They are read off the row, never off the resolved
- * instant, because elapsed time is not a display date: an override moves the
- * day shown, and a webinar still runs for 45 minutes.
+ * instant, because elapsed time is not a display date.
  */
 export function webinarTiming(item: ProgramDateFields): {
   startAt: string | null;
   endAt: string | null;
 } {
   // No `timezone` here on purpose: it would be a second derivation of what
-  // `programDateInstant` already resolved (and the UN-NULLED one, so a call
-  // site could reintroduce a zone the day-valued rule just dropped).
+  // `programDateInstant` already resolved.
   return { startAt: programStr(item.start_at), endAt: programStr(item.end_at) };
 }
 
