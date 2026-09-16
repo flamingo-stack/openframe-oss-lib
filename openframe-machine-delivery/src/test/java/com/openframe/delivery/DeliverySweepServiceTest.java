@@ -43,7 +43,7 @@ class DeliverySweepServiceTest {
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliveryFailureRecorder failureRecorder;
     @Mock private DeliveryMetrics metrics;
-    @Mock private DeliverySpec<TestPayload> spec;
+    @Mock private DeliverySpec<TestSeed, TestPayload> spec;
 
     @Captor private ArgumentCaptor<TestPayload> payloadCaptor;
 

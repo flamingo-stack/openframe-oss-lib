@@ -80,7 +80,7 @@ public class DeliverySweepService {
 
     private void republish(MachineDelivery delivery, Instant now) {
         DeliveryType type = delivery.getType();
-        DeliverySpec<?> spec = registry.require(type);
+        DeliverySpec<?, ?> spec = registry.require(type);
         publish(spec, delivery);
 
         int attempt = delivery.getAttempts() + 1;
@@ -92,7 +92,7 @@ public class DeliverySweepService {
                 type, delivery.getTargetId(), delivery.getMachineId(), attempt);
     }
 
-    private <P> void publish(DeliverySpec<P> spec, MachineDelivery delivery) {
+    private <S extends DeliverySeed, P> void publish(DeliverySpec<S, P> spec, MachineDelivery delivery) {
         Class<P> payloadClass = spec.getPayloadClass();
         P payload = readPayload(delivery, payloadClass);
         String machineId = delivery.getMachineId();

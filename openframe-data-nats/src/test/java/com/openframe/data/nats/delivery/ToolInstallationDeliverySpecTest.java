@@ -46,14 +46,14 @@ class ToolInstallationDeliverySpecTest {
         when(publisher.buildMessage(toolAgent, tool, true)).thenReturn(message);
 
         // execution
-        DeliveryRequest<ToolInstallationMessage> request = spec.request(MACHINE_ID, toolAgent, tool, true);
+        ToolInstallationDeliverySpec.Seed seed = new ToolInstallationDeliverySpec.Seed(MACHINE_ID, toolAgent, tool, true);
+        DeliveryRequest<ToolInstallationMessage> request = spec.request(seed);
 
         // verifications
         assertThat(request.getType()).isEqualTo(DeliveryType.TOOL_INSTALLATION);
         assertThat(request.getTargetId()).isEqualTo(TOOL_AGENT_KEY);
         assertThat(request.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(request.getPayload()).isSameAs(message);
-        assertThat(request.getSpec()).isSameAs(spec);
     }
 
     @Test

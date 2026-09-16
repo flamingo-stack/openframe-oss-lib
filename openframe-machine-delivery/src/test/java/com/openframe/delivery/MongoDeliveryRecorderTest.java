@@ -16,44 +16,41 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class RecordingDeliveryDispatchTest {
+class MongoDeliveryRecorderTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String VALUE = "issued";
 
     @Mock private MachineDeliveryRepository repository;
-    @Mock private DeliverySpec<TestPayload> spec;
 
     @Captor private ArgumentCaptor<MachineDelivery> deliveryCaptor;
 
-    private RecordingDeliveryDispatch dispatch;
+    private MongoDeliveryRecorder recorder;
 
-    private TestPayload payload;
+    private DeliveryRequest<TestPayload> request;
 
     @BeforeEach
     void setUp() {
-        payload = new TestPayload();
+        TestPayload payload = new TestPayload();
         payload.setValue(VALUE);
-        dispatch = new RecordingDeliveryDispatch(repository, new ObjectMapper());
-    }
-
-    @Test
-    void send_request_pendingRowSavedThenPublishedThroughSpec() {
-        // setup
-        when(spec.getType()).thenReturn(DeliveryType.CLIENT_UNINSTALL);
-        DeliveryRequest<TestPayload> request = DeliveryRequest.<TestPayload>builder()
-                .spec(spec)
+        request = DeliveryRequest.<TestPayload>builder()
+                .type(DeliveryType.CLIENT_UNINSTALL)
                 .targetId(MACHINE_ID)
                 .machineId(MACHINE_ID)
                 .payload(payload)
                 .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT)
                 .build();
+        recorder = new MongoDeliveryRecorder(repository, new ObjectMapper());
+    }
+
+    @Test
+    void record_request_pendingRowSaved() {
+        // setup
 
         // execution
-        dispatch.send(request);
+        recorder.record(request);
 
         // verifications
         verify(repository).save(deliveryCaptor.capture());
@@ -65,6 +62,5 @@ class RecordingDeliveryDispatchTest {
         assertThat(saved.getPayloadJson()).contains(VALUE);
         assertThat(saved.getOfflineBehavior()).isEqualTo(ScheduleOfflineBehavior.RETRY_ON_RECONNECT);
         assertThat(saved.getDispatchedAt()).isEqualTo(saved.getLastAttemptAt());
-        verify(spec).publish(MACHINE_ID, payload);
     }
 }

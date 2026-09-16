@@ -24,7 +24,7 @@ class DeliveryFailureRecorderTest {
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliveryMetrics metrics;
-    @Mock private DeliverySpec<TestPayload> spec;
+    @Mock private DeliverySpec<TestSeed, TestPayload> spec;
 
     private DeliveryFailureRecorder recorder;
 

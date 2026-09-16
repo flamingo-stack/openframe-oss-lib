@@ -9,7 +9,10 @@ import com.openframe.data.nats.model.ClientUninstallMessage;
 import com.openframe.data.nats.publisher.ClientUninstallNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.delivery.DeliveryRequest;
+import com.openframe.delivery.DeliverySeed;
 import com.openframe.delivery.DeliverySpec;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -17,20 +20,20 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty("spring.cloud.stream.enabled")
-public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstallMessage> {
+public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstallDeliverySpec.Seed, ClientUninstallMessage> {
 
     private final ClientUninstallNatsPublisher publisher;
     private final MachineRepository machineRepository;
 
-    // targetId is the machine itself: the agent confirms over HTTP /api/agents/uninstall with X-Machine-Id
-    public DeliveryRequest<ClientUninstallMessage> request(String machineId) {
-        ClientUninstallMessage message = publisher.buildMessage();
-        return DeliveryRequest.<ClientUninstallMessage>builder()
-                .spec(this)
-                .targetId(machineId)
-                .machineId(machineId)
-                .payload(message)
-                .build();
+    @Getter
+    @AllArgsConstructor
+    public static class Seed implements DeliverySeed {
+        private final String machineId;
+
+        @Override
+        public DeliveryType type() {
+            return DeliveryType.CLIENT_UNINSTALL;
+        }
     }
 
     @Override
@@ -39,8 +42,26 @@ public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstall
     }
 
     @Override
+    public Class<Seed> getSeedClass() {
+        return Seed.class;
+    }
+
+    @Override
     public Class<ClientUninstallMessage> getPayloadClass() {
         return ClientUninstallMessage.class;
+    }
+
+    // targetId is the machine itself: the agent confirms over HTTP /api/agents/uninstall with X-Machine-Id
+    @Override
+    public DeliveryRequest<ClientUninstallMessage> request(Seed seed) {
+        ClientUninstallMessage message = publisher.buildMessage();
+        String machineId = seed.getMachineId();
+        return DeliveryRequest.<ClientUninstallMessage>builder()
+                .type(DeliveryType.CLIENT_UNINSTALL)
+                .targetId(machineId)
+                .machineId(machineId)
+                .payload(message)
+                .build();
     }
 
     @Override

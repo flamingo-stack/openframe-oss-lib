@@ -16,11 +16,11 @@ import static java.util.stream.Collectors.toUnmodifiableMap;
 @Component
 public class DeliverySpecRegistry {
 
-    private final Map<DeliveryType, DeliverySpec<?>> byType;
+    private final Map<DeliveryType, DeliverySpec<?, ?>> byType;
 
     // ObjectProvider, not List: a service with zero specs on the classpath must still boot.
     // toUnmodifiableMap throws IllegalStateException on a duplicate type — the wanted fail-fast.
-    public DeliverySpecRegistry(ObjectProvider<DeliverySpec<?>> specs) {
+    public DeliverySpecRegistry(ObjectProvider<DeliverySpec<?, ?>> specs) {
         this.byType = specs.stream()
                 .collect(toUnmodifiableMap(DeliverySpec::getType, identity()));
         Set<DeliveryType> registered = byType.keySet();
@@ -28,8 +28,8 @@ public class DeliverySpecRegistry {
         log.info("Registered {} delivery spec(s): {}", byType.size(), sortedTypes);
     }
 
-    public DeliverySpec<?> require(DeliveryType type) {
-        DeliverySpec<?> spec = byType.get(type);
+    public DeliverySpec<?, ?> require(DeliveryType type) {
+        DeliverySpec<?, ?> spec = byType.get(type);
         if (spec == null) {
             throw new IllegalArgumentException("No spec registered for delivery type: " + type.name());
         }

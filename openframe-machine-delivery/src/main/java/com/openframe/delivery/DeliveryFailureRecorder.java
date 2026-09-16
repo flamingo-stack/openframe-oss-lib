@@ -36,7 +36,7 @@ public class DeliveryFailureRecorder {
         repository.save(delivery);
 
         metrics.recordFailed(type, failure);
-        DeliverySpec<?> spec = registry.require(type);
+        DeliverySpec<?, ?> spec = registry.require(type);
         spec.onFailed(delivery, failure);
         log.warn("Delivery FAILED: type={} targetId={} machineId={} attempts={} reason={}",
                 type, delivery.getTargetId(), delivery.getMachineId(), delivery.getAttempts(), failure);

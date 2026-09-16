@@ -16,23 +16,17 @@ import java.time.Instant;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "openframe.delivery.enabled", havingValue = "true")
-public class RecordingDeliveryDispatch implements DeliveryDispatch {
+public class MongoDeliveryRecorder implements DeliveryRecorder {
 
     private final MachineDeliveryRepository repository;
     private final ObjectMapper objectMapper;
 
     @Override
-    public void send(DeliveryRequest<?> request) {
+    public void record(DeliveryRequest<?> request) {
         MachineDelivery delivery = pendingRow(request);
         repository.save(delivery);
-        publish(request);
-        log.info("Delivery dispatched: type={} targetId={} machineId={}",
+        log.info("Delivery recorded: type={} targetId={} machineId={}",
                 request.getType(), request.getTargetId(), request.getMachineId());
-    }
-
-    private <P> void publish(DeliveryRequest<P> request) {
-        DeliverySpec<P> spec = request.getSpec();
-        spec.publish(request.getMachineId(), request.getPayload());
     }
 
     private MachineDelivery pendingRow(DeliveryRequest<?> request) {

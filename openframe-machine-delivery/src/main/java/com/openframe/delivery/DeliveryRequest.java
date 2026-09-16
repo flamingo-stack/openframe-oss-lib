@@ -8,14 +8,10 @@ import lombok.Getter;
 @Getter
 @Builder
 public class DeliveryRequest<P> {
-    private final DeliverySpec<P> spec;
+    private final DeliveryType type;
     private final String targetId;
     private final String machineId;
     private final P payload;
     private final ScheduleOfflineBehavior offlineBehavior;
     private final Long reconnectWindowSeconds;
-
-    public DeliveryType getType() {
-        return spec.getType();
-    }
 }

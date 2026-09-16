@@ -55,7 +55,8 @@ class ClientUninstallDeliverySpecTest {
         when(publisher.buildMessage()).thenReturn(message);
 
         // execution
-        DeliveryRequest<ClientUninstallMessage> request = spec.request(MACHINE_ID);
+        ClientUninstallDeliverySpec.Seed seed = new ClientUninstallDeliverySpec.Seed(MACHINE_ID);
+        DeliveryRequest<ClientUninstallMessage> request = spec.request(seed);
 
         // verifications
         assertThat(request.getType()).isEqualTo(DeliveryType.CLIENT_UNINSTALL);

@@ -16,12 +16,12 @@ class DeliverySpecRegistryTest {
     @Test
     void require_registeredType_specReturned() {
         // setup
-        DeliverySpec<?> spec = spec(DeliveryType.TOOL_INSTALLATION);
-        ObjectProvider<DeliverySpec<?>> specs = provider(spec);
+        DeliverySpec<?, ?> spec = spec(DeliveryType.TOOL_INSTALLATION);
+        ObjectProvider<DeliverySpec<?, ?>> specs = provider(spec);
         DeliverySpecRegistry registry = new DeliverySpecRegistry(specs);
 
         // execution
-        DeliverySpec<?> resolved = registry.require(DeliveryType.TOOL_INSTALLATION);
+        DeliverySpec<?, ?> resolved = registry.require(DeliveryType.TOOL_INSTALLATION);
 
         // verifications
         assertThat(resolved).isSameAs(spec);
@@ -30,7 +30,7 @@ class DeliverySpecRegistryTest {
     @Test
     void require_unregisteredType_throwsIllegalArgument() {
         // setup
-        ObjectProvider<DeliverySpec<?>> specs = provider();
+        ObjectProvider<DeliverySpec<?, ?>> specs = provider();
         DeliverySpecRegistry registry = new DeliverySpecRegistry(specs);
 
         // execution + verifications
@@ -42,9 +42,9 @@ class DeliverySpecRegistryTest {
     @Test
     void constructor_duplicateType_throwsIllegalState() {
         // setup
-        DeliverySpec<?> first = spec(DeliveryType.TOOL_INSTALLATION);
-        DeliverySpec<?> second = spec(DeliveryType.TOOL_INSTALLATION);
-        ObjectProvider<DeliverySpec<?>> duplicates = provider(first, second);
+        DeliverySpec<?, ?> first = spec(DeliveryType.TOOL_INSTALLATION);
+        DeliverySpec<?, ?> second = spec(DeliveryType.TOOL_INSTALLATION);
+        ObjectProvider<DeliverySpec<?, ?>> duplicates = provider(first, second);
 
         // execution + verifications
         assertThatThrownBy(() -> new DeliverySpecRegistry(duplicates))
@@ -55,9 +55,9 @@ class DeliverySpecRegistryTest {
     @Test
     void types_twoSpecs_bothTypesListed() {
         // setup
-        DeliverySpec<?> install = spec(DeliveryType.TOOL_INSTALLATION);
-        DeliverySpec<?> uninstall = spec(DeliveryType.CLIENT_UNINSTALL);
-        ObjectProvider<DeliverySpec<?>> specs = provider(install, uninstall);
+        DeliverySpec<?, ?> install = spec(DeliveryType.TOOL_INSTALLATION);
+        DeliverySpec<?, ?> uninstall = spec(DeliveryType.CLIENT_UNINSTALL);
+        ObjectProvider<DeliverySpec<?, ?>> specs = provider(install, uninstall);
 
         // execution
         DeliverySpecRegistry registry = new DeliverySpecRegistry(specs);
@@ -67,14 +67,14 @@ class DeliverySpecRegistryTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static ObjectProvider<DeliverySpec<?>> provider(DeliverySpec<?>... specs) {
-        ObjectProvider<DeliverySpec<?>> provider = mock(ObjectProvider.class);
+    private static ObjectProvider<DeliverySpec<?, ?>> provider(DeliverySpec<?, ?>... specs) {
+        ObjectProvider<DeliverySpec<?, ?>> provider = mock(ObjectProvider.class);
         when(provider.stream()).thenReturn(Stream.of(specs));
         return provider;
     }
 
-    private static DeliverySpec<?> spec(DeliveryType type) {
-        DeliverySpec<?> spec = mock(DeliverySpec.class);
+    private static DeliverySpec<?, ?> spec(DeliveryType type) {
+        DeliverySpec<?, ?> spec = mock(DeliverySpec.class);
         when(spec.getType()).thenReturn(type);
         return spec;
     }
