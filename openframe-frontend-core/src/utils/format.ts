@@ -273,28 +273,88 @@ export function formatDurationCompact(seconds: number | null | undefined): strin
  * fixing the React #418 hydration mismatch — AND shows the true event time
  * (4:00 PM EDT, not the 8:00 PM UTC a plain UTC pin would show, nor the
  * viewer-local time the old unpinned call produced). Falls back to UTC when no
- * zone is given, and tolerates a non-IANA label (legacy data) without throwing.
- * The zone LABEL is rendered separately by callers, so it is never appended here.
+ * zone is given, and tolerates an unresolvable label (legacy data) without throwing.
+ * The zone LABEL is rendered separately by callers that have room for their own
+ * styled span; pass `withZoneLabel` where the output is a plain joined string
+ * (the compact card densities) and the short name is appended inline — an
+ * unlabelled wall clock beside a date is readable but still ambiguous about
+ * WHICH zone it is stating.
  *
- * Returns: "4:00 PM"
+ * Returns: "4:00 PM", or "4:00 PM EDT" with `withZoneLabel`.
  */
-export function formatTimeWithTimezone(date: Date | string | null | undefined, timezone?: string | null): string {
+export function formatTimeWithTimezone(
+  date: Date | string | null | undefined,
+  timezone?: string | null,
+  options?: { withZoneLabel?: boolean },
+): string {
   if (!date) return '';
 
   const dateObj = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(dateObj.getTime())) return '';
   const opts: Intl.DateTimeFormatOptions = {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
     timeZone: timezone || 'UTC',
+    ...(options?.withZoneLabel ? { timeZoneName: 'short' as const } : {}),
   };
   try {
     return dateObj.toLocaleTimeString('en-US', opts);
   } catch {
-    // Non-IANA `timezone` (e.g. a bare "EST" label) makes Intl throw a
-    // RangeError. Fall back to a UTC-pinned render so we stay deterministic
-    // (still no #418) instead of crashing.
+    // An UNRESOLVABLE `timezone` makes Intl throw a RangeError. Fall back to a
+    // UTC-pinned render so we stay deterministic (still no #418) instead of
+    // crashing. Note a bare "EST" does NOT land here: Node resolves it as a
+    // legacy fixed UTC-5 alias, which is a different wall clock from
+    // America/New_York whenever DST is in effect — a data problem, not a
+    // crash, and not one this catch can see.
     return dateObj.toLocaleTimeString('en-US', { ...opts, timeZone: 'UTC' });
+  }
+}
+
+/**
+ * Format a webinar/event DATE as the calendar day in its OWN timezone — the
+ * sibling of `formatTimeWithTimezone`, and the reason it exists.
+ *
+ * A card that prints the date in UTC and the time beside it in the event's zone
+ * can name a moment that never existed: a webinar at `2026-03-20T01:18Z` in
+ * `America/New_York` read "Mar 20, 2026 · 9:18 PM" — 9:18 PM on the 20th is not
+ * when it happens, 9:18 PM on the 19th is. Both halves of one timestamp must be
+ * rendered in ONE zone. Same UTC fallback and same non-IANA tolerance as the
+ * time formatter, so the pair can never disagree about which zone it used.
+ *
+ * `style` picks the two shapes the program cards actually render:
+ * `'medium'` → "Mar 19, 2026" (compact densities), `'weekday'` →
+ * "Thursday 19 March" (default density).
+ *
+ * Returns: "Mar 19, 2026"
+ */
+export type ZonedDateStyle = 'medium' | 'weekday';
+
+const ZONED_DATE_STYLES: Record<ZonedDateStyle, Intl.DateTimeFormatOptions> = {
+  medium: { year: 'numeric', month: 'short', day: 'numeric' },
+  weekday: { weekday: 'long', day: 'numeric', month: 'long' },
+};
+
+export function formatDateWithTimezone(
+  date: Date | string | null | undefined,
+  timezone?: string | null,
+  style: ZonedDateStyle = 'medium',
+): string {
+  if (!date) return '';
+
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(dateObj.getTime())) return '';
+  const opts: Intl.DateTimeFormatOptions = {
+    ...ZONED_DATE_STYLES[style],
+    timeZone: timezone || 'UTC',
+  };
+  try {
+    return dateObj.toLocaleDateString('en-US', opts);
+  } catch {
+    // An unresolvable `timezone` throws a RangeError — same tolerance as
+    // `formatTimeWithTimezone`, so a bad row degrades to UTC on BOTH halves
+    // rather than only one, which is the whole point of the pair.
+    return dateObj.toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' });
   }
 }
 
@@ -302,6 +362,16 @@ export function formatTimeWithTimezone(date: Date | string | null | undefined, t
  * Calculate and format duration between two timestamps
  * Used for webinar durations
  * Returns: "1h 30m" or "45m"
+ *
+ * Returns `''` — the same "nothing to show" this function already returns for a
+ * missing endpoint — when the range is not a positive, real duration. An event
+ * whose `end_at` precedes its `start_at` is corrupt data, and the unguarded
+ * subtraction printed it literally: a live webinar row rendered "-45m" on the
+ * card. An unparseable timestamp printed "NaNm" the same way. A renderer shows
+ * nothing rather than an impossible value; the write path is what must reject
+ * the row. (Note the negative case never even reached the `>= 60` branch, so
+ * -90 minutes rendered as "-90m" rather than "-1h 30m" — the output was not
+ * just wrong, it was inconsistently wrong.)
  */
 export function formatDurationFromRange(
   startAt: string | Date | null | undefined,
@@ -312,7 +382,9 @@ export function formatDurationFromRange(
   const start = typeof startAt === 'string' ? new Date(startAt) : startAt;
   const end = typeof endAt === 'string' ? new Date(endAt) : endAt;
   const durationMs = end.getTime() - start.getTime();
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return '';
   const minutes = Math.round(durationMs / 60000);
+  if (minutes <= 0) return '';
 
   if (minutes >= 60) {
     const hours = Math.floor(minutes / 60);

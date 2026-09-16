@@ -1,4 +1,26 @@
+import { createRequire } from 'node:module';
+
 import { defineConfig } from 'tsup';
+
+// Build-time version stamp — see src/lib-version.ts for why it exists.
+//
+// The version committed to git is VESTIGIAL: the release workflow reads the
+// last published version off the REGISTRY and runs `npm version` immediately
+// before `npm publish`, so `package.json` in the repo does not match anything
+// consumers install. What ships is the `prepack` build, which runs after that
+// rewrite — so in CI, `pkg.version` is the true published version.
+//
+// Outside CI it is the stale committed number, so a local or yalc build is
+// stamped `<version>-local`. That marker is the point: a bundle must never
+// report a plain version string it did not actually ship as.
+//
+// (Do NOT try to detect `prepack` via `npm_lifecycle_event` — prepack runs
+// `npm run build`, a NESTED lifecycle, so by the time tsup loads this config
+// the value is 'build'. That check can never be true.)
+const pkgVersion: string = createRequire(import.meta.url)('./package.json').version;
+const LIB_VERSION_DEFINE = {
+  __LIB_VERSION__: JSON.stringify(process.env.CI ? pkgVersion : `${pkgVersion}-local`),
+};
 
 // Config is split into two builds: client and server/universal.
 //
@@ -101,12 +123,17 @@ export default defineConfig([
       // imports the emit side from the same module the client hooks
       // decode with — emitter and parser can't drift.
       'chat-protocol/index': 'src/chat-protocol/index.ts',
+      // Build-time version stamp — a single string constant, no React, no
+      // browser APIs. Its own subpath so a consumer's diagnostics/footer can
+      // read the running lib version without pulling any barrel.
+      'lib-version': 'src/lib-version.ts',
     },
     format: ['esm', 'cjs'],
     dts: false,
     splitting: false,
     sourcemap: true,
     external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
+    define: LIB_VERSION_DEFINE,
     treeshake: true,
   },
   // Client-side entries — these contain React components/hooks that require
@@ -180,6 +207,7 @@ export default defineConfig([
     splitting: true,
     sourcemap: true,
     external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
+    define: LIB_VERSION_DEFINE,
     banner: {
       js: '"use client";',
     },

@@ -117,6 +117,55 @@ describe('sourceMetadataEvent', () => {
     expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
   });
 
+  // A same-origin href is the hub's NORMAL output when the owning platform is
+  // the serving platform. Dropping it left every guide chip with a name and no
+  // destination, before the consumer's own absolutiser could ever run.
+  it('keeps a root-relative external URL', () => {
+    const event = sourceMetadataEvent({
+      sources: [
+        {
+          index: 1,
+          name: 'Guide',
+          path: 'onboarding-guides/x',
+          documentType: 'onboarding_guide',
+          externalUrl: '/onboarding-guides/x',
+        },
+      ],
+    });
+    expect(event?.sources?.[0].externalUrl).toBe('/onboarding-guides/x');
+  });
+
+  it('keeps a root-relative external URL on a grouped item', () => {
+    const event = sourceMetadataEvent({
+      sources: [
+        {
+          index: 1,
+          name: 'Guides',
+          items: [{ id: 'a', documentType: 'onboarding_guide', name: 'A', externalUrl: '/onboarding-guides/a' }],
+        },
+      ],
+    });
+    expect(event?.sources?.[0].items?.[0].externalUrl).toBe('/onboarding-guides/a');
+  });
+
+  it('drops a protocol-relative URL, which is a third-party origin and not a path', () => {
+    const event = sourceMetadataEvent({
+      sources: [{ index: 1, name: 'Doc', path: 'docs/x', documentType: 'markdown', externalUrl: '//evil.test/x' }],
+    });
+    expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
+  });
+
+  it('drops an href carrying control or zero-width characters', () => {
+    const event = sourceMetadataEvent({
+      sources: [
+        { index: 1, name: 'A', externalUrl: '/docs/\u200bx' },
+        { index: 2, name: 'B', externalUrl: 'https://x.test/\u0000y' },
+      ],
+    });
+    expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
+    expect(event?.sources?.[1]).not.toHaveProperty('externalUrl');
+  });
+
   it('preserves an explicit null targetPlatform, which means "no destination"', () => {
     const event = sourceMetadataEvent({
       sources: [{ index: 1, name: 'Doc', path: 'docs/x', documentType: 'markdown', targetPlatform: null }],

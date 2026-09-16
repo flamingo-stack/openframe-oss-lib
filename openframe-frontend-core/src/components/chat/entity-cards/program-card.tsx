@@ -25,7 +25,12 @@ import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
-import { formatDurationCompact, formatTimeWithTimezone, formatDurationFromRange } from '../../../utils/format';
+import {
+  formatDurationCompact,
+  formatTimeWithTimezone,
+  formatDateWithTimezone,
+  formatDurationFromRange,
+} from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
@@ -181,17 +186,43 @@ function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string
  * been `in`-guarded for `start_at`. Each field is validated rather than
  * asserted — the generic item type does not declare them.
  */
+/** Read a string column off the generic item type, which does not declare it. */
+const programStr = (value: unknown): string | null => (typeof value === 'string' && value ? value : null);
+
 function webinarTiming(item: BaseProgramItem): {
   startAt: string | null;
   endAt: string | null;
   timezone: string | null;
 } {
-  const str = (value: unknown): string | null => (typeof value === 'string' && value ? value : null);
   return {
-    startAt: 'start_at' in item ? str(item.start_at) : null,
-    endAt: 'end_at' in item ? str(item.end_at) : null,
-    timezone: 'timezone' in item ? str(item.timezone) : null,
+    startAt: 'start_at' in item ? programStr(item.start_at) : null,
+    endAt: 'end_at' in item ? programStr(item.end_at) : null,
+    timezone: 'timezone' in item ? programStr(item.timezone) : null,
   };
+}
+
+/**
+ * The instant and zone this card renders its DATE in.
+ *
+ * A card must render every part of ONE timestamp in ONE zone. The date used to
+ * come from `item.date` pinned to UTC while the time printed beside it came
+ * from `start_at` in the event's own IANA zone, so a webinar at
+ * `2026-03-20T01:18Z` / `America/New_York` read "Mar 20, 2026 · 9:18 PM" — a
+ * date and a time that never coexisted. Where the row carries a zone, the date
+ * is now derived from the SAME instant the time is, in that same zone.
+ *
+ * A row with no zone keeps the UTC pin (`formatUtc`). That pin is the React
+ * #418 hydration fix, not an oversight: do not "fix the timezone" by making it
+ * render local — that produces a different wrong answer, one that also differs
+ * between server and client.
+ */
+function programDateInstant(item: BaseProgramItem): { instant: string | null; timezone: string | null } {
+  const timezone = 'timezone' in item ? programStr(item.timezone) : null;
+  if (!timezone) return { instant: null, timezone: null };
+  // Prefer the scheduling instant the TIME is read from, so the two halves
+  // cannot disagree even if `item.date` carries a display override upstream.
+  const startAt = 'start_at' in item ? programStr(item.start_at) : null;
+  return { instant: startAt ?? programStr(item.date), timezone };
 }
 
 function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string }) {
@@ -293,13 +324,18 @@ export function ProgramCard<T extends BaseProgramItem>({
       if (typeof loc === 'string' && loc.trim().length > 0) return loc;
     } else if (config.type === 'webinar' && 'start_at' in item) {
       const { startAt, endAt, timezone } = webinarTiming(item);
-      const time = formatTimeWithTimezone(startAt, timezone);
+      // Compact densities join plain strings, so the zone rides inline here;
+      // the default density renders it as its own styled span instead.
+      const time = formatTimeWithTimezone(startAt, timezone, { withZoneLabel: true });
       const dur = formatDurationFromRange(startAt, endAt);
       return dur ? `${time} · ${dur}` : time;
     }
     return null;
   };
-  const compactDate = formatUtc(new Date(item.date), 'MMM d, yyyy');
+  const zonedDate = programDateInstant(item);
+  const compactDate = zonedDate.instant
+    ? formatDateWithTimezone(zonedDate.instant, zonedDate.timezone, 'medium')
+    : formatUtc(new Date(item.date), 'MMM d, yyyy');
 
   if (size === 'portrait') {
     // Rail/strip density — mapped onto the shared <EntityPortraitCard> shell
@@ -378,7 +414,9 @@ export function ProgramCard<T extends BaseProgramItem>({
   }
 
   const itemDate = new Date(item.date);
-  const dateFormat = formatUtc(itemDate, 'EEEE d MMMM');
+  const dateFormat = zonedDate.instant
+    ? formatDateWithTimezone(zonedDate.instant, zonedDate.timezone, 'weekday')
+    : formatUtc(itemDate, 'EEEE d MMMM');
 
   const defaultRenderMeta = () => {
     if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {

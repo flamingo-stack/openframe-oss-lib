@@ -10,7 +10,13 @@
  * Everything is validated, and anything that fails is DROPPED rather than
  * repaired: this payload is assembled from a remote MCP server's tool output,
  * so a malformed row means an upstream contract slip, and rendering a chip with
- * a blank title or a link to a non-https URL is worse than rendering nothing.
+ * a blank title or an unsafe href is worse than rendering nothing.
+ *
+ * "Unsafe" is the operative word, and it is not a synonym for "relative".
+ * Links go through `linkUrl` (absolute https OR a root-relative path); only
+ * MEDIA urls, which have no origin to resolve against, go through `httpsUrl`.
+ * Conflating the two is what made every same-origin source chip lose its
+ * destination while keeping its name.
  *
  * Server-safe: no React, no browser APIs beyond `URL`.
  */
@@ -44,16 +50,50 @@ function nullableText(value: unknown): string | null | undefined {
   return value === null ? null : text(value);
 }
 
-/** An https URL, or nothing. Plain http and non-URLs are dropped — these become
- *  hrefs and video sources in the panel. */
+/** Control, zero-width and line-separator characters — never legitimate in a
+ *  URL we are about to render, and the classic way a payload smuggles one
+ *  href past a reader's eye. Same set the render-time `safeHref` rejects. */
+const UNSAFE_URL_CHARS = /[\u0000-\u001f\u007f\u200b-\u200d\u2028\u2029\ufeff]/;
+
+/** An absolute https URL, or nothing. Plain http and non-URLs are dropped —
+ *  these become MEDIA sources (`<video src>`, poster images), which have no
+ *  origin to resolve against and so must be absolute. For a LINK, use
+ *  `linkUrl` — a same-origin path is valid there and this would discard it. */
 function httpsUrl(value: unknown): string | undefined {
   const candidate = text(value);
-  if (!candidate) return undefined;
+  if (!candidate || UNSAFE_URL_CHARS.test(candidate)) return undefined;
   try {
     return new URL(candidate).protocol === 'https:' ? candidate : undefined;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * A URL that is safe to render as a source chip's href: an absolute https URL,
+ * or a ROOT-RELATIVE path (`/onboarding-guides/foo`).
+ *
+ * Root-relative is the whole reason this exists separately from `httpsUrl`.
+ * The hub emits a relative href whenever the owning platform is the serving
+ * platform — correct for its own chat, and correct for any consumer that knows
+ * the hub origin (the dashboard absolutises hub-owned hrefs itself). Running
+ * `new URL()` with no base on such a path THROWS, so treating "not an absolute
+ * https URL" as hostile silently deleted every same-origin link before the code
+ * that would have resolved it ever ran, leaving a chip with a name and no
+ * destination.
+ *
+ * Deliberately STRICTER than the render-time `safeHref`, which also permits
+ * `http:` and `mailto:`. This payload is assembled from a remote MCP server's
+ * tool output, so the ingest guard stays fail-closed on scheme; the two differ
+ * on purpose, and only in the safe direction.
+ */
+function linkUrl(value: unknown): string | undefined {
+  const candidate = text(value);
+  if (!candidate || UNSAFE_URL_CHARS.test(candidate)) return undefined;
+  // Same-origin path. `//host` is protocol-relative, not a path — it would
+  // resolve to a THIRD-PARTY origin, so it is rejected with the rest.
+  if (candidate.startsWith('/')) return candidate.startsWith('//') ? undefined : candidate;
+  return httpsUrl(candidate);
 }
 
 /**
@@ -89,7 +129,7 @@ function sourceItems(value: unknown): NonNullable<ChatSource['items']> | undefin
     // A grouped row without these three has nothing to render OR navigate with.
     if (!id || !documentType || !name) return [];
 
-    const externalUrl = httpsUrl(item.externalUrl);
+    const externalUrl = linkUrl(item.externalUrl);
     const targetPlatform = nullableText(item.targetPlatform);
     const path = nullableText(item.path);
     return [
@@ -133,7 +173,7 @@ function sources(value: unknown): ChatSource[] {
 
     const path = text(candidate.path);
     const documentType = text(candidate.documentType);
-    const externalUrl = httpsUrl(candidate.externalUrl);
+    const externalUrl = linkUrl(candidate.externalUrl);
     const targetPlatform = nullableText(candidate.targetPlatform);
     const id = text(candidate.id);
     const sourceRepo = text(candidate.sourceRepo);

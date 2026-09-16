@@ -138,6 +138,8 @@ export {
   formatDurationMMSS,
   formatDurationCompact,
   formatTimeWithTimezone,
+  formatDateWithTimezone,
+  type ZonedDateStyle,
   formatDurationFromRange,
   type FormatDateUTCOptions,
   formatDateUTC,
