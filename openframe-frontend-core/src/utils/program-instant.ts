@@ -169,6 +169,18 @@ export function programMetaLine(
   return { at, typeMeta, line: [fmt.date(at), typeMeta].filter(Boolean).join(' · ') };
 }
 
+/** The shape `programMetaFormatters` adapts — the three renderers a program
+ *  meta line is built from, supplied by the caller so this leaf stays free of
+ *  `./format`. */
+export interface ProgramMetaRenderers {
+  date: (at: ProgramInstant, style: 'medium' | 'weekday') => string;
+  duration: (seconds: number | null) => string;
+  webinarMeta: (
+    at: ProgramInstant,
+    opts: { startAt: string | null; endAt: string | null; withZoneLabel?: boolean },
+  ) => string;
+}
+
 /**
  * The formatter set `programMetaLine` needs, built once.
  *
@@ -186,14 +198,7 @@ export function programMetaLine(
  * stays free of `./format` and the two can be tree-shaken apart.
  */
 export function programMetaFormatters(
-  fmt: {
-    date: (at: ProgramInstant, style: 'medium' | 'weekday') => string;
-    duration: (seconds: number | null) => string;
-    webinarMeta: (
-      at: ProgramInstant,
-      opts: { startAt: string | null; endAt: string | null; withZoneLabel?: boolean },
-    ) => string;
-  },
+  fmt: ProgramMetaRenderers,
   opts: { withZoneLabel?: boolean; dateStyle?: 'medium' | 'weekday' } = {},
 ) {
   const withZoneLabel = opts.withZoneLabel !== false;

@@ -24,9 +24,10 @@ import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
-import { formatDurationCompact, formatProgramDate, formatWebinarTimeMeta } from '../../../utils/format';
+import { formatProgramDate } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
+import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -53,12 +54,6 @@ import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-/** The three formatters every program meta line is built from. */
-const PROGRAM_FMT = {
-  date: formatProgramDate,
-  duration: formatDurationCompact,
-  webinarMeta: formatWebinarTimeMeta,
-};
 type CardSize = 'default' | 'sm' | 'portrait';
 
 export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
@@ -260,7 +255,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     line: compactMetaLine,
     // Compact densities join plain strings, so the zone rides inline here; the
     // default density below renders it as its own styled span instead.
-  } = programMetaLine(item, config.type, programMetaFormatters(PROGRAM_FMT));
+  } = programMetaLine(item, config.type, programMetaFormatters(PROGRAM_META_RENDERERS));
   const compactDate = formatProgramDate(zonedDate, 'medium');
 
   if (size === 'portrait') {
@@ -350,7 +345,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   const { typeMeta: defaultTypeMeta } = programMetaLine(
     item,
     config.type,
-    programMetaFormatters(PROGRAM_FMT, { withZoneLabel: false }),
+    programMetaFormatters(PROGRAM_META_RENDERERS, { withZoneLabel: false }),
   );
 
   const defaultRenderMeta = () => {

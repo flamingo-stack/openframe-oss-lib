@@ -411,4 +411,7 @@ export {
   programStr,
   webinarTiming,
 } from './program-instant';
-export type { ProgramDateFields, ProgramInstant } from './program-instant';
+// The concrete renderer bundle, so every surface in BOTH repos builds its meta
+// line from one set rather than mirroring the triple.
+export { PROGRAM_META_RENDERERS } from './program-meta-renderers';
+export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './program-instant';
