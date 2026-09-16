@@ -12,6 +12,7 @@ use std::path::Path;
 use tokio::time::{interval, Duration};
 use tracing::info;
 
+const UPDATES_ENABLED: bool = false;
 const UPDATE_INTERVAL: Duration = Duration::from_secs(3600);
 const UPDATE_TIMEOUT_SECS: u32 = 600;
 const SETUP_FAILURE_RETCODE: i32 = 85;
@@ -216,6 +217,11 @@ impl PackageManagerUpdateRunManager {
     }
 
     pub fn start(&self) {
+        if !UPDATES_ENABLED {
+            info!("Package manager self-update is disabled");
+            return;
+        }
+
         info!("Starting package manager update run manager");
 
         tokio::spawn(async move {
