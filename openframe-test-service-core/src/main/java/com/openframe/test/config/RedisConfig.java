@@ -26,6 +26,7 @@ public class RedisConfig {
     private static volatile String nodes;
     private static volatile String tenant;
     private static volatile String caCertificate;
+    private static volatile String authToken;
 
     public static void setNodes(String csvNodes) {
         nodes = csvNodes;
@@ -49,6 +50,22 @@ public class RedisConfig {
                 ? caCertificate
                 : System.getenv("REDIS_SERVER_CA");
         return (pem != null && !pem.trim().isEmpty()) ? pem : null;
+    }
+
+    /**
+     * Token of the {@code default} user where the cluster runs with basic token-based auth
+     * (Memorystore). Jedis sends it as the password, which is exactly {@code AUTH <token>}. A cluster
+     * with auth disabled leaves it unset and the client connects unauthenticated.
+     */
+    public static void setAuthToken(String token) {
+        authToken = token;
+    }
+
+    public static String getAuthToken() {
+        String token = (authToken != null && !authToken.trim().isEmpty())
+                ? authToken
+                : System.getenv("REDIS_AUTH_TOKEN");
+        return (token != null && !token.trim().isEmpty()) ? token : null;
     }
 
     public static Set<HostAndPort> getClusterNodes() {
