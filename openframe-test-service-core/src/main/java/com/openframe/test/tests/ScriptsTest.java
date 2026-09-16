@@ -102,4 +102,25 @@ public class ScriptsTest extends BaseTest {
         assertThat(archived.getId()).as("Archived script id should match").isEqualTo(script.getId());
         assertThat(archived.getStatus()).as("Archived script status should be ARCHIVED").isEqualTo("ARCHIVED");
     }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Unarchive an archived script")
+    @Order(6)
+    public void testUnarchiveScript() {
+        Script script = ScriptApi.createScript(ScriptGenerator.createScriptRequest());
+        try {
+            assertThat(ScriptApi.archiveScript(script.getId()).getStatus()).as("The script is archived first").isEqualTo("ARCHIVED");
+            assertThat(ScriptApi.listScripts()).extracting(Script::getId).as("An archived script is not listed as ACTIVE").doesNotContain(script.getId());
+
+            Script restored = ScriptApi.unarchiveScript(script.getId());
+            assertThat(restored.getId()).as("Unarchived script id should match").isEqualTo(script.getId());
+            assertThat(restored.getStatus()).as("Unarchived script status should be ACTIVE").isEqualTo("ACTIVE");
+            assertThat(ScriptApi.getScript(script.getId()).getStatus()).as("The ACTIVE status is persisted").isEqualTo("ACTIVE");
+            assertThat(ScriptApi.listScripts()).extracting(Script::getId).as("The script is back among the ACTIVE ones").contains(script.getId());
+            assertThat(ScriptApi.unarchiveScript(script.getId()).getStatus()).as("Unarchiving an active script is idempotent").isEqualTo("ACTIVE");
+        } finally {
+            ScriptApi.deleteScript(script.getId());
+        }
+    }
 }

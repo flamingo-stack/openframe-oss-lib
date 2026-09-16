@@ -37,7 +37,7 @@ export interface CustomerInterviewCardProps {
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   targetPlatform?: string | null;
   /** OG placeholder URL fallback when `interview.featured_image` is missing. */
   placeholderUrl?: string | null;

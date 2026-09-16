@@ -47,6 +47,13 @@ describe('PersonCell', () => {
     render(<PersonCell name="Ada" onClick={() => {}} actionTitle="Filter by Ada" />);
     expect(screen.getByRole('button', { name: /Ada/ }).getAttribute('title')).toBe('Filter by Ada');
   });
+  it('sm stays the dense cell; lg swaps the primary line to body scale', () => {
+    const { container: dense } = render(<PersonCell name="Ada" secondary="Engineer" />);
+    const { container: explicit } = render(<PersonCell name="Ada" secondary="Engineer" size="sm" />);
+    expect(dense.innerHTML).toBe(explicit.innerHTML);
+    render(<PersonCell name="Give me my vulnerabilities" secondary="Albert Guerra, Owner" size="lg" />);
+    expect(screen.getByText('Give me my vulnerabilities').className).toContain('text-h3');
+  });
 });
 
 describe('PeopleCell', () => {

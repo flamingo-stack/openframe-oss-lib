@@ -139,7 +139,7 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
    *  nav decision (cross-platform / embed → new tab). Defaults to
    *  same-tab for non-chat callsites. */
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   targetPlatform?: string | null;
   /** OG placeholder URL used by the compact branch when no cover. */
   placeholderUrl?: string | null;

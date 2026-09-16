@@ -82,7 +82,9 @@ export type CardSize = 'lg' | 'default' | 'sm';
 export interface CardLinkAnchorProps {
   href: string;
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  /** `noopener` alone for a new-tab link to one of our own platforms (keeps the
+   *  Referer for cross-domain attribution); `noreferrer` for third parties. */
+  rel?: 'noopener' | 'noopener noreferrer';
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
@@ -306,6 +308,7 @@ const CUSTOMER_INTERVIEW_ROW_DEFAULTS: CustomerInterview = {
   user_id: null,
   main_video_url: null,
   teasers: [],
+  quotes: [],
   case_study_id: null,
   seo_title: null,
   seo_description: null,
