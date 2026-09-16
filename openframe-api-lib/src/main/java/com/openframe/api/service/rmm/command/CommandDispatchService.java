@@ -38,7 +38,7 @@ public class CommandDispatchService {
     private final DeviceService deviceService;
     private final CommandExecutionService commandExecutionService;
 
-    @Value("${openframe.rmm.test-mode.enabled:false}")
+    @Value("${openframe.rmm.test-mode.enabled}")
     private boolean testModeEnabled;
 
     public DispatchResponse runCommand(RunCommandInput input) {

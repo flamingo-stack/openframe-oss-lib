@@ -69,7 +69,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
 
     private final MongoTemplate mongoTemplate;
 
-    @Value("${openframe.rmm.test-mode.enabled:false}")
+    @Value("${openframe.rmm.test-mode.enabled}")
     private boolean testModeEnabled;
 
     @Override

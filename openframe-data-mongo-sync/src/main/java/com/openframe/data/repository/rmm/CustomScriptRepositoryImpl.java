@@ -73,7 +73,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
 
     private final MongoTemplate mongoTemplate;
 
-    @Value("${openframe.rmm.test-mode.enabled:false}")
+    @Value("${openframe.rmm.test-mode.enabled}")
     private boolean testModeEnabled;
 
     @Override

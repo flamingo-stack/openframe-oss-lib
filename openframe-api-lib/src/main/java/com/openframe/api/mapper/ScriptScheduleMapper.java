@@ -24,8 +24,7 @@ import java.util.List;
 @Component
 public class ScriptScheduleMapper {
 
-    /** Same test-mode switch semantics as {@link ScriptMapper#testModeEnabled}. */
-    @Value("${openframe.rmm.test-mode.enabled:false}")
+    @Value("${openframe.rmm.test-mode.enabled}")
     private boolean testModeEnabled;
 
     public ScheduleScript toEntity(String tenantId, CreateScriptScheduleInput input) {

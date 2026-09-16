@@ -56,7 +56,7 @@ public class ScheduleFireDispatcher {
     private final MachineRepository machineRepository;
     private final DeviceOnlineDispatchRepository dispatchRepository;
     private final ScriptDeliveryRetryStore retryStore;
-    @Value("${openframe.rmm.test-mode.enabled:false}")
+    @Value("${openframe.rmm.test-mode.enabled}")
     private boolean testModeEnabled;
 
     public void dispatch(ScheduleScript schedule, Instant now) {

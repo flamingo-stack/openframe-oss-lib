@@ -16,12 +16,7 @@ import java.util.List;
 @Component
 public class ScriptMapper {
 
-    /**
-     * Tenant-instance test-mode switch. When {@code true}, every newly-created Script is
-     * stamped {@code testScript = true} and hidden from user-facing GraphQL reads by the
-     * repository shield. Default {@code false} — everything is visible.
-     */
-    @Value("${openframe.rmm.test-mode.enabled:false}")
+    @Value("${openframe.rmm.test-mode.enabled}")
     private boolean testModeEnabled;
 
     public Script toEntity(String tenantId, CreateScriptInput input) {

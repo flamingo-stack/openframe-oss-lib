@@ -65,7 +65,7 @@ public class ScriptDispatchService {
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTimeoutValidator timeoutValidator;
-    @Value("${openframe.rmm.test-mode.enabled:false}")
+    @Value("${openframe.rmm.test-mode.enabled}")
     private boolean testModeEnabled;
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
@@ -250,7 +250,6 @@ public class ScriptDispatchService {
 
         // Persist the effective timeout per row so the watchdog can derive a
         // per-execution stuck-threshold from it.
-        // Server-side stamp — see runScript for rationale.
         scriptExecutionService.createBatch(executionId, script.getId(), null, machineIds, privilegeLevel,
                 timeoutSeconds, initiatedBy, source, testModeEnabled);
 
