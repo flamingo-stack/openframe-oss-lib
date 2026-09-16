@@ -10,6 +10,7 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.ReadStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -30,7 +31,7 @@ public class GraphQLNotificationMapper {
                 .toList();
     }
 
-    public NotificationView toView(Notification notification, boolean read) {
+    public NotificationView toView(Notification notification, ReadStatus status) {
         NotificationCategory category = notification.getCategory();
         return NotificationView.builder()
                 .id(notification.getId())
@@ -41,7 +42,8 @@ public class GraphQLNotificationMapper {
                 .category(category)
                 .type(notification.getType())
                 .attributes(notification.getAttributes())
-                .read(read)
+                .read(status == ReadStatus.READ || status == ReadStatus.ARCHIVED)
+                .status(status)
                 .build();
     }
 
