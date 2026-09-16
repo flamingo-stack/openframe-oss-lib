@@ -22,11 +22,16 @@
  *   intra-card coherence — it does, by disagreeing with everything else.
  * - `start_at` / `end_at` remain the source for DURATION, which is elapsed time
  *   rather than a display date.
- * - A `'date'`-precision value states a calendar DAY, not a moment. An admin
- *   backdating in a `datetime-local` control gets `00:00`, so "show this as
- *   March 19" is stored at UTC midnight; rendering that in a west-of-UTC zone
- *   shows March 18 at 8 PM — a day early, at a time nobody chose. Such a value
- *   is rendered UTC-pinned with no clock.
+ * - A DISPLAY OVERRIDE is a chosen date, not a moment. An admin backdating in a
+ *   `datetime-local` control gets `00:00`, so "show this as March 19" is stored
+ *   at UTC midnight; rendering that in a west-of-UTC zone shows March 18 at
+ *   8 PM — a day early, at a time nobody chose. Such a value renders UTC-pinned
+ *   with no clock.
+ *
+ *   The discriminator is "did an override supply this", NOT the value's
+ *   precision. The override column is `timestamptz` and the host normalizes it
+ *   through `toISOString()`, so it is always a full instant — an earlier
+ *   attempt keyed on precision and could therefore never fire.
  */
 
 /** Read a string field off an item type that does not declare it. */
@@ -38,14 +43,15 @@ export interface ProgramInstant {
   instant: string | null;
   /** The event's IANA zone, or null when the row declares none. */
   timezone: string | null;
-  /** True when the value states a calendar day: render the day, no clock. */
+  /** True when an admin display override supplied the value: render the day
+   *  UTC-pinned, with no clock. */
   dateOnly: boolean;
 }
 
 /** Resolve what a program item should render. */
 export function programDateInstant(item: Record<string, unknown>): ProgramInstant {
   const timezone = programStr(item.timezone);
-  const dateOnly = item.date_precision === 'date';
+  const dateOnly = item.date_is_display_override === true;
   const date = programStr(item.date);
   const startAt = programStr(item.start_at);
 

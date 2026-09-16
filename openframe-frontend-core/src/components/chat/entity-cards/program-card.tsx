@@ -25,13 +25,7 @@ import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
-import {
-  formatDurationCompact,
-  formatTimeWithTimezone,
-  formatDateWithTimezone,
-  formatDurationFromRange,
-  formatWebinarTimeMeta,
-} from '../../../utils/format';
+import { formatDurationCompact, formatDateWithTimezone, formatWebinarTimeMeta } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
@@ -313,6 +307,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         endAt,
         timezone,
         withZoneLabel: true,
+        dateOnly: zonedDate.dateOnly,
       });
     }
     return null;
@@ -424,13 +419,17 @@ export function ProgramCard<T extends BaseProgramItem>({
     }
     if (config.type === 'webinar' && 'start_at' in item) {
       const { startAt, endAt, timezone } = webinarTiming(item);
-      const duration = formatDurationFromRange(startAt, endAt);
       return (
         <>
           <Video className="h-4 w-4 text-ods-text-secondary" />
           <span className="font-body text-ods-text-secondary">
-            {formatTimeWithTimezone(zonedDate.instant ?? startAt, timezone)}
-            {duration && ` · ${duration}`}
+            {formatWebinarTimeMeta({
+              instant: zonedDate.instant,
+              startAt,
+              endAt,
+              timezone,
+              dateOnly: zonedDate.dateOnly,
+            })}
           </span>
           {timezone && <span className="text-ods-text-secondary text-h6">({timezone})</span>}
         </>

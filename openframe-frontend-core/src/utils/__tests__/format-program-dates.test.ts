@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDateWithTimezone, formatDurationFromRange, formatTimeWithTimezone } from '../format';
+import {
+  formatDateWithTimezone,
+  formatDurationFromRange,
+  formatTimeWithTimezone,
+  formatWebinarTimeMeta,
+} from '../format';
 
 /**
  * These three formatters render the date, time and duration of ONE event, side
@@ -87,5 +92,40 @@ describe('formatDateWithTimezone / formatTimeWithTimezone agree on the zone', ()
     expect(formatDateWithTimezone(null, zone)).toBe('');
     expect(formatDateWithTimezone('not-a-date', zone)).toBe('');
     expect(formatTimeWithTimezone('not-a-date', zone)).toBe('');
+  });
+});
+
+/**
+ * The webinar time+duration composition. These exact three lines existed in
+ * three surfaces and drifted twice — once so the page read the raw `start_at`
+ * while the card read the resolved instant, once so two of three applied the
+ * display-override rule. The rule now lives here, so it is tested here.
+ */
+describe('formatWebinarTimeMeta', () => {
+  const base = { startAt: '2026-03-20T01:18:00Z', endAt: '2026-03-20T02:18:00Z', timezone: 'America/New_York' };
+
+  it('renders the time from the resolved instant and the duration from the range', () => {
+    expect(formatWebinarTimeMeta({ ...base, instant: base.startAt })).toBe('9:18 PM · 1h');
+  });
+
+  it('labels the zone when asked', () => {
+    expect(formatWebinarTimeMeta({ ...base, instant: base.startAt, withZoneLabel: true })).toBe('9:18 PM EDT · 1h');
+  });
+
+  it('drops the CLOCK for a display override, keeping the duration', () => {
+    // A chosen display date has no time of day the admin meant.
+    expect(formatWebinarTimeMeta({ ...base, instant: '2026-03-19T00:00:00Z', dateOnly: true })).toBe('1h');
+  });
+
+  it('leaves no dangling separator when either side is missing', () => {
+    expect(formatWebinarTimeMeta({ ...base, endAt: null, instant: base.startAt })).toBe('9:18 PM');
+    // An inverted range yields no duration — and must not leave a trailing " · ".
+    expect(formatWebinarTimeMeta({ ...base, endAt: '2026-03-20T00:00:00Z', instant: base.startAt })).toBe('9:18 PM');
+    // An unrenderable time must not leave a LEADING " · " either.
+    expect(formatWebinarTimeMeta({ ...base, instant: 'not-a-date' })).toBe('1h');
+  });
+
+  it('falls back to start_at when no resolved instant is supplied', () => {
+    expect(formatWebinarTimeMeta({ ...base, instant: null })).toBe('9:18 PM · 1h');
   });
 });

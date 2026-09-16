@@ -818,8 +818,13 @@ export function formatBioText(aboutHtml: string | null | undefined, fallback: st
  *
  * The split is the point: the TIME comes from the resolved display `instant`
  * (which carries any override), the DURATION from `startAt`/`endAt`, because
- * elapsed time is not a display date. The separator is gated on the duration
- * STRING, so a suppressed duration cannot leave a dangling separator.
+ * elapsed time is not a display date. Both sides of the separator are gated, so
+ * neither a suppressed duration nor an unrenderable time can leave one dangling.
+ *
+ * `dateOnly` lives in HERE rather than at the call sites on purpose: when each
+ * caller applied it, two of the three forgot and the surfaces disagreed about
+ * the same row. A chosen display date has no clock the admin meant, so the time
+ * half is dropped and only the duration remains.
  */
 export function formatWebinarTimeMeta(opts: {
   instant: Date | string | null;
@@ -827,10 +832,12 @@ export function formatWebinarTimeMeta(opts: {
   endAt: string | null;
   timezone: string | null;
   withZoneLabel?: boolean;
+  dateOnly?: boolean;
 }): string {
+  const duration = formatDurationFromRange(opts.startAt, opts.endAt);
+  if (opts.dateOnly === true) return duration;
   const time = formatTimeWithTimezone(opts.instant ?? opts.startAt, opts.timezone, {
     withZoneLabel: opts.withZoneLabel === true,
   });
-  const duration = formatDurationFromRange(opts.startAt, opts.endAt);
-  return duration ? `${time} · ${duration}` : time;
+  return [time, duration].filter(Boolean).join(' · ');
 }

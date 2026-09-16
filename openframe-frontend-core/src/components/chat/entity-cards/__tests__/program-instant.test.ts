@@ -43,17 +43,23 @@ describe('programDateInstant', () => {
     expect(programDateInstant({ date: '2026-03-20T01:18:00.000Z' }).instant).toBeNull();
   });
 
-  it('flags a calendar-date value so no clock is invented for it', () => {
-    // An admin picks "Mar 19"; the picker stores UTC midnight. Rendering that
-    // in a west-of-UTC zone would show Mar 18 at 8 PM.
+  it('flags an admin display override — the shape a producer ACTUALLY emits', () => {
+    // This is what the DAL hands over: the override column is timestamptz and
+    // the route normalizes through toISOString(), so the value is a FULL
+    // INSTANT. An earlier version of this test hand-built a bare `YYYY-MM-DD`
+    // row that no producer can emit, which made it pass while the bug it named
+    // stayed live.
     const r = programDateInstant({
       date: '2026-03-19T00:00:00.000Z',
+      start_at: '2026-04-01T20:00:00.000Z',
       timezone: 'America/New_York',
-      date_precision: 'date',
+      date_is_display_override: true,
     });
     expect(r.dateOnly).toBe(true);
-    // Callers render a dateOnly value UTC-pinned, which keeps the chosen day.
+    // Rendered UTC-pinned, so the admin who asked for March 19 sees March 19 —
+    // not March 18 at 8 PM, which is what a zoned render of UTC midnight gives.
     expect(formatDateWithTimezone(r.instant, 'UTC')).toBe('Mar 19, 2026');
+    expect(formatDateWithTimezone(r.instant, r.timezone)).toBe('Mar 18, 2026');
   });
 
   it('treats a real timestamp as an instant', () => {

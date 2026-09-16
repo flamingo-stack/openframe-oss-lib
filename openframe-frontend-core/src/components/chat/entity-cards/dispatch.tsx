@@ -38,7 +38,6 @@ import { faqItemAnchor } from '../../../utils/faq-anchor';
 import {
   formatDateUTC as formatDate,
   formatDurationCompact,
-  formatDurationFromRange,
   formatDateWithTimezone,
   formatWebinarTimeMeta,
 } from '../../../utils/format';
@@ -1129,15 +1128,15 @@ function ProgramChatCard({
   // is a React #418 hydration mismatch besides.
   const zoned = programDateInstant((item ?? {}) as Record<string, unknown>);
   if (configKey === 'webinar' && item?.start_at) {
-    const meta = formatWebinarTimeMeta({
-      instant: zoned.dateOnly ? null : zoned.instant,
-      startAt: item.start_at,
-      endAt: item.end_at ?? null,
-      timezone: zoned.timezone ?? item.timezone ?? null,
-      withZoneLabel: Boolean(zoned.timezone),
-    });
-    // A calendar-date value states no time of day, so show only the duration.
-    typeMeta = zoned.dateOnly ? formatDurationFromRange(item.start_at, item.end_at) || undefined : meta;
+    typeMeta =
+      formatWebinarTimeMeta({
+        instant: zoned.instant,
+        startAt: item.start_at,
+        endAt: item.end_at ?? null,
+        timezone: zoned.timezone,
+        withZoneLabel: Boolean(zoned.timezone),
+        dateOnly: zoned.dateOnly,
+      }) || undefined;
   }
   const itemDate =
     zoned.instant && !zoned.dateOnly
