@@ -29,6 +29,7 @@ public class TicketQueryFilter {
     private List<TicketStatusKind> statusKinds;
 
     // ===== Shared =====
+    private List<Integer> ticketNumbers;
     private List<String> organizationIds;
     private List<String> assigneeIds;
     private List<String> tagIds;

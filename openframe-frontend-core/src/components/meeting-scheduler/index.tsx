@@ -105,6 +105,13 @@ export interface HubSpotMeetingSchedulerProps {
    */
   onBack?: () => void;
   onBooked?: (b: BookingConfirmation) => void;
+  /**
+   * What the visitor sees: the step, or `'unavailable'` when the degraded box
+   * replaces the flow (the load failed, or the link cannot be booked natively).
+   * Reported on mount and on every change. For a host that shows something
+   * beside the card at some stages only (a landing page's explore nudge).
+   */
+  onStageChange?: (stage: SchedulerStage) => void;
   className?: string;
   /**
    * Panel order.
@@ -146,6 +153,8 @@ export interface HubSpotMeetingSchedulerProps {
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
+/** `onStageChange`'s value: a step, or the degraded box that replaces the flow. */
+export type SchedulerStage = Step | 'unavailable';
 
 /** Values collected at the details step, held until a slot picks the instant. */
 type StashedDetails = {
@@ -386,6 +395,7 @@ export function HubSpotMeetingScheduler({
   fallbackUrl,
   onBack,
   onBooked,
+  onStageChange,
   className,
   flow = DEFAULT_SCHEDULER_FLOW,
   detailsForm: DetailsForm = BookingForm,
@@ -429,6 +439,26 @@ export function HubSpotMeetingScheduler({
 
   const preset = SCHEDULER_FLOW_PRESETS[flow];
   const [step, setStep] = useState<Step>(preset.initialStep);
+  // The same predicates, in the same order, as the degraded returns below: a
+  // cold load is still the current step; a failed load or a link the form cannot
+  // reproduce is the degraded box.
+  const stage: SchedulerStage =
+    !(isLoadingAvailability && !availability) &&
+    (Boolean(availabilityError) || !availability || !isNativelyBookable(availability))
+      ? 'unavailable'
+      : step;
+  // Reported from an effect, not beside each `setStep`: the stage moves in several
+  // places (one of them during render, on a link swap), and a host setState run
+  // from this component's render is a cross-component update. The ref keeps an
+  // inline host callback from re-firing on every render; it is written in an
+  // effect, never during render.
+  const onStageChangeRef = useRef(onStageChange);
+  useEffect(() => {
+    onStageChangeRef.current = onStageChange;
+  });
+  useEffect(() => {
+    onStageChangeRef.current?.(stage);
+  }, [stage]);
   // State, not a ref: the link-swap reset below writes it DURING RENDER, and
   // this file's own rule forbids writing a ref there. "Frozen" means written
   // once at Continue, not `useRef`.

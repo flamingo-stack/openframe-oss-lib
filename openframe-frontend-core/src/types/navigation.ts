@@ -27,7 +27,8 @@ export interface NavigationItem {
 export interface HeaderConfig {
   logo: {
     element: React.ReactNode;
-    href: string;
+    /** Where the logo links. Omitted, the logo is not a link (a landing page that keeps the visitor on it). */
+    href?: string;
   };
   navigation?: {
     items: NavigationItem[];
