@@ -214,12 +214,7 @@ export default defineConfig([
     // regexes harder to read, so the exception is declared here where it can be
     // reviewed.
     name: 'openframe-frontend-core/control-chars-are-the-payload',
-    files: [
-      'src/chat-protocol/encode.ts',
-      'src/utils/url-safety.ts',
-      'src/components/ui/markdown/sanitize.ts',
-      'src/components/chat/utils/compact-card-classes.ts',
-    ],
+    files: ['src/chat-protocol/encode.ts', 'src/utils/url-safety.ts', 'src/components/ui/markdown/sanitize.ts'],
     rules: { 'no-control-regex': 'off' },
   },
 

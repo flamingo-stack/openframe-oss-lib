@@ -38,8 +38,9 @@ import { faqItemAnchor } from '../../../utils/faq-anchor';
 import {
   formatDateUTC as formatDate,
   formatDurationCompact,
-  formatTimeWithTimezone,
   formatDurationFromRange,
+  formatDateWithTimezone,
+  formatWebinarTimeMeta,
 } from '../../../utils/format';
 import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
@@ -111,6 +112,7 @@ import { OnboardingGuideCardSkeleton } from './onboarding-guide-card';
 import { ProductReleaseCardSkeleton, type ProductReleaseCardProps } from './product-release-card';
 import { defaultBuildProductReleaseCardProps } from './product-release-card-defaults';
 import { ProgramCardSkeleton } from './program-card';
+import { programDateInstant } from './program-instant';
 import { RoadmapCardSkeleton } from './roadmap-card';
 import { TaskTypeIcon } from './task-type-icon';
 
@@ -1119,12 +1121,28 @@ function ProgramChatCard({
     typeMeta = formatDurationCompact(item.duration_seconds);
   } else if (configKey === 'event' && typeof item?.location_name === 'string' && item.location_name.trim().length > 0) {
     typeMeta = item.location_name;
-  } else if (configKey === 'webinar' && item?.start_at) {
-    const time = formatTimeWithTimezone(item.start_at, item.timezone ?? null);
-    const dur = formatDurationFromRange(item.start_at, item.end_at);
-    typeMeta = dur ? `${time} · ${dur}` : time;
   }
-  const itemDate = formatDate(item?.date ?? null, { fallback: '', timezone: 'local' });
+  // ONE instant, ONE zone — the same rule the public card uses, via the shared
+  // `programDateInstant`. This block used to render the DATE in the VIEWER's
+  // zone (`timezone: 'local'`) beside a time in the EVENT's zone: a pairing
+  // that names no real moment, is wrong for every viewer outside that zone, and
+  // is a React #418 hydration mismatch besides.
+  const zoned = programDateInstant((item ?? {}) as Record<string, unknown>);
+  if (configKey === 'webinar' && item?.start_at) {
+    const meta = formatWebinarTimeMeta({
+      instant: zoned.dateOnly ? null : zoned.instant,
+      startAt: item.start_at,
+      endAt: item.end_at ?? null,
+      timezone: zoned.timezone ?? item.timezone ?? null,
+      withZoneLabel: Boolean(zoned.timezone),
+    });
+    // A calendar-date value states no time of day, so show only the duration.
+    typeMeta = zoned.dateOnly ? formatDurationFromRange(item.start_at, item.end_at) || undefined : meta;
+  }
+  const itemDate =
+    zoned.instant && !zoned.dateOnly
+      ? formatDateWithTimezone(zoned.instant, zoned.timezone, 'medium')
+      : formatDate(item?.date ?? null, { fallback: '' });
   const meta = [itemDate, typeMeta].filter(Boolean).join(' · ');
 
   return (

@@ -139,6 +139,7 @@ export {
   formatDurationCompact,
   formatTimeWithTimezone,
   formatDateWithTimezone,
+  formatWebinarTimeMeta,
   type ZonedDateStyle,
   formatDurationFromRange,
   type FormatDateUTCOptions,

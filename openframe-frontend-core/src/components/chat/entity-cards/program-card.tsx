@@ -30,6 +30,7 @@ import {
   formatTimeWithTimezone,
   formatDateWithTimezone,
   formatDurationFromRange,
+  formatWebinarTimeMeta,
 } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
 import { Button } from '../../ui/button/button';
@@ -55,6 +56,7 @@ import {
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
 import { EntityPortraitCard } from './entity-portrait-card';
+import { programDateInstant, programStr } from './program-instant';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 type CardSize = 'default' | 'sm' | 'portrait';
@@ -187,7 +189,6 @@ function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string
  * asserted — the generic item type does not declare them.
  */
 /** Read a string column off the generic item type, which does not declare it. */
-const programStr = (value: unknown): string | null => (typeof value === 'string' && value ? value : null);
 
 function webinarTiming(item: BaseProgramItem): {
   startAt: string | null;
@@ -199,38 +200,6 @@ function webinarTiming(item: BaseProgramItem): {
     endAt: 'end_at' in item ? programStr(item.end_at) : null,
     timezone: 'timezone' in item ? programStr(item.timezone) : null,
   };
-}
-
-/**
- * The instant and zone this card renders its DATE in.
- *
- * A card must render every part of ONE timestamp in ONE zone. The date used to
- * come from `item.date` pinned to UTC while the time printed beside it came
- * from `start_at` in the event's own IANA zone, so a webinar at
- * `2026-03-20T01:18Z` / `America/New_York` read "Mar 20, 2026 · 9:18 PM" — a
- * date and a time that never coexisted.
- *
- * `item.date` IS the instant to render. The host resolves it once — applying
- * any admin display override — and hands the same resolved value to this card,
- * to the model's context and to the API wire. Preferring `start_at` here
- * instead looks like it buys intra-card coherence, and it does, but it buys it
- * by ignoring the override: the card would then show the schedule while the
- * assistant beside it shows the override. That is the page-versus-assistant
- * divergence this whole change exists to remove, re-introduced one layer down.
- * Both halves read `item.date`, so the card is internally coherent AND agrees
- * with everything else. `start_at` remains the source for DURATION, which is an
- * elapsed time rather than a display date.
- *
- * A row with no zone keeps the UTC pin (`formatUtc`). That pin is the React
- * #418 hydration fix, not an oversight: do not "fix the timezone" by making it
- * render local — that produces a different wrong answer, one that also differs
- * between server and client.
- */
-function programDateInstant(item: BaseProgramItem): { instant: string | null; timezone: string | null } {
-  const timezone = 'timezone' in item ? programStr(item.timezone) : null;
-  if (!timezone) return { instant: null, timezone: null };
-  const startAt = 'start_at' in item ? programStr(item.start_at) : null;
-  return { instant: programStr(item.date) ?? startAt, timezone };
 }
 
 function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string }) {
@@ -321,7 +290,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   // below is followed by a real type check instead of a cast.
   const isScheduled = 'status' in item && item.status === 'scheduled';
 
-  const zonedDate = programDateInstant(item);
+  const zonedDate = programDateInstant(item as unknown as Record<string, unknown>);
 
   // Compact per-type meta (duration / location / start time) — shared by the
   // `sm` and `portrait` densities.
@@ -338,15 +307,20 @@ export function ProgramCard<T extends BaseProgramItem>({
       // the default density renders it as its own styled span instead.
       // Read from the SAME resolved instant the date is (see
       // `programDateInstant`) so the two halves cannot name different moments.
-      const time = formatTimeWithTimezone(zonedDate.instant ?? startAt, timezone, { withZoneLabel: true });
-      const dur = formatDurationFromRange(startAt, endAt);
-      return dur ? `${time} · ${dur}` : time;
+      return formatWebinarTimeMeta({
+        instant: zonedDate.instant,
+        startAt,
+        endAt,
+        timezone,
+        withZoneLabel: true,
+      });
     }
     return null;
   };
-  const compactDate = zonedDate.instant
-    ? formatDateWithTimezone(zonedDate.instant, zonedDate.timezone, 'medium')
-    : formatUtc(new Date(item.date), 'MMM d, yyyy');
+  const compactDate =
+    zonedDate.instant && !zonedDate.dateOnly
+      ? formatDateWithTimezone(zonedDate.instant, zonedDate.timezone, 'medium')
+      : formatUtc(new Date(item.date), 'MMM d, yyyy');
 
   if (size === 'portrait') {
     // Rail/strip density — mapped onto the shared <EntityPortraitCard> shell
@@ -425,9 +399,10 @@ export function ProgramCard<T extends BaseProgramItem>({
   }
 
   const itemDate = new Date(item.date);
-  const dateFormat = zonedDate.instant
-    ? formatDateWithTimezone(zonedDate.instant, zonedDate.timezone, 'weekday')
-    : formatUtc(itemDate, 'EEEE d MMMM');
+  const dateFormat =
+    zonedDate.instant && !zonedDate.dateOnly
+      ? formatDateWithTimezone(zonedDate.instant, zonedDate.timezone, 'weekday')
+      : formatUtc(itemDate, 'EEEE d MMMM');
 
   const defaultRenderMeta = () => {
     if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {

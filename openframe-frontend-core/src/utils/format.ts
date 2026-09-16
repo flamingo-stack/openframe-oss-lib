@@ -806,3 +806,31 @@ export function formatBioText(aboutHtml: string | null | undefined, fallback: st
 
   return stripHtml(aboutHtml).trim() || fallback;
 }
+
+/**
+ * "4:00 PM EDT · 45m" — a webinar's time and duration as one meta string.
+ *
+ * Extracted because this exact three-line composition existed in the chat card
+ * and the public page header, and they DRIFTED: the card was corrected to read
+ * the resolved display instant while the page still read the raw `start_at`, so
+ * an admin override printed two different clock times for one webinar. One
+ * review round apart, on the same three lines.
+ *
+ * The split is the point: the TIME comes from the resolved display `instant`
+ * (which carries any override), the DURATION from `startAt`/`endAt`, because
+ * elapsed time is not a display date. The separator is gated on the duration
+ * STRING, so a suppressed duration cannot leave a dangling separator.
+ */
+export function formatWebinarTimeMeta(opts: {
+  instant: Date | string | null;
+  startAt: string | null;
+  endAt: string | null;
+  timezone: string | null;
+  withZoneLabel?: boolean;
+}): string {
+  const time = formatTimeWithTimezone(opts.instant ?? opts.startAt, opts.timezone, {
+    withZoneLabel: opts.withZoneLabel === true,
+  });
+  const duration = formatDurationFromRange(opts.startAt, opts.endAt);
+  return duration ? `${time} · ${duration}` : time;
+}
