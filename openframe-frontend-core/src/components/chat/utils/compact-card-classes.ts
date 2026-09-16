@@ -1,3 +1,5 @@
+import { UNSAFE_URL_CHARS, isSameOriginPath } from '../../../utils/url-safety';
+
 /**
  * Compact-card class constants — single source of truth for the chat-inline
  * `size='sm'` card frame.
@@ -73,21 +75,11 @@ const SAFE_URL_SCHEMES = ['http:', 'https:', 'mailto:'];
 export function safeHref(url: string | null | undefined): string | null {
   if (!url) return null;
   // Defense in depth: control chars + zero-width / line-separator chars.
-  if (/[\u0000-\u001f\u007f\u200b-\u200d\u2028\u2029\ufeff]/.test(url)) return null;
+  if (UNSAFE_URL_CHARS.test(url)) return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
-  // Pure same-origin path — decided by RESOLVING it, not by prefix. The URL
-  // parser treats a backslash as a slash in the authority position, so
-  // `/\\evil.test/x` lands on a THIRD-PARTY origin while passing a
-  // `startsWith('//')` test. Ask the parser where it actually goes.
-  if (trimmed.startsWith('/')) {
-    const sameOriginBase = 'https://_safehref_base.invalid';
-    try {
-      return new URL(trimmed, sameOriginBase).origin === sameOriginBase ? trimmed : null;
-    } catch {
-      return null;
-    }
-  }
+  // Pure same-origin path — RESOLVED, not prefix-tested. See `isSameOriginPath`.
+  if (trimmed.startsWith('/')) return isSameOriginPath(trimmed) ? trimmed : null;
   if (trimmed.startsWith('#')) return trimmed;
   // Reject bare scheme-only inputs.
   if (/^[a-z][a-z0-9+.-]*:$/i.test(trimmed)) return null;

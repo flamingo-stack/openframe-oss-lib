@@ -23,6 +23,7 @@
 
 import type { ChatRef } from '../components/chat/chat-ref.types';
 import type { ChatSource } from '../components/chat/types/message.types';
+import { UNSAFE_URL_CHARS, isSameOriginPath } from '../utils/url-safety';
 import { CARD_REFERENCE } from './card-marker';
 import type { SourcesEvent } from './events';
 import { isRecord } from './wire-narrow';
@@ -50,11 +51,6 @@ function nullableText(value: unknown): string | null | undefined {
   return value === null ? null : text(value);
 }
 
-/** Control, zero-width and line-separator characters — never legitimate in a
- *  URL we are about to render, and the classic way a payload smuggles one
- *  href past a reader's eye. Same set the render-time `safeHref` rejects. */
-const UNSAFE_URL_CHARS = /[\u0000-\u001f\u007f\u200b-\u200d\u2028\u2029\ufeff]/;
-
 /** An absolute https URL, or nothing. Plain http and non-URLs are dropped —
  *  these become MEDIA sources (`<video src>`, poster images), which have no
  *  origin to resolve against and so must be absolute. For a LINK, use
@@ -66,26 +62,6 @@ function httpsUrl(value: unknown): string | undefined {
     return new URL(candidate).protocol === 'https:' ? candidate : undefined;
   } catch {
     return undefined;
-  }
-}
-
-/**
- * Is this a path that stays on the CURRENT origin?
- *
- * Decided by RESOLVING it, not by inspecting the prefix. A prefix test is what
- * a reader reaches for — `startsWith('//')` — and it is not sufficient: the URL
- * parser treats a backslash as a slash in the authority position, so
- * `/\\evil.test/x` resolves to `https://evil.test/x` while passing every
- * "starts with one slash" check. `/%2F`, `/%5C` and any future parser quirk
- * fall to the same class. Asking the parser which origin it lands on cannot
- * drift from what the browser will actually do with the href.
- */
-function sameOriginPath(candidate: string): boolean {
-  const base = 'https://_sameorigin_.invalid';
-  try {
-    return new URL(candidate, base).origin === base;
-  } catch {
-    return false;
   }
 }
 
@@ -110,7 +86,7 @@ function sameOriginPath(candidate: string): boolean {
 function linkUrl(value: unknown): string | undefined {
   const candidate = text(value);
   if (!candidate || UNSAFE_URL_CHARS.test(candidate)) return undefined;
-  if (candidate.startsWith('/')) return sameOriginPath(candidate) ? candidate : undefined;
+  if (candidate.startsWith('/')) return isSameOriginPath(candidate) ? candidate : undefined;
   return httpsUrl(candidate);
 }
 

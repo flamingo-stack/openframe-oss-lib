@@ -200,22 +200,23 @@ export default defineConfig([
 
   {
     // `no-control-regex` assumes a control character in a pattern is a typo
-    // (`\x1b` where `\e` was meant). These four modules are the exceptions
+    // (`\x1b` where `\e` was meant). These three modules are the exceptions
     // where matching them IS the job:
     //   - encode.ts frames SSE on \0 / \x1E / \x1F and must strip those bytes
     //     out of model text before they reach the wire;
-    //   - sanitize.ts, compact-card-classes.ts and source-metadata.ts reject
-    //     `\x00-\x1f` inside a URL because that is how `java\x00script:` slips
-    //     past a naive scheme check. The first two guard at RENDER time; the
-    //     last guards the same shapes at DECODE time, on a payload that came
-    //     from a remote MCP server.
-    // Rewriting the ranges to dodge the rule would make four security-relevant
+    //   - sanitize.ts strips them from markdown before it is rendered;
+    //   - url-safety.ts rejects `\x00-\x1f` inside a URL, because that is how
+    //     `java\x00script:` slips past a naive scheme check. It is the ONE
+    //     owner of that class for both the wire decoder (`source-metadata.ts`)
+    //     and the render-time guard (`compact-card-classes.ts`), which import
+    //     it rather than carrying their own copies.
+    // Rewriting the ranges to dodge the rule would make three security-relevant
     // regexes harder to read, so the exception is declared here where it can be
     // reviewed.
     name: 'openframe-frontend-core/control-chars-are-the-payload',
     files: [
       'src/chat-protocol/encode.ts',
-      'src/chat-protocol/source-metadata.ts',
+      'src/utils/url-safety.ts',
       'src/components/ui/markdown/sanitize.ts',
       'src/components/chat/utils/compact-card-classes.ts',
     ],
