@@ -190,21 +190,20 @@ export interface ProgramMetaRenderers {
  * more. A mirrored block in exactly those files is the arrangement this module
  * documents as the cause of the original drift.
  *
- * `withZoneLabel` is the only real axis: a compact density joins plain strings
- * so the zone rides inline, while the default density renders it as its own
- * styled span and asks for the value without it.
+ * `withZoneLabel` is the only axis: a compact density joins plain strings so
+ * the zone rides inline, while the default density renders it as its own styled
+ * span and asks for the value without it.
  *
  * Takes its formatters as arguments rather than importing them, so this leaf
  * stays free of `./format` and the two can be tree-shaken apart.
  */
-export function programMetaFormatters(
-  fmt: ProgramMetaRenderers,
-  opts: { withZoneLabel?: boolean; dateStyle?: 'medium' | 'weekday' } = {},
-) {
+export function programMetaFormatters(fmt: ProgramMetaRenderers, opts: { withZoneLabel?: boolean } = {}) {
   const withZoneLabel = opts.withZoneLabel !== false;
-  const dateStyle = opts.dateStyle ?? 'medium';
   return {
-    date: (at: ProgramInstant) => fmt.date(at, dateStyle),
+    // The meta line always renders the compact day; the one surface that wants
+    // the weekday form renders it in its own slot, so a `dateStyle` option here
+    // would exist for no caller.
+    date: (at: ProgramInstant) => fmt.date(at, 'medium'),
     duration: fmt.duration,
     webinarMeta: (at: ProgramInstant, o: { startAt: string | null; endAt: string | null }) =>
       fmt.webinarMeta(at, { ...o, withZoneLabel }),
