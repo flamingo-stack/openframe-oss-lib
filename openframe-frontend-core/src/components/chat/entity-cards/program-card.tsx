@@ -26,7 +26,7 @@ import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
 import { formatDurationCompact, formatProgramDate, formatWebinarTimeMeta } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
-import { programMetaLine } from '../../../utils/program-instant';
+import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -52,6 +52,13 @@ import {
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
+
+/** The three formatters every program meta line is built from. */
+const PROGRAM_FMT = {
+  date: formatProgramDate,
+  duration: formatDurationCompact,
+  webinarMeta: formatWebinarTimeMeta,
+};
 type CardSize = 'default' | 'sm' | 'portrait';
 
 export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
@@ -251,13 +258,9 @@ export function ProgramCard<T extends BaseProgramItem>({
     at: zonedDate,
     typeMeta: compactTypeMetaValue,
     line: compactMetaLine,
-  } = programMetaLine(item, config.type, {
-    date: at => formatProgramDate(at, 'medium'),
-    duration: formatDurationCompact,
     // Compact densities join plain strings, so the zone rides inline here; the
-    // default density renders it as its own styled span instead.
-    webinarMeta: (at, opts) => formatWebinarTimeMeta(at, { ...opts, withZoneLabel: true }),
-  });
+    // default density below renders it as its own styled span instead.
+  } = programMetaLine(item, config.type, programMetaFormatters(PROGRAM_FMT));
   const compactDate = formatProgramDate(zonedDate, 'medium');
 
   if (size === 'portrait') {
@@ -344,11 +347,11 @@ export function ProgramCard<T extends BaseProgramItem>({
   // why this asks for an unlabelled webinar value. Restating the dispatch is
   // how the two ended up with three conditions that disagreed: the podcast one
   // dropped the `> 0` check, and the event one dropped the non-empty check.
-  const { typeMeta: defaultTypeMeta } = programMetaLine(item, config.type, {
-    date: () => '',
-    duration: formatDurationCompact,
-    webinarMeta: (at, opts) => formatWebinarTimeMeta(at, opts),
-  });
+  const { typeMeta: defaultTypeMeta } = programMetaLine(
+    item,
+    config.type,
+    programMetaFormatters(PROGRAM_FMT, { withZoneLabel: false }),
+  );
 
   const defaultRenderMeta = () => {
     if (config.type === 'podcast') {

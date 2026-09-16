@@ -41,7 +41,7 @@ import {
   formatProgramDate,
   formatWebinarTimeMeta,
 } from '../../../utils/format';
-import { programMetaLine } from '../../../utils/program-instant';
+import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
@@ -1111,11 +1111,15 @@ function ProgramChatCard({
   // the DATE in the VIEWER's zone (`timezone: 'local'`) beside a time in the
   // EVENT's zone, and it labelled the zone on a different condition. The type
   // label itself lives in the status pill, so it is omitted here.
-  const { line: meta } = programMetaLine(item ?? {}, configKey, {
-    date: at => formatProgramDate(at, 'medium'),
-    duration: formatDurationCompact,
-    webinarMeta: (at, opts) => formatWebinarTimeMeta(at, { ...opts, withZoneLabel: true }),
-  });
+  const { line: meta } = programMetaLine(
+    item ?? {},
+    configKey,
+    programMetaFormatters({
+      date: formatProgramDate,
+      duration: formatDurationCompact,
+      webinarMeta: formatWebinarTimeMeta,
+    }),
+  );
 
   return (
     <EntityMingoCard

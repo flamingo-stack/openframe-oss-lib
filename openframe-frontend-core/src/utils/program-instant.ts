@@ -168,3 +168,40 @@ export function programMetaLine(
   }
   return { at, typeMeta, line: [fmt.date(at), typeMeta].filter(Boolean).join(' · ') };
 }
+
+/**
+ * The formatter set `programMetaLine` needs, built once.
+ *
+ * `programMetaLine` unified the DISPATCH; the three formatters passed into it
+ * were then mirrored byte-for-byte across the two components the function
+ * exists to keep in sync, plus a second `withZoneLabel: false` variant in two
+ * more. A mirrored block in exactly those files is the arrangement this module
+ * documents as the cause of the original drift.
+ *
+ * `withZoneLabel` is the only real axis: a compact density joins plain strings
+ * so the zone rides inline, while the default density renders it as its own
+ * styled span and asks for the value without it.
+ *
+ * Takes its formatters as arguments rather than importing them, so this leaf
+ * stays free of `./format` and the two can be tree-shaken apart.
+ */
+export function programMetaFormatters(
+  fmt: {
+    date: (at: ProgramInstant, style: 'medium' | 'weekday') => string;
+    duration: (seconds: number | null) => string;
+    webinarMeta: (
+      at: ProgramInstant,
+      opts: { startAt: string | null; endAt: string | null; withZoneLabel?: boolean },
+    ) => string;
+  },
+  opts: { withZoneLabel?: boolean; dateStyle?: 'medium' | 'weekday' } = {},
+) {
+  const withZoneLabel = opts.withZoneLabel !== false;
+  const dateStyle = opts.dateStyle ?? 'medium';
+  return {
+    date: (at: ProgramInstant) => fmt.date(at, dateStyle),
+    duration: fmt.duration,
+    webinarMeta: (at: ProgramInstant, o: { startAt: string | null; endAt: string | null }) =>
+      fmt.webinarMeta(at, { ...o, withZoneLabel }),
+  };
+}

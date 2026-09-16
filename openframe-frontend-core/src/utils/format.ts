@@ -388,6 +388,24 @@ export function formatProgramDate(at: ProgramInstant, style: ZonedDateStyle = 'm
 }
 
 /**
+ * Do these two endpoints describe a forward-running interval?
+ *
+ * THE ordering rule for every renderer in this file. A range that runs
+ * backwards is not a short range, it is a false one: a card shipped "-45m"
+ * from a row whose `end_at` preceded its `start_at`, and the clock renderer
+ * printed "11:00 PM - 9:00 PM" from the same shape. Both refuse it here.
+ *
+ * Exported so a consumer enforcing the same rule at INGEST (the hub drops such
+ * an `end_at` rather than storing it) can state it the same way.
+ */
+export function isOrderedRange(from: Date | string | null | undefined, to: Date | string | null | undefined): boolean {
+  if (!from || !to) return false;
+  const a = (typeof from === 'string' ? new Date(from) : from).getTime();
+  const b = (typeof to === 'string' ? new Date(to) : to).getTime();
+  return Number.isFinite(a) && Number.isFinite(b) && b > a;
+}
+
+/**
  * Calculate and format duration between two timestamps
  * Used for webinar durations
  * Returns: "1h 30m" or "45m"
@@ -406,13 +424,17 @@ export function formatDurationFromRange(
   startAt: string | Date | null | undefined,
   endAt: string | Date | null | undefined,
 ): string {
-  if (!startAt || !endAt) return '';
+  // ONE statement of "is this a forward-running interval", shared with
+  // `formatProgramTimeRange`. This function's guard and that one's were written
+  // separately — the second one's comment even named this as its sibling — and
+  // an ordering rule stated twice is a rule that can disagree with itself about
+  // the same row.
+  if (!isOrderedRange(startAt, endAt)) return '';
 
-  const start = typeof startAt === 'string' ? new Date(startAt) : startAt;
-  const end = typeof endAt === 'string' ? new Date(endAt) : endAt;
-  const durationMs = end.getTime() - start.getTime();
-  if (!Number.isFinite(durationMs) || durationMs <= 0) return '';
-  const minutes = Math.round(durationMs / 60000);
+  // Non-null past the guard above, which rejects null/unparseable endpoints.
+  const start = typeof startAt === 'string' ? new Date(startAt) : (startAt as Date);
+  const end = typeof endAt === 'string' ? new Date(endAt) : (endAt as Date);
+  const minutes = Math.round((end.getTime() - start.getTime()) / 60000);
   if (minutes <= 0) return '';
 
   if (minutes >= 60) {
@@ -882,14 +904,6 @@ export function formatProgramTimeRange(
   if (!bare) return '';
   // Only the LAST clock carries the label, so a range reads "9:00 AM - 5:00 PM EDT".
   return end ? `${bare} - ${end}` : labelled;
-}
-
-/** Do these two endpoints describe a forward-running interval? */
-function isOrderedRange(from: Date | string | null | undefined, to: string | null | undefined): boolean {
-  if (!from || !to) return false;
-  const a = (typeof from === 'string' ? new Date(from) : from).getTime();
-  const b = new Date(to).getTime();
-  return Number.isFinite(a) && Number.isFinite(b) && b > a;
 }
 
 /**
