@@ -31,6 +31,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
     private final AuthErrorResponder authErrorResponder;
     private final AppleWebTokenCapture appleWebTokenCapture;
     private final MicrosoftLoginEmailGate microsoftLoginEmailGate;
+    private final SsoIdentityCapture ssoIdentityCapture;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -55,6 +56,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                 }
                 super.onAuthenticationSuccess(request, response, authentication);
                 appleWebTokenCapture.captureIfApple(request, authentication);
+                ssoIdentityCapture.capture(authentication);
                 return;
             }
             // A flow cookie is present but none owns this state: a stale cookie from an abandoned flow,

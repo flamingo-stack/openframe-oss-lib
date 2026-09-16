@@ -1,23 +1,15 @@
 package com.openframe.api.dto.rmm.execution;
 
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
 
-/**
- * Read-side projection of an {@code Execution} row — the History list / detail
- * shape sent to the GraphQL layer.
- *
- * <p>{@code initiatedBy} stays a raw user id; the GraphQL {@code initiator} field
- * is resolved separately by the DataFetcher via the user DataLoader (mirrors the
- * {@code Script.author} pattern). Likewise the script's display name is not
- * carried here — the GraphQL {@code scriptName} field is resolved from
- * {@code scriptId} at read time via the script DataLoader.
- */
 @Data
 @Builder
 public class ScriptExecutionResponse {
@@ -25,7 +17,9 @@ public class ScriptExecutionResponse {
     private String id;
     private String executionId;
     private String scriptId;
-    /** Schedule this execution came from; null for ad-hoc runs. */
+    private PackageManagerType packageManager;
+    private String packageName;
+    private SoftwareAction softwareAction;
     private String scheduleId;
     private String machineId;
     private PrivilegeLevel privilegeLevel;

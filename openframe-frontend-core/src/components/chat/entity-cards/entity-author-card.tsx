@@ -1,3 +1,4 @@
+import type React from 'react';
 import Link from '../../../embed-shims/next-link';
 import type { EntityAuthor } from '../../../types/entity-author';
 import { formatDate, nameInitials } from '../../../utils/format';
@@ -60,7 +61,7 @@ export interface EntityAuthorCardProps {
    * webinar host, customer-interview customer). The grid auto-sizes via
    * `grid-cols-N`.
    */
-  extraCells?: Array<{ value: string; label: string; uppercase?: boolean }>;
+  extraCells?: Array<{ value: React.ReactNode; label: string; uppercase?: boolean }>;
   /** When true, render the author cell even when `author?.full_name` is
    *  missing — using the `EMPTY_AUTHOR_PLACEHOLDER` shape above. Used by
    *  catalog grids that must keep a fixed shape so skeleton alignment
@@ -71,7 +72,8 @@ export interface EntityAuthorCardProps {
 
 /**
  * Single value cell — top: large `text-h4` value (uppercase), bottom: small
- * `DM_Sans` 14px secondary label.
+ * `DM_Sans` 14px secondary label. A non-text value (a `DepartmentBadge`) renders
+ * as given in the value slot.
  */
 export function EntityMetadataValueCell({
   value,
@@ -79,7 +81,7 @@ export function EntityMetadataValueCell({
   className,
   uppercase = true,
 }: {
-  value: string;
+  value: React.ReactNode;
   label: string;
   className?: string;
   uppercase?: boolean;
@@ -87,7 +89,11 @@ export function EntityMetadataValueCell({
   return (
     <div className={`flex flex-col gap-3 bg-ods-card p-4 ${className ?? ''}`}>
       <div className="flex flex-col gap-0">
-        <p className="text-ods-text-primary text-h4">{uppercase ? value.toLocaleUpperCase() : value}</p>
+        {typeof value === 'string' ? (
+          <p className="text-ods-text-primary text-h4">{uppercase ? value.toLocaleUpperCase() : value}</p>
+        ) : (
+          <div className="flex min-h-6 items-center">{value}</div>
+        )}
         <p className="text-ods-text-secondary text-h6">{label}</p>
       </div>
     </div>

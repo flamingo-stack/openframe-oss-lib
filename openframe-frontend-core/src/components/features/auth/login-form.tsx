@@ -7,6 +7,7 @@ import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-tria
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { LabeledDivider } from './labeled-divider';
+import { LegalLinks } from './legal-links';
 import type { AuthSsoProvider } from './sso-providers';
 import { SsoProviderButtons } from './sso-providers';
 
@@ -57,6 +58,13 @@ export interface LoginFormProps {
   title?: string;
   /** Overrides the default sub-heading. */
   subtitle?: ReactNode;
+  /**
+   * Public legal pages, linked in a quiet "Terms of Service • Privacy Policy" row at the foot of
+   * the card. Both are needed for the row to render: this screen has no consent checkbox to carry
+   * the links, so the row is the only place they appear.
+   */
+  termsUrl?: string;
+  privacyPolicyUrl?: string;
   className?: string;
 }
 
@@ -88,6 +96,8 @@ export function LoginForm({
   submitDisabled = false,
   title = 'Login to OpenFrame',
   subtitle = 'Enter your email to access your organization.',
+  termsUrl,
+  privacyPolicyUrl,
   className,
 }: LoginFormProps) {
   const fieldDisabled = disabled || loading;
@@ -158,7 +168,9 @@ export function LoginForm({
           // bold-body step, a 24px icon, and 12/16 for the inset and the gap.
           <div
             role="status"
-            className="flex h-11 w-full items-center gap-[var(--spacing-system-m)] rounded-md bg-ods-bg-surface px-[var(--spacing-system-s)] text-ods-text-secondary text-h3 md:h-12"
+            // A minimum, not a fixed height: a consumer's `noCustomSsoLabel` can run to several lines
+            // at phone width, and a fixed row clipped it.
+            className="flex min-h-11 w-full items-center gap-[var(--spacing-system-m)] rounded-md bg-ods-bg-surface px-[var(--spacing-system-s)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h3 md:min-h-12"
           >
             <AlertTriangleIcon className="h-6 w-6 shrink-0" />
             {noCustomSsoLabel}
@@ -183,6 +195,8 @@ export function LoginForm({
           </Button>
         </div>
       )}
+
+      {termsUrl && privacyPolicyUrl && <LegalLinks termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
     </div>
   );
 }

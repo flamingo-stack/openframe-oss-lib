@@ -22,6 +22,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { PAGE_PARAM_LIMITS, pageCount, positiveInt } from '../../../utils/search-params';
 import type { TicketData } from '../types';
 
 const FIND_TICKET_ENDPOINT = '/api/chat/agent/find-ticket';
@@ -93,8 +94,8 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
   const search = (filters.search ?? '').trim();
   const status = (filters.status ?? '').trim().toLowerCase();
   const statusFilter = status && status !== 'all' ? status : '';
-  const page = Math.max(1, Math.floor(filters.page ?? 1) || 1);
-  const pageSize = Math.max(1, Math.min(100, Math.floor(filters.pageSize ?? DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE));
+  const page = positiveInt(filters.page, 1);
+  const pageSize = positiveInt(filters.pageSize, DEFAULT_PAGE_SIZE, { max: PAGE_PARAM_LIMITS.maxPageSize });
 
   // `customerEmail` is the source of truth — parent (HelpCenterList)
   // already gates on `identity.user?.email` being truthy before
@@ -145,7 +146,7 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
   const totalCount = data?.totalCount ?? data?.count ?? data?.tickets?.length ?? 0;
   const echoedPage = data?.page ?? page;
   const echoedPageSize = data?.pageSize ?? pageSize;
-  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(totalCount / echoedPageSize));
+  const totalPages = data?.totalPages ?? pageCount(totalCount, echoedPageSize);
 
   return {
     tickets: data?.tickets ?? [],
@@ -154,16 +155,6 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
     // windows where the query is enabled-but-fetch-not-yet-fired
     // OR where stale-data exists from a sibling cache slot — both
     // produced the EmptyState flash on /tickets first load. Treating
-    // "no data for THIS query slot yet" as the universal loading
-    // signal can't lie:
-    //   - Initial render after enabled flips: data === undefined → load
-    //   - Background refetch with existing data: data !== undefined → no load
-    //   - Filter-change refetch landing on empty results: data?.tickets===[]
-    //     + isFetching → bridge skeleton (the `||` branch)
-    // Loading-state-truth = `data === undefined`. TanStack v5's
-    // `isPending` / `isLoading` flags can be `false` in transient
-    // windows where the query is enabled-but-fetch-not-yet-fired
-    // OR where stale-data exists from a sibling cache slot. Treating
     // "no data for THIS query slot yet" as the universal loading
     // signal can't lie:
     //   - Initial render after enabled flips: data === undefined → load

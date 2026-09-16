@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ServerWebExchange;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
 import static com.openframe.security.oauth.SecurityConstants.ACCESS_TOKEN;
 import static com.openframe.security.oauth.SecurityConstants.REFRESH_TOKEN;
 import static org.springframework.http.HttpHeaders.SET_COOKIE;
@@ -65,27 +66,15 @@ public class CookieService {
     }
 
     public void addClearSasCookies(HttpHeaders headers) {
-        ResponseCookie clearedAuthSession = createClearedCookie(JSESSIONID, "/sas");
-        ResponseCookie clearedAuthSessionHostOnly = createClearedCookieHostOnly(JSESSIONID, "/sas");
-        // Also clear potential SSO registration cookie used during tenant registration
-        ResponseCookie clearedSsoRegistration = createClearedCookie("of_sso_reg", "/");
-        ResponseCookie clearedSsoRegistrationHostOnly = createClearedCookieHostOnly("of_sso_reg", "/");
-        // Also clear potential SSO invitation cookie used during invitation acceptance
-        ResponseCookie clearedSsoInvite = createClearedCookie("of_sso_invite", "/");
-        ResponseCookie clearedSsoInviteHostOnly = createClearedCookieHostOnly("of_sso_invite", "/");
-        // And the email-less login flow cookie: left behind by an abandoned or failed attempt, it
-        // would otherwise inject its stale state into this fresh tenant-scoped login and let the
-        // wrong flow handler claim the callback.
-        ResponseCookie clearedSsoLogin = createClearedCookie("of_sso_login", "/");
-        ResponseCookie clearedSsoLoginHostOnly = createClearedCookieHostOnly("of_sso_login", "/");
-        headers.add(SET_COOKIE, clearedAuthSession.toString());
-        headers.add(SET_COOKIE, clearedAuthSessionHostOnly.toString());
-        headers.add(SET_COOKIE, clearedSsoRegistration.toString());
-        headers.add(SET_COOKIE, clearedSsoRegistrationHostOnly.toString());
-        headers.add(SET_COOKIE, clearedSsoInvite.toString());
-        headers.add(SET_COOKIE, clearedSsoInviteHostOnly.toString());
-        headers.add(SET_COOKIE, clearedSsoLogin.toString());
-        headers.add(SET_COOKIE, clearedSsoLoginHostOnly.toString());
+        headers.add(SET_COOKIE, createClearedCookie(JSESSIONID, "/sas").toString());
+        headers.add(SET_COOKIE, createClearedCookieHostOnly(JSESSIONID, "/sas").toString());
+        // Every SSO flow cookie: one left behind by an abandoned or failed flow would inject its
+        // stale state into this fresh login and let the wrong flow handler claim the callback.
+        // The shared list keeps this in lockstep with the auth server's flows.
+        for (String name : SsoFlowCookieNames.ALL) {
+            headers.add(SET_COOKIE, createClearedCookie(name, "/").toString());
+            headers.add(SET_COOKIE, createClearedCookieHostOnly(name, "/").toString());
+        }
     }
 
     /**

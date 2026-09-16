@@ -255,7 +255,7 @@ input CreateScriptScheduleInput {
     reconnectWindowSeconds: Long
     "The scheduled run time. For SERVER: an absolute UTC instant. For DEVICE_LOCAL: the picked Date + Time with NO zone offset applied (local 09:00 → 2026-09-10T09:00:00Z), re-based into each device's own timezone. Required when trigger is DATE_TIME; must be null for DEVICE_ONLINE. Must fall on a 30-minute boundary (xx:00 or xx:30)."
     startAt: Instant
-    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt. Not supported for DEVICE_LOCAL (one-shot only)."
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …); the runner ticks on that grid. Null means run once at startAt. For DEVICE_LOCAL it advances the local wall-clock by this many seconds each occurrence (e.g. 86400 = daily at the same local time)."
     repeat: Long
 }
 
@@ -282,7 +282,7 @@ input UpdateScriptScheduleInput {
     selectionMode: ScheduleDeviceSelectionMode
     "The scheduled run time. For SERVER: an absolute UTC instant. For DEVICE_LOCAL: the picked Date + Time with NO zone offset applied, re-based per device. Required when trigger is DATE_TIME; must be null for DEVICE_ONLINE. Changing it reschedules the run. Must fall on a 30-minute boundary."
     startAt: Instant
-    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot). Not supported for DEVICE_LOCAL."
+    "Recurrence interval in seconds. Must be a whole number of 30-minute slots (1800, 3600, 5400, …). Null clears recurrence (one-shot). For DEVICE_LOCAL it advances the local wall-clock each occurrence (e.g. 86400 = daily at the same local time)."
     repeat: Long
 }
 

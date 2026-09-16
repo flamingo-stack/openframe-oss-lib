@@ -62,10 +62,12 @@ import type {
   NatsMessageType,
   ChatApprovalStatus,
 } from '../types';
-import type { DialogItem } from '../types/component.types';
 import type {
   ChatConnectionState,
+  ChatDialogCapabilities,
   DialogTokenUsage,
+  FetchDialogsParams,
+  FetchDialogsResult,
   UnifiedChatState,
   UnifiedChatMessage,
   UnifiedSendMessageOptions,
@@ -74,6 +76,7 @@ import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
 import { extractIncompleteTailState } from '../utils/extract-incomplete-message-state';
 import { processHistoricalMessagesWithErrors } from '../utils/process-historical-messages';
 import { useChunkCatchup } from './use-chunk-catchup';
+import { useManagedDialogList } from './use-managed-dialog-list';
 import { useNatsDialogSubscription } from './use-nats-dialog-subscription';
 
 // Legacy public home of the pure message-mutation helpers ("exported for
@@ -90,21 +93,11 @@ export {
 // Config + options
 // =============================================================================
 
-/** Page-fetch parameters passed to `fetchDialogs`. The adapter owns the
- *  cursor — the host only resolves it against the backend. */
-export interface FetchDialogsParams {
-  cursor?: string;
-  limit?: number;
-  search?: string;
-}
-
-/** Successful `fetchDialogs` response. `nextCursor: null` means "no more
- *  pages" — used to terminate the infinite-scroll observer in the
- *  sidebar. */
-export interface FetchDialogsResult {
-  dialogs: DialogItem[];
-  nextCursor: string | null;
-}
+// `FetchDialogsParams` / `FetchDialogsResult` moved to the unified types
+// module (they are the host contract of the SHARED `useManagedDialogList`
+// hook, consumed by both adapters); re-exported here so the public import
+// path stays stable.
+export type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
 
 /** Page-fetch parameters passed to `fetchDialogMessages`. */
 export interface FetchDialogMessagesParams {
@@ -422,6 +415,8 @@ export function useNatsChatAdapter(
     deleteDialog: deleteDialogCallback,
     renameDialog: renameDialogCallback,
     archiveDialog: archiveDialogCallback,
+    fetchArchivedDialogs,
+    unarchiveDialog,
     approveRequest: approveRequestCallback,
     rejectRequest: rejectRequestCallback,
     stopGeneration: stopGenerationCallback,
@@ -570,12 +565,37 @@ export function useNatsChatAdapter(
   );
 
   // ─── Dialog list state (managed-dialog mode only) ─────────────────────────
+  // The list state machine itself is the SHARED `useManagedDialogList`
+  // (also behind the SSE/Guide adapter); this adapter only layers the
+  // active-id + reducer-store side effects on top via `onDialogRemoved`.
 
-  const [dialogs, setDialogs] = useState<DialogItem[]>([]);
-  const [dialogsNextCursor, setDialogsNextCursor] = useState<string | null>(null);
-  const [isDialogsLoading, setIsDialogsLoading] = useState<boolean>(false);
-  const [dialogsError, setDialogsError] = useState<boolean>(false);
   const [isCreatingDialog, setIsCreatingDialog] = useState<boolean>(false);
+  const {
+    dialogs,
+    isDialogsLoading,
+    dialogsError,
+    hasMoreDialogs,
+    reloadDialogs,
+    loadMoreDialogs,
+    renameDialog,
+    archiveDialog,
+    deleteDialog,
+    upsertDialogTop,
+  } = useManagedDialogList({
+    autoLoad: active,
+    fetchDialogs,
+    renameDialog: renameDialogCallback,
+    archiveDialog: archiveDialogCallback,
+    deleteDialog: deleteDialogCallback,
+    pageSize: dialogsPageSize,
+    logTag: '[useNatsChatAdapter]',
+    onDialogRemoved: (id, reason) => {
+      if (reason === 'deleted') dialogStore.remove(id);
+      if (isManagedMode && internalDialogId === id) {
+        setInternalDialogId(null);
+      }
+    },
+  });
 
   // ─── Message-history pagination ───────────────────────────────────────────
 
@@ -861,59 +881,6 @@ export function useNatsChatAdapter(
   const connectionState: ChatConnectionState =
     !active || !dialogId ? 'connected' : connectedForDialog === dialogId ? 'connected' : 'connecting';
 
-  // ─── Dialog list management (managed-dialog mode) ─────────────────────────
-
-  // Forward-declared so `loadDialogsPage` can reset the initial-load guard on
-  // a first-page failure (enabling retry / auto-retry on re-activation).
-  const initialDialogsLoadedRef = useRef(false);
-
-  const loadDialogsPage = useCallback(
-    async (cursor?: string): Promise<void> => {
-      if (!fetchDialogs) return;
-      setIsDialogsLoading(true);
-      // Clear a prior first-page error when (re)loading the first page.
-      if (cursor === undefined) setDialogsError(false);
-      try {
-        const result = await fetchDialogs({
-          cursor,
-          limit: dialogsPageSize,
-        });
-        setDialogsNextCursor(result.nextCursor);
-        if (cursor === undefined) {
-          setDialogs(result.dialogs);
-        } else {
-          setDialogs(prev => [...prev, ...result.dialogs]);
-        }
-      } catch (err) {
-        console.error('[useNatsChatAdapter] fetchDialogs failed:', err);
-        // Only the FIRST page failing is a "can't show the list" error — a
-        // pagination failure keeps the already-loaded list intact. Flag it and
-        // release the initial-load guard so a retry (or re-activation) re-runs.
-        if (cursor === undefined) {
-          setDialogsError(true);
-          initialDialogsLoadedRef.current = false;
-        }
-      } finally {
-        setIsDialogsLoading(false);
-      }
-    },
-    [fetchDialogs, dialogsPageSize],
-  );
-
-  // Retry the initial dialog-list load after a failure.
-  const reloadDialogs = useCallback(() => {
-    void loadDialogsPage();
-  }, [loadDialogsPage]);
-
-  // Initial dialog list load.
-  useEffect(() => {
-    if (!fetchDialogs) return;
-    if (!active) return;
-    if (initialDialogsLoadedRef.current) return;
-    initialDialogsLoadedRef.current = true;
-    void loadDialogsPage();
-  }, [active, fetchDialogs, loadDialogsPage]);
-
   // ─── Public action handlers ───────────────────────────────────────────────
 
   const sendMessage = useCallback(
@@ -968,14 +935,11 @@ export function useNatsChatAdapter(
       // Optimistically prepend a placeholder dialog so the sidebar shows
       // the new conversation immediately. The next list refresh will
       // replace it with the canonical entry.
-      setDialogs(prev => [
-        {
-          id: result.dialogId,
-          title: 'New Chat',
-          timestamp: new Date(),
-        },
-        ...prev.filter(d => d.id !== result.dialogId),
-      ]);
+      upsertDialogTop({
+        id: result.dialogId,
+        title: 'New Chat',
+        timestamp: new Date(),
+      });
       if (isManagedMode) {
         setInternalDialogId(result.dialogId);
       }
@@ -986,74 +950,7 @@ export function useNatsChatAdapter(
     } finally {
       setIsCreatingDialog(false);
     }
-  }, [createDialogCallback, isCreatingDialog, isManagedMode]);
-
-  const deleteDialog = useCallback(
-    async (id: string): Promise<void> => {
-      if (!deleteDialogCallback) return;
-      try {
-        await deleteDialogCallback(id);
-        setDialogs(prev => prev.filter(d => d.id !== id));
-        dialogStore.remove(id);
-        if (isManagedMode && internalDialogId === id) {
-          setInternalDialogId(null);
-        }
-      } catch (err) {
-        console.error('[useNatsChatAdapter] deleteDialog failed:', err);
-      }
-    },
-    [deleteDialogCallback, dialogStore, internalDialogId, isManagedMode],
-  );
-
-  const renameDialog = useCallback(
-    async (id: string, title: string): Promise<void> => {
-      if (!renameDialogCallback) return;
-      // Optimistic — update the local title immediately, roll back on error.
-      let previous: string | undefined;
-      setDialogs(prev =>
-        prev.map(d => {
-          if (d.id !== id) return d;
-          previous = d.title;
-          return { ...d, title };
-        }),
-      );
-      try {
-        await renameDialogCallback(id, title);
-      } catch (err) {
-        console.error('[useNatsChatAdapter] renameDialog failed:', err);
-        // `previous` is a `let` written from inside the optimistic updater, so
-        // its narrowing does not reach the rollback closure. Freeze it into a
-        // const first — that is also what pins the rollback to the title we
-        // actually replaced.
-        const rollbackTitle = previous;
-        if (rollbackTitle !== undefined) {
-          setDialogs(prev => prev.map(d => (d.id === id ? { ...d, title: rollbackTitle } : d)));
-        }
-      }
-    },
-    [renameDialogCallback],
-  );
-
-  const archiveDialog = useCallback(
-    async (id: string): Promise<void> => {
-      if (!archiveDialogCallback) return;
-      try {
-        await archiveDialogCallback(id);
-        setDialogs(prev => prev.filter(d => d.id !== id));
-        if (isManagedMode && internalDialogId === id) {
-          setInternalDialogId(null);
-        }
-      } catch (err) {
-        console.error('[useNatsChatAdapter] archiveDialog failed:', err);
-      }
-    },
-    [archiveDialogCallback, internalDialogId, isManagedMode],
-  );
-
-  const loadMoreDialogs = useCallback(async (): Promise<void> => {
-    if (!dialogsNextCursor) return;
-    await loadDialogsPage(dialogsNextCursor);
-  }, [dialogsNextCursor, loadDialogsPage]);
+  }, [createDialogCallback, isCreatingDialog, isManagedMode, upsertDialogTop]);
 
   const loadMoreMessages = useCallback(async (): Promise<void> => {
     if (!dialogId || !messagesNextCursor) return;
@@ -1102,8 +999,23 @@ export function useNatsChatAdapter(
 
   const { messages, streamingPhase, dialogTokenUsage = null, liveModel = null } = state;
   const isLoading = streamingPhase !== 'idle';
-  const hasMoreDialogs = dialogsNextCursor != null;
   const hasMoreMessages = messagesNextCursor != null;
+
+  // The conversation-list capability object — ALWAYS present: this is the
+  // Mingo transport, whose panel owns a dialog list whether or not the host
+  // wired paging (an unmanaged config just has nothing in it, and the panel
+  // renders the same empty "Current Chats" surface it always has). Each field
+  // is gated on its own callback, the rule used throughout this file: the
+  // presence of a callback IS the capability.
+  const dialogCapabilities = useMemo<ChatDialogCapabilities>(
+    () => ({
+      canRename: isManagedMode && !!renameDialogCallback,
+      canArchive: isManagedMode && !!archiveDialogCallback,
+      fetchArchivedDialogs: isManagedMode ? fetchArchivedDialogs : undefined,
+      unarchiveDialog: isManagedMode ? unarchiveDialog : undefined,
+    }),
+    [isManagedMode, renameDialogCallback, archiveDialogCallback, fetchArchivedDialogs, unarchiveDialog],
+  );
 
   return useMemo<UnifiedChatState>(
     () => ({
@@ -1142,6 +1054,7 @@ export function useNatsChatAdapter(
       loadMoreDialogs,
       hasMoreMessages,
       loadMoreMessages,
+      dialogCapabilities,
       // Approval mutations
       approveRequest,
       rejectRequest,
@@ -1174,6 +1087,7 @@ export function useNatsChatAdapter(
       loadMoreDialogs,
       hasMoreMessages,
       loadMoreMessages,
+      dialogCapabilities,
       approveRequest,
       rejectRequest,
       dialogTokenUsage,

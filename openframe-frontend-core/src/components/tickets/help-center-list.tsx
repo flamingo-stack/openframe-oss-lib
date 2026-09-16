@@ -33,8 +33,10 @@ import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { toast as defaultToast } from '../../hooks/use-toast';
 import { DEV_SECTION_PARAM_KEYS, devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
+import { positiveInt } from '../../utils/search-params';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
+import { ListEmptyState } from '../list-empty-state';
 import { DevSectionPage } from '../shared/dev-section';
 import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row';
 import { Button } from '../ui';
@@ -80,8 +82,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
   // 1-based page from the URL. `<UnifiedPagination>` writes `?page=N`
   // on navigation; we read it here and re-fetch on change. Invalid
   // values fall back to page 1.
-  const rawPage = Number(searchParams.get('page'));
-  const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+  const page = positiveInt(searchParams.get('page'), 1);
 
   // Identity gate FIRST — anon visitors skip every fetch + hook below.
   // `useChatIdentity` has a brief `isLoading` window on first render
@@ -334,28 +335,24 @@ function HelpCenterListAuthed({
             // response landing.
             <DevCardRowSkeletonList rows={1} />
           ) : !hasResults ? (
-            hasActiveFilters ? (
-              <EmptyState
-                type="search"
-                title="No tickets found"
-                description="No tickets match your current filters. Try clearing them or broadening your search."
-                showCTA
-                ctaText="Reset filters"
-                onCtaClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.delete('search');
-                  params.delete('status');
-                  router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-                }}
-              />
-            ) : (
-              <EmptyState
-                type="generic"
-                title="No tickets yet"
-                description="Open one above to start the conversation with the support team."
-                showCTA={false}
-              />
-            )
+            <ListEmptyState
+              isFiltered={hasActiveFilters}
+              filtered={{
+                title: 'No tickets found',
+                description: 'No tickets match your current filters. Try clearing them or broadening your search.',
+                clearText: 'Reset filters',
+              }}
+              onClearFilters={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete('search');
+                params.delete('status');
+                router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+              }}
+              empty={{
+                title: 'No tickets yet',
+                description: 'Open one above to start the conversation with the support team.',
+              }}
+            />
           ) : (
             // `overflow-clip` (NOT `overflow-hidden`) — both visually
             // clip the rounded corners, but `hidden` makes the element

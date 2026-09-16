@@ -25,6 +25,7 @@ export {
   useTicketLive,
   useOptionalTicketLive,
   type TicketLiveContextValue,
+  type TicketLiveProviderProps,
 } from './ticket-live-provider';
 export {
   type TicketData,

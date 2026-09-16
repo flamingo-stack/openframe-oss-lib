@@ -113,7 +113,7 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
         row.setStderrTruncated(truncStderr.truncated);
 
         commandExecutionRepository.save(row);
-        executionMetrics.recordCompleted(RmmExecutionMetrics.KIND_COMMAND, newStatus, row.getDispatchedAt(), now);
+        executionMetrics.recordCommandCompleted(newStatus, row.getDispatchedAt(), now);
         log.info("Transitioned CommandExecution row: executionId={} machineId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), row.getMachineId(), newStatus, exitCode, timedOut);
     }

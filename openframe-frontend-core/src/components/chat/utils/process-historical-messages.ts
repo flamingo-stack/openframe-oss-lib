@@ -34,6 +34,7 @@ import {
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
 import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+import { mergeSourceMetadata, sourceMetadataEvent, type SourceMetadata } from '../../../chat-protocol/source-metadata';
 import { applyApprovalStatusToSegment } from '../stream/message-mutations';
 import {
   MESSAGE_TYPE,
@@ -120,6 +121,13 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
         return { type: 'thinking-delta', text: data.text };
       }
       return null;
+
+    // Persisted source metadata, through the SAME decoder the live chunk uses
+    // (`sourceMetadataEvent`). That shared parse is the whole reason a reloaded
+    // answer renders identically to the one the reader watched arrive.
+    case MESSAGE_TYPE.GUIDE:
+    case MESSAGE_TYPE.SOURCES:
+      return 'payload' in data ? sourceMetadataEvent(data.payload) : null;
 
     // Same completeness gate as the live decoder (`decodeNatsChunk`): a
     // persisted row without a question or without options is not a card the
@@ -315,6 +323,7 @@ function applyHistoryEvent(
   escalatedApprovals?: EscalatedApprovals,
   offerResolutions?: OfferResolutions,
   rowCreatedAt?: Date,
+  rowStreamSeq?: number,
 ): void {
   // batchApprovalsEnabled is owned by the consumer (oss-tenant chat client /
   // openframe-frontend tickets). Defaults to ON so consumers that haven't
@@ -342,12 +351,16 @@ function applyHistoryEvent(
       });
       break;
 
-    // Seq-less on purpose: the persisted row's sequence lives on the message
-    // (`lastChunkStreamSeq`), not in `messageData`. A live redelivery of the
-    // same event matches this segment by payload equality (see
-    // `addTicketEvent`).
+    // `rowStreamSeq` re-stamps the event's JetStream sequence (the persisted
+    // row's `lastChunkStreamSeq` - `messageData` itself does not carry it).
+    // The store's `ticket-event:<seq>` upsert key is the ONLY join between
+    // this hydrated segment and a catch-up/stale-consumer replay of the same
+    // chunk; a seq-less segment never joins, so the replayed copy rendered as
+    // a second identical card (the resolve/reopen duplication). The payload
+    // fallback in `addTicketEvent` cannot own that case: a COMPLETE hydrated
+    // tail seeds no accumulator, so the twins only ever meet in the store.
     case 'ticket-event':
-      // `rowCreatedAt` is the persisted row's own time — without it the card
+      // `rowCreatedAt` is the persisted row's own time - without it the card
       // renders the enclosing assistant bubble's timestamp, i.e. the FIRST
       // row of the turn, and every lifecycle card reads the same stale time.
       accumulator.addTicketEvent(
@@ -359,7 +372,7 @@ function applyHistoryEvent(
           reason: event.reason,
           targetStatusKind: event.targetStatusKind,
         },
-        undefined,
+        rowStreamSeq,
         rowCreatedAt,
       );
       break;
@@ -591,6 +604,12 @@ export function processHistoricalMessages(
   // MAX persisted seq across the rows grouped into the current assistant turn
   // — carried onto the flushed message's streamSeq for per-role merge coverage.
   let currentAssistantStreamSeq: number | undefined;
+  // Source metadata for the current assistant turn. It is persisted as its OWN
+  // row (the backend saves it when the remote tool returns, before the answer
+  // text exists), so it arrives as a separate history message that groups into
+  // the same turn — and has to be carried across the group rather than applied
+  // where it was read.
+  let currentAssistantSourceMetadata: SourceMetadata | null = null;
 
   /**
    * Flush the current assistant message to processedMessages.
@@ -609,6 +628,7 @@ export function processHistoricalMessages(
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
         ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
+        ...(currentAssistantSourceMetadata ?? {}),
       });
       accumulator.resetSegments();
     }
@@ -623,6 +643,10 @@ export function processHistoricalMessages(
     currentAssistantTimestamp = null;
     lastAssistantId = null;
     currentAssistantStreamSeq = undefined;
+    // Reset UNCONDITIONALLY, for the same reason the seq above is: a turn whose
+    // only row was metadata renders nothing, and leaving it set would stamp the
+    // NEXT answer with citations that belong to this one.
+    currentAssistantSourceMetadata = null;
   };
 
   messages.forEach((msg, index) => {
@@ -689,6 +713,12 @@ export function processHistoricalMessages(
       messageDataArray.forEach(data => {
         const event = decodeHistoricalMessageData(data);
         if (!event) return;
+        // Metadata is a property OF the turn, not a segment in it — it never
+        // reaches the accumulator, which would have nothing to do with it.
+        if (event.type === 'sources') {
+          currentAssistantSourceMetadata = mergeSourceMetadata(currentAssistantSourceMetadata, event);
+          return;
+        }
         applyHistoryEvent(
           event,
           accumulator,
@@ -697,6 +727,13 @@ export function processHistoricalMessages(
           escalatedApprovals,
           offerResolutions,
           new Date(msg.createdAt),
+          // TICKET_EVENT chunks are standalone, one per row, so the row seq IS
+          // the event seq - but vouch for that only when the row holds exactly
+          // one entry: a bundled row's `lastChunkStreamSeq` belongs to its LAST
+          // chunk and could stamp the wrong event.
+          messageDataArray.length === 1 && typeof msg.lastChunkStreamSeq === 'number'
+            ? msg.lastChunkStreamSeq
+            : undefined,
         );
       });
 

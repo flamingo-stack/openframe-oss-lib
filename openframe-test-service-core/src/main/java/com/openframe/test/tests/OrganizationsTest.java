@@ -162,4 +162,20 @@ public class OrganizationsTest extends BaseTest {
                 assertThat(timestamp).as("Organization lastActivityAt should be within the inclusive range")
                         .isBetween(from, to));
     }
+
+    @Tag("feature")
+    @Tag("saas")
+    @Test
+    @DisplayName("Check whether an organization can be archived")
+    public void testCanArchiveOrganization() {
+        Organization organization = OrganizationApi.createOrganization(OrganizationGenerator.createOrganizationRequest(true));
+        try {
+            assertThat(OrganizationApi.canArchiveOrganization(organization.getOrganizationId()))
+                    .as("An organization with no devices can be archived").isTrue();
+        } finally {
+            OrganizationApi.archiveOrganization(organization);
+        }
+        Organization archived = OrganizationApi.retrieveOrganizationByOrganizationId(organization.getOrganizationId());
+        assertThat(archived.getStatus()).as("The organization is archived afterwards").isEqualTo("ARCHIVED");
+    }
 }

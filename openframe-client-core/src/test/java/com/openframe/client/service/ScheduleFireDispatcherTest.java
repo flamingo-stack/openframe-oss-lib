@@ -367,6 +367,28 @@ class ScheduleFireDispatcherTest {
         verify(scriptScheduleNatsPublisher, never()).publish(any(), any());
     }
 
+    @Test
+    @DisplayName("armReconnectRetry(single): writes NEW with the caller's firstSeenAt/expiresAt verbatim (occurrence-relative window)")
+    void armReconnectRetry_singleMachine_usesCallerChosenWindow() {
+        ScheduleScript schedule = retrySchedule(List.of("script-a"), 3600L);
+        Instant firstSeenAt = Instant.parse("2026-09-15T06:05:00Z");
+        Instant expiresAt = Instant.parse("2026-09-15T06:30:00Z");   // fireAt(06:00Z) + window, NOT firstSeenAt + window
+        when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT, "m-off", SCHEDULE_ID))
+                .thenReturn(Optional.empty());
+
+        dispatcher.armReconnectRetry(schedule, "m-off", firstSeenAt, expiresAt);
+
+        ArgumentCaptor<DeviceFirstOnlineDispatch> captor = ArgumentCaptor.forClass(DeviceFirstOnlineDispatch.class);
+        verify(dispatchRepository).save(captor.capture());
+        DeviceFirstOnlineDispatch sentinel = captor.getValue();
+        assertThat(sentinel.getMachineId()).isEqualTo("m-off");
+        assertThat(sentinel.getScheduleId()).isEqualTo(SCHEDULE_ID);
+        assertThat(sentinel.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
+        assertThat(sentinel.getFirstSeenAt()).isEqualTo(firstSeenAt);
+        assertThat(sentinel.getExpiresAt()).isEqualTo(expiresAt);
+        assertThat(sentinel.getDispatchedAt()).isNull();
+    }
+
     private static ScheduleScript schedule(List<String> scriptIds) {
         return ScheduleScript.builder()
                 .id(SCHEDULE_ID)
