@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Optional;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.BACKOFF_MULTIPLIER;
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeliveryPropertiesTest {
 
     private static final int UNINSTALL_MAX_ATTEMPTS = 5;
+    private static final String MIN_AGENT_VERSION = "1.4.0";
 
     private DeliveryProperties properties;
 
@@ -72,5 +74,64 @@ class DeliveryPropertiesTest {
 
         // verifications
         assertThat(resolved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
+    }
+    @Test
+    void isEnabled_typeNotListed_false() {
+        // setup
+        properties.setEnabled(Map.of());
+
+        // execution
+        boolean enabled = properties.isEnabled(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(enabled).isFalse();
+    }
+
+    @Test
+    void isEnabled_typeListedOff_false() {
+        // setup
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, false));
+
+        // execution
+        boolean enabled = properties.isEnabled(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(enabled).isFalse();
+    }
+
+    @Test
+    void minAgentVersion_typeNotListed_empty() {
+        // setup
+        properties.setMinAgentVersion(Map.of());
+
+        // execution
+        Optional<String> minAgentVersion = properties.minAgentVersion(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(minAgentVersion).isEmpty();
+    }
+
+    @Test
+    void minAgentVersion_typeListed_versionReturned() {
+        // setup
+        properties.setMinAgentVersion(Map.of(DeliveryType.TOOL_INSTALLATION, MIN_AGENT_VERSION));
+
+        // execution
+        Optional<String> minAgentVersion = properties.minAgentVersion(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(minAgentVersion).contains(MIN_AGENT_VERSION);
+    }
+
+    @Test
+    void isEnabled_typeListedOn_true() {
+        // setup
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+
+        // execution
+        boolean enabled = properties.isEnabled(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(enabled).isTrue();
     }
 }

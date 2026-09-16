@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
@@ -50,7 +51,7 @@ class DeliveryDispatcherTest {
     }
 
     @Test
-    void dispatch_seed_requestRecordedThenPublishedThroughSpec() {
+    void dispatch_seed_dispatchIdSetThenRecordedThenPublishedThroughSpec() {
         // setup
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         when(spec.request(seed)).thenReturn(request);
@@ -59,6 +60,7 @@ class DeliveryDispatcherTest {
         dispatcher.dispatch(seed);
 
         // verifications
+        assertThat(payload.getDispatchId()).isNotBlank();
         verify(recorder).record(request);
         verify(spec).publish(MACHINE_ID, payload);
     }

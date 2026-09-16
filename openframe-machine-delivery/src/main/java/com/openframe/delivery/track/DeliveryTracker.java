@@ -19,15 +19,17 @@ public class DeliveryTracker {
     private final MachineDeliveryRepository repository;
     private final DeliveryProperties properties;
 
-    public void acknowledge(DeliveryType type, String targetId, String machineId) {
+    public void acknowledge(DeliveryType type, String targetId, String machineId, String dispatchId) {
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Policy policy = properties.resolve(type);
         long resultTimeoutSeconds = policy.getResultTimeoutSeconds();
         Instant resultDueAt = now.plusSeconds(resultTimeoutSeconds);
-        boolean acked = repository.markAcked(id, DeliveryStatus.UNACKED, now, resultDueAt);
+        boolean acked = repository.markAcked(id, dispatchId, DeliveryStatus.UNACKED, now, resultDueAt);
         if (acked) {
-            log.info("Delivery ACKED: type={} targetId={} machineId={}", type, targetId, machineId);
+            log.info("Delivery ACKED: type={} targetId={} machineId={} dispatchId={}", type, targetId, machineId, dispatchId);
+        } else {
+            log.debug("Delivery ack ignored, no unacked row for this dispatch: id={} dispatchId={}", id, dispatchId);
         }
     }
 

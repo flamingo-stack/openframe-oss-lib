@@ -8,6 +8,7 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
+import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.track.DeliveryId;
 import lombok.RequiredArgsConstructor;
@@ -26,9 +27,6 @@ public class DeliveryRecorder {
     private final ObjectMapper objectMapper;
 
     public void record(DeliveryRequest<?> request) {
-        if (!properties.isEnabled()) {
-            return;
-        }
         MachineDelivery delivery = pendingRow(request);
         repository.upsertPending(delivery);
         log.info("Delivery recorded: type={} targetId={} machineId={}",
@@ -41,7 +39,8 @@ public class DeliveryRecorder {
         String targetId = request.getTargetId();
         String machineId = request.getMachineId();
         String id = DeliveryId.of(type, targetId, machineId);
-        Object payload = request.getPayload();
+        DeliveryPayload payload = request.getPayload();
+        String dispatchId = payload.getDispatchId();
         String payloadJson = toJson(payload);
         Policy policy = properties.resolve(type);
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
@@ -51,6 +50,7 @@ public class DeliveryRecorder {
                 .type(type)
                 .targetId(targetId)
                 .machineId(machineId)
+                .dispatchId(dispatchId)
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
                 .errors(0)

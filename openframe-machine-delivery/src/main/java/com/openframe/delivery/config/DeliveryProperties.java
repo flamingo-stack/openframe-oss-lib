@@ -13,7 +13,9 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Optional;
 
+import static java.lang.Boolean.FALSE;
 import static java.util.Objects.requireNonNullElse;
 
 @Getter
@@ -22,9 +24,6 @@ import static java.util.Objects.requireNonNullElse;
 @Component
 @ConfigurationProperties(prefix = "openframe.delivery")
 public class DeliveryProperties {
-
-    @NotNull
-    private Boolean enabled;
 
     @Valid
     @NotNull
@@ -37,8 +36,19 @@ public class DeliveryProperties {
     // deliberately not @Valid: a per-type entry lists only the fields it overrides
     private Map<DeliveryType, Policy> types = new EnumMap<>(DeliveryType.class);
 
-    public boolean isEnabled() {
-        return enabled;
+    // a type not listed here is off: every environment switches each type on explicitly
+    private Map<DeliveryType, Boolean> enabled = new EnumMap<>(DeliveryType.class);
+
+    // first agent version that acks the type; a type not listed here keeps every machine on the old path
+    private Map<DeliveryType, String> minAgentVersion = new EnumMap<>(DeliveryType.class);
+
+    public boolean isEnabled(DeliveryType type) {
+        return enabled.getOrDefault(type, FALSE);
+    }
+
+    public Optional<String> minAgentVersion(DeliveryType type) {
+        String version = minAgentVersion.get(type);
+        return Optional.ofNullable(version);
     }
 
     public Policy resolve(DeliveryType type) {

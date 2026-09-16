@@ -19,7 +19,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = {"openframe.delivery.enabled", "openframe.delivery.sweep.enabled"}, havingValue = "true")
+@ConditionalOnProperty(name = "openframe.delivery.sweep.enabled", havingValue = "true")
 public class DeliveryWatchdogService {
 
     private final MachineDeliveryRepository repository;

@@ -29,6 +29,7 @@ class DeliveryTrackerTest {
     private static final String TARGET_ID = "fleetmdm-agent";
     private static final String DELIVERY_ID = DeliveryId.of(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
     private static final long TWO_ROWS = 2L;
+    private static final String DISPATCH_ID = "d-1";
 
     @Mock private MachineDeliveryRepository repository;
 
@@ -45,10 +46,10 @@ class DeliveryTrackerTest {
     @Test
     void acknowledge_typedKey_unackedRowMarkedAckedWithResultDeadline() {
         // setup
-        when(repository.markAcked(eq(DELIVERY_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
+        when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
 
         // execution
-        tracker.acknowledge(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+        tracker.acknowledge(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID, DISPATCH_ID);
 
         // verifications
         Instant ackedAt = atCaptor.getValue();

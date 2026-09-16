@@ -22,7 +22,7 @@ public interface CustomMachineDeliveryRepository {
 
     boolean park(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt);
 
-    boolean markAcked(String id, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt);
+    boolean markAcked(String id, String dispatchId, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt);
 
     boolean markDone(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
 

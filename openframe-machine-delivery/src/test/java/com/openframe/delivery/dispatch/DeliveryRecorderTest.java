@@ -5,7 +5,6 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
-import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.TestPayload;
@@ -21,13 +20,13 @@ import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class DeliveryRecorderTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String VALUE = "issued";
+    private static final String DISPATCH_ID = "d-1";
 
     @Mock private MachineDeliveryRepository repository;
 
@@ -35,21 +34,20 @@ class DeliveryRecorderTest {
 
     private DeliveryRecorder recorder;
 
-    private DeliveryProperties properties;
     private DeliveryRequest<TestPayload> request;
 
     @BeforeEach
     void setUp() {
         TestPayload payload = new TestPayload();
         payload.setValue(VALUE);
+        payload.setDispatchId(DISPATCH_ID);
         request = DeliveryRequest.<TestPayload>builder()
                 .type(DeliveryType.CLIENT_UNINSTALL)
                 .targetId(MACHINE_ID)
                 .machineId(MACHINE_ID)
                 .payload(payload)
                 .build();
-        properties = DeliveryTestPolicies.properties();
-        recorder = new DeliveryRecorder(repository, properties, new ObjectMapper());
+        recorder = new DeliveryRecorder(repository, DeliveryTestPolicies.properties(), new ObjectMapper());
     }
 
     @Test
@@ -66,21 +64,10 @@ class DeliveryRecorderTest {
         assertThat(saved.getType()).isEqualTo(DeliveryType.CLIENT_UNINSTALL);
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(saved.getAttempts()).isZero();
-        assertThat(saved.getPayloadJson()).contains(VALUE);
+        assertThat(saved.getDispatchId()).isEqualTo(DISPATCH_ID);
+        assertThat(saved.getPayloadJson()).contains(VALUE).contains(DISPATCH_ID);
         assertThat(saved.getDueAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(ACK_THRESHOLD));
         assertThat(saved.getExpiresAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(TTL));
         assertThat(saved.getErrors()).isZero();
-    }
-
-    @Test
-    void record_engineDisabled_nothingWritten() {
-        // setup
-        properties.setEnabled(false);
-
-        // execution
-        recorder.record(request);
-
-        // verifications
-        verifyNoInteractions(repository);
     }
 }

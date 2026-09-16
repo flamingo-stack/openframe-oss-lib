@@ -33,6 +33,7 @@ class CustomMachineDeliveryRepositoryImplTest {
     private static final String TENANT_ID = "tenant-1";
     private static final int LIMIT = 500;
     private static final int ATTEMPTS = 1;
+    private static final String DISPATCH_ID = "d-1";
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
     @Mock private MongoConverter converter;
@@ -117,6 +118,28 @@ class CustomMachineDeliveryRepositoryImplTest {
 
         // verifications
         assertThat(republished).isFalse();
+    }
+
+    @Test
+    void markAcked_unackedRowOfThisDispatch_ackedAndTrue() {
+        // setup
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
+
+        // execution
+        boolean acked = repository.markAcked(ID, DISPATCH_ID, DeliveryStatus.UNACKED, now, now);
+
+        // verifications
+        assertThat(acked).isTrue();
+        assertThat(queryCaptor.getValue().getQueryObject().toString())
+                .contains(ID)
+                .contains("PENDING")
+                .contains("dispatchId=" + DISPATCH_ID);
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("ACKED")
+                .contains("ackedAt")
+                .contains("dueAt")
+                .contains("parked=false");
     }
 
     @Test

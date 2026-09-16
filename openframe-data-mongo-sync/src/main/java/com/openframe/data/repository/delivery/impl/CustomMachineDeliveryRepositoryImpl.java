@@ -29,6 +29,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_ATTEMPTS = "attempts";
     private static final String FIELD_ERRORS = "errors";
+    private static final String FIELD_DISPATCH_ID = "dispatchId";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_DUE_AT = "dueAt";
@@ -99,13 +100,14 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     }
 
     @Override
-    public boolean markAcked(String id, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt) {
+    public boolean markAcked(String id, String dispatchId, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt) {
+        Criteria thisDispatch = stillIn(id, from).and(FIELD_DISPATCH_ID).is(dispatchId);
         Update update = new Update()
                 .set(FIELD_STATUS, DeliveryStatus.ACKED)
                 .set(FIELD_ACKED_AT, ackedAt)
                 .set(FIELD_DUE_AT, dueAt)
                 .set(FIELD_PARKED, false);
-        return updateOne(stillIn(id, from), update);
+        return updateOne(thisDispatch, update);
     }
 
     @Override

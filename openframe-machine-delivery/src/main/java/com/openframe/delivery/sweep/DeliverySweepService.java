@@ -11,6 +11,7 @@ import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
@@ -28,7 +29,7 @@ import static java.util.stream.Collectors.toSet;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = {"openframe.delivery.enabled", "openframe.delivery.sweep.enabled"}, havingValue = "true")
+@ConditionalOnProperty(name = "openframe.delivery.sweep.enabled", havingValue = "true")
 public class DeliverySweepService {
 
     private final MachineDeliveryRepository repository;
@@ -102,9 +103,9 @@ public class DeliverySweepService {
 
     private void republish(MachineDelivery delivery, Policy policy, Instant now) {
         DeliveryType type = delivery.getType();
-        DeliverySpec<DeliverySeed, Object> spec = registry.require(type);
-        Class<Object> payloadClass = spec.getPayloadClass();
-        Object payload = readPayload(delivery, payloadClass);
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
+        DeliveryPayload payload = readPayload(delivery, payloadClass);
         String machineId = delivery.getMachineId();
         boolean published = publish(spec, machineId, payload);
         if (!published) {
@@ -128,7 +129,7 @@ public class DeliverySweepService {
                 type, delivery.getTargetId(), machineId, attempt, dueAt);
     }
 
-    private static boolean publish(DeliverySpec<DeliverySeed, Object> spec, String machineId, Object payload) {
+    private static boolean publish(DeliverySpec<DeliverySeed, DeliveryPayload> spec, String machineId, DeliveryPayload payload) {
         try {
             spec.publish(machineId, payload);
             return true;

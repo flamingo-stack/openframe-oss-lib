@@ -8,6 +8,7 @@ import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
@@ -23,7 +24,7 @@ import java.util.Set;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = {"openframe.delivery.enabled", "openframe.delivery.sweep.enabled"}, havingValue = "true")
+@ConditionalOnProperty(name = "openframe.delivery.sweep.enabled", havingValue = "true")
 public class DeliveryCloser {
 
     private final MachineDeliveryRepository repository;
@@ -67,7 +68,7 @@ public class DeliveryCloser {
 
     private void notifySpec(MachineDelivery delivery, DeliveryFailure failure) {
         DeliveryType type = delivery.getType();
-        Optional<DeliverySpec<DeliverySeed, Object>> spec = registry.find(type);
+        Optional<DeliverySpec<DeliverySeed, DeliveryPayload>> spec = registry.find(type);
         spec.ifPresentOrElse(
                 registered -> registered.onFailed(delivery, failure),
                 () -> log.warn("No spec registered for delivery type {}, onFailed skipped", type));

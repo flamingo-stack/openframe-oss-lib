@@ -31,7 +31,6 @@ public final class DeliveryTestPolicies {
         Sweep sweep = new Sweep();
         sweep.setBatchSize(BATCH_SIZE);
         DeliveryProperties properties = new DeliveryProperties();
-        properties.setEnabled(true);
         properties.setDefaults(defaults);
         properties.setSweep(sweep);
         return properties;
