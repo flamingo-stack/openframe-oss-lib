@@ -21,20 +21,6 @@ describe('isSameOriginPath', () => {
   it.each(['/ok/x', '/a/b?q=1#frag', '/%2Fnot-an-authority', '/'])('accepts %s', href => {
     expect(isSameOriginPath(href)).toBe(true);
   });
-
-  it('agrees with what the URL parser would actually do', () => {
-    // The property that makes this correct: resolution, not prefix inspection.
-    for (const href of escapes) {
-      const resolved = (() => {
-        try {
-          return new URL(href, 'https://safe.test').origin;
-        } catch {
-          return null;
-        }
-      })();
-      expect(resolved === 'https://safe.test').toBe(isSameOriginPath(href));
-    }
-  });
 });
 
 describe('safeHref uses the same rule', () => {

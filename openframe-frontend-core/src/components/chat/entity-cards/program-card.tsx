@@ -431,7 +431,7 @@ export function ProgramCard<T extends BaseProgramItem>({
               dateOnly: zonedDate.dateOnly,
             })}
           </span>
-          {timezone && <span className="text-ods-text-secondary text-h6">({timezone})</span>}
+          {timezone && !zonedDate.dateOnly && <span className="text-ods-text-secondary text-h6">({timezone})</span>}
         </>
       );
     }
