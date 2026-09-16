@@ -1,5 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -30,6 +31,13 @@ impl ScriptShell {
 pub enum PrivilegeLevel {
     User,
     Admin,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PrivilegePolicy {
+    #[default]
+    AsRequested,
+    InteractiveElevated,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -79,7 +87,7 @@ impl ScriptSpec {
                 .collect(),
             script_id,
             schedule_id,
-            software_operation: false,
+            privilege_policy: PrivilegePolicy::default(),
         }
     }
 }
@@ -178,13 +186,14 @@ pub struct ExecutionRequest<'a> {
     pub env_vars: Vec<String>,
     pub script_id: Option<&'a str>,
     pub schedule_id: Option<&'a str>,
-    pub software_operation: bool,
+    pub privilege_policy: PrivilegePolicy,
 }
 
 pub trait ExecutionMessage: Sized + Send {
     const KIND: &'static str;
     const RESULT_KIND: &'static str = Self::KIND;
     const DURABLE: bool = false;
+    const PRIVILEGE_POLICY: PrivilegePolicy = PrivilegePolicy::AsRequested;
 
     fn from_payload(payload: &str) -> Result<Self>;
     fn execution_id(&self) -> &str;
@@ -217,7 +226,7 @@ impl ExecutionMessage for CommandMessage {
             env_vars: Vec::new(),
             script_id: None,
             schedule_id: None,
-            software_operation: false,
+            privilege_policy: PrivilegePolicy::default(),
         }]
     }
 }
@@ -246,58 +255,58 @@ impl ExecutionMessage for ScriptMessage {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct BootstrapScriptMessage(pub ScriptMessage);
+pub trait ScriptRoute {
+    const KIND: &'static str;
+    const PRIVILEGE_POLICY: PrivilegePolicy = PrivilegePolicy::AsRequested;
+}
 
-impl ExecutionMessage for BootstrapScriptMessage {
+#[derive(Debug, Clone)]
+pub struct RoutedScriptMessage<R: ScriptRoute> {
+    pub message: ScriptMessage,
+    _route: PhantomData<fn() -> R>,
+}
+
+impl<R: ScriptRoute + 'static> ExecutionMessage for RoutedScriptMessage<R> {
+    const KIND: &'static str = R::KIND;
+    const PRIVILEGE_POLICY: PrivilegePolicy = R::PRIVILEGE_POLICY;
+
+    fn from_payload(payload: &str) -> Result<Self> {
+        Ok(Self {
+            message: serde_json::from_str(payload)?,
+            _route: PhantomData,
+        })
+    }
+
+    fn execution_id(&self) -> &str {
+        self.message.execution_id()
+    }
+
+    fn schedule_id(&self) -> Option<&str> {
+        self.message.schedule_id()
+    }
+
+    fn to_requests(&self) -> Vec<ExecutionRequest<'_>> {
+        self.message.to_requests()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BootstrapRoute;
+
+impl ScriptRoute for BootstrapRoute {
     const KIND: &'static str = "script-bootstrap-execution";
-
-    fn from_payload(payload: &str) -> Result<Self> {
-        Ok(Self(serde_json::from_str(payload)?))
-    }
-
-    fn execution_id(&self) -> &str {
-        self.0.execution_id()
-    }
-
-    fn schedule_id(&self) -> Option<&str> {
-        self.0.schedule_id()
-    }
-
-    fn to_requests(&self) -> Vec<ExecutionRequest<'_>> {
-        self.0.to_requests()
-    }
 }
 
-#[derive(Debug, Clone)]
-pub struct SoftwareScriptMessage(pub ScriptMessage);
+#[derive(Debug, Clone, Copy)]
+pub struct SoftwareRoute;
 
-impl ExecutionMessage for SoftwareScriptMessage {
+impl ScriptRoute for SoftwareRoute {
     const KIND: &'static str = "software-execution";
-
-    fn from_payload(payload: &str) -> Result<Self> {
-        Ok(Self(serde_json::from_str(payload)?))
-    }
-
-    fn execution_id(&self) -> &str {
-        self.0.execution_id()
-    }
-
-    fn schedule_id(&self) -> Option<&str> {
-        self.0.schedule_id()
-    }
-
-    fn to_requests(&self) -> Vec<ExecutionRequest<'_>> {
-        self.0
-            .to_requests()
-            .into_iter()
-            .map(|request| ExecutionRequest {
-                software_operation: true,
-                ..request
-            })
-            .collect()
-    }
+    const PRIVILEGE_POLICY: PrivilegePolicy = PrivilegePolicy::InteractiveElevated;
 }
+
+pub type BootstrapScriptMessage = RoutedScriptMessage<BootstrapRoute>;
+pub type SoftwareScriptMessage = RoutedScriptMessage<SoftwareRoute>;
 
 impl ExecutionMessage for ScriptScheduleExecutionMessage {
     const KIND: &'static str = "script-schedule-execution";

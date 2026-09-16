@@ -24,7 +24,7 @@ export NONINTERACTIVE=1
             .to_string()
     }
 
-    fn interpret(&self, result: &ExecResult) -> UpdateOutcome {
+    fn interpret_result(&self, result: &ExecResult) -> UpdateOutcome {
         if result.stdout.contains("__NOT_PRESENT__") {
             return UpdateOutcome::NotPresent;
         }

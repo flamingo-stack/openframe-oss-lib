@@ -2,7 +2,7 @@
 mod brew;
 #[cfg(target_os = "windows")]
 mod choco;
-pub mod missing;
+pub mod presence_report;
 #[cfg(target_os = "windows")]
 mod winget;
 
@@ -45,6 +45,16 @@ impl ManagerId {
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             &[]
+        }
+    }
+
+    fn updater(self) -> Option<Box<dyn ManagerUpdater>> {
+        match self {
+            #[cfg(target_os = "macos")]
+            ManagerId::Brew => Some(Box::new(brew::Brew)),
+            #[cfg(target_os = "windows")]
+            ManagerId::Winget => Some(Box::new(winget::Winget)),
+            _ => None,
         }
     }
 
@@ -101,8 +111,7 @@ if ($p -and (Test-Path "$p\winget.exe")) { exit 0 }
 exit 1
 "#;
 
-#[cfg(target_os = "windows")]
-const PRESENCE_TIMEOUT_SECS: u32 = 60;
+pub const PRESENCE_PROBE_TIMEOUT_SECS: u32 = 60;
 
 #[cfg(target_os = "windows")]
 async fn winget_presence() -> Presence {
@@ -110,7 +119,7 @@ async fn winget_presence() -> Presence {
         code: WINGET_PRESENCE_SCRIPT,
         shell: "powershell",
         args: &[],
-        timeout_secs: PRESENCE_TIMEOUT_SECS,
+        timeout_secs: PRESENCE_PROBE_TIMEOUT_SECS,
         privilege: Privilege::User,
         env_vars: &[],
     })
@@ -153,7 +162,7 @@ pub trait ManagerUpdater: Send + Sync {
     fn privilege(&self) -> Privilege;
     fn shell(&self) -> &'static str;
     fn update_script(&self) -> String;
-    fn interpret(&self, result: &ExecResult) -> UpdateOutcome;
+    fn interpret_result(&self, result: &ExecResult) -> UpdateOutcome;
 }
 
 #[cfg(target_os = "windows")]
@@ -165,7 +174,7 @@ mod markers {
 }
 
 #[cfg(target_os = "windows")]
-fn marker(stdout: &str, prefix: &str) -> Option<String> {
+fn marker_value(stdout: &str, prefix: &str) -> Option<String> {
     stdout.lines().find_map(|line| {
         line.trim()
             .strip_prefix(prefix)
@@ -178,7 +187,7 @@ fn interpret_markers(result: &ExecResult) -> UpdateOutcome {
     if result.stdout.contains(markers::NOT_PRESENT) {
         return UpdateOutcome::NotPresent;
     }
-    if let Some(version) = marker(&result.stdout, markers::LATEST) {
+    if let Some(version) = marker_value(&result.stdout, markers::LATEST) {
         return UpdateOutcome::AlreadyLatest {
             version: Some(version),
         };
@@ -189,24 +198,16 @@ fn interpret_markers(result: &ExecResult) -> UpdateOutcome {
         };
     }
     UpdateOutcome::Updated {
-        from: marker(&result.stdout, markers::FROM),
-        to: marker(&result.stdout, markers::TO),
+        from: marker_value(&result.stdout, markers::FROM),
+        to: marker_value(&result.stdout, markers::TO),
     }
 }
 
 fn managers() -> Vec<Box<dyn ManagerUpdater>> {
-    #[cfg(target_os = "macos")]
-    {
-        vec![Box::new(brew::Brew)]
-    }
-    #[cfg(target_os = "windows")]
-    {
-        vec![Box::new(winget::Winget)]
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    {
-        Vec::new()
-    }
+    ManagerId::for_current_platform()
+        .iter()
+        .filter_map(|id| id.updater())
+        .collect()
 }
 
 pub struct PackageManagerUpdateRunManager;
@@ -252,7 +253,7 @@ impl PackageManagerUpdateRunManager {
                     {
                         UpdateOutcome::Deferred
                     } else {
-                        manager.interpret(&result)
+                        manager.interpret_result(&result)
                     };
 
                     info!(

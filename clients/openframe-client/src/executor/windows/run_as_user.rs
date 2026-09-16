@@ -33,7 +33,7 @@ use crate::executor::{ExecResult, ScriptParams};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Elevation {
     AsLoggedOn,
-    Linked,
+    Elevated,
 }
 
 pub(super) async fn run_as_interactive(
@@ -307,11 +307,18 @@ impl InteractiveToken {
 
         match elevation {
             Elevation::AsLoggedOn => Self::to_primary(token),
-            Elevation::Linked => {
-                let linked = linked_elevated_token(token);
-                close(token);
-                Self::to_primary(linked?)
-            }
+            Elevation::Elevated => match is_elevated(token) {
+                Ok(true) => Self::to_primary(token),
+                Ok(false) => {
+                    let linked = linked_elevated_token(token);
+                    close(token);
+                    Self::to_primary(linked?)
+                }
+                Err(e) => {
+                    close(token);
+                    Err(e)
+                }
+            },
         }
     }
 

@@ -1,5 +1,5 @@
 use super::*;
-use crate::models::{PrivilegeLevel, ScriptShell};
+use crate::models::{PrivilegeLevel, PrivilegePolicy, ScriptShell};
 
 fn req(shell: ScriptShell, code: &str) -> ExecutionRequest<'_> {
     ExecutionRequest {
@@ -12,7 +12,7 @@ fn req(shell: ScriptShell, code: &str) -> ExecutionRequest<'_> {
         env_vars: Vec::new(),
         script_id: None,
         schedule_id: None,
-        software_operation: false,
+        privilege_policy: PrivilegePolicy::default(),
     }
 }
 

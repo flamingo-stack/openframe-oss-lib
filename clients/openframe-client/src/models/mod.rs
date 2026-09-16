@@ -23,10 +23,11 @@ pub mod tool_version_overrides;
 pub mod update_state;
 
 pub use execution::{
-    is_ack_subject, BootstrapScriptMessage, CommandMessage, ExecutionAck, ExecutionMessage,
-    ExecutionRequest, PrivilegeLevel, RmmResult, ScriptEnvVar, ScriptMessage,
-    ScriptScheduleExecutionItem, ScriptScheduleExecutionMessage, ScriptShell, ScriptSpec,
-    SoftwareScriptMessage, EXECUTION_ACK_KIND,
+    is_ack_subject, BootstrapRoute, BootstrapScriptMessage, CommandMessage, ExecutionAck,
+    ExecutionMessage, ExecutionRequest, PrivilegeLevel, PrivilegePolicy, RmmResult,
+    RoutedScriptMessage, ScriptEnvVar, ScriptMessage, ScriptRoute, ScriptScheduleExecutionItem,
+    ScriptScheduleExecutionMessage, ScriptShell, ScriptSpec, SoftwareRoute, SoftwareScriptMessage,
+    EXECUTION_ACK_KIND,
 };
 
 pub use agent_configuration::AgentConfiguration;

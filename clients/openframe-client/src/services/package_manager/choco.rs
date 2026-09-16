@@ -33,7 +33,7 @@ exit $LASTEXITCODE
         .to_string()
     }
 
-    fn interpret(&self, result: &ExecResult) -> UpdateOutcome {
+    fn interpret_result(&self, result: &ExecResult) -> UpdateOutcome {
         interpret_markers(result)
     }
 }

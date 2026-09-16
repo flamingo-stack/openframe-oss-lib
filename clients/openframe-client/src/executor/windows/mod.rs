@@ -30,7 +30,7 @@ pub async fn execute_script(params: ScriptParams<'_>) -> ExecResult {
     let elevation = match params.privilege {
         crate::executor::Privilege::Agent => None,
         crate::executor::Privilege::User => Some(run_as_user::Elevation::AsLoggedOn),
-        crate::executor::Privilege::ElevatedUser => Some(run_as_user::Elevation::Linked),
+        crate::executor::Privilege::ElevatedUser => Some(run_as_user::Elevation::Elevated),
     };
 
     let tmp_file = match create_temp_script(params.code, interpreter.ext) {

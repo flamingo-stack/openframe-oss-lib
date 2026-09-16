@@ -179,14 +179,28 @@ fn execution_ack_command_shape() {
 }
 
 #[test]
-fn software_message_marks_requests_as_software_operations() {
+fn routed_script_messages_share_the_script_payload_but_not_the_policy() {
     let payload = r#"{"executionId":"e","code":"winget install x","shell":"POWERSHELL"}"#;
 
     let software = SoftwareScriptMessage::from_payload(payload).unwrap();
     let requests = software.to_requests();
     assert_eq!(requests.len(), 1);
-    assert!(requests[0].software_operation);
+    assert_eq!(requests[0].code, "winget install x");
+    assert_eq!(software.execution_id(), "e");
 
-    let plain = ScriptMessage::from_payload(payload).unwrap();
-    assert!(!plain.to_requests()[0].software_operation);
+    assert_eq!(
+        SoftwareScriptMessage::PRIVILEGE_POLICY,
+        PrivilegePolicy::InteractiveElevated
+    );
+    assert_eq!(
+        BootstrapScriptMessage::PRIVILEGE_POLICY,
+        PrivilegePolicy::AsRequested
+    );
+    assert_eq!(
+        ScriptMessage::PRIVILEGE_POLICY,
+        PrivilegePolicy::AsRequested
+    );
+
+    assert_eq!(SoftwareScriptMessage::KIND, "software-execution");
+    assert_eq!(BootstrapScriptMessage::KIND, "script-bootstrap-execution");
 }

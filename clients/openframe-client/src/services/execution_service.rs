@@ -2,6 +2,8 @@ use std::time::Instant;
 
 use crate::models::{ExecutionRequest, RmmResult};
 
+#[cfg(windows)]
+use crate::models::PrivilegePolicy;
 #[cfg(any(unix, windows))]
 use crate::{executor::Privilege, models::PrivilegeLevel};
 
@@ -97,10 +99,10 @@ fn base_privilege(level: PrivilegeLevel) -> Privilege {
 
 #[cfg(windows)]
 fn resolve_privilege(req: &ExecutionRequest<'_>) -> Privilege {
-    if req.software_operation {
-        return Privilege::ElevatedUser;
+    match req.privilege_policy {
+        PrivilegePolicy::InteractiveElevated => Privilege::ElevatedUser,
+        PrivilegePolicy::AsRequested => base_privilege(req.privilege),
     }
-    base_privilege(req.privilege)
 }
 
 #[cfg(unix)]

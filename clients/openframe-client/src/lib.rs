@@ -70,9 +70,10 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
-use crate::services::package_manager::missing::{
-    PackageManagerMissingPublisher, PackageManagerMissingRunManager,
+use crate::services::package_manager::presence_report::{
+    PackageManagerPresenceReporter, PackageManagerPresenceRunManager,
 };
+use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::ResultStore;
@@ -178,7 +179,8 @@ pub struct Client {
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
-    package_manager_missing_run_manager: PackageManagerMissingRunManager,
+    package_manager_presence_run_manager: PackageManagerPresenceRunManager,
+    package_manager_update_run_manager: PackageManagerUpdateRunManager,
     hostname_report_publisher: HostnameReportPublisher,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
@@ -583,11 +585,12 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
-        let package_manager_missing_run_manager =
-            PackageManagerMissingRunManager::new(PackageManagerMissingPublisher::new(
+        let package_manager_presence_run_manager =
+            PackageManagerPresenceRunManager::new(PackageManagerPresenceReporter::new(
                 nats_message_publisher.clone(),
                 config_service.clone(),
             ));
+        let package_manager_update_run_manager = PackageManagerUpdateRunManager::new();
 
         let hostname_report_publisher = HostnameReportPublisher::new(
             nats_message_publisher.clone(),
@@ -627,7 +630,8 @@ impl Client {
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
-            package_manager_missing_run_manager,
+            package_manager_presence_run_manager,
+            package_manager_update_run_manager,
             hostname_report_publisher,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
@@ -702,9 +706,9 @@ impl Client {
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();
 
-        crate::services::package_manager::PackageManagerUpdateRunManager::new().start();
+        self.package_manager_update_run_manager.start();
 
-        self.package_manager_missing_run_manager.start();
+        self.package_manager_presence_run_manager.start();
 
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
