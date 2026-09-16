@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -54,10 +55,14 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_COUNT = "count";
     private static final String CURSOR_SEPARATOR = "|";
+    private static final String FIELD_TEST_SCRIPT = "testScript";
 
     private static final Set<String> SORTABLE_FIELDS = Set.of(FIELD_ID, FIELD_DISPATCHED_AT);
 
     private final MongoTemplate mongoTemplate;
+
+    @Value("${openframe.rmm.test-mode.enabled}")
+    private boolean testModeEnabled;
 
     @Override
     public List<ScheduleScriptExecution> findPageForSchedule(String tenantId,
@@ -204,9 +209,12 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
         return criteria;
     }
 
-    private static Criteria baseCriteria(String tenantId, String scriptScheduleId, ScheduleRunQueryFilter filter) {
+    private Criteria baseCriteria(String tenantId, String scriptScheduleId, ScheduleRunQueryFilter filter) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId)
                 .and(FIELD_SCRIPT_SCHEDULE_ID).is(scriptScheduleId);
+        if (testModeEnabled) {
+            criteria.and(FIELD_TEST_SCRIPT).ne(true);
+        }
         if (filter == null) {
             return criteria;
         }

@@ -69,7 +69,8 @@ public class ScriptExecutionService {
                                           PrivilegeLevel privilegeLevel,
                                           Integer timeoutSeconds,
                                           String initiatedBy,
-                                          ExecutionSource source) {
+                                          ExecutionSource source,
+                                          boolean testScript) {
         // Single ad-hoc run (runScript) never originates from a schedule → scheduleId null.
         List<ScriptExecution> saved = scriptExecutionRepository.saveRunning(RunningExecutionRows.builder()
                 .tenantId(tenantIdProvider.getTenantId())
@@ -80,6 +81,7 @@ public class ScriptExecutionService {
                 .timeoutSeconds(timeoutSeconds)
                 .initiatedBy(initiatedBy)
                 .source(source)
+                .testScript(testScript)
                 .build());
         log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} source={} status=RUNNING",
                 executionId, scriptId, machineId, initiatedBy, source);
@@ -101,7 +103,8 @@ public class ScriptExecutionService {
                                                      PrivilegeLevel privilegeLevel,
                                                      Integer timeoutSeconds,
                                                      String initiatedBy,
-                                                     ExecutionSource source) {
+                                                     ExecutionSource source,
+                                                     boolean testScript) {
         List<ScriptExecution> saved = scriptExecutionRepository.saveRunning(RunningExecutionRows.builder()
                 .tenantId(tenantIdProvider.getTenantId())
                 .executionId(executionId)
@@ -112,6 +115,7 @@ public class ScriptExecutionService {
                 .timeoutSeconds(timeoutSeconds)
                 .initiatedBy(initiatedBy)
                 .source(source)
+                .testScript(testScript)
                 .build());
         log.info("Persisted batch execution rows: executionId={} scriptId={} scheduleId={} machineCount={} initiatedBy={} source={} status=RUNNING",
                 executionId, scriptId, scheduleId, machineIds.size(), initiatedBy, source);
@@ -152,6 +156,7 @@ public class ScriptExecutionService {
                 .packageManager(packageManager)
                 .packageName(packageName)
                 .softwareAction(softwareAction)
+                .testScript(false)
                 .build());
         log.info("Persisted software batch rows: executionId={} scriptId={} packageManager={} packageName={} action={} machineCount={} initiatedBy={} source={} status=RUNNING",
                 executionId, scriptId, packageManager, packageName, softwareAction, machineIds.size(), initiatedBy, source);

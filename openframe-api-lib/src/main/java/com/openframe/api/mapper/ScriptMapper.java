@@ -8,20 +8,21 @@ import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Pure entity &harr; DTO mapping for scripts. Lives in {@code openframe-api-lib}
- * so it can be reused by any service that talks to the script repository,
- * regardless of transport (GraphQL / REST / messaging).
- *
- * <p>GraphQL-specific concerns (cursor pagination, Relay Connection / Edge
- * envelope) live in {@code GraphQLScriptMapper} alongside the DGS resolver.
- */
 @Component
 public class ScriptMapper {
+
+    /**
+     * Tenant-instance test-mode switch. When {@code true}, every newly-created Script is
+     * stamped {@code testScript = true} and hidden from user-facing GraphQL reads by the
+     * repository shield. Default {@code false} — everything is visible.
+     */
+    @Value("${openframe.rmm.test-mode.enabled:false}")
+    private boolean testModeEnabled;
 
     public Script toEntity(String tenantId, CreateScriptInput input) {
         return Script.builder()
@@ -35,6 +36,7 @@ public class ScriptMapper {
                 .defaultTimeoutSeconds(input.getDefaultTimeoutSeconds())
                 .defaultArgs(input.getDefaultArgs())
                 .envVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()))
+                .testScript(testModeEnabled)
                 .build();
     }
 
@@ -67,6 +69,7 @@ public class ScriptMapper {
                 .statusChangedAt(entity.getStatusChangedAt())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .testScript(entity.isTestScript())
                 .build();
     }
 

@@ -83,4 +83,5 @@ public class ScheduleScript implements TenantScoped {
     private ScriptStatus status = ScriptStatus.ACTIVE;
 
     private Instant statusChangedAt;
+    private boolean testScript;
 }

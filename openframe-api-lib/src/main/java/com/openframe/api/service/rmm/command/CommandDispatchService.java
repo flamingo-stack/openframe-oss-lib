@@ -10,6 +10,7 @@ import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,9 @@ public class CommandDispatchService {
     private final CommandNatsPublisher commandNatsPublisher;
     private final DeviceService deviceService;
     private final CommandExecutionService commandExecutionService;
+
+    @Value("${openframe.rmm.test-mode.enabled:false}")
+    private boolean testModeEnabled;
 
     public DispatchResponse runCommand(RunCommandInput input) {
         deviceService.verifyDispatchable(input.getMachineId());
@@ -76,7 +80,8 @@ public class CommandDispatchService {
         // Persist one RUNNING row per machine (tenant-scoped, via the service) before
         // anything hits the wire — the agent's result transitions each row later.
         commandExecutionService.createBatch(executionId, input.getCommand(), input.getShell(),
-                machineIds, input.getPrivilegeLevel(), input.getTimeoutSeconds(), initiatedBy);
+                machineIds, input.getPrivilegeLevel(), input.getTimeoutSeconds(), initiatedBy,
+                testModeEnabled);
 
         // Fan out the same payload (one executionId) to every machine.
         CommandMessage message = CommandMessage.builder()

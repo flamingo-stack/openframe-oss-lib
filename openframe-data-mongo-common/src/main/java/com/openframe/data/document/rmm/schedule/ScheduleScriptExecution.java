@@ -56,4 +56,5 @@ public class ScheduleScriptExecution implements TenantScoped {
 
     @CreatedDate
     private Instant createdAt;
+    private boolean testScript;
 }

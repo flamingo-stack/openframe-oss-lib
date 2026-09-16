@@ -28,6 +28,7 @@ import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 
@@ -55,6 +56,8 @@ public class ScheduleFireDispatcher {
     private final MachineRepository machineRepository;
     private final DeviceOnlineDispatchRepository dispatchRepository;
     private final ScriptDeliveryRetryStore retryStore;
+    @Value("${openframe.rmm.test-mode.enabled:false}")
+    private boolean testModeEnabled;
 
     public void dispatch(ScheduleScript schedule, Instant now) {
         List<String> targets = targetResolver.resolveTargetMachineIds(schedule);
@@ -185,6 +188,7 @@ public class ScheduleFireDispatcher {
                 .status(ExecutionStatus.RUNNING)
                 .totalMachineCount(fire.machineIds().size())
                 .dispatchedAt(fire.now())
+                .testScript(testModeEnabled)
                 .build());
     }
 
@@ -204,6 +208,7 @@ public class ScheduleFireDispatcher {
                         .status(ExecutionStatus.QUEUED)
                         .dispatchedAt(fire.now())
                         .statusChangedAt(fire.now())
+                        .testScript(testModeEnabled)
                         .build()))
                 .toList();
         scriptExecutionRepository.saveAll(rows);

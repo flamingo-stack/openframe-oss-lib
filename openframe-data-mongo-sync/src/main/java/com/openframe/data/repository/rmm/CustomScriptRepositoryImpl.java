@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -59,6 +60,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_CREATED_BY = "createdBy";
     private static final String FIELD_TYPE = "type";
+    private static final String FIELD_TEST_SCRIPT = "testScript";
 
     // tag_assignments fields used to resolve the tagIds filter into script ids.
     private static final String FIELD_TA_TAG_ID = "tagId";
@@ -70,6 +72,9 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
             Set.of(FIELD_ID, FIELD_NAME, FIELD_CREATED_AT, FIELD_UPDATED_AT);
 
     private final MongoTemplate mongoTemplate;
+
+    @Value("${openframe.rmm.test-mode.enabled:false}")
+    private boolean testModeEnabled;
 
     @Override
     public List<Script> findPageForTenant(String tenantId,
@@ -185,8 +190,11 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
         return FIELD_ID;
     }
 
-    private static void applyManagedScriptShield(Criteria criteria) {
+    private void applyManagedScriptShield(Criteria criteria) {
         criteria.and(FIELD_TYPE).nin(ScriptType.SYSTEM, ScriptType.SOFTWARE);
+        if (testModeEnabled) {
+            criteria.and(FIELD_TEST_SCRIPT).ne(true);
+        }
     }
 
     private static void applyStatusFilter(Criteria criteria, ScriptQueryFilter filter) {

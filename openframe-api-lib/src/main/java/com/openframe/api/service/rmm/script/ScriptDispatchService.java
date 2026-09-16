@@ -27,6 +27,7 @@ import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -64,6 +65,8 @@ public class ScriptDispatchService {
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTimeoutValidator timeoutValidator;
+    @Value("${openframe.rmm.test-mode.enabled:false}")
+    private boolean testModeEnabled;
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
@@ -77,7 +80,8 @@ public class ScriptDispatchService {
         // Persist the effective timeout on the row so the watchdog can derive a
         // per-execution stuck-threshold from it.
         scriptExecutionService.create(executionId, script.getId(),
-                input.getMachineId(), input.getPrivilegeLevel(), timeoutSeconds, initiatedBy, source);
+                input.getMachineId(), input.getPrivilegeLevel(), timeoutSeconds, initiatedBy, source,
+                testModeEnabled);
 
         ScriptMessage message = ScriptMessage.builder()
                 .executionId(executionId)
@@ -185,6 +189,7 @@ public class ScriptDispatchService {
                 .status(ExecutionStatus.RUNNING)
                 .totalMachineCount(machineIds.size())
                 .dispatchedAt(now)
+                .testScript(testModeEnabled)
                 .build());
 
         // 2. Leaves: N × M ScriptExecution rows (persist per-script batch), so the watchdog
@@ -196,7 +201,7 @@ public class ScriptDispatchService {
             scriptExecutionService.createBatch(executionId, script.getId(), scheduleId, machineIds,
                     script.getPrivilegeLevel(),
                     effectiveTimeout(null, script.getDefaultTimeoutSeconds()),
-                    initiatedBy, ExecutionSource.SCHEDULED);
+                    initiatedBy, ExecutionSource.SCHEDULED, testModeEnabled);
         }
 
         // 3. Build the batched agent payload once — shared across every target machine. Per-script
@@ -245,7 +250,9 @@ public class ScriptDispatchService {
 
         // Persist the effective timeout per row so the watchdog can derive a
         // per-execution stuck-threshold from it.
-        scriptExecutionService.createBatch(executionId, script.getId(), null, machineIds, privilegeLevel, timeoutSeconds, initiatedBy, source);
+        // Server-side stamp — see runScript for rationale.
+        scriptExecutionService.createBatch(executionId, script.getId(), null, machineIds, privilegeLevel,
+                timeoutSeconds, initiatedBy, source, testModeEnabled);
 
         List<String> args = ScriptArgsTokenizer.tokenize(argsOverride != null ? argsOverride : script.getDefaultArgs());
         List<ScriptEnvVar> envVars = mergeEnvVars(script.getEnvVars(), envVarsOverride);

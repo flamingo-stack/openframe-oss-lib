@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -59,6 +60,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
     private static final String FIELD_TRIGGER_BUCKET = "_triggerBucket";
     private static final ScheduleScriptTrigger TRIGGER_LAST = ScheduleScriptTrigger.DEVICE_ONLINE;
     private static final String ASSIGNMENTS_COLLECTION = "script_schedules_machines_assigned";
+    private static final String FIELD_TEST_SCRIPT = "testScript";
     private static final String LOOKUP_ALIAS = "assignments";
     private static final String CURSOR_SEPARATOR = "|";
 
@@ -66,6 +68,9 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
             Set.of(FIELD_ID, FIELD_NAME, FIELD_START_AT, FIELD_REPEAT, FIELD_DEVICE_COUNT);
 
     private final MongoTemplate mongoTemplate;
+
+    @Value("${openframe.rmm.test-mode.enabled:false}")
+    private boolean testModeEnabled;
 
     @Override
     public List<ScheduleScript> findPageForTenant(String tenantId,
@@ -262,12 +267,19 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
      */
     private Criteria buildBaseCriteria(String tenantId, ScriptScheduleQueryFilter filter, String search) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        applyTestScheduleShield(criteria);
         applyStatusFilter(criteria, filter);
         applyPlatformsFilter(criteria, filter);
         applyCreatedByFilter(criteria, filter);
         applyStartAtRangeFilter(criteria, filter);
         applySearch(criteria, search);
         return criteria;
+    }
+
+    private void applyTestScheduleShield(Criteria criteria) {
+        if (testModeEnabled) {
+            criteria.and(FIELD_TEST_SCRIPT).ne(true);
+        }
     }
 
     @Override
@@ -287,6 +299,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
      */
     private Criteria facetCriteria(String tenantId, ScriptScheduleQueryFilter filter, String excludeField) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        applyTestScheduleShield(criteria);
         applyStatusFilter(criteria, filter);
         if (!FIELD_SUPPORTED_PLATFORMS.equals(excludeField)) {
             applyPlatformsFilter(criteria, filter);
