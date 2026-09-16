@@ -8,7 +8,8 @@ use windows::Win32::Foundation::{
     CloseHandle, SetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT, TRUE, WAIT_TIMEOUT,
 };
 use windows::Win32::Security::{
-    DuplicateTokenEx, SecurityImpersonation, TokenPrimary, TOKEN_ALL_ACCESS,
+    DuplicateTokenEx, GetTokenInformation, SecurityImpersonation, TokenElevation, TokenLinkedToken,
+    TokenPrimary, TOKEN_ALL_ACCESS, TOKEN_ELEVATION, TOKEN_INFORMATION_CLASS, TOKEN_LINKED_TOKEN,
 };
 use windows::Win32::System::Environment::{CreateEnvironmentBlock, DestroyEnvironmentBlock};
 use windows::Win32::System::RemoteDesktop::{
@@ -29,10 +30,17 @@ use crate::executor::output::{clean_string, MAX_OUTPUT_SIZE};
 use crate::executor::tempfile::{temp_script_name, TempFileGuard};
 use crate::executor::{ExecResult, ScriptParams};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Elevation {
+    AsLoggedOn,
+    Linked,
+}
+
 pub(super) async fn run_as_interactive(
     interpreter: &Interpreter,
     tmp_file: &Path,
     params: &ScriptParams<'_>,
+    elevation: Elevation,
 ) -> ExecResult {
     let command_line = build_command_line(interpreter, tmp_file, params.args);
     let dir = match tmp_file.parent() {
@@ -45,7 +53,14 @@ pub(super) async fn run_as_interactive(
     let env_vars: Vec<String> = params.env_vars.to_vec();
 
     let result = tokio::task::spawn_blocking(move || {
-        run_as_blocking(command_line, env_vars, out_path, err_path, timeout_secs)
+        run_as_blocking(
+            command_line,
+            env_vars,
+            out_path,
+            err_path,
+            timeout_secs,
+            elevation,
+        )
     })
     .await;
 
@@ -102,8 +117,9 @@ fn run_as_blocking(
     out_path: PathBuf,
     err_path: PathBuf,
     timeout_secs: u32,
+    elevation: Elevation,
 ) -> Result<ExecResult> {
-    let token = InteractiveToken::acquire()?;
+    let token = InteractiveToken::acquire(elevation)?;
 
     let in_file = std::fs::File::open("NUL").map_err(|e| anyhow!("failed to open NUL: {e}"))?;
     let out_file = std::fs::File::create(&out_path)
@@ -285,13 +301,18 @@ fn read_capped_file(path: &Path) -> String {
 struct InteractiveToken(HANDLE);
 
 impl InteractiveToken {
-    fn acquire() -> Result<Self> {
-        if let Some(token) = Self::token_for_active_session() {
-            return Self::to_primary(token);
+    fn acquire(elevation: Elevation) -> Result<Self> {
+        let token = Self::token_for_active_session()
+            .ok_or_else(|| anyhow!("run_as_user requested but no active interactive session"))?;
+
+        match elevation {
+            Elevation::AsLoggedOn => Self::to_primary(token),
+            Elevation::Linked => {
+                let linked = linked_elevated_token(token);
+                close(token);
+                Self::to_primary(linked?)
+            }
         }
-        Err(anyhow!(
-            "run_as_user requested but no active interactive session"
-        ))
     }
 
     fn token_for_active_session() -> Option<HANDLE> {
@@ -318,10 +339,57 @@ impl InteractiveToken {
                 TokenPrimary,
                 &mut primary,
             );
-            let _ = CloseHandle(user_token);
+            close(user_token);
             dup.map_err(|e| anyhow!("DuplicateTokenEx failed: {e}"))?;
             Ok(InteractiveToken(primary))
         }
+    }
+}
+
+unsafe fn token_information<T: Default>(
+    token: HANDLE,
+    class: TOKEN_INFORMATION_CLASS,
+) -> windows::core::Result<T> {
+    let mut value = T::default();
+    let mut returned: u32 = 0;
+    GetTokenInformation(
+        token,
+        class,
+        Some(&mut value as *mut T as *mut core::ffi::c_void),
+        core::mem::size_of::<T>() as u32,
+        &mut returned,
+    )?;
+    Ok(value)
+}
+
+fn linked_elevated_token(token: HANDLE) -> Result<HANDLE> {
+    let linked: TOKEN_LINKED_TOKEN = unsafe { token_information(token, TokenLinkedToken) }
+        .map_err(|e| anyhow!("no linked token for the interactive user: {e}"))?;
+
+    match is_elevated(linked.LinkedToken) {
+        Ok(true) => Ok(linked.LinkedToken),
+        Ok(false) => {
+            close(linked.LinkedToken);
+            Err(anyhow!(
+                "linked token is not elevated; interactive user is not a local administrator"
+            ))
+        }
+        Err(e) => {
+            close(linked.LinkedToken);
+            Err(e)
+        }
+    }
+}
+
+fn is_elevated(token: HANDLE) -> Result<bool> {
+    let elevation: TOKEN_ELEVATION = unsafe { token_information(token, TokenElevation) }
+        .map_err(|e| anyhow!("TokenElevation query failed: {e}"))?;
+    Ok(elevation.TokenIsElevated != 0)
+}
+
+fn close(handle: HANDLE) {
+    unsafe {
+        let _ = CloseHandle(handle);
     }
 }
 
@@ -347,8 +415,6 @@ unsafe fn first_active_session_token() -> Option<HANDLE> {
 
 impl Drop for InteractiveToken {
     fn drop(&mut self) {
-        unsafe {
-            let _ = CloseHandle(self.0);
-        }
+        close(self.0);
     }
 }

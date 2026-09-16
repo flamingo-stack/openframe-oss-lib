@@ -12,6 +12,7 @@ fn req(code: &str) -> ExecutionRequest<'_> {
         env_vars: Vec::new(),
         script_id: None,
         schedule_id: None,
+        software_operation: false,
     }
 }
 

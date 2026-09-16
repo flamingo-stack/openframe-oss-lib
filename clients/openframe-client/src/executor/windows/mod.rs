@@ -27,7 +27,11 @@ pub async fn execute_script(params: ScriptParams<'_>) -> ExecResult {
         }
     };
 
-    let wants_run_as = matches!(params.privilege, crate::executor::Privilege::User);
+    let elevation = match params.privilege {
+        crate::executor::Privilege::Agent => None,
+        crate::executor::Privilege::User => Some(run_as_user::Elevation::AsLoggedOn),
+        crate::executor::Privilege::ElevatedUser => Some(run_as_user::Elevation::Linked),
+    };
 
     let tmp_file = match create_temp_script(params.code, interpreter.ext) {
         Ok(path) => path,
@@ -41,10 +45,11 @@ pub async fn execute_script(params: ScriptParams<'_>) -> ExecResult {
         return spawn_error("Script file locked by another process".to_string());
     }
 
-    if wants_run_as {
-        run_as_user::run_as_interactive(&interpreter, &tmp_file, &params).await
-    } else {
-        process::run_normal(&interpreter, &tmp_file, &params).await
+    match elevation {
+        Some(elevation) => {
+            run_as_user::run_as_interactive(&interpreter, &tmp_file, &params, elevation).await
+        }
+        None => process::run_normal(&interpreter, &tmp_file, &params).await,
     }
 }
 

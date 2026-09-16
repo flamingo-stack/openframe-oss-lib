@@ -39,7 +39,7 @@ impl ManagerId {
         }
         #[cfg(target_os = "windows")]
         {
-            &[ManagerId::Choco, ManagerId::Winget]
+            &[ManagerId::Winget]
         }
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
@@ -200,7 +200,7 @@ fn managers() -> Vec<Box<dyn ManagerUpdater>> {
     }
     #[cfg(target_os = "windows")]
     {
-        vec![Box::new(choco::Choco), Box::new(winget::Winget)]
+        vec![Box::new(winget::Winget)]
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
@@ -242,7 +242,7 @@ impl PackageManagerUpdateRunManager {
                     let result = execute_script(params).await;
 
                     let outcome = if result.retcode == SETUP_FAILURE_RETCODE
-                        && manager.privilege() == Privilege::User
+                        && manager.privilege() != Privilege::Agent
                     {
                         UpdateOutcome::Deferred
                     } else {

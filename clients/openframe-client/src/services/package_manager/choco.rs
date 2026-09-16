@@ -1,6 +1,7 @@
 use super::{interpret_markers, ManagerId, ManagerUpdater, UpdateOutcome};
 use crate::executor::{ExecResult, Privilege};
 
+#[allow(dead_code)]
 pub struct Choco;
 
 impl ManagerUpdater for Choco {

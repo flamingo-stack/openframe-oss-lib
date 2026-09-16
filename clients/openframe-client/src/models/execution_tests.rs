@@ -177,3 +177,16 @@ fn execution_ack_command_shape() {
     assert!(v["scheduleId"].is_null(), "scheduleId serializes as null");
     assert_eq!(v["scriptIds"], serde_json::json!([]));
 }
+
+#[test]
+fn software_message_marks_requests_as_software_operations() {
+    let payload = r#"{"executionId":"e","code":"winget install x","shell":"POWERSHELL"}"#;
+
+    let software = SoftwareScriptMessage::from_payload(payload).unwrap();
+    let requests = software.to_requests();
+    assert_eq!(requests.len(), 1);
+    assert!(requests[0].software_operation);
+
+    let plain = ScriptMessage::from_payload(payload).unwrap();
+    assert!(!plain.to_requests()[0].software_operation);
+}

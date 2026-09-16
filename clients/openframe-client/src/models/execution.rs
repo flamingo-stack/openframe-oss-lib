@@ -79,6 +79,7 @@ impl ScriptSpec {
                 .collect(),
             script_id,
             schedule_id,
+            software_operation: false,
         }
     }
 }
@@ -177,6 +178,7 @@ pub struct ExecutionRequest<'a> {
     pub env_vars: Vec<String>,
     pub script_id: Option<&'a str>,
     pub schedule_id: Option<&'a str>,
+    pub software_operation: bool,
 }
 
 pub trait ExecutionMessage: Sized + Send {
@@ -215,6 +217,7 @@ impl ExecutionMessage for CommandMessage {
             env_vars: Vec::new(),
             script_id: None,
             schedule_id: None,
+            software_operation: false,
         }]
     }
 }
@@ -285,7 +288,14 @@ impl ExecutionMessage for SoftwareScriptMessage {
     }
 
     fn to_requests(&self) -> Vec<ExecutionRequest<'_>> {
-        self.0.to_requests()
+        self.0
+            .to_requests()
+            .into_iter()
+            .map(|request| ExecutionRequest {
+                software_operation: true,
+                ..request
+            })
+            .collect()
     }
 }
 
