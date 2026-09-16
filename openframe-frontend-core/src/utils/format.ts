@@ -2,6 +2,8 @@
  * Utility functions for formatting data
  */
 
+import type { ProgramInstant } from './program-instant';
+
 /**
  * Format a date to a human-readable string
  * @param date - The date to format (Date object or ISO string)
@@ -356,6 +358,31 @@ export function formatDateWithTimezone(
     // rather than only one, which is the whole point of the pair.
     return dateObj.toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' });
   }
+}
+
+/**
+ * THE program date — the date half of what `formatWebinarTimeMeta` renders as
+ * the time half, taking the same already-resolved `ProgramInstant` so the two
+ * cannot name different moments.
+ *
+ * Every program surface used to write this branch itself:
+ * `zoned.instant && !zoned.dateOnly ? formatDateWithTimezone(...) :
+ * formatUtc(new Date(item.date), 'EEEE d MMMM')` — four copies, and they did
+ * not agree. Three stated the condition off the resolved instant and the
+ * fourth off a local timezone variable; worse, the two branches rendered
+ * DIFFERENT SHAPES, so whether a row happened to declare a zone decided
+ * whether its headline read "Thursday, March 19" or "Thursday 19 March".
+ *
+ * There is no UTC branch here because there never needed to be one:
+ * `formatDateWithTimezone` already pins to UTC when handed no zone, which is
+ * the same React #418 fix the hand-rolled `formatUtc` twins existed for — they
+ * were a date-fns re-implementation of a fallback that was already inside the
+ * function they sat next to.
+ */
+export function formatProgramDate(at: ProgramInstant, style: ZonedDateStyle = 'medium'): string {
+  // `timezone` is already null for a day-valued row, so this one call covers
+  // the zoned render, the no-zone render and the override render alike.
+  return formatDateWithTimezone(at.instant ?? at.utcDate, at.timezone, style);
 }
 
 /**

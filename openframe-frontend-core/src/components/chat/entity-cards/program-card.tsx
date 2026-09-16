@@ -19,14 +19,14 @@
  * and pass the resolved detail URL via `href`.
  */
 
-import { format } from 'date-fns';
 import { ExternalLink, Clock, Play, Video } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
-import { formatDurationCompact, formatDateWithTimezone, formatWebinarTimeMeta } from '../../../utils/format';
+import { formatDurationCompact, formatProgramDate, formatWebinarTimeMeta } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
+import { programDateInstant, programStr } from '../../../utils/program-instant';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -50,29 +50,9 @@ import {
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
 import { EntityPortraitCard } from './entity-portrait-card';
-import { programDateInstant, programStr } from './program-instant';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 type CardSize = 'default' | 'sm' | 'portrait';
-
-/**
- * Format a Date with date-fns pinned to UTC. `date-fns` `format()` reads the
- * runtime's LOCAL wall-clock, so the same instant renders differently on the
- * server (Vercel = UTC) and the client (visitor tz) → React #418 hydration
- * mismatch. Shifting by the local offset before formatting emits the UTC
- * wall-clock on every machine, so server and client agree. Mirrors the helper
- * in the hub's `program-header.tsx` (kept local — the lib has no date-fns-tz
- * dep) and the repo-wide "pin program dates to UTC" convention.
- */
-function formatUtc(date: Date, fmt: string): string {
-  // A row can legitimately arrive without a date (the field is not guaranteed by
-  // the wire type), and `new Date(undefined)` / `new Date('')` both give an
-  // Invalid Date, which makes date-fns `format()` throw RangeError. Thrown from
-  // render that takes down the whole card rail, not just this card — so the
-  // helper is total and an unknown date renders as nothing.
-  if (Number.isNaN(date.getTime())) return '';
-  return format(new Date(date.getTime() + date.getTimezoneOffset() * 60_000), fmt);
-}
 
 export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
   if (size === 'sm') {
@@ -182,8 +162,6 @@ function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string
  * been `in`-guarded for `start_at`. Each field is validated rather than
  * asserted — the generic item type does not declare them.
  */
-/** Read a string column off the generic item type, which does not declare it. */
-
 function webinarTiming(item: BaseProgramItem): {
   startAt: string | null;
   endAt: string | null;
@@ -312,10 +290,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     }
     return null;
   };
-  const compactDate =
-    zonedDate.instant && !zonedDate.dateOnly
-      ? formatDateWithTimezone(zonedDate.instant, zonedDate.timezone, 'medium')
-      : formatUtc(new Date(item.date), 'MMM d, yyyy');
+  const compactDate = formatProgramDate(zonedDate, 'medium');
 
   if (size === 'portrait') {
     // Rail/strip density — mapped onto the shared <EntityPortraitCard> shell
@@ -393,11 +368,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     );
   }
 
-  const itemDate = new Date(item.date);
-  const dateFormat =
-    zonedDate.instant && !zonedDate.dateOnly
-      ? formatDateWithTimezone(zonedDate.instant, zonedDate.timezone, 'weekday')
-      : formatUtc(itemDate, 'EEEE d MMMM');
+  const dateFormat = formatProgramDate(zonedDate, 'weekday');
 
   const defaultRenderMeta = () => {
     if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {
@@ -431,7 +402,7 @@ export function ProgramCard<T extends BaseProgramItem>({
               dateOnly: zonedDate.dateOnly,
             })}
           </span>
-          {timezone && !zonedDate.dateOnly && <span className="text-ods-text-secondary text-h6">({timezone})</span>}
+          {zonedDate.timezone && <span className="text-ods-text-secondary text-h6">({zonedDate.timezone})</span>}
         </>
       );
     }

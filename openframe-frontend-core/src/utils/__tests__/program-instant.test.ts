@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDateWithTimezone, formatTimeWithTimezone } from '../../../../utils/format';
+import { formatDateWithTimezone, formatProgramDate, formatTimeWithTimezone } from '../format';
 import { programDateInstant } from '../program-instant';
 
 /**
@@ -56,10 +56,28 @@ describe('programDateInstant', () => {
       date_is_display_override: true,
     });
     expect(r.dateOnly).toBe(true);
-    // Rendered UTC-pinned, so the admin who asked for March 19 sees March 19 —
-    // not March 18 at 8 PM, which is what a zoned render of UTC midnight gives.
-    expect(formatDateWithTimezone(r.instant, 'UTC')).toBe('Mar 19, 2026');
-    expect(formatDateWithTimezone(r.instant, r.timezone)).toBe('Mar 18, 2026');
+    // The resolved value carries NO ZONE, so a consumer cannot render or label
+    // one. Three surfaces had to remember that gate and two forgot; nulling it
+    // makes the mistake unrepresentable rather than merely documented.
+    expect(r.timezone).toBeNull();
+    expect(r.rowTimezone).toBe('America/New_York');
+    // The admin who asked for March 19 sees March 19 — not March 18 at 8 PM,
+    // which is what a zoned render of UTC midnight gives.
+    expect(formatProgramDate(r)).toBe('Mar 19, 2026');
+    // ...and that is true precisely BECAUSE the zone was dropped: the row's own
+    // zone, if a consumer reached past the rule for it, still says the 18th.
+    expect(formatDateWithTimezone(r.utcDate, r.rowTimezone)).toBe('Mar 18, 2026');
+  });
+
+  it('renders the same shape whether or not the row declares a zone', () => {
+    // The UTC fallback used to be a separate date-fns branch at each call site,
+    // and it emitted a DIFFERENT SHAPE ("Thursday 19 March" vs "Thursday,
+    // March 19"), so whether a row happened to carry a zone decided how its
+    // headline read.
+    const withZone = formatProgramDate(programDateInstant(zoned), 'weekday');
+    const withoutZone = formatProgramDate(programDateInstant({ date: '2026-03-19T12:00:00.000Z' }), 'weekday');
+    expect(withZone).toBe('Thursday, March 19');
+    expect(withoutZone).toBe('Thursday, March 19');
   });
 
   it('treats a real timestamp as an instant', () => {

@@ -38,9 +38,10 @@ import { faqItemAnchor } from '../../../utils/faq-anchor';
 import {
   formatDateUTC as formatDate,
   formatDurationCompact,
-  formatDateWithTimezone,
+  formatProgramDate,
   formatWebinarTimeMeta,
 } from '../../../utils/format';
+import { programDateInstant } from '../../../utils/program-instant';
 import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
@@ -111,7 +112,6 @@ import { OnboardingGuideCardSkeleton } from './onboarding-guide-card';
 import { ProductReleaseCardSkeleton, type ProductReleaseCardProps } from './product-release-card';
 import { defaultBuildProductReleaseCardProps } from './product-release-card-defaults';
 import { ProgramCardSkeleton } from './program-card';
-import { programDateInstant } from './program-instant';
 import { RoadmapCardSkeleton } from './roadmap-card';
 import { TaskTypeIcon } from './task-type-icon';
 
@@ -1138,10 +1138,7 @@ function ProgramChatCard({
         dateOnly: zoned.dateOnly,
       }) || undefined;
   }
-  const itemDate =
-    zoned.instant && !zoned.dateOnly
-      ? formatDateWithTimezone(zoned.instant, zoned.timezone, 'medium')
-      : formatDate(item?.date ?? null, { fallback: '' });
+  const itemDate = formatProgramDate(zoned, 'medium');
   const meta = [itemDate, typeMeta].filter(Boolean).join(' · ');
 
   return (

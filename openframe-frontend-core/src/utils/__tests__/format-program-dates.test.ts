@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   formatDateWithTimezone,
   formatDurationFromRange,
+  formatProgramDate,
   formatTimeWithTimezone,
   formatWebinarTimeMeta,
 } from '../format';
+import { programDateInstant } from '../program-instant';
 
 /**
  * These three formatters render the date, time and duration of ONE event, side
@@ -127,5 +129,38 @@ describe('formatWebinarTimeMeta', () => {
 
   it('falls back to start_at when no resolved instant is supplied', () => {
     expect(formatWebinarTimeMeta({ ...base, instant: null })).toBe('9:18 PM · 1h');
+  });
+});
+
+describe('a day-valued row leaves nothing for a consumer to mislabel', () => {
+  // The worst shape this rule can produce, and the one three surfaces rendered:
+  // an override supplies the day (so no clock), `end_at` is null (so no
+  // duration), and the composition is EMPTY — beside which two of the three
+  // surfaces still printed the row's bare IANA zone, captioning nothing.
+  //
+  // `end_at` being null is not hypothetical: the Livestorm ingest guard nulls
+  // it on an inverted range, which is exactly the corrupt-row case that guard
+  // was added for.
+  it('empty meta and no zone, so the slot renders nothing at all', () => {
+    const at = programDateInstant({
+      date: '2026-03-19T00:00:00.000Z',
+      start_at: '2026-03-20T01:18:00.000Z',
+      end_at: null,
+      timezone: 'America/New_York',
+      date_is_display_override: true,
+    });
+    expect(at.timezone).toBeNull();
+    expect(
+      formatWebinarTimeMeta({
+        instant: at.instant ?? at.utcDate,
+        startAt: '2026-03-20T01:18:00.000Z',
+        endAt: null,
+        timezone: at.timezone,
+        withZoneLabel: true,
+        dateOnly: at.dateOnly,
+      }),
+    ).toBe('');
+    // ...while the DATE is still stated, and states the day the admin chose.
+    expect(formatProgramDate(at, 'weekday')).toBe('Thursday, March 19');
   });
 });

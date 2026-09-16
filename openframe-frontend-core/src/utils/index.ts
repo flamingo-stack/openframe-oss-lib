@@ -140,6 +140,7 @@ export {
   formatTimeWithTimezone,
   formatDateWithTimezone,
   formatWebinarTimeMeta,
+  formatProgramDate,
   type ZonedDateStyle,
   formatDurationFromRange,
   type FormatDateUTCOptions,
@@ -396,3 +397,10 @@ export * from './csv';
 export * from './social-platforms';
 // The ODS badge palette a row whose colour is data picks from (departments).
 export { BADGE_PALETTE, isBadgePaletteKey, pickBadgePaletteColor, type BadgePaletteKey } from './badge-palette';
+
+// "Which instant does a program render, in which zone, and does it have a
+// clock" — THE resolver every webinar/event/podcast surface reads, in this
+// package and in the hub. Exported because the hub re-derived it by hand while
+// it was package-private, and the copies drifted.
+export { programDateInstant, programStr } from './program-instant';
+export type { ProgramInstant } from './program-instant';
