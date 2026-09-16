@@ -121,12 +121,6 @@
       "require": "./dist/platform-domains.cjs",
       "default": "./dist/platform-domains.js"
     },
-    "./lib-version": {
-      "types": "./dist/lib-version.d.ts",
-      "import": "./dist/lib-version.js",
-      "require": "./dist/lib-version.cjs",
-      "default": "./dist/lib-version.js"
-    },
     "./chat-protocol": {
       "types": "./dist/chat-protocol/index.d.ts",
       "import": "./dist/chat-protocol/index.js",
