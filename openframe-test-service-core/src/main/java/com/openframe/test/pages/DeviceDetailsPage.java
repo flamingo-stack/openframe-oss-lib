@@ -150,7 +150,9 @@ public class DeviceDetailsPage {
         page.waitForURL(
                 url -> url.contains("/remote-desktop"),
                 new Page.WaitForURLOptions().setTimeout(15_000));
-        return new RemoteDesktopPage(page).waitForCanvasVisible(15_000);
+        // The approval gate stands between the route and the canvas on qa and dev; clearing it here
+        // keeps waitForCanvasVisible a plain wait.
+        return new RemoteDesktopPage(page).clearApprovalGate().waitForCanvasVisible(15_000);
     }
 
     /**
