@@ -116,6 +116,25 @@ public class TicketService {
         return ticketRepository.findById(ticketId);
     }
 
+    public Optional<Ticket> getTicketByNumber(AuthPrincipal principal, Integer ticketNumber) {
+        log.debug("Getting ticket #{} for {}", ticketNumber, principal.getActorType());
+
+        if (isAgent(principal)) {
+            return ticketRepository.findByTicketNumberAndOwnerMachineId(ticketNumber, principal.getMachineId());
+        }
+        return ticketRepository.findByTicketNumber(ticketNumber);
+    }
+
+    public Optional<Ticket> findByIdOrNumber(AuthPrincipal principal, String ticketId, Integer ticketNumber) {
+        if (hasText(ticketId)) {
+            return getTicket(principal, ticketId);
+        }
+        if (ticketNumber == null) {
+            throw new IllegalArgumentException("ticketId or ticketNumber is required");
+        }
+        return getTicketByNumber(principal, ticketNumber);
+    }
+
     @Transactional
     public Ticket createTicket(AuthPrincipal principal, CreateTicketInput input) {
         log.info("Creating ticket by {} {}", principal.getActorType(), principal.getDisplayName());
