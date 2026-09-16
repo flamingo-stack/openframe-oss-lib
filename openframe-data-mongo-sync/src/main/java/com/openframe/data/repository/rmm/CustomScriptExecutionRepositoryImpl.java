@@ -1,10 +1,12 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.script.ExecutionStatus;
-import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.mongodb.ReadPreference;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.RunningExecutionRows;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
@@ -13,44 +15,23 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
-import com.mongodb.ReadPreference;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
-import java.util.Optional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-/**
- * MongoTemplate-backed implementation of {@link CustomScriptExecutionRepository}.
- *
- * <p>The list / count / facet queries are owner-agnostic — {@link ExecutionOwnerScope}
- * decides which owner field narrows the base predicate. Facet queries drop the "own"
- * filter arm so their dropdowns keep offering every switchable value.
- *
- * <p>Cursor pagination is implemented on {@code _id}: descending by default
- * ({@code newest first}), with the cursor comparison flipped when paginating backward.
- * The predicate is tenant-scoped + owner-scoped so it hits the compound index prefix;
- * the {@code _id} sort/cursor is a natural tiebreaker.
- *
- * <p>The cursor value is parsed into a Mongo {@link ObjectId} before being applied —
- * comparing a String against a BSON {@code ObjectId} field does not match correctly
- * under Mongo's type-bracketing rules. An invalid cursor (anything not a valid 24-char
- * hex {@code ObjectId}, or a compound cursor missing its separator / with unparseable
- * epoch millis) is rejected fail-fast with
- * {@link com.openframe.core.exception.BadRequestException}. Silent fallback would drop
- * the cursor while preserving {@code backward=true}, returning the OLDEST rows in ASC
- * order alongside cursor-based {@code pageInfo} — a wrong-order surprise for the client.
- */
 @Slf4j
 @Repository
 @RequiredArgsConstructor
@@ -64,6 +45,9 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_EXECUTION_ID = "executionId";
     private static final String FIELD_SCRIPT_ID = "scriptId";
+    private static final String FIELD_PACKAGE_MANAGER = "packageManager";
+    private static final String FIELD_PACKAGE_NAME = "packageName";
+    private static final String FIELD_SOFTWARE_ACTION = "softwareAction";
     private static final String FIELD_STDOUT = "stdout";
     private static final String FIELD_STDERR = "stderr";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
@@ -87,6 +71,43 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
             ExecutionFacetField.MACHINE, FIELD_MACHINE_ID));
 
     private final MongoTemplate mongoTemplate;
+
+    @Override
+    public List<ScriptExecution> saveRunning(RunningExecutionRows request) {
+        return save(request, ExecutionStatus.RUNNING);
+    }
+
+    @Override
+    public List<ScriptExecution> saveQueued(RunningExecutionRows request) {
+        return save(request, ExecutionStatus.QUEUED);
+    }
+
+    private List<ScriptExecution> save(RunningExecutionRows request, ExecutionStatus initialStatus) {
+        Instant now = Instant.now();
+        List<ScriptExecution> rows = request.getMachineIds().stream()
+                .map(machineId -> ScriptExecution.builder()
+                        .tenantId(request.getTenantId())
+                        .executionId(request.getExecutionId())
+                        .scriptId(request.getScriptId())
+                        .scheduleId(request.getScheduleId())
+                        .machineId(machineId)
+                        .privilegeLevel(request.getPrivilegeLevel())
+                        .timeoutSeconds(request.getTimeoutSeconds())
+                        .initiatedBy(request.getInitiatedBy())
+                        .source(request.getSource())
+                        .packageManager(request.getPackageManager())
+                        .packageName(request.getPackageName())
+                        .softwareAction(request.getSoftwareAction())
+                        .status(initialStatus)
+                        .dispatchedAt(now)
+                        .statusChangedAt(now)
+                        .build())
+                .toList();
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        return new ArrayList<>(mongoTemplate.insertAll(rows));
+    }
 
     @Override
     public List<ScriptExecution> findPage(String tenantId, ExecutionOwnerScope owner,
@@ -173,17 +194,20 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         return mongoTemplate.count(query, ScriptExecution.class);
     }
 
-    // ────────── Owner-agnostic core ──────────
+    private static void applyOwner(Criteria criteria, ExecutionOwnerScope owner) {
+        if (owner.type() == ExecutionOwnerScope.Type.SOFTWARE) {
+            criteria.and(FIELD_PACKAGE_MANAGER).is(owner.packageManager())
+                    .and(FIELD_PACKAGE_NAME).is(owner.packageName())
+                    .and(FIELD_SOFTWARE_ACTION).is(owner.softwareAction());
+        } else {
+            criteria.and(OWNER_FIELDS.get(owner.type())).is(owner.id());
+        }
+    }
 
-    /**
-     * Tenant + owner scope + applicable filter arms. When {@code excludedField} is non-null
-     * the matching filter arm is dropped — used by facet queries so each dropdown keeps
-     * offering every switchable value.
-     */
     private static Criteria baseCriteria(String tenantId, ExecutionOwnerScope owner,
                                          ScriptExecutionQueryFilter filter, String excludedField) {
-        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId)
-                .and(OWNER_FIELDS.get(owner.type())).is(owner.id());
+        Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        applyOwner(criteria, owner);
         if (filter == null) {
             return criteria;
         }

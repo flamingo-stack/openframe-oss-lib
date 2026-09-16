@@ -6,8 +6,12 @@ import { Arrow01DownIcon } from '../../icons-v2-generated/arrows/arrow-01-down-i
 import { Arrow01UpIcon } from '../../icons-v2-generated/arrows/arrow-01-up-icon';
 import { SwitchVrIcon } from '../../icons-v2-generated/arrows/switch-vr-icon';
 import { Checkbox } from '../checkbox';
+import { InfoHint } from '../info-hint';
 import { TableColumnFilterDropdown } from './table-column-filter-dropdown';
 import type { TableColumn, TableHeaderProps, TableRowData } from './types';
+
+/** The default header label: wraps inside its cell with a balanced split. */
+const TABLE_HEADER_LABEL_CLASS = 'min-w-0 text-balance uppercase text-ods-text-secondary text-h5';
 import { getHideClasses } from './utils';
 
 /** @deprecated Use `DataTableHeader` from `data-table` instead. */
@@ -120,18 +124,23 @@ export function TableHeader<T = TableRowData>({
               )
             ) : column.filterable && column.filterOptions && onFilterChange ? (
               /* Filterable column — label + icon are both inside the dropdown trigger */
-              <TableColumnFilterDropdown
-                columnKey={column.key}
-                columnLabel={column.label}
-                filterOptions={column.filterOptions}
-                filters={filters}
-                onFilterChange={onFilterChange}
-              />
+              <>
+                <TableColumnFilterDropdown
+                  columnKey={column.key}
+                  columnLabel={column.label}
+                  filterOptions={column.filterOptions}
+                  filters={filters}
+                  onFilterChange={onFilterChange}
+                />
+                {column.hint ? <InfoHint label={column.label}>{column.hint}</InfoHint> : null}
+              </>
             ) : (
               /* Non-filterable column — regular label with optional sort */
               <div
                 className={cn(
-                  'flex items-center gap-2',
+                  // `min-w-0` lets the row shrink to its column, so a long label
+                  // wraps inside the cell instead of forcing the row past it.
+                  'flex min-w-0 items-center gap-2',
                   column.sortable && 'cursor-pointer transition-colors hover:text-ods-text-primary',
                 )}
                 onClick={() => handleSort(column)}
@@ -143,7 +152,23 @@ export function TableHeader<T = TableRowData>({
                   </>
                 ) : (
                   <>
-                    <span className="whitespace-nowrap uppercase text-ods-text-secondary text-h5">{column.label}</span>
+                    {/* Wraps inside the cell, with a BALANCED split — "IMPLEMENTATION
+                        / OWNERS", never one word stranded on a line of its own. A
+                        nowrapped label longer than its column paints straight
+                        across the next column's header. */}
+                    {column.hint ? (
+                      /* The hint sits in a LABEL GROUP with the text, pinned to the
+                        FIRST line (`items-start`): on a label that breaks onto a
+                        second line it reads beside the opening word instead of
+                        floating in the gap between the two. Added only when a
+                        hint exists, so a hint-less header keeps its DOM. */
+                      <span className="flex min-w-0 items-start gap-[var(--spacing-system-xxs)]">
+                        <span className={TABLE_HEADER_LABEL_CLASS}>{column.label}</span>
+                        <InfoHint label={column.label}>{column.hint}</InfoHint>
+                      </span>
+                    ) : (
+                      <span className={TABLE_HEADER_LABEL_CLASS}>{column.label}</span>
+                    )}
                     {getSortIcon(column)}
                   </>
                 )}

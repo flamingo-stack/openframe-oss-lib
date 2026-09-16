@@ -28,7 +28,7 @@ import {
 export interface HubspotTicketCardAnchorProps {
   href: string;
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 

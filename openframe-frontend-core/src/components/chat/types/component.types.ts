@@ -196,6 +196,20 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    */
   renderEntityCard?: (reference: ChatRef) => ReactNode;
   /**
+   * References this answer's metadata described, used to expand the
+   * `[card://type:id]` markers in its body.
+   *
+   * A marker on the wire carries only a type and an id, so without these a card
+   * has to be hydrated by id through a per-entity API — which the host may not
+   * have for entities that live on another platform. Supplying the reference
+   * here is what lets such a card render with a real title and link instead of
+   * falling back to its raw id.
+   *
+   * Presence is NOT a render list: only markers actually written into the body
+   * render, and the metadata routinely describes more than the model cited.
+   */
+  refs?: ChatRef[];
+  /**
    * Host-provided anchor component for markdown links. When supplied, the
    * `<a>` override in the markdown renderer delegates to this component
    * so the host's unified click rule (e.g. `useNavLink`) owns routing
@@ -296,6 +310,19 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   /** Host-provided renderer for inline entity cards. Forwarded verbatim
    *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
   renderEntityCard?: (reference: ChatRef) => ReactNode;
+  /**
+   * Content owned by ONE message, rendered directly beneath it.
+   *
+   * For anything whose subject is that specific answer rather than the thread —
+   * the source chips a Guide answer cites, today. Rendering such content once at
+   * the bottom of the thread instead is a quiet lie in a multi-answer
+   * conversation: it attributes the newest answer's sources to whichever answer
+   * the reader is actually looking at.
+   *
+   * Return `null` for messages that own nothing. Hidden and pending-placeholder
+   * messages never reach it — they do not render at all.
+   */
+  renderAfterMessage?: (message: Message, index: number) => ReactNode;
   /** Host-provided anchor for markdown links. Forwarded verbatim to every
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */

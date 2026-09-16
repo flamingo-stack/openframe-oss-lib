@@ -12,6 +12,7 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
@@ -69,6 +70,19 @@ public class DeviceService {
         Optional<Machine> result = machineRepository.findByMachineId(machineId);
         log.debug("Found machine: {}", result.isPresent());
         return result;
+    }
+
+    public void verifyDispatchable(List<String> machineIds) {
+        machineIds.forEach(this::verifyDispatchable);
+    }
+
+    public void verifyDispatchable(String machineId) {
+        Machine machine = findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
+        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(machine.getStatus())) {
+            throw new BadRequestException(
+                    "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
+        }
     }
 
     public CountedGenericQueryResult<Machine> queryDevices(DeviceFilterCriteria filterOptions,

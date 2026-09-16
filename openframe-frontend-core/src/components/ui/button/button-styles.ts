@@ -21,6 +21,12 @@ export const buttonSurfaceClasses = {
   // `hover:bg-transparent active:bg-transparent`.
   glyph:
     'bg-transparent text-ods-text-primary hover:bg-transparent active:bg-transparent disabled:bg-transparent disabled:text-ods-text-disabled aria-disabled:bg-transparent aria-disabled:text-ods-text-disabled',
+  // A quiet inline text action (a "Show all" / "Show less" disclosure, a
+  // secondary "Clear" beside a field): secondary text that takes the accent on
+  // hover, and no surface in any state. Promoted to a variant because the
+  // disclosure toggle was a primitive <button> restating these classes. Pair
+  // with size="compact" and noPaddingX so the label aligns with the text above.
+  link: 'bg-transparent text-ods-text-secondary hover:bg-transparent hover:text-ods-accent active:bg-transparent active:text-ods-accent-active disabled:bg-transparent disabled:text-ods-text-disabled aria-disabled:bg-transparent aria-disabled:text-ods-text-disabled',
   // Chrome that sits ON media (video cards, image lightboxes): a scrim disc so
   // the glyph stays legible over an arbitrary frame. Promoted to a variant
   // because the walkthrough card, its theater and the bite cards were each

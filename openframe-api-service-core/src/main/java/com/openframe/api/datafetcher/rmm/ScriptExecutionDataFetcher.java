@@ -21,7 +21,9 @@ import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
 import com.openframe.api.service.rmm.script.ScriptExecutionFilterService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -101,11 +103,37 @@ public class ScriptExecutionDataFetcher {
     }
 
     @DgsQuery
+    public CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> softwareExecutions(
+            @InputArgument PackageManagerType packageManager,
+            @InputArgument @NotBlank String packageName,
+            @InputArgument SoftwareAction action,
+            @InputArgument @Valid ScriptExecutionFilterInput filter,
+            @InputArgument String search,
+            @InputArgument @Valid SortInput sort,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
+        return listExecutions(ExecutionOwnerScope.forSoftware(packageManager, packageName, action),
+                filter, search, sort, first, after, last, before);
+    }
+
+    @DgsQuery
     public ScriptExecutionFilters scriptExecutionFilters(
             @InputArgument @NotBlank String scriptId,
             @InputArgument ScriptExecutionFilterInput filter,
             @InputArgument String search) {
         return facetExecutions(ExecutionOwnerScope.forScript(decodeId(scriptId)), filter, search);
+    }
+
+    @DgsQuery
+    public ScriptExecutionFilters softwareExecutionFilters(
+            @InputArgument PackageManagerType packageManager,
+            @InputArgument @NotBlank String packageName,
+            @InputArgument SoftwareAction action,
+            @InputArgument ScriptExecutionFilterInput filter,
+            @InputArgument String search) {
+        return facetExecutions(ExecutionOwnerScope.forSoftware(packageManager, packageName, action), filter, search);
     }
 
     @DgsQuery

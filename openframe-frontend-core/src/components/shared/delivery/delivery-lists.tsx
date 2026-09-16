@@ -35,7 +35,7 @@ import type { DeliveryItem, DeliveryResponse } from '../../../types/delivery';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
-import { EmptyState } from '../../empty-state';
+import { ListEmptyState } from '../../list-empty-state';
 import { LoadError } from '../../ui/error-state';
 import { DeliveryTable } from './delivery-table';
 
@@ -181,30 +181,23 @@ export function DeliveryLists({
   return (
     <div className="flex w-full flex-col gap-[40px]">
       {/* Empty state if no results after filtering */}
-      {!isLoading &&
-        !hasResults &&
-        (hasActiveFilters ? (
-          <EmptyState
-            type="search"
-            title="No tasks found"
-            description="No tasks match your current filters. Try adjusting your search or status filter."
-            showCTA={true}
-            ctaText="Reset Filters"
-            onCtaClick={() => {
-              const params = new URLSearchParams(searchParams.toString());
-              params.delete(searchParamKey);
-              params.delete(taskTypeParamKey);
-              router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-            }}
-          />
-        ) : (
-          <EmptyState
-            type="generic"
-            title="No tasks available"
-            description="Check back soon for upcoming tasks!"
-            showCTA={false}
-          />
-        ))}
+      {!isLoading && !hasResults && (
+        <ListEmptyState
+          isFiltered={hasActiveFilters}
+          filtered={{
+            title: 'No tasks found',
+            description: 'No tasks match your current filters. Try adjusting your search or status filter.',
+            clearText: 'Reset Filters',
+          }}
+          onClearFilters={() => {
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete(searchParamKey);
+            params.delete(taskTypeParamKey);
+            router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+          }}
+          empty={{ title: 'No tasks available', description: 'Check back soon for upcoming tasks!' }}
+        />
+      )}
 
       {/* Completed Tasks Table */}
       {showCompleted && (hasResults || isLoading) && (

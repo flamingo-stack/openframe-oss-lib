@@ -1,5 +1,6 @@
 package com.openframe.management.initializer;
 
+import com.openframe.data.nats.rmm.model.PackageManagerMissingMessage;
 import com.openframe.management.service.NatsStreamManagementService;
 import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StorageType;
@@ -92,6 +93,13 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .subjects(List.of("machine.*.execution.acknowledge"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
+            StreamConfiguration.builder()
+                    .name(PackageManagerMissingMessage.STREAM)
+                    .subjects(List.of(PackageManagerMissingMessage.SUBJECT_FILTER))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .maxAge(Duration.ofHours(1))
                     .build()
     );
 

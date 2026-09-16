@@ -25,6 +25,11 @@ export interface Notification {
   settled?: boolean;
   severity?: NotificationSeverity;
   category?: string;
+  /**
+   * Host-defined facts about the notification. The one key this lib reads is
+   * `notificationType` — the backend's notification type string (e.g.
+   * `TICKET_ASSIGNED`, `MINGO_APPROVAL_REQUEST`), which gates the approval tile.
+   */
   meta?: Record<string, unknown>;
   onClick?: () => void;
 }
@@ -41,8 +46,23 @@ export type RenderNotificationTile = (
   helpers: { onComplete: (id: string) => void; onSettle: (id: string) => void; liveDurationMs?: number },
 ) => ReactNode;
 
-/** Discriminator carried in `notification.meta.contextType` for Mingo approval requests. */
-export const ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE = 'ADMIN_APPROVAL_REQUEST';
+/**
+ * Notification types that carry an approval request — the backend's `TenantNotificationType`
+ * values, split by whether the request is linked to a ticket. Matched against
+ * `notification.meta.notificationType`.
+ */
+export const TICKET_APPROVAL_REQUEST_TYPE = 'TICKET_APPROVAL_REQUEST';
+export const MINGO_APPROVAL_REQUEST_TYPE = 'MINGO_APPROVAL_REQUEST';
+
+const APPROVAL_REQUEST_TYPES: ReadonlySet<string> = new Set([
+  TICKET_APPROVAL_REQUEST_TYPE,
+  MINGO_APPROVAL_REQUEST_TYPE,
+]);
+
+/** True for a notification type string that carries an approval request. */
+export function isApprovalNotificationType(type: unknown): boolean {
+  return typeof type === 'string' && APPROVAL_REQUEST_TYPES.has(type);
+}
 
 /** A single planned tool invocation awaiting approval. */
 export interface ApprovalToolCallMeta {
@@ -56,7 +76,7 @@ export interface ApprovalToolCallMeta {
   toolCallArguments?: Record<string, unknown> | null;
 }
 
-/** Approval payload stashed in `notification.meta` for an `ADMIN_APPROVAL_REQUEST` notification. */
+/** Approval payload stashed in `notification.meta` for an approval-request notification. */
 export interface ApprovalNotificationMeta {
   approvalRequestId: string;
   dialogId?: string | null;
@@ -70,7 +90,7 @@ export interface ApprovalNotificationMeta {
 }
 
 export function isApprovalNotification(notification: Notification): boolean {
-  return notification.meta?.contextType === ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE;
+  return isApprovalNotificationType(notification.meta?.notificationType);
 }
 
 /** Safely read the approval payload off a notification; returns null when absent or malformed. */
