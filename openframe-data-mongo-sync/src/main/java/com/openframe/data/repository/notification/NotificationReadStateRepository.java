@@ -20,9 +20,6 @@ import java.util.List;
 public interface NotificationReadStateRepository
         extends MongoRepository<NotificationReadState, String>, CustomNotificationReadStateRepository {
 
-    // ARCHIVED is not yet read: any mark-read turns it into READ.
-    String UNREAD_OR_ARCHIVED = "['UNREAD', 'ARCHIVED']";
-
     boolean existsByRecipientIdAndRecipientTypeAndStatus(String recipientId,
                                                          RecipientType recipientType,
                                                          ReadStatus status);
@@ -37,13 +34,13 @@ public interface NotificationReadStateRepository
                                                                              RecipientType recipientType,
                                                                              Collection<ReadStatus> statuses);
 
-    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': { '$in': " + UNREAD_OR_ARCHIVED + " } }")
+    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'notificationId': ?2, 'status': { '$in': ?3 } }")
     @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
-    long markAsRead(String recipientId, RecipientType recipientType, String notificationId);
+    long markAsRead(String recipientId, RecipientType recipientType, String notificationId, Collection<ReadStatus> statuses);
 
-    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'status': { '$in': " + UNREAD_OR_ARCHIVED + " } }")
+    @Query("{ 'recipientId': ?0, 'recipientType': ?1, 'status': { '$in': ?2 } }")
     @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
-    long markAllAsRead(String recipientId, RecipientType recipientType);
+    long markAllAsRead(String recipientId, RecipientType recipientType, Collection<ReadStatus> statuses);
 
     /**
      * Flips every recipient's UNREAD row for the given notification to READ in one bulk update.
@@ -112,10 +109,11 @@ public interface NotificationReadStateRepository
 
     // Flips exactly the ids the caller snapshotted, never "everything still unread on that entity":
     // a notification arriving mid-call would otherwise turn read without anyone retracting its push.
-    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'notificationId': { '$in': ?3 }, 'status': { '$in': " + UNREAD_OR_ARCHIVED + " } }")
+    @Query("{ 'tenantId': ?0, 'recipientId': ?1, 'recipientType': ?2, 'notificationId': { '$in': ?3 }, 'status': { '$in': ?4 } }")
     @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
     long markAsReadByIds(String tenantId,
                          String recipientId,
                          RecipientType recipientType,
-                         Collection<String> notificationIds);
+                         Collection<String> notificationIds,
+                         Collection<ReadStatus> statuses);
 }

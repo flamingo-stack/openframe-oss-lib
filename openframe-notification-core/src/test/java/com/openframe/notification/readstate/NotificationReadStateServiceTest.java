@@ -43,7 +43,7 @@ class NotificationReadStateServiceTest {
     @Test
     @DisplayName("Given an UNREAD row, when markRead flips it, then every listener gets ONE event carrying the id and the READ transition")
     void mark_read_publishes_a_read_event() {
-        when(repository.markAsRead(ALICE, U, "n-1")).thenReturn(1L);
+        when(repository.markAsRead(ALICE, U, "n-1", List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED))).thenReturn(1L);
 
         assertThat(service.markRead(ALICE, U, "n-1")).isTrue();
 
@@ -58,7 +58,7 @@ class NotificationReadStateServiceTest {
     @Test
     @DisplayName("Given an already-read row, when markRead matches nothing, then NO event fires — repeats and races must not re-trigger retractions")
     void idempotent_mark_read_stays_silent() {
-        when(repository.markAsRead(ALICE, U, "n-1")).thenReturn(0L);
+        when(repository.markAsRead(ALICE, U, "n-1", List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED))).thenReturn(0L);
 
         assertThat(service.markRead(ALICE, U, "n-1")).isFalse();
 
@@ -70,7 +70,7 @@ class NotificationReadStateServiceTest {
     void mark_all_as_read_publishes_one_bulk_event() {
         when(repository.findByRecipientIdAndRecipientTypeAndStatusIn(ALICE, U, List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED)))
                 .thenReturn(List.of(row(ALICE, U, "n-1", ReadStatus.UNREAD), row(ALICE, U, "n-2", ReadStatus.UNREAD)));
-        when(repository.markAsReadByIds(any(), eq(ALICE), eq(U), anyCollection())).thenReturn(2L);
+        when(repository.markAsReadByIds(any(), eq(ALICE), eq(U), anyCollection(), eq(List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED)))).thenReturn(2L);
 
         assertThat(service.markAllAsRead(ALICE, U)).isEqualTo(2L);
 
@@ -95,7 +95,7 @@ class NotificationReadStateServiceTest {
     void mark_all_as_read_flips_archived_rows_too() {
         when(repository.findByRecipientIdAndRecipientTypeAndStatusIn(ALICE, U, List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED)))
                 .thenReturn(List.of(row(ALICE, U, "n-1", ReadStatus.UNREAD), row(ALICE, U, "n-2", ReadStatus.ARCHIVED)));
-        when(repository.markAsReadByIds(any(), eq(ALICE), eq(U), anyCollection())).thenReturn(2L);
+        when(repository.markAsReadByIds(any(), eq(ALICE), eq(U), anyCollection(), eq(List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED)))).thenReturn(2L);
 
         assertThat(service.markAllAsRead(ALICE, U)).isEqualTo(2L);
 
@@ -181,7 +181,7 @@ class NotificationReadStateServiceTest {
         service = service(List.of(event -> {
             throw new IllegalStateException("boom");
         }, survivor));
-        when(repository.markAsRead(ALICE, U, "n-1")).thenReturn(1L);
+        when(repository.markAsRead(ALICE, U, "n-1", List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED))).thenReturn(1L);
 
         assertThat(service.markRead(ALICE, U, "n-1")).isTrue();
 
