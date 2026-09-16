@@ -866,12 +866,27 @@ export function formatProgramTimeRange(
   const source = at.instant ?? at.utcDate ?? opts.startAt;
   const clock = (withZoneLabel: boolean) => formatTimeWithTimezone(source, at.timezone, { withZoneLabel });
   const label = opts.withZoneLabel === true;
-  const end = opts.endAt ? formatTimeWithTimezone(opts.endAt, at.timezone, { withZoneLabel: label }) : '';
+  // An INVERTED range is not rendered as a range. Its sibling
+  // `formatDurationFromRange` already refuses exactly this — its docblock
+  // records the "-45m" that shipped on a card — and this renderer guarded the
+  // unusable-endpoint cases but stopped one step short of the ordering check,
+  // so a corrupt row read "11:00 PM - 9:00 PM EDT". The START is still true, so
+  // it is kept; only the impossible pairing is dropped.
+  const ordered = isOrderedRange(source, opts.endAt);
+  const end = ordered && opts.endAt ? formatTimeWithTimezone(opts.endAt, at.timezone, { withZoneLabel: label }) : '';
   // An end with no usable start is not a range, and rendering it alone puts a
   // FINISH time where the reader expects a start. Say nothing instead.
   if (!clock(false)) return '';
   // Only the LAST clock carries the label, so a range reads "9:00 AM - 5:00 PM EDT".
   return end ? `${clock(false)} - ${end}` : clock(label);
+}
+
+/** Do these two endpoints describe a forward-running interval? */
+function isOrderedRange(from: Date | string | null | undefined, to: string | null | undefined): boolean {
+  if (!from || !to) return false;
+  const a = (typeof from === 'string' ? new Date(from) : from).getTime();
+  const b = new Date(to).getTime();
+  return Number.isFinite(a) && Number.isFinite(b) && b > a;
 }
 
 /**

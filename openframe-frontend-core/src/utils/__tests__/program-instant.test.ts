@@ -153,6 +153,14 @@ describe('formatProgramTimeRange', () => {
     expect(formatProgramTimeRange(at, { endAt: '2026-03-20T17:00:00Z' })).toBe('');
   });
 
+  it('refuses an inverted range, keeping the start that is still true', () => {
+    // The sibling duration formatter already refuses this — a card once shipped
+    // "-45m" — and rendering "11:00 PM - 9:00 PM" is the same impossible value
+    // one field over. Luma has no ingest guard against it.
+    const at = programDateInstant({ date: '2026-03-20T03:00:00Z', timezone: 'America/New_York' });
+    expect(formatProgramTimeRange(at, { endAt: '2026-03-20T01:00:00Z', withZoneLabel: true })).toBe('11:00 PM EDT');
+  });
+
   it('labels only the last clock of a range', () => {
     const at = programDateInstant({ date: '2026-03-20T13:00:00Z', timezone: 'America/New_York' });
     expect(formatProgramTimeRange(at, { endAt: '2026-03-20T17:00:00Z', withZoneLabel: true })).toBe(
