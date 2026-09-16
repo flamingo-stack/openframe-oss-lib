@@ -45,7 +45,6 @@ import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
-import { BuildingsIcon } from '../../icons-v2-generated/buildings/buildings-icon';
 import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon';
 import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon';
 import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentation-bar-icon';
@@ -89,6 +88,7 @@ import { resolveHrefForRuntime } from '../utils/chat-nav-resolution';
 import { safeHref } from '../utils/compact-card-classes';
 import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
+import { resolveIcon } from '../utils/icon-library';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
 import { resolveFetchedCardHref, pickFetchedCardHref, readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { getSourceLabel } from '../utils/source-icons';
@@ -1360,9 +1360,11 @@ interface GlyphCardConfig {
  *  (`/api/design-docs`, `/api/openframe-tenants`, `/api/prospect-calls` — ChatRef-shaped items,
  *  same preset as github / slack). Adding one = one line here + the
  *  `list-url.ts` builder + the `source-icons.ts` label / icon / type entries. */
+/** The OpenFrame logo every OpenFrame surface uses (the `openframe` icon name). */
+const OpenFrameGlyph = resolveIcon('openframe');
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
-  openframe_tenant: { label: 'OpenFrame tenant', icon: () => <BuildingsIcon size={24} /> },
+  openframe_tenant: { label: 'OpenFrame tenant', icon: () => <OpenFrameGlyph size={24} /> },
   prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {

@@ -48,7 +48,7 @@ export interface BlogCardProps {
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   /** Platform that owns `href`. Used by parent wrappers; the card
    *  itself doesn't read it but exposes the prop for the standard
    *  pure-presentation contract. */

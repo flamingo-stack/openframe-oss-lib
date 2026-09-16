@@ -161,16 +161,6 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
     //   - Background refetch with existing data: data !== undefined → no load
     //   - Filter-change refetch landing on empty results: data?.tickets===[]
     //     + isFetching → bridge skeleton (the `||` branch)
-    // Loading-state-truth = `data === undefined`. TanStack v5's
-    // `isPending` / `isLoading` flags can be `false` in transient
-    // windows where the query is enabled-but-fetch-not-yet-fired
-    // OR where stale-data exists from a sibling cache slot. Treating
-    // "no data for THIS query slot yet" as the universal loading
-    // signal can't lie:
-    //   - Initial render after enabled flips: data === undefined → load
-    //   - Background refetch with existing data: data !== undefined → no load
-    //   - Filter-change refetch landing on empty results: data?.tickets===[]
-    //     + isFetching → bridge skeleton (the `||` branch)
     isLoading: enabled && (data === undefined || (query.isFetching && (data?.tickets ?? []).length === 0)),
     isFetching: query.isFetching,
     error: query.error ?? null,

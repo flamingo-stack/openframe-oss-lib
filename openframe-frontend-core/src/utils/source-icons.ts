@@ -77,7 +77,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
 
   // Product-hub internal
   'design-docs': 'file-text',
-  'openframe-tenants': 'globe',
+  'openframe-tenants': 'openframe',
   'prospect-calls': 'phone',
 };
 
