@@ -32,8 +32,22 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * skip the actor), so this class cannot mint a notification for itself; it works on whatever the
  * inbox holds. By decision of the suite owner (2026-09-13) the bulk operations run on every
  * tenant, including the shared qa one: the last case empties the inbox of the test user.
+ * <p>
+ * Hence {@code @Tag("notification")}: it is what lets the runner place this class in a phase of
+ * its own, after {@code mingo}, rather than in the catch-all {@code functional} phase. A pipeline
+ * run registers a fresh tenant, so its inbox starts empty and only that run can fill it. Nothing
+ * before {@code mingo} does: on the 2026-09-16 qa nightly the phases up to and including
+ * {@code fae} raised no ADMIN approval at all, while {@code mingo} raised 28, and every one of
+ * those mints a notification (the chat dispatcher skips only {@code ApprovalType.CLIENT}, which it
+ * treats as user-resolvable). Run before {@code mingo}, case 2 found nothing to mark and aborted
+ * on its assumption; run after it, there is plenty to work on.
+ * <p>
+ * The tag does not help the feature-branch pipeline, which has no {@code mingo} phase: there this
+ * class still depends on what the shared tenant happens to hold, and case 2 still self-skips when
+ * an earlier run has drained it.
  */
 @Tag("saas")
+@Tag("notification")
 @DisplayName("Notifications")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class NotificationsTest extends BaseTest {
