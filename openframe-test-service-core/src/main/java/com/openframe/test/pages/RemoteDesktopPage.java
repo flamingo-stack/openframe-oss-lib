@@ -2,6 +2,9 @@ package com.openframe.test.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.TimeoutError;
+
+import com.microsoft.playwright.options.WaitForSelectorState;
 
 import static com.microsoft.playwright.options.WaitForSelectorState.VISIBLE;
 
@@ -120,11 +123,90 @@ public class RemoteDesktopPage {
      * @param timeoutMs maximum time to wait in milliseconds
      */
     public RemoteDesktopPage waitForCanvasVisible(int timeoutMs) {
+        clearApprovalGate();
         remoteDesktopCanvas()
                 .waitFor(new Locator.WaitForOptions()
                         .setState(VISIBLE)
                         .setTimeout(timeoutMs));
         return this;
+    }
+
+    // ── Remote-access approval gate ──────────────────────────────────────────
+
+    /** The awaiting screen's heading. There are no test ids on this flow, so the copy is the handle. */
+    private static final String AWAITING_HEADING = "main h2:has-text('Waiting for approval')";
+
+    /** Buttons of the mock service panel, shown only while {@code remote-access-mock-tools} is on. */
+    private static final String MOCK_APPROVE = "main button:has-text('Approve')";
+
+    /** The four screens the flow ends on without reaching the session. */
+    private static final String[] GATE_FAILURES = {
+            "Remote access disabled",
+            "Remote access declined",
+            "No response",
+            "Request failed"
+    };
+
+    /** How long to look for the gate at all. It renders with the page or not at all. */
+    private static final int GATE_PROBE_MS = 5_000;
+
+    /** How long to give the approval once it has been answered. */
+    private static final int GATE_SETTLE_MS = 20_000;
+
+    /**
+     * Passes the remote-access approval gate when it is in the way.
+     *
+     * <p>qa and dev run with {@code remote-access-approval} on, which mounts the session component only
+     * after the end user approves. There is nothing to type — the request fires on its own — so this
+     * waits out the states that settle by themselves and answers the one that does not:
+     *
+     * <ul>
+     *   <li>flag off (stage, prod), or a policy of NOTIFY_ONLY / SILENT_ACCESS: the canvas is already
+     *       on its way and this returns after the probe without touching anything;</li>
+     *   <li>APPROVAL_REQUIRED: the awaiting screen appears and, with {@code remote-access-mock-tools}
+     *       on, carries the mock service's Approve button — which is how a headless run answers a
+     *       request that is otherwise waiting on a human at the device;</li>
+     *   <li>disabled, declined, no response or failed: the run stops with that screen's own words
+     *       rather than a bare canvas timeout twenty seconds later.</li>
+     * </ul>
+     *
+     * <p>Only the remote desktop is gated. Remote shell and file manager sit outside the flow, which is
+     * why neither page object has any of this.
+     */
+    public void clearApprovalGate() {
+        Locator awaiting = page.locator(AWAITING_HEADING);
+        try {
+            awaiting.waitFor(new Locator.WaitForOptions()
+                    .setState(VISIBLE)
+                    .setTimeout(GATE_PROBE_MS));
+        } catch (TimeoutError noGate) {
+            failIfGateRefused();
+            return;
+        }
+
+        Locator approve = page.locator(MOCK_APPROVE);
+        if (approve.count() == 0) {
+            throw new AssertionError("The remote-access approval gate is waiting for the end user and the "
+                    + "mock service panel is not on this environment, so nothing can answer it. "
+                    + "Enable remote-access-mock-tools, or approve the request on the device.");
+        }
+        approve.first().click();
+
+        awaiting.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.HIDDEN)
+                .setTimeout(GATE_SETTLE_MS));
+        failIfGateRefused();
+    }
+
+    /** Turns one of the gate's dead-end screens into a failure that names it. */
+    private void failIfGateRefused() {
+        for (String title : GATE_FAILURES) {
+            Locator screen = page.locator("main :text-is('" + title + "')");
+            if (screen.count() > 0 && screen.first().isVisible()) {
+                throw new AssertionError("The remote-access approval gate ended on \"" + title
+                        + "\", so the session never started.");
+            }
+        }
     }
 
     public boolean waitForDesktop() {
