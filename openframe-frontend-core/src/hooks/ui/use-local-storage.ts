@@ -66,11 +66,10 @@ export function useLocalStorage<T>(
     // the adapter so the payload is decoded and validated in exactly one place.
     // A removed key reads back as null and resets to `initialValue`, whichever
     // event reported it.
-    const syncFromStorage = (source: string) => {
+    const syncFromStorage = (_source: string) => {
       const next = storage.load();
       isFromStorageEvent.current = true;
       setStoredValue(next ?? initialValueRef.current);
-      console.log(`🔄 ${next === null ? 'Cleared' : 'Updated'} localStorage key "${key}" from ${source}`);
     };
 
     const handleStorageChange = (e: StorageEvent) => {
@@ -121,3 +120,4 @@ export function useLocalStorage<T>(
 
   return [storedValue, setValue];
 }
+

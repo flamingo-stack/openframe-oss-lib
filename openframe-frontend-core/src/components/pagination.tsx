@@ -5,6 +5,10 @@ import { type ButtonHTMLAttributes, type HTMLAttributes, forwardRef } from 'reac
 import { cn } from '../utils/cn';
 import { Button } from './ui/button';
 
+// NOTE: This component implements its own page-window/ellipsis algorithm.
+// If/when a shared `UnifiedPagination` primitive is available in this package,
+// this implementation should be migrated to delegate to it so that page-number
+// and ellipsis logic is not duplicated/diverging across call sites.
 interface PaginationProps {
   currentPage: number;
   totalPages: number;

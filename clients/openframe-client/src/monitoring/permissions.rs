@@ -85,11 +85,21 @@ impl PermissionMonitor {
         }
     }
 
-    pub fn get_metrics(&self) -> Vec<(&str, f64)> {
+    pub async fn get_metrics(&self) -> Vec<(&str, f64)> {
+        let metrics = self.metrics.read().await;
         vec![
-            ("openframe_permission_errors_total", 0.0),
-            ("openframe_permission_fixes_total", 0.0),
-            ("openframe_last_permission_check_timestamp", 0.0),
+            (
+                "openframe_permission_errors_total",
+                metrics.get_value("openframe_permission_errors_total"),
+            ),
+            (
+                "openframe_permission_fixes_total",
+                metrics.get_value("openframe_permission_fixes_total"),
+            ),
+            (
+                "openframe_last_permission_check_timestamp",
+                metrics.get_value("openframe_last_permission_check_timestamp"),
+            ),
         ]
     }
 }

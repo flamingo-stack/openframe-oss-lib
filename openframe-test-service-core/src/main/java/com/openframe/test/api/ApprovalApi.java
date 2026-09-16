@@ -29,7 +29,7 @@ public class ApprovalApi {
      * One refusal is <em>transient</em> and so gets its own type. A {@code 409 DIALOG_LOCKED} means the run
      * still held the dialog lock at the instant we approved, which clears on its own when the turn ends; it
      * is raised as {@link DialogLockedException} so the caller can retry instead of failing a case on a
-     * race. Every other non-200 is a real refusal and still raises {@link AssertionError}.
+     * race. Every other non-200 is a real refusal and still raises {@link ApprovalRefusedException}.
      */
     public static void approve(String approvalRequestId, boolean approve) {
         Response response = given(getAuthorizedSpec())
@@ -54,6 +54,18 @@ public class ApprovalApi {
             throw new DialogLockedException(detail);
         }
 
-        throw new AssertionError(detail);
+        throw new ApprovalRefusedException(detail);
+    }
+
+    /**
+     * Raised when the server refuses an approval resolution with a non-200 status other than the
+     * transient {@code 409 DIALOG_LOCKED} case. A dedicated runtime exception, rather than
+     * {@link AssertionError}, ensures the failure is always surfaced regardless of whether JVM
+     * assertions are enabled.
+     */
+    public static class ApprovalRefusedException extends RuntimeException {
+        public ApprovalRefusedException(String message) {
+            super(message);
+        }
     }
 }

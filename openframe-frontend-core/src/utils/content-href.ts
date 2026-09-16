@@ -36,6 +36,15 @@ import { canonicalContentRefType } from './list-url';
  * cross-repo boundary makes a shared import impossible; the lib test pins this
  * constant against a literal copy of itself, so it does NOT detect hub-side
  * drift — values match today and are kept aligned by hand.)
+ *
+ * KNOWN CROSS-REPO CONTRACT RISK: this object is a hand-maintained mirror of
+ * the hub's (multi-platform-hub) `PUBLIC_URL_PATHS`. Neither repo's test suite
+ * can detect the other side changing independently — a renamed/added/removed
+ * hub route silently breaks in-app routing here (onboarding guides, releases,
+ * etc.) until someone notices. If you change `PUBLIC_URL_PATHS` in the hub,
+ * you MUST update this map in the same change, and vice versa. Until a shared
+ * package or a generated/checked-in contract file exists, treat any edit to
+ * either side as incomplete without the matching edit to the other.
  */
 export const DEFAULT_CONTENT_SUFFIXES: Record<string, string> = {
   onboarding_guide: 'onboarding-guides',
@@ -292,3 +301,4 @@ export function resolveContentHref(
     ? composeContentUrl({ type: args.type, identifier: args.slug, platforms: args.platforms })
     : buildDefaultHref(args.basePath, args.slug);
 }
+

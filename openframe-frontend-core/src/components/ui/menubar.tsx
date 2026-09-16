@@ -187,7 +187,7 @@ MenubarSeparator.displayName = MenubarPrimitive.Separator.displayName;
 const MenubarShortcut = ({ className, ...props }: HTMLAttributes<HTMLSpanElement>) => {
   return <span className={cn('ml-auto text-muted-foreground text-h6', className)} {...props} />;
 };
-MenubarShortcut.displayname = 'MenubarShortcut';
+MenubarShortcut.displayName = 'MenubarShortcut';
 
 export {
   Menubar,

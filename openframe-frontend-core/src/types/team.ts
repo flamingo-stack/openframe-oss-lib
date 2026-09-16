@@ -1,3 +1,9 @@
+export interface DepartmentRef {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface TeamMember {
   id: string;
   employee_id: string;
@@ -9,8 +15,8 @@ export interface TeamMember {
   phone?: string;
   role?: string;
   title?: string;
-  /** Display name of the department (presentational shape); `department_id` is the FK. */
-  department?: string;
+  /** Embedded department reference (SSOT: department.ts); `department_id` is the FK. */
+  department?: DepartmentRef;
   department_id?: string | null;
   team?: string;
   manager_id?: string;

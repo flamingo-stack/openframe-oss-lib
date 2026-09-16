@@ -56,6 +56,18 @@ impl Asset {
     }
 }
 
+fn current_os_str() -> Option<&'static str> {
+    if cfg!(target_os = "windows") {
+        Some("windows")
+    } else if cfg!(target_os = "macos") {
+        Some("macos")
+    } else if cfg!(target_os = "linux") {
+        Some("linux")
+    } else {
+        None
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalFilenameConfig {
@@ -65,16 +77,10 @@ pub struct LocalFilenameConfig {
 
 impl LocalFilenameConfig {
     pub fn matches_current_os(&self) -> bool {
-        let current_os = if cfg!(target_os = "windows") {
-            "windows"
-        } else if cfg!(target_os = "macos") {
-            "macos"
-        } else if cfg!(target_os = "linux") {
-            "linux"
-        } else {
-            return false;
-        };
-        self.os.eq_ignore_ascii_case(current_os)
+        match current_os_str() {
+            Some(current_os) => self.os.eq_ignore_ascii_case(current_os),
+            None => false,
+        }
     }
 }
 
