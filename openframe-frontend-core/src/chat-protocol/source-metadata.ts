@@ -12,18 +12,20 @@
  * so a malformed row means an upstream contract slip, and rendering a chip with
  * a blank title or an unsafe href is worse than rendering nothing.
  *
- * "Unsafe" is the operative word, and it is not a synonym for "relative".
- * Links go through `linkUrl` (absolute https OR a root-relative path); only
- * MEDIA urls, which have no origin to resolve against, go through `httpsUrl`.
- * Conflating the two is what made every same-origin source chip lose its
- * destination while keeping its name.
+ * Every URL here — link or media — must be ABSOLUTE https. This payload is
+ * rendered by a consumer with no hub origin (the dashboard), so a root-relative
+ * `/onboarding-guides/x` would resolve against the DASHBOARD's domain and point
+ * at a page that does not exist there. Accepting it does not keep a link; it
+ * manufactures a broken one. The producer owns making links resolvable: the
+ * hub's MCP boundary absolutises every href it emits, so a relative href
+ * arriving here is an upstream contract slip and is dropped like any other.
  *
  * Server-safe: no React, no browser APIs beyond `URL`.
  */
 
 import type { ChatRef } from '../components/chat/chat-ref.types';
 import type { ChatSource } from '../components/chat/types/message.types';
-import { UNSAFE_URL_CHARS, isSameOriginPath } from '../utils/url-safety';
+import { UNSAFE_URL_CHARS } from '../utils/url-safety';
 import { CARD_REFERENCE } from './card-marker';
 import type { SourcesEvent } from './events';
 import { isRecord } from './wire-narrow';
@@ -51,10 +53,9 @@ function nullableText(value: unknown): string | null | undefined {
   return value === null ? null : text(value);
 }
 
-/** An absolute https URL, or nothing. Plain http and non-URLs are dropped —
- *  these become MEDIA sources (`<video src>`, poster images), which have no
- *  origin to resolve against and so must be absolute. For a LINK, use
- *  `linkUrl` — a same-origin path is valid there and this would discard it. */
+/** An absolute https URL, or nothing. Plain http, relative paths and non-URLs
+ *  are dropped — see the module note on why relative is not "a same-origin
+ *  link" for this payload's consumer. Used for links and media alike. */
 function httpsUrl(value: unknown): string | undefined {
   const candidate = text(value);
   if (!candidate || UNSAFE_URL_CHARS.test(candidate)) return undefined;
@@ -63,31 +64,6 @@ function httpsUrl(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-/**
- * A URL that is safe to render as a source chip's href: an absolute https URL,
- * or a ROOT-RELATIVE path (`/onboarding-guides/foo`).
- *
- * Root-relative is the whole reason this exists separately from `httpsUrl`.
- * The hub emits a relative href whenever the owning platform is the serving
- * platform — correct for its own chat, and correct for any consumer that knows
- * the hub origin (the dashboard absolutises hub-owned hrefs itself). Running
- * `new URL()` with no base on such a path THROWS, so treating "not an absolute
- * https URL" as hostile silently deleted every same-origin link before the code
- * that would have resolved it ever ran, leaving a chip with a name and no
- * destination.
- *
- * Deliberately STRICTER than the render-time `safeHref`, which also permits
- * `http:` and `mailto:`. This payload is assembled from a remote MCP server's
- * tool output, so the ingest guard stays fail-closed on scheme; the two differ
- * on purpose, and only in the safe direction.
- */
-function linkUrl(value: unknown): string | undefined {
-  const candidate = text(value);
-  if (!candidate || UNSAFE_URL_CHARS.test(candidate)) return undefined;
-  if (candidate.startsWith('/')) return isSameOriginPath(candidate) ? candidate : undefined;
-  return httpsUrl(candidate);
 }
 
 /**
@@ -123,7 +99,7 @@ function sourceItems(value: unknown): NonNullable<ChatSource['items']> | undefin
     // A grouped row without these three has nothing to render OR navigate with.
     if (!id || !documentType || !name) return [];
 
-    const externalUrl = linkUrl(item.externalUrl);
+    const externalUrl = httpsUrl(item.externalUrl);
     const targetPlatform = nullableText(item.targetPlatform);
     const path = nullableText(item.path);
     return [
@@ -167,7 +143,7 @@ function sources(value: unknown): ChatSource[] {
 
     const path = text(candidate.path);
     const documentType = text(candidate.documentType);
-    const externalUrl = linkUrl(candidate.externalUrl);
+    const externalUrl = httpsUrl(candidate.externalUrl);
     const targetPlatform = nullableText(candidate.targetPlatform);
     const id = text(candidate.id);
     const sourceRepo = text(candidate.sourceRepo);

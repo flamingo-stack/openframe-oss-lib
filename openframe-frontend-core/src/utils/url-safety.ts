@@ -1,20 +1,19 @@
 /**
- * URL-safety primitives shared by the wire DECODER and the render-time guard.
+ * URL-safety primitives for the wire DECODER and the render-time guard.
  *
- * Both layers ask the same two questions — "does this string carry characters
- * that have no business in an href" and "does this path stay on our origin" —
- * and both used to answer them with their own copy. A security predicate kept
- * in sync by a comment saying "same set the other one rejects" is a predicate
- * that drifts: the copies already differed on the backslash case, which is how
- * a path resolving to a third-party origin reached an anchor tag.
+ * `UNSAFE_URL_CHARS` is shared by both: "does this string carry characters that
+ * have no business in an href" had two copies once, and a security predicate
+ * kept in sync by a comment drifts.
+ *
+ * `isSameOriginPath` is used by the RENDER-time guard only. It answers "does
+ * this path stay on our origin", which is only a meaningful question where the
+ * page rendering the href IS the origin the path belongs to — the hub's own
+ * chat cards. The wire decoder does not ask it: its consumer has no hub origin,
+ * so a relative path there is not a same-origin link but a broken one, and the
+ * decoder accepts absolute https only.
  *
  * Pure and dependency-free, so the server-safe `chat-protocol` leaf and the
  * client-side card utils can both import it directly.
- *
- * What is NOT shared, deliberately: which SCHEMES each layer allows. The
- * decoder is stricter (https only) because it ingests a remote MCP server's
- * output; the renderer also permits http and mailto. That difference is a
- * policy choice each layer states for itself.
  */
 
 /** Control, zero-width and line-separator characters. Never legitimate in a URL

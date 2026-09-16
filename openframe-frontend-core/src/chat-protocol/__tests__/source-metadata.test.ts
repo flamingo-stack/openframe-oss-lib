@@ -117,10 +117,11 @@ describe('sourceMetadataEvent', () => {
     expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
   });
 
-  // A same-origin href is the hub's NORMAL output when the owning platform is
-  // the serving platform. Dropping it left every guide chip with a name and no
-  // destination, before the consumer's own absolutiser could ever run.
-  it('keeps a root-relative external URL', () => {
+  // A root-relative href is NOT a same-origin link for this payload: its
+  // consumer (the dashboard) has no hub origin, so `/onboarding-guides/x` would
+  // resolve against the dashboard's own domain and 404. The producer absolutises;
+  // anything relative that still arrives is dropped rather than rendered broken.
+  it('drops a root-relative external URL instead of rendering a broken link', () => {
     const event = sourceMetadataEvent({
       sources: [
         {
@@ -132,10 +133,12 @@ describe('sourceMetadataEvent', () => {
         },
       ],
     });
-    expect(event?.sources?.[0].externalUrl).toBe('/onboarding-guides/x');
+    // The source itself survives — only the unresolvable href is dropped.
+    expect(event?.sources?.[0].name).toBe('Guide');
+    expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
   });
 
-  it('keeps a root-relative external URL on a grouped item', () => {
+  it('drops a root-relative external URL on a grouped item', () => {
     const event = sourceMetadataEvent({
       sources: [
         {
@@ -145,7 +148,14 @@ describe('sourceMetadataEvent', () => {
         },
       ],
     });
-    expect(event?.sources?.[0].items?.[0].externalUrl).toBe('/onboarding-guides/a');
+    expect(event?.sources?.[0].items?.[0]).not.toHaveProperty('externalUrl');
+  });
+
+  it('keeps an absolute https external URL, which is what the producer emits', () => {
+    const event = sourceMetadataEvent({
+      sources: [{ index: 1, name: 'Guide', externalUrl: 'https://hub.example/onboarding-guides/x' }],
+    });
+    expect(event?.sources?.[0].externalUrl).toBe('https://hub.example/onboarding-guides/x');
   });
 
   it('drops a protocol-relative URL, which is a third-party origin and not a path', () => {
@@ -292,28 +302,23 @@ describe('mergeSourceMetadata', () => {
 });
 
 /**
- * Origin-escape via the URL parser's backslash handling.
- *
- * `/\evil.test/x` starts with exactly one slash, so every prefix-based
- * "is this same-origin" test accepts it — and then the parser resolves it to
- * `https://evil.test/x`, because a backslash is a slash in the authority
- * position. The href lands in a real `<a>` in the chat panel, built from a
- * remote MCP server's output. Resolving the candidate and comparing origins is
- * the only check that cannot disagree with what the browser will do.
+ * Paths that masquerade as same-origin. None can survive: the decoder accepts
+ * only absolute https, so an origin escape (`/\evil.test/x` resolves to
+ * `https://evil.test/x`) is rejected for the same reason an honest relative
+ * path is — this payload has no origin for either to be relative TO.
  */
-describe('linkUrl rejects origin escapes that look like paths', () => {
-  const escapes = ['/\\evil.test/x', '/\\\\evil.test/x', '//evil.test/x', '/\\/evil.test/x'];
-  it.each(escapes)('drops %s', href => {
+describe('relative and path-shaped hrefs are all dropped', () => {
+  const hrefs = [
+    '/\\evil.test/x',
+    '/\\\\evil.test/x',
+    '//evil.test/x',
+    '/\\/evil.test/x',
+    '/onboarding-guides/set-up-sso',
+  ];
+  it.each(hrefs)('drops %s', href => {
     const event = sourceMetadataEvent({
       sources: [{ index: 1, name: 'Doc', path: 'docs/x', documentType: 'markdown', externalUrl: href }],
     });
     expect(event?.sources?.[0]).not.toHaveProperty('externalUrl');
-  });
-
-  it('still keeps a genuine same-origin path', () => {
-    const event = sourceMetadataEvent({
-      sources: [{ index: 1, name: 'Guide', externalUrl: '/onboarding-guides/set-up-sso' }],
-    });
-    expect(event?.sources?.[0].externalUrl).toBe('/onboarding-guides/set-up-sso');
   });
 });
