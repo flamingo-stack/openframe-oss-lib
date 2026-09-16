@@ -864,8 +864,11 @@ export function formatProgramTimeRange(
   // Resolved ONCE — spelling this chain twice is how the previous version of
   // this pair drifted apart.
   const source = at.instant ?? at.utcDate ?? opts.startAt;
-  const clock = (withZoneLabel: boolean) => formatTimeWithTimezone(source, at.timezone, { withZoneLabel });
   const label = opts.withZoneLabel === true;
+  // Each of these builds an `Intl.DateTimeFormat`, so they are computed once
+  // rather than per branch.
+  const bare = formatTimeWithTimezone(source, at.timezone);
+  const labelled = label ? formatTimeWithTimezone(source, at.timezone, { withZoneLabel: true }) : bare;
   // An INVERTED range is not rendered as a range. Its sibling
   // `formatDurationFromRange` already refuses exactly this — its docblock
   // records the "-45m" that shipped on a card — and this renderer guarded the
@@ -876,9 +879,9 @@ export function formatProgramTimeRange(
   const end = ordered && opts.endAt ? formatTimeWithTimezone(opts.endAt, at.timezone, { withZoneLabel: label }) : '';
   // An end with no usable start is not a range, and rendering it alone puts a
   // FINISH time where the reader expects a start. Say nothing instead.
-  if (!clock(false)) return '';
+  if (!bare) return '';
   // Only the LAST clock carries the label, so a range reads "9:00 AM - 5:00 PM EDT".
-  return end ? `${clock(false)} - ${end}` : clock(label);
+  return end ? `${bare} - ${end}` : labelled;
 }
 
 /** Do these two endpoints describe a forward-running interval? */

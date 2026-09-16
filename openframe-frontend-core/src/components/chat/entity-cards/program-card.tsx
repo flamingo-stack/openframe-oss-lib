@@ -359,8 +359,12 @@ export function ProgramCard<T extends BaseProgramItem>({
         </>
       ) : null;
     }
-    if (config.type === 'event' && 'location_name' in item) {
-      return <span className="font-body text-ods-text-secondary">{defaultTypeMeta || 'Location TBD'}</span>;
+    // No 'Location TBD' fallback: the page header hides the tile entirely for
+    // an event with no location, and two surfaces answering "where is this?"
+    // differently — one silent, one confidently "TBD" — is the drift this
+    // shared dispatch exists to end.
+    if (config.type === 'event') {
+      return defaultTypeMeta ? <span className="font-body text-ods-text-secondary">{defaultTypeMeta}</span> : null;
     }
     if (config.type === 'webinar' && (defaultTypeMeta || zonedDate.timezone)) {
       return (
