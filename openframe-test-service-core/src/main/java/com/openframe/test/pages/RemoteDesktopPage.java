@@ -123,7 +123,6 @@ public class RemoteDesktopPage {
      * @param timeoutMs maximum time to wait in milliseconds
      */
     public RemoteDesktopPage waitForCanvasVisible(int timeoutMs) {
-        clearApprovalGate();
         remoteDesktopCanvas()
                 .waitFor(new Locator.WaitForOptions()
                         .setState(VISIBLE)
@@ -133,13 +132,12 @@ public class RemoteDesktopPage {
 
     // ── Remote-access approval gate ──────────────────────────────────────────
 
-    /** The awaiting screen's heading. There are no test ids on this flow, so the copy is the handle. */
+    // The flow carries no test ids, so its copy is the only handle.
     private static final String AWAITING_HEADING = "main h2:has-text('Waiting for approval')";
 
-    /** Buttons of the mock service panel, shown only while {@code remote-access-mock-tools} is on. */
+    // Present only while remote-access-mock-tools is on, which is qa and dev.
     private static final String MOCK_APPROVE = "main button:has-text('Approve')";
 
-    /** The four screens the flow ends on without reaching the session. */
     private static final String[] GATE_FAILURES = {
             "Remote access disabled",
             "Remote access declined",
@@ -147,10 +145,9 @@ public class RemoteDesktopPage {
             "Request failed"
     };
 
-    /** How long to look for the gate at all. It renders with the page or not at all. */
+    // Short on purpose: the gate renders with the page or not at all, and stage and prod pay this.
     private static final int GATE_PROBE_MS = 5_000;
 
-    /** How long to give the approval once it has been answered. */
     private static final int GATE_SETTLE_MS = 20_000;
 
     /**
@@ -173,7 +170,7 @@ public class RemoteDesktopPage {
      * <p>Only the remote desktop is gated. Remote shell and file manager sit outside the flow, which is
      * why neither page object has any of this.
      */
-    public void clearApprovalGate() {
+    public RemoteDesktopPage clearApprovalGate() {
         Locator awaiting = page.locator(AWAITING_HEADING);
         try {
             awaiting.waitFor(new Locator.WaitForOptions()
@@ -181,7 +178,7 @@ public class RemoteDesktopPage {
                     .setTimeout(GATE_PROBE_MS));
         } catch (TimeoutError noGate) {
             failIfGateRefused();
-            return;
+            return this;
         }
 
         Locator approve = page.locator(MOCK_APPROVE);
@@ -196,9 +193,9 @@ public class RemoteDesktopPage {
                 .setState(WaitForSelectorState.HIDDEN)
                 .setTimeout(GATE_SETTLE_MS));
         failIfGateRefused();
+        return this;
     }
 
-    /** Turns one of the gate's dead-end screens into a failure that names it. */
     private void failIfGateRefused() {
         for (String title : GATE_FAILURES) {
             Locator screen = page.locator("main :text-is('" + title + "')");
