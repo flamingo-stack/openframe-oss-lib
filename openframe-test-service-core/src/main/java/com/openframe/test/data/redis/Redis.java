@@ -1,10 +1,13 @@
 package com.openframe.test.data.redis;
 
+import com.google.auth.oauth2.GoogleCredentials;
 import com.openframe.test.config.RedisConfig;
 import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.DefaultJedisClientConfig;
+import redis.clients.jedis.DefaultRedisCredentials;
 import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.RedisCredentials;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
@@ -63,20 +66,42 @@ public class Redis {
     }
 
     /**
-     * TLS only where a CA is published; an in-cluster Redis without in-transit encryption stays plain.
+     * Auth and TLS are independent and both optional: a token is sent only where the cluster runs
+     * with IAM auth, TLS only where a CA is published. A plain in-cluster Redis has neither.
      *
      * <p>The client is built per call rather than cached: a caller polls at most a few dozen times, and
      * a cached static client would trade those handshakes for a topology-staleness problem.
      */
     private static JedisClientConfig clientConfig() throws GeneralSecurityException, IOException {
-        String ca = RedisConfig.getCaCertificate();
-        if (ca == null) {
-            return DefaultJedisClientConfig.builder().build();
+        DefaultJedisClientConfig.Builder builder = DefaultJedisClientConfig.builder();
+
+        if (RedisConfig.isIamAuth()) {
+            builder.credentialsProvider(Redis::iamCredentials);
         }
-        return DefaultJedisClientConfig.builder()
-                .ssl(true)
-                .sslSocketFactory(sslSocketFactory(ca))
-                .build();
+
+        String ca = RedisConfig.getCaCertificate();
+        if (ca != null) {
+            builder.ssl(true).sslSocketFactory(sslSocketFactory(ca));
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * A managed Redis on IAM takes an access token where a password would go. The supplier is called
+     * per connection on purpose: the token expires within the hour and Google's own guidance is not
+     * to cache one, so refreshing here keeps a long-polling caller from authenticating with a stale
+     * credential. In a pod the identity comes from Workload Identity, so no key material is involved.
+     */
+    private static RedisCredentials iamCredentials() {
+        try {
+            GoogleCredentials credentials = GoogleCredentials.getApplicationDefault()
+                    .createScoped("https://www.googleapis.com/auth/cloud-platform");
+            credentials.refreshIfExpired();
+            return new DefaultRedisCredentials(null, credentials.getAccessToken().getTokenValue());
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not obtain an access token for Redis IAM auth", e);
+        }
     }
 
     /** Trust exactly the published CA - a managed Redis signs with a private one the JVM has never seen. */
