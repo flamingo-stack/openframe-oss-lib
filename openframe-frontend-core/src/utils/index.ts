@@ -4,7 +4,15 @@ export { cn } from './cn';
 // here so existing `/utils` callers keep working; the new resolver/helpers
 // (getPlatformByHostname/hostOf/expandWwwApex/…) are exposed via the `/platform-domains`
 // subpath ONLY (one import surface for the new API).
-export { getPlatformUrl, getPlatformProductionUrl, getAllPlatformBaseDomains } from '../platform-domains';
+export {
+  getPlatformUrl,
+  getPlatformProductionUrl,
+  getAllPlatformBaseDomains,
+  getDeploymentUrl,
+  getRequestOrigin,
+  isLocalUrl,
+  resolveRedirectTarget,
+} from '../platform-domains';
 // Number / currency / byte / date formatters live in `./format` (single
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.

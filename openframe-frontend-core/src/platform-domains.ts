@@ -164,6 +164,75 @@ export function getPlatformUrl(platform: string, options: { environment?: 'curre
   return url.replace(/\/+$/, '');
 }
 
+/**
+ * Where THIS app is reachable, no trailing slash: what anything outside the app must
+ * fetch from the code that is running (rendered images, provider callbacks, self-calls).
+ * The one app-origin resolver; each app only supplies its own platform and config.
+ *
+ * In order:
+ * 1. In the browser: the page's origin.
+ * 2. `configuredUrl`: an app whose URL is configured at runtime (a self-hosted OpenFrame
+ *    install's `NEXT_PUBLIC_APP_URL`) — that install's address wins over any default.
+ * 3. On a Vercel preview: the deployment's immutable `VERCEL_URL` (not the branch alias,
+ *    which moves to the next commit and would serve other code).
+ * 4. In any production build: the platform's registry URL.
+ * 5. In development: `NEXT_PUBLIC_DEV_URL`, else localhost on the running port.
+ */
+export function getDeploymentUrl(options: { platform: string; configuredUrl?: string | null }): string {
+  if (typeof window !== 'undefined') return window.location.origin;
+  const configured = options.configuredUrl?.trim();
+  if (configured) return ensureScheme(configured).replace(/\/+$/, '');
+  if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_URL) {
+    return ensureScheme(process.env.VERCEL_URL).replace(/\/+$/, '');
+  }
+  if (process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production') {
+    return getPlatformUrl(options.platform, { environment: 'production' });
+  }
+  return (process.env.NEXT_PUBLIC_DEV_URL || `http://localhost:${process.env.PORT ?? 3000}`).replace(/\/+$/, '');
+}
+
+/** A hostname on the local machine, matched WHOLE: `localhost.example.com` and
+ *  `127.evil.example` are public hosts. */
+const LOCAL_HOSTNAME = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1\])$/i;
+
+/** Is this URL on the local machine, where no external system (a webhook sender, an
+ *  OAuth provider) can reach it? False for anything that is not a URL. */
+export function isLocalUrl(url: string): boolean {
+  try {
+    return LOCAL_HOSTNAME.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The origin a server request arrived on, from its `host` header only (what the edge set
+ * for this request — a client-writable `x-forwarded-host` never chooses where a flow
+ * returns). `http` for a local host unless the proxy says otherwise, else `https`.
+ * `null` when there is no Host header; the caller decides the fallback.
+ */
+export function getRequestOrigin(headers: { get(name: string): string | null }): string | null {
+  const host = headers.get('host');
+  if (!host) return null;
+  const local = LOCAL_HOSTNAME.test(host.replace(/:\d+$/, ''));
+  const proto = headers.get('x-forwarded-proto')?.split(',')[0].trim() || (local ? 'http' : 'https');
+  return `${proto}://${host}`;
+}
+
+/**
+ * Where a redirect goes: a path resolves against `origin`; an explicit absolute
+ * `http(s)://` URL is used as is. THROWS when a relative target resolves to another
+ * origin (`//evil.example`, `/\\evil.example`), so a shared redirect helper built on it
+ * can never be an open redirect.
+ */
+export function resolveRedirectTarget(origin: string, target: string): URL {
+  const url = new URL(target, origin);
+  if (!/^https?:\/\//i.test(target) && url.origin !== new URL(origin).origin) {
+    throw new Error(`resolveRedirectTarget: "${target}" is not a same-origin path`);
+  }
+  return url;
+}
+
 // ── Single-owner host primitives ──
 
 /** Canonical URL→host parser: `.hostname` (PORT-STRIPPED, lowercased), null on parse failure. */
