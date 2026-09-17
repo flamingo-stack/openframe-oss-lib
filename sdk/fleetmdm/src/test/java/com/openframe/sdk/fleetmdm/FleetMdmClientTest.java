@@ -3,6 +3,7 @@ package com.openframe.sdk.fleetmdm;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.FleetVulnerability;
 import com.openframe.sdk.fleetmdm.model.Host;
+import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +18,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,10 +47,15 @@ class FleetMdmClientTest {
         assertNotNull(host);
         assertEquals(1L, host.getId());
         assertEquals("mac", host.getHostname());
+        verify(httpClient).send(
+                org.mockito.ArgumentMatchers.argThat(request -> request.uri().toString()
+                        .equals("https://fleet.example.com/api/v1/fleet/hosts/1?exclude_software=true")),
+                any(HttpResponse.BodyHandler.class));
     }
 
     @Test
-    void getHostById_hostContainsVulnerableSoftware_preservesDeviceVulnerabilityFields() throws Exception {
+    void getHostVulnerabilityInventoryById_hostContainsVulnerableSoftware_preservesDeviceVulnerabilityFields()
+            throws Exception {
         // setup
         String body = """
                 {
@@ -94,10 +101,10 @@ class FleetMdmClientTest {
         when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
 
         // execution
-        Host host = client.getHostById(1);
+        HostVulnerabilityInventory host = client.getHostVulnerabilityInventoryById(1);
 
         // verifications
-        List<FleetSoftware> software = host.getSoftware();
+        List<FleetSoftware> software = host.software();
         assertEquals(1, software.size());
         FleetSoftware application = software.get(0);
         assertEquals(42L, application.getId());
