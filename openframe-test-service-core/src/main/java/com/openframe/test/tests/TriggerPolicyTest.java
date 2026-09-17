@@ -163,6 +163,9 @@ public class TriggerPolicyTest extends BaseTest {
         // run was already in flight, typically the one the previous case in this class started seconds
         // earlier, and its aggregation may already be done; waiting on that run can never produce a
         // stamp newer than aggregatedBefore.
+        //
+        // Retrying a server-wide trigger is safe: FleetWait polls every 3s, so this is at most ~20
+        // requests, and a refused one starts nothing, so at most one extra cron run comes of it.
         int triggerStatus = FleetWait.until(
                 "Fleet to accept a " + MonitoringApi.CLEANUPS_THEN_AGGREGATION + " trigger",
                 () -> MonitoringApi.triggerCronSchedule(MonitoringApi.CLEANUPS_THEN_AGGREGATION),
