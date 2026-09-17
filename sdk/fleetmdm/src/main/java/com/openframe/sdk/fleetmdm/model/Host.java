@@ -3,6 +3,8 @@ package com.openframe.sdk.fleetmdm.model;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.List;
+
 /**
  * Host model from Fleet MDM
  */
@@ -25,6 +27,8 @@ public class Host {
 
     @JsonProperty("software_updated_at")
     private String softwareUpdatedAt;
+
+    private List<FleetSoftware> software;
 
     @JsonProperty("detail_updated_at")
     private String detailUpdatedAt;
@@ -206,6 +210,9 @@ public class Host {
 
     public String getSoftwareUpdatedAt() { return softwareUpdatedAt; }
     public void setSoftwareUpdatedAt(String softwareUpdatedAt) { this.softwareUpdatedAt = softwareUpdatedAt; }
+
+    public List<FleetSoftware> getSoftware() { return software; }
+    public void setSoftware(List<FleetSoftware> software) { this.software = software; }
 
     public String getDetailUpdatedAt() { return detailUpdatedAt; }
     public void setDetailUpdatedAt(String detailUpdatedAt) { this.detailUpdatedAt = detailUpdatedAt; }
