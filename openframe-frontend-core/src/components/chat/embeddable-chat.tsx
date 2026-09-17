@@ -98,6 +98,7 @@ import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-m
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
 import { FALLBACK_TOP_RETRIEVED, splitCitedSources } from './utils/cited-sources';
+import { formatCitationIndices } from './utils/group-sources';
 import { executeNavigation } from './utils/execute-navigation';
 import { flattenAssistantContent } from './utils/flatten-assistant-content';
 import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
@@ -668,7 +669,9 @@ function SourceChip({
       // value is what keeps the handler assertion-free.
       const itemChatRef = itemCta.chatRef;
       return {
-        label: item.name,
+        // A client-built group keeps each row's own citation number, so the
+        // `[3]` in the answer is findable inside the dropdown.
+        label: item.index === undefined ? item.name : `[${item.index}] ${item.name}`,
         icon: <ItemIcon className="h-3.5 w-3.5" />,
         href: itemCta.href ?? undefined,
         targetPlatform: itemCta.targetPlatform,
@@ -683,6 +686,11 @@ function SourceChip({
             : undefined,
       };
     });
+
+    // A server-grouped chip answers to one number; a client-built one answers
+    // to every number its rows were cited by.
+    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
+    const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
 
     return (
       <HoverDropdown
@@ -701,7 +709,7 @@ function SourceChip({
         <span className={`${chipClass} cursor-pointer`}>
           {icon}
           <span className="max-w-[160px] truncate">
-            [{src.index}] {src.name}
+            [{groupIndices}] {src.name}
           </span>
         </span>
       </HoverDropdown>
