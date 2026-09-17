@@ -22,6 +22,7 @@ import { Eye } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import type { BlogPostSummary } from '../../../types/blog';
 import { cn } from '../../../utils/cn';
+import { formatDateWithTimezone } from '../../../utils/format';
 import { StatusBadge } from '../../ui/status-badge';
 import {
   COMPACT_CARD_IMAGE_SLOT,
@@ -48,7 +49,7 @@ export interface BlogCardProps {
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   /** Platform that owns `href`. Used by parent wrappers; the card
    *  itself doesn't read it but exposes the prop for the standard
    *  pure-presentation contract. */
@@ -133,14 +134,7 @@ export function BlogCard({
   const { src: displayImage, onError: onImageError } = useCoverImageFallback(post.featured_image, placeholderUrl);
 
   if (size === 'sm') {
-    const dateStr = post.published_at
-      ? new Date(post.published_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          timeZone: 'UTC',
-        })
-      : '';
+    const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
     const firstCategory = post.categories?.find(c => c && c.name)?.name;
     return (
       <a
@@ -189,14 +183,7 @@ export function BlogCard({
     // Rail/strip density — shared <EntityPortraitCard> shell. Raw cover +
     // placeholder go in separately; the shell runs the SAME shared
     // useCoverImageFallback chain internally (so its error recovery works).
-    const dateStr = post.published_at
-      ? new Date(post.published_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          timeZone: 'UTC',
-        })
-      : '';
+    const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
     return (
       <EntityPortraitCard
         href={href}
@@ -218,14 +205,7 @@ export function BlogCard({
   }
 
   // Default: full vertical card.
-  const dateStr = post.published_at
-    ? new Date(post.published_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        timeZone: 'UTC',
-      })
-    : '';
+  const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
   return (
     <article
       className={cn(

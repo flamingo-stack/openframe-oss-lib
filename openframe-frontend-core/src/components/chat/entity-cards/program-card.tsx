@@ -19,14 +19,15 @@
  * and pass the resolved detail URL via `href`.
  */
 
-import { format } from 'date-fns';
 import { ExternalLink, Clock, Play, Video } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
-import { formatDurationCompact, formatTimeWithTimezone, formatDurationFromRange } from '../../../utils/format';
+import { formatProgramDate } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
+import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
+import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -52,26 +53,8 @@ import {
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
-type CardSize = 'default' | 'sm' | 'portrait';
 
-/**
- * Format a Date with date-fns pinned to UTC. `date-fns` `format()` reads the
- * runtime's LOCAL wall-clock, so the same instant renders differently on the
- * server (Vercel = UTC) and the client (visitor tz) → React #418 hydration
- * mismatch. Shifting by the local offset before formatting emits the UTC
- * wall-clock on every machine, so server and client agree. Mirrors the helper
- * in the hub's `program-header.tsx` (kept local — the lib has no date-fns-tz
- * dep) and the repo-wide "pin program dates to UTC" convention.
- */
-function formatUtc(date: Date, fmt: string): string {
-  // A row can legitimately arrive without a date (the field is not guaranteed by
-  // the wire type), and `new Date(undefined)` / `new Date('')` both give an
-  // Invalid Date, which makes date-fns `format()` throw RangeError. Thrown from
-  // render that takes down the whole card rail, not just this card — so the
-  // helper is total and an unknown date renders as nothing.
-  if (Number.isNaN(date.getTime())) return '';
-  return format(new Date(date.getTime() + date.getTimezoneOffset() * 60_000), fmt);
-}
+type CardSize = 'default' | 'sm' | 'portrait';
 
 export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
   if (size === 'sm') {
@@ -139,7 +122,7 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
    *  nav decision (cross-platform / embed → new tab). Defaults to
    *  same-tab for non-chat callsites. */
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   targetPlatform?: string | null;
   /** OG placeholder URL used by the compact branch when no cover. */
   placeholderUrl?: string | null;
@@ -174,24 +157,6 @@ function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string
     console.warn('Failed to parse hosts data:', error);
   }
   return [];
-}
-
-/**
- * Webinar scheduling columns, read off a `BaseProgramItem` that has already
- * been `in`-guarded for `start_at`. Each field is validated rather than
- * asserted — the generic item type does not declare them.
- */
-function webinarTiming(item: BaseProgramItem): {
-  startAt: string | null;
-  endAt: string | null;
-  timezone: string | null;
-} {
-  const str = (value: unknown): string | null => (typeof value === 'string' && value ? value : null);
-  return {
-    startAt: 'start_at' in item ? str(item.start_at) : null,
-    endAt: 'end_at' in item ? str(item.end_at) : null,
-    timezone: 'timezone' in item ? str(item.timezone) : null,
-  };
 }
 
 function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string }) {
@@ -282,24 +247,16 @@ export function ProgramCard<T extends BaseProgramItem>({
   // below is followed by a real type check instead of a cast.
   const isScheduled = 'status' in item && item.status === 'scheduled';
 
-  // Compact per-type meta (duration / location / start time) — shared by the
-  // `sm` and `portrait` densities.
-  const compactTypeMeta = (): string | null => {
-    if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {
-      const dur = item.duration_seconds;
-      if (typeof dur === 'number' && dur > 0) return formatDurationCompact(dur);
-    } else if (config.type === 'event' && 'location_name' in item) {
-      const loc = item.location_name;
-      if (typeof loc === 'string' && loc.trim().length > 0) return loc;
-    } else if (config.type === 'webinar' && 'start_at' in item) {
-      const { startAt, endAt, timezone } = webinarTiming(item);
-      const time = formatTimeWithTimezone(startAt, timezone);
-      const dur = formatDurationFromRange(startAt, endAt);
-      return dur ? `${time} · ${dur}` : time;
-    }
-    return null;
-  };
-  const compactDate = formatUtc(new Date(item.date), 'MMM d, yyyy');
+  // The compact meta line, built by the ONE shared function — the chat card
+  // renders the same string from the same code rather than mirroring it.
+  const {
+    at: zonedDate,
+    typeMeta: compactTypeMetaValue,
+    line: compactMetaLine,
+    // Compact densities join plain strings, so the zone rides inline here; the
+    // default density below renders it as its own styled span instead.
+  } = programMetaLine(item, config.type, programMetaFormatters(PROGRAM_META_RENDERERS));
+  const compactDate = formatProgramDate(zonedDate, 'medium');
 
   if (size === 'portrait') {
     // Rail/strip density — mapped onto the shared <EntityPortraitCard> shell
@@ -308,7 +265,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     // host); the date · duration meta line fills the subtitle when the
     // profile has no job title.
     const profile = programItemToStripProfile(item);
-    const dateMeta = [compactDate, compactTypeMeta()].filter(Boolean).join(' · ');
+    const dateMeta = compactMetaLine;
     return (
       <EntityPortraitCard
         href={href}
@@ -333,7 +290,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   if (size === 'sm') {
     const itemDate = compactDate;
     const compactCover = coverImage || placeholderUrl || null;
-    const typeMeta = compactTypeMeta();
+    const typeMeta = compactTypeMetaValue;
     const subtitleParts = [itemDate, typeMeta, config.labels?.singular].filter(
       (s): s is string => typeof s === 'string' && s.length > 0,
     );
@@ -377,38 +334,42 @@ export function ProgramCard<T extends BaseProgramItem>({
     );
   }
 
-  const itemDate = new Date(item.date);
-  const dateFormat = formatUtc(itemDate, 'EEEE d MMMM');
+  const dateFormat = formatProgramDate(zonedDate, 'weekday');
+
+  // The same dispatch as the compact densities — WHICH value a type shows is
+  // decided once, by `programMetaLine`. Only the presentation differs here
+  // (an icon, and the zone as its own styled span rather than inline), which is
+  // why this asks for an unlabelled webinar value. Restating the dispatch is
+  // how the two ended up with three conditions that disagreed: the podcast one
+  // dropped the `> 0` check, and the event one dropped the non-empty check.
+  const { typeMeta: defaultTypeMeta } = programMetaLine(
+    item,
+    config.type,
+    programMetaFormatters(PROGRAM_META_RENDERERS, { withZoneLabel: false }),
+  );
 
   const defaultRenderMeta = () => {
-    if (config.type === 'podcast' && 'duration_seconds' in item && !isScheduled) {
-      const dur = item.duration_seconds;
-      return (
+    if (config.type === 'podcast') {
+      return defaultTypeMeta ? (
         <>
           <Clock className="h-4 w-4 text-ods-text-secondary" />
-          <span className="font-body text-ods-text-secondary">
-            {formatDurationCompact(typeof dur === 'number' ? dur : null)}
-          </span>
+          <span className="font-body text-ods-text-secondary">{defaultTypeMeta}</span>
         </>
-      );
+      ) : null;
     }
-    if (config.type === 'event' && 'location_name' in item) {
-      const loc = item.location_name;
-      return (
-        <span className="font-body text-ods-text-secondary">{(typeof loc === 'string' && loc) || 'Location TBD'}</span>
-      );
+    // No 'Location TBD' fallback: the page header hides the tile entirely for
+    // an event with no location, and two surfaces answering "where is this?"
+    // differently — one silent, one confidently "TBD" — is the drift this
+    // shared dispatch exists to end.
+    if (config.type === 'event') {
+      return defaultTypeMeta ? <span className="font-body text-ods-text-secondary">{defaultTypeMeta}</span> : null;
     }
-    if (config.type === 'webinar' && 'start_at' in item) {
-      const { startAt, endAt, timezone } = webinarTiming(item);
-      const duration = formatDurationFromRange(startAt, endAt);
+    if (config.type === 'webinar' && (defaultTypeMeta || zonedDate.timezone)) {
       return (
         <>
           <Video className="h-4 w-4 text-ods-text-secondary" />
-          <span className="font-body text-ods-text-secondary">
-            {formatTimeWithTimezone(startAt, timezone)}
-            {duration && ` · ${duration}`}
-          </span>
-          {timezone && <span className="text-ods-text-secondary text-h6">({timezone})</span>}
+          {defaultTypeMeta && <span className="font-body text-ods-text-secondary">{defaultTypeMeta}</span>}
+          {zonedDate.timezone && <span className="text-ods-text-secondary text-h6">({zonedDate.timezone})</span>}
         </>
       );
     }

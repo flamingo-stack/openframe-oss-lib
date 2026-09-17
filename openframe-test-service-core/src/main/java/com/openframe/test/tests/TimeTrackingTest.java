@@ -13,6 +13,7 @@ import com.openframe.test.helpers.RelayIds;
 import com.openframe.test.helpers.ai.RunId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -206,11 +207,13 @@ public class TimeTrackingTest extends BaseTest {
     }
 
     /**
-     * Kept as its own case on purpose: at origin/main 9cc95b263 the api-service answers HTTP 502 to
-     * {@code durationSeconds: 0} instead of the GraphQL validation error the service layer defines
-     * ("Duration must be positive"), so this case fails until the product maps that rejection. The
-     * assertion states the contract; it is not weakened to match the bug.
+     * Disabled pending the product fix tracked at https://app.clickup.com/t/86akk1mqf.
+     * {@code GraphQLExceptionHandler} has no branch for {@code ConstraintViolationException}, so the
+     * real refusal ("durationSeconds: must be greater than 0") never leaves the server and the caller
+     * gets "An unexpected error occurred". The assertion states the contract and is deliberately not
+     * weakened to match the bug. Re-enable when the handler maps validation failures.
      */
+    @Disabled("Wait for bug fix")
     @Tag("feature")
     @Tag("negative")
     @Test

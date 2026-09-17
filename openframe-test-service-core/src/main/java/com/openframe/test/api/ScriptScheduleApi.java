@@ -1,6 +1,10 @@
 package com.openframe.test.api;
 
 import com.openframe.test.data.dto.device.DeviceFilterInput;
+import com.openframe.test.data.dto.execution.ScheduleRunConnection;
+import com.openframe.test.data.dto.execution.ScheduleRunFilters;
+import com.openframe.test.data.dto.execution.ScriptExecutionConnection;
+import com.openframe.test.data.dto.execution.ScriptExecutionFilters;
 import com.openframe.test.data.dto.schedule.CreateScriptScheduleInput;
 import com.openframe.test.data.dto.schedule.ScheduleDeviceCriteriaInput;
 import com.openframe.test.data.dto.schedule.ScheduleDevices;
@@ -10,12 +14,17 @@ import com.openframe.test.data.dto.schedule.ScriptScheduleFilterInput;
 import com.openframe.test.data.dto.schedule.ScriptScheduleFilters;
 import com.openframe.test.data.dto.schedule.UpdateScriptScheduleInput;
 import com.openframe.test.data.dto.shared.GraphqlError;
+import io.restassured.path.json.JsonPath;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.api.graphql.ScriptScheduleQueries.ADD_ALL_DEVICES_TO_SCHEDULE;
+import static com.openframe.test.api.graphql.ScriptScheduleQueries.SCHEDULE_EXECUTIONS;
+import static com.openframe.test.api.graphql.ScriptScheduleQueries.SCHEDULE_EXECUTION_FILTERS;
+import static com.openframe.test.api.graphql.ScriptScheduleQueries.SCHEDULE_RUNS;
+import static com.openframe.test.api.graphql.ScriptScheduleQueries.SCHEDULE_RUN_FILTERS;
 import static com.openframe.test.api.graphql.ScriptScheduleQueries.ADD_DEVICES_TO_SCHEDULE;
 import static com.openframe.test.api.graphql.ScriptScheduleQueries.ARCHIVE_SCRIPT_SCHEDULE;
 import static com.openframe.test.api.graphql.ScriptScheduleQueries.CREATE_SCRIPT_SCHEDULE;
@@ -252,5 +261,42 @@ public class ScriptScheduleApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getString("data.deleteScriptSchedule");
+    }
+
+    // ---- execution history and runs of a schedule (plan item CP-17) ----
+    //
+    // Each read holds the response in a named local before taking a field out of it, so a failure
+    // says which step produced nothing.
+
+    /** Every execution this schedule has dispatched, newest first. */
+    public static ScriptExecutionConnection getScheduleExecutions(String scheduleId, int first) {
+        return object(SCHEDULE_EXECUTIONS, "scheduleExecutions",
+                Map.of("scheduleId", scheduleId, "first", first), ScriptExecutionConnection.class);
+    }
+
+    /** The facet block beside that list: initiators, statuses and machines. */
+    public static ScriptExecutionFilters getScheduleExecutionFilters(String scheduleId) {
+        return object(SCHEDULE_EXECUTION_FILTERS, "scheduleExecutionFilters",
+                Map.of("scheduleId", scheduleId), ScriptExecutionFilters.class);
+    }
+
+    /** A run is one firing of the schedule across its devices; executions are its per-device legs. */
+    public static ScheduleRunConnection getScheduleRuns(String scheduleId, int first) {
+        return object(SCHEDULE_RUNS, "scheduleRuns",
+                Map.of("scheduleId", scheduleId, "first", first), ScheduleRunConnection.class);
+    }
+
+    public static ScheduleRunFilters getScheduleRunFilters(String scheduleId) {
+        return object(SCHEDULE_RUN_FILTERS, "scheduleRunFilters",
+                Map.of("scheduleId", scheduleId), ScheduleRunFilters.class);
+    }
+
+    private static <T> T object(String document, String field, Map<String, Object> variables, Class<T> type) {
+        Map<String, Object> body = Map.of("query", document, "variables", variables);
+        JsonPath response = given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath();
+        return response.getObject("data." + field, type);
     }
 }
