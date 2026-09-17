@@ -23,7 +23,7 @@
  */
 
 import type { ChatSource } from '../components/chat/types/message.types';
-import { getSourceLabel } from './source-icons';
+import { defaultDocumentTypeForTableId, getSourceLabel } from './source-icons';
 
 /**
  * Doc-table documentTypes: whole documents with their own viewer (markdown =
@@ -91,14 +91,23 @@ function isGroupedChip(source: ChatSource): boolean {
   return !!source.items && source.items.length > 0;
 }
 
+/** A source's type, or its TABLE's canonical type when the row arrived without
+ *  one. The table is the stronger fact: a typeless row of a doc table is still
+ *  a whole document, and a typeless row of an entity table still groups. */
+function typeOf(source: TableSource): string {
+  return source.documentType || defaultDocumentTypeForTableId(source.sourceRepo) || '';
+}
+
 /** A source that belongs to its table's chip: it names its table and is not a
  *  whole document. Both shapes qualify, a flat row AND a chip the server
- *  already grouped, so one table is never drawn twice. A flat row with no `id`
- *  still joins (as the hub's server-side chips do), as an Open-only dropdown
- *  row: leaving it out would split one table across a group AND a stray chip. */
+ *  already grouped, so one table is never drawn twice. Naming the table is the
+ *  ONLY requirement: a row with no `id`, or no `documentType`, still joins (as
+ *  the hub's server-side chips do). Leaving it out would split one table
+ *  across a group AND a stray chip. What it lacks only limits its dropdown
+ *  row: no `id` or no type means Open-only, no Ask. */
 function joinsTableChip(source: ChatSource): source is TableSource {
-  if (!source.sourceRepo || !source.documentType) return false;
-  return groupsByTable(source.documentType);
+  if (!source.sourceRepo) return false;
+  return groupsByTable(typeOf({ ...source, sourceRepo: source.sourceRepo }));
 }
 
 /** A source's dropdown rows: a grouped chip's own items, or the flat row itself. */
@@ -108,7 +117,7 @@ function rowsOf(source: TableSource): GroupedSourceRow[] {
     {
       index: source.index,
       id: source.id ?? '',
-      documentType: source.documentType,
+      documentType: typeOf(source),
       name: source.name,
       ...(source.externalUrl ? { externalUrl: source.externalUrl } : {}),
       targetPlatform: source.targetPlatform ?? null,
@@ -134,8 +143,8 @@ function uniqueRows(rows: GroupedSourceRow[]): GroupedSourceRow[] {
 /**
  * Flat sources in, the strip's chips out: ONE chip per table.
  *
- * Every row that names its table joins that table's chip, a lone record and an
- * id-less row included, exactly as the hub's web chat draws it. Each flat row
+ * Every row that names its table joins that table's chip, a lone record and a
+ * row missing its `id` or `documentType` included, exactly as the hub's web chat draws it. Each flat row
  * keeps the citation number it was given, so `[3]` in the answer still
  * resolves inside the group. The chip sits where its table first appeared and
  * takes that source's `index` (unique, members are disjoint), so the strip

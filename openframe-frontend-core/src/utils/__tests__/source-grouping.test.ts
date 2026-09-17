@@ -183,6 +183,21 @@ describe('groupSourcesByTable', () => {
     expect(chips[0].items?.[1].externalUrl).toBe('/clickup-tasks-internal?search=2');
   });
 
+  it('keeps a table in ONE chip when a row has no documentType: the table supplies the type', () => {
+    const typeless = { ...task(2), documentType: '' };
+    const chips = groupSourcesByTable([task(1), typeless]);
+
+    expect(chips).toHaveLength(1);
+    expect(chips[0].name).toBe('ClickUp Tasks (2 records)');
+    // The row gets its table's canonical type, so Ask still works on it.
+    expect(chips[0].items?.map(item => item.documentType)).toEqual(['internal_task', 'internal_task']);
+  });
+
+  it('still treats a typeless row of a doc table as a whole document', () => {
+    const typelessDoc = { ...doc(1), documentType: '' };
+    expect(groupSourcesByTable([typelessDoc, doc(2)])).toEqual([typelessDoc, doc(2)]);
+  });
+
   it('leaves a row that names no table as its own chip', () => {
     const { sourceRepo: _repo, ...noTable } = task(2);
     expect(groupSourcesByTable([noTable])).toEqual([noTable]);
