@@ -209,11 +209,14 @@ export function isLocalUrl(url: string): boolean {
  * The origin a server request arrived on, from its `host` header only (what the edge set
  * for this request — a client-writable `x-forwarded-host` never chooses where a flow
  * returns). `http` for a local host unless the proxy says otherwise, else `https`.
- * `null` when there is no Host header; the caller decides the fallback.
+ * With no Host header, the app's own origin (`getDeploymentUrl` for `platform`).
  */
-export function getRequestOrigin(headers: { get(name: string): string | null }): string | null {
+export function getRequestOrigin(
+  headers: { get(name: string): string | null },
+  options: { platform: string; configuredUrl?: string | null },
+): string {
   const host = headers.get('host');
-  if (!host) return null;
+  if (!host) return getDeploymentUrl(options);
   const local = LOCAL_HOSTNAME.test(host.replace(/:\d+$/, ''));
   const proto = headers.get('x-forwarded-proto')?.split(',')[0].trim() || (local ? 'http' : 'https');
   return `${proto}://${host}`;

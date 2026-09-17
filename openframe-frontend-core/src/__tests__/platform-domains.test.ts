@@ -233,17 +233,25 @@ describe('getDeploymentUrl — the one app-origin resolver', () => {
 describe('getRequestOrigin / isLocalUrl / resolveRedirectTarget', () => {
   const headers = (values: Record<string, string>) => ({ get: (name: string) => values[name] ?? null });
 
-  it('reads the host the request arrived on, https unless local, ignoring x-forwarded-host', () => {
-    expect(getRequestOrigin(headers({ host: 'www.flamingo.run' }))).toBe('https://www.flamingo.run');
-    expect(getRequestOrigin(headers({ host: 'localhost:3000' }))).toBe('http://localhost:3000');
-    expect(getRequestOrigin(headers({ host: '[::1]:3000' }))).toBe('http://[::1]:3000');
-    expect(getRequestOrigin(headers({ host: 'x.vercel.app', 'x-forwarded-proto': 'https' }))).toBe(
-      'https://x.vercel.app',
-    );
-    expect(getRequestOrigin(headers({ host: 'www.flamingo.run', 'x-forwarded-host': 'evil.example' }))).toBe(
+  it('reads the host the request arrived on, https unless local, ignoring x-forwarded-host, else the app origin', () => {
+    expect(getRequestOrigin(headers({ host: 'www.flamingo.run' }), { platform: 'flamingo' })).toBe(
       'https://www.flamingo.run',
     );
-    expect(getRequestOrigin(headers({}))).toBeNull();
+    expect(getRequestOrigin(headers({ host: 'localhost:3000' }), { platform: 'flamingo' })).toBe(
+      'http://localhost:3000',
+    );
+    expect(getRequestOrigin(headers({ host: '[::1]:3000' }), { platform: 'flamingo' })).toBe('http://[::1]:3000');
+    expect(
+      getRequestOrigin(headers({ host: 'x.vercel.app', 'x-forwarded-proto': 'https' }), { platform: 'flamingo' }),
+    ).toBe('https://x.vercel.app');
+    expect(
+      getRequestOrigin(headers({ host: 'www.flamingo.run', 'x-forwarded-host': 'evil.example' }), {
+        platform: 'flamingo',
+      }),
+    ).toBe('https://www.flamingo.run');
+    vi.stubGlobal('window', undefined);
+    vi.stubEnv('NEXT_PUBLIC_DEV_URL', 'http://localhost:4000');
+    expect(getRequestOrigin(headers({}), { platform: 'flamingo' })).toBe('http://localhost:4000');
   });
 
   it.each([
