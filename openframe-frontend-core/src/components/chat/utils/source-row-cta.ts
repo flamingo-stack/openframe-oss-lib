@@ -24,6 +24,7 @@
 import { FileText } from 'lucide-react';
 import type React from 'react';
 import { getPlatformUrl } from '../../../platform-domains';
+import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import { canonicalContentRefType } from '../../../utils/list-url';
 import type { ChatRef } from '../chat-ref.types';
@@ -154,13 +155,9 @@ function pickSourceIcon(sourceRepo: string | null, documentType: string | null |
   return { icon, iconLabel };
 }
 
-/**
- * Doc-table documentTypes — rows that carry an in-app `path` (not an entity
- * `externalUrl`) and resolve to a doc viewer. The SAME set an embedder keys its
- * `docPlatformTargets` map by (markdown = product docs, data_room_doc = data room),
- * declared once so the two can't silently diverge.
- */
-export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc'] as const;
+// Declared once in `utils/source-grouping`; re-exported so embedders that key
+// `docPlatformTargets` by it keep their import.
+export { DOC_TABLE_TYPES };
 
 /**
  * Only doc-table rows (DOC_TABLE_TYPES) fall back to doc-viewer navigation when no

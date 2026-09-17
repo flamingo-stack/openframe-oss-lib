@@ -98,7 +98,7 @@ import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-m
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
 import { FALLBACK_TOP_RETRIEVED, splitCitedSources } from './utils/cited-sources';
-import { formatCitationIndices } from './utils/group-sources';
+import { formatCitationIndices } from '../../utils/source-grouping';
 import { executeNavigation } from './utils/execute-navigation';
 import { flattenAssistantContent } from './utils/flatten-assistant-content';
 import { mapHostMessage, pruneTimestampCache } from './utils/host-message';

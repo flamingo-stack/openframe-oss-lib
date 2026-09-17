@@ -10,10 +10,14 @@
  * dropped — callers that want logging can wrap this helper).
  */
 
+import { getSourceLabel } from '../../../utils/source-icons';
+import { recordCountLabel } from '../../../utils/source-grouping';
 import type { SearchResult } from '../../ui/search-input';
 import type { DocSearchResult } from './types';
 
 /** Source repos that should be collapsed into grouped results in the search bar.
+ *  A SEARCH rule, deliberately narrower than the chat strip's `groupsByTable`:
+ *  a search result is a destination, so only rows that share one are folded.
  *  Only financial tables (all rows link to the same admin page).
  *  Content tables (blog, webinar, podcast, etc.) stay individual since each has a unique URL. */
 const SEARCH_GROUP_REPOS = new Set([
@@ -23,20 +27,6 @@ const SEARCH_GROUP_REPOS = new Set([
   'financial-balance-sheet',
   'financial-cash-flow',
 ]);
-
-const ENTITY_LABELS: Record<string, string> = {
-  'financial-cap-table': 'Cap Table',
-  'financial-kpis': 'Financial KPIs',
-  'financial-pnl': 'Profit & Loss',
-  'financial-balance-sheet': 'Balance Sheets',
-  'financial-cash-flow': 'Cash Flow',
-  'blog-posts': 'Blog Posts',
-  'product-releases': 'Product Releases',
-  'case-studies': 'Case Studies',
-  webinars: 'Webinars',
-  events: 'Events',
-  podcasts: 'Podcasts',
-};
 
 export function mapDocSearchResults(docs: DocSearchResult[]): SearchResult[] {
   const entityGroups = new Map<string, DocSearchResult[]>();
@@ -67,10 +57,10 @@ export function mapDocSearchResults(docs: DocSearchResult[]): SearchResult[] {
       // whole search dropdown if that ever stops holding.
       const rows = entityGroups.get(entry.repo);
       if (!rows || rows.length === 0) continue;
-      const label = ENTITY_LABELS[entry.repo] || entry.repo;
       results.push({
         id: `group-${entry.repo}`,
-        title: `${label} (${rows.length} ${rows.length === 1 ? 'record' : 'records'})`,
+        // Same table label and count as the chat's grouped chip: one owner each.
+        title: `${getSourceLabel(entry.repo)} ${recordCountLabel(rows.length)}`,
         path: rows[0].path,
         type: 'file',
         metadata: {

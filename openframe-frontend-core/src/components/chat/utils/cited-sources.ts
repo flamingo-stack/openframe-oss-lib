@@ -1,5 +1,5 @@
 import type { ChatSource } from '../types/message.types';
-import { groupSourcesByTable } from './group-sources';
+import { groupSourcesByTable } from '../../../utils/source-grouping';
 
 /** How many retrieved sources to show when the answer cited none of them. */
 export const FALLBACK_TOP_RETRIEVED = 3;
