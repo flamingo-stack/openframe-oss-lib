@@ -78,6 +78,11 @@ public class TicketLifecycleService {
 
         boolean reopening = isReopening(context.currentStatus(), target);
         applyTransition(context.ticket(), target);
+        // `order` is ranked per column, so a transition must re-rank: a rank minted for the
+        // old column drops the ticket at an arbitrary depth in the new one, and collides with
+        // its head (every column is seeded from LexoRank.middle()). Newest-on-top, same as a
+        // freshly created ticket. Read before the save, so it cannot find ITSELF as the head.
+        context.ticket().setOrder(computeRankAtTop(target.getId()));
         stampResolverIfResolved(context.ticket(), target, principal);
         if (reopening) {
             clearResolutionTrace(context.ticket());
@@ -236,6 +241,13 @@ public class TicketLifecycleService {
                 .orElseThrow(() -> new TicketNotFoundException(input.getId()));
 
         String targetStatusId = hasText(input.getStatusId()) ? input.getStatusId() : ticket.getStatusId();
+
+        // Ranked BEFORE the transition, never after: the transition is its own save (plus a
+        // history entry and listener notifications no rollback undoes), so ranking afterwards
+        // let a failed rank leave the ticket already moved while the caller was told it had
+        // not. The anchors are in the target column either way, so they read the same here.
+        String newOrder = computeRankBetween(input.getAfterTicketId(), input.getBeforeTicketId(), targetStatusId);
+
         if (!targetStatusId.equals(ticket.getStatusId())) {
             TransitionTicketInput transitionInput = TransitionTicketInput.builder()
                     .ticketId(ticket.getId())
@@ -247,7 +259,7 @@ public class TicketLifecycleService {
                     .orElseThrow(() -> new TicketNotFoundException(input.getId()));
         }
 
-        String newOrder = computeRankBetween(input.getAfterTicketId(), input.getBeforeTicketId(), targetStatusId);
+        // Overwrites the top-of-column rank the transition assigned: this caller knows the slot.
         ticket.setOrder(newOrder);
         Ticket saved = ticketRepository.save(ticket);
         log.info("Reordered ticket {} in column {} to order {}", saved.getId(), targetStatusId, newOrder);
@@ -270,7 +282,14 @@ public class TicketLifecycleService {
         if (areBothNeighborsPresent(afterTicketId, beforeTicketId)) {
             LexoRank lower = loadRank(afterTicketId, targetStatusId);
             LexoRank upper = loadRank(beforeTicketId, targetStatusId);
-            return lower.between(upper).format();
+            // LexoRank throws on two equal ranks rather than picking a side, failing the drop
+            // over data the user can neither see nor repair. Fall through to the single-anchor
+            // path, which finds the opposite neighbour by a STRICT comparison and steps over
+            // the tie. Ties cost nothing else: the cursor sort tie-breaks on `_id`.
+            if (!lower.format().equals(upper.format())) {
+                return lower.between(upper).format();
+            }
+            return rankAfterAnchor(lower, targetStatusId);
         }
 
         if (afterTicketId != null) {

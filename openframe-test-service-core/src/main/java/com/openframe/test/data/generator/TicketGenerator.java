@@ -53,13 +53,20 @@ public class TicketGenerator {
     /**
      * Reorders the column's bottom ticket to the top (before the current first ticket). Uses a single
      * anchor so the new rank is derived from one neighbor's rank (never a between-two-equal-ranks
-     * collision), and keeps the ticket in its own lifecycle column (no statusId change).
+     * collision), and keeps the ticket in its own lifecycle column.
+     *
+     * <p>{@code statusId} is sent even though the column does not change, because it is what selects
+     * the ranking implementation: without it {@code reorderTicket} falls through to the pre-lifecycle
+     * body, which ranks against the deprecated {@code status} enum instead of the statusId column
+     * this test is asserting about. Leaving it out had this test covering a path no client uses.
      */
     public static ReorderTicketInput moveLastBeforeFirst(TicketConnection connection) {
         List<TicketEdge> edges = connection.getEdges();
+        Ticket moved = edges.getLast().getNode();
         return ReorderTicketInput.builder()
-                .id(edges.getLast().getNode().getId())
+                .id(moved.getId())
                 .beforeTicketId(edges.getFirst().getNode().getId())
+                .statusId(moved.getStatusDefinition().getId())
                 .build();
     }
 
