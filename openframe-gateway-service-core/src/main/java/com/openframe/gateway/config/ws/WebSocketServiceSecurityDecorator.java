@@ -1,5 +1,6 @@
 package com.openframe.gateway.config.ws;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,8 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
     private final RequestJwtClaimsReader requestJwtReader;
     private final GatewayTrafficMetrics gatewayTrafficMetrics;
     private final WebSocketLoggingProperties loggingProperties;
+    private final MeshControlCommandProperties meshControlProperties;
+    private final ObjectMapper objectMapper;
 
     private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
     private record SessionInfo(Instant createdAt, String path, String sub) {}
@@ -61,9 +64,17 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                     Disposable disposable = scheduleSessionRemoveJob(session, path, sub, debugPath, effectiveSeconds);
                     processSessionClosedEvent(session, path, sub, disposable);
 
-                    WebSocketSession sessionToHandle = loggingProperties.isFramePath(path)
-                            ? new LoggingWebSocketSessionDecorator(session, path, tenantId(exchange), loggingProperties)
-                            : session;
+                    WebSocketSession sessionToHandle = session;
+                    // Command allowlist first, so the logging tap (when on) records what actually
+                    // reaches the tool rather than what the browser attempted.
+                    if (meshControlProperties.isEnabled() && meshControlProperties.isControlPath(path)) {
+                        sessionToHandle = new MeshControlFilteringWebSocketSessionDecorator(
+                                sessionToHandle, path, tenantId(exchange), meshControlProperties, objectMapper);
+                    }
+                    if (loggingProperties.isFramePath(path)) {
+                        sessionToHandle = new LoggingWebSocketSessionDecorator(
+                                sessionToHandle, path, tenantId(exchange), loggingProperties);
+                    }
                     return defaultWebSocketHandler.handle(sessionToHandle);
                 } catch (Exception e) {
                     log.warn(LOG_PREFIX + "JWT expiration read failed, closing: {}", sessionId, path, sub, e.getMessage(), e);
