@@ -75,6 +75,6 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
 
     @Override
     public void onFailed(MachineDelivery delivery, DeliveryFailure failure) {
-        // nothing beyond FAILED + metric: an install is safe to re-run by hand
+        // intentionally empty: a failed install leaves nothing to compensate
     }
 }
