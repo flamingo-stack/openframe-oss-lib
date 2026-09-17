@@ -2,7 +2,6 @@ package com.openframe.delivery;
 
 import com.openframe.data.document.delivery.DeliveryType;
 
-// composite _id: re-dispatching the same command overwrites its row, and the tracker finds it without an index
 final class DeliveryId {
 
     private static final String SEPARATOR = ":";

@@ -7,7 +7,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-// only the service that owns the sweep (client) turns this on; every publisher of deliveries gets the rest
 @Slf4j
 @Component
 @RequiredArgsConstructor

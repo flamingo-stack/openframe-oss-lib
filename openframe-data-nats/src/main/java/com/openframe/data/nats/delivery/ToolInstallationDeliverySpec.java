@@ -52,7 +52,7 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
         return ToolInstallationMessage.class;
     }
 
-    // targetId is the tool agent key: the agent reports it back as agentType in installed-agent
+    // targetId must equal the agentType the agent sends in installed-agent, or complete() never finds the row
     @Override
     public DeliveryRequest<ToolInstallationMessage> request(Seed seed) {
         IntegratedToolAgent toolAgent = seed.getToolAgent();

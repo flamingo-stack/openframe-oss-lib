@@ -40,7 +40,6 @@ public class DeliveryProperties {
         return override.mergeOver(defaults);
     }
 
-    // row-level overrides come from ScheduleScript (per-schedule offline behaviour) and win over the type policy
     public Policy resolve(MachineDelivery delivery) {
         Policy typePolicy = resolve(delivery.getType());
         Policy rowOverride = new Policy();

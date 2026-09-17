@@ -12,7 +12,6 @@ import java.util.Set;
 
 import static java.util.stream.Collectors.toSet;
 
-// the only place the engine reads the Machine document; heartbeat-driven status today
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "openframe.delivery.enabled", havingValue = "true")
