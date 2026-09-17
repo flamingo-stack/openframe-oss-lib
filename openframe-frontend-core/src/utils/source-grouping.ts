@@ -196,7 +196,7 @@ export function groupSourcesByTable(sources: ChatSource[]): ChatSource[] {
 export function formatCitationIndices(indices: number[]): string {
   const sorted = [...new Set(indices)].sort((a, b) => a - b);
   const runs: string[] = [];
-  for (let start = 0; start < sorted.length; ) {
+  for (let start = 0; start < sorted.length;) {
     let end = start;
     while (end + 1 < sorted.length && sorted[end + 1] === sorted[end] + 1) end++;
     runs.push(end === start ? `${sorted[start]}` : `${sorted[start]}-${sorted[end]}`);

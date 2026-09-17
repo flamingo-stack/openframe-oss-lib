@@ -55,7 +55,14 @@ describe('buildGroupedSource', () => {
       index: 4,
       sourceRepo: 'clickup-tasks-internal',
       rows: [
-        { id: 'a', documentType: 'internal_task', name: 'A', externalUrl: '/a', targetPlatform: 'product-hub', path: 'p/a' },
+        {
+          id: 'a',
+          documentType: 'internal_task',
+          name: 'A',
+          externalUrl: '/a',
+          targetPlatform: 'product-hub',
+          path: 'p/a',
+        },
         { id: 'b', documentType: 'internal_task', name: 'B', path: null },
       ],
     });
@@ -123,7 +130,12 @@ describe('groupSourcesByTable', () => {
       'openframe-docs',
     ]);
     // Every row lands in exactly one chip, in the order it arrived.
-    expect(chips.map(chip => chip.items?.map(item => item.index) ?? [chip.index])).toEqual([[1, 4, 8], [2, 6], [3, 7], [5]]);
+    expect(chips.map(chip => chip.items?.map(item => item.index) ?? [chip.index])).toEqual([
+      [1, 4, 8],
+      [2, 6],
+      [3, 7],
+      [5],
+    ]);
   });
 
   it('never groups doc-table rows: each document is its own chip', () => {
