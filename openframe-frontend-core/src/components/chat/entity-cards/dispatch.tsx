@@ -35,12 +35,9 @@ import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { formatDateShort } from '../../../utils/date-formatters';
 import { faqItemAnchor } from '../../../utils/faq-anchor';
-import {
-  formatDateUTC as formatDate,
-  formatDurationCompact,
-  formatTimeWithTimezone,
-  formatDurationFromRange,
-} from '../../../utils/format';
+import { formatDateUTC as formatDate } from '../../../utils/format';
+import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
+import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
 import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
@@ -1105,27 +1102,12 @@ function ProgramChatCard({
       <MicrophoneIcon size={24} />
     );
 
-  // Rich meta line mirroring ProgramCard's compact subtitle: "date · <typeMeta>"
-  // where typeMeta is podcast duration / event location / webinar time·duration.
-  // The type label itself already lives in the status pill, so it's omitted here.
-  const isScheduled = item?.status === 'scheduled';
-  let typeMeta: string | undefined;
-  if (
-    configKey === 'podcast' &&
-    typeof item?.duration_seconds === 'number' &&
-    item.duration_seconds > 0 &&
-    !isScheduled
-  ) {
-    typeMeta = formatDurationCompact(item.duration_seconds);
-  } else if (configKey === 'event' && typeof item?.location_name === 'string' && item.location_name.trim().length > 0) {
-    typeMeta = item.location_name;
-  } else if (configKey === 'webinar' && item?.start_at) {
-    const time = formatTimeWithTimezone(item.start_at, item.timezone ?? null);
-    const dur = formatDurationFromRange(item.start_at, item.end_at);
-    typeMeta = dur ? `${time} · ${dur}` : time;
-  }
-  const itemDate = formatDate(item?.date ?? null, { fallback: '', timezone: 'local' });
-  const meta = [itemDate, typeMeta].filter(Boolean).join(' · ');
+  // The compact meta line, built by the SAME function the public card uses.
+  // This block used to mirror that one in prose — and drifted twice: it rendered
+  // the DATE in the VIEWER's zone (`timezone: 'local'`) beside a time in the
+  // EVENT's zone, and it labelled the zone on a different condition. The type
+  // label itself lives in the status pill, so it is omitted here.
+  const { line: meta } = programMetaLine(item ?? {}, configKey, programMetaFormatters(PROGRAM_META_RENDERERS));
 
   return (
     <EntityMingoCard

@@ -42,7 +42,13 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * has never fired must answer with empty pages and empty facets rather than an error or a null.
  */
 @Slf4j
+// @Tag("post-mingo") for the same reason as NotificationsTest: on a fresh tenant the only scripts
+// ever dispatched are the ones the mingo phase runs, so read before it this class has no history and
+// case 1 self-skips. Tagged at class level, not on that one method, so the class stays inside a single
+// phase — splitting a class across two phases is what made ExtApi: Archive customer fail on its second
+// run against static fixture state.
 @Tag("saas")
+@Tag("post-mingo")
 @DisplayName("Script execution history")
 public class ScriptExecutionHistoryTest extends BaseTest {
 

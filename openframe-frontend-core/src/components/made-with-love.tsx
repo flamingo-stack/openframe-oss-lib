@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useState, useEffect } from 'react';
-import { getBaseUrl } from '../utils';
+import { getPlatformUrl } from '../platform-domains';
 import { FlamingoLogo } from './flamingo-logo';
 
 interface MadeWithLoveProps {
@@ -52,7 +52,7 @@ export function MadeWithLove({ className = '', size = 'md', showOnMobile = true 
   };
 
   const config = sizeConfig[size];
-  const flamingoUrl = getBaseUrl('flamingo');
+  const flamingoUrl = getPlatformUrl('flamingo');
 
   // Container styles using primitive CSS
   const containerStyle: React.CSSProperties = {

@@ -10,13 +10,29 @@
  * Everything is validated, and anything that fails is DROPPED rather than
  * repaired: this payload is assembled from a remote MCP server's tool output,
  * so a malformed row means an upstream contract slip, and rendering a chip with
- * a blank title or a link to a non-https URL is worse than rendering nothing.
+ * a blank title or an unsafe href is worse than rendering nothing.
+ *
+ * LINKS are carried, not judged. A source's `externalUrl` is passed through as
+ * the producer sent it — a root-relative path included — because resolving a
+ * link is a CLIENT decision: only the page rendering the chip knows where it is
+ * embedded. The chat runtime resolves a relative href against the embedder's
+ * `defaultContentOrigin` in embed mode and keeps it relative in host mode
+ * (`resolveHrefForRuntime`), and every chip href passes the ONE safety gate,
+ * `safeHref`, at render (`buildSourceRowCta`). This decoder used to be a second,
+ * STRICTER gate that dropped what it could not resolve on its own — every
+ * relative link, and any `http:` one — leaving chips with a name and no
+ * destination. That is how broken links were made; it is not how they were
+ * prevented.
+ *
+ * MEDIA urls (`<video src>`, posters) are still required to be absolute https:
+ * they have no render-time gate and no navigation runtime to resolve them.
  *
  * Server-safe: no React, no browser APIs beyond `URL`.
  */
 
 import type { ChatRef } from '../components/chat/chat-ref.types';
 import type { ChatSource } from '../components/chat/types/message.types';
+import { UNSAFE_URL_CHARS } from '../utils/url-safety';
 import { CARD_REFERENCE } from './card-marker';
 import type { SourcesEvent } from './events';
 import { isRecord } from './wire-narrow';
@@ -44,11 +60,11 @@ function nullableText(value: unknown): string | null | undefined {
   return value === null ? null : text(value);
 }
 
-/** An https URL, or nothing. Plain http and non-URLs are dropped — these become
- *  hrefs and video sources in the panel. */
+/** An absolute https URL, or nothing — for MEDIA sources only (see the module
+ *  note). Links are carried as text and judged once, at render. */
 function httpsUrl(value: unknown): string | undefined {
   const candidate = text(value);
-  if (!candidate) return undefined;
+  if (!candidate || UNSAFE_URL_CHARS.test(candidate)) return undefined;
   try {
     return new URL(candidate).protocol === 'https:' ? candidate : undefined;
   } catch {
@@ -89,7 +105,7 @@ function sourceItems(value: unknown): NonNullable<ChatSource['items']> | undefin
     // A grouped row without these three has nothing to render OR navigate with.
     if (!id || !documentType || !name) return [];
 
-    const externalUrl = httpsUrl(item.externalUrl);
+    const externalUrl = text(item.externalUrl);
     const targetPlatform = nullableText(item.targetPlatform);
     const path = nullableText(item.path);
     return [
@@ -133,7 +149,7 @@ function sources(value: unknown): ChatSource[] {
 
     const path = text(candidate.path);
     const documentType = text(candidate.documentType);
-    const externalUrl = httpsUrl(candidate.externalUrl);
+    const externalUrl = text(candidate.externalUrl);
     const targetPlatform = nullableText(candidate.targetPlatform);
     const id = text(candidate.id);
     const sourceRepo = text(candidate.sourceRepo);
