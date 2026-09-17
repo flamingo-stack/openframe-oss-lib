@@ -68,7 +68,7 @@ public class LogService {
                     timestampFrom, timestampTo,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
-                    search, cursor, limit,
+                    search, cursor, limit + 1,
                     sortField, sortDirection);
         } else {
             log.debug("Using exact field filtering");
@@ -78,7 +78,7 @@ public class LogService {
                     timestampFrom, timestampTo,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
-                    cursor, limit,
+                    cursor, limit + 1,
                     sortField, sortDirection);
         }
 
@@ -166,12 +166,13 @@ public class LogService {
         if (logs == null) {
             logs = new ArrayList<>();
         }
-        List<LogEvent> events = logs.stream()
+        boolean hasNextPage = logs.size() > limit;
+        List<LogEvent> events = (hasNextPage ? logs.subList(0, limit) : logs).stream()
                 .map(this::mapToLogEvent)
                 .collect(Collectors.toList());
 
         PageInfo pageInfo = PageInfo.builder()
-                .hasNextPage(logs.size() == limit)
+                .hasNextPage(hasNextPage)
                 .hasPreviousPage(cursor != null)
                 .startCursor(events.isEmpty() ? null : CursorCodec.encode(createLogCursor(events.getFirst())))
                 .endCursor(events.isEmpty() ? null : CursorCodec.encode(createLogCursor(events.getLast())))
