@@ -151,7 +151,7 @@ class DeviceLogServiceIT {
         List<DeviceLogEntry> errors = walk(MACHINE_ID,
                 DeviceLogFilterCriteria.builder().from(FROM).levels(List.of(DeviceLogLevel.ERROR)).build(), 500);
         List<DeviceLogEntry> failures = walk(MACHINE_ID,
-                DeviceLogFilterCriteria.builder().from(FROM).search("connection failed").build(), 500);
+                DeviceLogFilterCriteria.builder().from(FROM).contains(List.of("connection", "failed")).build(), 500);
         List<DeviceLogEntry> lastSecond = walk(MACHINE_ID,
                 DeviceLogFilterCriteria.builder().from(instant(BASE_NANOS + 590 * STEP_NANOS)).build(), 500);
 
@@ -166,16 +166,32 @@ class DeviceLogServiceIT {
     @Test
     void matchesSearchTextLiterallySoItCannotWidenTheQuery() {
         List<DeviceLogEntry> hostile = walk(MACHINE_ID,
-                DeviceLogFilterCriteria.builder().from(FROM).search("\"} or {job=~\".+").build(), 500);
+                DeviceLogFilterCriteria.builder().from(FROM).contains(List.of("\"} or {job=~\".+")).build(), 500);
         List<DeviceLogEntry> regexLooking = walk(MACHINE_ID,
-                DeviceLogFilterCriteria.builder().from(FROM).search("line-0.0").build(), 500);
+                DeviceLogFilterCriteria.builder().from(FROM).contains(List.of("line-0.0")).build(), 500);
         List<DeviceLogEntry> literal = walk(MACHINE_ID,
-                DeviceLogFilterCriteria.builder().from(FROM).search("line-010").build(), 500);
+                DeviceLogFilterCriteria.builder().from(FROM).contains(List.of("line-010")).build(), 500);
 
         assertThat(hostile).isEmpty();
         // Unescaped, "." would match line-000 through line-090
         assertThat(regexLooking).isEmpty();
         assertThat(literal).extracting(DeviceLogEntry::getMessage).containsExactly("line-010 heartbeat ok");
+    }
+
+    @Test
+    void narrowsWithSeveralTermsExclusionsAndRegex() {
+        List<DeviceLogEntry> allTerms = walk(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM)
+                .contains(List.of("connection", "failed")).build(), 500);
+        List<DeviceLogEntry> withoutADecade = walk(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM)
+                .contains(List.of("heartbeat")).excludes(List.of("line-01")).build(), 500);
+        List<DeviceLogEntry> byRegex = walk(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM)
+                .regex("line-00[0-9] ").build(), 500);
+
+        assertThat(allTerms).hasSize(ERROR_LINES);
+        assertThat(withoutADecade).hasSize(DEVICE_LINES - ERROR_LINES - 10)
+                .extracting(DeviceLogEntry::getMessage).noneMatch(message -> message.contains("line-01"));
+        assertThat(byRegex).hasSize(10)
+                .extracting(DeviceLogEntry::getMessage).first().isEqualTo("line-009 heartbeat ok");
     }
 
     @Test

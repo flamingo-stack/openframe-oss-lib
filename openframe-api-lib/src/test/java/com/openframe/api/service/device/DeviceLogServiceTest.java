@@ -74,7 +74,7 @@ class DeviceLogServiceTest {
     void pinsSelectorToTheTenantDomainAndEscapesFilters() {
         DeviceLogFilterCriteria filter = DeviceLogFilterCriteria.builder()
                 .levels(List.of(DeviceLogLevel.ERROR, DeviceLogLevel.WARN))
-                .search("a\"b")
+                .contains(List.of("a\"b"))
                 .from(FROM)
                 .to(TO)
                 .build();
@@ -237,7 +237,41 @@ class DeviceLogServiceTest {
                 DeviceLogFilterCriteria.builder().from(TO.minus(Duration.ofDays(31))).to(TO).build(), page(null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID,
-                DeviceLogFilterCriteria.builder().from(FROM).to(TO).search("x".repeat(257)).build(), page(null, null)))
+                DeviceLogFilterCriteria.builder().from(FROM).to(TO).contains(List.of("x".repeat(257))).build(),
+                page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(lokiClient);
+    }
+
+    @Test
+    void buildsOneLineFilterPerTermBeforeTheMetadataFilter() {
+        DeviceLogFilterCriteria filter = DeviceLogFilterCriteria.builder()
+                .contains(List.of("connection", "failed"))
+                .excludes(List.of("heartbeat"))
+                .regex("fd=\\d+")
+                .from(FROM)
+                .to(TO)
+                .build();
+
+        service.queryDeviceLogs(MACHINE_ID, filter, page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}"
+                        + " |~ \"(?i)connection\" |~ \"(?i)failed\" !~ \"(?i)heartbeat\" |~ \"(?i)fd=\\\\d+\""
+                        + " | machine_id=\"machine-1\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD);
+    }
+
+    @Test
+    void rejectsTooManyTermsAndPatternsLokiCannotRun() {
+        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
+                .contains(List.of("a", "b", "c", "d", "e", "f")).build(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
+                .regex("(?=lookahead)").build(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
+                .regex("unclosed(").build(), page(null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(lokiClient);
     }

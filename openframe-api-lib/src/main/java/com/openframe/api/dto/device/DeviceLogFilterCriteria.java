@@ -20,9 +20,19 @@ public class DeviceLogFilterCriteria {
     private List<DeviceLogLevel> levels;
 
     /**
-     * Case-insensitive substring match on the log message.
+     * Every term must appear in the message, matched case-insensitively and literally.
      */
-    private String search;
+    private List<String> contains;
+
+    /**
+     * No term may appear in the message, matched the same way.
+     */
+    private List<String> excludes;
+
+    /**
+     * Opt-in RE2 pattern, applied case-insensitively.
+     */
+    private String regex;
 
     /**
      * Inclusive lower bound; defaults to {@code to} minus the default lookback.

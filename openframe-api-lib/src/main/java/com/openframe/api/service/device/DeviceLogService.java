@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import static java.util.stream.Collectors.joining;
 
@@ -45,12 +47,16 @@ public class DeviceLogService {
     static final Duration DEFAULT_LOOKBACK = Duration.ofDays(7);
     static final Duration MAX_RANGE = Duration.ofDays(30);
     static final int MAX_SEARCH_LENGTH = 256;
+    static final int MAX_SEARCH_TERMS = 5;
     static final int DEFAULT_PAGE_SIZE = 100;
     static final int MAX_PAGE_SIZE = 500;
     // Loki's max_entries_limit_per_query on prod
     static final int MAX_LINES_PER_TIMESTAMP = 5000;
 
     private static final String AGENT_LOGS_JOB = "agent-logs";
+    private static final String CASE_INSENSITIVE = "(?i)";
+    /** Lookaround and backreferences: Java compiles them, Loki's RE2 engine rejects them. */
+    private static final Pattern UNSUPPORTED_REGEX = Pattern.compile("\\(\\?[=!<]|\\\\[1-9]");
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
 
     private final LokiClient lokiClient;
@@ -74,7 +80,7 @@ public class DeviceLogService {
         DeviceLogFilterCriteria criteria = filter != null ? filter : new DeviceLogFilterCriteria();
         CursorPaginationCriteria page = pagination != null ? pagination : new CursorPaginationCriteria();
         DeviceLogCursor after = DeviceLogCursor.fromRaw(page.getCursor());
-        validateSearch(criteria.getSearch());
+        validateSearch(criteria);
 
         Instant to = criteria.getTo() != null ? criteria.getTo() : Instant.now();
         Instant from = criteria.getFrom() != null ? criteria.getFrom() : to.minus(DEFAULT_LOOKBACK);
@@ -113,11 +119,27 @@ public class DeviceLogService {
             query.append(", level=~").append(LogQl.quote(alternatives));
         }
         query.append('}');
-        if (StringUtils.hasText(criteria.getSearch())) {
-            // Line filter before the metadata filter: the cheapest stage runs first
-            query.append(" |~ ").append(LogQl.quote("(?i)" + LogQl.regexLiteral(criteria.getSearch())));
+        // Line filters before the metadata filter: the cheapest stage runs first
+        appendTermFilters(query, " |~ ", criteria.getContains());
+        appendTermFilters(query, " !~ ", criteria.getExcludes());
+        if (StringUtils.hasText(criteria.getRegex())) {
+            query.append(" |~ ").append(LogQl.quote(CASE_INSENSITIVE + criteria.getRegex()));
         }
         return query.append(" | machine_id=").append(LogQl.quote(machineId)).toString();
+    }
+
+    /**
+     * One line filter per term, so several terms narrow the result instead of being matched as one phrase.
+     */
+    private static void appendTermFilters(StringBuilder query, String operator, List<String> terms) {
+        if (terms == null) {
+            return;
+        }
+        for (String term : terms) {
+            if (StringUtils.hasText(term)) {
+                query.append(operator).append(LogQl.quote(CASE_INSENSITIVE + LogQl.regexLiteral(term)));
+            }
+        }
     }
 
     /**
@@ -201,9 +223,43 @@ public class DeviceLogService {
         return Math.min(Math.max(requested, 1), MAX_PAGE_SIZE);
     }
 
-    private static void validateSearch(String search) {
-        if (search != null && search.length() > MAX_SEARCH_LENGTH) {
-            throw new IllegalArgumentException("search cannot exceed " + MAX_SEARCH_LENGTH + " characters");
+    private static void validateSearch(DeviceLogFilterCriteria criteria) {
+        validateTerms(criteria.getContains(), "contains");
+        validateTerms(criteria.getExcludes(), "excludes");
+        validateRegex(criteria.getRegex());
+    }
+
+    private static void validateTerms(List<String> terms, String field) {
+        if (terms == null) {
+            return;
+        }
+        if (terms.size() > MAX_SEARCH_TERMS) {
+            throw new IllegalArgumentException(field + " cannot hold more than " + MAX_SEARCH_TERMS + " terms");
+        }
+        for (String term : terms) {
+            if (term != null && term.length() > MAX_SEARCH_LENGTH) {
+                throw new IllegalArgumentException(field + " terms cannot exceed " + MAX_SEARCH_LENGTH + " characters");
+            }
+        }
+    }
+
+    /**
+     * Rejected here rather than at Loki, so a mistyped pattern reads as a bad request instead of a failed query.
+     */
+    private static void validateRegex(String regex) {
+        if (!StringUtils.hasText(regex)) {
+            return;
+        }
+        if (regex.length() > MAX_SEARCH_LENGTH) {
+            throw new IllegalArgumentException("regex cannot exceed " + MAX_SEARCH_LENGTH + " characters");
+        }
+        if (UNSUPPORTED_REGEX.matcher(regex).find()) {
+            throw new IllegalArgumentException("regex cannot use lookaround or backreferences");
+        }
+        try {
+            Pattern.compile(regex);
+        } catch (PatternSyntaxException e) {
+            throw new IllegalArgumentException("regex is not valid: " + e.getDescription());
         }
     }
 

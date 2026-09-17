@@ -23,7 +23,9 @@ public class GraphQLDeviceLogMapper {
         }
         return DeviceLogFilterCriteria.builder()
                 .levels(input.getLevels())
-                .search(input.getSearch())
+                .contains(input.getContains())
+                .excludes(input.getExcludes())
+                .regex(input.getRegex())
                 .from(input.getFrom())
                 .to(input.getTo())
                 .build();
