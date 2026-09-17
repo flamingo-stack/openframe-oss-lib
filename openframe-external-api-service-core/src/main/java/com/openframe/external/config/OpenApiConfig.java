@@ -38,6 +38,7 @@ public class OpenApiConfig {
                     - **Devices** – list, filter, inspect, update status/nickname
                     - **Customers** – full CRUD incl. archiving
                     - **Tickets** – list, create, update, transition, assign, tag and annotate tickets (SaaS deployments)
+                    - **Knowledge Base** – browse folders and articles, create/update/publish/archive articles, tag them and attach files
                     - **Logs** / **Tools** – read access and integration proxying
                     
                     ## Authentication
@@ -71,7 +72,7 @@ public class OpenApiConfig {
                     - `429` - Too Many Requests (rate limit exceeded)
                     - `500` - Internal Server Error
                     """)
-                .version("1.1.0")
+                .version("1.2.0")
                 .contact(new Contact()
                     .name("OpenFrame Team")
                     .email("support@openframe.com")
