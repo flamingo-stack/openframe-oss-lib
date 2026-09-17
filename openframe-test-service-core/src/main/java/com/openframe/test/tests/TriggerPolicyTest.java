@@ -44,6 +44,9 @@ public class TriggerPolicyTest extends BaseTest {
      * Aggregation is a cron run over the whole Fleet instance, so it is slower than a host check-in.
      */
     private static final int AGGREGATION_TIMEOUT_SECONDS = 180;
+    /** Fleet started a run for this call; {@code 409} means it only joined one already in flight. */
+    private static final int TRIGGER_STARTED = 200;
+    private static final int TRIGGER_ACCEPTED_TIMEOUT_SECONDS = 60;
 
     @Tag("mdm")
     @Tag("scheduled")
@@ -156,8 +159,21 @@ public class TriggerPolicyTest extends BaseTest {
         }
 
         // Fleet only rolls host results into the policy's counts on an hourly cron, so force that run
-        // rather than waiting it out.
-        MonitoringApi.triggerCronSchedule(MonitoringApi.CLEANUPS_THEN_AGGREGATION);
+        // rather than waiting it out — and insist on a trigger Fleet actually accepted. A 409 means a
+        // run was already in flight, typically the one the previous case in this class started seconds
+        // earlier, and its aggregation may already be done; waiting on that run can never produce a
+        // stamp newer than aggregatedBefore.
+        int triggerStatus = FleetWait.until(
+                "Fleet to accept a " + MonitoringApi.CLEANUPS_THEN_AGGREGATION + " trigger",
+                () -> MonitoringApi.triggerCronSchedule(MonitoringApi.CLEANUPS_THEN_AGGREGATION),
+                status -> status == TRIGGER_STARTED,
+                TRIGGER_ACCEPTED_TIMEOUT_SECONDS);
+        assertThat(triggerStatus)
+                .as("Fleet answered %d to every %s trigger for %ds, so a run stayed in flight the whole "
+                                + "time and no aggregation can be attributed to this case. That is a Fleet "
+                                + "or environment problem, not a policy one.",
+                        triggerStatus, MonitoringApi.CLEANUPS_THEN_AGGREGATION, TRIGGER_ACCEPTED_TIMEOUT_SECONDS)
+                .isEqualTo(TRIGGER_STARTED);
 
         Policy aggregated = FleetWait.until(
                 "policy '" + policy.getName() + "' counts to be re-aggregated",
