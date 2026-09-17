@@ -115,9 +115,8 @@ function envOverrideFor(key: string): string | null {
  * base-domain derivation, CSP) receives a parseable URL. Full-URL inputs (the registry
  * `defaultUrl`s, any scheme'd override) pass through unchanged.
  *
- * EXPORTED as the single owner of the scheme-normalization rule (next.config.mjs keeps a
- * byte-identical local copy ONLY because Next evaluates its config outside the TS module
- * graph and cannot import this — see the comment there).
+ * EXPORTED as the single owner of the scheme-normalization rule. This subpath is pure ESM,
+ * so a consumer's next.config.mjs imports it directly rather than keeping a copy.
  *
  * Handles a (theoretical) protocol-relative `//host` too: strips the leading slashes so it
  * doesn't become `https:////host` (empty-host → hostOf null → silent platform drop).
@@ -133,12 +132,36 @@ export function ensureScheme(url: string): string {
  * NEVER throws / undefined — the default guarantees a host (this is what keeps the
  * cookie base-domains, the reverse map, and CSP intact even with every override unset).
  * The result ALWAYS carries a scheme (`ensureScheme`), so the scheme-less env overrides
- * resolve to valid URLs. Unknown-key fallback preserves cn.ts's flamingo.run default.
+ * resolve to valid URLs. Unknown-key fallback is flamingo's URL.
  */
 export function getPlatformProductionUrl(platform: string): string {
   const resolved =
     envOverrideFor(platform) ?? byKey(platform)?.defaultUrl ?? envOverrideFor('flamingo') ?? 'https://www.flamingo.run';
   return ensureScheme(resolved);
+}
+
+/**
+ * THE URL of a platform, for the environment the code is running in, no trailing slash.
+ * The one platform-URL resolver: consumers build every link to a platform from this.
+ *
+ * - `environment: 'current'` (default): the local dev URL (`NEXT_PUBLIC_DEV_URL`, else
+ *   `http://localhost:3000`) outside a production build, the registry's production URL
+ *   in any production build (a preview included — a preview never links to itself as
+ *   canonical).
+ * - `environment: 'production'`: the registry's production URL everywhere, for links that
+ *   leave the machine.
+ *
+ * `platform` is REQUIRED. The former `getBaseUrl()` accepted none and then returned
+ * `VERCEL_PROJECT_PRODUCTION_URL` — whichever domain Vercel lists first for a project
+ * (`flamingo.cx` on flamingo, a 308), and production on previews. A deployment's own
+ * origin is not a platform URL; consumers resolve it themselves.
+ */
+export function getPlatformUrl(platform: string, options: { environment?: 'current' | 'production' } = {}): string {
+  const url =
+    options.environment !== 'production' && process.env.NODE_ENV !== 'production'
+      ? process.env.NEXT_PUBLIC_DEV_URL || 'http://localhost:3000'
+      : getPlatformProductionUrl(platform);
+  return url.replace(/\/+$/, '');
 }
 
 // ── Single-owner host primitives ──

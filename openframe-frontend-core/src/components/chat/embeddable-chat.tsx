@@ -154,7 +154,7 @@ export interface EmbeddableChatProps {
   baseRoute?: string;
   /** When the embedder doesn't host a `[...path]` route to render markdown
    *  chips against, set this to a platform that does. Chips with
-   *  `externalUrl: null` resolve to `getBaseUrl(chipBasePlatform) +
+   *  `externalUrl: null` resolve to `getPlatformUrl(chipBasePlatform) +
    *  '/knowledge-base/' + path` and open in a new tab. */
   chipBasePlatform?: string;
   /** DB-driven list of enabled RAG table ids (chip catalog filter).
@@ -1439,7 +1439,7 @@ function EmbeddableChatInner({
   // doesn't host an in-app doc viewer should NOT pass an empty baseRoute (that just
   // falls back to the platform default here) — instead it sets a truthy baseRoute +
   // `chipBasePlatform` so doc chips with no externalUrl resolve cross-platform to that
-  // platform's public knowledge hub (`getBaseUrl(chipBasePlatform)/knowledge-base/…`),
+  // platform's public knowledge hub (`getPlatformUrl(chipBasePlatform)/knowledge-base/…`),
   // exactly like the hub's openframe config (baseRoute:'/', chipBasePlatform:'openframe').
   const resolvedBaseRoute = baseRoute || (source === 'flamingo' ? '/knowledge-base' : '/data-room');
 

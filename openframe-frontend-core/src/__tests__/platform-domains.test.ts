@@ -3,6 +3,7 @@ import {
   PLATFORM_DOMAINS,
   byKey,
   getPlatformProductionUrl,
+  getPlatformUrl,
   getPlatformByHostname,
   getAllPlatformBaseDomains,
   hostOf,
@@ -153,6 +154,29 @@ describe('env override path', () => {
     }
     expect(host).toBe('www.openmsp.ai');
     expect(mod.toRegistrableBaseDomain(host)).toBe('openmsp.ai');
+  });
+});
+
+describe('getPlatformUrl — the one platform-URL resolver', () => {
+  it('is the registry URL in a production build, with no trailing slash', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(getPlatformUrl('flamingo')).toBe('https://www.flamingo.run');
+    expect(getPlatformUrl('openframe')).toBe(getPlatformProductionUrl('openframe').replace(/\/+$/, ''));
+  });
+
+  it("never reads Vercel's first-listed domain", () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_PROJECT_PRODUCTION_URL', 'flamingo.cx');
+    expect(getPlatformUrl('flamingo')).toBe('https://www.flamingo.run');
+  });
+
+  it('is the local dev URL outside a production build, unless production is asked for', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('NEXT_PUBLIC_DEV_URL', '');
+    expect(getPlatformUrl('openmsp')).toBe('http://localhost:3000');
+    expect(getPlatformUrl('openmsp', { environment: 'production' })).toBe('https://www.openmsp.ai');
+    vi.stubEnv('NEXT_PUBLIC_DEV_URL', 'https://my-tunnel.example/');
+    expect(getPlatformUrl('openmsp')).toBe('https://my-tunnel.example');
   });
 });
 
