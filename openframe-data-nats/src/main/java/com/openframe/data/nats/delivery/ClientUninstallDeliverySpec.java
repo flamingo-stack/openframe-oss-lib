@@ -22,6 +22,9 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty("spring.cloud.stream.enabled")
 public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstallDeliverySpec.Seed, ClientUninstallMessage> {
 
+    // the target is the OpenFrame client itself, under the agentType it reports in installed-agent
+    public static final String CLIENT_AGENT_TYPE = "openframe-client";
+
     private final ClientUninstallNatsPublisher publisher;
     private final MachineRepository machineRepository;
 
@@ -51,15 +54,13 @@ public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstall
         return ClientUninstallMessage.class;
     }
 
-    // targetId is the machine itself: the agent confirms over HTTP /api/agents/uninstall with X-Machine-Id
     @Override
     public DeliveryRequest<ClientUninstallMessage> request(Seed seed) {
         ClientUninstallMessage message = publisher.buildMessage();
-        String machineId = seed.getMachineId();
         return DeliveryRequest.<ClientUninstallMessage>builder()
                 .type(DeliveryType.CLIENT_UNINSTALL)
-                .targetId(machineId)
-                .machineId(machineId)
+                .targetId(CLIENT_AGENT_TYPE)
+                .machineId(seed.getMachineId())
                 .payload(message)
                 .build();
     }

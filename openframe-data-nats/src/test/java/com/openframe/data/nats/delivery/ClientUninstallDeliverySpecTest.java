@@ -41,7 +41,7 @@ class ClientUninstallDeliverySpecTest {
     void setUp() {
         delivery = MachineDelivery.builder()
                 .type(DeliveryType.CLIENT_UNINSTALL)
-                .targetId(MACHINE_ID)
+                .targetId(ClientUninstallDeliverySpec.CLIENT_AGENT_TYPE)
                 .machineId(MACHINE_ID)
                 .build();
         machine = new Machine();
@@ -50,7 +50,7 @@ class ClientUninstallDeliverySpecTest {
     }
 
     @Test
-    void request_machine_targetIsMachineAndPayloadBuiltByPublisher() {
+    void request_machine_targetIsClientAgentAndPayloadBuiltByPublisher() {
         // setup
         when(publisher.buildMessage()).thenReturn(message);
 
@@ -60,7 +60,7 @@ class ClientUninstallDeliverySpecTest {
 
         // verifications
         assertThat(request.getType()).isEqualTo(DeliveryType.CLIENT_UNINSTALL);
-        assertThat(request.getTargetId()).isEqualTo(MACHINE_ID);
+        assertThat(request.getTargetId()).isEqualTo(ClientUninstallDeliverySpec.CLIENT_AGENT_TYPE);
         assertThat(request.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(request.getPayload()).isSameAs(message);
     }
