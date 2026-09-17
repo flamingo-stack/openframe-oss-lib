@@ -1,0 +1,80 @@
+# Software bundle — the staging layer for immediate Install / Update Software.
+#
+# The frontend creates a bundle the moment the first device is assigned on the Install/Update screen, then
+# edits it (devices/packages) as the user builds the request. Running the bundle dispatches every package to
+# the matching-OS subset of its devices (brew → macOS, winget/choco → Windows) and flips it to COMPLETED.
+# A PENDING bundle left unrun is disposable and reaped by a Mongo TTL index.
+#
+# Gated behind openframe.rmm.software.enabled=true (+ spring.cloud.stream.enabled for the run dispatch).
+# Reuses SoftwareAction, SoftwarePackageInput, SoftwareDispatchResult, PackageManagerType and BrewPackageType
+# from software.graphqls.
+
+extend type Query {
+    """One bundle by id. Null when it does not exist (or was already reaped)."""
+    softwareBundle(id: ID!): SoftwareBundle
+
+    """Bundles for the tenant, newest first. Optionally filtered by status."""
+    softwareBundles(status: SoftwareBundleStatus): [SoftwareBundle!]!
+}
+
+extend type Mutation {
+    """Create a staged bundle (status PENDING). Called when the first device is assigned; packages may be
+    empty at this point and added later via updateSoftwareBundle."""
+    createSoftwareBundle(input: CreateSoftwareBundleInput!): SoftwareBundle!
+
+    """Replace a PENDING bundle's devices and/or packages. Fails if the bundle is already COMPLETED."""
+    updateSoftwareBundle(input: UpdateSoftwareBundleInput!): SoftwareBundle!
+
+    """Discard a PENDING bundle. Fails if the bundle is already COMPLETED (history is immutable)."""
+    deleteSoftwareBundle(id: ID!): Boolean!
+
+    """Run a PENDING bundle now: dispatch every package to its OS-compatible devices and mark it COMPLETED.
+    Returns one dispatch result (with its executionId) per dispatched package. Fails if already COMPLETED."""
+    runSoftwareBundle(id: ID!): [SoftwareDispatchResult!]!
+}
+
+"""A staged install/update operation: devices + packages, plus lifecycle state."""
+type SoftwareBundle {
+    id: ID!
+    "INSTALL or UPDATE — fixed at creation."
+    action: SoftwareAction!
+    "PENDING while drafting, COMPLETED once run. Server-controlled; never settable."
+    status: SoftwareBundleStatus!
+    "Assigned device machineIds (1..n)."
+    machineIds: [String!]!
+    "Packages to act on. May be empty while PENDING."
+    packages: [SoftwareBundlePackage!]!
+    createdBy: String
+    createdAt: Instant
+    updatedAt: Instant
+    "When the bundle was run. Null while PENDING."
+    completedAt: Instant
+    "Execution ids from the run (one per dispatched package). Null/empty while PENDING."
+    executionIds: [String!]
+}
+
+"""One catalog package staged in a bundle."""
+type SoftwareBundlePackage {
+    packageManager: PackageManagerType!
+    packageName: String!
+    brewPackageType: BrewPackageType
+}
+
+enum SoftwareBundleStatus {
+    PENDING
+    COMPLETED
+}
+
+"""Create a bundle. machineIds must have at least one device; packages may be omitted while drafting."""
+input CreateSoftwareBundleInput {
+    action: SoftwareAction!
+    machineIds: [String!]!
+    packages: [SoftwarePackageInput!]
+}
+
+"""Edit a PENDING bundle. action and status are immutable and cannot be set."""
+input UpdateSoftwareBundleInput {
+    id: ID!
+    machineIds: [String!]!
+    packages: [SoftwarePackageInput!]
+}
