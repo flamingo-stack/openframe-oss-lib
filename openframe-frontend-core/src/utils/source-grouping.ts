@@ -84,32 +84,73 @@ export function buildGroupedSource(spec: {
   };
 }
 
-type GroupableSource = ChatSource & { sourceRepo: string };
+type TableSource = ChatSource & { sourceRepo: string };
 
-/** A flat source that joins its table's chip: it names its table, it is not a
- *  whole document, and it was not already grouped upstream. A row with no `id`
+/** A chip the server already grouped (it carries `items`). */
+function isGroupedChip(source: ChatSource): boolean {
+  return !!source.items && source.items.length > 0;
+}
+
+/** A source that belongs to its table's chip: it names its table and is not a
+ *  whole document. Both shapes qualify, a flat row AND a chip the server
+ *  already grouped, so one table is never drawn twice. A flat row with no `id`
  *  still joins (as the hub's server-side chips do), as an Open-only dropdown
  *  row: leaving it out would split one table across a group AND a stray chip. */
-function isGroupable(source: ChatSource): source is GroupableSource {
-  if (source.items && source.items.length > 0) return false;
+function joinsTableChip(source: ChatSource): source is TableSource {
   if (!source.sourceRepo || !source.documentType) return false;
   return groupsByTable(source.documentType);
 }
 
+/** A source's dropdown rows: a grouped chip's own items, or the flat row itself. */
+function rowsOf(source: TableSource): GroupedSourceRow[] {
+  if (isGroupedChip(source)) return source.items ?? [];
+  return [
+    {
+      index: source.index,
+      id: source.id ?? '',
+      documentType: source.documentType,
+      name: source.name,
+      ...(source.externalUrl ? { externalUrl: source.externalUrl } : {}),
+      targetPlatform: source.targetPlatform ?? null,
+      path: source.path || null,
+    },
+  ];
+}
+
+/** First occurrence wins per record, so a record that arrived both inside a
+ *  server chip and as a flat row is one dropdown row. Id-less rows cannot be
+ *  told apart and are all kept. */
+function uniqueRows(rows: GroupedSourceRow[]): GroupedSourceRow[] {
+  const seen = new Set<string>();
+  return rows.filter(row => {
+    if (!row.id) return true;
+    const identity = `${row.documentType}:${row.id}`;
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+}
+
 /**
- * Flat sources in, the strip's chips out.
+ * Flat sources in, the strip's chips out: ONE chip per table.
  *
  * Every row that names its table joins that table's chip, a lone record and an
- * id-less row included, exactly as the hub's web chat draws it. Each row keeps the citation number it was
- * given, so `[3]` in the answer still resolves inside the group. The chip sits
- * where its first row was and takes that row's `index` (unique, members are
- * disjoint), so the strip keeps the order it was handed: reading order for
- * cited sources. Anything not groupable passes through untouched.
+ * id-less row included, exactly as the hub's web chat draws it. Each flat row
+ * keeps the citation number it was given, so `[3]` in the answer still
+ * resolves inside the group. The chip sits where its table first appeared and
+ * takes that source's `index` (unique, members are disjoint), so the strip
+ * keeps the order it was handed: reading order for cited sources.
+ *
+ * A chip the server already grouped passes through UNTOUCHED when it is its
+ * table's only source. When flat rows of the same table arrive beside it (a
+ * hub-injected chip plus MCP-cited rows in one answer), they merge into it:
+ * its rows first, its chip-level link kept, the count restated. Whole
+ * documents and rows naming no table pass through as their own chips.
  */
 export function groupSourcesByTable(sources: ChatSource[]): ChatSource[] {
-  const membersByTable = new Map<string, GroupableSource[]>();
+  const membersByTable = new Map<string, TableSource[]>();
   for (const source of sources) {
-    if (!isGroupable(source)) continue;
+    if (!joinsTableChip(source)) continue;
     const members = membersByTable.get(source.sourceRepo) ?? [];
     members.push(source);
     membersByTable.set(source.sourceRepo, members);
@@ -118,26 +159,27 @@ export function groupSourcesByTable(sources: ChatSource[]): ChatSource[] {
   const emitted = new Set<string>();
   const chips: ChatSource[] = [];
   for (const source of sources) {
-    if (!isGroupable(source)) {
+    if (!joinsTableChip(source)) {
       chips.push(source);
       continue;
     }
     if (emitted.has(source.sourceRepo)) continue;
     emitted.add(source.sourceRepo);
 
+    const members = membersByTable.get(source.sourceRepo) ?? [];
+    if (members.length === 1 && isGroupedChip(source)) {
+      chips.push(source);
+      continue;
+    }
+    // A server chip may carry a chip-level link that is not its first row's.
+    const serverChip = members.find(isGroupedChip);
     chips.push(
       buildGroupedSource({
         index: source.index,
         sourceRepo: source.sourceRepo,
-        rows: (membersByTable.get(source.sourceRepo) ?? []).map(member => ({
-          index: member.index,
-          id: member.id ?? '',
-          documentType: member.documentType,
-          name: member.name,
-          ...(member.externalUrl ? { externalUrl: member.externalUrl } : {}),
-          targetPlatform: member.targetPlatform ?? null,
-          path: member.path || null,
-        })),
+        rows: uniqueRows(members.flatMap(rowsOf)),
+        ...(serverChip?.externalUrl ? { externalUrl: serverChip.externalUrl } : {}),
+        ...(serverChip && serverChip.targetPlatform !== undefined ? { targetPlatform: serverChip.targetPlatform } : {}),
       }),
     );
   }

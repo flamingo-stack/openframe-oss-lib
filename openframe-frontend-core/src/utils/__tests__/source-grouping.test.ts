@@ -141,6 +141,26 @@ describe('groupSourcesByTable', () => {
     expect(first).toBe(serverGroup);
   });
 
+  it('merges flat rows into a server-grouped chip of the same table: one chip, never two', () => {
+    const serverChip = buildGroupedSource({
+      index: 1,
+      sourceRepo: 'clickup-tasks-internal',
+      rows: [{ id: '9', documentType: 'internal_task', name: 'Task 9' }],
+      externalUrl: '/admin/tasks',
+      targetPlatform: 'product-hub',
+    });
+    // task(9) is the record already inside the chip; task(2) is new.
+    const chips = groupSourcesByTable([serverChip, blog(5), task(2), task(9)]);
+
+    expect(chips.map(chip => chip.sourceRepo)).toEqual(['clickup-tasks-internal', 'blog-posts']);
+    expect(chips[0].name).toBe('ClickUp Tasks (2 records)');
+    expect(chips[0].index).toBe(1);
+    expect(chips[0].externalUrl).toBe('/admin/tasks');
+    expect(chips[0].items?.map(item => item.id)).toEqual(['9', '2']);
+    // The server's row keeps the group's number; the flat row keeps its own.
+    expect(chips[0].items?.map(item => item.index)).toEqual([undefined, 2]);
+  });
+
   it('keeps a table in ONE chip when a row has no id: it joins as an Open-only row', () => {
     const { id: _id, ...noId } = task(2);
     const chips = groupSourcesByTable([task(1), noId, task(3)]);
