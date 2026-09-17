@@ -23,9 +23,12 @@ public class SoftwareBundle implements TenantScoped {
 
     private String tenantId;
     private SoftwareAction action;
+    private SoftwareBundleMode mode;
     private SoftwareBundleStatus status;
     private List<String> machineIds;
     private List<SoftwareBundlePackage> packages;
+    private Instant startAt;
+    private String scheduleId;
     private List<String> executionIds;
 
     private String createdBy;

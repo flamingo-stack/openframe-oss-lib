@@ -6,7 +6,6 @@ import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.rmm.software.CreateSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
-import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareBundleInput;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.data.document.rmm.software.SoftwareBundleStatus;
@@ -57,7 +56,7 @@ public class SoftwareBundleDataFetcher {
     }
 
     @DgsMutation
-    public List<SoftwareDispatchResult> runSoftwareBundle(@InputArgument String id) {
+    public SoftwareBundleResponse runSoftwareBundle(@InputArgument String id) {
         return softwareBundleService.run(id, getCurrentUserId());
     }
 

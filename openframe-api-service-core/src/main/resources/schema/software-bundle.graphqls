@@ -28,9 +28,10 @@ extend type Mutation {
     """Discard a PENDING bundle. Fails if the bundle is already COMPLETED (history is immutable)."""
     deleteSoftwareBundle(id: ID!): Boolean!
 
-    """Run a PENDING bundle now: dispatch every package to its OS-compatible devices and mark it COMPLETED.
-    Returns one dispatch result (with its executionId) per dispatched package. Fails if already COMPLETED."""
-    runSoftwareBundle(id: ID!): [SoftwareDispatchResult!]!
+    """Run a PENDING bundle now (Device-Online): arm each assigned device so its OS-compatible packages run as
+    soon as it is online — immediately for online devices, on reconnect for offline ones — and mark the bundle
+    COMPLETED. Returns the COMPLETED bundle. Fails if already COMPLETED."""
+    runSoftwareBundle(id: ID!): SoftwareBundle!
 }
 
 """A staged install/update operation: devices + packages, plus lifecycle state."""
@@ -38,12 +39,18 @@ type SoftwareBundle {
     id: ID!
     "INSTALL or UPDATE — fixed at creation."
     action: SoftwareAction!
+    "NOW (Device-Online) or SCHEDULED (fires a DATE_TIME schedule at startAt)."
+    mode: SoftwareBundleMode!
     "PENDING while drafting, COMPLETED once run. Server-controlled; never settable."
     status: SoftwareBundleStatus!
     "Assigned device machineIds (1..n)."
     machineIds: [String!]!
     "Packages to act on. May be empty while PENDING."
     packages: [SoftwareBundlePackage!]!
+    "For SCHEDULED bundles: when the run fires (absolute instant, SERVER time). Null for NOW."
+    startAt: Instant
+    "For SCHEDULED bundles: the schedule created on run. Null for NOW / while PENDING."
+    scheduleId: String
     createdBy: String
     createdAt: Instant
     updatedAt: Instant
@@ -51,6 +58,11 @@ type SoftwareBundle {
     completedAt: Instant
     "Execution ids from the run (one per dispatched package). Null/empty while PENDING."
     executionIds: [String!]
+}
+
+enum SoftwareBundleMode {
+    NOW
+    SCHEDULED
 }
 
 """One catalog package staged in a bundle."""
@@ -65,16 +77,21 @@ enum SoftwareBundleStatus {
     COMPLETED
 }
 
-"""Create a bundle. machineIds must have at least one device; packages may be omitted while drafting."""
+"""Create a bundle. machineIds must have at least one device; packages may be omitted while drafting.
+startAt is required for SCHEDULED bundles (enforced at run) and ignored for NOW."""
 input CreateSoftwareBundleInput {
     action: SoftwareAction!
+    mode: SoftwareBundleMode!
     machineIds: [String!]!
     packages: [SoftwarePackageInput!]
+    startAt: Instant
 }
 
 """Edit a PENDING bundle. action and status are immutable and cannot be set."""
 input UpdateSoftwareBundleInput {
     id: ID!
+    mode: SoftwareBundleMode!
     machineIds: [String!]!
     packages: [SoftwarePackageInput!]
+    startAt: Instant
 }

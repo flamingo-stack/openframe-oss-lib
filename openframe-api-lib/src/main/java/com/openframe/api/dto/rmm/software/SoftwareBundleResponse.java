@@ -1,6 +1,7 @@
 package com.openframe.api.dto.rmm.software;
 
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleStatus;
 import lombok.Builder;
@@ -15,9 +16,12 @@ public class SoftwareBundleResponse {
 
     private String id;
     private SoftwareAction action;
+    private SoftwareBundleMode mode;
     private SoftwareBundleStatus status;
     private List<String> machineIds;
     private List<SoftwareBundlePackage> packages;
+    private Instant startAt;
+    private String scheduleId;
     private String createdBy;
     private Instant createdAt;
     private Instant updatedAt;
