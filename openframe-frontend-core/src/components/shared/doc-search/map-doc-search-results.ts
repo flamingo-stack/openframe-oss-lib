@@ -10,8 +10,8 @@
  * dropped — callers that want logging can wrap this helper).
  */
 
-import { getSourceLabel } from '../../../utils/source-icons';
 import { recordCountLabel } from '../../../utils/source-grouping';
+import { getSourceLabel } from '../../../utils/source-icons';
 import type { SearchResult } from '../../ui/search-input';
 import type { DocSearchResult } from './types';
 

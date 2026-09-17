@@ -84,22 +84,23 @@ export function buildGroupedSource(spec: {
   };
 }
 
-type GroupableSource = ChatSource & { sourceRepo: string; id: string };
+type GroupableSource = ChatSource & { sourceRepo: string };
 
-/** A flat source that can become a dropdown row: it names its table and its
- *  record (Open and Ask both resolve from them), it is not a whole document,
- *  and it was not already grouped upstream. */
+/** A flat source that joins its table's chip: it names its table, it is not a
+ *  whole document, and it was not already grouped upstream. A row with no `id`
+ *  still joins (as the hub's server-side chips do), as an Open-only dropdown
+ *  row: leaving it out would split one table across a group AND a stray chip. */
 function isGroupable(source: ChatSource): source is GroupableSource {
   if (source.items && source.items.length > 0) return false;
-  if (!source.sourceRepo || !source.id || !source.documentType) return false;
+  if (!source.sourceRepo || !source.documentType) return false;
   return groupsByTable(source.documentType);
 }
 
 /**
  * Flat sources in, the strip's chips out.
  *
- * Every groupable row joins its table's chip, a lone record included, exactly
- * as the hub's web chat draws it. Each row keeps the citation number it was
+ * Every row that names its table joins that table's chip, a lone record and an
+ * id-less row included, exactly as the hub's web chat draws it. Each row keeps the citation number it was
  * given, so `[3]` in the answer still resolves inside the group. The chip sits
  * where its first row was and takes that row's `index` (unique, members are
  * disjoint), so the strip keeps the order it was handed: reading order for
@@ -130,7 +131,7 @@ export function groupSourcesByTable(sources: ChatSource[]): ChatSource[] {
         sourceRepo: source.sourceRepo,
         rows: (membersByTable.get(source.sourceRepo) ?? []).map(member => ({
           index: member.index,
-          id: member.id,
+          id: member.id ?? '',
           documentType: member.documentType,
           name: member.name,
           ...(member.externalUrl ? { externalUrl: member.externalUrl } : {}),

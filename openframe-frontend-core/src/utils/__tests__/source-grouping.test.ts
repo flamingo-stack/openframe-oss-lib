@@ -141,11 +141,19 @@ describe('groupSourcesByTable', () => {
     expect(first).toBe(serverGroup);
   });
 
-  it('leaves a row without an id or a table as its own chip', () => {
-    const { id: _id, ...noId } = task(1);
+  it('keeps a table in ONE chip when a row has no id: it joins as an Open-only row', () => {
+    const { id: _id, ...noId } = task(2);
+    const chips = groupSourcesByTable([task(1), noId, task(3)]);
+
+    expect(chips).toHaveLength(1);
+    expect(chips[0].name).toBe('ClickUp Tasks (3 records)');
+    expect(chips[0].items?.map(item => item.id)).toEqual(['1', '', '3']);
+    expect(chips[0].items?.[1].externalUrl).toBe('/clickup-tasks-internal?search=2');
+  });
+
+  it('leaves a row that names no table as its own chip', () => {
     const { sourceRepo: _repo, ...noTable } = task(2);
-    const chips = groupSourcesByTable([noId, noTable]);
-    expect(chips).toEqual([noId, noTable]);
+    expect(groupSourcesByTable([noTable])).toEqual([noTable]);
   });
 });
 

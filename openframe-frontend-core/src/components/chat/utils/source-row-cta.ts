@@ -24,9 +24,9 @@
 import { FileText } from 'lucide-react';
 import type React from 'react';
 import { getPlatformUrl } from '../../../platform-domains';
-import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import { canonicalContentRefType } from '../../../utils/list-url';
+import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
 import type { ChatRef } from '../chat-ref.types';
 import { safeHref } from './compact-card-classes';
 import { getIconComponent } from './icon-registry';
