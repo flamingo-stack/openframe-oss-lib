@@ -882,6 +882,12 @@ function SourceChips({
  * EmbeddableChat — the floating "Ask AI" button + Mingo chat panel.
  * Lib-portable port of the hub's `<GlobalAskAI>`.
  */
+/** What a host hands `EmbeddableChatHandle.prefillDraft`: the composer text plus the context items to attach. */
+export interface ChatPrefillDraft {
+  text: string;
+  mentions?: ChatContextItem[];
+}
+
 /**
  * Imperative escape hatch for the ONE thing a host can't express as a prop:
  * "put the panel on a new chat, now". Everything else the host drives is state
@@ -899,6 +905,14 @@ export interface EmbeddableChatHandle {
    * the compose flag is inert.
    */
   startNewChat: () => void;
+  /**
+   * A new chat with the composer PREFILLED and nothing sent: the host has a
+   * suggested message (e.g. "Fix with Mingo" on an incident) and the user
+   * decides whether to send it. `mentions` are attached as context items up
+   * front, each committed as an inline `@marker:id` chip exactly as if picked
+   * from the `@` picker, and `text` follows them in the draft.
+   */
+  prefillDraft: (draft: ChatPrefillDraft) => void;
 }
 
 export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableChatProps>(
@@ -2025,6 +2039,43 @@ function EmbeddableChatInner({
     resetToNewChat();
   }, [resetToNewChat]);
 
+  // Host prefill (`prefillDraft`) — staged, not written at once. The composer
+  // it goes into may only mount on the commit `resetToNewChat` +
+  // `setComposeOpen(true)` produce (narrow layout: list → compose; or the
+  // archive closing), and those are ordinary updates React commits on its own
+  // schedule — a frame-timed write raced them and lost on a phone. So the
+  // draft waits in state: the context strip is seeded while rendering (AFTER
+  // the dialog-change reset above, which would otherwise wipe it), and the
+  // effect writes the chips + text once `chatInputRef` is attached, re-running
+  // on each layout change until it is. `mentionKeysRef` is cleared by the
+  // dialog-change effect above, so this one must stay declared after it.
+  const [pendingDraft, setPendingDraft] = useState<Required<ChatPrefillDraft> | null>(null);
+  const [seededDraft, setSeededDraft] = useState<Required<ChatPrefillDraft> | null>(null);
+  if (pendingDraft && seededDraft !== pendingDraft) {
+    setSeededDraft(pendingDraft);
+    setContextItems(pendingDraft.mentions);
+  }
+  const appliedDraftRef = useRef<Required<ChatPrefillDraft> | null>(null);
+  useEffect(() => {
+    const draft = pendingDraft;
+    if (!draft || appliedDraftRef.current === draft) return;
+    const input = chatInputRef.current;
+    if (!input) return;
+    appliedDraftRef.current = draft;
+    input.clear();
+    for (const item of draft.mentions) {
+      const key = `${item.type}:${item.id}`;
+      input.commitMention(mentionTokenOf(key, mentionMarkerByType), {
+        label: item.label,
+        icon: resolveContextIcon(item),
+      });
+      mentionKeysRef.current.add(key);
+    }
+    // The text starts on its own line — its first line is a heading, not a
+    // continuation of the chip run.
+    if (draft.text) input.setValue(`${input.getValue()}${draft.mentions.length > 0 ? '\n' : ''}${draft.text}`);
+  }, [pendingDraft, composeOpen, activeDialogId, activeMode, archiveOpen, mentionMarkerByType, resolveContextIcon]);
+
   // Host-driven "Start New Chat" (see EmbeddableChatHandle). Same reset as the
   // rail button, plus the narrow layout's list→compose navigation that the
   // in-panel button gets from the list itself — a host has no other way in.
@@ -2035,8 +2086,19 @@ function EmbeddableChatInner({
         resetToNewChat();
         setComposeOpen(true);
       },
+      prefillDraft: ({ text, mentions = [] }) => {
+        resetToNewChat();
+        setComposeOpen(true);
+        // The effect below clears the draft, which invalidates every key held
+        // here. Dropped now rather than there: with no dialog change nothing
+        // else clears them, and a composer mounting on this commit reports
+        // `onValueChange('')` before that effect runs — a stale key equal to
+        // one of the new mentions would strip the freshly seeded item.
+        mentionKeysRef.current.clear();
+        setPendingDraft({ text, mentions: mentions.slice(0, contextMaxItems) });
+      },
     }),
-    [resetToNewChat],
+    [resetToNewChat, contextMaxItems],
   );
 
   // Desktop split header ⋯ menu (active, non-archived conversation only).
