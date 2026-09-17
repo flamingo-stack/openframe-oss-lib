@@ -97,8 +97,11 @@ public class TicketService {
         String sortDirection = sort != null && sort.getDirection() != null
                 ? sort.getDirection().name()
                 : SortDirection.DESC.name();
-        List<Ticket> pageItems = fetchPageItems(query, paging, sortField, sortDirection);
-        boolean hasNextPage = pageItems.size() == paging.getLimit();
+        int limit = paging.getLimit();
+        List<Ticket> raw = ticketRepository.findTicketsWithCursor(
+                query, paging.getCursor(), limit + 1, sortField, sortDirection);
+        boolean hasNextPage = raw.size() > limit;
+        List<Ticket> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
 
         return CountedGenericQueryResult.<Ticket>builder()
                 .items(pageItems)
@@ -580,15 +583,6 @@ public class TicketService {
                 .organizationIds(filter.getOrganizationIds())
                 .assigneeIds(filter.getAssigneeIds())
                 .build();
-    }
-
-    private List<Ticket> fetchPageItems(Query query, CursorPaginationCriteria criteria,
-                                        String sortField, String sortDirection) {
-        List<Ticket> tickets = ticketRepository.findTicketsWithCursor(
-                query, criteria.getCursor(), criteria.getLimit() + 1, sortField, sortDirection);
-        return tickets.size() > criteria.getLimit()
-                ? tickets.subList(0, criteria.getLimit())
-                : tickets;
     }
 
     private PageInfo buildPageInfo(List<Ticket> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
