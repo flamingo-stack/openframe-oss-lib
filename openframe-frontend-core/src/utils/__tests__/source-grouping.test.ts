@@ -168,6 +168,23 @@ describe('splitCitedSources with grouping', () => {
   });
 });
 
+describe('grouping is per message', () => {
+  it('groups each answer from its own sources only: the same table in two answers is two chips', () => {
+    // The strip calls this once per message with THAT message's sources. There
+    // is no shared state to carry a table's rows from one answer into the next.
+    const first = splitCitedSources([task(1), task(2)], 'See [1] and [2].');
+    const second = splitCitedSources([task(1), blog(2)], 'See [1].');
+
+    expect(first.cited.map(chip => chip.name)).toEqual(['ClickUp Tasks (2 records)']);
+    expect(second.cited.map(chip => chip.name)).toEqual(['ClickUp Tasks (1 record)']);
+    expect(second.uncited.map(chip => chip.name)).toEqual(['Blog Posts (1 record)']);
+    // The inputs are never mutated, so a re-render regroups from the same flat list.
+    const flat = [task(1), task(2)];
+    groupSourcesByTable(flat);
+    expect(flat.every(source => source.items === undefined)).toBe(true);
+  });
+});
+
 describe('formatCitationIndices', () => {
   it('folds consecutive numbers into ranges', () => {
     expect(formatCitationIndices([3, 1, 2, 7, 9, 10])).toBe('1-3, 7, 9-10');
