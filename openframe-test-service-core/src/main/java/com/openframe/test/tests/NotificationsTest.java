@@ -33,8 +33,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * inbox holds. By decision of the suite owner (2026-09-13) the bulk operations run on every
  * tenant, including the shared qa one: the last case empties the inbox of the test user.
  * <p>
- * Hence {@code @Tag("notification")}: it is what lets the runner place this class in a phase of
- * its own, after {@code mingo}, rather than in the catch-all {@code functional} phase. A pipeline
+ * Hence {@code @Tag("post-mingo")}: it is what lets the runner place this class after the
+ * {@code mingo} phase rather than in the catch-all {@code functional} phase. A pipeline
  * run registers a fresh tenant, so its inbox starts empty and only that run can fill it. Nothing
  * before {@code mingo} does: on the 2026-09-16 qa nightly the phases up to and including
  * {@code fae} raised no ADMIN approval at all, while {@code mingo} raised 28, and every one of
@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * an earlier run has drained it.
  */
 @Tag("saas")
-@Tag("notification")
+@Tag("post-mingo")
 @DisplayName("Notifications")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class NotificationsTest extends BaseTest {
