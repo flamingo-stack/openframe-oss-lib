@@ -35,12 +35,8 @@ public class ToolInstallationNatsPublisher {
     }
 
     public void publish(String machineId, IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
-        ToolInstallationMessage message = buildMessage(toolAgent, tool, reinstall);
-        publish(machineId, message);
-    }
-
-    public void publish(String machineId, ToolInstallationMessage message) {
         String topicName = buildTopicName(machineId);
+        ToolInstallationMessage message = buildMessage(toolAgent, tool, reinstall);
         natsMessagePublisher.publishPersistent(topicName, message);
     }
 
@@ -52,7 +48,7 @@ public class ToolInstallationNatsPublisher {
         return buildMessage(toolAgent, tool, false);
     }
 
-    public ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
+    private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
         ToolInstallationMessage message = new ToolInstallationMessage();
         message.setToolAgentId(toolAgent.getKey());
         // TODO: need refactoring
