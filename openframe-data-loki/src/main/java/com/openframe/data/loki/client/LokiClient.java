@@ -43,8 +43,8 @@ public class LokiClient {
         try {
             response = api.queryRange(query, startNanos, endNanos, limit, direction.name().toLowerCase(Locale.ROOT));
         } catch (RestClientResponseException e) {
-            throw new LokiQueryException("Loki query failed with HTTP " + e.getStatusCode().value() + ": "
-                    + abbreviate(e.getResponseBodyAsString()), e);
+            String body = abbreviate(e.getResponseBodyAsString());
+            throw new LokiQueryException("Loki query failed with HTTP " + e.getStatusCode().value() + ": " + body, e);
         } catch (RestClientException e) {
             throw new LokiQueryException("Loki query failed: " + e.getMessage(), e);
         }
@@ -69,7 +69,8 @@ public class LokiClient {
                     new TreeMap<>(stream.stream() != null ? stream.stream() : Map.of()));
             for (List<String> value : stream.values()) {
                 if (value != null && value.size() >= 2) {
-                    entries.add(new LokiLogEntry(Long.parseLong(value.get(0)), value.get(1), labels));
+                    long timestampNanos = Long.parseLong(value.get(0));
+                    entries.add(new LokiLogEntry(timestampNanos, value.get(1), labels));
                 }
             }
         }

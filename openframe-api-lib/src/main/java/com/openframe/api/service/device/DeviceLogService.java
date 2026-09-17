@@ -106,8 +106,10 @@ public class DeviceLogService {
         List<LokiLogEntry> entries = lokiClient.queryRange(query, startNanos, endNanos, queryLimit, LokiDirection.BACKWARD);
         List<LokiLogEntry> pageEntries = wholeTimestampsOnly(entries, pageSize, query);
         List<DeviceLogEntry> items = toItems(pageEntries);
+        boolean hasNextPage = entries.size() > pageSize;
+        boolean hasPreviousPage = after != null;
 
-        return result(items, entries.size() > pageSize, after != null);
+        return result(items, hasNextPage, hasPreviousPage);
     }
 
     static String buildQuery(String tenantDomain, String machineId, DeviceLogFilterCriteria criteria) {
@@ -220,7 +222,8 @@ public class DeviceLogService {
         if (requested == null) {
             return DEFAULT_PAGE_SIZE;
         }
-        return Math.min(Math.max(requested, 1), MAX_PAGE_SIZE);
+        int atLeastOneLine = Math.max(requested, 1);
+        return Math.min(atLeastOneLine, MAX_PAGE_SIZE);
     }
 
     private static void validateSearch(DeviceLogFilterCriteria criteria) {
