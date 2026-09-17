@@ -81,10 +81,6 @@ public class SoftwareBundleService {
         return true;
     }
 
-    public SoftwareBundleResponse get(String id) {
-        return toResponse(loadOrThrow(id));
-    }
-
     public Optional<SoftwareBundleResponse> findById(String id) {
         return bundleRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id).map(SoftwareBundleService::toResponse);
     }
@@ -110,6 +106,11 @@ public class SoftwareBundleService {
         List<SoftwareDispatchResult> results = entity.getAction() == SoftwareAction.INSTALL
                 ? installUpdateService.install(input, actor, ExecutionSource.MANUAL)
                 : installUpdateService.update(input, actor, ExecutionSource.MANUAL);
+
+        if (results.isEmpty()) {
+            throw new BadRequestException("Cannot run software bundle " + id
+                    + ": no package could be dispatched to a compatible device");
+        }
 
         Instant now = Instant.now();
         entity.setStatus(SoftwareBundleStatus.COMPLETED);

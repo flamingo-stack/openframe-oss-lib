@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -148,6 +149,37 @@ class SoftwareInstallUpdateManagementServiceTest {
                 eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.INSTALL));
         verify(softwareDispatchService).dispatch(eq(winget), eq(List.of("m-win")), anyList(), eq(USER),
                 eq(ExecutionSource.MANUAL), eq(PackageManagerType.WINGET), eq("vscode"), eq(SoftwareAction.INSTALL));
+    }
+
+    @Test
+    @DisplayName("install: a package with no OS-compatible device is skipped, while a compatible one still dispatches")
+    void install_incompatiblePackage_skipped() {
+        when(registry.handlerFor(PackageManagerType.WINGET)).thenReturn(new WingetPackageManagerHandler());
+        // Only a macOS device is assigned — the winget package has nowhere to go.
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m-mac", OsType.MAC_OS)));
+        ScriptResponse brew = script("brew-install-id", OsType.MAC_OS);
+        ScriptResponse winget = script("winget-install-id", OsType.WINDOWS);
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_INSTALL)).thenReturn(brew);
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.WINGET_INSTALL)).thenReturn(winget);
+        when(softwareDispatchService.dispatch(eq(brew), anyList(), anyList(), eq(USER), eq(ExecutionSource.MANUAL),
+                any(), any(), any()))
+                .thenReturn("exec-brew");
+
+        SoftwareManagementInput in = new SoftwareManagementInput();
+        in.setMachineIds(List.of("m-mac"));
+        in.setPackages(List.of(
+                pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK),
+                pkg(PackageManagerType.WINGET, "vscode", null)));
+
+        List<SoftwareDispatchResult> results = service.install(in, USER, ExecutionSource.MANUAL);
+
+        // brew dispatched to the macOS device; winget skipped entirely (no Windows device).
+        assertThat(results).extracting(SoftwareDispatchResult::getPackageName).containsExactly("slack");
+        verify(softwareDispatchService).dispatch(eq(brew), eq(List.of("m-mac")), anyList(), eq(USER),
+                eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.INSTALL));
+        verify(softwareDispatchService, never()).dispatch(eq(winget), anyList(), anyList(), any(), any(),
+                any(), any(), any());
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {

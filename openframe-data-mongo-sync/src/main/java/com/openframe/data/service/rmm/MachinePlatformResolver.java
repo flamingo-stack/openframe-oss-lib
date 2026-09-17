@@ -36,7 +36,7 @@ public class MachinePlatformResolver {
         if (supportedPlatforms == null || supportedPlatforms.isEmpty()) {
             return List.of();
         }
-        Set<OsType> platforms = supportedPlatforms instanceof Set<OsType> set ? set : new HashSet<>(supportedPlatforms);
+        Set<OsType> platforms = new HashSet<>(supportedPlatforms);
         return machineIds.stream()
                 .filter(id -> platforms.contains(osTypes.get(id)))
                 .collect(Collectors.toList());

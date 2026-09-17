@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
 import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
+import com.openframe.api.dto.rmm.software.UpdateSoftwareBundleInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
@@ -135,6 +136,90 @@ class SoftwareBundleServiceTest {
 
         assertThatThrownBy(() -> service.delete(BUNDLE_ID, USER)).isInstanceOf(BadRequestException.class);
         verify(bundleRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("update: a PENDING bundle's devices/packages are replaced and its TTL anchor refreshed")
+    void update_pending_replacesAndRefreshes() {
+        SoftwareBundle pending = pending(SoftwareAction.INSTALL,
+                SoftwareBundlePackage.builder().packageManager(PackageManagerType.BREW).packageName("slack").build());
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(pending));
+        when(bundleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateSoftwareBundleInput input = new UpdateSoftwareBundleInput();
+        input.setId(BUNDLE_ID);
+        input.setMachineIds(List.of("m1", "m2"));
+        SoftwarePackageInput pkg = new SoftwarePackageInput();
+        pkg.setPackageManager(PackageManagerType.BREW);
+        pkg.setPackageName("chrome");
+        input.setPackages(List.of(pkg));
+
+        service.update(input, USER);
+
+        ArgumentCaptor<SoftwareBundle> captor = ArgumentCaptor.forClass(SoftwareBundle.class);
+        verify(bundleRepository).save(captor.capture());
+        SoftwareBundle saved = captor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(SoftwareBundleStatus.PENDING);
+        assertThat(saved.getMachineIds()).containsExactly("m1", "m2");
+        assertThat(saved.getPackages()).extracting(SoftwareBundlePackage::getPackageName).containsExactly("chrome");
+        assertThat(saved.getExpireAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("update: a COMPLETED bundle cannot be edited")
+    void update_completed_rejected() {
+        SoftwareBundle completed = pending(SoftwareAction.INSTALL);
+        completed.setStatus(SoftwareBundleStatus.COMPLETED);
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(completed));
+
+        UpdateSoftwareBundleInput input = new UpdateSoftwareBundleInput();
+        input.setId(BUNDLE_ID);
+        input.setMachineIds(List.of("m1"));
+
+        assertThatThrownBy(() -> service.update(input, USER)).isInstanceOf(BadRequestException.class);
+        verify(bundleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("delete: a PENDING bundle is removed")
+    void delete_pending_ok() {
+        SoftwareBundle pending = pending(SoftwareAction.INSTALL);
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(pending));
+
+        assertThat(service.delete(BUNDLE_ID, USER)).isTrue();
+        verify(bundleRepository).delete(pending);
+    }
+
+    @Test
+    @DisplayName("run: an UPDATE bundle dispatches via the update engine (not install)")
+    void run_updateAction_usesUpdateEngine() {
+        SoftwareBundle pending = pending(SoftwareAction.UPDATE,
+                SoftwareBundlePackage.builder().packageManager(PackageManagerType.BREW).packageName("slack").build());
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(pending));
+        when(installUpdateService.update(any(), eq(USER), eq(ExecutionSource.MANUAL)))
+                .thenReturn(List.of(result("exec-9")));
+
+        List<SoftwareDispatchResult> results = service.run(BUNDLE_ID, USER);
+
+        verify(installUpdateService).update(any(), eq(USER), eq(ExecutionSource.MANUAL));
+        verify(installUpdateService, never()).install(any(), any(), any());
+        assertThat(results).extracting(SoftwareDispatchResult::getExecutionId).containsExactly("exec-9");
+        ArgumentCaptor<SoftwareBundle> captor = ArgumentCaptor.forClass(SoftwareBundle.class);
+        verify(bundleRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(SoftwareBundleStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("run: when nothing dispatches (no OS-compatible device), the bundle stays PENDING and is not completed")
+    void run_nothingDispatched_staysPending() {
+        SoftwareBundle pending = pending(SoftwareAction.INSTALL,
+                SoftwareBundlePackage.builder().packageManager(PackageManagerType.BREW).packageName("slack").build());
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(pending));
+        when(installUpdateService.install(any(), eq(USER), eq(ExecutionSource.MANUAL))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.run(BUNDLE_ID, USER)).isInstanceOf(BadRequestException.class);
+        verify(bundleRepository, never()).save(any());
+        assertThat(pending.getStatus()).isEqualTo(SoftwareBundleStatus.PENDING);
     }
 
     private static CreateSoftwareBundleInput createInput() {
