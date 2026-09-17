@@ -33,12 +33,12 @@ export interface UseEntityCardLinkArgs {
   /** Explicit override. When set, runtime decision is skipped. */
   target?: '_blank';
   /** Explicit override. When set, runtime decision is skipped. */
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
 }
 
 export interface EntityCardLinkProps {
   target: '_blank' | undefined;
-  rel: 'noopener noreferrer' | undefined;
+  rel: 'noopener' | 'noopener noreferrer' | undefined;
 }
 
 export function useEntityCardLink({ href, targetPlatform, target, rel }: UseEntityCardLinkArgs): EntityCardLinkProps {
