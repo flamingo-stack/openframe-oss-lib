@@ -172,7 +172,7 @@ function ReviewStateBadge({ state, className = '' }: { state: PrReviewState; cla
 export interface GitHubActivityCardAnchorProps {
   href: string;
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
