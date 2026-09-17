@@ -126,6 +126,19 @@ pub async fn remove_directory_with_retry(path: &Path, max_retries: u32) -> Resul
                 return Ok(());
             }
             Err(e) => {
+                // Sharing violation (os error 32): a process holds a file open without
+                // FILE_SHARE_DELETE. Identify the holders, evict the safe ones, and retry.
+                #[cfg(target_os = "windows")]
+                if crate::platform::file_lock::is_file_in_use_error(&e) {
+                    warn!(
+                        "Removal of {} blocked by a sharing violation on attempt {}/{}; attempting lock-aware recovery",
+                        path.display(),
+                        attempt,
+                        max_retries
+                    );
+                    crate::platform::lock_recovery::evict_holders_for_removal(path).await;
+                }
+
                 if attempt < max_retries {
                     let wait_secs = std::cmp::min(2_u64.pow(attempt - 1), 8); // Exponential backoff, max 8 seconds
                     warn!(
@@ -151,6 +164,21 @@ pub async fn remove_directory_with_retry(path: &Path, max_retries: u32) -> Resul
                             return Ok(());
                         }
                         Err(force_err) => {
+                            // A refused/unkillable holder still locks the directory: schedule its
+                            // contents for deletion on the next boot so it clears without a wipe.
+                            #[cfg(target_os = "windows")]
+                            if path.exists() && crate::platform::file_lock::is_file_in_use_error(&e)
+                            {
+                                let scheduled =
+                                    crate::platform::lock_recovery::schedule_delete_on_reboot(path);
+                                warn!(
+                                    "Directory {} is still locked after {} attempts; scheduled {} entr{} for delete-on-reboot (a reboot is required to fully clear it)",
+                                    path.display(),
+                                    max_retries,
+                                    scheduled,
+                                    if scheduled == 1 { "y" } else { "ies" }
+                                );
+                            }
                             return Err(anyhow::anyhow!(
                                 "Failed to remove directory {} after {} attempts. Last error: {}. Force removal error: {}",
                                 path.display(),
