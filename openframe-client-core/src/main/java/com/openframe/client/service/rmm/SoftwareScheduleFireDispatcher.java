@@ -8,6 +8,7 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptType;
+import com.openframe.data.document.rmm.software.SoftwareExecutionId;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
@@ -25,7 +26,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -76,7 +76,7 @@ public class SoftwareScheduleFireDispatcher {
         }
 
         List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
-        String executionId = UUID.randomUUID().toString();
+        String executionId = SoftwareExecutionId.forSchedule(schedule.getId(), pkg.getPackageManager(), pkg.getPackageName());
 
         scriptExecutionRepository.saveQueued(RunningExecutionRows.builder()
                 .tenantId(schedule.getTenantId())

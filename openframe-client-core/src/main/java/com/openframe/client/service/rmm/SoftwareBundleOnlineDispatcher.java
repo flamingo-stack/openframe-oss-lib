@@ -9,6 +9,7 @@ import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
+import com.openframe.data.document.rmm.software.SoftwareExecutionId;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
@@ -23,7 +24,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -70,7 +70,7 @@ public class SoftwareBundleOnlineDispatcher {
         }
 
         List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
-        String executionId = UUID.randomUUID().toString();
+        String executionId = SoftwareExecutionId.forBundle(bundle.getId(), pkg.getPackageManager(), pkg.getPackageName());
 
         scriptExecutionRepository.saveQueued(RunningExecutionRows.builder()
                 .tenantId(bundle.getTenantId())

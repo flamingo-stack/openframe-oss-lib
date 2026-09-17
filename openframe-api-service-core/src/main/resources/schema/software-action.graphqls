@@ -1,0 +1,66 @@
+# Software Actions — the "Software Actions" page: one row per install/update of a package across its devices.
+# A row is a SoftwareExecutionBatch header; the X/Y ratio is respondedMachineCount / totalMachineCount.
+# Gated behind openframe.rmm.software.enabled=true. Reuses SoftwareAction, PackageManagerType, Instant, SortInput.
+
+extend type Query {
+    """One software action by id. Null when unknown."""
+    softwareAction(id: ID!): SoftwareActionRun
+
+    """Software actions for the tenant (install/update runs + scheduled ones), newest first."""
+    softwareActions(
+        filter: SoftwareActionFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): SoftwareActionRunConnection!
+}
+
+"""A single install/update of one package across its target devices."""
+type SoftwareActionRun {
+    id: ID!
+    executionId: String!
+    "Package name (the SOFTWARE column)."
+    software: String!
+    "INSTALL or UPDATE."
+    action: SoftwareAction!
+    "Package manager engine — BREW / WINGET / CHOCO."
+    engine: PackageManagerType!
+    status: SoftwareActionStatus!
+    "Total target devices (Y in X / Y)."
+    totalMachineCount: Int!
+    "Devices that have finished (X in X / Y)."
+    respondedMachineCount: Int!
+    "When a SCHEDULED action will fire. Null once dispatched / for NOW."
+    scheduledAt: Instant
+    "When the action was dispatched. Null while SCHEDULED."
+    dispatchedAt: Instant
+    finishedAt: Instant
+    initiatedBy: String
+}
+
+enum SoftwareActionStatus {
+    SCHEDULED
+    IN_PROGRESS
+    COMPLETED
+    FAILED
+}
+
+type SoftwareActionRunConnection {
+    edges: [SoftwareActionRunEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type SoftwareActionRunEdge {
+    node: SoftwareActionRun!
+    cursor: String!
+}
+
+input SoftwareActionFilterInput {
+    statuses: [SoftwareActionStatus!]
+    actions: [SoftwareAction!]
+    engines: [PackageManagerType!]
+}
