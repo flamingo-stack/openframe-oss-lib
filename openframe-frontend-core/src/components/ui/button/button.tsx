@@ -228,7 +228,10 @@ interface ButtonProps
   linkProps?: {
     href: string;
     target?: '_blank';
-    rel?: 'noopener noreferrer';
+    /** `noopener` alone keeps the Referer for a new-tab link to one of our own
+     *  platforms (cross-domain analytics attribution); `noreferrer` is for
+     *  third-party destinations. */
+    rel?: 'noopener' | 'noopener noreferrer';
     onClick?: React.MouseEventHandler<HTMLAnchorElement>;
   } | null;
   leftIcon?: React.ReactNode;

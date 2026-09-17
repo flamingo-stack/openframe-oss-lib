@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getBaseUrl } from '../../../../utils/cn';
+import { getPlatformUrl } from '../../../../platform-domains';
 import { resolveSourceRowCTA } from '../source-row-cta';
 
 /**
@@ -28,7 +28,7 @@ describe('resolveSourceRowCTA — doc-chip platform routing', () => {
   };
 
   const expectHref = (platform: string, base: string, path: string) =>
-    new URL(path, `${getBaseUrl(platform)}/${base}/`).toString();
+    new URL(path, `${getPlatformUrl(platform)}/${base}/`).toString();
 
   it('routes EACH doc source to its own platform from ONE shared context (mixed sources)', () => {
     const md = resolveSourceRowCTA(markdownRow, { docPlatformTargets });
