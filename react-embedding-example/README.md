@@ -221,7 +221,7 @@ docPlatformTargets: {
   markdown:      { platform: 'flamingo',    basePath: 'knowledge-base' },
   data_room_doc: { platform: 'company-hub', basePath: 'data-room' },
 },
-// markdown chip → getBaseUrl('flamingo')/knowledge-base/<path>, opened in a new tab.
+// markdown chip → getPlatformUrl('flamingo')/knowledge-base/<path>, opened in a new tab.
 ```
 
 ### 4. Shared-page chrome — `DevSectionPage` props

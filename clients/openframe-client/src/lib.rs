@@ -48,7 +48,10 @@ use crate::listener::tool_installation_message_listener::ToolInstallationMessage
 use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
 use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
-use crate::models::{CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage};
+use crate::models::{
+    BootstrapScriptMessage, CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage,
+    SoftwareScriptMessage,
+};
 use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
@@ -68,6 +71,10 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::package_manager::presence_report::{
+    PackageManagerPresenceReporter, PackageManagerPresenceRunManager,
+};
+use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::ResultStore;
@@ -165,12 +172,16 @@ pub struct Client {
     client_uninstall_message_listener: ClientUninstallMessageListener,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
+    script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
+    software_execution_listener: ExecutionListener<SoftwareScriptMessage>,
     script_schedule_execution_listener: ExecutionListener<ScriptScheduleExecutionMessage>,
     tool_run_manager: ToolRunManager,
     token_refresh_run_manager: TokenRefreshRunManager,
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
+    package_manager_presence_run_manager: PackageManagerPresenceRunManager,
+    package_manager_update_run_manager: PackageManagerUpdateRunManager,
     hostname_report_publisher: HostnameReportPublisher,
     machine_timezone_request_listener: MachineTimezoneRequestListener,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
@@ -552,6 +563,22 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let script_bootstrap_execution_listener = ExecutionListener::<BootstrapScriptMessage>::new(
+            nats_connection_manager.clone(),
+            nats_message_publisher.clone(),
+            execution_service.clone(),
+            config_service.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
+        let software_execution_listener = ExecutionListener::<SoftwareScriptMessage>::new(
+            nats_connection_manager.clone(),
+            nats_message_publisher.clone(),
+            execution_service.clone(),
+            config_service.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
         let script_schedule_execution_listener =
             ExecutionListener::<ScriptScheduleExecutionMessage>::new(
                 nats_connection_manager.clone(),
@@ -567,6 +594,13 @@ impl Client {
             MachineHeartbeatPublisher::new(nats_message_publisher.clone(), config_service.clone());
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
+
+        let package_manager_presence_run_manager =
+            PackageManagerPresenceRunManager::new(PackageManagerPresenceReporter::new(
+                nats_message_publisher.clone(),
+                config_service.clone(),
+            ));
+        let package_manager_update_run_manager = PackageManagerUpdateRunManager::new();
 
         let hostname_report_publisher = HostnameReportPublisher::new(
             nats_message_publisher.clone(),
@@ -595,12 +629,16 @@ impl Client {
             client_uninstall_message_listener,
             command_execution_listener,
             script_execution_listener,
+            script_bootstrap_execution_listener,
+            software_execution_listener,
             script_schedule_execution_listener,
             tool_run_manager,
             token_refresh_run_manager,
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
+            package_manager_presence_run_manager,
+            package_manager_update_run_manager,
             hostname_report_publisher,
             machine_timezone_request_listener,
             result_outbox_run_manager,
@@ -676,6 +714,10 @@ impl Client {
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();
 
+        self.package_manager_update_run_manager.start();
+
+        self.package_manager_presence_run_manager.start();
+
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
 
@@ -712,6 +754,12 @@ impl Client {
         info!("Starting script execution listener...");
         self.script_execution_listener.start().await?;
         info!("Script execution listener started");
+        info!("Starting script bootstrap execution listener...");
+        self.script_bootstrap_execution_listener.start().await?;
+        info!("Script bootstrap execution listener started");
+        info!("Starting software execution listener...");
+        self.software_execution_listener.start().await?;
+        info!("Software execution listener started");
         info!("Starting script schedule execution listener...");
         self.script_schedule_execution_listener.start().await?;
         info!("Script schedule execution listener started");
