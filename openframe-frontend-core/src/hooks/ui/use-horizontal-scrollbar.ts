@@ -232,6 +232,17 @@ export function useHorizontalScrollbar() {
     target.style.cursor = 'grab';
   }, []);
 
+  // Drag: pointer cancel. The browser takes the pointer away mid-drag (a touch
+  // that turned into a pan, a palm rejection) and no pointerup ever follows —
+  // left as dragging, `onScroll` would skip every sync from then on and the
+  // thumb would freeze where it was. Capture is released implicitly right
+  // after pointercancel, so there is nothing to release here.
+  const onThumbPointerCancel = useCallback((e: PointerEvent) => {
+    isDraggingRef.current = false;
+    const target = e.currentTarget as HTMLElement;
+    target.style.cursor = 'grab';
+  }, []);
+
   return {
     scrollRef,
     trackRef,
@@ -245,5 +256,6 @@ export function useHorizontalScrollbar() {
     onThumbPointerDown,
     onThumbPointerMove,
     onThumbPointerUp,
+    onThumbPointerCancel,
   };
 }
