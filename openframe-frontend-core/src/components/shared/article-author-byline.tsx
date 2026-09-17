@@ -29,7 +29,7 @@ import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import Image from '../../embed-shims/next-image';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
-import { formatBioText } from '../../utils/format';
+import { formatBioText, formatDateWithTimezone } from '../../utils/format';
 import { getProxiedImageUrl } from '../../utils/image-proxy';
 
 export interface ArticleAuthorBylineProps {
@@ -65,18 +65,9 @@ export interface ArticleAuthorBylineProps {
 }
 
 function formatDate(value: string | Date): string {
-  const d = typeof value === 'string' ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return '';
-  // `timeZone: 'UTC'` keeps the SSR (server = UTC) and client (user's local tz)
-  // renders identical — without it a published_at near a midnight boundary
-  // formats to a different day on each side, triggering a React #418 hydration
-  // text mismatch. Matches the convention in blog-metadata.tsx / investor-update.
-  return d.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  // A published date is a content date: UTC-pinned through the one renderer, so
+  // the server and every client agree on the day (React #418).
+  return formatDateWithTimezone(value, null, 'long');
 }
 
 export function ArticleAuthorByline({

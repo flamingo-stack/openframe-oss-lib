@@ -32,12 +32,22 @@ type Notification implements Node {
     title: String!
     description: String
     createdAt: Instant!
-    read: Boolean!
+    read: Boolean! @deprecated(reason: "Use status.")
+    "The recipient's read state of this notification. DELETED rows are never listed."
+    status: NotificationReadStatus!
     category: NotificationCategory!
     "Spec-driven notification type."
     type: String
     "Flat string map of the notification's facts, snapshotted at emission."
     attributes: JSON
+}
+
+enum NotificationReadStatus {
+    UNREAD
+    READ
+    "Read automatically because its ticket or dialog was archived; turns into READ on the first interaction."
+    ARCHIVED
+    DELETED
 }
 
 enum NotificationCategory {

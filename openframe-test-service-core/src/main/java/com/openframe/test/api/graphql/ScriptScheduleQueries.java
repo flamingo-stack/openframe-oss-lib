@@ -186,4 +186,49 @@ public class ScriptScheduleQueries {
                 }
             }
             """ + SCHEDULE_FIELDS;
+
+    // ---- execution history and runs of a schedule (plan item CP-17) ----
+
+    private static final String EXECUTION_NODE = "id executionId scriptId scriptName scheduleId source status dispatchedAt statusChangedAt";
+
+    public static final String SCHEDULE_EXECUTIONS = """
+            query ScheduleExecutions($scheduleId: ID!, $first: Int) {
+                scheduleExecutions(scheduleId: $scheduleId, first: $first) {
+                    filteredCount
+                    edges { node { %s } cursor }
+                    pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
+                }
+            }
+            """.formatted(EXECUTION_NODE);
+
+    public static final String SCHEDULE_EXECUTION_FILTERS = """
+            query ScheduleExecutionFilters($scheduleId: ID!) {
+                scheduleExecutionFilters(scheduleId: $scheduleId) {
+                    initiators { value label count }
+                    statuses { value label count }
+                    machines { value label count }
+                    filteredCount
+                }
+            }
+            """;
+
+    public static final String SCHEDULE_RUNS = """
+            query ScheduleRuns($scheduleId: ID!, $first: Int) {
+                scheduleRuns(scheduleId: $scheduleId, first: $first) {
+                    filteredCount
+                    edges { node { id executionId scheduleId status totalMachineCount respondedMachineCount dispatchedAt finishedAt } cursor }
+                    pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
+                }
+            }
+            """;
+
+    public static final String SCHEDULE_RUN_FILTERS = """
+            query ScheduleRunFilters($scheduleId: ID!) {
+                scheduleRunFilters(scheduleId: $scheduleId) {
+                    statuses { value label count }
+                    initiators { value label count }
+                    filteredCount
+                }
+            }
+            """;
 }
