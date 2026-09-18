@@ -147,7 +147,8 @@ class ScriptDispatchServiceTest {
                 eq(PrivilegeLevel.ADMIN),
                 eq(60),                      // effective timeout (script default, no override) — persisted for the watchdog
                 eq(USER_ID),
-                eq(ExecutionSource.MANUAL));
+                eq(ExecutionSource.MANUAL),
+                eq(false));
         inOrder.verify(scriptNatsPublisher).publishScript(eq(MACHINE_ID), any(ScriptMessage.class));
     }
 
@@ -163,7 +164,8 @@ class ScriptDispatchServiceTest {
                 eq(PrivilegeLevel.ADMIN),
                 eq(60),
                 eq((String) null),
-                eq(ExecutionSource.MANUAL));
+                eq(ExecutionSource.MANUAL),
+                eq(false));
     }
 
     @Test
@@ -232,7 +234,7 @@ class ScriptDispatchServiceTest {
         scriptDispatchService.runScript(input, USER_ID, ExecutionSource.MANUAL);
 
         verify(scriptExecutionService).create(
-                any(String.class), eq(SCRIPT_ID), eq(MACHINE_ID), eq(PrivilegeLevel.ADMIN), eq(90), eq(USER_ID), eq(ExecutionSource.MANUAL));
+                any(String.class), eq(SCRIPT_ID), eq(MACHINE_ID), eq(PrivilegeLevel.ADMIN), eq(90), eq(USER_ID), eq(ExecutionSource.MANUAL), eq(false));
         assertThat(capturePublished().getTimeoutSeconds()).isEqualTo(90);
     }
 
@@ -344,7 +346,8 @@ class ScriptDispatchServiceTest {
                 eq(PrivilegeLevel.ADMIN),
                 eq(60),
                 eq(USER_ID),
-                eq(ExecutionSource.MANUAL));
+                eq(ExecutionSource.MANUAL),
+                eq(false));
 
         ArgumentCaptor<ScriptMessage> captor = ArgumentCaptor.forClass(ScriptMessage.class);
         for (String id : machines) {
@@ -398,7 +401,7 @@ class ScriptDispatchServiceTest {
         scriptDispatchService.batchRunScript(batchInput(List.of("machine-1", "machine-1")), USER_ID, ExecutionSource.MANUAL);
 
         verify(scriptExecutionService).createBatch(
-                any(), eq(SCRIPT_ID), eq((String) null), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(60), eq(USER_ID), eq(ExecutionSource.MANUAL));
+                any(), eq(SCRIPT_ID), eq((String) null), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(60), eq(USER_ID), eq(ExecutionSource.MANUAL), eq(false));
         verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
     }
 

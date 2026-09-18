@@ -216,7 +216,7 @@ class CommandDispatchServiceTest {
         // carrying the shared executionId + command/shell/privilege/timeout + initiatedBy.
         verify(commandExecutionService).createBatch(
                 eq(response.getExecutionId()), eq("uptime"), eq(ScriptShell.BASH),
-                eq(machines), eq(PrivilegeLevel.ADMIN), eq(30), eq(INITIATED_BY));
+                eq(machines), eq(PrivilegeLevel.ADMIN), eq(30), eq(INITIATED_BY), eq(false));
 
         // One publish per machine — every published payload must carry the FULL wire contract
         // (executionId, code, shell, privilegeLevel, timeout), not just executionId+code, so a
@@ -242,7 +242,7 @@ class CommandDispatchServiceTest {
 
         InOrder order = inOrder(commandExecutionService, commandNatsPublisher);
         order.verify(commandExecutionService).createBatch(any(), any(), any(),
-                org.mockito.ArgumentMatchers.anyList(), any(), any(), any());
+                org.mockito.ArgumentMatchers.anyList(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
         order.verify(commandNatsPublisher).publishCommand(eq("machine-1"), any(CommandMessage.class));
     }
 
@@ -253,7 +253,7 @@ class CommandDispatchServiceTest {
         commandDispatchService.batchRunCommand(batchInput(List.of("machine-1", "machine-1")), INITIATED_BY);
 
         verify(commandExecutionService).createBatch(any(), any(), any(),
-                eq(List.of("machine-1")), any(), any(), any());
+                eq(List.of("machine-1")), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
         verify(commandNatsPublisher).publishCommand(eq("machine-1"), any(CommandMessage.class));
     }
 

@@ -96,7 +96,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: hands the repository a RunningExecutionRows with tenant scope + scriptId + one machine (no schedule origin), and maps the saved row to a DTO")
     void create_forwardsRunningExecutionRows() {
-        ScriptExecutionResponse result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
+        ScriptExecutionResponse result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL, false);
 
         ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
         verify(scriptExecutionRepository).saveRunning(captor.capture());
@@ -122,7 +122,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: tenantId is taken from TenantIdProvider, NOT from any caller-supplied input — locks in the pod-scoped tenant contract")
     void create_alwaysUsesTenantIdProvider() {
-        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL, false);
 
         verify(tenantIdProvider).getTenantId();
         ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
@@ -133,7 +133,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: a null initiatedBy is forwarded as null — defensive fallback so an authenticated request without a fully-formed principal still produces a History row instead of NPE-ing the whole dispatch")
     void create_acceptsNullInitiatedBy() {
-        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, null, ExecutionSource.MANUAL);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, null, ExecutionSource.MANUAL, false);
 
         ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
         verify(scriptExecutionRepository).saveRunning(captor.capture());
@@ -143,7 +143,7 @@ class ScriptExecutionServiceTest {
     @Test
     @DisplayName("create: privilegeLevel is forwarded verbatim — USER vs ADMIN reaches the request exactly as the dispatch carried it")
     void create_forwardsPrivilegeLevelVerbatim() {
-        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL, false);
 
         ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
         verify(scriptExecutionRepository).saveRunning(captor.capture());
@@ -156,7 +156,7 @@ class ScriptExecutionServiceTest {
         List<String> machines = List.of("m-1", "m-2", "m-3");
 
         List<ScriptExecutionResponse> results = service.createBatch(EXECUTION_ID, SCRIPT_ID, "sched-1", machines,
-                PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.SCHEDULED);
+                PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.SCHEDULED, false);
 
         ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
         verify(scriptExecutionRepository).saveRunning(captor.capture());

@@ -24,4 +24,5 @@ public class RunningExecutionRows {
     PackageManagerType packageManager;
     String packageName;
     SoftwareAction softwareAction;
+    boolean testScript;
 }
