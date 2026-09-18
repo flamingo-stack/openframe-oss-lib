@@ -290,7 +290,7 @@ tags = ["saas", "feature"]
 depends_on = ["CP-1"]
 needs = []
 source = "owner request 2026-09-13 (cheap batch)"
-branch = "test/coverage-scripts-executions"
+branch = "test/coverage-schedule-runs"
 notes = "Done 2026-09-13: ScriptExecutionHistoryTest, 2 read cases, green on qa test-env. The script side prefers a script that already has history (the AI suites leave some) and checks the connection against its facets; the schedule side uses an own schedule a day out whose history is legitimately empty. Nothing is dispatched. ScriptExecution.scriptId is the raw id while Script.id is global (RelayIds.decode compares them); the status enum is QUEUED/DISPATCHED/RUNNING/SUCCESS/…"
 
 [[items]]

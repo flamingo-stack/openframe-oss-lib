@@ -41,7 +41,7 @@ export interface CaseStudyCardProps {
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   targetPlatform?: string | null;
   /** OG placeholder URL, used when `study.featured_image` is missing. */
   placeholderUrl?: string | null;

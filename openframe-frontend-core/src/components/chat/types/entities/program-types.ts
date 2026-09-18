@@ -10,10 +10,11 @@
  *   3. Configuration-Driven: Program types defined via configuration objects
  *   4. Admin Consistency: Same patterns work for public pages and admin CRUD
  *
- * Lifted from `lib/types/program-types.ts` in the hub. The pure transform
- * helpers (`transformEventToProgram`, `transformPodcastToProgram`,
- * `transformWebinarToProgram`) also move here — they're pure shape
- * mappers with no DB / state access.
+ * Lifted from `lib/types/program-types.ts` in the hub.
+ *
+ * The pure row→item transform helpers that used to live here are GONE. They
+ * had no caller in this package or in the host app. The host app keeps its
+ * own transforms, which resolve the date.
  */
 
 import type { ReactNode } from 'react';
@@ -166,6 +167,9 @@ export interface BaseProgramItem {
   description: string | null;
   cover_url: string | null; // Primary image
   date: string; // ISO date string - maps to: start_at, published_at
+  /** The event's IANA zone, when the row declares one. Read through
+   *  `programDateInstant`, never directly — see that module on why. */
+  timezone?: string | null;
   external_url?: string | null; // Registration/play link
   hosts?: ProgramHost[] | null; // Speakers/hosts
   // Platform tagging lives in the host app's `entity_platforms` array (exposed
@@ -377,88 +381,3 @@ export interface AdminProgramFilter extends ProgramFilter {
 // ============================================================================
 // TRANSFORM UTILITIES
 // ============================================================================
-
-/**
- * Transform a database event row to EventItem
- */
-export function transformEventToProgram(event: LumaEventRow): EventItem {
-  return {
-    id: event.id,
-    title: event.name,
-    description: event.description ?? null,
-    cover_url: event.cover_url ?? null,
-    date: event.start_at,
-    external_url: event.event_url ?? null,
-    hosts: event.hosts ?? null,
-    luma_api_id: event.luma_api_id,
-    end_at: event.end_at,
-    timezone: event.timezone ?? null,
-    location_name: event.location_name ?? null,
-    location_full_address: event.location_full_address ?? null,
-    geo_latitude: event.geo_latitude ?? null,
-    geo_longitude: event.geo_longitude ?? null,
-    meeting_url: event.meeting_url ?? null,
-    event_url: event.event_url ?? null,
-    guest_count: event.guest_count ?? null,
-    visibility: event.visibility ?? null,
-    is_deleted: event.is_deleted ?? false,
-  };
-}
-
-/**
- * Transform a database podcast row to PodcastItem
- */
-export function transformPodcastToProgram(episode: PodcastEpisodeRow): PodcastItem {
-  return {
-    id: episode.id,
-    title: episode.title,
-    description: episode.description ?? null,
-    // Use cover_image_override if set, otherwise use cover_url
-    cover_url: episode.cover_image_override ?? episode.cover_url ?? null,
-    date: episode.published_at ?? episode.created_at,
-    external_url: episode.external_url ?? null,
-    hosts: episode.hosts ?? null,
-    podbean_episode_id: episode.podbean_episode_id,
-    podbean_podcast_id: episode.podbean_podcast_id,
-    audio_url: episode.audio_url ?? null,
-    main_video_url: episode.main_video_url ?? null,
-    media_type: episode.media_type ?? 'audio',
-    duration_seconds: episode.duration_seconds ?? null,
-    status: episode.status ?? 'published',
-    published_at: episode.published_at ?? null,
-    is_deleted: episode.is_deleted ?? false,
-    // Override fields
-    cover_image_override: episode.cover_image_override ?? null,
-    custom_video_url: episode.custom_video_url ?? null,
-  };
-}
-
-/**
- * Transform a database webinar row to WebinarItem
- * Uses display_date_override for date field when available (for backdating)
- * Uses cover_image_override for cover_url when available
- */
-export function transformWebinarToProgram(webinar: WebinarRow): WebinarItem {
-  return {
-    id: webinar.id,
-    title: webinar.title,
-    description: webinar.description ?? null,
-    // Use cover_image_override if set, otherwise use cover_url
-    cover_url: webinar.cover_image_override ?? webinar.cover_url ?? null,
-    // Use display_date_override if set, otherwise use start_at
-    date: webinar.display_date_override ?? webinar.start_at,
-    external_url: webinar.registration_url ?? null,
-    hosts: webinar.hosts ?? null,
-    livestorm_event_id: webinar.livestorm_event_id,
-    start_at: webinar.start_at,
-    end_at: webinar.end_at ?? null,
-    timezone: webinar.timezone ?? null,
-    registration_url: webinar.registration_url ?? null,
-    is_deleted: webinar.is_deleted ?? false,
-    main_video_url: webinar.main_video_url ?? null,
-    // Override fields
-    custom_video_url: webinar.custom_video_url ?? null,
-    display_date_override: webinar.display_date_override ?? null,
-    cover_image_override: webinar.cover_image_override ?? null,
-  };
-}

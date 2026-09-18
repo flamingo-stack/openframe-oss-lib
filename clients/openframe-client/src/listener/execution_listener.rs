@@ -147,7 +147,14 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
         };
         let execution_id = parsed.execution_id().to_string();
         let schedule_id = parsed.schedule_id().unwrap_or("-").to_string();
-        let requests = parsed.to_requests();
+        let requests: Vec<ExecutionRequest<'_>> = parsed
+            .to_requests()
+            .into_iter()
+            .map(|request| ExecutionRequest {
+                privilege_policy: M::PRIVILEGE_POLICY,
+                ..request
+            })
+            .collect();
         info!(kind = M::KIND, execution_id = %execution_id, schedule_id = %schedule_id, scripts = requests.len(), "Execution request received");
 
         self.acknowledge_receipt(machine_id, &execution_id, parsed.schedule_id(), &requests)
