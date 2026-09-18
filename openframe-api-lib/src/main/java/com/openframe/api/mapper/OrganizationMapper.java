@@ -20,7 +20,7 @@ public class OrganizationMapper {
      */
     public Organization toEntity(CreateOrganizationRequest request) {
         if (request == null) {
-            return null;
+            throw new IllegalArgumentException("request must not be null");
         }
 
         return Organization.builder()
@@ -52,6 +52,9 @@ public class OrganizationMapper {
      * Note: organizationId cannot be updated - it's immutable once created.
      */
     public Organization updateEntity(Organization existing, UpdateOrganizationRequest request) {
+        if (existing == null) {
+            throw new IllegalArgumentException("existing must not be null");
+        }
         if (request == null) {
             return existing;
         }
@@ -93,7 +96,7 @@ public class OrganizationMapper {
      */
     public OrganizationResponse toResponse(Organization organization) {
         if (organization == null) {
-            return null;
+            throw new IllegalArgumentException("organization must not be null");
         }
 
         return OrganizationResponse.builder()
@@ -121,7 +124,7 @@ public class OrganizationMapper {
 
     private ContactInformation toContactInformationEntity(ContactInformationDto dto) {
         if (dto == null) {
-            return null;
+            return ContactInformation.builder().build();
         }
 
         Address physicalAddress = toAddressEntity(dto.physicalAddress());
@@ -146,7 +149,7 @@ public class OrganizationMapper {
 
     private ContactPerson toContactPersonEntity(ContactPersonDto dto) {
         if (dto == null) {
-            return null;
+            return ContactPerson.builder().build();
         }
 
         return ContactPerson.builder()
@@ -174,7 +177,7 @@ public class OrganizationMapper {
 
     private ContactInformationDto toContactInformationDto(ContactInformation entity) {
         if (entity == null) {
-            return null;
+            return ContactInformationDto.builder().build();
         }
 
         return ContactInformationDto.builder()
@@ -189,7 +192,7 @@ public class OrganizationMapper {
 
     private ContactPersonDto toContactPersonDto(ContactPerson entity) {
         if (entity == null) {
-            return null;
+            return ContactPersonDto.builder().build();
         }
 
         return ContactPersonDto.builder()

@@ -5,25 +5,33 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "Create customer request")
-public record CreateCustomerRequest(
+public class CreateCustomerRequest {
         @NotBlank(message = "Name is required")
         @Schema(description = "Customer name", requiredMode = Schema.RequiredMode.REQUIRED)
-        String name,
-        String category,
+        private String name;
+        private String category;
         @PositiveOrZero(message = "Number of employees must be zero or positive")
-        Integer numberOfEmployees,
-        String websiteUrl,
-        String notes,
+        private Integer numberOfEmployees;
+        private String websiteUrl;
+        private String notes;
         @Valid
-        ContactInformationDto contactInformation,
+        private ContactInformationDto contactInformation;
         @PositiveOrZero(message = "Monthly revenue must be zero or positive")
-        BigDecimal monthlyRevenue,
-        LocalDate contractStartDate,
-        LocalDate contractEndDate
-) {
+        private BigDecimal monthlyRevenue;
+        private LocalDate contractStartDate;
+        private LocalDate contractEndDate;
 }
+

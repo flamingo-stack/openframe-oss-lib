@@ -2,12 +2,17 @@ package com.openframe.data.document.rmm.filter;
 
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-public record ExecutionOwnerScope(Type type,
-                                  String id,
-                                  PackageManagerType packageManager,
-                                  String packageName,
-                                  SoftwareAction softwareAction) {
+@Getter
+@AllArgsConstructor
+public class ExecutionOwnerScope {
+    private final Type type;
+    private final String id;
+    private final PackageManagerType packageManager;
+    private final String packageName;
+    private final SoftwareAction softwareAction;
 
     public enum Type {
         SCRIPT, SCHEDULE, SOFTWARE

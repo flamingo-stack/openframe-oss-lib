@@ -2,6 +2,7 @@ package com.openframe.data.document.tenant;
 
 import com.openframe.data.document.sso.SSOConfig;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -16,6 +17,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class SSOPerTenantConfig extends SSOConfig {

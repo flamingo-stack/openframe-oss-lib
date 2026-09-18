@@ -12,6 +12,11 @@ import java.util.List;
  * Integrated tool response
  *
  * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0.
+ *
+ * <p><strong>Note:</strong> This DTO is intentionally kept in sync with the equivalent
+ * {@code ToolResponse} in {@code openframe-external-api-service-core}, since both are generated
+ * from the same OpenAPI contract. Consolidating them into a shared module is tracked separately
+ * (see OFJAVA-009); any field added here must also be added there until that consolidation happens.
  */
 @Data
 @Builder
