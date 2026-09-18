@@ -18,15 +18,15 @@ extend type Query {
     ): SoftwareActionRunConnection!
 
     """
-    Device drill-down for one action: every target device with its result.
-    Executed devices come from their execution leaves (with output for "Show Result");
-    devices still offline come from the action's reconnect sentinels as SCHEDULED.
-    Pass the run's executionId plus its bundleId (NOW) or scheduleId (SCHEDULE).
+    Device drill-down for one action: every target device with its result. Pass the SoftwareActionRun's
+    opaque id as actionId (it carries the execution / bundle / schedule keys). Executed devices come from
+    their execution leaves (with output for "Show Result"); devices still offline come from the action's
+    reconnect sentinels, and a not-yet-fired schedule lists its assigned devices — all as SCHEDULED.
+    Optional filter (Status / Customer) and search (hostname or machine id).
     """
     softwareActionExecutions(
-        executionId: String,
-        bundleId: String,
-        scheduleId: String,
+        actionId: String!,
+        filter: SoftwareActionDeviceFilterInput,
         search: String
     ): [SoftwareActionDevice!]!
 
@@ -73,9 +73,12 @@ enum SoftwareActionStatus {
     FAILED
 }
 
-"""One target device of a software action, with its result."""
+"""One target device of a software action, with its result. Customer = the device's organization."""
 type SoftwareActionDevice {
     machineId: ID!
+    hostname: String
+    organizationId: String
+    organizationName: String
     status: SoftwareActionStatus!
     exitCode: Int
     stdout: String
@@ -85,6 +88,13 @@ type SoftwareActionDevice {
     error: String
     dispatchedAt: Instant
     finishedAt: Instant
+}
+
+"""Filter for softwareActionExecutions. All fields optional; null/empty = no constraint.
+organizationIds is the Customer filter."""
+input SoftwareActionDeviceFilterInput {
+    statuses: [SoftwareActionStatus!]
+    organizationIds: [ID!]
 }
 
 type SoftwareActionRunConnection {

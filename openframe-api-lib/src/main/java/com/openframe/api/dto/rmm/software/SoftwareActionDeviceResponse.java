@@ -11,6 +11,9 @@ import java.time.Instant;
 public class SoftwareActionDeviceResponse {
 
     private String machineId;
+    private String hostname;
+    private String organizationId;
+    private String organizationName;
     private SoftwareActionStatus status;
 
     private Integer exitCode;

@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareActionFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareActionFilters;
+import com.openframe.api.dto.rmm.software.SoftwareActionId;
 import com.openframe.api.dto.rmm.software.SoftwareActionResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.mapper.ScriptFilterOptionMapper;
@@ -123,7 +124,11 @@ public class SoftwareActionService {
         }
     }
 
-    public Optional<SoftwareActionResponse> findById(String executionId) {
+    public Optional<SoftwareActionResponse> findById(String actionId) {
+        String executionId = SoftwareActionId.decode(actionId).executionId();
+        if (executionId == null) {
+            return Optional.empty();
+        }
         return aggregationRepository.findByExecutionId(tenantIdProvider.getTenantId(), executionId)
                 .map(SoftwareActionService::toResponse);
     }
@@ -141,9 +146,10 @@ public class SoftwareActionService {
                 if (!scheduledMatchesFilter(filter, search, schedule, pkg)) {
                     continue;
                 }
+                String executionId = SoftwareExecutionId.forSchedule(schedule.getId(), pkg.getPackageManager(), pkg.getPackageName());
                 rows.add(SoftwareActionResponse.builder()
-                        .id(SoftwareExecutionId.forSchedule(schedule.getId(), pkg.getPackageManager(), pkg.getPackageName()))
-                        .executionId(SoftwareExecutionId.forSchedule(schedule.getId(), pkg.getPackageManager(), pkg.getPackageName()))
+                        .id(SoftwareActionId.of(executionId, null, schedule.getId()).encode())
+                        .executionId(executionId)
                         .software(pkg.getPackageName())
                         .action(schedule.getAction())
                         .engine(pkg.getPackageManager())
@@ -213,7 +219,7 @@ public class SoftwareActionService {
 
     private static SoftwareActionResponse toResponse(SoftwareActionSummary s) {
         return SoftwareActionResponse.builder()
-                .id(s.getExecutionId())
+                .id(SoftwareActionId.of(s.getExecutionId(), s.getBundleId(), s.getScheduleId()).encode())
                 .executionId(s.getExecutionId())
                 .software(s.getPackageName())
                 .action(s.getAction())

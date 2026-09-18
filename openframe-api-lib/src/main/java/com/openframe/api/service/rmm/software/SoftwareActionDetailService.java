@@ -1,12 +1,19 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareActionDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceResponse;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
+import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -14,13 +21,23 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import static org.springframework.util.StringUtils.hasText;
 
+/**
+ * The device drill-down for one Software Action: every target device with its result. Rows are layered so the
+ * most concrete state wins — the schedule's assigned machines seed a SCHEDULED baseline (a not-yet-fired
+ * schedule has no leaves/sentinels), reconnect sentinels overlay it (EXPIRED → FAILED), and execution leaves
+ * overlay everything with the real outcome and output for "Show Result". Each device is enriched with its
+ * hostname and customer (organization) and can be filtered by status / customer / search.
+ */
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -30,23 +47,39 @@ public class SoftwareActionDetailService {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final SoftwareBundleOnlineDispatchRepository bundleOnlineDispatchRepository;
     private final SoftwareScheduleOnlineDispatchRepository scheduleOnlineDispatchRepository;
+    private final SoftwareScheduleMachineAssignedRepository scheduleMachineAssignedRepository;
+    private final MachineRepository machineRepository;
+    private final OrganizationRepository organizationRepository;
     private final TenantIdProvider tenantIdProvider;
 
-    public List<SoftwareActionDeviceResponse> devices(String executionId, String bundleId, String scheduleId, String search) {
+    public List<SoftwareActionDeviceResponse> devices(String executionId, String bundleId, String scheduleId,
+                                                      SoftwareActionDeviceFilterInput filter, String search) {
         String tenantId = tenantIdProvider.getTenantId();
-
-        // Devices that already ran — from the execution leaves (keep leaf order, dedupe per machine).
         Map<String, SoftwareActionDeviceResponse> byMachine = new LinkedHashMap<>();
-        if (hasText(executionId)) {
-            for (ScriptExecution leaf : scriptExecutionRepository.findByTenantIdAndExecutionId(tenantId, executionId)) {
-                byMachine.putIfAbsent(leaf.getMachineId(), fromLeaf(leaf));
+
+        // 1. Baseline: a schedule's full target set as SCHEDULED (not-yet-fired schedules have no leaves).
+        if (hasText(scheduleId)) {
+            for (SoftwareScheduleMachineAssigned a : scheduleMachineAssignedRepository
+                    .findByTenantIdAndSoftwareScheduleId(tenantId, scheduleId)) {
+                byMachine.putIfAbsent(a.getMachineId(), pending(a.getMachineId(), SoftwareActionStatus.SCHEDULED, null));
             }
         }
 
-        // Devices still offline / waiting — from the reconnect sentinels of this action's source.
+        // 2. Overlay reconnect sentinels (offline devices armed at fire time) — EXPIRED overrides the baseline.
         addPending(byMachine, tenantId, bundleId, scheduleId);
 
+        // 3. Overlay execution leaves — the real outcome wins over any pending state.
+        if (hasText(executionId)) {
+            for (ScriptExecution leaf : scriptExecutionRepository.findByTenantIdAndExecutionId(tenantId, executionId)) {
+                byMachine.put(leaf.getMachineId(), fromLeaf(leaf));
+            }
+        }
+
+        enrichWithCustomer(tenantId, byMachine);
+
         return byMachine.values().stream()
+                .filter(row -> matchesStatus(row, filter))
+                .filter(row -> matchesCustomer(row, filter))
                 .filter(row -> matchesSearch(row, search))
                 .toList();
     }
@@ -55,9 +88,6 @@ public class SoftwareActionDetailService {
                             String bundleId, String scheduleId) {
         if (hasText(bundleId)) {
             bundleOnlineDispatchRepository.findByTenantIdAndBundleId(tenantId, bundleId).forEach(s -> {
-                if (byMachine.containsKey(s.getMachineId())) {
-                    return;
-                }
                 if (s.getStatus() == DeviceOnlineDispatchStatus.NEW) {
                     byMachine.put(s.getMachineId(), pending(s.getMachineId(), SoftwareActionStatus.SCHEDULED, null));
                 }
@@ -65,9 +95,6 @@ public class SoftwareActionDetailService {
             });
         } else if (hasText(scheduleId)) {
             scheduleOnlineDispatchRepository.findByTenantIdAndScheduleId(tenantId, scheduleId).forEach(s -> {
-                if (byMachine.containsKey(s.getMachineId())) {
-                    return;
-                }
                 if (s.getStatus() == DeviceOnlineDispatchStatus.NEW) {
                     byMachine.put(s.getMachineId(), pending(s.getMachineId(), SoftwareActionStatus.SCHEDULED, null));
                 } else if (s.getStatus() == DeviceOnlineDispatchStatus.EXPIRED) {
@@ -78,12 +105,61 @@ public class SoftwareActionDetailService {
         }
     }
 
+    /** Batch-loads each device's hostname and customer (organization) in two queries, not per row. */
+    private void enrichWithCustomer(String tenantId, Map<String, SoftwareActionDeviceResponse> byMachine) {
+        if (byMachine.isEmpty()) {
+            return;
+        }
+        Map<String, Machine> machines = new HashMap<>();
+        machineRepository.findByTenantIdAndMachineIdIn(tenantId, byMachine.keySet())
+                .forEach(m -> machines.put(m.getMachineId(), m));
+
+        Set<String> organizationIds = new HashSet<>();
+        machines.values().forEach(m -> {
+            if (m.getOrganizationId() != null) {
+                organizationIds.add(m.getOrganizationId());
+            }
+        });
+        Map<String, String> organizationNames = new HashMap<>();
+        if (!organizationIds.isEmpty()) {
+            organizationRepository.findByOrganizationIdIn(organizationIds)
+                    .forEach(o -> organizationNames.put(o.getOrganizationId(), o.getName()));
+        }
+
+        byMachine.forEach((machineId, row) -> {
+            Machine m = machines.get(machineId);
+            if (m != null) {
+                row.setHostname(m.getHostname());
+                row.setOrganizationId(m.getOrganizationId());
+                row.setOrganizationName(organizationNames.get(m.getOrganizationId()));
+            }
+        });
+    }
+
+    private static boolean matchesStatus(SoftwareActionDeviceResponse row, SoftwareActionDeviceFilterInput filter) {
+        if (filter == null || filter.getStatuses() == null || filter.getStatuses().isEmpty()) {
+            return true;
+        }
+        return filter.getStatuses().contains(row.getStatus());
+    }
+
+    private static boolean matchesCustomer(SoftwareActionDeviceResponse row, SoftwareActionDeviceFilterInput filter) {
+        if (filter == null || filter.getOrganizationIds() == null || filter.getOrganizationIds().isEmpty()) {
+            return true;
+        }
+        return row.getOrganizationId() != null && filter.getOrganizationIds().contains(row.getOrganizationId());
+    }
+
     private static boolean matchesSearch(SoftwareActionDeviceResponse row, String search) {
         if (!hasText(search)) {
             return true;
         }
         String needle = search.trim().toLowerCase(Locale.ROOT);
-        return row.getMachineId() != null && row.getMachineId().toLowerCase(Locale.ROOT).contains(needle);
+        return contains(row.getHostname(), needle) || contains(row.getMachineId(), needle);
+    }
+
+    private static boolean contains(String value, String needle) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(needle);
     }
 
     private static SoftwareActionDeviceResponse fromLeaf(ScriptExecution leaf) {
