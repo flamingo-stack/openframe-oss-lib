@@ -209,5 +209,4 @@ export { GetAppIcon } from './getapp-icon';
 
 // Financial platform icons
 export { CartaIcon } from './carta-icon';
-export { PilotIcon } from './pilot-icon';
 export { QuickBooksIcon } from './quickbooks-icon';
