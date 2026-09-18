@@ -98,6 +98,8 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                         .packageManager(request.getPackageManager())
                         .packageName(request.getPackageName())
                         .softwareAction(request.getSoftwareAction())
+                        .softwareBundleId(request.getSoftwareBundleId())
+                        .softwareScheduleId(request.getSoftwareScheduleId())
                         .status(initialStatus)
                         .dispatchedAt(now)
                         .statusChangedAt(now)

@@ -27,4 +27,7 @@ public class SoftwareActionResponse {
     private Instant dispatchedAt;
     private Instant finishedAt;
     private String initiatedBy;
+
+    private String bundleId;
+    private String scheduleId;
 }

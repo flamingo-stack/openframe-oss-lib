@@ -84,6 +84,7 @@ public class SoftwareBundleOnlineDispatcher {
                 .packageManager(pkg.getPackageManager())
                 .packageName(pkg.getPackageName())
                 .softwareAction(bundle.getAction())
+                .softwareBundleId(bundle.getId())
                 .build());
 
         ScriptMessage message = ScriptMessage.builder()

@@ -19,4 +19,7 @@ public class SoftwareActionSummary {
     private int respondedMachineCount;
     private Instant dispatchedAt;
     private String initiatedBy;
+
+    private String bundleId;
+    private String scheduleId;
 }

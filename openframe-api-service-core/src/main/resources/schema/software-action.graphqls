@@ -1,5 +1,5 @@
 # Software Actions — the "Software Actions" page: one row per install/update of a package across its devices.
-# A row is a SoftwareExecutionBatch header; the X/Y ratio is respondedMachineCount / totalMachineCount.
+# A row is aggregated from the execution leaves by executionId; the X/Y ratio is respondedMachineCount / totalMachineCount.
 # Gated behind openframe.rmm.software.enabled=true. Reuses SoftwareAction, PackageManagerType, Instant, SortInput.
 
 extend type Query {
@@ -16,6 +16,19 @@ extend type Query {
         search: String,
         sort: SortInput
     ): SoftwareActionRunConnection!
+
+    """
+    Device drill-down for one action: every target device with its result.
+    Executed devices come from their execution leaves (with output for "Show Result");
+    devices still offline come from the action's reconnect sentinels as SCHEDULED.
+    Pass the run's executionId plus its bundleId (NOW) or scheduleId (SCHEDULE).
+    """
+    softwareActionExecutions(
+        executionId: String,
+        bundleId: String,
+        scheduleId: String,
+        search: String
+    ): [SoftwareActionDevice!]!
 }
 
 """A single install/update of one package across its target devices."""
@@ -39,13 +52,31 @@ type SoftwareActionRun {
     dispatchedAt: Instant
     finishedAt: Instant
     initiatedBy: String
+    "Source bundle of a NOW action — pass to softwareActionExecutions. Null for SCHEDULE."
+    bundleId: String
+    "Source schedule of a SCHEDULE action — pass to softwareActionExecutions. Null for NOW."
+    scheduleId: String
 }
 
 enum SoftwareActionStatus {
     SCHEDULED
     IN_PROGRESS
-    COMPLETED
+    SUCCESS
     FAILED
+}
+
+"""One target device of a software action, with its result."""
+type SoftwareActionDevice {
+    machineId: ID!
+    status: SoftwareActionStatus!
+    exitCode: Int
+    stdout: String
+    stdoutTruncated: Boolean
+    stderr: String
+    stderrTruncated: Boolean
+    error: String
+    dispatchedAt: Instant
+    finishedAt: Instant
 }
 
 type SoftwareActionRunConnection {

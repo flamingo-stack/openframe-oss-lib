@@ -111,6 +111,7 @@ public class SoftwareActionService {
                         .respondedMachineCount(0)
                         .scheduledAt(schedule.getNextRunAt())
                         .initiatedBy(schedule.getCreatedBy())
+                        .scheduleId(schedule.getId())
                         .build());
             }
         }
@@ -181,6 +182,8 @@ public class SoftwareActionService {
                 .respondedMachineCount(s.getRespondedMachineCount())
                 .dispatchedAt(s.getDispatchedAt())
                 .initiatedBy(s.getInitiatedBy())
+                .bundleId(s.getBundleId())
+                .scheduleId(s.getScheduleId())
                 .build();
     }
 }

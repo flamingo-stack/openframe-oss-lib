@@ -118,6 +118,8 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .append("packageName", new Document("$first", "$packageName"))
                 .append("action", new Document("$first", "$softwareAction"))
                 .append("initiatedBy", new Document("$first", "$initiatedBy"))
+                .append("bundleId", new Document("$first", "$softwareBundleId"))
+                .append("scheduleId", new Document("$first", "$softwareScheduleId"))
                 .append("dispatchedAt", new Document("$max", "$dispatchedAt"))
                 .append("machines", new Document("$addToSet", "$machineId"))
                 .append("responded", new Document("$addToSet", cond(inArr("$status", TERMINAL), "$machineId", null)))
@@ -129,13 +131,15 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
         Object respondedCount = new Document("$size", new Document("$setDifference",
                 List.of("$responded", java.util.Collections.singletonList(null))));
         Object status = cond(new Document("$gt", List.of("$hasInProgress", 0)), SoftwareActionStatus.IN_PROGRESS.name(),
-                cond(new Document("$gt", List.of("$failed", 0)), SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.COMPLETED.name()));
+                cond(new Document("$gt", List.of("$failed", 0)), SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.SUCCESS.name()));
         return new Document("_id", 0)
                 .append("executionId", "$_id")
                 .append("packageManager", 1)
                 .append("packageName", 1)
                 .append("action", 1)
                 .append("initiatedBy", 1)
+                .append("bundleId", 1)
+                .append("scheduleId", 1)
                 .append("dispatchedAt", 1)
                 .append("totalMachineCount", new Document("$size", "$machines"))
                 .append("respondedMachineCount", respondedCount)
@@ -182,6 +186,8 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .respondedMachineCount(intValue(doc.get("respondedMachineCount")))
                 .dispatchedAt(instantOrNull(doc.get("dispatchedAt")))
                 .initiatedBy(doc.getString("initiatedBy"))
+                .bundleId(doc.getString("bundleId"))
+                .scheduleId(doc.getString("scheduleId"))
                 .build();
     }
 

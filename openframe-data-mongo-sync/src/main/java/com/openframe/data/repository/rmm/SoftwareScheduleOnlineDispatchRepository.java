@@ -18,5 +18,7 @@ public interface SoftwareScheduleOnlineDispatchRepository extends MongoRepositor
 
     Optional<SoftwareScheduleOnlineDispatch> findByTenantIdAndMachineIdAndScheduleId(String tenantId, String machineId, String scheduleId);
 
+    List<SoftwareScheduleOnlineDispatch> findByTenantIdAndScheduleId(String tenantId, String scheduleId);
+
     long deleteByTenantIdAndScheduleId(String tenantId, String scheduleId);
 }

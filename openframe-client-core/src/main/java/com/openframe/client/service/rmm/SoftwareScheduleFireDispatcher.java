@@ -90,6 +90,7 @@ public class SoftwareScheduleFireDispatcher {
                 .packageManager(pkg.getPackageManager())
                 .packageName(pkg.getPackageName())
                 .softwareAction(schedule.getAction())
+                .softwareScheduleId(schedule.getId())
                 .build());
 
         targets.forEach(machineId -> {
