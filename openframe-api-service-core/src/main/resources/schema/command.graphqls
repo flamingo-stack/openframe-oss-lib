@@ -32,6 +32,8 @@ input BatchRunCommandInput {
 enum PrivilegeLevel {
     USER
     ADMIN
+    """Windows only: the logged-on user with the elevated (UAC) token. Scripts must declare supportedPlatforms = [WINDOWS]."""
+    ELEVATED_USER
 }
 
 input CancelExecutionInput {
