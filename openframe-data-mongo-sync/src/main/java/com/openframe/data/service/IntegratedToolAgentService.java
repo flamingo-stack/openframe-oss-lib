@@ -37,14 +37,6 @@ public class IntegratedToolAgentService {
 
     /**
      * Look up an agent by its human-readable key (e.g. "fleetmdm-agent").
-     * Uses the compound (tenantId, key) index to avoid conflicts across tenants.
-     */
-    public Optional<IntegratedToolAgent> findByKey(String key) {
-        return agentRepository.findByKey(key);
-    }
-
-    /**
-     * Look up an agent by its human-readable key (e.g. "fleetmdm-agent").
      * Throws if not found.
      */
     public IntegratedToolAgent getByKey(String key) {
@@ -70,7 +62,7 @@ public class IntegratedToolAgentService {
     }
 
     /**
-     * @deprecated Use {@link #findByKey(String)} for key-based lookup or {@link #findByUuid(String)} for UUID lookup.
+     * @deprecated Use {@link #getByKey(String)} for key-based lookup or {@link #findByUuid(String)} for UUID lookup.
      */
     @Deprecated
     public Optional<IntegratedToolAgent> findById(String id) {
