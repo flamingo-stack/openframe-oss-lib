@@ -11,6 +11,37 @@ struct LastKnownGood {
     version: String,
 }
 
+/// fsync a freshly written file so its rename cannot become durable before its
+/// contents. Without this a power cut can leave a present-but-empty `.lkg` or
+/// anchor — and nothing validates either before trusting them in a rollback.
+#[cfg(unix)]
+fn sync_file(path: &Path) -> Result<()> {
+    fs::File::open(path)
+        .and_then(|f| f.sync_all())
+        .with_context(|| format!("Failed to sync {}", path.display()))
+}
+
+#[cfg(not(unix))]
+fn sync_file(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
+/// fsync the directory holding `path`, so the rename itself is durable.
+#[cfg(unix)]
+fn sync_dir_of(path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::File::open(parent)
+            .and_then(|dir| dir.sync_all())
+            .with_context(|| format!("Failed to sync directory {}", parent.display()))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn sync_dir_of(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
 /// Last-known-good ratchet for the openframe-client binary, owned by the updater.
 ///
 /// Same artifacts as the in-client implementation (Hotfix #2169), so existing
@@ -79,12 +110,14 @@ impl LastKnownGoodService {
                 temp_reserve.display()
             )
         })?;
+        sync_file(&temp_reserve)?;
         fs::rename(&temp_reserve, &self.reserve_path).with_context(|| {
             format!(
                 "Failed to move temp reserve into place: {}",
                 self.reserve_path.display()
             )
         })?;
+        sync_dir_of(&self.reserve_path)?;
 
         let json_content = serde_json::to_string_pretty(&LastKnownGood {
             version: version.to_string(),
@@ -97,12 +130,14 @@ impl LastKnownGoodService {
                 temp_anchor
             )
         })?;
+        sync_file(&temp_anchor)?;
         fs::rename(&temp_anchor, &self.anchor_file_path).with_context(|| {
             format!(
                 "Failed to move last-known-good file into place: {:?}",
                 self.anchor_file_path
             )
         })?;
+        sync_dir_of(&self.anchor_file_path)?;
 
         info!(
             "Last-known-good anchor set to {} (reserve: {})",

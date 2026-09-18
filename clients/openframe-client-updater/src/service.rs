@@ -60,13 +60,21 @@ fn windows_service_main(_args: Vec<std::ffi::OsString>) {
         }
     };
 
-    let _ = set_service_status(&status_handle, ServiceState::Running);
+    let _ = set_service_status(
+        &status_handle,
+        ServiceState::Running,
+        ServiceExitCode::Win32(0),
+    );
 
     let rt = match Runtime::new() {
         Ok(runtime) => runtime,
         Err(e) => {
             eprintln!("Failed to create Tokio runtime: {:?}", e);
-            let _ = set_service_status(&status_handle, ServiceState::Stopped);
+            let _ = set_service_status(
+                &status_handle,
+                ServiceState::Stopped,
+                ServiceExitCode::ServiceSpecific(1),
+            );
             return;
         }
     };
@@ -84,14 +92,32 @@ fn windows_service_main(_args: Vec<std::ffi::OsString>) {
         }
     });
 
+    // Report a non-zero exit code so the SCM treats this as a failure. Without it the
+    // recovery actions installed at register time (and
+    // `set_failure_actions_on_non_crash_failures`) can never fire, because a clean
+    // Stopped/0 is indistinguishable from an operator-requested stop.
     if let Err(e) = result {
-        eprintln!("Updater service failed: {:?}", e);
+        tracing::error!("Updater service failed: {:#}", e);
+        let _ = set_service_status(
+            &status_handle,
+            ServiceState::Stopped,
+            ServiceExitCode::ServiceSpecific(1),
+        );
+    } else {
+        let _ = set_service_status(
+            &status_handle,
+            ServiceState::Stopped,
+            ServiceExitCode::Win32(0),
+        );
     }
-    let _ = set_service_status(&status_handle, ServiceState::Stopped);
 }
 
 #[cfg(windows)]
-fn set_service_status(status_handle: &ServiceStatusHandle, state: ServiceState) -> Result<()> {
+fn set_service_status(
+    status_handle: &ServiceStatusHandle,
+    state: ServiceState,
+    exit_code: ServiceExitCode,
+) -> Result<()> {
     let status = ServiceStatus {
         service_type: ServiceType::OWN_PROCESS,
         current_state: state,
@@ -100,7 +126,7 @@ fn set_service_status(status_handle: &ServiceStatusHandle, state: ServiceState) 
         } else {
             ServiceControlAccept::empty()
         },
-        exit_code: ServiceExitCode::Win32(0),
+        exit_code,
         checkpoint: 0,
         wait_hint: std::time::Duration::from_secs(5),
         process_id: None,

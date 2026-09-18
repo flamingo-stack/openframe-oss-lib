@@ -310,10 +310,23 @@ impl UpdaterOrchestrator {
                 Some(report)
             }
 
-            UpdaterPhase::Completed
-            | UpdaterPhase::Failed
-            | UpdaterPhase::RollingBack
-            | UpdaterPhase::RolledBack => {
+            // An interrupted rollback is NOT terminal (see `UpdaterState::is_terminal`):
+            // `rollback()` holds this phase across a service stop, up to six restore
+            // attempts and a boot-marker wait, so a reboot here would otherwise clear
+            // the state — losing the recorded backup path — and leave the client
+            // stopped on whatever binary the rollback had reached. Finish the rollback
+            // instead. The backup is preferred over the reserve: it is the pre-swap
+            // binary, so it cannot be the version that just failed.
+            UpdaterPhase::RollingBack => {
+                info!("Crash recovery: resuming an interrupted rollback of {version}");
+                let report = self
+                    .restore_and_start(&state.backup_path, &target, version, lkg_service, false)
+                    .await;
+                state_service.clear()?;
+                Some(report)
+            }
+
+            UpdaterPhase::Completed | UpdaterPhase::Failed | UpdaterPhase::RolledBack => {
                 info!("Crash recovery: clearing terminal state ({})", state.phase);
                 state_service.clear()?;
                 None

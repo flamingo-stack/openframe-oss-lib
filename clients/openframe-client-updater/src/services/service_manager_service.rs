@@ -217,6 +217,19 @@ impl ServiceManagerService {
                 return Ok(());
             }
             if std::time::Instant::now() >= deadline {
+                // `unload` already removed the job, so bailing here would leave the
+                // wedged process with nothing to restart it once it finally dies —
+                // launchd has no job left, and the updater only loads one inside an
+                // update. Put the job back before giving up.
+                if let Err(e) = std::process::Command::new("launchctl")
+                    .args(["load", &plist])
+                    .status()
+                {
+                    warn!(
+                        "Failed to reload '{}' after a stop timeout: {:#}",
+                        service_name, e
+                    );
+                }
                 return Err(anyhow!(
                     "Service '{}' did not stop within {}s after unload",
                     service_name,
