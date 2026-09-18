@@ -35,7 +35,7 @@ export interface BoardTicketActivity {
   /**
    * Overrides the built-in label for the kind. Required in practice for
    * 'stale', whose label carries the computed duration ("No activity for
-   * 2 hours") that only the consumer can know — and tick over time.
+   * 30 minutes") that only the consumer can know — and tick over time.
    */
   label?: string;
 }
