@@ -135,6 +135,28 @@ class SeedManagedScriptsChangeUnitTest {
     }
 
     @Test
+    void refreshesTheScriptWhenThePrivilegeLevelDrifted() {
+        when(scriptRepository.findByTenantIdAndNameAndType(any(), any(), any())).thenReturn(Optional.empty());
+        when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        changeUnit.execution(scriptRepository, tenantIdProvider);
+        ArgumentCaptor<Script> seeded = ArgumentCaptor.forClass(Script.class);
+        verify(scriptRepository, times(TOTAL_DEFINITIONS)).save(seeded.capture());
+
+        Script drifted = byName(seeded.getAllValues(), SystemScriptCode.INSTALL_BREW.canonicalName());
+        drifted.setPrivilegeLevel(PrivilegeLevel.USER);
+        ScriptRepository secondRepo = mock(ScriptRepository.class);
+        for (Script script : seeded.getAllValues()) {
+            when(secondRepo.findByTenantIdAndNameAndType(TENANT_ID, script.getName(), script.getType()))
+                    .thenReturn(Optional.of(script));
+        }
+
+        changeUnit.execution(secondRepo, tenantIdProvider);
+
+        verify(secondRepo).save(drifted);
+        assertEquals(PrivilegeLevel.ADMIN, drifted.getPrivilegeLevel());
+    }
+
+    @Test
     void everyManagedScriptCodeHasExactlyOneSeedingDefinition() {
         for (SystemScriptCode code : SystemScriptCode.values()) {
             long definitions = Arrays.stream(SystemScriptDefinition.values())

@@ -57,10 +57,15 @@ public class SeedManagedScriptsChangeUnit {
 
     private void refreshIfStale(ScriptRepository scriptRepository, Script script,
                                 ManagedScriptDefinition definition, String body, String contentHash) {
-        if (contentHash.equals(script.getContentHash())) {
+        if (isUpToDate(script, definition, contentHash)) {
             return;
         }
         refresh(scriptRepository, script, definition, body, contentHash);
+    }
+
+    private static boolean isUpToDate(Script script, ManagedScriptDefinition definition, String contentHash) {
+        return contentHash.equals(script.getContentHash())
+                && definition.getPrivilegeLevel() == script.getPrivilegeLevel();
     }
 
     private void create(ScriptRepository scriptRepository, String tenantId,
