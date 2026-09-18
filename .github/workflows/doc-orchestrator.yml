@@ -1955,9 +1955,13 @@ jobs:
             rm -f /tmp/ecosystem.md
             exit 0
           fi
-          mkdir -p "$REFERENCE_OUTPUT_PATH"
-          cp /tmp/ecosystem.md "$REFERENCE_OUTPUT_PATH/ecosystem.md"
-          echo "✅ ecosystem.md ($(wc -c < /tmp/ecosystem.md | tr -d ' ') bytes) → $REFERENCE_OUTPUT_PATH/ecosystem.md"
+          # Kept in /tmp ONLY until Stage 2 has run. The reference directory is
+          # CodeWiki's output directory, and CodeWiki asks "already contains
+          # documentation. Overwrite?" when it finds a .md file there — a prompt
+          # a runner cannot answer, so Stage 2 aborted on every CodeWiki repo
+          # (CodeWiki run 35293807658). The Stage 2 commit step copies the file
+          # into place, after either engine has written its own output.
+          echo "✅ ecosystem.md ($(wc -c < /tmp/ecosystem.md | tr -d ' ') bytes) fetched; copied to $REFERENCE_OUTPUT_PATH after Stage 2"
 
           HTTP_CODE=$(node /tmp/ci-hub.mjs get "${ECOSYSTEM_PATH}&format=agents" /tmp/ecosystem-agents.md) || HTTP_CODE="000"
           if [ "$HTTP_CODE" = "200" ]; then
@@ -2388,6 +2392,15 @@ jobs:
           fi
           echo ""
 
+          # The hub-rendered ecosystem.md joins the reference directory only NOW,
+          # after the engine has run: placed earlier it makes CodeWiki prompt for
+          # an overwrite (see "Fetch ecosystem facts").
+          if [ -f /tmp/ecosystem.md ]; then
+            mkdir -p "$REFERENCE_OUTPUT_PATH"
+            cp /tmp/ecosystem.md "$REFERENCE_OUTPUT_PATH/ecosystem.md"
+            echo "   Added ecosystem.md to $REFERENCE_OUTPUT_PATH/"
+          fi
+
           # Stage all .md, .mmd, and .gitignore files from Stage 2 output directories
           # CRITICAL: Use git add on full paths to preserve nested directory structure
           # This ensures Backend/Authentication/JWT/JWT.md keeps its full path in git
@@ -2409,6 +2422,16 @@ jobs:
               -o -name "*-schema.json" -o -name "*-config.json" \
             \) -exec git add {} \; 2>/dev/null || true
             echo "   Added .md/.mmd/.gitignore/*-schema.json/*-config.json from $DIAGRAMS_OUTPUT_PATH/"
+          fi
+
+          # AGENTS.md carries the hub-rendered ecosystem block ("Fetch ecosystem
+          # facts" upserts it just before this stage). It sits at the repository
+          # root, outside every output directory staged above, so it is staged by
+          # name: the first production run wrote the block and no commit ever
+          # picked the file up (openframe-cli#383).
+          if [ -f AGENTS.md ]; then
+            git add -f AGENTS.md
+            echo "   Added AGENTS.md (ecosystem block)"
           fi
 
           # Check if there are changes
@@ -2505,7 +2528,12 @@ jobs:
       #                        dev/getting-started-dev, dev/architecture-overview-dev
       # =========================================================================
       - name: Install Tutorial Generator Dependencies
-        if: contains(env.STAGES, 'tutorials')
+        # Stage 3 AND Stage 4 run on VoltAgent (generate-repo-docs.cjs requires
+        # @voltagent/core too). Gated on tutorials alone, a repository configured
+        # with inline-docs + repo-docs and no tutorials (openframe-saas-mobile,
+        # openframe-saas-desktop) reached Stage 4 with no dependencies at all:
+        # "Cannot find module '@voltagent/core'", run 35302244804.
+        if: contains(env.STAGES, 'tutorials') || contains(env.STAGES, 'repo-docs')
         # Isolated deps tree (see Stage 1) - no reconciliation with the target repo, so no
         # peer-conflict band-aids. @ai-sdk/anthropic pinned to 2.x (v2 spec): 3.x uses the
         # v3 spec, incompatible with VoltAgent's ai@5.x (AI SDK 5).
@@ -2828,7 +2856,8 @@ jobs:
           done
 
           # Stage repository documentation files
-          for f in README.md CONTRIBUTING.md LICENSE.md SECURITY.md; do
+          # AGENTS.md is here as the backstop for a run whose Stage 2 commit did not happen.
+          for f in README.md CONTRIBUTING.md LICENSE.md SECURITY.md AGENTS.md; do
             if [ -f "$f" ]; then
               git add -f "$f"
             fi
@@ -3024,9 +3053,15 @@ jobs:
           echo "📋 Staged files:"
           git diff --cached --name-only | head -50
 
-          if [ "$STAGED_COUNT" -eq "0" ]; then
+          # "Changes" means the BRANCH differs from the documented source head, not
+          # that this final sweep found something left to stage: every stage commits
+          # its own output as it goes, so a run whose stages all committed (inline
+          # docs, README) left nothing here and was reported as no_changes while its
+          # pull request held twenty files (openframe-saas-mobile run 35302244804).
+          # The status file is the run's own bookkeeping, never a documentation change.
+          if [ "$STAGED_COUNT" -eq "0" ] && git diff --quiet "$SOURCE_HEAD_SHA" HEAD -- . ':!.flamingo-ai-technical-writer-status.md'; then
             echo ""
-            echo "⚠️ No documentation files to stage"
+            echo "⚠️ No documentation files to stage, and the branch holds no documentation change"
             set_output "has_changes" "false"
           else
             set_output "has_changes" "true"

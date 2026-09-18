@@ -8,6 +8,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
@@ -32,6 +33,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -64,6 +66,7 @@ public class DeviceService {
     private final ScheduleScriptDeviceService scheduleScriptDeviceService;
     private final DeviceFilterOptionMapper deviceFilterOptionMapper;
     private final TenantIdProvider tenantIdProvider;
+    private final ApplicationEventPublisher eventPublisher;
 
     public Optional<Machine> findByMachineId(@NotBlank String machineId) {
         log.debug("Finding machine by ID: {}", machineId);
@@ -366,6 +369,7 @@ public class DeviceService {
         MachineWriteResult result = machineWriter
                 .update(machineId, machineUpdate().set(NICKNAME, normalizeNickname(nickname)))
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+        eventPublisher.publishEvent(new DeviceNicknameUpdatedEvent(this, machineId));
         log.info("Device {} nickname updated", machineId);
         return result.after();
     }
