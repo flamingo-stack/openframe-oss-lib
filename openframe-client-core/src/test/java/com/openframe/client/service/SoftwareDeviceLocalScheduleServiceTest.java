@@ -11,7 +11,6 @@ import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.SoftwareAction;
-import com.openframe.data.nats.publisher.MachineTimezoneRequestNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
@@ -43,17 +42,16 @@ class SoftwareDeviceLocalScheduleServiceTest {
     private final MachineRepository machineRepository = mock(MachineRepository.class);
     private final ScheduleDeviceLocalDispatchRepository dispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
     private final SoftwareScheduleFireDispatcher fireDispatcher = mock(SoftwareScheduleFireDispatcher.class);
-    private final MachineTimezoneRequestNatsPublisher timezoneRequestPublisher = mock(MachineTimezoneRequestNatsPublisher.class);
 
     private final SoftwareDeviceLocalScheduleService service = new SoftwareDeviceLocalScheduleService(
-            scheduleRepository, targetResolver, machineRepository, dispatchRepository, fireDispatcher, timezoneRequestPublisher);
+            scheduleRepository, targetResolver, machineRepository, dispatchRepository, fireDispatcher);
 
     {
         ReflectionTestUtils.setField(service, "catchupSeconds", 1800L);
     }
 
     @Test
-    @DisplayName("online device whose local time has arrived within the window → fires software + records FIRED + requests a fresh timezone")
+    @DisplayName("online device whose local time has arrived within the window → fires software + records FIRED")
     void online_dueWithinWindow_fires() {
         Instant now = Instant.now();
         SoftwareSchedule schedule = deviceLocalSchedule(now.minusSeconds(60));
@@ -61,7 +59,6 @@ class SoftwareDeviceLocalScheduleServiceTest {
 
         service.runDueDeviceLocalSchedules(now);
 
-        verify(timezoneRequestPublisher).request("m-1", SCHEDULE_ID);
         verify(fireDispatcher).dispatch(eq(schedule), eq(List.of("m-1")), eq(now));
         ArgumentCaptor<ScheduleLocalMachineTimeDispatch> sentinel = ArgumentCaptor.forClass(ScheduleLocalMachineTimeDispatch.class);
         verify(dispatchRepository).save(sentinel.capture());
@@ -69,14 +66,13 @@ class SoftwareDeviceLocalScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("online device with no reported timezone yet → requests it and defers (no fire, no sentinel)")
+    @DisplayName("online device with no reported timezone yet → skips this tick (no fire, no sentinel)")
     void online_noTimezone_defers() {
         Instant now = Instant.now();
         given(deviceLocalSchedule(now.minusSeconds(60)), machine("m-1", DeviceStatus.ONLINE, null));
 
         service.runDueDeviceLocalSchedules(now);
 
-        verify(timezoneRequestPublisher).request("m-1", SCHEDULE_ID);
         verify(fireDispatcher, never()).dispatch(any(), anyList(), any());
         verify(dispatchRepository, never()).save(any());
     }

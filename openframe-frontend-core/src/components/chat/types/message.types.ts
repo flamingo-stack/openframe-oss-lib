@@ -424,6 +424,11 @@ export interface ChatSource {
   id?: string;
   /** Per-row items for grouped chips. */
   items?: Array<{
+    /** The row's own citation number. Present when the group was built
+     *  client-side from flat sources (`groupSourcesByTable`), so `[N]` in the
+     *  answer still resolves to a row; absent on a server-grouped chip, whose
+     *  rows share the group's one number. */
+    index?: number;
     id: string;
     documentType: string;
     name: string;

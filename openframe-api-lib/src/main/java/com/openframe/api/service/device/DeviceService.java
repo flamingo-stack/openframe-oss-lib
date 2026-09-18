@@ -207,13 +207,11 @@ public class DeviceService {
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
 
-        List<Machine> allWithOne = machineRepository.findMachinesWithCursor(tenantId, filter, search,
-                normalizedPagination.getCursor(), normalizedPagination.getLimit() + 1,
-                sortField, sortDirection.name());
-        List<Machine> pageItems = allWithOne.size() > normalizedPagination.getLimit()
-                ? allWithOne.subList(0, normalizedPagination.getLimit())
-                : allWithOne;
-        boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
+        int limit = normalizedPagination.getLimit();
+        List<Machine> raw = machineRepository.findMachinesWithCursor(tenantId, filter, search,
+                normalizedPagination.getCursor(), limit + 1, sortField, sortDirection.name());
+        boolean hasNextPage = raw.size() > limit;
+        List<Machine> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
 
         PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
 
