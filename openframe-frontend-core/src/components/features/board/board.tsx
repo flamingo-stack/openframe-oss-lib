@@ -154,6 +154,7 @@ function DragBoard({
     onThumbPointerDown,
     onThumbPointerMove,
     onThumbPointerUp,
+    onThumbPointerCancel,
   } = useHorizontalScrollbar();
 
   // The monitor is registered once for the board's lifetime; these keep it
@@ -625,11 +626,12 @@ function DragBoard({
                 <div
                   ref={thumbRef}
                   data-scrollbar-thumb
-                  className="absolute top-0 h-full rounded-full bg-ods-text-secondary transition-colors"
+                  className="absolute top-0 h-full touch-none rounded-full bg-ods-text-secondary transition-colors"
                   style={{ width: `${thumbRatio * 100}%`, cursor: 'grab' }}
                   onPointerDown={onThumbPointerDown}
                   onPointerMove={onThumbPointerMove}
                   onPointerUp={onThumbPointerUp}
+                  onPointerCancel={onThumbPointerCancel}
                 />
               </div>
             )}

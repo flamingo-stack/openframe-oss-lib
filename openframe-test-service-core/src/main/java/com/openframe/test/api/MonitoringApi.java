@@ -137,19 +137,24 @@ public class MonitoringApi {
      * collapsing a wait of up to an hour into seconds. Pass {@link #CLEANUPS_THEN_AGGREGATION} to
      * recompute policy pass/fail aggregates.
      *
-     * <p>Accepts {@code 409} as well as {@code 200}: Fleet returns Conflict when that schedule is
-     * already running, which happens whenever an ad-hoc trigger collides with the regular hourly run.
-     * The run the caller wants is underway either way, so treating Conflict as failure would make
-     * callers flaky. An unknown schedule name is a {@code 404} and still fails.
-     *
      * <p><b>This is server-wide, not tenant-scoped</b> — it runs the cron for the whole Fleet instance,
      * so on a shared Fleet it affects every tenant, not just this one.
+     *
+     * @return {@code 200} when Fleet started a run for this call, or {@code 409} when a run was already
+     * in flight and this call started nothing. Both are legitimate answers, which is why neither fails
+     * here, but they are not interchangeable and the caller must not treat them as such: a caller
+     * waiting for a result newer than some baseline cannot be served by a run that may already have
+     * passed that point, so on {@code 409} it has to retry rather than wait on the in-flight one.
+     * Reading this as "the run I wanted is underway either way" is what made
+     * {@code TriggerPolicyTest} spend its whole timeout waiting for a stamp that was never coming.
+     * An unknown schedule name is a {@code 404} and still fails.
      */
-    public static void triggerCronSchedule(String name) {
-        given(getAuthorizedSpec())
+    public static int triggerCronSchedule(String name) {
+        return given(getAuthorizedSpec())
                 .accept(ContentType.JSON)
                 .queryParam("name", name)
                 .post(TRIGGER)
-                .then().statusCode(anyOf(is(200), is(409)));
+                .then().statusCode(anyOf(is(200), is(409)))
+                .extract().statusCode();
     }
 }
