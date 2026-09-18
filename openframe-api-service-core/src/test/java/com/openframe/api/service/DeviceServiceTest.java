@@ -4,6 +4,7 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
@@ -30,6 +31,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
@@ -66,11 +68,14 @@ class DeviceServiceTest {
     @Mock private DeviceFilterOptionMapper deviceFilterOptionMapper;
     @Mock
     private TenantIdProvider tenantIdProvider;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, deviceOnlineDispatchRepository, machineWriter,
                 tagRepository, tagAssignmentRepository,
-                deviceStatusProcessor, scheduleScriptDeviceService, deviceFilterOptionMapper, tenantIdProvider);
+                deviceStatusProcessor, scheduleScriptDeviceService, deviceFilterOptionMapper, tenantIdProvider,
+                eventPublisher);
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         lenient().when(machineRepository.countMachines(any(), any(MachineQueryFilter.class), any())).thenReturn(0L);
         lenient().when(machineRepository.findMachinesWithCursor(any(), any(MachineQueryFilter.class), any(),
@@ -374,6 +379,31 @@ class DeviceServiceTest {
         verify(machineRepository, never()).save(any(Machine.class));
         verify(machineRepository, never()).findByMachineId(any());
         verify(machineWriter).update(eq("m1"), any(MachineUpdate.class));
+    }
+
+    @Test
+    @DisplayName("updateNickname: publishes the invalidation event for the renamed machine once the write succeeded")
+    void updateNickname_publishesInvalidationEventAfterWrite() {
+        DeviceService s = service();
+        stubAtomicNicknameUpdate("m1");
+
+        s.updateNickname("m1", "Reception iMac");
+
+        ArgumentCaptor<DeviceNicknameUpdatedEvent> captor = ArgumentCaptor.forClass(DeviceNicknameUpdatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getMachineId()).isEqualTo("m1");
+    }
+
+    @Test
+    @DisplayName("updateNickname: an unknown device fails before anything is published — nothing to invalidate")
+    void updateNickname_unknownDevice_doesNotPublish() {
+        DeviceService s = service();
+        when(machineWriter.update(eq("m1"), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> s.updateNickname("m1", "Reception iMac"))
+                .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
