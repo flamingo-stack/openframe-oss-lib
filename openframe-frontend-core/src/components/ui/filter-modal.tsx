@@ -5,13 +5,13 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { Filter02Icon } from '../icons-v2-generated/sort-and-filter/filter-02-icon';
 import { Button } from './button';
+import type { TableFilters } from './data-table/types';
 import { DateFilterPanel, type DateFilterResult, type DateRange } from './date-picker';
 import { FilterCheckboxItem } from './filter-checkbox-item';
 import { ModalV2, ModalV2Content, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
 import { ScrollFadeOverlay, useScrollFade } from './scroll-fade';
 import { Skeleton } from './skeleton';
 import { SortColumnItem, type SortConfig, type SortDirection } from './sort-column-item';
-import type { TableFilters } from './table/types';
 import { TagKeyValueFilter, type TagKeyConfig } from './tag-key-value-filter';
 
 // Re-export sub-component types for consumers

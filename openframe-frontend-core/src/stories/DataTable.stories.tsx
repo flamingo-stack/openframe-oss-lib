@@ -1421,3 +1421,98 @@ export const KitchenSink: Story = {
     );
   },
 };
+
+/** Seeded Fisher-Yates so every "Shuffle" click yields a NEW order (a plain `sort` by seed repeats). */
+function shuffle<T>(items: T[], seed: number): T[] {
+  const result = [...items];
+  let state = seed * 2654435761 + 1;
+  for (let i = result.length - 1; i > 0; i--) {
+    state = (state * 1103515245 + 12345) % 2147483648;
+    const j = state % (i + 1);
+    [result[i], result[j]] = [result[j] as T, result[i] as T];
+  }
+  return result;
+}
+
+/**
+ * **Row reorder animation** — opt in with `animateRowReorder` on
+ * `<DataTable.Body>` and a reorder (same row id, new order) slides rows into
+ * place via FLIP instead of jumping. framer-motion is loaded lazily, as its own
+ * chunk, only for tables that set the prop.
+ *
+ * `getRowId` is mandatory here: TanStack's default row id is the row INDEX,
+ * and an index does not move when the data does, so without it nothing would
+ * animate. Honour `prefers-reduced-motion` at the call site (pass `false`).
+ */
+export const WithRowReorderAnimation: Story = {
+  render: () => {
+    const [sort, setSort] = useState<DataTableSortState | null>({ id: 'hostname', desc: false });
+    const [shuffleSeed, setShuffleSeed] = useState(0);
+
+    const handleSortChange = useCallback((columnId: string) => {
+      setSort(prev => {
+        if (prev?.id !== columnId) return { id: columnId, desc: false };
+        if (!prev.desc) return { id: columnId, desc: true };
+        return null;
+      });
+    }, []);
+
+    const orderedData = useMemo(() => {
+      if (!sort) return shuffle(DEVICES_8, shuffleSeed);
+      const dir = sort.desc ? -1 : 1;
+      return [...DEVICES_8].sort((a, b) => {
+        const av = a[sort.id as keyof Device] as string | number;
+        const bv = b[sort.id as keyof Device] as string | number;
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+      });
+    }, [sort, shuffleSeed]);
+
+    const columns = useMemo<ColumnDef<Device>[]>(
+      () => [
+        { accessorKey: 'hostname', header: 'Hostname', meta: { width: 'w-[200px]', sortable: true } },
+        { accessorKey: 'ipAddress', header: 'IP', meta: { width: 'w-[140px]', sortable: true } },
+        {
+          accessorKey: 'status',
+          header: 'Status',
+          cell: ({ row }) => <StatusTag status={row.original.status} />,
+          meta: { width: 'w-[140px]', sortable: true },
+        },
+        {
+          accessorKey: 'cpuLoad',
+          header: 'CPU',
+          cell: ({ row }) => <LoadCell value={row.original.cpuLoad} />,
+          meta: { width: 'flex-1 min-w-0', align: 'right', sortable: true },
+        },
+      ],
+      [],
+    );
+
+    const getRowId = useCallback((device: Device) => device.id, []);
+    const table = useDataTable<Device>({ data: orderedData, columns, getRowId });
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSort(null);
+              setShuffleSeed(seed => seed + 1);
+            }}
+          >
+            Shuffle
+          </Button>
+          <span className="text-ods-text-secondary text-h5">
+            Current sort: <code>{JSON.stringify(sort)}</code>
+          </span>
+        </div>
+        <DataTable table={table}>
+          <DataTable.Header sort={sort} onSortChange={handleSortChange} />
+          <DataTable.Body animateRowReorder />
+        </DataTable>
+      </div>
+    );
+  },
+};
