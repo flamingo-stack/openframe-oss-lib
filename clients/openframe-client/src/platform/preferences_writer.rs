@@ -19,7 +19,32 @@ pub fn write<'a>(
     }
 
     for (key, value) in &prefs {
-        let status = Command::new("sudo")
+        // `launchctl asuser` first, `sudo -u` only as a fallback — the same order
+        // `user_session::launch_as_user` uses. From a LaunchDaemon there is no user
+        // session bootstrap, so a bare `sudo -u defaults write` is rejected by cfprefsd
+        // ("Could not write domain ...; exiting") and the app then launches with none of
+        // its configuration, because preferences are the only channel GuiApp args travel.
+        let status = Command::new("launchctl")
+            .args([
+                "asuser",
+                &user.uid.to_string(),
+                "sudo",
+                "-u",
+                &user.username,
+                "defaults",
+                "write",
+                bundle_id,
+                key,
+                value,
+            ])
+            .status()
+            .with_context(|| format!("Failed to write preference '{}'", key))?;
+
+        if status.success() {
+            continue;
+        }
+
+        let fallback = Command::new("sudo")
             .args([
                 "-u",
                 &user.username,
@@ -32,8 +57,8 @@ pub fn write<'a>(
             .status()
             .with_context(|| format!("Failed to write preference '{}'", key))?;
 
-        if !status.success() {
-            anyhow::bail!("defaults write failed for '{}': exit {}", key, status);
+        if !fallback.success() {
+            anyhow::bail!("defaults write failed for '{}': {}", key, fallback);
         }
     }
 

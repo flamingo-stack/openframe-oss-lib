@@ -1,13 +1,13 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{error, info, warn};
 
 use super::{ToolUpdater, ToolUpdaterDeps, UpdateContext};
 use crate::models::{DownloadConfiguration, Installation, InstalledTool};
 use crate::platform::preferences_writer::{args_to_pairs, write as write_preferences};
-use crate::platform::remove_app_bundle;
 use crate::platform::user_session::{get_console_user, launch_as_user};
+use crate::platform::DirectoryManager;
 
 pub struct GuiAppToolUpdater {
     deps: ToolUpdaterDeps,
@@ -16,6 +16,42 @@ pub struct GuiAppToolUpdater {
 impl GuiAppToolUpdater {
     pub fn new(deps: ToolUpdaterDeps) -> Self {
         Self { deps }
+    }
+
+    fn backup_path_for(bundle: &Path) -> PathBuf {
+        bundle.with_extension("app.update-backup")
+    }
+
+    /// Renames the installed `.app` to a sibling backup so a failed download can be undone.
+    /// The old code deleted the bundle outright and then downloaded its replacement, so a
+    /// dropped connection left no app at all and a rollback that could only log
+    /// "reinstall required". A rename is atomic, same-volume, and costs nothing.
+    async fn move_bundle_aside(
+        executable_path: &str,
+        tool_agent_id: &str,
+    ) -> Result<Option<PathBuf>> {
+        let Some(bundle) = DirectoryManager::find_app_bundle_path(Path::new(executable_path))
+        else {
+            warn!(tool_id = %tool_agent_id, "No .app bundle in {} — updating without a backup", executable_path);
+            return Ok(None);
+        };
+        if !bundle.exists() {
+            return Ok(None);
+        }
+
+        let backup = Self::backup_path_for(&bundle);
+        if backup.exists() {
+            tokio::fs::remove_dir_all(&backup).await.ok();
+        }
+        tokio::fs::rename(&bundle, &backup).await.with_context(|| {
+            format!(
+                "Failed to move {} aside to {}",
+                bundle.display(),
+                backup.display()
+            )
+        })?;
+        info!(tool_id = %tool_agent_id, "Old app bundle kept at {}", backup.display());
+        Ok(Some(backup))
     }
 }
 
@@ -34,8 +70,15 @@ impl ToolUpdater for GuiAppToolUpdater {
 
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
+        let backup_path = match &tool.installation {
+            Installation::GuiApp {
+                executable_path, ..
+            } => Self::move_bundle_aside(executable_path, tool_agent_id).await?,
+            _ => None,
+        };
+
         Ok(UpdateContext {
-            backup_path: None,
+            backup_path,
             needs_restart: true,
         })
     }
@@ -49,20 +92,15 @@ impl ToolUpdater for GuiAppToolUpdater {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Applying GuiApp update");
 
-        let Installation::GuiApp {
-            executable_path,
-            bundle_id,
-        } = &tool.installation
-        else {
+        let Installation::GuiApp { bundle_id, .. } = &tool.installation else {
             anyhow::bail!(
                 "Expected GuiApp installation type for tool: {}",
                 tool_agent_id
             );
         };
 
-        info!(tool_id = %tool_agent_id, "Removing old app bundle");
-        remove_app_bundle(executable_path).await?;
-
+        // The old bundle was moved aside in `prepare`, so the destination is already free
+        // and `rollback` can put it back if this download fails.
         let applications_dir = PathBuf::from("/Applications");
 
         info!(tool_id = %tool_agent_id, "Downloading and installing new version from: {}", config.link);
@@ -92,6 +130,17 @@ impl ToolUpdater for GuiAppToolUpdater {
     async fn finalize(&self, tool: &InstalledTool, ctx: &UpdateContext) -> Result<()> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Finalizing GuiApp update");
+
+        // `finalize` only runs after a successful apply, so the kept-aside bundle has done
+        // its job. Drop it here rather than after the relaunch, so the early return below
+        // cannot leak a full copy of the app into /Applications.
+        if let Some(backup) = &ctx.backup_path {
+            if backup.exists() {
+                if let Err(e) = tokio::fs::remove_dir_all(backup).await {
+                    warn!(tool_id = %tool_agent_id, "Failed to remove the old app bundle {}: {:#}", backup.display(), e);
+                }
+            }
+        }
 
         if !ctx.needs_restart {
             info!(tool_id = %tool_agent_id, "Restart not requested, skipping");
@@ -154,10 +203,38 @@ impl ToolUpdater for GuiAppToolUpdater {
         Ok(())
     }
 
-    async fn rollback(&self, tool: &InstalledTool, _ctx: &UpdateContext) -> Result<()> {
+    async fn rollback(&self, tool: &InstalledTool, ctx: &UpdateContext) -> Result<()> {
         let tool_agent_id = &tool.tool_agent_id;
-        warn!(tool_id = %tool_agent_id,
-              "Rollback requested for GuiApp but no backup available. User should reinstall from server.");
+
+        let Some(backup) = &ctx.backup_path else {
+            warn!(tool_id = %tool_agent_id,
+                  "Rollback requested for GuiApp but no backup was taken. User should reinstall from server.");
+            return Ok(());
+        };
+
+        let Installation::GuiApp {
+            executable_path, ..
+        } = &tool.installation
+        else {
+            anyhow::bail!("Expected GuiApp installation type for tool: {tool_agent_id}");
+        };
+        let Some(bundle) = DirectoryManager::find_app_bundle_path(Path::new(executable_path))
+        else {
+            anyhow::bail!("Could not resolve the .app bundle path for {tool_agent_id}");
+        };
+
+        // A partially extracted new bundle must not block the restore.
+        if bundle.exists() {
+            tokio::fs::remove_dir_all(&bundle).await.ok();
+        }
+        tokio::fs::rename(backup, &bundle).await.with_context(|| {
+            format!(
+                "Failed to restore the previous app bundle from {}",
+                backup.display()
+            )
+        })?;
+
+        info!(tool_id = %tool_agent_id, "Restored the previous app bundle: {}", bundle.display());
         Ok(())
     }
 }

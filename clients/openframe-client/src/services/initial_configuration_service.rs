@@ -107,7 +107,11 @@ impl InitialConfigurationService {
     pub fn save(&self, config: &InitialConfiguration) -> Result<()> {
         let config_json = serde_json::to_string_pretty(config)
             .context("Failed to serialize initial configuration to JSON")?;
-        fs::write(&self.config_file_path, config_json).with_context(|| {
+        // Atomic: a torn write here is unrecoverable in software — `is_configured()` goes
+        // false, the service parks in the awaiting-auth gate, and NATS never connects, so
+        // the machine cannot be repaired remotely. `agent_config.json` next door already
+        // writes this way.
+        crate::utils::fs::atomic_write(&self.config_file_path, config_json).with_context(|| {
             format!(
                 "Failed to write initial configuration file: {:?}",
                 self.config_file_path

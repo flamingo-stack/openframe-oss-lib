@@ -3,10 +3,10 @@ use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessa
 use crate::models::{Installation, InstalledAsset, ToolRecordState};
 use crate::platform::{
     binary_writer, clear_aside_binary, detect_actual_installation, needs_migration, run_migration,
-    run_update, DirectoryManager, ToolUpdaterDeps,
+    run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
-use crate::services::tool_run_manager::ToolRunManager;
+use crate::services::tool_run_manager::{ToolRunManager, UpdatingGuard};
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
 use crate::services::InstalledToolsService;
@@ -152,8 +152,32 @@ impl ToolAgentUpdateService {
             return Ok(());
         }
 
-        // Mark as updating once for all updates
-        self.tool_run_manager.mark_updating(tool_agent_id).await;
+        // Serialise against install/reinstall/uninstall/restart, which all take this same
+        // lock. Updates arrive on a different NATS stream, so without it an uninstall can
+        // delete the registry record while this update holds a stale copy and then writes
+        // it back — resurrecting a record for a tool whose binary is gone. Deferring (like
+        // uninstall and restart do) rather than blocking keeps a slow neighbour from
+        // pushing this past ack_wait into a duplicate delivery.
+        let tool_lock = self.tool_run_manager.tool_lock(tool_agent_id).await;
+        let lock_guard = match tool_lock.try_lock_owned() {
+            Ok(guard) => guard,
+            Err(_) => {
+                info!(
+                    "Tool {} is busy with another operation, deferring update for redelivery",
+                    tool_agent_id
+                );
+                anyhow::bail!(
+                    "tool {} busy with another operation, deferring update for redelivery",
+                    tool_agent_id
+                );
+            }
+        };
+
+        // Mark as updating once for all updates; the guard clears the flag — and only then
+        // releases the lock — on return, panic or cancellation. A leaked flag parks the
+        // tool's supervisor and blocks every client self-update for the process lifetime.
+        let _updating =
+            UpdatingGuard::acquire(&self.tool_run_manager, tool_agent_id, Some(lock_guard)).await;
 
         // A Standard->GuiApp migration self-relaunches, so only relaunch here if it was already a GUI app.
         let was_gui_before_update =
@@ -167,9 +191,6 @@ impl ToolAgentUpdateService {
                 &assets_to_update,
             )
             .await;
-
-        // Clear updating flag - for Standard tools the run manager relaunches them via this flag.
-        self.tool_run_manager.clear_updating(tool_agent_id).await;
 
         if result.is_ok() && needs_repair {
             if let Err(e) = self
@@ -210,7 +231,10 @@ impl ToolAgentUpdateService {
             );
             self.do_tool_update(new_version, message, installed_tool)
                 .await?;
-        } else if !assets_to_update.is_empty() {
+        }
+
+        let mut stopped_for_assets = false;
+        if !needs_tool_update && !assets_to_update.is_empty() {
             // Only assets to update - stop tool once before all asset updates
             info!(tool_id = %tool_agent_id, "Stopping tool for asset updates");
             self.tool_kill_service
@@ -219,12 +243,32 @@ impl ToolAgentUpdateService {
                 .with_context(|| {
                     format!("Failed to stop tool {} for asset updates", tool_agent_id)
                 })?;
+            stopped_for_assets = true;
         }
 
         // 2. Asset updates (tool already stopped by tool_update or above)
         for asset in assets_to_update {
             self.do_asset_update(tool_agent_id, asset, installed_tool)
                 .await?;
+        }
+
+        // A Service install is not supervised by the run manager — `run_tool` returns early
+        // for it and `run()` never starts services — so an asset-only update that stopped
+        // the tool has to start it again. Without this a routine asset bump (e.g. osqueryd)
+        // silently takes the agent down until a reboot or a reinstall. Supervised installs
+        // are relaunched by their run loop once the updating flag clears.
+        if stopped_for_assets {
+            if let Installation::Service { service_name, .. } = &installed_tool.installation {
+                info!(tool_id = %tool_agent_id, service = %service_name, "Restarting service tool after asset updates");
+                system_service::start_service(service_name)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to restart service {} after asset updates for {}",
+                            service_name, tool_agent_id
+                        )
+                    })?;
+            }
         }
 
         Ok(())

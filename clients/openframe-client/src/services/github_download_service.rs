@@ -2,12 +2,32 @@ use crate::config::update_config::{
     DOWNLOAD_TIMEOUT_SECS, MAX_DOWNLOAD_RETRIES, MIN_BINARY_SIZE_BYTES,
 };
 use crate::models::download_configuration::DownloadConfiguration;
+
+/// Join an archive entry path under `target_dir`, refusing anything that could escape it.
+/// `Path::join` with an absolute entry *replaces* the base, and `..` is resolved by the OS,
+/// so an unsanitised entry in a downloaded archive writes anywhere on disk — as root, and
+/// with the archive's own mode bits. `tar::Archive::unpack` guards this; this hand-rolled
+/// loop has to do it itself.
+fn safe_join(target_dir: &Path, entry_path: &Path) -> Result<PathBuf> {
+    for component in entry_path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => {
+                return Err(anyhow!(
+                    "Refusing archive entry with an unsafe path: {}",
+                    entry_path.display()
+                ))
+            }
+        }
+    }
+    Ok(target_dir.join(entry_path))
+}
 use crate::platform::binary_writer;
 use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use reqwest::Client;
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use tokio::time::Duration;
 use tracing::{info, warn};
 
@@ -409,7 +429,7 @@ impl GithubDownloadService {
         for entry_result in archive.entries().context("Failed to read tar entries")? {
             let mut entry = entry_result.context("Failed to read tar entry")?;
             let path = entry.path().context("Failed to get entry path")?;
-            let dest_path = target_dir.join(&path);
+            let dest_path = safe_join(target_dir, &path)?;
 
             if entry.header().entry_type().is_dir() {
                 fs::create_dir_all(&dest_path).with_context(|| {
