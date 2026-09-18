@@ -47,7 +47,7 @@ public class SeedManagedScriptsChangeUnit {
 
     private void ensure(ScriptRepository scriptRepository, String tenantId, ManagedScriptDefinition definition) {
         String body = loadBody(definition);
-        String contentHash = sha256(body);
+        String contentHash = sha256(fingerprint(definition, body));
 
         scriptRepository.findByTenantIdAndNameAndType(tenantId, definition.getCanonicalName(), definition.getScriptType())
                 .ifPresentOrElse(
@@ -57,15 +57,10 @@ public class SeedManagedScriptsChangeUnit {
 
     private void refreshIfStale(ScriptRepository scriptRepository, Script script,
                                 ManagedScriptDefinition definition, String body, String contentHash) {
-        if (isUpToDate(script, definition, contentHash)) {
+        if (contentHash.equals(script.getContentHash())) {
             return;
         }
         refresh(scriptRepository, script, definition, body, contentHash);
-    }
-
-    private static boolean isUpToDate(Script script, ManagedScriptDefinition definition, String contentHash) {
-        return contentHash.equals(script.getContentHash())
-                && definition.getPrivilegeLevel() == script.getPrivilegeLevel();
     }
 
     private void create(ScriptRepository scriptRepository, String tenantId,
@@ -110,10 +105,20 @@ public class SeedManagedScriptsChangeUnit {
         }
     }
 
-    private static String sha256(String body) {
+    private static String fingerprint(ManagedScriptDefinition definition, String body) {
+        return String.join("\n",
+                body,
+                definition.getShell().name(),
+                definition.getPrivilegeLevel().name(),
+                String.valueOf(definition.getDefaultTimeoutSeconds()),
+                definition.getOsType().name(),
+                definition.getDescription());
+    }
+
+    private static String sha256(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(body.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
