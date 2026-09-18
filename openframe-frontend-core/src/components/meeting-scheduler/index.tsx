@@ -53,7 +53,7 @@ import {
   type MeetingHost,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
-import { formatDurationCompact } from '../../utils/format';
+import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
 import { BookingForm, BookingFormSkeleton, DEFAULT_SUBMIT_LABEL, type BookingFormProps } from './booking-form';
 import { Confirmation } from './confirmation';
@@ -845,16 +845,8 @@ export function HubSpotMeetingScheduler({
                   RangeError on rather than ignoring. */}
               {selectedSlot != null && durationMs != null && timezone != null && (
                 <p className="text-ods-text-primary text-h4">
-                  {new Intl.DateTimeFormat(undefined, {
-                    timeZone: timezone,
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    timeZoneName: 'short',
-                  }).format(new Date(selectedSlot))}{' '}
-                  · {formatDurationCompact(durationMs / 1000)}
+                  {formatDateWithTimezone(selectedSlot, timezone, 'weekdayDateTimeZoned', { viewerLocale: true })} ·{' '}
+                  {formatDurationCompact(durationMs / 1000)}
                 </p>
               )}
               <DetailsForm

@@ -204,18 +204,17 @@ export default defineConfig([
     // where matching them IS the job:
     //   - encode.ts frames SSE on \0 / \x1E / \x1F and must strip those bytes
     //     out of model text before they reach the wire;
-    //   - sanitize.ts and compact-card-classes.ts reject `\x00-\x1f` inside a
-    //     URL because that is how `java\x00script:` slips past a naive scheme
-    //     check.
+    //   - sanitize.ts strips them from markdown before it is rendered;
+    //   - url-safety.ts rejects `\x00-\x1f` inside a URL, because that is how
+    //     `java\x00script:` slips past a naive scheme check. It is the ONE
+    //     owner of that class for both the wire decoder (`source-metadata.ts`)
+    //     and the render-time guard (`compact-card-classes.ts`), which import
+    //     it rather than carrying their own copies.
     // Rewriting the ranges to dodge the rule would make three security-relevant
     // regexes harder to read, so the exception is declared here where it can be
     // reviewed.
     name: 'openframe-frontend-core/control-chars-are-the-payload',
-    files: [
-      'src/chat-protocol/encode.ts',
-      'src/components/ui/markdown/sanitize.ts',
-      'src/components/chat/utils/compact-card-classes.ts',
-    ],
+    files: ['src/chat-protocol/encode.ts', 'src/utils/url-safety.ts', 'src/components/ui/markdown/sanitize.ts'],
     rules: { 'no-control-regex': 'off' },
   },
 
