@@ -8,6 +8,7 @@ import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.RouteToRequestUrlFilter;
@@ -24,6 +25,7 @@ import java.net.URI;
 
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(name = "openframe.gateway.tenant-routing.enabled", havingValue = "true", matchIfMissing = true)
 public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Ordered {
 
     public static final String ORIGINAL_AUTHORIZATION_ATTR = "originalAuthorization";
@@ -56,7 +58,7 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
                     URI proxyUri = upstreamRegistry.resolve(toolId)
                             .resolveWs(tool, request, getEndpointPrefix());
 
-                    log.debug("Proxy web socket request: {}", proxyUri);
+                    log.debug("Proxy web socket request: {}", maskUri(proxyUri));
 
                     exchange.getAttributes()
                             .put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR, proxyUri);
@@ -87,18 +89,64 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
                 : toolRepository.findByKey(toolId);
         return lookup
                 // TODO: throw a custom exception (openframe-exception) instead and catch it on the client side
-                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Tool not found: " + toolId)))
+                .switchIfEmpty(Mono.error(new ToolNotFoundException("Tool not found: " + toolId)))
                 .flatMap(tool -> {
                     if (!tool.isEnabled()) {
                         // TODO: throw a custom exception (openframe-exception) instead and catch it on the client side
-                        return Mono.error(new IllegalArgumentException("Tool " + tool.getName() + " is not enabled"));
+                        return Mono.error(new ToolDisabledException("Tool " + tool.getName() + " is not enabled"));
                     }
                     return Mono.just(tool);
                 });
     }
 
+    /**
+     * Masks any query string on the proxy URI before logging, since some upstream resolvers may embed
+     * bearer tokens or other credentials in query parameters. Only scheme/host/port/path are logged.
+     */
+    private static String maskUri(URI uri) {
+        if (uri == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        if (uri.getScheme() != null) {
+            sb.append(uri.getScheme()).append("://");
+        }
+        if (uri.getHost() != null) {
+            sb.append(uri.getHost());
+        }
+        if (uri.getPort() != -1) {
+            sb.append(':').append(uri.getPort());
+        }
+        if (uri.getRawPath() != null) {
+            sb.append(uri.getRawPath());
+        }
+        if (uri.getRawQuery() != null && !uri.getRawQuery().isEmpty()) {
+            sb.append("?***");
+        }
+        return sb.toString();
+    }
+
     protected abstract String getRequestToolId(String path);
 
     protected abstract String getEndpointPrefix();
+
+    /**
+     * Thrown when the requested tool cannot be found. Mapped to HTTP 404 by callers/handlers.
+     */
+    public static class ToolNotFoundException extends ResponseStatusException {
+        public ToolNotFoundException(String reason) {
+            super(HttpStatus.NOT_FOUND, reason);
+        }
+    }
+
+    /**
+     * Thrown when the requested tool exists but is not enabled. Distinct from
+     * {@link ToolNotFoundException} so gateway callers can differentiate the two conditions.
+     */
+    public static class ToolDisabledException extends ResponseStatusException {
+        public ToolDisabledException(String reason) {
+            super(HttpStatus.CONFLICT, reason);
+        }
+    }
 
 }
