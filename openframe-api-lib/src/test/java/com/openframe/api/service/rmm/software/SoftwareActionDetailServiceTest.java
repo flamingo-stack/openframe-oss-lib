@@ -59,7 +59,7 @@ class SoftwareActionDetailServiceTest {
 
         assertThat(rows).extracting(SoftwareActionDeviceResponse::getMachineId)
                 .containsExactly("m-success", "m-running", "m-offline");
-        assertThat(status(rows, "m-success")).isEqualTo(SoftwareActionStatus.SUCCESS);
+        assertThat(status(rows, "m-success")).isEqualTo(SoftwareActionStatus.COMPLETED);
         assertThat(status(rows, "m-running")).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
         assertThat(status(rows, "m-offline")).isEqualTo(SoftwareActionStatus.SCHEDULED);
     }

@@ -7,6 +7,7 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareActionFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareActionFilters;
 import com.openframe.api.dto.rmm.software.SoftwareActionResponse;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.rmm.software.SoftwareActionDetailService;
@@ -40,6 +41,13 @@ public class SoftwareActionDataFetcher {
         int page = PageCursors.decodePage(after != null ? after : before);
         Integer perPage = first != null ? first : last;
         return PageCursors.toConnection(softwareActionService.list(filter, search, sort, page, perPage));
+    }
+
+    @DgsQuery
+    public SoftwareActionFilters softwareActionFilters(
+            @InputArgument SoftwareActionFilterInput filter,
+            @InputArgument String search) {
+        return softwareActionService.filters(filter, search);
     }
 
     @DgsQuery

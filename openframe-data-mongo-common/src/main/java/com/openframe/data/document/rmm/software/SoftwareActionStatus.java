@@ -4,6 +4,6 @@ public enum SoftwareActionStatus {
 
     SCHEDULED,
     IN_PROGRESS,
-    SUCCESS,
+    COMPLETED,
     FAILED
 }

@@ -29,6 +29,14 @@ extend type Query {
         scheduleId: String,
         search: String
     ): [SoftwareActionDevice!]!
+
+    """Available filter options (with live counts) for the softwareActions list — the ACTION / ENGINE /
+    STATUS dropdowns. Same filter/search scope as softwareActions; each facet is counted under the active
+    filters. filteredCount = total rows (executed + scheduled) matching them."""
+    softwareActionFilters(
+        filter: SoftwareActionFilterInput,
+        search: String
+    ): SoftwareActionFilters!
 }
 
 """A single install/update of one package across its target devices."""
@@ -61,7 +69,7 @@ type SoftwareActionRun {
 enum SoftwareActionStatus {
     SCHEDULED
     IN_PROGRESS
-    SUCCESS
+    COMPLETED
     FAILED
 }
 
@@ -94,4 +102,13 @@ input SoftwareActionFilterInput {
     statuses: [SoftwareActionStatus!]
     actions: [SoftwareAction!]
     engines: [PackageManagerType!]
+}
+
+"""Faceted filter options (with live counts) for the "Software Actions" page. Reuses ScriptFilterOption
+(value / label / count); values are enum names. filteredCount = total rows matching all active filters."""
+type SoftwareActionFilters {
+    statuses: [ScriptFilterOption!]!
+    actions: [ScriptFilterOption!]!
+    engines: [ScriptFilterOption!]!
+    filteredCount: Int!
 }

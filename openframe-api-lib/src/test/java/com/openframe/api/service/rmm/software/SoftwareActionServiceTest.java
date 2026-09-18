@@ -1,7 +1,10 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.software.SoftwareActionFilters;
 import com.openframe.api.dto.rmm.software.SoftwareActionResponse;
 import com.openframe.api.dto.shared.PageResult;
+import com.openframe.api.mapper.ScriptFilterOptionMapper;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
@@ -39,18 +42,20 @@ class SoftwareActionServiceTest {
     @Mock private SoftwareScheduleMachineAssignedRepository assignedRepository;
     @Mock private TenantIdProvider tenantIdProvider;
 
+    private final ScriptFilterOptionMapper optionMapper = new ScriptFilterOptionMapper(null, null);
+
     private SoftwareActionService service;
 
     @BeforeEach
     void setUp() {
-        service = new SoftwareActionService(aggregationRepository, scheduleRepository, assignedRepository, tenantIdProvider);
+        service = new SoftwareActionService(aggregationRepository, scheduleRepository, assignedRepository, optionMapper, tenantIdProvider);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
-        when(aggregationRepository.getDefaultSortField()).thenReturn("dispatchedAt");
     }
 
     @Test
     @DisplayName("list: executed rows come from the leaf aggregation with derived status + X/Y")
     void list_executedRows() {
+        when(aggregationRepository.getDefaultSortField()).thenReturn("dispatchedAt");
         when(scheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(eq(TENANT), eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of());
         when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(1L);
@@ -95,6 +100,44 @@ class SoftwareActionServiceTest {
         assertThat(row.getTotalMachineCount()).isEqualTo(7);
         assertThat(row.getRespondedMachineCount()).isZero();
         assertThat(row.getScheduledAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("filters: executed facets merge with scheduled tallies; SCHEDULED comes only from schedules")
+    void filters_mergeExecutedAndScheduled() {
+        when(aggregationRepository.facet(eq(TENANT), any(), any(), eq("status")))
+                .thenReturn(new java.util.LinkedHashMap<>(java.util.Map.of("COMPLETED", 3, "FAILED", 1)));
+        when(aggregationRepository.facet(eq(TENANT), any(), any(), eq("action")))
+                .thenReturn(new java.util.LinkedHashMap<>(java.util.Map.of("UPDATE", 4)));
+        when(aggregationRepository.facet(eq(TENANT), any(), any(), eq("packageManager")))
+                .thenReturn(new java.util.LinkedHashMap<>(java.util.Map.of("BREW", 4)));
+        when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(4L);
+
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("s1").tenantId(TENANT).createdBy("user-1").action(SoftwareAction.INSTALL)
+                .nextRunAt(Instant.now().plusSeconds(3600))
+                .packages(List.of(SoftwareSchedulePackage.builder()
+                        .packageManager(PackageManagerType.WINGET).packageName("chrome").build()))
+                .build();
+        when(scheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(eq(TENANT), eq(ScriptStatus.ACTIVE), any()))
+                .thenReturn(List.of(schedule));
+        when(assignedRepository.countByTenantIdAndSoftwareScheduleId(TENANT, "s1")).thenReturn(7L);
+
+        SoftwareActionFilters filters = service.filters(null, null);
+
+        assertThat(count(filters.getStatuses(), "COMPLETED")).isEqualTo(3);
+        assertThat(count(filters.getStatuses(), "FAILED")).isEqualTo(1);
+        assertThat(count(filters.getStatuses(), "SCHEDULED")).isEqualTo(1); // only from the schedule
+        assertThat(count(filters.getActions(), "UPDATE")).isEqualTo(4);
+        assertThat(count(filters.getActions(), "INSTALL")).isEqualTo(1);    // from the schedule
+        assertThat(count(filters.getEngines(), "BREW")).isEqualTo(4);
+        assertThat(count(filters.getEngines(), "WINGET")).isEqualTo(1);     // from the schedule
+        assertThat(filters.getFilteredCount()).isEqualTo(5);               // 4 executed + 1 scheduled
+    }
+
+    private static int count(List<ScriptFilterOption> options, String value) {
+        return options.stream().filter(o -> o.getValue().equals(value)).map(ScriptFilterOption::getCount)
+                .findFirst().orElse(0);
     }
 
     private static SoftwareActionSummary summary(String executionId, PackageManagerType pm, String name,

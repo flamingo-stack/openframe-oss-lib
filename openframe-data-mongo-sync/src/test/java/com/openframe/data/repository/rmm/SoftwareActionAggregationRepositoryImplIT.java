@@ -60,7 +60,7 @@ class SoftwareActionAggregationRepositoryImplIT extends BaseMongoIntegrationTest
                 .findPage(TENANT, null, null, "dispatchedAt", Sort.Direction.DESC, 0, 50).stream()
                 .collect(Collectors.toMap(SoftwareActionSummary::getExecutionId, Function.identity()));
 
-        assertThat(byExec.get("exec-1").getStatus()).isEqualTo(SoftwareActionStatus.SUCCESS);
+        assertThat(byExec.get("exec-1").getStatus()).isEqualTo(SoftwareActionStatus.COMPLETED);
         assertThat(byExec.get("exec-1").getTotalMachineCount()).isEqualTo(3);
         assertThat(byExec.get("exec-1").getRespondedMachineCount()).isEqualTo(3);
 

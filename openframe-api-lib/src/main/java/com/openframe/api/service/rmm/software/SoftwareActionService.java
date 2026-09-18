@@ -1,8 +1,10 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareActionFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareActionFilters;
 import com.openframe.api.dto.rmm.software.SoftwareActionResponse;
 import com.openframe.api.dto.shared.PageResult;
+import com.openframe.api.mapper.ScriptFilterOptionMapper;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,9 +47,14 @@ public class SoftwareActionService {
             "devices", "totalMachineCount",
             "dispatchedAt", "dispatchedAt");
 
+    private static final String FIELD_STATUS = "status";
+    private static final String FIELD_ACTION = "action";
+    private static final String FIELD_ENGINE = "packageManager";
+
     private final SoftwareActionAggregationRepository aggregationRepository;
     private final SoftwareScheduleRepository scheduleRepository;
     private final SoftwareScheduleMachineAssignedRepository assignedRepository;
+    private final ScriptFilterOptionMapper optionMapper;
     private final TenantIdProvider tenantIdProvider;
 
     public PageResult<SoftwareActionResponse> list(SoftwareActionFilterInput filter, String search,
@@ -80,6 +88,39 @@ public class SoftwareActionService {
         boolean hasNext = (long) offset + items.size() < total;
         boolean hasPrev = page > 0;
         return new PageResult<>(items, hasNext, hasPrev, (int) total, page);
+    }
+
+    public SoftwareActionFilters filters(SoftwareActionFilterInput filter, String search) {
+        String tenantId = tenantIdProvider.getTenantId();
+        SoftwareActionQueryFilter queryFilter = toQueryFilter(filter);
+
+        Map<String, Integer> statuses = new LinkedHashMap<>(aggregationRepository.facet(tenantId, queryFilter, search, FIELD_STATUS));
+        Map<String, Integer> actions = new LinkedHashMap<>(aggregationRepository.facet(tenantId, queryFilter, search, FIELD_ACTION));
+        Map<String, Integer> engines = new LinkedHashMap<>(aggregationRepository.facet(tenantId, queryFilter, search, FIELD_ENGINE));
+
+        List<SoftwareActionResponse> scheduled = includeScheduled(filter)
+                ? scheduledRows(tenantId, filter, search)
+                : List.of();
+        for (SoftwareActionResponse row : scheduled) {
+            bump(statuses, row.getStatus() != null ? row.getStatus().name() : null);
+            bump(actions, row.getAction() != null ? row.getAction().name() : null);
+            bump(engines, row.getEngine() != null ? row.getEngine().name() : null);
+        }
+
+        long filteredCount = scheduled.size() + aggregationRepository.count(tenantId, queryFilter, search);
+
+        return SoftwareActionFilters.builder()
+                .statuses(optionMapper.selfLabeled(statuses))
+                .actions(optionMapper.selfLabeled(actions))
+                .engines(optionMapper.selfLabeled(engines))
+                .filteredCount((int) filteredCount)
+                .build();
+    }
+
+    private static void bump(Map<String, Integer> counts, String key) {
+        if (key != null) {
+            counts.merge(key, 1, Integer::sum);
+        }
     }
 
     public Optional<SoftwareActionResponse> findById(String executionId) {

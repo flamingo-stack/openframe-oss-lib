@@ -19,8 +19,12 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -61,7 +65,23 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
     }
 
     @Override
-    public java.util.Optional<SoftwareActionSummary> findByExecutionId(String tenantId, String executionId) {
+    public Map<String, Integer> facet(String tenantId, SoftwareActionQueryFilter filter, String search, String field) {
+        List<AggregationOperation> stages = new ArrayList<>(pipeline(tenantId, filter, search));
+        stages.add(ctx -> new Document("$group", new Document("_id", "$" + field).append("count", new Document("$sum", 1))));
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(Aggregation.newAggregation(stages), ScriptExecution.class, Document.class);
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Document doc : results.getMappedResults()) {
+            Object id = doc.get("_id");
+            if (id != null) {
+                counts.put(id.toString(), intValue(doc.get("count")));
+            }
+        }
+        return counts;
+    }
+
+    @Override
+    public Optional<SoftwareActionSummary> findByExecutionId(String tenantId, String executionId) {
         List<AggregationOperation> stages = new ArrayList<>();
         stages.add(ctx -> new Document("$match", new Document("tenantId", tenantId)
                 .append("executionId", executionId).append("softwareAction", new Document("$ne", null))));
@@ -70,7 +90,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
         AggregationResults<Document> results =
                 mongoTemplate.aggregate(Aggregation.newAggregation(stages), ScriptExecution.class, Document.class);
         Document doc = results.getUniqueMappedResult();
-        return java.util.Optional.ofNullable(doc == null ? null : toSummary(doc));
+        return Optional.ofNullable(doc == null ? null : toSummary(doc));
     }
 
     @Override
@@ -129,9 +149,9 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
 
     private static Document projectDoc() {
         Object respondedCount = new Document("$size", new Document("$setDifference",
-                List.of("$responded", java.util.Collections.singletonList(null))));
+                List.of("$responded", Collections.singletonList(null))));
         Object status = cond(new Document("$gt", List.of("$hasInProgress", 0)), SoftwareActionStatus.IN_PROGRESS.name(),
-                cond(new Document("$gt", List.of("$failed", 0)), SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.SUCCESS.name()));
+                cond(new Document("$gt", List.of("$failed", 0)), SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.COMPLETED.name()));
         return new Document("_id", 0)
                 .append("executionId", "$_id")
                 .append("packageManager", 1)

@@ -114,7 +114,7 @@ public class SoftwareActionDetailService {
             return SoftwareActionStatus.IN_PROGRESS;
         }
         return switch (status) {
-            case SUCCESS -> SoftwareActionStatus.SUCCESS;
+            case SUCCESS -> SoftwareActionStatus.COMPLETED;
             case FAILED -> SoftwareActionStatus.FAILED;
             case QUEUED, RUNNING -> SoftwareActionStatus.IN_PROGRESS;
         };
