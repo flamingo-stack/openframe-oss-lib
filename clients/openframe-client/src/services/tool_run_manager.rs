@@ -1,5 +1,5 @@
 use crate::models::installed_tool::{Installation, InstalledTool, ToolRecordState};
-use crate::platform::system_service;
+use crate::platform::{system_service, write_in_flight_tool_ops};
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
 use crate::services::tool_kill_service::ToolKillService;
@@ -407,25 +407,6 @@ pub(crate) fn launch_process_in_target_session(
     }
 }
 
-#[derive(Clone, Default)]
-pub(crate) struct ClientUpdatePendingFlag {
-    since: Arc<RwLock<Option<std::time::Instant>>>,
-}
-
-impl ClientUpdatePendingFlag {
-    pub(crate) async fn mark(&self) {
-        *self.since.write().await = Some(std::time::Instant::now());
-    }
-
-    pub(crate) async fn is_pending(&self, ttl: Duration) -> bool {
-        matches!(*self.since.read().await, Some(since) if since.elapsed() < ttl)
-    }
-
-    pub(crate) async fn clear(&self) {
-        *self.since.write().await = None;
-    }
-}
-
 #[derive(Clone)]
 pub struct ToolRunManager {
     installed_tools_service: InstalledToolsService,
@@ -435,9 +416,8 @@ pub struct ToolRunManager {
     updating_tools: Arc<RwLock<HashMap<String, usize>>>,
     tool_locks: Arc<RwLock<HashMap<String, Arc<Mutex<()>>>>>,
     shutting_down: Arc<AtomicBool>,
-    /// Set by a deactivation stop, which a failed self-update must not undo
+    /// Set by a deactivation stop
     tools_stopped: Arc<AtomicBool>,
-    client_update_pending: ClientUpdatePendingFlag,
 }
 
 impl ToolRunManager {
@@ -446,6 +426,7 @@ impl ToolRunManager {
         params_processor: ToolCommandParamsResolver,
         tool_kill_service: ToolKillService,
     ) -> Self {
+        write_in_flight_tool_ops(params_processor.directory_manager.secured_dir(), &[]);
         Self {
             installed_tools_service,
             params_processor,
@@ -455,7 +436,6 @@ impl ToolRunManager {
             tool_locks: Arc::new(RwLock::new(HashMap::new())),
             shutting_down: Arc::new(AtomicBool::new(false)),
             tools_stopped: Arc::new(AtomicBool::new(false)),
-            client_update_pending: ClientUpdatePendingFlag::default(),
         }
     }
 
@@ -467,7 +447,6 @@ impl ToolRunManager {
     }
 
     /// Signal all run loops to stop launching new processes.
-    /// Called by self-update before the updater kills the service.
     pub fn signal_shutdown(&self) {
         self.shutting_down.store(true, Ordering::Release);
         info!("Tool run manager: shutdown signalled, no new launches will occur");
@@ -532,55 +511,6 @@ impl ToolRunManager {
         self.run().await
     }
 
-    /// Undo [`signal_shutdown`] after the updater failed without stopping the service: live supervisors carry on, tools whose loop already exited are relaunched.
-    pub async fn resume_after_update_failure(&self) -> Result<()> {
-        {
-            let _set = self.running_tools.write().await;
-            if self.tools_stopped.load(Ordering::Acquire) {
-                info!("Tool run manager: tools are stopped by deactivation, not resuming");
-                return Ok(());
-            }
-            self.shutting_down.store(false, Ordering::Release);
-        }
-
-        let tools = self
-            .installed_tools_service
-            .get_all()
-            .await
-            .context("Failed to list installed tools for resume")?;
-        for tool in tools {
-            if tool.installation.is_service() || !self.try_mark_running(&tool.tool_agent_id).await {
-                continue;
-            }
-            let tool_id = tool.tool_agent_id.clone();
-            info!(tool_id = %tool_id, "Relaunching tool supervisor after the aborted update");
-            if let Err(e) = self.run_tool(tool, false).await {
-                warn!(tool_id = %tool_id, "Failed to relaunch tool after the aborted update: {:#}", e);
-                self.clear_running_tool(&tool_id).await;
-            }
-        }
-        info!("Tool run manager: supervision resumed after the aborted update");
-        Ok(())
-    }
-
-    pub async fn mark_client_update_pending(&self) {
-        self.client_update_pending.mark().await;
-        info!("Client update pending: new tool operations will be parked");
-    }
-
-    pub async fn is_client_update_pending(&self) -> bool {
-        self.client_update_pending
-            .is_pending(Duration::from_secs(
-                crate::config::update_config::CLIENT_UPDATE_PENDING_TTL_SECS,
-            ))
-            .await
-    }
-
-    pub async fn clear_client_update_pending(&self) {
-        self.client_update_pending.clear().await;
-        info!("Client update no longer pending: parked tool operations released");
-    }
-
     pub async fn mark_updating(&self, tool_id: &str) {
         let mut map = self.updating_tools.write().await;
         let count = map.entry(tool_id.to_string()).or_insert(0);
@@ -588,6 +518,16 @@ impl ToolRunManager {
         info!(
             "Tool {} marked as updating (in-flight ops: {})",
             tool_id, *count
+        );
+        self.publish_in_flight_tool_ops(&map);
+    }
+
+    fn publish_in_flight_tool_ops(&self, map: &HashMap<String, usize>) {
+        let mut tool_ids: Vec<String> = map.keys().cloned().collect();
+        tool_ids.sort();
+        write_in_flight_tool_ops(
+            self.params_processor.directory_manager.secured_dir(),
+            &tool_ids,
         );
     }
 
@@ -605,6 +545,7 @@ impl ToolRunManager {
                 );
             }
         }
+        self.publish_in_flight_tool_ops(&map);
     }
 
     pub async fn is_updating(&self, tool_id: &str) -> bool {
@@ -1040,7 +981,3 @@ impl ToolRunManager {
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[path = "tool_run_manager_tests.rs"]
-mod tests;
