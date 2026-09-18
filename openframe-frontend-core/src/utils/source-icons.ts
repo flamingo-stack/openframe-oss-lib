@@ -256,3 +256,16 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
 export function defaultTableIdForDocumentType(documentType: string): string | null {
   return DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID[documentType] ?? null;
 }
+
+/**
+ * The reverse lookup: a table's canonical `documentType`. The map above is
+ * 1:1 (the hub's per-source contract test pins one type per table), so a row
+ * that names its table but arrived with no type still has one. `null` for a
+ * table the map does not list.
+ */
+export function defaultDocumentTypeForTableId(tableId: string): string | null {
+  for (const [documentType, table] of Object.entries(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID)) {
+    if (table === tableId) return documentType;
+  }
+  return null;
+}

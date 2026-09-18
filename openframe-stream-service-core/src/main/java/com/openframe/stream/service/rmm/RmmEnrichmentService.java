@@ -67,6 +67,7 @@ public class RmmEnrichmentService implements DataEnrichmentService<DeserializedD
         }
         enriched.setMachineId(machine.getMachineId());
         enriched.setHostname(machine.getHostname());
+        enriched.setNickname(machine.getNickname());
 
         CachedOrganizationInfo organization = machineIdCacheService.getOrganization(machine.getOrganizationId());
         if (organization != null) {

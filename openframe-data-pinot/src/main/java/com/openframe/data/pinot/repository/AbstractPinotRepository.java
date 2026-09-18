@@ -112,6 +112,17 @@ public abstract class AbstractPinotRepository {
      * query selects many columns and the mapper wants name-based access
      * instead of hardcoded indices.
      */
+    // A column selected by the query but absent from the ResultSet means the Pinot schema has not
+    // caught up with the deployed code. Degrade that one field to null rather than failing the page.
+    protected String readString(ResultSet resultSet, int rowIndex, Map<String, Integer> columnIndexMap, String column) {
+        Integer columnIndex = columnIndexMap.get(column);
+        if (columnIndex == null) {
+            log.debug("Column {} missing from Pinot result set - returning null", column);
+            return null;
+        }
+        return resultSet.getString(rowIndex, columnIndex);
+    }
+
     protected Map<String, Integer> buildColumnIndexMap(ResultSet resultSet) {
         Map<String, Integer> columnIndexMap = new HashMap<>();
         for (int i = 0; i < resultSet.getColumnCount(); i++) {
