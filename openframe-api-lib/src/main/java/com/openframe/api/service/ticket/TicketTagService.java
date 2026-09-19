@@ -39,10 +39,6 @@ public class TicketTagService {
         return tagRepository.findByEntityType(TagEntityType.TICKET);
     }
 
-    public List<Tag> getTags() {
-        return tagRepository.findByEntityType(TagEntityType.TICKET);
-    }
-
     @Transactional
     public void addTagToTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String tagId) {
         validateAdminAccess(principal);
