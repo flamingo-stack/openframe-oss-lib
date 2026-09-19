@@ -15,11 +15,14 @@ import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionResult;
+import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareBundleOnlineDispatch;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleStatus;
+import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -60,6 +63,7 @@ class SoftwareBundleServiceTest {
     @Mock private SoftwareBundleRepository bundleRepository;
     @Mock private SoftwareBundleOnlineDispatchRepository onlineDispatchRepository;
     @Mock private SoftwareScheduleService softwareScheduleService;
+    @Mock private SoftwareActionResultRepository softwareActionResultRepository;
     @Mock private MachinePlatformResolver machinePlatformResolver;
     @Mock private TenantIdProvider tenantIdProvider;
 
@@ -68,7 +72,7 @@ class SoftwareBundleServiceTest {
     @BeforeEach
     void setUp() {
         service = new SoftwareBundleService(bundleRepository, onlineDispatchRepository, softwareScheduleService,
-                machinePlatformResolver, tenantIdProvider);
+                softwareActionResultRepository, machinePlatformResolver, tenantIdProvider);
         ReflectionTestUtils.setField(service, "pendingTtl", Duration.ofHours(1));
         ReflectionTestUtils.setField(service, "scheduleReconnectWindowSeconds", RECONNECT_WINDOW);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -300,6 +304,19 @@ class SoftwareBundleServiceTest {
         assertThat(saved.getValue().getExecutionIds()).hasSize(2);
         assertThat(saved.getValue().getExpireAt()).isNull();
         assertThat(res.getStatus()).isEqualTo(SoftwareBundleStatus.COMPLETED);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<SoftwareActionResult>> results = ArgumentCaptor.forClass(List.class);
+        verify(softwareActionResultRepository).saveAll(results.capture());
+        assertThat(results.getValue()).hasSize(2).allSatisfy(r -> {
+            assertThat(r.getBundleId()).isEqualTo(BUNDLE_ID);
+            assertThat(r.getScheduleId()).isNull();
+            assertThat(r.getStatus()).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
+            assertThat(r.getMode()).isEqualTo(SoftwareBundleMode.NOW);
+            assertThat(r.getMachineIds()).containsExactlyInAnyOrder("m1", "m2"); // both macOS → both compatible with brew
+            assertThat(r.getId()).isEqualTo(r.getExecutionId());
+            assertThat(r.getVersion()).isEqualTo("1.2.3"); // catalog version recorded on the action
+        });
     }
 
     @Test
@@ -362,6 +379,7 @@ class SoftwareBundleServiceTest {
         p.setPackageManager(PackageManagerType.BREW);
         p.setPackageName(name);
         p.setBrewPackageType(BrewPackageType.CASK);
+        p.setVersion("1.2.3");
         return p;
     }
 

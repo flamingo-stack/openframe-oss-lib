@@ -349,6 +349,7 @@ input SoftwarePackageInput {
     packageName: String!
     "Brew-only sub-type (CASK/FORMULA). Required for brew (enforced server-side), ignored by managers that do not distinguish."
     brewPackageType: BrewPackageType
+    version: String
 }
 
 """The dispatch outcome for one package: its shared executionId across the targeted devices."""

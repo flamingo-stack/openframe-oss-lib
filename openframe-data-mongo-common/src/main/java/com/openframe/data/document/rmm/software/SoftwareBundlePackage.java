@@ -16,4 +16,5 @@ public class SoftwareBundlePackage {
     private PackageManagerType packageManager;
     private String packageName;
     private BrewPackageType brewPackageType;
+    private String version;
 }

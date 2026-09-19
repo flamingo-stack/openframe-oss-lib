@@ -19,9 +19,12 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareBundleOnlineDispatch;
+import com.openframe.data.document.rmm.software.SoftwareActionResult;
+import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleStatus;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
+import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -53,6 +56,7 @@ public class SoftwareBundleService {
     private final SoftwareBundleRepository bundleRepository;
     private final SoftwareBundleOnlineDispatchRepository onlineDispatchRepository;
     private final SoftwareScheduleService softwareScheduleService;
+    private final SoftwareActionResultRepository softwareActionResultRepository;
     private final MachinePlatformResolver machinePlatformResolver;
     private final TenantIdProvider tenantIdProvider;
 
@@ -199,7 +203,8 @@ public class SoftwareBundleService {
         }
         List<SoftwareBundlePackage> packages = toDomainPackages(input.getPackages());
         validatePackages(packages);
-        rejectDevicesWithoutCompatiblePackage(machineIds, packages);
+        Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
+        rejectDevicesWithoutCompatiblePackage(machineIds, packages, deviceOsTypes);
 
         entity.setAction(input.getAction());
         entity.setPackages(packages);
@@ -220,9 +225,49 @@ public class SoftwareBundleService {
         entity.setUpdatedAt(now);
         entity.setExpireAt(null); // completed bundles are history — never reaped
         bundleRepository.save(entity);
+
+        // Persist one Software Action result per package, targeting the OS-compatible subset of the devices.
+        writeActionResults(entity, packages, deviceOsTypes, now, actor);
+
         log.info("Submitted software bundle id={} mode={} action={} devices={} packages={} actor={}",
                 entity.getId(), entity.getMode(), entity.getAction(), machineIds.size(), packages.size(), actor);
         return toResponse(entity);
+    }
+
+    private void writeActionResults(SoftwareBundle bundle, List<SoftwareBundlePackage> packages,
+                                    Map<String, OsType> deviceOsTypes, Instant now, String actor) {
+        boolean scheduled = bundle.getMode() == SoftwareBundleMode.SCHEDULED;
+        List<SoftwareActionResult> results = new java.util.ArrayList<>(packages.size());
+        for (SoftwareBundlePackage pkg : packages) {
+            OsType packageOs = osTypeOf(pkg.getPackageManager());
+            List<String> targets = currentMachineIds(bundle).stream()
+                    .filter(machineId -> deviceOsTypes.get(machineId) == packageOs)
+                    .toList();
+            String executionId = scheduled
+                    ? SoftwareExecutionId.forSchedule(bundle.getScheduleId(), pkg.getPackageManager(), pkg.getPackageName())
+                    : SoftwareExecutionId.forBundle(bundle.getId(), pkg.getPackageManager(), pkg.getPackageName());
+            results.add(SoftwareActionResult.builder()
+                    .id(executionId)
+                    .tenantId(bundle.getTenantId())
+                    .executionId(executionId)
+                    .action(bundle.getAction())
+                    .packageManager(pkg.getPackageManager())
+                    .packageName(pkg.getPackageName())
+                    .version(pkg.getVersion())
+                    .status(scheduled ? SoftwareActionStatus.SCHEDULED : SoftwareActionStatus.IN_PROGRESS)
+                    .mode(bundle.getMode())
+                    .machineIds(targets)
+                    .totalMachineCount(targets.size())
+                    .bundleId(scheduled ? null : bundle.getId())
+                    .scheduleId(scheduled ? bundle.getScheduleId() : null)
+                    .scheduledAt(scheduled ? bundle.getStartAt() : null)
+                    .dispatchedAt(scheduled ? null : now)
+                    .initiatedBy(actor)
+                    .createdAt(now)
+                    .build());
+        }
+        softwareActionResultRepository.saveAll(results);
+        log.info("Wrote {} software action result(s) for bundle id={}", results.size(), bundle.getId());
     }
 
     private static void validatePackages(List<SoftwareBundlePackage> packages) {
@@ -243,11 +288,11 @@ public class SoftwareBundleService {
         }
     }
 
-    private void rejectDevicesWithoutCompatiblePackage(List<String> machineIds, List<SoftwareBundlePackage> packages) {
+    private void rejectDevicesWithoutCompatiblePackage(List<String> machineIds, List<SoftwareBundlePackage> packages,
+                                                       Map<String, OsType> deviceOsTypes) {
         Set<OsType> packageOsTypes = packages.stream()
                 .map(p -> osTypeOf(p.getPackageManager()))
                 .collect(Collectors.toSet());
-        Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         List<String> incompatible = machineIds.stream()
                 .filter(machineId -> {
                     OsType os = deviceOsTypes.get(machineId);
@@ -389,6 +434,7 @@ public class SoftwareBundleService {
                         .packageManager(p.getPackageManager())
                         .packageName(p.getPackageName())
                         .brewPackageType(p.getBrewPackageType())
+                        .version(p.getVersion())
                         .build())
                 .toList();
     }

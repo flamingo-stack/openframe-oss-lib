@@ -12,12 +12,12 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.List;
 
-@Document(collection = "software_actions")
+@Document(collection = "software_actions_result")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SoftwareActionRun implements TenantScoped {
+public class SoftwareActionResult implements TenantScoped {
 
     @Id
     private String id;
@@ -28,8 +28,10 @@ public class SoftwareActionRun implements TenantScoped {
     private SoftwareAction action;
     private PackageManagerType packageManager;
     private String packageName;
+    private String version;
 
     private SoftwareActionStatus status;
+    private SoftwareBundleMode mode;
 
     private List<String> machineIds;
     private int totalMachineCount;
