@@ -17,4 +17,5 @@ public class SoftwarePackageInput {
 
     /** Brew-only sub-type (CASK/FORMULA). Required for brew (enforced by its handler), ignored by managers that do not distinguish. */
     private BrewPackageType brewPackageType;
+    private String version;
 }

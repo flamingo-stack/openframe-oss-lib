@@ -79,6 +79,8 @@ public class ScriptExecution implements TenantScoped {
     private PackageManagerType packageManager;
     private String packageName;
     private SoftwareAction softwareAction;
+    private String softwareBundleId;
+    private String softwareScheduleId;
 
     private ExecutionStatus status;
 

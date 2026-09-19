@@ -39,6 +39,8 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             error = buildError(ce.getMessage(), ce.getErrorCode());
         } else if (exception instanceof BaseException be) {
             error = buildError(be.getMessage(), be.getErrorCode());
+        } else if (exception instanceof jakarta.validation.ConstraintViolationException cve) {
+            error = buildError(cve.getMessage(), ErrorCode.VALIDATION_ERROR);
         } else if (exception instanceof IllegalArgumentException || exception instanceof IllegalStateException) {
             error = buildError(exception.getMessage(), ErrorCode.VALIDATION_ERROR);
         } else if (exception instanceof RuntimeException) {
@@ -64,4 +66,4 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
                 ))
                 .build();
     }
-} 
+}

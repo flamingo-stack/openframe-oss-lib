@@ -15,7 +15,8 @@ public enum NodeType {
     SCRIPT("Script"),
     SCRIPT_EXECUTION("ScriptExecution"),
     SCRIPT_SCHEDULE("ScriptSchedule"),
-    SCHEDULE_RUN("ScheduleRun");
+    SCHEDULE_RUN("ScheduleRun"),
+    SOFTWARE_BUNDLE("SoftwareBundle");
 
     private final String graphqlTypeName;
 
