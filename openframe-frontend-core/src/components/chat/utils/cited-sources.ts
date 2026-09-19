@@ -1,3 +1,4 @@
+import { groupSourcesByTable } from '../../../utils/source-grouping';
 import type { ChatSource } from '../types/message.types';
 
 /** How many retrieved sources to show when the answer cited none of them. */
@@ -40,6 +41,11 @@ function withoutCode(content: string): string {
  * even when the model numbered it `[3]`. A number cited twice is placed once,
  * at its first mention.
  *
+ * Each half is then grouped by knowledge table (`groupSourcesByTable`): AFTER
+ * the split, because cited-ness belongs to a citation number, and a table whose
+ * rows were only partly cited is honestly two chips, the cited rows under
+ * "Sources" and the rest behind the expander.
+ *
  * `content` is the flat answer text. A segmented message has to be flattened by
  * the caller — citation markers live in text segments, and this function
  * deliberately does not know what a segment is.
@@ -57,5 +63,5 @@ export function splitCitedSources(sources: ChatSource[] | undefined, content: st
     .filter(source => firstMentionAt.has(source.index))
     .sort((a, b) => (firstMentionAt.get(a.index) ?? 0) - (firstMentionAt.get(b.index) ?? 0));
   const uncited = sources.filter(source => !firstMentionAt.has(source.index));
-  return { cited, uncited };
+  return { cited: groupSourcesByTable(cited), uncited: groupSourcesByTable(uncited) };
 }

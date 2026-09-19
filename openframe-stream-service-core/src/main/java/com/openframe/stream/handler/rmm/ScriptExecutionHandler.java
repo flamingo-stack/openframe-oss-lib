@@ -149,7 +149,7 @@ public class ScriptExecutionHandler implements MessageHandler<DeserializedDebezi
         row.setStderrTruncated(truncStderr.truncated);
 
         scriptExecutionRepository.save(row);
-        executionMetrics.recordCompleted(RmmExecutionMetrics.KIND_SCRIPT, newStatus, row.getDispatchedAt(), now);
+        executionMetrics.recordScriptCompleted(newStatus, row.getSource(), row.getPackageManager(), row.getDispatchedAt(), now);
         log.info("Transitioned Execution row: executionId={} status={}→{} exitCode={} timedOut={}",
                 row.getExecutionId(), previous, newStatus, exitCode, timedOut);
     }

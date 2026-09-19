@@ -58,6 +58,7 @@ enum Commands {
     /// Uninstall the OpenFrame client service
     Uninstall,
     /// Run the OpenFrame client directly (not as a service)
+    #[command(hide = true)]
     Run,
     /// Run as a service (used by service manager)
     #[command(hide = true)]

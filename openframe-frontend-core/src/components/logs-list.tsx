@@ -1,22 +1,13 @@
 import { type FC, forwardRef, useRef } from 'react';
 import type { LogsListProps, LogEntry } from '../types/logs.types';
 import { cn } from '../utils/cn';
+import { formatDateTimeYmd } from '../utils/format';
 import { LogSeverityDot } from './log-severity-dot';
 import { ToolIcon } from './tool-icon';
 
-const formatTimestamp = (timestamp: string | Date): string => {
-  const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
-
-  // UTC getters so the timestamp is identical on server (UTC) and client
-  // (local) — otherwise React #418 hydration mismatch.
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  const hours = String(date.getUTCHours()).padStart(2, '0');
-  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-
-  return `${year}/${month}/${day},${hours}:${minutes}`;
-};
+// UTC-pinned so the server and every client agree (React #418), through the one
+// renderer rather than hand-built `getUTC*` strings.
+const formatTimestamp = (timestamp: string | Date): string => formatDateTimeYmd(timestamp, null, { separator: ',' });
 
 const LogCard: FC<{
   log: LogEntry;

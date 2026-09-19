@@ -5,11 +5,6 @@ import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import org.springframework.stereotype.Component;
 
-/**
- * Pure entity → DTO mapping for {@link ScriptExecution}. No business logic, no
- * GraphQL concerns — the connection envelope is assembled higher up in
- * {@code GraphQLExecutionMapper}.
- */
 @Component
 public class ScriptExecutionMapper {
 
@@ -18,6 +13,9 @@ public class ScriptExecutionMapper {
                 .id(entity.getId())
                 .executionId(entity.getExecutionId())
                 .scriptId(entity.getScriptId())
+                .packageManager(entity.getPackageManager())
+                .packageName(entity.getPackageName())
+                .softwareAction(entity.getSoftwareAction())
                 .scheduleId(entity.getScheduleId())
                 .machineId(entity.getMachineId())
                 .privilegeLevel(entity.getPrivilegeLevel())

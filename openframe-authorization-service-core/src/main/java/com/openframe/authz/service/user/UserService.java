@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -137,6 +138,8 @@ public class UserService {
                                 List<UserRole> roles) {
         AuthUser user = AuthUser.builder()
                 .id(randomUUID().toString())
+                // Set explicitly: with a pre-assigned id Spring Data treats the user as existing, so auditing never fills @CreatedDate.
+                .createdAt(LocalDateTime.now())
                 .tenantId(tenantId)
                 .email(email)
                 .firstName(firstName)
@@ -226,6 +229,8 @@ public class UserService {
         String randomPassword = randomUUID().toString();
         AuthUser user = AuthUser.builder()
                 .id(randomUUID().toString())
+                // Set explicitly: with a pre-assigned id Spring Data treats the user as existing, so auditing never fills @CreatedDate.
+                .createdAt(LocalDateTime.now())
                 .tenantId(tenantId)
                 .email(email)
                 .firstName(firstName)

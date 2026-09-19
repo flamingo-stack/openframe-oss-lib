@@ -50,6 +50,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
     // ties to the bug it guards against.
     private static final String MACHINE_ID = "6d925893-702a-4223-b62f-2f80b927cbaa";
     private static final String HOSTNAME = "MBP-Oleksandr.lan";
+    private static final String NICKNAME = "Reception iMac";
     private static final String ORG_ID = "e0521785-8fef-4ec3-b520-f99087ed988e";
     private static final String ORG_NAME = "Default";
     private static final String TENANT_ID = "tenant-1";
@@ -82,7 +83,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
 
         // 3. Stub the Mongo/Redis-backed lookups; real cache layer is irrelevant here.
         when(machineIdCacheService.getMachineByMachineId(MACHINE_ID))
-                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, ORG_ID));
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, NICKNAME, ORG_ID));
         when(machineIdCacheService.getOrganization(ORG_ID))
                 .thenReturn(new CachedOrganizationInfo(ORG_ID, ORG_NAME));
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
@@ -101,6 +102,9 @@ class ScriptExecutedEnrichmentIntegrationTest {
         assertThat(enriched.getHostname())
                 .as("hostname on the LogEvent")
                 .isEqualTo(HOSTNAME);
+        assertThat(enriched.getNickname())
+                .as("nickname on the LogEvent — carried alongside hostname, never replacing it")
+                .isEqualTo(NICKNAME);
         assertThat(enriched.getOrganizationId())
                 .as("organizationId on the LogEvent")
                 .isEqualTo(ORG_ID);
@@ -123,7 +127,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
                 .isEqualTo(MACHINE_ID);
 
         when(machineIdCacheService.getMachineByMachineId(MACHINE_ID))
-                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, ORG_ID));
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, null, ORG_ID));
         when(machineIdCacheService.getOrganization(ORG_ID))
                 .thenReturn(new CachedOrganizationInfo(ORG_ID, ORG_NAME));
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
@@ -134,6 +138,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
 
         assertThat(enriched.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(enriched.getHostname()).isEqualTo(HOSTNAME);
+        assertThat(enriched.getNickname()).isNull();
         assertThat(enriched.getOrganizationId()).isEqualTo(ORG_ID);
         assertThat(enriched.getOrganizationName()).isEqualTo(ORG_NAME);
         assertThat(enriched.getTenantId()).isEqualTo(TENANT_ID);
