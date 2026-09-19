@@ -1,11 +1,7 @@
 'use client';
 
 import type React from 'react';
-import Link from '../../embed-shims/next-link';
-import { cn } from '../../utils/cn';
-import { Ellipsis01Icon } from '../icons-v2-generated';
-import { Button } from './button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu';
+import { ActionsMenuDropdown, type ActionsMenuItemConfig } from './actions-menu';
 
 /**
  * @deprecated Use `ActionsMenuItem` from `./actions-menu` with
@@ -58,6 +54,9 @@ export interface MoreActionsMenuProps {
  * supports the same trigger override (`customTrigger`), controlled `open` /
  * `onOpenChange`, `onCloseAutoFocus`, and `danger` items, plus grouped items,
  * checkboxes, and submenus. This component will be removed in a future release.
+ *
+ * This is now a thin wrapper around `ActionsMenuDropdown` to guarantee
+ * behavioral parity until removal.
  */
 export function MoreActionsMenu({
   items,
@@ -72,92 +71,30 @@ export function MoreActionsMenu({
   onOpenChange,
   onCloseAutoFocus,
 }: MoreActionsMenuProps) {
+  const mappedItems: ActionsMenuItemConfig[] = items.map(item => ({
+    label: item.label,
+    onClick: item.onClick,
+    href: item.href,
+    openInNewTab: item.openInNewTab,
+    icon: item.icon,
+    disabled: item.disabled,
+    danger: item.danger,
+  }));
+
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        {trigger || (
-          <Button
-            variant="outline"
-            size="icon"
-            className={
-              className || 'flex items-center justify-center border-ods-border bg-ods-card hover:bg-ods-bg-hover'
-            }
-            aria-label={ariaLabel}
-          >
-            <Ellipsis01Icon size={24} className="text-ods-text-primary" />
-          </Button>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align={align}
-        side={side}
-        sideOffset={sideOffset}
-        onCloseAutoFocus={onCloseAutoFocus}
-        className={cn('min-w-[200px] rounded-[4px] border border-ods-border bg-ods-card p-0', contentClassName)}
-      >
-        {items.map((item, idx) => {
-          const itemClassName =
-            'flex items-center gap-2 px-4 py-3 bg-ods-bg hover:bg-ods-bg-hover focus:bg-ods-bg-hover border-b border-ods-border last:border-b-0 rounded-none cursor-pointer data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed';
-
-          const content = (
-            <>
-              {item.icon && (
-                <div
-                  className={cn(
-                    item.danger ? 'text-ods-error' : 'text-ods-text-secondary',
-                    '[&_svg]:size-6 [&_svg]:shrink-0',
-                  )}
-                >
-                  {item.icon}
-                </div>
-              )}
-              <span className="text-ods-text-primary text-h4">{item.label}</span>
-            </>
-          );
-
-          const handleActivate = (e: React.SyntheticEvent) => {
-            e.stopPropagation();
-            if (!item.disabled) item.onClick?.();
-          };
-
-          // Link variant — real <a href> in the DOM, visible to crawlers
-          if (item.href) {
-            return (
-              <DropdownMenuItem key={`${item.label}-${idx}`} asChild disabled={item.disabled} className={itemClassName}>
-                <Link
-                  href={item.href}
-                  target={item.openInNewTab ? '_blank' : undefined}
-                  rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
-                  aria-disabled={item.disabled || undefined}
-                  tabIndex={item.disabled ? -1 : undefined}
-                  onClick={e => {
-                    if (item.disabled) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      return;
-                    }
-                    if (item.onClick) handleActivate(e);
-                  }}
-                >
-                  {content}
-                </Link>
-              </DropdownMenuItem>
-            );
-          }
-
-          // Button variant — onClick only
-          return (
-            <DropdownMenuItem
-              key={`${item.label}-${idx}`}
-              onClick={handleActivate}
-              disabled={item.disabled}
-              className={itemClassName}
-            >
-              {content}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <ActionsMenuDropdown
+      items={mappedItems}
+      align={align}
+      side={side}
+      sideOffset={sideOffset}
+      triggerClassName={className}
+      contentClassName={contentClassName}
+      ariaLabel={ariaLabel}
+      customTrigger={trigger}
+      open={open}
+      onOpenChange={onOpenChange}
+      onCloseAutoFocus={onCloseAutoFocus}
+    />
   );
 }
+
