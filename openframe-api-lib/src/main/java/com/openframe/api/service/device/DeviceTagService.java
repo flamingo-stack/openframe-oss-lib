@@ -1,6 +1,7 @@
 package com.openframe.api.service.device;
 
 import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagValidation;
@@ -113,10 +114,16 @@ public class DeviceTagService {
      * Finds the DEVICE tag for {@code key}, or creates it. On an existing tag any previously unseen
      * values are appended to its predefined options, so a value typed on one device becomes a
      * suggestion for the next.
+     *
+     * <p>Keys are unique ignoring case, same as {@code TagService.createTag}: the Mongo index is
+     * case-sensitive, so without the check "Site" would quietly become a second key next to "site".
      */
     private Tag findOrCreateTag(String key, List<String> values) {
         Tag existing = tagRepository.findByKeyAndEntityType(key, DEVICE);
         if (existing == null) {
+            if (tagRepository.existsByKeyIgnoreCaseAndEntityType(key, DEVICE)) {
+                throw new ConflictException("Tag with key '" + key + "' already exists");
+            }
             Tag created = tagRepository.save(Tag.builder()
                     .key(key)
                     .values(normalize(values))
