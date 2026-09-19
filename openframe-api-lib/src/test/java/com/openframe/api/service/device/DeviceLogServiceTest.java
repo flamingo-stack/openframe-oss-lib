@@ -276,6 +276,24 @@ class DeviceLogServiceTest {
         verifyNoInteractions(lokiClient);
     }
 
+    @Test
+    void ignoresBlankTermsAndRejectsAtomicGroups() {
+        service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
+                .contains(List.of("a", "", "  ", "b", "c", "d", "e")).build(), page(null, null));
+
+        // The two blank terms neither reach the query nor count towards the five-term limit
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}"
+                        + " |~ \"(?i)a\" |~ \"(?i)b\" |~ \"(?i)c\" |~ \"(?i)d\" |~ \"(?i)e\""
+                        + " | machine_id=\"machine-1\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD);
+
+        // Java compiles an atomic group, Loki's RE2 engine does not
+        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
+                .regex("(?>atomic)").build(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private static DeviceLogFilterCriteria window() {
         return DeviceLogFilterCriteria.builder().from(FROM).to(TO).build();
     }

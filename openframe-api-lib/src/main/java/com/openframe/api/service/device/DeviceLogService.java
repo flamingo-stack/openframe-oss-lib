@@ -55,8 +55,8 @@ public class DeviceLogService {
 
     private static final String AGENT_LOGS_JOB = "agent-logs";
     private static final String CASE_INSENSITIVE = "(?i)";
-    /** Lookaround and backreferences: Java compiles them, Loki's RE2 engine rejects them. */
-    private static final Pattern UNSUPPORTED_REGEX = Pattern.compile("\\(\\?[=!<]|\\\\[1-9]");
+    /** Lookaround, atomic groups and backreferences: Java compiles them, Loki's RE2 engine rejects them. */
+    private static final Pattern UNSUPPORTED_REGEX = Pattern.compile("\\(\\?[=!<>]|\\\\[1-9]");
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
 
     private final LokiClient lokiClient;
@@ -232,17 +232,26 @@ public class DeviceLogService {
         validateRegex(criteria.getRegex());
     }
 
+    /**
+     * Counts only the terms that reach the query: blank ones are skipped when the filters are built, so they do not
+     * use up the term budget either.
+     */
     private static void validateTerms(List<String> terms, String field) {
         if (terms == null) {
             return;
         }
-        if (terms.size() > MAX_SEARCH_TERMS) {
-            throw new IllegalArgumentException(field + " cannot hold more than " + MAX_SEARCH_TERMS + " terms");
-        }
+        int used = 0;
         for (String term : terms) {
-            if (term != null && term.length() > MAX_SEARCH_LENGTH) {
+            if (!StringUtils.hasText(term)) {
+                continue;
+            }
+            if (term.length() > MAX_SEARCH_LENGTH) {
                 throw new IllegalArgumentException(field + " terms cannot exceed " + MAX_SEARCH_LENGTH + " characters");
             }
+            used++;
+        }
+        if (used > MAX_SEARCH_TERMS) {
+            throw new IllegalArgumentException(field + " cannot hold more than " + MAX_SEARCH_TERMS + " terms");
         }
     }
 
@@ -257,7 +266,7 @@ public class DeviceLogService {
             throw new IllegalArgumentException("regex cannot exceed " + MAX_SEARCH_LENGTH + " characters");
         }
         if (UNSUPPORTED_REGEX.matcher(regex).find()) {
-            throw new IllegalArgumentException("regex cannot use lookaround or backreferences");
+            throw new IllegalArgumentException("regex cannot use lookaround, atomic groups or backreferences");
         }
         try {
             Pattern.compile(regex);
