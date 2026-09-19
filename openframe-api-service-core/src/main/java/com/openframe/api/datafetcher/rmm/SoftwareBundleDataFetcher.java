@@ -52,7 +52,7 @@ public class SoftwareBundleDataFetcher {
 
     @DgsQuery
     public SoftwareBundleResponse softwareBundle(@InputArgument String id) {
-        return softwareBundleService.findById(id).orElse(null);
+        return softwareBundleService.findById(decodeId(id)).orElse(null);
     }
 
     @DgsMutation
@@ -63,13 +63,13 @@ public class SoftwareBundleDataFetcher {
     @DgsMutation
     public SoftwareBundleResponse addDevicesToSoftwareBundle(@InputArgument String bundleId,
                                                              @InputArgument List<String> machineIds) {
-        return softwareBundleService.addDevices(bundleId, decodeMachineIds(machineIds), getCurrentUserId());
+        return softwareBundleService.addDevices(decodeId(bundleId), decodeMachineIds(machineIds), getCurrentUserId());
     }
 
     @DgsMutation
     public SoftwareBundleResponse removeDevicesFromSoftwareBundle(@InputArgument String bundleId,
                                                                   @InputArgument List<String> machineIds) {
-        return softwareBundleService.removeDevices(bundleId, decodeMachineIds(machineIds), getCurrentUserId());
+        return softwareBundleService.removeDevices(decodeId(bundleId), decodeMachineIds(machineIds), getCurrentUserId());
     }
 
     @DgsMutation
@@ -77,7 +77,7 @@ public class SoftwareBundleDataFetcher {
                                                                 @InputArgument @Valid DeviceFilterInput filter,
                                                                 @InputArgument String search) {
         List<String> machineIds = deviceService.findAllDeviceIds(deviceMapper.toDeviceFilterCriteria(filter), search);
-        return softwareBundleService.addDevices(bundleId, machineIds, getCurrentUserId());
+        return softwareBundleService.addDevices(decodeId(bundleId), machineIds, getCurrentUserId());
     }
 
     @DgsMutation
@@ -85,17 +85,18 @@ public class SoftwareBundleDataFetcher {
                                                                      @InputArgument @Valid DeviceFilterInput filter,
                                                                      @InputArgument String search) {
         List<String> machineIds = deviceService.findAllDeviceIds(deviceMapper.toDeviceFilterCriteria(filter), search);
-        return softwareBundleService.removeDevices(bundleId, machineIds, getCurrentUserId());
+        return softwareBundleService.removeDevices(decodeId(bundleId), machineIds, getCurrentUserId());
     }
 
     @DgsMutation
     public SoftwareBundleResponse submitSoftwareBundle(@InputArgument @Valid SubmitSoftwareBundleInput input) {
+        input.setId(decodeId(input.getId()));
         return softwareBundleService.submit(input, getCurrentUserId());
     }
 
     @DgsMutation
     public boolean deleteSoftwareBundle(@InputArgument String id) {
-        return softwareBundleService.delete(id, getCurrentUserId());
+        return softwareBundleService.delete(decodeId(id), getCurrentUserId());
     }
 
     @DgsData(parentType = "SoftwareBundle", field = "id")
