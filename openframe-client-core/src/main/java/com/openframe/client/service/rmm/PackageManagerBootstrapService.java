@@ -17,6 +17,7 @@ import com.openframe.data.repository.rmm.ScriptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class PackageManagerBootstrapService {
@@ -100,6 +102,7 @@ public class PackageManagerBootstrapService {
                 .privilegeLevel(script.getPrivilegeLevel())
                 .timeoutSeconds(script.getDefaultTimeoutSeconds())
                 .source(ExecutionSource.SYSTEM_BOOTSTRAP)
+                .packageManager(packageManager)
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(now)
                 .statusChangedAt(now)

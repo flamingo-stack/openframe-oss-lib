@@ -7,6 +7,7 @@ import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSearchResponse;
+import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import com.openframe.sdk.fleetmdm.model.QueryResult;
 import com.openframe.sdk.fleetmdm.model.LiveQueryCampaign;
 import com.openframe.sdk.fleetmdm.model.RunLiveQueryRequest;
@@ -127,9 +128,19 @@ public class FleetMdmClient {
      * @return Host object or null if not found
      */
     public Host getHostById(long id) {
+        String url = baseUrl + HOSTS_URL + "/" + id + "?exclude_software=true";
+        return getHost(id, url, Host.class);
+    }
+
+    public HostVulnerabilityInventory getHostVulnerabilityInventoryById(long id) {
+        String url = baseUrl + HOSTS_URL + "/" + id;
+        return getHost(id, url, HostVulnerabilityInventory.class);
+    }
+
+    private <T> T getHost(long id, String url, Class<T> responseType) {
         return call("fetch Fleet host " + id, () -> {
             HttpRequest request = addHeaders(HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + HOSTS_URL + "/" + id)))
+                    .uri(URI.create(url)))
                     .GET()
                     .timeout(Duration.ofSeconds(30))
                     .build();
@@ -139,12 +150,14 @@ public class FleetMdmClient {
             if (response.statusCode() == 401) {
                 throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
             } else if (response.statusCode() == 404) {
-                return null; // Host not found
+                return null;
             } else if (response.statusCode() != 200) {
                 throw new FleetMdmApiException("Failed to fetch host", response.statusCode(), response.body());
             }
 
-            return MAPPER.treeToValue(MAPPER.readTree(response.body()).path("host"), Host.class);
+            JsonNode responseBody = MAPPER.readTree(response.body());
+            JsonNode host = responseBody.path("host");
+            return MAPPER.treeToValue(host, responseType);
         });
     }
 

@@ -4,7 +4,15 @@ export { cn } from './cn';
 // here so existing `/utils` callers keep working; the new resolver/helpers
 // (getPlatformByHostname/hostOf/expandWwwApex/…) are exposed via the `/platform-domains`
 // subpath ONLY (one import surface for the new API).
-export { getPlatformProductionUrl, getAllPlatformBaseDomains } from '../platform-domains';
+export {
+  getPlatformUrl,
+  getPlatformProductionUrl,
+  getAllPlatformBaseDomains,
+  getDeploymentUrl,
+  getRequestOrigin,
+  isLocalUrl,
+  resolveRedirectTarget,
+} from '../platform-domains';
 // Number / currency / byte / date formatters live in `./format` (single
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
@@ -40,7 +48,6 @@ export {
   pick,
   NO_CLIENT_CACHE,
 } from './common';
-export { getBaseUrl } from '../utils/cn';
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title';
@@ -189,6 +196,17 @@ export {
 // instead of src/components/chat/utils/ so server-side hub callers like
 // doc-chat-utils can use them without tripping the 'use client' boundary)
 export { SOURCE_ICON_NAMES, getSourceIconName, SOURCE_LABELS_BY_TABLE, getSourceLabel } from './source-icons';
+// Grouped source chips: the one rule + the one constructor, for the hub
+// (server) and the chat strip (client) alike.
+export {
+  DOC_TABLE_TYPES,
+  groupsByTable,
+  recordCountLabel,
+  buildGroupedSource,
+  groupSourcesByTable,
+  formatCitationIndices,
+  type GroupedSourceRow,
+} from './source-grouping';
 
 // Embed-surface auth — generic across chat AND ticket center (and any
 // future embedded React component that needs to identify as the proxied

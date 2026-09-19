@@ -114,6 +114,7 @@ class PackageManagerBootstrapServiceTest {
         assertThat(row.getValue().getStatus()).isEqualTo(ExecutionStatus.RUNNING);
         assertThat(row.getValue().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.USER);
         assertThat(row.getValue().getTimeoutSeconds()).isEqualTo(1800);
+        assertThat(row.getValue().getPackageManager()).isEqualTo(PackageManagerType.WINGET);
 
         ArgumentCaptor<ScriptMessage> message = ArgumentCaptor.forClass(ScriptMessage.class);
         verify(scriptBootstrapNatsPublisher).publishBootstrapScript(anyString(), message.capture());

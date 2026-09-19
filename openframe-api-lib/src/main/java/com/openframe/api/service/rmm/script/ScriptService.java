@@ -44,11 +44,13 @@ public class ScriptService {
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTagService scriptTagService;
     private final ScriptTimeoutValidator timeoutValidator;
+    private final ScriptPrivilegeValidator privilegeValidator;
 
     public ScriptResponse create(CreateScriptInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
         timeoutValidator.validate(input.getDefaultTimeoutSeconds());
+        privilegeValidator.validate(input.getPrivilegeLevel(), input.getSupportedPlatforms());
 
         if (scriptRepository.existsByTenantIdAndNameAndStatusIn(tenantId, input.getName(), NAME_UNIQUE_STATUSES)) {
             throw new ConflictException(
@@ -176,6 +178,7 @@ public class ScriptService {
         String tenantId = tenantIdProvider.getTenantId();
 
         timeoutValidator.validate(input.getDefaultTimeoutSeconds());
+        privilegeValidator.validate(input.getPrivilegeLevel(), input.getSupportedPlatforms());
 
         Script existing = loadVisibleOrThrow(tenantId, id);
         requireUserScript(existing);

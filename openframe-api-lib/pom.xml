@@ -25,6 +25,10 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-mongo-sync</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-redis</artifactId>
+        </dependency>
 
         <!-- OpenFrame Dependencies -->
         <dependency>

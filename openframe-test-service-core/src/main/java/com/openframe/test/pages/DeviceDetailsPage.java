@@ -51,6 +51,14 @@ public class DeviceDetailsPage {
     // locator call on it fails — regardless of which page or menu is open.
     private static final String MENU = "div[role='menu']";
 
+    /**
+     * How long a MeshCentral-backed session gets to come up: remote desktop canvas, remote shell
+     * prompt, file-manager listing. One number for all three because they share a failure mode — the
+     * session card sits at *Idle* and nothing arrives — and on the qa nightly of 2026-09-18 thirty
+     * seconds was not enough to tell a slow session from one that never starts.
+     */
+    private static final int MESH_SESSION_TIMEOUT_MS = 60_000;
+
     // ── Constructor ──────────────────────────────────────────────────────────
 
     public DeviceDetailsPage(Page page) {
@@ -152,7 +160,7 @@ public class DeviceDetailsPage {
                 new Page.WaitForURLOptions().setTimeout(15_000));
         // The approval gate stands between the route and the canvas on qa and dev; clearing it here
         // keeps waitForCanvasVisible a plain wait.
-        return new RemoteDesktopPage(page).clearApprovalGate().waitForCanvasVisible(15_000);
+        return new RemoteDesktopPage(page).clearApprovalGate().waitForCanvasVisible(MESH_SESSION_TIMEOUT_MS);
     }
 
     /**
@@ -165,7 +173,8 @@ public class DeviceDetailsPage {
         openMoreActionsMenu();
         clickMenuItemByText("Manage Files");
         FileManagerPage fileManagerPage = new FileManagerPage(this.page);
-        page.waitForCondition(fileManagerPage::isLoaded);
+        page.waitForCondition(fileManagerPage::isLoaded,
+                new Page.WaitForConditionOptions().setTimeout(MESH_SESSION_TIMEOUT_MS));
         return fileManagerPage;
     }
 
@@ -186,7 +195,7 @@ public class DeviceDetailsPage {
         openRemoteShellMenu();
         clickMenuItemByText("PowerShell");
         RemoteShellPage remoteShellPage = new RemoteShellPage(this.page);
-        remoteShellPage.waitForOutputContaining("PS ", 30_000);
+        remoteShellPage.waitForOutputContaining("PS ", MESH_SESSION_TIMEOUT_MS);
         return remoteShellPage;
     }
 
