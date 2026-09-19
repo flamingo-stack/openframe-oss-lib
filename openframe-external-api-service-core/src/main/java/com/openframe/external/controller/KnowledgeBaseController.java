@@ -431,7 +431,7 @@ public class KnowledgeBaseController {
     @Operation(summary = "Get an attachment download link",
             description = "Returns a short-lived signed URL to download the file bytes from")
     @ApiResponses({
-            @ApiResponse(responseCode = "400", description = "Attachment not found",
+            @ApiResponse(responseCode = "404", description = "Attachment not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/attachments/{attachmentId}/download-url")
@@ -441,13 +441,14 @@ public class KnowledgeBaseController {
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.debug("Generating KB attachment download URL for {} - userId: {}, apiKeyId: {}", attachmentId, caller.userId(), caller.apiKeyId());
+        knowledgeBaseReadService.requireAttachment(attachmentId);
         return new KnowledgeBaseAttachmentDownloadResponse(knowledgeBaseAttachmentService.generateDownloadUrl(attachmentId));
     }
 
     @Operation(summary = "Delete an attachment", description = "Removes the file from storage and the metadata from the article")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Attachment deleted"),
-            @ApiResponse(responseCode = "400", description = "Attachment not found",
+            @ApiResponse(responseCode = "404", description = "Attachment not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/attachments/{attachmentId}")
@@ -457,6 +458,7 @@ public class KnowledgeBaseController {
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.info("Deleting KB attachment {} - userId: {}, apiKeyId: {}", attachmentId, caller.userId(), caller.apiKeyId());
+        knowledgeBaseReadService.requireAttachment(attachmentId);
         knowledgeBaseAttachmentService.deleteAttachment(attachmentId);
     }
 

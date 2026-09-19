@@ -3,16 +3,17 @@ package com.openframe.external.service;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseAttachmentService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseTagService;
-import com.openframe.core.exception.ErrorCode;
-import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemAttachmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.external.dto.knowledgebase.KnowledgeBaseItemResponse;
+import com.openframe.external.exception.KnowledgeBaseAttachmentNotFoundException;
 import com.openframe.external.exception.KnowledgeBaseItemNotFoundException;
+import com.openframe.external.exception.KnowledgeBaseTagNotFoundException;
 import com.openframe.external.mapper.KnowledgeBaseMapper;
 import com.openframe.external.mapper.KnowledgeBaseMapper.ItemRelations;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class KnowledgeBaseReadService {
     private final KnowledgeBaseTagService knowledgeBaseTagService;
     private final KnowledgeBaseAttachmentService knowledgeBaseAttachmentService;
     private final TagRepository tagRepository;
+    private final KnowledgeBaseItemAttachmentRepository attachmentRepository;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
 
     public KnowledgeBaseItem requireItem(String id) {
@@ -55,7 +57,12 @@ public class KnowledgeBaseReadService {
     public Tag requireTag(String tagId) {
         return tagRepository.findById(tagId)
                 .filter(tag -> tag.getEntityType() == TagEntityType.KNOWLEDGE_ARTICLE)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId));
+                .orElseThrow(() -> new KnowledgeBaseTagNotFoundException(tagId));
+    }
+
+    public KnowledgeBaseItemAttachment requireAttachment(String attachmentId) {
+        return attachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new KnowledgeBaseAttachmentNotFoundException(attachmentId));
     }
 
     /** Single-item variant: includes the article content. */
