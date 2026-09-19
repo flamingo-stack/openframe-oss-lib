@@ -52,14 +52,22 @@ public class FleetMdmAgentRegistrationSecretRetriever implements ToolAgentRegist
                     .orElseThrow(() -> new IllegalStateException("Found no api url for tool with id" + TOOL_ID));
 
             String apiUrl = toolUrl.getUrl() + ":" + toolUrl.getPort();
-            String apiToken = integratedTool.getCredentials().getApiKey().getKey();
 
             // Create Fleet MDM client and get enroll secret
-            FleetMdmClient client = new FleetMdmClient(apiUrl, apiToken, tenantId);
+            FleetMdmClient client;
+            try {
+                String apiToken = integratedTool.getCredentials().getApiKey().getKey();
+                client = new FleetMdmClient(apiUrl, apiToken, tenantId);
+            } catch (Exception e) {
+                log.error("Unexpected error while creating Fleet MDM client");
+                throw new IllegalStateException("Failed to retrieve Fleet MDM enroll secret");
+            }
             String enrollSecret = client.getEnrollSecret();
             
             log.info("Successfully retrieved enroll secret from Fleet MDM");
             return enrollSecret;
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to retrieve Fleet MDM enroll secret", e);
         }
