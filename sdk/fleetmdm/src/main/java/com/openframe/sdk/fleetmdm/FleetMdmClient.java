@@ -505,6 +505,9 @@ public class FleetMdmClient {
             if (Boolean.TRUE.equals(request.getVulnerable())) {
                 params.add("vulnerable=true");
             }
+            if (request.getTeamId() != null) {
+                params.add("team_id=" + request.getTeamId());
+            }
         }
         if (!params.isEmpty()) {
             url.append("?").append(String.join("&", params));
@@ -550,6 +553,9 @@ public class FleetMdmClient {
             }
             if (Boolean.TRUE.equals(request.getExploit())) {
                 params.add("exploit=true");
+            }
+            if (request.getTeamId() != null) {
+                params.add("team_id=" + request.getTeamId());
             }
         }
         if (!params.isEmpty()) {

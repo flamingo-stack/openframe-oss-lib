@@ -22,4 +22,6 @@ public class SoftwareTitleRequest {
     private String orderDirection;
 
     private Boolean vulnerable;
+
+    private Long teamId;
 }

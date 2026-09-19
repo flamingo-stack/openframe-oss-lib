@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
@@ -7,8 +8,12 @@ import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.PageResult;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.api.service.rmm.fleet.FleetClientProvider;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
+import com.openframe.api.service.rmm.fleet.FleetTenantTeamResolver;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.model.Host;
@@ -43,9 +48,17 @@ import static org.springframework.util.StringUtils.hasText;
 public class SoftwareInventoryService {
 
     private static final int DEVICES_PER_VERSION_LIMIT = 500;
+    private static final Map<String, String> FLEET_SORT = Map.of(
+            "name", "name",
+            "devicesCount", "hosts_count");
+    private static final Set<String> CLIENT_SORT = Set.of("cveCount", "highestSeverity", "severity");
+    private static final String SORTABLE_FIELDS = "name, devicesCount, cveCount, highestSeverity";
+    private static final int TITLES_FETCH_PAGE = 500;
+    private static final int TITLES_FETCH_CAP = 5000;
 
     private final FleetClientProvider fleet;
     private final FleetHostMachineResolver hostMachineResolver;
+    private final FleetTenantTeamResolver teamResolver;
     private final TenantIdProvider tenantIdProvider;
 
     public Optional<SoftwareResponse> findById(String softwareId) {
@@ -55,27 +68,104 @@ public class SoftwareInventoryService {
     }
 
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
-                                                     String orderKey, String orderDirection, Boolean vulnerable) {
+                                                     SortInput sort, Boolean vulnerable) {
+        Long teamId = teamResolver.currentTenantTeamId().orElse(null);
+        String field = sort == null ? null : sort.getField();
+        boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
+
+        if (field == null || FLEET_SORT.containsKey(field)) {
+            String orderKey = field == null ? null : FLEET_SORT.get(field);
+            // Fleet rejects order_direction without order_key — send it only when there is a key.
+            String orderDirection = orderKey == null ? null : (desc ? "desc" : "asc");
+            return fleetPage(search, page, perPage, orderKey, orderDirection, vulnerable, teamId);
+        }
+        if (!CLIENT_SORT.contains(field)) {
+            throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
+        }
+        List<SoftwareResponse> all = fetchAllTitles(search, vulnerable, teamId).stream()
+                .sorted(clientComparator(field, desc))
+                .toList();
+        return paginateList(all, page, perPage);
+    }
+
+    private PageResult<SoftwareResponse> fleetPage(String search, int page, Integer perPage, String orderKey,
+                                                   String orderDirection, Boolean vulnerable, Long teamId) {
         SoftwareTitleRequest request = SoftwareTitleRequest.builder()
                 .page(page).perPage(perPage).query(search)
                 .orderKey(orderKey).orderDirection(orderDirection)
                 .vulnerable(vulnerable)
+                // Scope to the tenant's Fleet team so hosts_count reflects tenant devices, not all of Fleet.
+                .teamId(teamId)
                 .build();
         SoftwareTitlesResponse response = fleet.call(
-                client -> client.listSoftwareTitles(request),
-                "list Fleet software titles");
-        List<SoftwareResponse> items = response.getSoftwareTitles() == null
-                ? List.of()
-                : response.getSoftwareTitles().stream()
-                        .map(FleetSoftwareMapper::toResponse)
-                        .filter(Objects::nonNull)
-                        .toList();
+                client -> client.listSoftwareTitles(request), "list Fleet software titles");
+        List<SoftwareResponse> items = mapTitles(response);
         boolean hasNext = response.getMeta() != null
                 && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
         boolean hasPrev = response.getMeta() != null
                 && Boolean.TRUE.equals(response.getMeta().getHasPreviousResults());
         int total = response.getCount() == null ? items.size() : response.getCount();
         return new PageResult<>(items, hasNext, hasPrev, total, page);
+    }
+
+    /** Pages the full team-scoped software titles set from Fleet, bounded by {@link #TITLES_FETCH_CAP}. */
+    private List<SoftwareResponse> fetchAllTitles(String search, Boolean vulnerable, Long teamId) {
+        List<SoftwareResponse> all = new ArrayList<>();
+        int page = 0;
+        while (all.size() < TITLES_FETCH_CAP) {
+            int current = page;
+            SoftwareTitleRequest request = SoftwareTitleRequest.builder()
+                    .page(current).perPage(TITLES_FETCH_PAGE).query(search)
+                    .vulnerable(vulnerable).teamId(teamId)
+                    .build();
+            SoftwareTitlesResponse response = fleet.call(
+                    client -> client.listSoftwareTitles(request), "list Fleet software titles page=" + current);
+            all.addAll(mapTitles(response));
+            boolean hasNext = response.getMeta() != null
+                    && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
+            if (!hasNext || response.getSoftwareTitles() == null || response.getSoftwareTitles().isEmpty()) {
+                break;
+            }
+            page++;
+        }
+        return all;
+    }
+
+    private static List<SoftwareResponse> mapTitles(SoftwareTitlesResponse response) {
+        return response.getSoftwareTitles() == null ? List.of()
+                : response.getSoftwareTitles().stream()
+                        .map(FleetSoftwareMapper::toResponse)
+                        .filter(Objects::nonNull)
+                        .toList();
+    }
+
+    private static Comparator<SoftwareResponse> clientComparator(String field, boolean desc) {
+        Comparator<SoftwareResponse> base = switch (field) {
+            case "cveCount" -> Comparator.comparingInt(SoftwareInventoryService::cveCount);
+            case "highestSeverity", "severity" -> Comparator.comparingInt(SoftwareInventoryService::severityRank);
+            default -> throw new BadRequestException(
+                    "Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
+        };
+        Comparator<SoftwareResponse> directed = desc ? base.reversed() : base;
+        // Stable tiebreaker: name ascending, case-insensitive, regardless of the primary direction.
+        return directed.thenComparing(row -> row.getName() == null ? "" : row.getName(),
+                String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private static int cveCount(SoftwareResponse row) {
+        return row.getVulnerabilitySummary() == null ? 0 : row.getVulnerabilitySummary().getCveCount();
+    }
+
+    private static int severityRank(SoftwareResponse row) {
+        SoftwareCveSeverity s = row.getVulnerabilitySummary() == null
+                ? null : row.getVulnerabilitySummary().getHighestSeverity();
+        return s == null ? 0 : switch (s) {
+            case CRITICAL -> 4;
+            case HIGH -> 3;
+            case MEDIUM -> 2;
+            case LOW -> 1;
+            case NONE -> 0;
+        };
     }
 
     public PageResult<SoftwareVulnerabilityResponse> listVulnerabilitiesForSoftware(
@@ -196,7 +286,7 @@ public class SoftwareInventoryService {
      * Bounded to {@link #FILTERS_SCAN_LIMIT} titles.
      */
     public SoftwareFilters getSoftwareFilters(String search) {
-        List<SoftwareResponse> titles = listSoftware(search, 0, FILTERS_SCAN_LIMIT, null, null, null).items();
+        List<SoftwareResponse> titles = listSoftware(search, 0, FILTERS_SCAN_LIMIT, null, null).items();
         return SoftwareFilters.builder()
                 .sources(facet(titles, SoftwareResponse::getSource))
                 .versionStatuses(facet(titles, SoftwareResponse::getVersionStatus))

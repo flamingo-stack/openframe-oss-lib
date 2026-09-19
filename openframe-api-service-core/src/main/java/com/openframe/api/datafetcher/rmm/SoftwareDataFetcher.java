@@ -18,19 +18,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
-import java.util.Locale;
-import java.util.Map;
 
 @DgsComponent
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class SoftwareDataFetcher {
-
-    private static final Map<String, String> FLEET_ORDER_KEY = Map.of(
-            "name", "name",
-            "devicesCount", "hosts_count",
-            "hosts_count", "hosts_count");
 
     private final SoftwareInventoryService softwareInventoryService;
 
@@ -47,14 +40,11 @@ public class SoftwareDataFetcher {
             @InputArgument String search, @InputArgument SortInput sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
         Integer perPage = first != null ? first : last;
-        String orderKey = sort == null ? null : FLEET_ORDER_KEY.get(sort.getField());
-        String orderDirection = sort == null || sort.getDirection() == null
-                ? null : sort.getDirection().name().toLowerCase(Locale.ROOT);
         Boolean vulnerable = filter != null && filter.getMinSeverity() != null
                 && filter.getMinSeverity() != SoftwareCveSeverity.NONE
                 ? Boolean.TRUE : null;
         return PageCursors.toConnection(softwareInventoryService.listSoftware(
-                search, page, perPage, orderKey, orderDirection, vulnerable));
+                search, page, perPage, sort, vulnerable));
     }
 
     @DgsQuery

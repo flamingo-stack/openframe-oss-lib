@@ -9,7 +9,9 @@ extend type Query {
     software(id: ID!): Software
 
     """Paginated list of software titles installed across the tenant's fleet.
-    One row = one software title (aggregated across devices)."""
+    One row = one software title (aggregated across devices).
+    Sortable fields: name, devicesCount, cveCount, highestSeverity (default: Fleet order by name).
+    An unknown sort field is rejected as a client error (BAD_REQUEST), not a server error."""
     softwares(
         filter: SoftwareFilterInput,
         first: Int,
@@ -65,6 +67,11 @@ extend type Query {
         search: String,
         sort: SortInput
     ): VulnerabilityConnection!
+
+    """Faceted filter options (with live counts) for the vulnerabilities list — the Severity dropdown.
+    Same filter/search scope as vulnerabilities; mirrors softwareFilters so the UI can disable a band
+    with no matching rows."""
+    vulnerabilityFilters(filter: VulnerabilityFilterInput, search: String): VulnerabilityFilters!
 
     """Devices affected by a given CVE — the hosts that have an affected software version, correlated
     to their OpenFrame Machine. Powers the vulnerability-detail "Devices" table. Each node is a Machine
@@ -285,6 +292,10 @@ type VulnerabilityConnection {
     edges: [VulnerabilityEdge!]!
     pageInfo: PageInfo!
     filteredCount: Int!
+}
+
+type VulnerabilityFilters {
+    severities: [SoftwareFilterOption!]!
 }
 
 type VulnerabilityEdge {
