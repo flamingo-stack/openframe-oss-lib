@@ -11,17 +11,21 @@ import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareBundleInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareBundleOnlineDispatch;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleStatus;
+import com.openframe.data.document.rmm.software.SoftwareExecutionId;
 import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.MachinePlatformResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,7 +37,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -41,9 +48,12 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SoftwareBundleService {
 
+    private static final int MAX_PACKAGES = 50;
+
     private final SoftwareBundleRepository bundleRepository;
     private final SoftwareBundleOnlineDispatchRepository onlineDispatchRepository;
     private final SoftwareScheduleService softwareScheduleService;
+    private final MachinePlatformResolver machinePlatformResolver;
     private final TenantIdProvider tenantIdProvider;
 
     @Value("${openframe.rmm.software.bundle.pending-ttl}")
@@ -91,7 +101,14 @@ public class SoftwareBundleService {
     }
 
     public boolean delete(String id, String actor) {
-        SoftwareBundle entity = loadPendingOrThrow(id);
+        Optional<SoftwareBundle> found = bundleRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id);
+        if (found.isEmpty()) {
+            return true;
+        }
+        SoftwareBundle entity = found.get();
+        if (entity.getStatus() == SoftwareBundleStatus.COMPLETED) {
+            return false;
+        }
         bundleRepository.delete(entity);
         log.info("Deleted PENDING software bundle id={} actor={}", id, actor);
         return true;
@@ -154,7 +171,6 @@ public class SoftwareBundleService {
         return toResponse(saved);
     }
 
-    /** Assign devices (idempotent — already-assigned ids are skipped). Fails if COMPLETED. */
     public SoftwareBundleResponse addDevices(String bundleId, List<String> machineIds, String actor) {
         SoftwareBundle entity = loadPendingOrThrow(bundleId);
         LinkedHashSet<String> set = new LinkedHashSet<>(currentMachineIds(entity));
@@ -163,7 +179,6 @@ public class SoftwareBundleService {
         return saveTouched(entity, actor);
     }
 
-    /** Unassign devices (ids not assigned are no-ops). Fails if COMPLETED. */
     public SoftwareBundleResponse removeDevices(String bundleId, List<String> machineIds, String actor) {
         SoftwareBundle entity = loadPendingOrThrow(bundleId);
         LinkedHashSet<String> set = new LinkedHashSet<>(currentMachineIds(entity));
@@ -172,35 +187,22 @@ public class SoftwareBundleService {
         return saveTouched(entity, actor);
     }
 
-    /**
-     * "Add N Devices" — assign every device matching (filter, search). STUB: the datafetcher owns the
-     * GraphQL DeviceFilterInput → device-id resolution; wire it to {@link #addDevices} once implemented.
-     */
-    public SoftwareBundleResponse addAllDevices(String bundleId, String actor) {
-        SoftwareBundle entity = loadPendingOrThrow(bundleId);
-        // TODO(align): resolve machineIds matching (filter, search) and add them (skip already-assigned).
-        log.warn("addAllDevicesToSoftwareBundle is a stub — bundleId={} filter/search not yet resolved", bundleId);
-        return toResponse(entity);
-    }
-
-    public SoftwareBundleResponse removeAllDevices(String bundleId, boolean clearAll, String actor) {
-        SoftwareBundle entity = loadPendingOrThrow(bundleId);
-        if (clearAll) {
-            entity.setMachineIds(List.of());
-            return saveTouched(entity, actor);
-        }
-        // TODO(align): resolve machineIds matching (filter, search) and remove only those.
-        log.warn("removeAllDevicesFromSoftwareBundle with filter/search is a stub — bundleId={}", bundleId);
-        return toResponse(entity);
-    }
-
     public SoftwareBundleResponse submit(SubmitSoftwareBundleInput input, String actor) {
-        SoftwareBundle entity = loadPendingOrThrow(input.getId());
-        if (currentMachineIds(entity).isEmpty()) {
+        SoftwareBundle entity = loadOrThrow(input.getId());
+        if (entity.getStatus() == SoftwareBundleStatus.COMPLETED) {
+            log.info("submitSoftwareBundle id={} already COMPLETED — returning unchanged", input.getId());
+            return toResponse(entity);
+        }
+        List<String> machineIds = currentMachineIds(entity);
+        if (machineIds.isEmpty()) {
             throw new BadRequestException("Cannot submit software bundle " + input.getId() + ": no devices assigned");
         }
+        List<SoftwareBundlePackage> packages = toDomainPackages(input.getPackages());
+        validatePackages(packages);
+        rejectDevicesWithoutCompatiblePackage(machineIds, packages);
+
         entity.setAction(input.getAction());
-        entity.setPackages(toDomainPackages(input.getPackages()));
+        entity.setPackages(packages);
 
         Instant now = Instant.now();
         if (input.getSchedule() != null) {
@@ -210,6 +212,7 @@ public class SoftwareBundleService {
         } else {
             entity.setMode(SoftwareBundleMode.NOW);
             armOnlineDispatch(entity, now);
+            entity.setExecutionIds(executionIds(entity)); // one deterministic executionId per package
         }
 
         entity.setStatus(SoftwareBundleStatus.COMPLETED);
@@ -217,9 +220,54 @@ public class SoftwareBundleService {
         entity.setUpdatedAt(now);
         entity.setExpireAt(null); // completed bundles are history — never reaped
         bundleRepository.save(entity);
-        log.info("Submitted software bundle id={} mode={} action={} devices={} actor={}",
-                entity.getId(), entity.getMode(), entity.getAction(), currentMachineIds(entity).size(), actor);
+        log.info("Submitted software bundle id={} mode={} action={} devices={} packages={} actor={}",
+                entity.getId(), entity.getMode(), entity.getAction(), machineIds.size(), packages.size(), actor);
         return toResponse(entity);
+    }
+
+    private static void validatePackages(List<SoftwareBundlePackage> packages) {
+        if (packages.isEmpty()) {
+            throw new BadRequestException("Cannot submit software bundle: at least one package is required");
+        }
+        if (packages.size() > MAX_PACKAGES) {
+            throw new BadRequestException("Cannot submit software bundle: at most " + MAX_PACKAGES
+                    + " packages (got " + packages.size() + ")");
+        }
+        List<String> brewMissingType = packages.stream()
+                .filter(p -> p.getPackageManager() == PackageManagerType.BREW && p.getBrewPackageType() == null)
+                .map(SoftwareBundlePackage::getPackageName)
+                .toList();
+        if (!brewMissingType.isEmpty()) {
+            throw new BadRequestException("brewPackageType (CASK or FORMULA) is required for brew packages: "
+                    + brewMissingType);
+        }
+    }
+
+    private void rejectDevicesWithoutCompatiblePackage(List<String> machineIds, List<SoftwareBundlePackage> packages) {
+        Set<OsType> packageOsTypes = packages.stream()
+                .map(p -> osTypeOf(p.getPackageManager()))
+                .collect(Collectors.toSet());
+        Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
+        List<String> incompatible = machineIds.stream()
+                .filter(machineId -> {
+                    OsType os = deviceOsTypes.get(machineId);
+                    return os != null && !packageOsTypes.contains(os); // unknown OS is left to dispatch-time routing
+                })
+                .toList();
+        if (!incompatible.isEmpty()) {
+            throw new BadRequestException("These devices have no package compatible with their OS: " + incompatible
+                    + ". Add a matching package or remove the devices.");
+        }
+    }
+
+    private static List<String> executionIds(SoftwareBundle bundle) {
+        return bundle.getPackages().stream()
+                .map(p -> SoftwareExecutionId.forBundle(bundle.getId(), p.getPackageManager(), p.getPackageName()))
+                .toList();
+    }
+
+    private static OsType osTypeOf(PackageManagerType packageManager) {
+        return packageManager == PackageManagerType.BREW ? OsType.MAC_OS : OsType.WINDOWS;
     }
 
     private void submitScheduled(SoftwareBundle bundle, SoftwareBundleScheduleInput sched, String actor) {

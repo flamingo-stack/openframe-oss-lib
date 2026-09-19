@@ -31,7 +31,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.HashSet;
@@ -77,16 +76,16 @@ public class SoftwareBundleDataFetcher {
     public SoftwareBundleResponse addAllDevicesToSoftwareBundle(@InputArgument String bundleId,
                                                                 @InputArgument @Valid DeviceFilterInput filter,
                                                                 @InputArgument String search) {
-        // TODO(align): resolve (filter, search) → device ids here (deviceMapper + DeviceService) and pass them down.
-        return softwareBundleService.addAllDevices(bundleId, getCurrentUserId());
+        List<String> machineIds = deviceService.findAllDeviceIds(deviceMapper.toDeviceFilterCriteria(filter), search);
+        return softwareBundleService.addDevices(bundleId, machineIds, getCurrentUserId());
     }
 
     @DgsMutation
     public SoftwareBundleResponse removeAllDevicesFromSoftwareBundle(@InputArgument String bundleId,
                                                                      @InputArgument @Valid DeviceFilterInput filter,
                                                                      @InputArgument String search) {
-        boolean clearAll = filter == null && !StringUtils.hasText(search);
-        return softwareBundleService.removeAllDevices(bundleId, clearAll, getCurrentUserId());
+        List<String> machineIds = deviceService.findAllDeviceIds(deviceMapper.toDeviceFilterCriteria(filter), search);
+        return softwareBundleService.removeDevices(bundleId, machineIds, getCurrentUserId());
     }
 
     @DgsMutation

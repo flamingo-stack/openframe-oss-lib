@@ -196,6 +196,11 @@ public class DeviceService {
                 scheduleDeviceFilter(filterOptions, null, machineIds), search);
     }
 
+    public List<String> findAllDeviceIds(DeviceFilterCriteria filterOptions, String search) {
+        return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
+                scheduleDeviceFilter(filterOptions, null, null), search);
+    }
+
     private CountedGenericQueryResult<Machine> paginate(MachineQueryFilter filter, String search,
                                                         CursorPaginationCriteria paginationCriteria,
                                                         SortInput sort) {
