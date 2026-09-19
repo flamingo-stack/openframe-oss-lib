@@ -17,6 +17,7 @@ import com.openframe.api.dto.ticket.UpdateTicketInput;
 import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
 import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
+import com.openframe.external.exception.TicketNoteNotFoundException;
 import com.openframe.api.service.ticket.TicketFilterService;
 import com.openframe.api.service.ticket.TicketLifecycleService;
 import com.openframe.api.service.ticket.TicketNoteService;
@@ -41,10 +42,13 @@ import com.openframe.security.authentication.AuthPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -65,6 +69,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -74,6 +79,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -386,7 +392,7 @@ class TicketControllerTest {
     void ticketIsReadAndAssembledByTheReadService() throws Exception {
         AuthPrincipal principal = resolvedPrincipal();
         Ticket ticket = ticket();
-        when(ticketService.getTicket(same(principal), eq(TICKET_ID))).thenReturn(Optional.of(ticket));
+        when(ticketReadService.requireTicket(same(principal), eq(TICKET_ID))).thenReturn(ticket);
         when(ticketReadService.toResponse(same(principal), same(ticket))).thenReturn(ticketResponse());
 
         mockMvc.perform(get(BASE + "/" + TICKET_ID))
@@ -404,14 +410,14 @@ class TicketControllerTest {
     @Test
     void unknownTicketIs404WithTicketErrorCode() throws Exception {
         AuthPrincipal principal = resolvedPrincipal();
-        when(ticketService.getTicket(same(principal), eq("missing"))).thenReturn(Optional.empty());
+        when(ticketReadService.requireTicket(same(principal), eq("missing"))).thenThrow(new TicketNotFoundException("missing"));
 
         mockMvc.perform(get(BASE + "/missing"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("TICKET_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Ticket not found: missing"));
 
-        verifyNoInteractions(ticketReadService);
+        verify(ticketReadService, never()).toResponse(any(), any());
     }
 
     @Test
@@ -766,32 +772,45 @@ class TicketControllerTest {
     void addTagAssignsItAndThenReturnsTheReloadedTicket() throws Exception {
         AuthPrincipal principal = resolvedPrincipal();
         Ticket ticket = ticket();
-        when(ticketService.getTicket(same(principal), eq(TICKET_ID))).thenReturn(Optional.of(ticket));
+        when(ticketReadService.requireTicket(same(principal), eq(TICKET_ID))).thenReturn(ticket);
         when(ticketReadService.toResponse(same(principal), same(ticket))).thenReturn(ticketResponse());
 
         mockMvc.perform(post(BASE + "/" + TICKET_ID + "/tags/tag-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(TICKET_ID));
 
-        InOrder order = inOrder(ticketTagService, ticketService);
+        InOrder order = inOrder(ticketTagService, ticketReadService);
         order.verify(ticketTagService).addTagToTicket(same(principal), eq(TICKET_ID), eq("tag-1"));
-        order.verify(ticketService).getTicket(same(principal), eq(TICKET_ID));
+        order.verify(ticketReadService).toResponse(same(principal), same(ticket));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"POST", "DELETE"})
+    void tagChangeOnUnknownTicketIs404AndNothingIsChanged(String method) throws Exception {
+        AuthPrincipal principal = resolvedPrincipal();
+        when(ticketReadService.requireTicket(same(principal), eq("missing"))).thenThrow(new TicketNotFoundException("missing"));
+
+        mockMvc.perform(request(HttpMethod.valueOf(method), BASE + "/missing/tags/tag-1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TICKET_NOT_FOUND"));
+
+        verifyNoInteractions(ticketTagService);
     }
 
     @Test
     void removeTagUnassignsItAndThenReturnsTheReloadedTicket() throws Exception {
         AuthPrincipal principal = resolvedPrincipal();
         Ticket ticket = ticket();
-        when(ticketService.getTicket(same(principal), eq(TICKET_ID))).thenReturn(Optional.of(ticket));
+        when(ticketReadService.requireTicket(same(principal), eq(TICKET_ID))).thenReturn(ticket);
         when(ticketReadService.toResponse(same(principal), same(ticket))).thenReturn(ticketResponse());
 
         mockMvc.perform(delete(BASE + "/" + TICKET_ID + "/tags/tag-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(TICKET_ID));
 
-        InOrder order = inOrder(ticketTagService, ticketService);
+        InOrder order = inOrder(ticketTagService, ticketReadService);
         order.verify(ticketTagService).removeTagFromTicket(same(principal), eq(TICKET_ID), eq("tag-1"));
-        order.verify(ticketService).getTicket(same(principal), eq(TICKET_ID));
+        order.verify(ticketReadService).toResponse(same(principal), same(ticket));
     }
 
     @Test
@@ -839,6 +858,46 @@ class TicketControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("n-1"))
                 .andExpect(jsonPath("$.content").value("Edited"));
+    }
+
+    @Test
+    void addNoteToUnknownTicketIs404AndNothingIsCreated() throws Exception {
+        AuthPrincipal principal = resolvedPrincipal();
+        when(ticketReadService.requireTicket(same(principal), eq("missing"))).thenThrow(new TicketNotFoundException("missing"));
+
+        mockMvc.perform(jsonRequest(post(BASE + "/missing/notes"), body("content", "Hello")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TICKET_NOT_FOUND"));
+
+        verifyNoInteractions(ticketNoteService);
+    }
+
+    @Test
+    void noteIsLookedUpUnderTheTicketFromThePathBeforeItIsChanged() throws Exception {
+        AuthPrincipal principal = resolvedPrincipal();
+        when(ticketNoteService.updateNote(same(principal), eq("n-1"), eq("Edited"))).thenReturn(note("Edited"));
+
+        mockMvc.perform(jsonRequest(put(BASE + "/" + TICKET_ID + "/notes/n-1"), body("content", "Edited")))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete(BASE + "/" + TICKET_ID + "/notes/n-1"))
+                .andExpect(status().isNoContent());
+
+        verify(ticketReadService, times(2)).requireNote(TICKET_ID, "n-1");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PUT", "DELETE"})
+    void noteOfAnotherTicketIs404AndNothingIsChanged(String method) throws Exception {
+        resolvedPrincipal();
+        when(ticketReadService.requireNote(TICKET_ID, "n-1")).thenThrow(new TicketNoteNotFoundException("n-1"));
+
+        mockMvc.perform(jsonRequest(request(HttpMethod.valueOf(method), BASE + "/" + TICKET_ID + "/notes/n-1"),
+                        body("content", "Edited")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TICKET_NOTE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Ticket note not found: n-1"));
+
+        verifyNoInteractions(ticketNoteService);
     }
 
     @Test

@@ -83,6 +83,16 @@ class LogMapperTest {
     }
 
     @Test
+    void queryResultWithoutItemsMapsToEmptyLogs() {
+        assertTrue(mapper.toLogsResponse(new GenericQueryResult<>()).getLogs().isEmpty());
+    }
+
+    @Test
+    void filtersWithoutOrganizationsMapToEmptyCustomers() {
+        assertTrue(mapper.toLogFilterResponse(new LogFilters()).getCustomers().isEmpty());
+    }
+
+    @Test
     void nullQueryResultMapsToEmptyLogsWithoutPageInfo() {
         LogsResponse response = mapper.toLogsResponse(null);
 

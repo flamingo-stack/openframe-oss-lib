@@ -396,8 +396,14 @@ class TicketMapperTest {
     }
 
     @Test
-    void nullFiltersStillProduceAResponse() {
-        assertNotNull(mapper.toFiltersResponse(null));
+    void nullFiltersMapToEmptyLists() {
+        TicketFiltersResponse response = mapper.toFiltersResponse(null);
+
+        assertEquals(mapper.toFiltersResponse(new TicketFilters()), response);
+        assertTrue(response.getStatuses().isEmpty());
+        assertTrue(response.getCustomerIds().isEmpty());
+        assertTrue(response.getAssigneeIds().isEmpty());
+        assertTrue(response.getTagIds().isEmpty());
     }
 
     @Test

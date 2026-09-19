@@ -12,6 +12,7 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springdoc.core.customizers.GlobalOpenApiCustomizer;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.util.AntPathMatcher;
@@ -23,6 +24,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -234,6 +236,11 @@ class OpenApiConfigTest {
         AntPathMatcher matcher = new AntPathMatcher();
         return group.getPathsToMatch().stream().anyMatch(pattern -> matcher.match(pattern, path))
                 && group.getPathsToExclude().stream().noneMatch(pattern -> matcher.match(pattern, path));
+    }
+
+    @Test
+    void commonResponsesCustomizerIsGlobalSoGroupedDocsGetItToo() {
+        assertInstanceOf(GlobalOpenApiCustomizer.class, config.commonResponsesCustomizer());
     }
 
     private void customise(Paths paths) {

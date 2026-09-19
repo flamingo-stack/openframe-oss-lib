@@ -102,7 +102,7 @@ class DeviceMapperTest {
     @Test
     void tagResponseCarriesTheTagDefinitionAndValues() {
         Tag tag = Tag.builder().id("tag-1").key("site").description("Physical location").color("#FF5733")
-                .values(List.of("hq", "branch")).createdAt(TAG_CREATED_AT).build();
+                .values(List.of("hq", "branch")).createdAt(TAG_CREATED_AT).createdBy("user-7").build();
 
         DeviceTagResponse response = mapper.toDeviceTagResponse(tag);
 
@@ -112,6 +112,7 @@ class DeviceMapperTest {
         assertEquals("#FF5733", response.getColor());
         assertEquals(List.of("hq", "branch"), response.getValues());
         assertEquals(TAG_CREATED_AT, response.getCreatedAt());
+        assertEquals("user-7", response.getCreatedBy());
     }
 
     @Test

@@ -312,7 +312,7 @@ class KnowledgeBaseControllerTest {
                 .publishedAt(Instant.parse("2026-01-12T10:45:00.123456789Z"))
                 .createdBy("user-a")
                 .lastModifiedBy("user-b")
-                .createdAt(Instant.parse("2026-01-10T08:00:00Z"))
+                .createdAt(Instant.parse("2026-01-10T08:00:00.000Z"))
                 .updatedAt(Instant.parse("2026-01-11T09:30:00.5Z"))
                 .tags(List.of(KnowledgeBaseTagResponse.builder().id("tag-1").key("vpn").color("#00ff00").build()))
                 .attachments(List.of(KnowledgeBaseAttachmentResponse.builder()
@@ -333,7 +333,7 @@ class KnowledgeBaseControllerTest {
                 .andExpect(jsonPath("$.publishedAt").value("2026-01-12T10:45:00.123Z"))
                 .andExpect(jsonPath("$.createdBy").value("user-a"))
                 .andExpect(jsonPath("$.lastModifiedBy").value("user-b"))
-                .andExpect(jsonPath("$.createdAt").value("2026-01-10T08:00:00Z"))
+                .andExpect(jsonPath("$.createdAt").value("2026-01-10T08:00:00.000Z"))
                 .andExpect(jsonPath("$.updatedAt").value("2026-01-11T09:30:00.500Z"))
                 .andExpect(jsonPath("$.tags[0].id").value("tag-1"))
                 .andExpect(jsonPath("$.tags[0].key").value("vpn"))
@@ -1134,7 +1134,7 @@ class KnowledgeBaseControllerTest {
                 .andExpect(jsonPath("$[0].key").value("network"))
                 .andExpect(jsonPath("$[0].description").value("About network"))
                 .andExpect(jsonPath("$[0].color").value("#ff0000"))
-                .andExpect(jsonPath("$[0].createdAt").value("2026-01-10T08:00:00Z"))
+                .andExpect(jsonPath("$[0].createdAt").value("2026-01-10T08:00:00.000Z"))
                 .andExpect(jsonPath("$[0].createdBy").value("user-a"))
                 .andExpect(jsonPath("$[0].entityType").doesNotExist())
                 .andExpect(jsonPath("$[0].tenantId").doesNotExist())
@@ -1219,7 +1219,7 @@ class KnowledgeBaseControllerTest {
                 .andExpect(jsonPath("$.attachment.contentType").value("application/pdf"))
                 .andExpect(jsonPath("$.attachment.fileSize").value(2048))
                 .andExpect(jsonPath("$.attachment.uploadedBy").value(OWNER_ID))
-                .andExpect(jsonPath("$.attachment.createdAt").value("2026-01-10T08:00:00Z"))
+                .andExpect(jsonPath("$.attachment.createdAt").value("2026-01-10T08:00:00.000Z"))
                 .andExpect(jsonPath("$.attachment.storagePath").doesNotExist());
 
         verify(knowledgeBaseReadService).requireItem("art-1", KnowledgeBaseItemType.ARTICLE);
@@ -1398,7 +1398,7 @@ class KnowledgeBaseControllerTest {
                 .description("About " + key)
                 .color("#ff0000")
                 .entityType(TagEntityType.KNOWLEDGE_ARTICLE)
-                .createdAt(Instant.parse("2026-01-10T08:00:00Z"))
+                .createdAt(Instant.parse("2026-01-10T08:00:00.000Z"))
                 .createdBy("user-a")
                 .build();
     }
@@ -1413,7 +1413,7 @@ class KnowledgeBaseControllerTest {
                 .fileSize(2048L)
                 .contentType("application/pdf")
                 .uploadedBy(OWNER_ID)
-                .createdAt(Instant.parse("2026-01-10T08:00:00Z"))
+                .createdAt(Instant.parse("2026-01-10T08:00:00.000Z"))
                 .build();
     }
 }

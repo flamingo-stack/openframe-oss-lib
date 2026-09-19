@@ -100,7 +100,7 @@ class IntegrationControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
+    @ValueSource(strings = {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
     void everySupportedMethodReachesTheProxy(String method) throws Exception {
         when(restProxyService.proxyApiRequest(eq(TOOL_ID), any(), isNull()))
                 .thenReturn(ResponseEntity.noContent().build());

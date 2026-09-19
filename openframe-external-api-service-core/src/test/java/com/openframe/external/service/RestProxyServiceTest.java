@@ -286,7 +286,7 @@ class RestProxyServiceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
+    @ValueSource(strings = {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
     void everySupportedMethodIsForwardedAsIs(String method) throws IOException {
         startUpstream(200, "ok");
         RestProxyService forwarding = forwardingService(enabledTool(null));

@@ -191,6 +191,7 @@ public class RestProxyService {
             Method httpMethod = Method.valueOf(method.toUpperCase(Locale.ROOT));
             return switch (httpMethod) {
                 case GET -> new HttpGet(uri);
+                case HEAD -> new HttpHead(uri);
                 case POST -> new HttpPost(uri);
                 case PUT -> new HttpPut(uri);
                 case PATCH -> new HttpPatch(uri);

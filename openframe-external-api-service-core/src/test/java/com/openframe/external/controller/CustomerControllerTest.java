@@ -50,6 +50,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -389,6 +390,7 @@ class CustomerControllerTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void canArchiveReturnsTheDomainAnswerAsBareBoolean(boolean canArchive) throws Exception {
+        when(organizationService.getOrganizationByOrganizationId(CUSTOMER_ID)).thenReturn(Optional.of(organization()));
         when(organizationService.canArchiveOrganization(CUSTOMER_ID)).thenReturn(canArchive);
 
         mockMvc.perform(get(BASE + "/" + CUSTOMER_ID + "/can-archive"))
@@ -399,6 +401,8 @@ class CustomerControllerTest {
     @ParameterizedTest
     @ValueSource(strings = {"ARCHIVED", "ACTIVE"})
     void updateStatusIs204AndMapsTheActionOntoTheDomainAction(String action) throws Exception {
+        when(organizationService.getOrganizationByOrganizationId(CUSTOMER_ID)).thenReturn(Optional.of(organization()));
+
         mockMvc.perform(json(patch(BASE + "/" + CUSTOMER_ID + "/status"), Map.of("status", action)))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
@@ -408,7 +412,30 @@ class CustomerControllerTest {
     }
 
     @Test
+    void canArchiveOfUnknownCustomerIs404WithCustomerNotFoundCode() throws Exception {
+        when(organizationService.getOrganizationByOrganizationId("missing")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get(BASE + "/missing/can-archive"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CUSTOMER_NOT_FOUND"));
+
+        verify(organizationService, never()).canArchiveOrganization(any());
+    }
+
+    @Test
+    void updateStatusOfUnknownCustomerIs404AndNothingIsUpdated() throws Exception {
+        when(organizationService.getOrganizationByOrganizationId("missing")).thenReturn(Optional.empty());
+
+        mockMvc.perform(json(patch(BASE + "/missing/status"), Map.of("status", "ARCHIVED")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CUSTOMER_NOT_FOUND"));
+
+        verifyNoInteractions(organizationCommandService);
+    }
+
+    @Test
     void archivingCustomerWithActiveDevicesIs409() throws Exception {
+        when(organizationService.getOrganizationByOrganizationId(CUSTOMER_ID)).thenReturn(Optional.of(organization()));
         doThrow(new OrganizationHasMachinesException(CUSTOMER_ID))
                 .when(organizationCommandService).updateOrganizationStatus(eq(CUSTOMER_ID), any());
 
@@ -419,6 +446,7 @@ class CustomerControllerTest {
 
     @Test
     void statusChangeRefusedByTheDomainIs400() throws Exception {
+        when(organizationService.getOrganizationByOrganizationId(CUSTOMER_ID)).thenReturn(Optional.of(organization()));
         doThrow(new IllegalArgumentException("Only archived organizations can be set to ACTIVE"))
                 .when(organizationCommandService).updateOrganizationStatus(eq(CUSTOMER_ID), any());
 

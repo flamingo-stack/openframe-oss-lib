@@ -171,6 +171,11 @@ class ToolMapperTest {
     }
 
     @Test
+    void toolListWithoutToolsMapsToEmptyTools() {
+        assertTrue(mapper.toToolsResponse(new ToolList()).getTools().isEmpty());
+    }
+
+    @Test
     void nullToolListMapsToEmptyTools() {
         ToolsResponse response = mapper.toToolsResponse(null);
 

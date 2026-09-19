@@ -336,6 +336,17 @@ class DeviceControllerTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"status\":null}"})
+    void updateStatusWithoutStatusIs400AndNothingIsUpdated(String body) throws Exception {
+        mockMvc.perform(patch(BASE + "/m-1").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("status"));
+
+        verifyNoInteractions(deviceService);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"{\"status\":\"BOGUS\"}", "{\"status\":\"archived\"}", "{not json"})
     void updateStatusWithUnreadableBodyIs400AndNothingIsUpdated(String body) throws Exception {
         mockMvc.perform(patch(BASE + "/m-1").contentType(MediaType.APPLICATION_JSON).content(body))

@@ -1,5 +1,11 @@
 package com.openframe.external.service;
 
+import java.util.Optional;
+import com.openframe.external.exception.TicketNoteNotFoundException;
+import com.openframe.data.repository.ticket.TicketNoteRepository;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.api.service.ticket.TicketService;
+import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.service.ticket.TicketLifecycleService;
 import com.openframe.api.service.ticket.TicketNoteService;
 import com.openframe.api.service.ticket.TicketStatusService;
@@ -26,6 +32,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.verify;
@@ -38,11 +46,15 @@ class TicketReadServiceTest {
     private static final AuthPrincipal PRINCIPAL = AuthPrincipal.builder().id("user-1").build();
 
     @Mock
+    private TicketService ticketService;
+    @Mock
     private TicketTagService ticketTagService;
     @Mock
     private TicketNoteService ticketNoteService;
     @Mock
     private TicketAttachmentRepository ticketAttachmentRepository;
+    @Mock
+    private TicketNoteRepository ticketNoteRepository;
     @Mock
     private TicketStatusService ticketStatusService;
     @Mock
@@ -52,8 +64,50 @@ class TicketReadServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TicketReadService(ticketTagService, ticketNoteService, ticketAttachmentRepository,
-                ticketStatusService, ticketLifecycleService, new TicketMapper());
+        service = new TicketReadService(ticketService, ticketTagService, ticketNoteService, ticketAttachmentRepository,
+                ticketNoteRepository, ticketStatusService, ticketLifecycleService, new TicketMapper());
+    }
+
+    @Test
+    void requireTicketReturnsTheTicketVisibleToThePrincipal() {
+        Ticket ticket = ticket("t-1", "st-open", TicketStatusKind.CUSTOM);
+        when(ticketService.getTicket(PRINCIPAL, "t-1")).thenReturn(Optional.of(ticket));
+
+        assertSame(ticket, service.requireTicket(PRINCIPAL, "t-1"));
+    }
+
+    @Test
+    void requireTicketTurnsAnUnknownIdIntoTicketNotFound() {
+        when(ticketService.getTicket(PRINCIPAL, "missing")).thenReturn(Optional.empty());
+
+        TicketNotFoundException ex = assertThrows(TicketNotFoundException.class,
+                () -> service.requireTicket(PRINCIPAL, "missing"));
+        assertEquals(ErrorCode.TICKET_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    void requireNoteReturnsANoteOfThatTicket() {
+        TicketNote note = TicketNote.builder().id("n-1").ticketId("t-1").build();
+        when(ticketNoteRepository.findById("n-1")).thenReturn(Optional.of(note));
+
+        assertSame(note, service.requireNote("t-1", "n-1"));
+    }
+
+    @Test
+    void requireNoteTreatsANoteOfAnotherTicketAsNotFound() {
+        TicketNote note = TicketNote.builder().id("n-1").ticketId("t-2").build();
+        when(ticketNoteRepository.findById("n-1")).thenReturn(Optional.of(note));
+
+        TicketNoteNotFoundException ex = assertThrows(TicketNoteNotFoundException.class,
+                () -> service.requireNote("t-1", "n-1"));
+        assertEquals(ErrorCode.TICKET_NOTE_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    void requireNoteTurnsAnUnknownIdIntoNoteNotFound() {
+        when(ticketNoteRepository.findById("missing")).thenReturn(Optional.empty());
+
+        assertThrows(TicketNoteNotFoundException.class, () -> service.requireNote("t-1", "missing"));
     }
 
     @Test

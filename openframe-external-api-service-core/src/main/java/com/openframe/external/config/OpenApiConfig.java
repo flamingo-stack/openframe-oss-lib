@@ -8,7 +8,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.responses.ApiResponse;
-import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springdoc.core.customizers.GlobalOpenApiCustomizer;
 import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -106,10 +106,11 @@ public class OpenApiConfig {
 
     /**
      * Responses every endpoint shares (gateway auth, rate limiting, server errors) are declared
-     * once here instead of being copy-pasted onto each operation.
+     * once here instead of being copy-pasted onto each operation. Global, because a plain
+     * OpenApiCustomizer bean is not applied to GroupedOpenApi docs (the ones Swagger UI serves).
      */
     @Bean
-    public OpenApiCustomizer commonResponsesCustomizer() {
+    public GlobalOpenApiCustomizer commonResponsesCustomizer() {
         return openApi -> openApi.getPaths().values().forEach(path -> path.readOperations().forEach(operation -> {
             var responses = operation.getResponses();
             responses.computeIfAbsent("400", code -> new ApiResponse().description("Invalid request parameters, body or cursor"));
