@@ -6,13 +6,10 @@ import com.openframe.api.dto.rmm.script.BatchRunScriptInput;
 import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
-import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.core.exception.BadRequestException;
-import com.openframe.data.document.device.DeviceStatus;
-import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -70,7 +67,7 @@ public class ScriptDispatchService {
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
-        verifyMachine(input.getMachineId());
+        deviceService.verifyDispatchable(input.getMachineId());
 
         // Tenant-scoped lookup; throws if the script is missing or soft-deleted.
         ScriptResponse script = scriptService.get(input.getScriptId());
@@ -109,7 +106,7 @@ public class ScriptDispatchService {
 
         // Verify every target up front — reject the whole batch if any is unknown,
         // so we never half-dispatch.
-        verifyMachines(machineIds);
+        deviceService.verifyDispatchable(machineIds);
 
         // Resolve the saved script once; every machine shares it.
         ScriptResponse script = scriptService.get(input.getScriptId());
@@ -151,7 +148,7 @@ public class ScriptDispatchService {
 
         // Verify every target up front — reject the whole run if any is unknown,
         // so we never half-dispatch across the schedule's scripts.
-        verifyMachines(machineIds);
+        deviceService.verifyDispatchable(machineIds);
 
         // Resolve every referenced script in ONE query (no N+1). Only ACTIVE scripts are
         // dispatched; a schedule can outlive some of its scripts (deleted/archived), and
@@ -272,19 +269,6 @@ public class ScriptDispatchService {
         return DispatchResponse.builder()
                 .executionId(executionId)
                 .build();
-    }
-
-    private void verifyMachines(List<String> machineIds) {
-        machineIds.forEach(this::verifyMachine);
-    }
-
-    private void verifyMachine(String machineId) {
-        Machine machine = deviceService.findByMachineId(machineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
-        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(machine.getStatus())) {
-            throw new BadRequestException(
-                    "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
-        }
     }
 
     private static Integer effectiveTimeout(Integer override, Integer scriptDefault) {

@@ -41,14 +41,16 @@ use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
 use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::execution_listener::ExecutionListener;
-use crate::listener::machine_timezone_request_listener::MachineTimezoneRequestListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
 use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
 use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
 use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
-use crate::models::{CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage};
+use crate::models::{
+    BootstrapScriptMessage, CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage,
+    SoftwareScriptMessage,
+};
 use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
@@ -63,11 +65,17 @@ use crate::services::installed_agent_message_publisher::InstalledAgentMessagePub
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::machine_heartbeat_publisher::MachineHeartbeatPublisher;
 use crate::services::machine_heartbeat_run_manager::MachineHeartbeatRunManager;
+use crate::services::machine_timezone_publisher::MachineTimezonePublisher;
+use crate::services::machine_timezone_run_manager::MachineTimezoneRunManager;
 use crate::services::mesh_self_heal_service::MeshSelfHealService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::package_manager::presence_report::{
+    PackageManagerPresenceReporter, PackageManagerPresenceRunManager,
+};
+use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::ResultStore;
@@ -165,14 +173,18 @@ pub struct Client {
     client_uninstall_message_listener: ClientUninstallMessageListener,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
+    script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
+    software_execution_listener: ExecutionListener<SoftwareScriptMessage>,
     script_schedule_execution_listener: ExecutionListener<ScriptScheduleExecutionMessage>,
     tool_run_manager: ToolRunManager,
     token_refresh_run_manager: TokenRefreshRunManager,
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
+    package_manager_presence_run_manager: PackageManagerPresenceRunManager,
+    package_manager_update_run_manager: PackageManagerUpdateRunManager,
     hostname_report_publisher: HostnameReportPublisher,
-    machine_timezone_request_listener: MachineTimezoneRequestListener,
+    machine_timezone_run_manager: MachineTimezoneRunManager,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
@@ -552,6 +564,22 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let script_bootstrap_execution_listener = ExecutionListener::<BootstrapScriptMessage>::new(
+            nats_connection_manager.clone(),
+            nats_message_publisher.clone(),
+            execution_service.clone(),
+            config_service.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
+        let software_execution_listener = ExecutionListener::<SoftwareScriptMessage>::new(
+            nats_connection_manager.clone(),
+            nats_message_publisher.clone(),
+            execution_service.clone(),
+            config_service.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
         let script_schedule_execution_listener =
             ExecutionListener::<ScriptScheduleExecutionMessage>::new(
                 nats_connection_manager.clone(),
@@ -568,17 +596,23 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
+        let package_manager_presence_run_manager =
+            PackageManagerPresenceRunManager::new(PackageManagerPresenceReporter::new(
+                nats_message_publisher.clone(),
+                config_service.clone(),
+            ));
+        let package_manager_update_run_manager = PackageManagerUpdateRunManager::new();
+
         let hostname_report_publisher = HostnameReportPublisher::new(
             nats_message_publisher.clone(),
             config_service.clone(),
             device_data_fetcher.clone(),
         );
 
-        let machine_timezone_request_listener = MachineTimezoneRequestListener::new(
-            nats_connection_manager.clone(),
-            nats_message_publisher.clone(),
-            config_service.clone(),
+        let machine_timezone_run_manager = MachineTimezoneRunManager::new(
+            MachineTimezonePublisher::new(nats_message_publisher.clone(), config_service.clone()),
             device_data_fetcher.clone(),
+            nats_connection_manager.clone(),
         );
 
         Ok(Self {
@@ -595,14 +629,18 @@ impl Client {
             client_uninstall_message_listener,
             command_execution_listener,
             script_execution_listener,
+            script_bootstrap_execution_listener,
+            software_execution_listener,
             script_schedule_execution_listener,
             tool_run_manager,
             token_refresh_run_manager,
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
+            package_manager_presence_run_manager,
+            package_manager_update_run_manager,
             hostname_report_publisher,
-            machine_timezone_request_listener,
+            machine_timezone_run_manager,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             update_handler_service,
@@ -675,12 +713,14 @@ impl Client {
 
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();
+        self.machine_timezone_run_manager.start();
+
+        self.package_manager_update_run_manager.start();
+
+        self.package_manager_presence_run_manager.start();
 
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
-
-        self.machine_timezone_request_listener.start().await?;
-        self.machine_timezone_request_listener.report_once().await;
 
         //Start tool installation message listener in background
         self.tool_installation_message_listener.start().await?;
@@ -712,6 +752,12 @@ impl Client {
         info!("Starting script execution listener...");
         self.script_execution_listener.start().await?;
         info!("Script execution listener started");
+        info!("Starting script bootstrap execution listener...");
+        self.script_bootstrap_execution_listener.start().await?;
+        info!("Script bootstrap execution listener started");
+        info!("Starting software execution listener...");
+        self.software_execution_listener.start().await?;
+        info!("Software execution listener started");
         info!("Starting script schedule execution listener...");
         self.script_schedule_execution_listener.start().await?;
         info!("Script schedule execution listener started");

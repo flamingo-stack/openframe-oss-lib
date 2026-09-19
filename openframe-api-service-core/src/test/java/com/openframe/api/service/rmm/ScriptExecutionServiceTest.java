@@ -6,6 +6,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 
 import java.util.Optional;
@@ -24,8 +25,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -60,9 +58,20 @@ class ScriptExecutionServiceTest {
     void setUp() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         service = new ScriptExecutionService(scriptExecutionRepository, tenantIdProvider, new ScriptExecutionMapper());
-        // create()/createBatch() now map the SAVED entity to a DTO, so save must echo its
-        // argument back — otherwise the mock's null return NPEs in the mapper.
-        lenient().when(scriptExecutionRepository.save(any(ScriptExecution.class))).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(scriptExecutionRepository.saveRunning(any(RunningExecutionRows.class)))
+                .thenAnswer(inv -> rowsFrom(inv.getArgument(0)));
+    }
+
+    private static List<ScriptExecution> rowsFrom(RunningExecutionRows r) {
+        return r.getMachineIds().stream()
+                .map(machineId -> ScriptExecution.builder()
+                        .tenantId(r.getTenantId()).executionId(r.getExecutionId()).scriptId(r.getScriptId())
+                        .scheduleId(r.getScheduleId()).machineId(machineId).privilegeLevel(r.getPrivilegeLevel())
+                        .timeoutSeconds(r.getTimeoutSeconds()).initiatedBy(r.getInitiatedBy()).source(r.getSource())
+                        .packageManager(r.getPackageManager()).packageName(r.getPackageName())
+                        .softwareAction(r.getSoftwareAction()).status(ExecutionStatus.RUNNING)
+                        .build())
+                .toList();
     }
 
     @Test
@@ -85,41 +94,28 @@ class ScriptExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("create: persists a RUNNING Execution row with tenant scope + scriptId only (the display name is resolved at read time, NOT snapshotted on the row)")
-    void create_persistsRunningRow() {
-        when(scriptExecutionRepository.save(any(ScriptExecution.class))).thenAnswer(inv -> inv.getArgument(0));
-        Instant before = Instant.now().minus(Duration.ofSeconds(1));
-
+    @DisplayName("create: hands the repository a RunningExecutionRows with tenant scope + scriptId + one machine (no schedule origin), and maps the saved row to a DTO")
+    void create_forwardsRunningExecutionRows() {
         ScriptExecutionResponse result = service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
 
-        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
-        ScriptExecution saved = captor.getValue();
+        ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(scriptExecutionRepository).saveRunning(captor.capture());
+        RunningExecutionRows request = captor.getValue();
 
-        assertThat(saved.getTenantId()).isEqualTo(TENANT_ID);
-        assertThat(saved.getExecutionId()).isEqualTo(EXECUTION_ID);
-        assertThat(saved.getScriptId()).isEqualTo(SCRIPT_ID);
-        assertThat(saved.getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(saved.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
-        assertThat(saved.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);   // persisted for the watchdog's per-execution threshold
-        assertThat(saved.getInitiatedBy()).isEqualTo(INITIATED_BY);
-        assertThat(saved.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
-        assertThat(saved.getDispatchedAt()).isAfterOrEqualTo(before);
-        assertThat(saved.getStatusChangedAt()).isEqualTo(saved.getDispatchedAt());
+        assertThat(request.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(request.getExecutionId()).isEqualTo(EXECUTION_ID);
+        assertThat(request.getScriptId()).isEqualTo(SCRIPT_ID);
+        assertThat(request.getScheduleId()).isNull();               // ad-hoc run — no schedule origin
+        assertThat(request.getMachineIds()).containsExactly(MACHINE_ID);
+        assertThat(request.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+        assertThat(request.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);
+        assertThat(request.getInitiatedBy()).isEqualTo(INITIATED_BY);
+        assertThat(request.getSource()).isEqualTo(ExecutionSource.MANUAL);
+        assertThat(request.getPackageName()).isNull();
 
-        // Result-side fields must be null on the freshly-dispatched row.
-        assertThat(saved.getFinishedAt()).isNull();
-        assertThat(saved.getExitCode()).isNull();
-        assertThat(saved.getStdout()).isNull();
-        assertThat(saved.getStderr()).isNull();
-        assertThat(saved.getError()).isNull();
-
-        // Service returns a DTO (never the entity), mapped from the persisted row.
         assertThat(result.getExecutionId()).isEqualTo(EXECUTION_ID);
         assertThat(result.getScriptId()).isEqualTo(SCRIPT_ID);
-        assertThat(result.getScheduleId()).isNull(); // ad-hoc run — no schedule origin
         assertThat(result.getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(result.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
         assertThat(result.getInitiatedBy()).isEqualTo(INITIATED_BY);
     }
 
@@ -129,66 +125,54 @@ class ScriptExecutionServiceTest {
         service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
 
         verify(tenantIdProvider).getTenantId();
-        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(scriptExecutionRepository).saveRunning(captor.capture());
         assertThat(captor.getValue().getTenantId()).isEqualTo(TENANT_ID);
     }
 
     @Test
-    @DisplayName("create: a null initiatedBy is accepted and persisted as null — defensive fallback so an authenticated request without a fully-formed principal still produces a History row instead of NPE-ing the whole dispatch")
+    @DisplayName("create: a null initiatedBy is forwarded as null — defensive fallback so an authenticated request without a fully-formed principal still produces a History row instead of NPE-ing the whole dispatch")
     void create_acceptsNullInitiatedBy() {
         service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, null, ExecutionSource.MANUAL);
 
-        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(scriptExecutionRepository).saveRunning(captor.capture());
         assertThat(captor.getValue().getInitiatedBy()).isNull();
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.RUNNING);
     }
 
     @Test
-    @DisplayName("create: privilegeLevel is forwarded verbatim — USER vs ADMIN reaches the row exactly as the dispatch carried it")
+    @DisplayName("create: privilegeLevel is forwarded verbatim — USER vs ADMIN reaches the request exactly as the dispatch carried it")
     void create_forwardsPrivilegeLevelVerbatim() {
         service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.USER, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
 
-        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
-        verify(scriptExecutionRepository).save(captor.capture());
+        ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(scriptExecutionRepository).saveRunning(captor.capture());
         assertThat(captor.getValue().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.USER);
     }
 
     @Test
-    @DisplayName("createBatch: persists one RUNNING row per machineId under a shared executionId — all rows share tenantId / scriptId / dispatchedAt, each row carries its own machineId. Backs (tenantId, executionId, machineId) unique constraint.")
-    void createBatch_persistsOneRowPerMachine() {
-        when(scriptExecutionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+    @DisplayName("createBatch: forwards ALL target machineIds under one shared executionId + scheduleId to the repository, and maps one DTO per saved row")
+    void createBatch_forwardsAllMachinesUnderSharedExecution() {
         List<String> machines = List.of("m-1", "m-2", "m-3");
-        Instant before = Instant.now().minus(Duration.ofSeconds(1));
 
-        service.createBatch(EXECUTION_ID, SCRIPT_ID, "sched-1", machines, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.SCHEDULED);
+        List<ScriptExecutionResponse> results = service.createBatch(EXECUTION_ID, SCRIPT_ID, "sched-1", machines,
+                PrivilegeLevel.ADMIN, TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.SCHEDULED);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<ScriptExecution>> captor = ArgumentCaptor.forClass(List.class);
-        verify(scriptExecutionRepository).saveAll(captor.capture());
-        List<ScriptExecution> rows = captor.getValue();
+        ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(scriptExecutionRepository).saveRunning(captor.capture());
+        RunningExecutionRows request = captor.getValue();
 
-        assertThat(rows).hasSize(3);
-        assertThat(rows)
-                .allSatisfy(r -> {
-                    assertThat(r.getTenantId()).isEqualTo(TENANT_ID);
-                    assertThat(r.getExecutionId()).isEqualTo(EXECUTION_ID);
-                    assertThat(r.getScriptId()).isEqualTo(SCRIPT_ID);
-                    assertThat(r.getScheduleId()).isEqualTo("sched-1");
-                    assertThat(r.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
-                    assertThat(r.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);
-                    assertThat(r.getInitiatedBy()).isEqualTo(INITIATED_BY);
-                    assertThat(r.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
-                    assertThat(r.getDispatchedAt()).isAfterOrEqualTo(before);
-                })
-                .extracting(ScriptExecution::getMachineId)
-                .containsExactlyElementsOf(machines);
+        assertThat(request.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(request.getExecutionId()).isEqualTo(EXECUTION_ID);
+        assertThat(request.getScriptId()).isEqualTo(SCRIPT_ID);
+        assertThat(request.getScheduleId()).isEqualTo("sched-1");
+        assertThat(request.getMachineIds()).containsExactlyElementsOf(machines);
+        assertThat(request.getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+        assertThat(request.getTimeoutSeconds()).isEqualTo(TIMEOUT_SECONDS);
+        assertThat(request.getInitiatedBy()).isEqualTo(INITIATED_BY);
+        assertThat(request.getSource()).isEqualTo(ExecutionSource.SCHEDULED);
 
-        // dispatchedAt is a single Instant captured once for the whole batch — same value across all rows
-        // so a UI grouping by "batch fired at" lines up exactly.
-        Instant sharedAt = rows.get(0).getDispatchedAt();
-        assertThat(rows).extracting(ScriptExecution::getDispatchedAt).containsOnly(sharedAt);
+        assertThat(results).extracting(ScriptExecutionResponse::getMachineId).containsExactlyElementsOf(machines);
     }
 
     @Test

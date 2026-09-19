@@ -80,7 +80,7 @@ class CommandExecutionHandlerTest {
         assertThat(saved.getStdoutTruncated()).isFalse();
         assertThat(saved.getFinishedAt()).isNotNull();
         assertThat(saved.getStatusChangedAt()).isNotNull();
-        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "command", "status", "SUCCESS").counter().count()).isEqualTo(1.0);
+        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "command", "status", "SUCCESS", "source", "MANUAL", "manager", "NONE").counter().count()).isEqualTo(1.0);
     }
 
     @Test

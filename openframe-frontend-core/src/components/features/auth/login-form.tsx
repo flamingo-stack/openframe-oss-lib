@@ -168,7 +168,9 @@ export function LoginForm({
           // bold-body step, a 24px icon, and 12/16 for the inset and the gap.
           <div
             role="status"
-            className="flex h-11 w-full items-center gap-[var(--spacing-system-m)] rounded-md bg-ods-bg-surface px-[var(--spacing-system-s)] text-ods-text-secondary text-h3 md:h-12"
+            // A minimum, not a fixed height: a consumer's `noCustomSsoLabel` can run to several lines
+            // at phone width, and a fixed row clipped it.
+            className="flex min-h-11 w-full items-center gap-[var(--spacing-system-m)] rounded-md bg-ods-bg-surface px-[var(--spacing-system-s)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h3 md:min-h-12"
           >
             <AlertTriangleIcon className="h-6 w-6 shrink-0" />
             {noCustomSsoLabel}

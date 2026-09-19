@@ -32,6 +32,7 @@ const buttonVariants = cva(
         warning: buttonSurfaceClasses.warning,
         glyph: buttonSurfaceClasses.glyph,
         overlay: buttonSurfaceClasses.overlay,
+        link: buttonSurfaceClasses.link,
       },
       size: {
         default: 'h-11 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 md:h-12',
@@ -227,7 +228,10 @@ interface ButtonProps
   linkProps?: {
     href: string;
     target?: '_blank';
-    rel?: 'noopener noreferrer';
+    /** `noopener` alone keeps the Referer for a new-tab link to one of our own
+     *  platforms (cross-domain analytics attribution); `noreferrer` is for
+     *  third-party destinations. */
+    rel?: 'noopener' | 'noopener noreferrer';
     onClick?: React.MouseEventHandler<HTMLAnchorElement>;
   } | null;
   leftIcon?: React.ReactNode;
