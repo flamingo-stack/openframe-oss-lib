@@ -11,6 +11,7 @@ import com.openframe.data.repository.tag.TagRepository;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -143,14 +144,23 @@ public class DeviceTagService {
             if (tagRepository.existsByKeyIgnoreCaseAndEntityType(key, DEVICE)) {
                 throw new ConflictException("Tag with key '" + key + "' already exists");
             }
-            Tag created = tagRepository.save(Tag.builder()
-                    .key(key)
-                    .values(merge(null, values))
-                    .entityType(DEVICE)
-                    .createdAt(Instant.now())
-                    .build());
-            log.info("Created DEVICE tag '{}' (id={})", key, created.getId());
-            return created;
+            try {
+                Tag created = tagRepository.save(Tag.builder()
+                        .key(key)
+                        .values(merge(null, values))
+                        .entityType(DEVICE)
+                        .createdAt(Instant.now())
+                        .build());
+                log.info("Created DEVICE tag '{}' (id={})", key, created.getId());
+                return created;
+            } catch (DuplicateKeyException e) {
+                // Lost a first-use race to another request: the unique (tenant, key, entityType)
+                // index kept the key single, so carry on with the winner's tag.
+                existing = tagRepository.findByKeyAndEntityType(key, DEVICE);
+                if (existing == null) {
+                    throw e;
+                }
+            }
         }
 
         List<String> merged = merge(existing.getValues(), values);
@@ -174,14 +184,23 @@ public class DeviceTagService {
                 .findByEntityIdAndTagIdAndEntityType(machineId, tagId, DEVICE);
 
         if (existing.isEmpty()) {
-            TagAssignment saved = tagAssignmentRepository.save(TagAssignment.builder()
-                    .entityId(machineId)
-                    .tagId(tagId)
-                    .entityType(DEVICE)
-                    .values(merge(null, values))
-                    .taggedAt(Instant.now())
-                    .build());
-            return saved.getValues();
+            try {
+                TagAssignment saved = tagAssignmentRepository.save(TagAssignment.builder()
+                        .entityId(machineId)
+                        .tagId(tagId)
+                        .entityType(DEVICE)
+                        .values(merge(null, values))
+                        .taggedAt(Instant.now())
+                        .build());
+                return saved.getValues();
+            } catch (DuplicateKeyException e) {
+                // Same race on the unique (tenant, entity, tag, entityType) index: apply the values
+                // to the assignment the other request just created.
+                existing = tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(machineId, tagId, DEVICE);
+                if (existing.isEmpty()) {
+                    throw e;
+                }
+            }
         }
 
         TagAssignment assignment = existing.get();

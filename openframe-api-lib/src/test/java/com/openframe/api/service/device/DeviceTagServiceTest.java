@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ import static com.openframe.data.document.tag.TagEntityType.DEVICE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -225,6 +227,47 @@ class DeviceTagServiceTest {
         verify(tagRepository).save(tag.capture());
         assertThat(tag.getValue().getValues()).containsExactly("chicago", "boston");
         assertThat(result.getValues()).containsExactly("chicago", "boston");
+    }
+
+    @Test
+    void assignTagAdoptsTheWinnersKeyWhenAFirstUseRaceIsLost() {
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE))
+                .thenReturn(null)
+                .thenReturn(existingTag("chicago"));
+        doThrow(new DuplicateKeyException("tenant_key_entity_idx")).when(tagRepository).save(any());
+
+        Tag result = service.assignTag(MACHINE_ID, "site", List.of("chicago"));
+
+        assertThat(result.getId()).isEqualTo(TAG_ID);
+        ArgumentCaptor<TagAssignment> assignment = ArgumentCaptor.forClass(TagAssignment.class);
+        verify(tagAssignmentRepository).save(assignment.capture());
+        assertThat(assignment.getValue().getTagId()).isEqualTo(TAG_ID);
+    }
+
+    @Test
+    void assignTagMergesIntoTheWinnersAssignmentWhenTheAssignmentRaceIsLost() {
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE))
+                .thenReturn(existingTag("chicago", "boston"));
+        when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(MACHINE_ID, TAG_ID, DEVICE))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existingAssignment("chicago")));
+        doThrow(new DuplicateKeyException("tenant_entity_tag_idx"))
+                .doAnswer(inv -> inv.getArgument(0))
+                .when(tagAssignmentRepository).save(any());
+
+        Tag result = service.assignTag(MACHINE_ID, "site", List.of("boston"));
+
+        assertThat(result.getValues()).containsExactly("chicago", "boston");
+    }
+
+    @Test
+    void assignTagRethrowsADuplicateKeyItCannotExplain() {
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE)).thenReturn(null);
+        doThrow(new DuplicateKeyException("tenant_key_entity_idx")).when(tagRepository).save(any());
+
+        assertThatThrownBy(() -> service.assignTag(MACHINE_ID, "site", List.of("chicago")))
+                .isInstanceOf(DuplicateKeyException.class);
+        verify(tagAssignmentRepository, never()).save(any());
     }
 
     // ---- setTagValues ----
