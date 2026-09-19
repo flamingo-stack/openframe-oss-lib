@@ -7,6 +7,7 @@ import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptBootstrapNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
@@ -16,6 +17,7 @@ import com.openframe.data.repository.rmm.ScriptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -23,6 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class PackageManagerBootstrapService {
@@ -49,7 +52,8 @@ public class PackageManagerBootstrapService {
         }
 
         String tenantId = machine.getTenantId();
-        Optional<Script> foundScript = scriptRepository.findSystemScript(packageManager.bootstrapScript(), tenantId);
+        Optional<Script> foundScript = scriptRepository.findByTenantIdAndNameAndType(
+                tenantId, packageManager.bootstrapScript().canonicalName(), ScriptType.SYSTEM);
         if (foundScript.isEmpty()) {
             log.warn("Bootstrap script {} not seeded for tenant {}, ignoring report from machineId={}",
                     packageManager.bootstrapScript(), tenantId, machineId);
@@ -98,6 +102,7 @@ public class PackageManagerBootstrapService {
                 .privilegeLevel(script.getPrivilegeLevel())
                 .timeoutSeconds(script.getDefaultTimeoutSeconds())
                 .source(ExecutionSource.SYSTEM_BOOTSTRAP)
+                .packageManager(packageManager)
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(now)
                 .statusChangedAt(now)

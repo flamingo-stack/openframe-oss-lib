@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
+import com.openframe.api.service.rmm.script.ScriptPrivilegeValidator;
 import com.openframe.api.service.rmm.script.ScriptTagService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.rmm.script.ScriptTimeoutValidator;
@@ -18,6 +19,8 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptStatus;
@@ -73,6 +76,8 @@ class ScriptServiceTest {
     private ScriptTagService scriptTagService;
     @Mock
     private ScriptTimeoutValidator timeoutValidator;
+    @Mock
+    private ScriptPrivilegeValidator privilegeValidator;
 
     @InjectMocks
     private ScriptService scriptService;
@@ -152,6 +157,39 @@ class ScriptServiceTest {
                 .isInstanceOf(BadRequestException.class);
 
         verify(timeoutValidator).validate(700);
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create: a privilege level the declared platforms cannot run throws (400) and nothing is persisted")
+    void create_validatesPrivilegeBeforeSave() {
+        // setup
+        createInput.setPrivilegeLevel(PrivilegeLevel.ELEVATED_USER);
+        createInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
+        doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "ELEVATED_USER is supported only on Windows"))
+                .when(privilegeValidator).validate(PrivilegeLevel.ELEVATED_USER, List.of(OsType.MAC_OS));
+
+        // execution + verifications
+        assertThatThrownBy(() -> scriptService.create(createInput, "user-1"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Windows");
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: a privilege level the declared platforms cannot run throws before the script is even loaded")
+    void update_validatesPrivilegeBeforeSave() {
+        // setup
+        updateInput.setName("Restart Spooler");
+        updateInput.setPrivilegeLevel(PrivilegeLevel.ELEVATED_USER);
+        updateInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
+        doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "ELEVATED_USER is supported only on Windows"))
+                .when(privilegeValidator).validate(PrivilegeLevel.ELEVATED_USER, List.of(OsType.MAC_OS));
+
+        // execution + verifications
+        assertThatThrownBy(() -> scriptService.update(updateInput))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Windows");
         verify(scriptRepository, never()).save(any());
     }
 
@@ -734,13 +772,13 @@ class ScriptServiceTest {
         Script system = new Script();
         system.setId(SCRIPT_ID);
         system.setStatus(ScriptStatus.ACTIVE);
-        system.setSystem(true);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
         updateInput.setName("renamed");
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
 
         assertThatThrownBy(() -> scriptService.update(updateInput))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("System scripts");
+                .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
     }
@@ -751,12 +789,12 @@ class ScriptServiceTest {
         Script system = new Script();
         system.setId(SCRIPT_ID);
         system.setStatus(ScriptStatus.ACTIVE);
-        system.setSystem(true);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
 
         assertThatThrownBy(() -> scriptService.delete(SCRIPT_ID))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("System scripts");
+                .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
     }
@@ -767,12 +805,12 @@ class ScriptServiceTest {
         Script system = new Script();
         system.setId(SCRIPT_ID);
         system.setStatus(ScriptStatus.ACTIVE);
-        system.setSystem(true);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
 
         assertThatThrownBy(() -> scriptService.archive(SCRIPT_ID))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("System scripts");
+                .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
     }

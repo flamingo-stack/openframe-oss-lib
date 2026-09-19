@@ -1,5 +1,8 @@
 package com.openframe.test.tests.ai;
 
+import com.openframe.test.api.DeviceApi;
+import com.openframe.test.data.dto.device.DeviceStatus;
+import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.helpers.ai.ApprovalPolicy;
 import com.openframe.test.helpers.ai.AssistantRunner;
 import com.openframe.test.helpers.ai.DialogFixture;
@@ -11,6 +14,10 @@ import com.openframe.test.tests.BaseTest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 
+import java.util.List;
+
+import static com.openframe.test.data.generator.DeviceGenerator.osAndStatusDevicesFilter;
+import static org.assertj.core.api.Assertions.assertThat;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -38,6 +45,23 @@ public abstract class MingoBaseTest extends BaseTest {
     protected DialogFixture dialog;
 
     /** Opens a fresh dialog and sends Mingo a prompt, auto-approving any command it needs to run. */
+
+    /**
+     * The online Windows box this run enrolled, for cases that must name a machine in their prompt.
+     *
+     * <p>Before saving a policy, scheduled query or script to the library, the assistant tests the exact
+     * SQL or body on a real machine, and it will not pick one itself: asked without a machine it replies
+     * "which machine should I use to test this?" and stops, so the case fails with nothing created. Naming
+     * the box gives it what its own workflow requires. "Online" is part of the phrasing on purpose -- the
+     * tenant can carry several records for this hostname and the assistant rightly refuses to guess
+     * between them.
+     */
+    protected Machine onlineWindowsDevice() {
+        List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
+        assertThat(devices).as("Expected at least one online Windows device with a Fleet connection").isNotEmpty();
+        return DeviceApi.getDevice(devices.getFirst().getMachineId());
+    }
+
     protected RunResult prompt(String text) {
         return prompt(text, ApprovalPolicy.AUTO_APPROVE);
     }

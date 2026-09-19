@@ -1,7 +1,7 @@
 'use client';
 
 import type { BookingConfirmation } from '../../schemas/meeting-booking-schema';
-import { formatDurationCompact } from '../../utils/format';
+import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
 
 /**
  * Confirmation — terminal success state after a completed booking. Renders
@@ -16,15 +16,11 @@ export interface ConfirmationProps {
 }
 
 export function Confirmation({ confirmation, timezone }: ConfirmationProps) {
-  const when = new Intl.DateTimeFormat(undefined, {
-    timeZone: timezone,
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  }).format(new Date(confirmation.startTimeMs));
+  // The SAME preset as the booking summary beside the slot picker, so the time
+  // a visitor picked and the time they are told was booked read identically.
+  const when = formatDateWithTimezone(confirmation.startTimeMs, timezone, 'weekdayDateTimeZoned', {
+    viewerLocale: true,
+  });
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">

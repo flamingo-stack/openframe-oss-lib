@@ -1,6 +1,7 @@
 import { forwardRef, useRef, useEffect } from 'react';
 import type { MouseEvent } from 'react';
 import { cn } from '../../utils/cn';
+import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { ChatPlusIcon, ChatsIcon, Chevron02RightIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
 import { ChatSidebarSkeleton, DialogListItemSkeleton } from './chat-sidebar-skeleton';
@@ -14,17 +15,9 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
     };
 
     const formatTimestamp = (timestamp?: Date | string) => {
-      if (!timestamp) return '';
-      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-      return (
-        date.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }) +
-        ', ' +
-        date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-      );
+      // "Your" last-active time in the app shell — the viewer's zone, stated
+      // explicitly, with the date and time rendered together by one renderer.
+      return formatDateWithTimezone(timestamp, VIEWER_TIMEZONE, 'numericDateTime24h');
     };
 
     return (
