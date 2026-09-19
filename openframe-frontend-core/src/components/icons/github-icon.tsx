@@ -7,7 +7,12 @@ interface GitHubIconProps {
   height?: number;
 }
 
-/** @deprecated Use icons from icons-v2-generated instead. */
+/**
+ * @deprecated Do not use this local component. Import GitHubIcon from '@flamingo/ui-kit' instead,
+ * per MAJORLEA-006, which mandates GitHubIcon be sourced from @flamingo/ui-kit (openframe-oss-lib)
+ * rather than re-implemented or duplicated elsewhere. This local copy is retained only to avoid
+ * breaking existing imports and will be removed once all consumers migrate.
+ */
 export const GitHubIcon: React.FC<GitHubIconProps> = ({ className = '', width = 15, height = 14, color = 'white' }) => {
   return (
     <svg
