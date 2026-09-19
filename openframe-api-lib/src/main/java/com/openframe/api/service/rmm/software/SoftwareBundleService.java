@@ -3,9 +3,11 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.CreateSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
+import com.openframe.api.dto.rmm.software.SoftwareBundleScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
+import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareBundleInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
@@ -132,6 +134,126 @@ public class SoftwareBundleService {
         log.info("Ran software bundle id={} mode={} action={} devices={} actor={}",
                 id, entity.getMode(), entity.getAction(), entity.getMachineIds().size(), actor);
         return toResponse(entity);
+    }
+
+    public SoftwareBundleResponse createBundleStub(String createdBy) {
+        String tenantId = tenantIdProvider.getTenantId();
+        Instant now = Instant.now();
+        SoftwareBundle entity = SoftwareBundle.builder()
+                .tenantId(tenantId)
+                .status(SoftwareBundleStatus.PENDING)
+                .machineIds(List.of())
+                .packages(List.of())
+                .createdBy(createdBy)
+                .createdAt(now)
+                .updatedAt(now)
+                .expireAt(now.plus(pendingTtl))
+                .build();
+        SoftwareBundle saved = bundleRepository.save(entity);
+        log.info("Created draft software bundle id={} tenantId={}", saved.getId(), tenantId);
+        return toResponse(saved);
+    }
+
+    /** Assign devices (idempotent — already-assigned ids are skipped). Fails if COMPLETED. */
+    public SoftwareBundleResponse addDevices(String bundleId, List<String> machineIds, String actor) {
+        SoftwareBundle entity = loadPendingOrThrow(bundleId);
+        LinkedHashSet<String> set = new LinkedHashSet<>(currentMachineIds(entity));
+        set.addAll(machineIds);
+        entity.setMachineIds(List.copyOf(set));
+        return saveTouched(entity, actor);
+    }
+
+    /** Unassign devices (ids not assigned are no-ops). Fails if COMPLETED. */
+    public SoftwareBundleResponse removeDevices(String bundleId, List<String> machineIds, String actor) {
+        SoftwareBundle entity = loadPendingOrThrow(bundleId);
+        LinkedHashSet<String> set = new LinkedHashSet<>(currentMachineIds(entity));
+        machineIds.forEach(set::remove);
+        entity.setMachineIds(List.copyOf(set));
+        return saveTouched(entity, actor);
+    }
+
+    /**
+     * "Add N Devices" — assign every device matching (filter, search). STUB: the datafetcher owns the
+     * GraphQL DeviceFilterInput → device-id resolution; wire it to {@link #addDevices} once implemented.
+     */
+    public SoftwareBundleResponse addAllDevices(String bundleId, String actor) {
+        SoftwareBundle entity = loadPendingOrThrow(bundleId);
+        // TODO(align): resolve machineIds matching (filter, search) and add them (skip already-assigned).
+        log.warn("addAllDevicesToSoftwareBundle is a stub — bundleId={} filter/search not yet resolved", bundleId);
+        return toResponse(entity);
+    }
+
+    public SoftwareBundleResponse removeAllDevices(String bundleId, boolean clearAll, String actor) {
+        SoftwareBundle entity = loadPendingOrThrow(bundleId);
+        if (clearAll) {
+            entity.setMachineIds(List.of());
+            return saveTouched(entity, actor);
+        }
+        // TODO(align): resolve machineIds matching (filter, search) and remove only those.
+        log.warn("removeAllDevicesFromSoftwareBundle with filter/search is a stub — bundleId={}", bundleId);
+        return toResponse(entity);
+    }
+
+    public SoftwareBundleResponse submit(SubmitSoftwareBundleInput input, String actor) {
+        SoftwareBundle entity = loadPendingOrThrow(input.getId());
+        if (currentMachineIds(entity).isEmpty()) {
+            throw new BadRequestException("Cannot submit software bundle " + input.getId() + ": no devices assigned");
+        }
+        entity.setAction(input.getAction());
+        entity.setPackages(toDomainPackages(input.getPackages()));
+
+        Instant now = Instant.now();
+        if (input.getSchedule() != null) {
+            entity.setMode(SoftwareBundleMode.SCHEDULED);
+            entity.setStartAt(input.getSchedule().getStartAt());
+            submitScheduled(entity, input.getSchedule(), actor);
+        } else {
+            entity.setMode(SoftwareBundleMode.NOW);
+            armOnlineDispatch(entity, now);
+        }
+
+        entity.setStatus(SoftwareBundleStatus.COMPLETED);
+        entity.setCompletedAt(now);
+        entity.setUpdatedAt(now);
+        entity.setExpireAt(null); // completed bundles are history — never reaped
+        bundleRepository.save(entity);
+        log.info("Submitted software bundle id={} mode={} action={} devices={} actor={}",
+                entity.getId(), entity.getMode(), entity.getAction(), currentMachineIds(entity).size(), actor);
+        return toResponse(entity);
+    }
+
+    private void submitScheduled(SoftwareBundle bundle, SoftwareBundleScheduleInput sched, String actor) {
+        CreateSoftwareScheduleInput input = new CreateSoftwareScheduleInput();
+        input.setName(sched.getName() != null ? sched.getName() : scheduleName(bundle));
+        input.setDescription(sched.getDescription());
+        input.setAction(bundle.getAction());
+        input.setPackages(toSchedulePackages(bundle.getPackages()));
+        input.setTimeReference(sched.getTimeReference() != null ? sched.getTimeReference() : ScheduleTimeReference.SERVER);
+        input.setOfflineBehavior(sched.getOfflineBehavior() != null ? sched.getOfflineBehavior() : ScheduleOfflineBehavior.RETRY_ON_RECONNECT);
+        input.setReconnectWindowSeconds(sched.getReconnectWindowSeconds() != null
+                ? sched.getReconnectWindowSeconds() : scheduleReconnectWindowSeconds);
+        input.setStartAt(sched.getStartAt());
+        input.setRepeat(sched.getRepeat());
+        input.setMachineIds(bundle.getMachineIds());
+
+        SoftwareScheduleResponse schedule = softwareScheduleService.create(input, actor);
+        bundle.setScheduleId(schedule.getId());
+        log.info("Submitted SCHEDULED software bundle id={} → schedule id={} startAt={}",
+                bundle.getId(), schedule.getId(), bundle.getStartAt());
+    }
+
+    private static List<String> currentMachineIds(SoftwareBundle entity) {
+        return entity.getMachineIds() == null ? List.of() : entity.getMachineIds();
+    }
+
+    private SoftwareBundleResponse saveTouched(SoftwareBundle entity, String actor) {
+        Instant now = Instant.now();
+        entity.setUpdatedAt(now);
+        entity.setExpireAt(now.plus(pendingTtl));
+        SoftwareBundle saved = bundleRepository.save(entity);
+        log.debug("Touched software bundle id={} devices={} actor={}",
+                saved.getId(), currentMachineIds(saved).size(), actor);
+        return toResponse(saved);
     }
 
     private void runScheduled(SoftwareBundle bundle, String actor) {

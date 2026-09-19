@@ -43,14 +43,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 
-/**
- * GraphQL resolver for RMM script CRUD.
- *
- * <p>Pure passthrough to {@link ScriptService} — tenant scoping is resolved
- * inside the service via {@code TenantIdProvider}. Authorisation (which roles
- * may invoke which mutation) is intentionally not enforced here yet — it will
- * be added in a dedicated security pass once the RMM role model is agreed.
- */
 @DgsComponent
 @RequiredArgsConstructor
 @Slf4j
