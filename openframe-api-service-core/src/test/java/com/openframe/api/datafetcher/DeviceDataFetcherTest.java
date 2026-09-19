@@ -120,6 +120,19 @@ class DeviceDataFetcherTest {
     }
 
     @Test
+    @DisplayName("setDeviceTagValues: delegates to DeviceTagService.setTagValues, not the additive assignTag")
+    void setDeviceTagValues_delegates() {
+        Tag updated = Tag.builder().id("tag-1").key("site").values(List.of("chicago")).build();
+        when(deviceTagService.setTagValues("m1", "site", List.of("chicago"))).thenReturn(updated);
+
+        Tag result = fetcher.setDeviceTagValues("m1", "site", List.of("chicago"));
+
+        assertThat(result).isSameAs(updated);
+        verify(deviceTagService).setTagValues("m1", "site", List.of("chicago"));
+        verify(deviceTagService, never()).assignTag("m1", "site", List.of("chicago"));
+    }
+
+    @Test
     @DisplayName("removeDeviceTag: decodes the Relay global id before delegating")
     void removeDeviceTag_decodesGlobalId() {
         String globalId = new Relay().toGlobalId("Tag", "tag-1");

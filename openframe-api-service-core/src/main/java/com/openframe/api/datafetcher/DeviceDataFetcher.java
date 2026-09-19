@@ -142,6 +142,14 @@ public class DeviceDataFetcher {
     }
 
     @DgsMutation
+    public Tag setDeviceTagValues(@InputArgument @NotBlank String machineId,
+                                  @InputArgument @NotBlank String key,
+                                  @InputArgument List<String> values) {
+        log.debug("Setting values of tag '{}' on machineId: {}", key, machineId);
+        return deviceTagService.setTagValues(machineId, key, values);
+    }
+
+    @DgsMutation
     public boolean removeDeviceTag(@InputArgument @NotBlank String machineId,
                                    @InputArgument @NotBlank String tagId) {
         String rawTagId = RELAY.fromGlobalId(tagId).getId();

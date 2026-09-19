@@ -215,6 +215,125 @@ class DeviceTagServiceTest {
         verifyNoInteractions(machineRepository, tagRepository, tagAssignmentRepository);
     }
 
+    @Test
+    void assignTagDropsDuplicateValuesFromTheRequest() {
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE)).thenReturn(null);
+
+        Tag result = service.assignTag(MACHINE_ID, "site", List.of("chicago", "chicago", "boston"));
+
+        ArgumentCaptor<Tag> tag = ArgumentCaptor.forClass(Tag.class);
+        verify(tagRepository).save(tag.capture());
+        assertThat(tag.getValue().getValues()).containsExactly("chicago", "boston");
+        assertThat(result.getValues()).containsExactly("chicago", "boston");
+    }
+
+    // ---- setTagValues ----
+
+    @Test
+    void setTagValuesReplacesTheDevicesValuesSoASingleValueCanBeRemoved() {
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE))
+                .thenReturn(existingTag("chicago", "boston", "austin"));
+        when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(MACHINE_ID, TAG_ID, DEVICE))
+                .thenReturn(Optional.of(existingAssignment("chicago", "boston", "austin")));
+
+        Tag result = service.setTagValues(MACHINE_ID, "site", List.of("chicago", "austin"));
+
+        ArgumentCaptor<TagAssignment> assignment = ArgumentCaptor.forClass(TagAssignment.class);
+        verify(tagAssignmentRepository).save(assignment.capture());
+        assertThat(assignment.getValue().getId()).isEqualTo("assignment-1");
+        assertThat(assignment.getValue().getValues()).containsExactly("chicago", "austin");
+        assertThat(result.getValues()).containsExactly("chicago", "austin");
+    }
+
+    @Test
+    void setTagValuesKeepsTheDroppedValueInTheKeysOptions() {
+        Tag tag = existingTag("chicago", "boston");
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE)).thenReturn(tag);
+        when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(MACHINE_ID, TAG_ID, DEVICE))
+                .thenReturn(Optional.of(existingAssignment("chicago", "boston")));
+
+        service.setTagValues(MACHINE_ID, "site", List.of("chicago"));
+
+        // Other devices may still carry "boston"; the key's options only ever grow.
+        verify(tagRepository, never()).save(any());
+        assertThat(tag.getValues()).containsExactly("chicago", "boston");
+    }
+
+    @Test
+    void setTagValuesAppendsUnseenValuesToTheKeysOptions() {
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE))
+                .thenReturn(existingTag("chicago"));
+        when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(MACHINE_ID, TAG_ID, DEVICE))
+                .thenReturn(Optional.of(existingAssignment("chicago")));
+
+        Tag result = service.setTagValues(MACHINE_ID, "site", List.of("austin"));
+
+        ArgumentCaptor<Tag> tag = ArgumentCaptor.forClass(Tag.class);
+        verify(tagRepository).save(tag.capture());
+        assertThat(tag.getValue().getValues()).containsExactly("chicago", "austin");
+        assertThat(result.getValues()).containsExactly("austin");
+    }
+
+    @Test
+    void setTagValuesWithNoValuesKeepsTheKeyOnTheDeviceAsALabel() {
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE))
+                .thenReturn(existingTag("chicago"));
+        when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(MACHINE_ID, TAG_ID, DEVICE))
+                .thenReturn(Optional.of(existingAssignment("chicago")));
+
+        Tag result = service.setTagValues(MACHINE_ID, "site", null);
+
+        ArgumentCaptor<TagAssignment> assignment = ArgumentCaptor.forClass(TagAssignment.class);
+        verify(tagAssignmentRepository).save(assignment.capture());
+        assertThat(assignment.getValue().getValues()).isEmpty();
+        assertThat(result.getValues()).isEmpty();
+        verify(tagAssignmentRepository, never()).deleteByEntityIdAndTagIdAndEntityType(any(), any(), any());
+    }
+
+    @Test
+    void setTagValuesCreatesKeyAndAssignmentOnFirstUse() {
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE)).thenReturn(null);
+
+        Tag result = service.setTagValues(MACHINE_ID, "site", List.of("chicago"));
+
+        verify(tagRepository).save(any());
+        ArgumentCaptor<TagAssignment> assignment = ArgumentCaptor.forClass(TagAssignment.class);
+        verify(tagAssignmentRepository).save(assignment.capture());
+        assertThat(assignment.getValue().getEntityId()).isEqualTo(MACHINE_ID);
+        assertThat(assignment.getValue().getValues()).containsExactly("chicago");
+        assertThat(result.getValues()).containsExactly("chicago");
+    }
+
+    @Test
+    void setTagValuesSkipsTheSaveWhenNothingChanges() {
+        when(tagRepository.findByKeyAndEntityType("site", DEVICE))
+                .thenReturn(existingTag("chicago", "boston"));
+        when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(MACHINE_ID, TAG_ID, DEVICE))
+                .thenReturn(Optional.of(existingAssignment("chicago", "boston")));
+
+        service.setTagValues(MACHINE_ID, "site", List.of("chicago", "boston"));
+
+        verify(tagRepository, never()).save(any());
+        verify(tagAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void setTagValuesAppliesTheSameGuardsAsAssignTag() {
+        when(machineRepository.findByMachineId("ghost")).thenReturn(Optional.empty());
+        when(tagRepository.findByKeyAndEntityType("Site", DEVICE)).thenReturn(null);
+        when(tagRepository.existsByKeyIgnoreCaseAndEntityType("Site", DEVICE)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.setTagValues("ghost", "site", List.of("chicago")))
+                .isInstanceOf(DeviceNotFoundException.class);
+        assertThatThrownBy(() -> service.setTagValues(MACHINE_ID, "site", List.of("new york")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.setTagValues(MACHINE_ID, "Site", List.of("chicago")))
+                .isInstanceOf(ConflictException.class);
+
+        verify(tagRepository, never()).save(any());
+        verify(tagAssignmentRepository, never()).save(any());
+    }
+
     // ---- removeTag ----
 
     @Test

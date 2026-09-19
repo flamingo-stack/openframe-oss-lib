@@ -12,7 +12,6 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -34,6 +33,10 @@ import static com.openframe.data.document.tag.TagEntityType.DEVICE;
  * {@code deleteByEntityIdAndTagIdAndEntityType}. Bypassing them (e.g. {@code deleteAll}) would
  * leave the device's Pinot row carrying tags it no longer has.
  *
+ * <p>Deliberately not {@code @Transactional}: no Mongo transaction manager is configured, so the
+ * annotation would promise atomicity it cannot give. The tag key is written before the assignment,
+ * so a failure in between leaves at worst an unused key.
+ *
  * <p>Not reused from the client-core service because {@code openframe-client-core} does not depend
  * on {@code openframe-api-lib}, and pulling the logic down into a shared module would drag the
  * machine/tag repositories along with it.
@@ -42,7 +45,6 @@ import static com.openframe.data.document.tag.TagEntityType.DEVICE;
 @Slf4j
 @Validated
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class DeviceTagService {
 
     private final TagRepository tagRepository;
@@ -58,16 +60,34 @@ public class DeviceTagService {
      *
      * @return the tag, carrying this device's values (not the tag's full option list)
      */
-    @Transactional
     public Tag assignTag(@NotBlank String machineId, @NotBlank String key, List<String> values) {
+        return writeTag(machineId, key, values, false);
+    }
+
+    /**
+     * Sets the device's values for {@code key} to exactly {@code values}, creating the tag key and
+     * the assignment on first use. This is how a single value is taken off a device: send the list
+     * without it. {@code null} or empty leaves the device carrying the key as a plain label; use
+     * {@link #removeTag} to detach the key altogether.
+     *
+     * <p>Only the device's assignment is replaced. The tag's predefined options stay additive — a
+     * value dropped here may still be in use on other devices.
+     *
+     * @return the tag, carrying this device's values (not the tag's full option list)
+     */
+    public Tag setTagValues(@NotBlank String machineId, @NotBlank String key, List<String> values) {
+        return writeTag(machineId, key, values, true);
+    }
+
+    private Tag writeTag(String machineId, String key, List<String> values, boolean replace) {
         TagValidation.validateKey(key);
         TagValidation.validateValues(values, key);
         requireMachine(machineId);
 
         Tag tag = findOrCreateTag(key, values);
-        List<String> assignedValues = upsertAssignment(machineId, tag.getId(), values);
+        List<String> assignedValues = upsertAssignment(machineId, tag.getId(), values, replace);
 
-        log.info("Assigned tag '{}' to machine {} with values {}", key, machineId, assignedValues);
+        log.info("{} tag '{}' on machine {}, values now {}", replace ? "Set" : "Assigned", key, machineId, assignedValues);
         return Tag.builder()
                 .id(tag.getId())
                 .key(tag.getKey())
@@ -86,7 +106,6 @@ public class DeviceTagService {
      *
      * @return {@code true} if the device had the tag, {@code false} if there was nothing to remove
      */
-    @Transactional
     public boolean removeTag(@NotBlank String machineId, @NotBlank String tagId) {
         requireMachine(machineId);
 
@@ -126,7 +145,7 @@ public class DeviceTagService {
             }
             Tag created = tagRepository.save(Tag.builder()
                     .key(key)
-                    .values(normalize(values))
+                    .values(merge(null, values))
                     .entityType(DEVICE)
                     .createdAt(Instant.now())
                     .build());
@@ -145,10 +164,12 @@ public class DeviceTagService {
     }
 
     /**
-     * Merges {@code values} into the device's assignment, creating it if the device does not carry
-     * the tag yet. Saving through the repository is what triggers the Pinot republish.
+     * Writes {@code values} to the device's assignment, creating it if the device does not carry the
+     * tag yet: merged into the current values, or in place of them when {@code replace} is set.
+     * Saving through the repository is what triggers the Pinot republish, so an unchanged list is
+     * not saved at all.
      */
-    private List<String> upsertAssignment(String machineId, String tagId, List<String> values) {
+    private List<String> upsertAssignment(String machineId, String tagId, List<String> values, boolean replace) {
         Optional<TagAssignment> existing = tagAssignmentRepository
                 .findByEntityIdAndTagIdAndEntityType(machineId, tagId, DEVICE);
 
@@ -157,19 +178,19 @@ public class DeviceTagService {
                     .entityId(machineId)
                     .tagId(tagId)
                     .entityType(DEVICE)
-                    .values(normalize(values))
+                    .values(merge(null, values))
                     .taggedAt(Instant.now())
                     .build());
             return saved.getValues();
         }
 
         TagAssignment assignment = existing.get();
-        List<String> merged = merge(assignment.getValues(), values);
-        if (merged.size() != size(assignment.getValues())) {
-            assignment.setValues(merged);
+        List<String> updated = merge(replace ? null : assignment.getValues(), values);
+        if (!updated.equals(normalize(assignment.getValues()))) {
+            assignment.setValues(updated);
             return tagAssignmentRepository.save(assignment).getValues();
         }
-        return assignment.getValues();
+        return normalize(assignment.getValues());
     }
 
     /** Insertion-ordered union — existing values keep their order, new ones are appended. */
