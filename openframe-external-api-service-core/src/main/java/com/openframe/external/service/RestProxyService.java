@@ -88,7 +88,7 @@ public class RestProxyService {
             ToolUrl toolUrl = optionalToolUrl.get();
             log.info("Tool URL: {}", toolUrl.getUrl());
 
-            URI targetUri = proxyUrlResolver.resolve(toolId, toolUrl.getUrl(), toolUrl.getPort(), originalUri, "/tools");
+            URI targetUri = proxyUrlResolver.resolvePreservingEncoding(toolId, toolUrl.getUrl(), toolUrl.getPort(), originalUri, "/tools");
             log.info("Target URI resolved to: {}", targetUri);
 
             String method = request.getMethod();

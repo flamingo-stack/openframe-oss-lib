@@ -203,12 +203,12 @@ class RestProxyServiceTest {
     @Test
     void resolverGetsApiUrlPortOriginalUriWithQueryAndToolsPrefix() {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("http://rmm-api", "8000", ToolUrlType.API));
-        when(proxyUrlResolver.resolve(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("Failed to resolve tool url"));
+        when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("Failed to resolve tool url"));
 
         service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api/v1/agents", "status=online&page=2"), null);
 
         ArgumentCaptor<URI> originalUri = ArgumentCaptor.forClass(URI.class);
-        verify(proxyUrlResolver).resolve(eq(TOOL_ID), eq("http://rmm-api"), eq("8000"), originalUri.capture(), eq("/tools"));
+        verify(proxyUrlResolver).resolvePreservingEncoding(eq(TOOL_ID), eq("http://rmm-api"), eq("8000"), originalUri.capture(), eq("/tools"));
         assertEquals("/tools/tactical-rmm/api/v1/agents", originalUri.getValue().getPath());
         assertEquals("status=online&page=2", originalUri.getValue().getRawQuery());
     }
@@ -216,19 +216,19 @@ class RestProxyServiceTest {
     @Test
     void originalUriHasNoQueryWhenRequestHasNone() {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("http://rmm-api", "8000", ToolUrlType.API));
-        when(proxyUrlResolver.resolve(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("Failed to resolve tool url"));
+        when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("Failed to resolve tool url"));
 
         service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api/v1/agents", null), null);
 
         ArgumentCaptor<URI> originalUri = ArgumentCaptor.forClass(URI.class);
-        verify(proxyUrlResolver).resolve(eq(TOOL_ID), eq("http://rmm-api"), eq("8000"), originalUri.capture(), eq("/tools"));
+        verify(proxyUrlResolver).resolvePreservingEncoding(eq(TOOL_ID), eq("http://rmm-api"), eq("8000"), originalUri.capture(), eq("/tools"));
         assertEquals("http://localhost/tools/tactical-rmm/api/v1/agents", originalUri.getValue().toString());
     }
 
     @Test
     void resolverFailureIs500WithItsMessage() {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("http://rmm-api", "8000", ToolUrlType.API));
-        when(proxyUrlResolver.resolve(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("Failed to resolve tool url"));
+        when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("Failed to resolve tool url"));
 
         ResponseEntity<String> response = service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api", null), null);
 
@@ -240,7 +240,7 @@ class RestProxyServiceTest {
     @ValueSource(strings = {"TRACE", "CONNECT", "BOGUS"})
     void unsupportedMethodIs500WithoutCallingTheTool(String method) {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("http://rmm-api", "8000", ToolUrlType.API));
-        when(proxyUrlResolver.resolve(any(), any(), any(), any(), any())).thenReturn(URI.create("http://rmm-api:8000/api"));
+        when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenReturn(URI.create("http://rmm-api:8000/api"));
 
         ResponseEntity<String> response = service.proxyApiRequest(TOOL_ID, request(method, "/tools/tactical-rmm/api", null), null);
 
@@ -251,7 +251,7 @@ class RestProxyServiceTest {
     @Test
     void unsupportedTargetSchemeIs500ProxyError() {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("ftp://rmm-api", "21", ToolUrlType.API));
-        when(proxyUrlResolver.resolve(any(), any(), any(), any(), any())).thenReturn(URI.create("ftp://127.0.0.1:21/api"));
+        when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenReturn(URI.create("ftp://127.0.0.1:21/api"));
 
         ResponseEntity<String> response = service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api", null), null);
 
@@ -272,6 +272,17 @@ class RestProxyServiceTest {
         assertEquals("GET", received.get().method());
         assertEquals("/api/v1/agents?status=online&q=a%20b", received.get().uri());
         assertEquals("", received.get().body());
+    }
+
+    @Test
+    void encodedReservedCharactersReachTheToolAsSent() throws IOException {
+        startUpstream(200, "ok");
+        RestProxyService forwarding = forwardingService(enabledTool(null));
+
+        forwarding.proxyApiRequest(TOOL_ID,
+                request("GET", "/tools/tactical-rmm/files/a%2Fb", "q=a%26b%3Dc&x=%2B1"), null);
+
+        assertEquals("/files/a%2Fb?q=a%26b%3Dc&x=%2B1", received.get().uri());
     }
 
     @Test
