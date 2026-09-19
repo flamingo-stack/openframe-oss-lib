@@ -166,7 +166,7 @@ export const ActivityIndicators: Story = {
       { kind: 'ai-working' },
       { kind: 'user-typing' },
       { kind: 'waiting-external' },
-      { kind: 'stale', label: 'No activity for 2 hours' },
+      { kind: 'stale', label: 'No activity for 30 minutes' },
     ];
     return (
       <div className="flex w-[320px] flex-col gap-[var(--spacing-system-sf)] rounded-lg bg-ods-card p-[var(--spacing-system-sf)]">
