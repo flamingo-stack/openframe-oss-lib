@@ -1,5 +1,10 @@
 package com.openframe.core.exception;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
 public enum ErrorCode {
 
     // Generic HTTP error codes
@@ -70,17 +75,4 @@ public enum ErrorCode {
 
     private final String code;
     private final int httpStatus;
-
-    ErrorCode(String code, int httpStatus) {
-        this.code = code;
-        this.httpStatus = httpStatus;
-    }
-
-    public String getCode() {
-        return code;
-    }
-
-    public int getHttpStatus() {
-        return httpStatus;
-    }
 }
