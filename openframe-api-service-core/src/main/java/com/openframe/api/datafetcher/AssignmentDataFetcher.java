@@ -106,6 +106,15 @@ public class AssignmentDataFetcher {
         return RELAY.toGlobalId("ItemAssignment", assignment.getId());
     }
 
+    // Ticket declares Node here like Organization and Machine do, and the assignment mutations take
+    // global ids — without this the raw id a client reads back cannot be passed to unassignItem.
+    @DgsData(parentType = "Ticket", field = "id")
+    public String ticketNodeId(DgsDataFetchingEnvironment dfe) {
+        Ticket ticket = dfe.getSource();
+        String ticketId = ticket.getId();
+        return RELAY.toGlobalId("Ticket", ticketId);
+    }
+
     @DgsData(parentType = "ItemAssignment", field = "target")
     public CompletableFuture<?> resolveTarget(DgsDataFetchingEnvironment dfe) {
         ItemAssignment assignment = dfe.getSource();
