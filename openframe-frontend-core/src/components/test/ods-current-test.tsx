@@ -91,15 +91,15 @@ export function OdsCurrentTest() {
           <div className="mt-4 space-y-2 text-sm">
             <div className="flex gap-2">
               <span className="text-ods-text-secondary">OpenFrame:</span>
-              <span className="text-[#ffc008]">Yellow (#ffc008)</span>
+              <span className="text-ods-current">Yellow (#ffc008)</span>
             </div>
             <div className="flex gap-2">
               <span className="text-ods-text-secondary">Flamingo:</span>
-              <span className="text-[#f357bb]">Pink (#f357bb)</span>
+              <span className="text-ods-current">Pink (#f357bb)</span>
             </div>
             <div className="flex gap-2">
               <span className="text-ods-text-secondary">TMCG:</span>
-              <span className="text-[#f357bb]">Pink (#f357bb)</span>
+              <span className="text-ods-current">Pink (#f357bb)</span>
             </div>
             <div className="flex gap-2">
               <span className="text-ods-text-secondary">Default:</span>
