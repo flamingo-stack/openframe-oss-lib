@@ -36,6 +36,21 @@ const imageSizeMap = {
   xl: { width: 40, height: 40 },
 };
 
+/**
+ * Tile px per size (the `sizeClasses` box). With `showBackground={false}`
+ * the image FILLS the tile (`h-full w-full`), so it must be requested at the
+ * tile's size: requesting the padded `imageSizeMap` size there served a
+ * 32px bitmap stretched over a 40-64px tile, blurry on every display.
+ */
+const tilePxMap = {
+  xs: 24,
+  sm: 32,
+  md: 40,
+  lg: 48,
+  l: 56,
+  xl: 64,
+};
+
 const backgroundClasses = {
   dark: 'bg-ods-bg border border-ods-border',
   light: 'bg-ods-card border border-ods-border',
@@ -54,7 +69,7 @@ export function VendorIcon({
   backgroundStyle = 'dark',
 }: VendorIconProps) {
   const logoUrl = getVendorLogo(vendor);
-  const { width, height } = imageSizeMap[size];
+  const { width, height } = showBackground ? imageSizeMap[size] : { width: tilePxMap[size], height: tilePxMap[size] };
 
   const containerClasses = cn(
     sizeClasses[size],
