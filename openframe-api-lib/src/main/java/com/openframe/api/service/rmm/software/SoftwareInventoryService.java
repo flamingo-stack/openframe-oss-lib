@@ -11,11 +11,10 @@ import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.BadRequestException;
-import com.openframe.api.service.rmm.fleet.FleetClientProvider;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
-import com.openframe.api.service.rmm.fleet.FleetTenantTeamResolver;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
@@ -56,20 +55,18 @@ public class SoftwareInventoryService {
     private static final int TITLES_FETCH_PAGE = 500;
     private static final int TITLES_FETCH_CAP = 5000;
 
-    private final FleetClientProvider fleet;
+    private final FleetMdmClient fleet;
     private final FleetHostMachineResolver hostMachineResolver;
-    private final FleetTenantTeamResolver teamResolver;
     private final TenantIdProvider tenantIdProvider;
 
     public Optional<SoftwareResponse> findById(String softwareId) {
         return parseNumericId(softwareId)
-                .map(id -> fleet.call(client -> client.getSoftwareTitle(id), "get Fleet software title id=" + id))
+                .map(fleet::getSoftwareTitle)
                 .map(FleetSoftwareMapper::toResponse);
     }
 
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
                                                      SortInput sort, Boolean vulnerable) {
-        Long teamId = teamResolver.currentTenantTeamId().orElse(null);
         String field = sort == null ? null : sort.getField();
         boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
 
@@ -77,28 +74,25 @@ public class SoftwareInventoryService {
             String orderKey = field == null ? null : FLEET_SORT.get(field);
             // Fleet rejects order_direction without order_key — send it only when there is a key.
             String orderDirection = orderKey == null ? null : (desc ? "desc" : "asc");
-            return fleetPage(search, page, perPage, orderKey, orderDirection, vulnerable, teamId);
+            return fleetPage(search, page, perPage, orderKey, orderDirection, vulnerable);
         }
         if (!CLIENT_SORT.contains(field)) {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
-        List<SoftwareResponse> all = fetchAllTitles(search, vulnerable, teamId).stream()
+        List<SoftwareResponse> all = fetchAllTitles(search, vulnerable).stream()
                 .sorted(clientComparator(field, desc))
                 .toList();
         return paginateList(all, page, perPage);
     }
 
     private PageResult<SoftwareResponse> fleetPage(String search, int page, Integer perPage, String orderKey,
-                                                   String orderDirection, Boolean vulnerable, Long teamId) {
+                                                   String orderDirection, Boolean vulnerable) {
         SoftwareTitleRequest request = SoftwareTitleRequest.builder()
                 .page(page).perPage(perPage).query(search)
                 .orderKey(orderKey).orderDirection(orderDirection)
                 .vulnerable(vulnerable)
-                // Scope to the tenant's Fleet team so hosts_count reflects tenant devices, not all of Fleet.
-                .teamId(teamId)
                 .build();
-        SoftwareTitlesResponse response = fleet.call(
-                client -> client.listSoftwareTitles(request), "list Fleet software titles");
+        SoftwareTitlesResponse response = fleet.listSoftwareTitles(request);
         List<SoftwareResponse> items = mapTitles(response);
         boolean hasNext = response.getMeta() != null
                 && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
@@ -108,18 +102,15 @@ public class SoftwareInventoryService {
         return new PageResult<>(items, hasNext, hasPrev, total, page);
     }
 
-    /** Pages the full team-scoped software titles set from Fleet, bounded by {@link #TITLES_FETCH_CAP}. */
-    private List<SoftwareResponse> fetchAllTitles(String search, Boolean vulnerable, Long teamId) {
+    private List<SoftwareResponse> fetchAllTitles(String search, Boolean vulnerable) {
         List<SoftwareResponse> all = new ArrayList<>();
         int page = 0;
         while (all.size() < TITLES_FETCH_CAP) {
-            int current = page;
             SoftwareTitleRequest request = SoftwareTitleRequest.builder()
-                    .page(current).perPage(TITLES_FETCH_PAGE).query(search)
-                    .vulnerable(vulnerable).teamId(teamId)
+                    .page(page).perPage(TITLES_FETCH_PAGE).query(search)
+                    .vulnerable(vulnerable)
                     .build();
-            SoftwareTitlesResponse response = fleet.call(
-                    client -> client.listSoftwareTitles(request), "list Fleet software titles page=" + current);
+            SoftwareTitlesResponse response = fleet.listSoftwareTitles(request);
             all.addAll(mapTitles(response));
             boolean hasNext = response.getMeta() != null
                     && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
@@ -175,9 +166,7 @@ public class SoftwareInventoryService {
         if (parsed.isEmpty()) {
             return PageResult.empty(page);
         }
-        SoftwareTitle title = fleet.call(
-                client -> client.getSoftwareTitle(parsed.get()),
-                "get Fleet software title id=" + parsed.get());
+        SoftwareTitle title = fleet.getSoftwareTitle(parsed.get());
         if (title == null || title.getVersions() == null || title.getVersions().isEmpty()) {
             return PageResult.empty(page);
         }
@@ -195,22 +184,13 @@ public class SoftwareInventoryService {
         return paginate(all, page, perPage);
     }
 
-    /**
-     * Devices that have a given software title installed — backs the software detail "Devices" tab.
-     * Fleet exposes the installed version only per software <em>version</em>, so we fan out one host
-     * query per version of the title, tag each returned host with that version, correlate the Fleet
-     * host to an OpenFrame {@link Machine}, and derive the status from the version vs the title's latest.
-     * Hosts not enrolled in OpenFrame (no matching Machine) are dropped. Paginated in memory.
-     */
     public PageResult<SoftwareOnDeviceResponse> listDevicesForSoftware(String softwareId, String search,
                                                                        int page, Integer perPage) {
         Optional<Long> titleId = parseNumericId(softwareId);
         if (titleId.isEmpty()) {
             return PageResult.empty(page);
         }
-        SoftwareTitle title = fleet.call(
-                client -> client.getSoftwareTitle(titleId.get()),
-                "get Fleet software title id=" + titleId.get());
+        SoftwareTitle title = fleet.getSoftwareTitle(titleId.get());
         if (title == null || title.getVersions() == null || title.getVersions().isEmpty()) {
             return PageResult.empty(page);
         }
@@ -224,9 +204,7 @@ public class SoftwareInventoryService {
             HostSearchRequest request = new HostSearchRequest();
             request.setSoftwareVersionId(version.getId());
             request.setPerPage(DEVICES_PER_VERSION_LIMIT);
-            List<Host> hosts = fleet.call(
-                    client -> client.searchHosts(request),
-                    "list Fleet hosts for software_version_id=" + version.getId());
+            List<Host> hosts = fleet.searchHosts(request);
             hosts.forEach(host -> hostVersions.add(new HostVersion(host, version.getVersion())));
         }
 
@@ -277,14 +255,8 @@ public class SoftwareInventoryService {
     private record HostVersion(Host host, String version) {
     }
 
-    /** Per-title scan cap when computing filter facet counts (one Fleet page). */
     private static final int FILTERS_SCAN_LIMIT = 1000;
 
-    /**
-     * Faceted filter-option counts for the software list — Source / Version-status / Severity dropdowns.
-     * Fleet has no facet endpoint, so we scan the (searched) software titles and tally each dimension.
-     * Bounded to {@link #FILTERS_SCAN_LIMIT} titles.
-     */
     public SoftwareFilters getSoftwareFilters(String search) {
         List<SoftwareResponse> titles = listSoftware(search, 0, FILTERS_SCAN_LIMIT, null, null).items();
         return SoftwareFilters.builder()
@@ -344,9 +316,7 @@ public class SoftwareInventoryService {
     private Map<String, Vulnerability> enrichCves(Set<String> cves) {
         return cves.parallelStream().collect(Collectors.toConcurrentMap(
                 cve -> cve,
-                cve -> Optional.ofNullable(fleet.call(
-                        client -> client.getVulnerability(cve),
-                        "get Fleet vulnerability " + cve)).orElse(null)));
+                cve -> Optional.ofNullable(fleet.getVulnerability(cve)).orElse(null)));
     }
 
     private static boolean matchesSearch(SoftwareVulnerabilityResponse row, String search) {

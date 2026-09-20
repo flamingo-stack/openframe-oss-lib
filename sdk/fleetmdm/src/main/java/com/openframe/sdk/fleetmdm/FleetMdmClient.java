@@ -458,29 +458,35 @@ public class FleetMdmClient {
         });
     }
 
-    public SoftwareTitlesResponse listSoftwareTitles(SoftwareTitleRequest request) throws IOException, InterruptedException {
-        HttpResponse<String> response = sendRequest(buildSoftwareTitlesQuery(request), "GET", null);
-        checkResponse(response, "list Fleet software titles");
-        return MAPPER.readValue(response.body(), SoftwareTitlesResponse.class);
+    public SoftwareTitlesResponse listSoftwareTitles(SoftwareTitleRequest request) {
+        return call("list Fleet software titles", () -> {
+            HttpResponse<String> response = sendRequest(buildSoftwareTitlesQuery(request), "GET", null);
+            checkResponse(response, "list Fleet software titles");
+            return MAPPER.readValue(response.body(), SoftwareTitlesResponse.class);
+        });
     }
 
-    public SoftwareTitle getSoftwareTitle(long id) throws IOException, InterruptedException {
-        HttpResponse<String> response = sendRequest(SOFTWARE_TITLES_URL + "/" + id, "GET", null);
-        if (response.statusCode() == 404) {
-            return null;
-        }
-        checkResponse(response, "get Fleet software title");
-        return MAPPER.treeToValue(requireNode(response.body(), "software_title"), SoftwareTitle.class);
+    public SoftwareTitle getSoftwareTitle(long id) {
+        return call("get Fleet software title " + id, () -> {
+            HttpResponse<String> response = sendRequest(SOFTWARE_TITLES_URL + "/" + id, "GET", null);
+            if (response.statusCode() == 404) {
+                return null;
+            }
+            checkResponse(response, "get Fleet software title");
+            return MAPPER.treeToValue(requireNode(response.body(), "software_title"), SoftwareTitle.class);
+        });
     }
 
-    public Vulnerability getVulnerability(String cve) throws IOException, InterruptedException {
-        HttpResponse<String> response = sendRequest(VULNERABILITY_DETAIL_URL + URLEncoder.encode(cve, StandardCharsets.UTF_8),
-                "GET", null);
-        if (response.statusCode() == 404) {
-            return null;
-        }
-        checkResponse(response, "get Fleet vulnerability");
-        return MAPPER.treeToValue(requireNode(response.body(), "vulnerability"), Vulnerability.class);
+    public Vulnerability getVulnerability(String cve) {
+        return call("get Fleet vulnerability " + cve, () -> {
+            HttpResponse<String> response = sendRequest(VULNERABILITY_DETAIL_URL + URLEncoder.encode(cve, StandardCharsets.UTF_8),
+                    "GET", null);
+            if (response.statusCode() == 404) {
+                return null;
+            }
+            checkResponse(response, "get Fleet vulnerability");
+            return MAPPER.treeToValue(requireNode(response.body(), "vulnerability"), Vulnerability.class);
+        });
     }
 
     private static String buildSoftwareTitlesQuery(SoftwareTitleRequest request) {
@@ -516,20 +522,15 @@ public class FleetMdmClient {
     }
 
     public VulnerabilitiesResponse listVulnerabilities(int page, int perPage) {
-        try {
-            return listVulnerabilities(VulnerabilityRequest.builder().page(page).perPage(perPage).build());
-        } catch (IOException e) {
-            throw new FleetMdmException("Failed to list Fleet vulnerabilities", e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new FleetMdmException("Interrupted while listing Fleet vulnerabilities", e);
-        }
+        return listVulnerabilities(VulnerabilityRequest.builder().page(page).perPage(perPage).build());
     }
 
-    public VulnerabilitiesResponse listVulnerabilities(VulnerabilityRequest request) throws IOException, InterruptedException {
-        HttpResponse<String> response = sendRequest(buildVulnerabilitiesQuery(request), "GET", null);
-        checkResponse(response, "list Fleet vulnerabilities");
-        return MAPPER.readValue(response.body(), VulnerabilitiesResponse.class);
+    public VulnerabilitiesResponse listVulnerabilities(VulnerabilityRequest request) {
+        return call("list Fleet vulnerabilities", () -> {
+            HttpResponse<String> response = sendRequest(buildVulnerabilitiesQuery(request), "GET", null);
+            checkResponse(response, "list Fleet vulnerabilities");
+            return MAPPER.readValue(response.body(), VulnerabilitiesResponse.class);
+        });
     }
 
     private static String buildVulnerabilitiesQuery(VulnerabilityRequest request) {

@@ -9,44 +9,24 @@ import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
-import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-import java.io.IOException;
 import java.util.List;
 
 import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
 
-@Component
+@Configuration
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
-@RequiredArgsConstructor
-public class FleetClientProvider {
+public class FleetMdmClientConfiguration {
 
     private static final String PORT_SEPARATOR = ":";
 
-    private final IntegratedToolRepository integratedToolRepository;
-    private final TenantIdProvider tenantIdProvider;
-
-    public <T> T call(FleetSdkCall<T> call, String action) {
-        try {
-            return call.execute(client());
-        } catch (IOException e) {
-            throw new FleetMdmException("Failed to " + action, e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new FleetMdmException("Interrupted while " + action, e);
-        }
-    }
-
-    @FunctionalInterface
-    public interface FleetSdkCall<T> {
-        T execute(FleetMdmClient client) throws IOException, InterruptedException;
-    }
-
-    private FleetMdmClient client() {
+    @Bean
+    public FleetMdmClient fleetMdmClient(IntegratedToolRepository integratedToolRepository,
+                                         TenantIdProvider tenantIdProvider) {
         String key = IntegratedToolId.FLEET_SERVER_ID.getValue();
         IntegratedTool tool = integratedToolRepository.findByKey(key)
                 .orElseThrow(() -> new IllegalStateException("Fleet MDM tool not configured: " + key));
