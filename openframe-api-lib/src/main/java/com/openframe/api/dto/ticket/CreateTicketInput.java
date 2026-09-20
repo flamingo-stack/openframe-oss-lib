@@ -25,6 +25,7 @@ public class CreateTicketInput {
     private String deviceId;
     private String organizationId;
     private String assigneeId;
+    // TODO: insight is a SaaS concept and should not be named here.
     /** Raw insight id when the ticket is filed from an insight; links the two on create. */
     private String insightId;
     @Size(max = 20)

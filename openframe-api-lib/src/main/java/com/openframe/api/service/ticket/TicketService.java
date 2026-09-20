@@ -682,6 +682,7 @@ public class TicketService {
         return hasText(ticket.getAssignedTo());
     }
 
+    // TODO: insight is a SaaS concept and should not be named here.
     // The insight is the item and the ticket its target, the other way round from the assignments
     // above: an insight can be filed as several tickets over time.
     private void linkInsight(String insightId, String ticketId) {
