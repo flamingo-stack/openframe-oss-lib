@@ -176,6 +176,7 @@ public class TicketService {
             createAssignments(ticketId, AssignmentTargetType.DEVICE, input.getAssignedDeviceIds());
             createAssignments(ticketId, AssignmentTargetType.TICKET, input.getAssignedTicketIds());
             createAssignments(ticketId, AssignmentTargetType.KNOWLEDGE_ARTICLE, input.getAssignedKnowledgeArticleIds());
+            linkInsight(input.getInsightId(), ticketId);
         }
 
         listeners.forEach(listener -> listener.onTicketCreated(savedTicket, input, principal));
@@ -679,6 +680,15 @@ public class TicketService {
 
     private boolean hasAssignee(Ticket ticket) {
         return hasText(ticket.getAssignedTo());
+    }
+
+    // The insight is the item and the ticket its target, the other way round from the assignments
+    // above: an insight can be filed as several tickets over time.
+    private void linkInsight(String insightId, String ticketId) {
+        if (!hasText(insightId)) {
+            return;
+        }
+        assignmentService.assignItem(insightId, AssignmentItemType.INSIGHT, AssignmentTargetType.TICKET, ticketId);
     }
 
     private void createAssignments(String ticketId, AssignmentTargetType targetType, List<String> targetIds) {

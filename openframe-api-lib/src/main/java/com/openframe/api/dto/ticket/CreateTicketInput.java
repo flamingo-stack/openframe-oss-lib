@@ -25,6 +25,8 @@ public class CreateTicketInput {
     private String deviceId;
     private String organizationId;
     private String assigneeId;
+    /** Raw insight id when the ticket is filed from an insight; links the two on create. */
+    private String insightId;
     @Size(max = 20)
     private List<String> tagIds;
     //TODO Backward compatibility alias. Remove after FE alignment
