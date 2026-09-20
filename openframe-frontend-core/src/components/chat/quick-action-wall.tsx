@@ -104,8 +104,10 @@ export interface QuickActionWallProps {
   fadeSize?: MarqueeWallProps['fadeSize'];
   /** THE wall pitch — one value drives the chip gap, the clone-seam gap, and
    *  (in brick mode) the row-stack gap, so the courses read as a uniform wall
-   *  and the seam is invisible by construction. Default
-   *  `var(--spacing-system-xsf)`. */
+   *  and the seam is invisible by construction. Default `var(--chip-wall-gap)`,
+   *  the ODS component token every wall of these chips reads (in-app and in the
+   *  marketing decks), so they cannot drift apart — override it only for a
+   *  surface that genuinely is not one of those walls. */
   copyGap?: number | string;
   /** Pad the track by REPEATING the chips up to this count (suffixed keys) so
    *  one copy always overflows the container and the loop engages — without
@@ -264,7 +266,7 @@ export function QuickActionWall({
   // ONE pitch for chips, clone seams, and (brick mode) the row stack — a
   // custom `copyGap` moves all three together, so no seam can ever disagree
   // with the chip gap.
-  const gap = copyGap ?? 'var(--spacing-system-xsf)';
+  const gap = copyGap ?? 'var(--chip-wall-gap)';
 
   // ---- BRICK-WALL mode: stacked independent row marquees ---------------------
   if (rows && rows > 0) {
