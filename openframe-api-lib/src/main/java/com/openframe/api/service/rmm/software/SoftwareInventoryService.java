@@ -11,10 +11,14 @@ import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.BadRequestException;
-import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
+import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.tool.IntegratedTool;
+import com.openframe.data.document.tool.IntegratedToolId;
+import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
+import com.openframe.sdk.fleetmdm.FleetTenantHeader;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
@@ -22,8 +26,10 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -47,6 +53,7 @@ import static org.springframework.util.StringUtils.hasText;
 public class SoftwareInventoryService {
 
     private static final int DEVICES_PER_VERSION_LIMIT = 500;
+    private static final int HOSTS_PER_TITLE_LIMIT = 500;
     private static final Map<String, String> FLEET_SORT = Map.of(
             "name", "name",
             "devicesCount", "hosts_count");
@@ -55,14 +62,36 @@ public class SoftwareInventoryService {
     private static final int TITLES_FETCH_PAGE = 500;
     private static final int TITLES_FETCH_CAP = 5000;
 
-    private final FleetMdmClient fleet;
-    private final FleetHostMachineResolver hostMachineResolver;
+    private final IntegratedToolRepository integratedToolRepository;
+    private final FleetDeviceCountEnricher deviceCountEnricher;
+    private final com.openframe.api.service.rmm.fleet.FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
+
+    @Value("${TENANT_ID:}")
+    private String tenantIdEnv;
+
+    @Value("${openframe.fleet.multi-tenancy.enabled}")
+    private boolean fleetMultiTenancyEnabled;
+
+    private FleetMdmClient fleet;
+
+    @PostConstruct
+    void wireFleetClient() {
+        FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantIdEnv);
+        String key = IntegratedToolId.FLEET_SERVER_ID.getValue();
+        IntegratedTool tool = integratedToolRepository.findByKey(key)
+                .orElseThrow(() -> new IllegalStateException("Fleet MDM tool not configured: " + key));
+        this.fleet = new FleetMdmClient(tool.getApiUrl(), tool.getApiToken(), tenantIdEnv);
+    }
 
     public Optional<SoftwareResponse> findById(String softwareId) {
         return parseNumericId(softwareId)
                 .map(fleet::getSoftwareTitle)
-                .map(FleetSoftwareMapper::toResponse);
+                .map(FleetSoftwareMapper::toResponse)
+                .map(row -> {
+                    enrichRealDevicesCount(List.of(row));
+                    return row;
+                });
     }
 
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
@@ -74,15 +103,43 @@ public class SoftwareInventoryService {
             String orderKey = field == null ? null : FLEET_SORT.get(field);
             // Fleet rejects order_direction without order_key — send it only when there is a key.
             String orderDirection = orderKey == null ? null : (desc ? "desc" : "asc");
-            return fleetPage(search, page, perPage, orderKey, orderDirection, vulnerable);
+            PageResult<SoftwareResponse> pageResult = fleetPage(search, page, perPage, orderKey, orderDirection, vulnerable);
+            // Enrich ONLY the visible page (bounded by perPage) to keep Fleet fan-out predictable.
+            enrichRealDevicesCount(pageResult.items());
+            return pageResult;
         }
         if (!CLIENT_SORT.contains(field)) {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
+        // fetchAllTitles is bounded by TITLES_FETCH_CAP; we sort in memory then enrich only the returned slice.
         List<SoftwareResponse> all = fetchAllTitles(search, vulnerable).stream()
                 .sorted(clientComparator(field, desc))
                 .toList();
-        return paginateList(all, page, perPage);
+        PageResult<SoftwareResponse> pageResult = paginateList(all, page, perPage);
+        enrichRealDevicesCount(pageResult.items());
+        return pageResult;
+    }
+
+    /**
+     * Replace Fleet's raw {@code hosts_count} with the count of OpenFrame Machines that correlate
+     * to the title's Fleet hosts. Delegates to {@link FleetDeviceCountEnricher} — the shared
+     * enrichment plumbing that also serves the vulnerability reader.
+     */
+    private void enrichRealDevicesCount(List<SoftwareResponse> titles) {
+        deviceCountEnricher.enrich(titles,
+                row -> hostsForTitle(row.getId()),
+                SoftwareResponse::setDevicesCount);
+    }
+
+    private List<Host> hostsForTitle(String titleIdStr) {
+        return parseNumericId(titleIdStr)
+                .map(titleId -> {
+                    HostSearchRequest request = new HostSearchRequest();
+                    request.setSoftwareTitleId(titleId);
+                    request.setPerPage(HOSTS_PER_TITLE_LIMIT);
+                    return fleet.searchHosts(request);
+                })
+                .orElseGet(List::of);
     }
 
     private PageResult<SoftwareResponse> fleetPage(String search, int page, Integer perPage, String orderKey,
@@ -258,7 +315,10 @@ public class SoftwareInventoryService {
     private static final int FILTERS_SCAN_LIMIT = 1000;
 
     public SoftwareFilters getSoftwareFilters(String search) {
-        List<SoftwareResponse> titles = listSoftware(search, 0, FILTERS_SCAN_LIMIT, null, null).items();
+        // Facet counts are by source/versionStatus/severity — none of them depends on the enriched
+        // devicesCount, so we deliberately bypass enrichRealDevicesCount here (it would fire N Fleet
+        // /hosts lookups just to produce numbers we don't use).
+        List<SoftwareResponse> titles = fetchAllTitles(search, null);
         return SoftwareFilters.builder()
                 .sources(facet(titles, SoftwareResponse::getSource))
                 .versionStatuses(facet(titles, SoftwareResponse::getVersionStatus))
