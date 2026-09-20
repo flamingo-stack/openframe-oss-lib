@@ -15,11 +15,14 @@ import com.openframe.security.authentication.AuthPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -46,18 +49,15 @@ class TicketServiceInsightLinkTest {
     @Mock private TicketOrderCalculationService ticketOrderCalculationService;
     @Mock private TicketLifecycleService ticketLifecycleService;
     @Mock private TicketResolverStamp ticketResolverStamp;
+    @Mock private TicketStalenessResolver ticketStalenessResolver;
+    @Spy private List<TicketEventListener> listeners = new ArrayList<>();
 
-    private TicketService service;
+    @InjectMocks private TicketService service;
+
     private AuthPrincipal admin;
 
     @BeforeEach
     void setUp() {
-        List<TicketEventListener> listeners = List.of();
-        service = new TicketService(ticketRepository, ticketNumberService, ticketTagService,
-                ticketIdsForFilter, machineRepository, organizationRepository, userRepository,
-                assignmentService, ticketOrderCalculationService, ticketLifecycleService,
-                ticketResolverStamp, listeners);
-
         admin = AuthPrincipal.builder().id("admin-1").actorType(ActorType.ADMIN).build();
 
         Ticket saved = Ticket.builder().id(TICKET_ID).build();
