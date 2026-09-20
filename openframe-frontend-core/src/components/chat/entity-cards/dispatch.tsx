@@ -46,9 +46,12 @@ import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-
 import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon';
 import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentation-bar-icon';
 import { PresentationLineIcon } from '../../icons-v2-generated/charts/presentation-line-icon';
+import { BracketCurlyCheckIcon } from '../../icons-v2-generated/coding/bracket-curly-check-icon';
 import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
+import { CodingBranchIcon } from '../../icons-v2-generated/coding/coding-branch-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
+import { PackageIcon } from '../../icons-v2-generated/coding/package-icon';
 import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
 import { ChatQuoteIcon } from '../../icons-v2-generated/communication/chat-quote-icon';
 import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
@@ -1348,6 +1351,13 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
   openframe_tenant: { label: 'OpenFrame tenant', icon: () => <OpenFrameGlyph size={24} /> },
   prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
+  // Code intelligence (product-hub internal): the review rules a repository is
+  // held to, the repositories themselves, and one row per deployment
+  // environment. Glyph cards like their siblings — none of the three has a
+  // cover image, and a rule is read in the admin screen it links to.
+  code_rule: { label: 'Review rule', icon: () => <BracketCurlyCheckIcon size={24} /> },
+  code_repo: { label: 'Repository', icon: () => <CodingBranchIcon size={24} /> },
+  code_deployment: { label: 'Deployment', icon: () => <PackageIcon size={24} /> },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
