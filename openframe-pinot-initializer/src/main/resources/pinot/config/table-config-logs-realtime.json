@@ -35,6 +35,7 @@
       "summary",
       "userId",
       "hostname",
+      "nickname",
       "organizationName"
     ],
     "invertedIndexColumns": [
@@ -98,6 +99,17 @@
     },
     {
       "name": "hostname",
+      "encodingType": "RAW",
+      "indexTypes": [
+        "TEXT"
+      ],
+      "properties": {
+        "enableQueryCache": "true",
+        "caseSensitive": "false"
+      }
+    },
+    {
+      "name": "nickname",
       "encodingType": "RAW",
       "indexTypes": [
         "TEXT"

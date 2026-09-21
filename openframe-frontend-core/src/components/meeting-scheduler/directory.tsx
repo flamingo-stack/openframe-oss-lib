@@ -27,7 +27,7 @@ import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import type { SchedulingLink, SchedulingLinksPayload } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { contentFetch } from '../../utils/embed-content-fetch';
-import { formatDurationCompact } from '../../utils/format';
+import { formatDurationCompact, formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { pageCount } from '../../utils/search-params';
 import { EmptyState } from '../empty-state';
 import { PersistentPaginationWrapper } from '../persistent-pagination';
@@ -60,17 +60,7 @@ function useNextAvailableLabel(ms: number | null): string | null {
   const hydrated = useIsHydrated();
   return useMemo(() => {
     if (!hydrated || ms == null) return null;
-    try {
-      return new Intl.DateTimeFormat(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      }).format(new Date(ms));
-    } catch {
-      return null;
-    }
+    return formatDateWithTimezone(ms, VIEWER_TIMEZONE, 'shortWeekdayDateTime', { viewerLocale: true }) || null;
   }, [hydrated, ms]);
 }
 
@@ -114,7 +104,7 @@ function DirectoryRow({
         {/* Hosts stay visible on mobile too — the facepile is the row's "who
             you're booking with" signal; only the chip and next-available meta
             collapse on narrow widths. */}
-        <AvatarStack people={link.hosts} max={3} size="md" className="flex shrink-0" />
+        <AvatarStack people={link.hosts} max={3} size="md" label="Hosts" className="flex shrink-0" />
 
         <div className="hidden w-44 shrink-0 flex-col items-end justify-center md:flex">
           <p className="text-ods-text-secondary text-h6">Next available</p>

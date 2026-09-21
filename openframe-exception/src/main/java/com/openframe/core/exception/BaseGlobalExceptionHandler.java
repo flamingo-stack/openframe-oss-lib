@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -122,6 +123,19 @@ public class BaseGlobalExceptionHandler {
     public ErrorResponse handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
         log.warn("Missing required parameter: {}", ex.getParameterName());
         return ErrorResponse.of(ErrorCode.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing");
+    }
+
+    /**
+     * A request parameter or path variable that cannot be converted to its declared type, e.g. an
+     * unknown enum value or text for a number. Without this it falls through to the generic handler
+     * and is reported as a 500.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        log.warn("Type mismatch for parameter '{}': {}", ex.getName(), ex.getMessage());
+        return ErrorResponse.of(ErrorCode.TYPE_MISMATCH,
+                String.format("Invalid value '%s' for parameter '%s'", ex.getValue(), ex.getName()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

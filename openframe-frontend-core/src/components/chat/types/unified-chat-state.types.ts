@@ -17,12 +17,11 @@
  */
 
 import type { ChatRef } from '../chat-ref.types';
-import type { ChatSource } from '../hooks/use-sse-chat-adapter';
 import type { ChatAttachment } from '../utils/chat-attachment-markdown';
 import type { AuthorType } from './chat.types';
 import type { DialogItem } from './component.types';
 import type { ChatContextItem } from './context-item.types';
-import type { MessageSegment, ScrollAnchor } from './message.types';
+import type { ChatSource, MessageSegment, ScrollAnchor } from './message.types';
 
 // ─── Dialog-list host contract (shared by the NATS + SSE adapters) ───────────
 
@@ -230,8 +229,18 @@ export interface UnifiedChatMessage {
    */
   timestamp?: Date | string | number;
 
-  /** Guide/SSE-only: document citations. Undefined in Mingo mode. */
+  /**
+   * Documents this answer cited, rendered as chips beneath it. Produced by
+   * BOTH transports now — SSE reads them off the per-turn metadata frame, NATS
+   * decodes them out of a `GUIDE`/`SOURCES` chunk.
+   */
   sources?: ChatSource[];
+  /**
+   * Entity references this answer's metadata described — videos and cards.
+   * Data for the `[card://type:id]` markers in the body, not a render list:
+   * only markers actually present in the text are rendered.
+   */
+  refs?: ChatRef[];
 
   /**
    * Per-message viewport-positioning hint. Common to both modes; the

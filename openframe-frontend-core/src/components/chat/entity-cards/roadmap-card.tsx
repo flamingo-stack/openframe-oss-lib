@@ -103,7 +103,7 @@ export interface RoadmapCardProps {
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   targetPlatform?: string | null;
   /** Compact-branch variant — drives the icon-slot fallback rule. */
   cardType?: 'roadmap_item' | 'delivery_item' | 'internal_task';

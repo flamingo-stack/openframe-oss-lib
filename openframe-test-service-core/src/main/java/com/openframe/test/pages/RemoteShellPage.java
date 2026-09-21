@@ -183,11 +183,18 @@ public class RemoteShellPage {
     /**
      * Returns all non-empty lines currently visible in the terminal output.
      * Lines are read from the xterm.js DOM rows container.
+     *
+     * <p>Read in one call on purpose. {@code all()} resolves the rows to locators by index and each
+     * {@code textContent()} is then a separate call that waits for its element, so a row that
+     * disappears between the two blocks until the timeout. xterm.js recycles its row divs on every
+     * repaint and drops rows when the session re-renders, which is exactly when this is called --
+     * a reconnect mid-test cost a 30s timeout on {@code .xterm-rows > div} nth(31) rather than a
+     * readable failure. {@code allTextContents()} snapshots every row in a single evaluation.
      */
     public List<String> getTerminalLines() {
-        return page.locator(TERMINAL_ROWS + " > div").all()
+        return page.locator(TERMINAL_ROWS + " > div").allTextContents()
                 .stream()
-                .map(loc -> loc.textContent().trim())
+                .map(String::trim)
                 .filter(t -> !t.isEmpty())
                 .collect(Collectors.toList());
     }

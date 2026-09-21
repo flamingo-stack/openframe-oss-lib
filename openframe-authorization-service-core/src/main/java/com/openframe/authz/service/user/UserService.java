@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -39,6 +40,19 @@ public class UserService {
     public Optional<AuthUser> findActiveById(String userId) {
         return userRepository.findById(userId)
                 .filter(user -> user.getStatus() == UserStatus.ACTIVE);
+    }
+
+    /**
+     * Whether the email already has an ACTIVE account in a tenant OTHER than the given one.
+     * Auto-provisioning consults this before creating a user: tenant registration enforces global
+     * single-active-email, but the per-tenant provisioning guard alone would let a second tenant
+     * mint a duplicate — after which every global findActiveByEmail throws
+     * IncorrectResultSizeDataAccessException.
+     */
+    public boolean hasActiveAccountInAnotherTenant(String email, String tenantId) {
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        return userRepository.findAllByEmailAndStatus(normalized, ACTIVE).stream()
+                .anyMatch(u -> !u.getTenantId().equals(tenantId));
     }
 
     public Optional<AuthUser> findActiveByEmail(String email) {
@@ -124,6 +138,8 @@ public class UserService {
                                 List<UserRole> roles) {
         AuthUser user = AuthUser.builder()
                 .id(randomUUID().toString())
+                // Set explicitly: with a pre-assigned id Spring Data treats the user as existing, so auditing never fills @CreatedDate.
+                .createdAt(LocalDateTime.now())
                 .tenantId(tenantId)
                 .email(email)
                 .firstName(firstName)
@@ -213,6 +229,8 @@ public class UserService {
         String randomPassword = randomUUID().toString();
         AuthUser user = AuthUser.builder()
                 .id(randomUUID().toString())
+                // Set explicitly: with a pre-assigned id Spring Data treats the user as existing, so auditing never fills @CreatedDate.
+                .createdAt(LocalDateTime.now())
                 .tenantId(tenantId)
                 .email(email)
                 .firstName(firstName)

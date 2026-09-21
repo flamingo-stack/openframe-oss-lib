@@ -98,8 +98,11 @@ public class TicketService {
         String sortDirection = sort != null && sort.getDirection() != null
                 ? sort.getDirection().name()
                 : SortDirection.DESC.name();
-        List<Ticket> pageItems = fetchPageItems(query, paging, sortField, sortDirection);
-        boolean hasNextPage = pageItems.size() == paging.getLimit();
+        int limit = paging.getLimit();
+        List<Ticket> raw = ticketRepository.findTicketsWithCursor(
+                query, paging.getCursor(), limit + 1, sortField, sortDirection);
+        boolean hasNextPage = raw.size() > limit;
+        List<Ticket> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
 
         return CountedGenericQueryResult.<Ticket>builder()
                 .items(pageItems)
@@ -115,6 +118,25 @@ public class TicketService {
             return ticketRepository.findByIdAndOwnerMachineId(ticketId, principal.getMachineId());
         }
         return ticketRepository.findById(ticketId);
+    }
+
+    public Optional<Ticket> getTicketByNumber(AuthPrincipal principal, Integer ticketNumber) {
+        log.debug("Getting ticket #{} for {}", ticketNumber, principal.getActorType());
+
+        if (isAgent(principal)) {
+            return ticketRepository.findByTicketNumberAndOwnerMachineId(ticketNumber, principal.getMachineId());
+        }
+        return ticketRepository.findByTicketNumber(ticketNumber);
+    }
+
+    public Optional<Ticket> findByIdOrNumber(AuthPrincipal principal, String ticketId, Integer ticketNumber) {
+        if (hasText(ticketId)) {
+            return getTicket(principal, ticketId);
+        }
+        if (ticketNumber == null) {
+            throw new IllegalArgumentException("ticketId or ticketNumber is required");
+        }
+        return getTicketByNumber(principal, ticketNumber);
     }
 
     @Transactional
@@ -154,6 +176,7 @@ public class TicketService {
             createAssignments(ticketId, AssignmentTargetType.DEVICE, input.getAssignedDeviceIds());
             createAssignments(ticketId, AssignmentTargetType.TICKET, input.getAssignedTicketIds());
             createAssignments(ticketId, AssignmentTargetType.KNOWLEDGE_ARTICLE, input.getAssignedKnowledgeArticleIds());
+            linkInsight(input.getInsightId(), ticketId);
         }
 
         listeners.forEach(listener -> listener.onTicketCreated(savedTicket, input, principal));
@@ -565,15 +588,6 @@ public class TicketService {
                 .build();
     }
 
-    private List<Ticket> fetchPageItems(Query query, CursorPaginationCriteria criteria,
-                                        String sortField, String sortDirection) {
-        List<Ticket> tickets = ticketRepository.findTicketsWithCursor(
-                query, criteria.getCursor(), criteria.getLimit() + 1, sortField, sortDirection);
-        return tickets.size() > criteria.getLimit()
-                ? tickets.subList(0, criteria.getLimit())
-                : tickets;
-    }
-
     private PageInfo buildPageInfo(List<Ticket> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
         String startCursor = pageItems.isEmpty() ? null : pageItems.getFirst().getId();
         String endCursor = pageItems.isEmpty() ? null : pageItems.getLast().getId();
@@ -666,6 +680,16 @@ public class TicketService {
 
     private boolean hasAssignee(Ticket ticket) {
         return hasText(ticket.getAssignedTo());
+    }
+
+    // TODO: insight is a SaaS concept and should not be named here.
+    // The insight is the item and the ticket its target, the other way round from the assignments
+    // above: an insight can be filed as several tickets over time.
+    private void linkInsight(String insightId, String ticketId) {
+        if (!hasText(insightId)) {
+            return;
+        }
+        assignmentService.assignItem(insightId, AssignmentItemType.INSIGHT, AssignmentTargetType.TICKET, ticketId);
     }
 
     private void createAssignments(String ticketId, AssignmentTargetType targetType, List<String> targetIds) {

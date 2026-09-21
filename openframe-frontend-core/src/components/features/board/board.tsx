@@ -42,9 +42,15 @@ const PENDING_MOVE_TIMEOUT_MS = 2000;
 const DROP_MS = 160;
 const DROP_EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 
-/** Above the header, modals and drawers, below toasts — a card being carried
- *  has to clear everything it is being carried over. */
-const DRAG_PREVIEW_Z = 1400;
+/** Above the header, the in-layout drawers and the header menus (z-[104]),
+ *  BELOW modals (`ModalV2` overlay z-[1300]). The carried card itself is the
+ *  browser's drag image and needs no z-index at all; this stacks only the
+ *  160ms landing glide, which never leaves the lanes - a release anywhere
+ *  else cancels, and no modal or drawer is open while a card is in the air.
+ *  The one modal the glide can meet is the one the drop itself opens (Take
+ *  Over / Reopen, mounted in the same commit as the glide), and that modal has
+ *  to cover the glide, not be flown over by it. */
+const DRAG_PREVIEW_Z = 1200;
 
 const ARROW_KEYS: ArrowKey[] = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
@@ -148,6 +154,7 @@ function DragBoard({
     onThumbPointerDown,
     onThumbPointerMove,
     onThumbPointerUp,
+    onThumbPointerCancel,
   } = useHorizontalScrollbar();
 
   // The monitor is registered once for the board's lifetime; these keep it
@@ -619,11 +626,12 @@ function DragBoard({
                 <div
                   ref={thumbRef}
                   data-scrollbar-thumb
-                  className="absolute top-0 h-full rounded-full bg-ods-text-secondary transition-colors"
+                  className="absolute top-0 h-full touch-none rounded-full bg-ods-text-secondary transition-colors"
                   style={{ width: `${thumbRatio * 100}%`, cursor: 'grab' }}
                   onPointerDown={onThumbPointerDown}
                   onPointerMove={onThumbPointerMove}
                   onPointerUp={onThumbPointerUp}
+                  onPointerCancel={onThumbPointerCancel}
                 />
               </div>
             )}

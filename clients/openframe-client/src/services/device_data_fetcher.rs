@@ -1,4 +1,4 @@
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 #[derive(Clone)]
 pub struct DeviceDataFetcher;
@@ -88,6 +88,19 @@ impl DeviceDataFetcher {
             None
         } else {
             Some(value)
+        }
+    }
+
+    pub fn get_timezone(&self) -> Option<String> {
+        match iana_time_zone::get_timezone() {
+            Ok(timezone) => {
+                debug!("Resolved system timezone '{}'", timezone);
+                Some(timezone)
+            }
+            Err(e) => {
+                warn!("Failed to get system timezone: {:#}", e);
+                None
+            }
         }
     }
 
