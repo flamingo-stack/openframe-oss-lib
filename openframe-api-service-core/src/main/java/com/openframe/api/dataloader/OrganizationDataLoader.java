@@ -6,7 +6,10 @@ import com.openframe.data.repository.organization.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
 import org.dataloader.BatchLoader;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
@@ -15,9 +18,11 @@ import java.util.stream.Collectors;
  * DataLoader for batch loading Organization objects by organizationId.
  * This prevents N+1 query problems when loading organizations for multiple machines.
  */
-@DgsDataLoader(name = "organizationDataLoader")
+@DgsDataLoader(name = OrganizationDataLoader.NAME)
 @RequiredArgsConstructor
 public class OrganizationDataLoader implements BatchLoader<String, Organization> {
+
+    public static final String NAME = "organizationDataLoader";
 
     private final OrganizationRepository organizationRepository;
 
