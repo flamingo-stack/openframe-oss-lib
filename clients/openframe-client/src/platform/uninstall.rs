@@ -164,21 +164,6 @@ pub async fn remove_directory_with_retry(path: &Path, max_retries: u32) -> Resul
                             return Ok(());
                         }
                         Err(force_err) => {
-                            // A refused/unkillable holder still locks the directory: schedule its
-                            // contents for deletion on the next boot so it clears without a wipe.
-                            #[cfg(target_os = "windows")]
-                            if path.exists() && crate::platform::file_lock::is_file_in_use_error(&e)
-                            {
-                                let scheduled =
-                                    crate::platform::lock_recovery::schedule_delete_on_reboot(path);
-                                warn!(
-                                    "Directory {} is still locked after {} attempts; scheduled {} entr{} for delete-on-reboot (a reboot is required to fully clear it)",
-                                    path.display(),
-                                    max_retries,
-                                    scheduled,
-                                    if scheduled == 1 { "y" } else { "ies" }
-                                );
-                            }
                             return Err(anyhow::anyhow!(
                                 "Failed to remove directory {} after {} attempts. Last error: {}. Force removal error: {}",
                                 path.display(),

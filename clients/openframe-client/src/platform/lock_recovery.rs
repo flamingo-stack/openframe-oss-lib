@@ -130,7 +130,7 @@ pub(crate) fn classify_holder(
 }
 
 // ---------------------------------------------------------------------------
-// Windows-only eviction + delete-on-reboot
+// Windows-only eviction
 // ---------------------------------------------------------------------------
 
 #[cfg(target_os = "windows")]
@@ -141,10 +141,6 @@ use crate::platform::system_service;
 use sysinfo::{Pid, System};
 #[cfg(target_os = "windows")]
 use tracing::{info, warn};
-#[cfg(target_os = "windows")]
-use windows::core::PCWSTR;
-#[cfg(target_os = "windows")]
-use windows::Win32::Storage::FileSystem::{MoveFileExW, MOVEFILE_DELAY_UNTIL_REBOOT};
 
 /// Depth of the ancestor walk when building the protected-PID set (guards against cycles).
 #[cfg(target_os = "windows")]
@@ -305,69 +301,6 @@ async fn terminate_pid(pid: u32) {
             "Lock recovery: failed to run taskkill for PID {}: {}",
             pid, e
         ),
-    }
-}
-
-/// Schedule every entry under `dir` (and `dir` itself) for deletion on the next boot via
-/// `MoveFileEx`, so a directory a refused holder still locks is cleared without a manual wipe.
-/// Returns the number of entries scheduled.
-#[cfg(target_os = "windows")]
-pub(crate) fn schedule_delete_on_reboot(dir: &Path) -> usize {
-    let mut files: Vec<PathBuf> = Vec::new();
-    let mut dirs: Vec<PathBuf> = Vec::new();
-    collect_entries(dir, &mut files, &mut dirs);
-    dirs.push(dir.to_path_buf());
-    // Deepest first, so each directory is empty when its own deletion is applied at boot.
-    dirs.sort_by_key(|d| std::cmp::Reverse(d.components().count()));
-
-    let mut scheduled = 0usize;
-    for file in &files {
-        if move_delete_on_reboot(file) {
-            scheduled += 1;
-        }
-    }
-    for directory in &dirs {
-        if move_delete_on_reboot(directory) {
-            scheduled += 1;
-        }
-    }
-    scheduled
-}
-
-#[cfg(target_os = "windows")]
-fn collect_entries(dir: &Path, files: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        match entry.file_type() {
-            Ok(ft) if ft.is_dir() => {
-                collect_entries(&path, files, dirs);
-                dirs.push(path);
-            }
-            Ok(_) => files.push(path),
-            Err(_) => {}
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn move_delete_on_reboot(path: &Path) -> bool {
-    use std::os::windows::ffi::OsStrExt;
-    let wide: Vec<u16> = path
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-    // A NULL destination with MOVEFILE_DELAY_UNTIL_REBOOT marks the path for deletion at boot.
-    unsafe {
-        MoveFileExW(
-            PCWSTR(wide.as_ptr()),
-            PCWSTR(std::ptr::null()),
-            MOVEFILE_DELAY_UNTIL_REBOOT,
-        )
-        .is_ok()
     }
 }
 
