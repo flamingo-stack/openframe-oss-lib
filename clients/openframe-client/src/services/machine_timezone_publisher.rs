@@ -29,10 +29,28 @@ impl MachineTimezonePublisher {
         };
         let bytes = serde_json::to_vec(&message)?;
 
-        let subject = format!("machine.{}.timezone", machine_id);
+        let encoded_machine_id = percent_encode_unreserved(&machine_id);
+        let subject = format!("machine.{}.timezone", encoded_machine_id);
         self.nats_publisher.publish_acked(&subject, &bytes).await?;
 
         info!("Reported timezone '{}' on {}", timezone, subject);
         Ok(())
     }
 }
+
+fn percent_encode_unreserved(input: &str) -> String {
+    let mut encoded = String::with_capacity(input.len());
+    for byte in input.as_bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(*byte as char);
+            }
+            _ => {
+                encoded.push('%');
+                encoded.push_str(&format!("{:02X}", byte));
+            }
+        }
+    }
+    encoded
+}
+
