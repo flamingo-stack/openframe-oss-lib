@@ -22,7 +22,7 @@ import java.util.Set;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "openframe.delivery.enabled", havingValue = "true")
+@ConditionalOnProperty(name = {"openframe.delivery.enabled", "openframe.delivery.sweep.enabled"}, havingValue = "true")
 public class DeliveryCloser {
 
     private final MachineDeliveryRepository repository;

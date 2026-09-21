@@ -29,7 +29,7 @@ import static java.util.stream.Collectors.toSet;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "openframe.delivery.enabled", havingValue = "true")
+@ConditionalOnProperty(name = {"openframe.delivery.enabled", "openframe.delivery.sweep.enabled"}, havingValue = "true")
 public class DeliverySweepService {
 
     private final MachineDeliveryRepository repository;
