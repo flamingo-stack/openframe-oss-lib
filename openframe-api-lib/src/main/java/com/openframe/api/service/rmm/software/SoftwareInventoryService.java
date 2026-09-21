@@ -81,7 +81,7 @@ public class SoftwareInventoryService {
         String key = IntegratedToolId.FLEET_SERVER_ID.getValue();
         IntegratedTool tool = integratedToolRepository.findByKey(key)
                 .orElseThrow(() -> new IllegalStateException("Fleet MDM tool not configured: " + key));
-        this.fleet = new FleetMdmClient(tool.getApiUrl(), tool.getApiToken(), tenantIdEnv);
+        this.fleet = new FleetMdmClient(tool.apiUrl(), tool.apiToken(), tenantIdEnv);
     }
 
     public Optional<SoftwareResponse> findById(String softwareId) {

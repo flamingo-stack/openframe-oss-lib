@@ -42,7 +42,7 @@ public class IntegratedTool implements TenantScoped {
     private String[] allowedEndpoints;
     private Object[] debeziumConnectors;
 
-    public String getApiUrl() {
+    public String apiUrl() {
         if (toolUrls == null || toolUrls.isEmpty()) {
             throw new IllegalStateException("Integrated tool has no configured URLs: " + key);
         }
@@ -54,7 +54,7 @@ public class IntegratedTool implements TenantScoped {
         return (port == null || port.isBlank()) ? api.getUrl() : api.getUrl() + ":" + port;
     }
 
-    public String getApiToken() {
+    public String apiToken() {
         ToolApiKey apiKey = credentials == null ? null : credentials.getApiKey();
         String value = apiKey == null ? null : apiKey.getKey();
         if (value == null || value.isBlank()) {
