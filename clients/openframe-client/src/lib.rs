@@ -41,7 +41,6 @@ use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
 use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::execution_listener::ExecutionListener;
-use crate::listener::machine_timezone_request_listener::MachineTimezoneRequestListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
 use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
@@ -66,6 +65,8 @@ use crate::services::installed_agent_message_publisher::InstalledAgentMessagePub
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::machine_heartbeat_publisher::MachineHeartbeatPublisher;
 use crate::services::machine_heartbeat_run_manager::MachineHeartbeatRunManager;
+use crate::services::machine_timezone_publisher::MachineTimezonePublisher;
+use crate::services::machine_timezone_run_manager::MachineTimezoneRunManager;
 use crate::services::mesh_self_heal_service::MeshSelfHealService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
@@ -183,7 +184,7 @@ pub struct Client {
     package_manager_presence_run_manager: PackageManagerPresenceRunManager,
     package_manager_update_run_manager: PackageManagerUpdateRunManager,
     hostname_report_publisher: HostnameReportPublisher,
-    machine_timezone_request_listener: MachineTimezoneRequestListener,
+    machine_timezone_run_manager: MachineTimezoneRunManager,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
@@ -608,11 +609,10 @@ impl Client {
             device_data_fetcher.clone(),
         );
 
-        let machine_timezone_request_listener = MachineTimezoneRequestListener::new(
-            nats_connection_manager.clone(),
-            nats_message_publisher.clone(),
-            config_service.clone(),
+        let machine_timezone_run_manager = MachineTimezoneRunManager::new(
+            MachineTimezonePublisher::new(nats_message_publisher.clone(), config_service.clone()),
             device_data_fetcher.clone(),
+            nats_connection_manager.clone(),
         );
 
         Ok(Self {
@@ -640,7 +640,7 @@ impl Client {
             package_manager_presence_run_manager,
             package_manager_update_run_manager,
             hostname_report_publisher,
-            machine_timezone_request_listener,
+            machine_timezone_run_manager,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             update_handler_service,
@@ -713,6 +713,7 @@ impl Client {
 
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();
+        self.machine_timezone_run_manager.start();
 
         self.package_manager_update_run_manager.start();
 
@@ -720,9 +721,6 @@ impl Client {
 
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
-
-        self.machine_timezone_request_listener.start().await?;
-        self.machine_timezone_request_listener.report_once().await;
 
         //Start tool installation message listener in background
         self.tool_installation_message_listener.start().await?;

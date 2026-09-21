@@ -52,6 +52,7 @@ export function QueryReportTable({
     onThumbPointerDown,
     onThumbPointerMove,
     onThumbPointerUp,
+    onThumbPointerCancel,
   } = useHorizontalScrollbar();
 
   return (
@@ -103,7 +104,7 @@ export function QueryReportTable({
               <div
                 ref={thumbRef}
                 data-scrollbar-thumb
-                className="absolute top-0 h-full rounded-full bg-ods-text-secondary transition-colors"
+                className="absolute top-0 h-full touch-none rounded-full bg-ods-text-secondary transition-colors"
                 style={{
                   width: `${thumbRatio * 100}%`,
                   cursor: 'grab',
@@ -111,6 +112,7 @@ export function QueryReportTable({
                 onPointerDown={onThumbPointerDown}
                 onPointerMove={onThumbPointerMove}
                 onPointerUp={onThumbPointerUp}
+                onPointerCancel={onThumbPointerCancel}
               />
             </div>
           )}
