@@ -51,7 +51,8 @@ export function SortColumnItem({ column, currentDirection, onSort, onClear }: So
   };
 
   return (
-    <div
+    <button
+      type="button"
       onClick={handleClick}
       className={cn(
         'flex w-full items-center justify-between gap-2 bg-ods-card p-3',
@@ -63,6 +64,6 @@ export function SortColumnItem({ column, currentDirection, onSort, onClear }: So
         {column.label}
       </span>
       {getSortIcon()}
-    </div>
+    </button>
   );
 }
