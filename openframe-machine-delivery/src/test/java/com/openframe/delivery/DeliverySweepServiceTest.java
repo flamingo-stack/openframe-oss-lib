@@ -45,8 +45,8 @@ class DeliverySweepServiceTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String OTHER_MACHINE_ID = "mach-43";
-    private static final String TARGET_ID = "tactical-agent";
-    private static final String PAYLOAD_JSON = "{\"value\":\"tactical-agent\"}";
+    private static final String TARGET_ID = "fleetmdm-agent";
+    private static final String PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\"}";
     private static final String CORRUPT_JSON = "not-json";
     private static final long TWO_DAYS_SECONDS = 172_800L;
     private static final long FIRST_RETRY_DELAY = ACK_THRESHOLD * BACKOFF_MULTIPLIER;

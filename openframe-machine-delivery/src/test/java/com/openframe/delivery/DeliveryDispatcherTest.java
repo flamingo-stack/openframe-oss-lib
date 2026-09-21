@@ -19,7 +19,7 @@ import static org.mockito.Mockito.when;
 class DeliveryDispatcherTest {
 
     private static final String MACHINE_ID = "mach-42";
-    private static final String TARGET_ID = "tactical-agent";
+    private static final String TARGET_ID = "fleetmdm-agent";
 
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliveryRecorder recorder;

@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class CustomMachineDeliveryRepositoryImplTest {
 
-    private static final String ID = "TOOL_INSTALLATION:tactical-agent:mach-42";
+    private static final String ID = "TOOL_INSTALLATION:fleetmdm-agent:mach-42";
     private static final String MACHINE_ID = "mach-42";
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
