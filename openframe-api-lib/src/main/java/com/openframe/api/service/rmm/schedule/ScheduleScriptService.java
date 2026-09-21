@@ -56,11 +56,7 @@ public class ScheduleScriptService {
     private final ScheduleDeviceLocalDispatchRepository deviceLocalDispatchRepository;
     private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
 
-    /**
-     * Create a new schedule in the current tenant.
-     *
-     * @throws ConflictException if a schedule with the same name already exists.
-     */
+    // Throws ConflictException if a schedule with the same name already exists in the tenant.
     public ScriptScheduleResponse create(CreateScriptScheduleInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
@@ -84,23 +80,19 @@ public class ScheduleScriptService {
         return scheduleMapper.toResponse(saved);
     }
 
-    /**
-     * Get a single schedule by id within the current tenant.
-     *
-     * @throws NotFoundException if it does not exist, belongs to a different tenant, or is soft-deleted.
-     */
+    // Throws NotFoundException if the schedule does not exist, belongs to another tenant, or is soft-deleted.
     public ScriptScheduleResponse get(String id) {
         return scheduleMapper.toResponse(loadVisibleOrThrow(tenantIdProvider.getTenantId(), id));
     }
 
-    /** Optional, non-throwing lookup — empty for a missing, soft-deleted, or other-tenant schedule. */
+    // Optional, non-throwing lookup — empty for a missing, soft-deleted, or other-tenant schedule.
     public Optional<ScriptScheduleResponse> findById(String id) {
         return scheduleRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
                 .filter(schedule -> schedule.getStatus() != ScriptStatus.DELETED)
                 .map(scheduleMapper::toResponse);
     }
 
-    /** Batch lookup of schedules by id in the current tenant. Unknown ids are simply absent. */
+    // Batch lookup of schedules by id in the current tenant. Unknown ids are simply absent.
     public List<ScriptScheduleResponse> getSchedulesByIds(Collection<String> ids) {
         if (ids == null || ids.isEmpty()) {
             return List.of();
@@ -110,11 +102,7 @@ public class ScheduleScriptService {
                 .toList();
     }
 
-    /**
-     * Cursor-paginated list of schedules in the current tenant, with
-     * optional filter / search / sort. Default order is newest-first (by
-     * {@code _id} desc). Uses the "fetch limit + 1" trick to detect further pages.
-     */
+    // Uses the "fetch limit + 1" trick to detect further pages; default order is newest-first (by _id desc).
     public CountedGenericQueryResult<ScriptScheduleResponse> list(ScriptScheduleFilterInput filter,
                                                                   String search,
                                                                   SortInput sort,
@@ -240,13 +228,7 @@ public class ScheduleScriptService {
         }
     }
 
-    /**
-     * Soft-delete a schedule: transition status to {@link ScriptStatus#DELETED}.
-     * Idempotent on already-deleted schedules.
-     *
-     * @return the id of the deleted schedule.
-     * @throws NotFoundException if the id does not exist in the tenant.
-     */
+    // Soft-delete a schedule (transition to DELETED); idempotent; throws NotFoundException if the id is unknown in the tenant.
     public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         ScheduleScript existing = loadOrThrow(tenantId, id);
@@ -263,12 +245,12 @@ public class ScheduleScriptService {
         return existing.getId();
     }
 
-    /** Archive a schedule. Idempotent on already-archived schedules. */
+    // Archive a schedule. Idempotent on already-archived schedules.
     public ScriptScheduleResponse archive(String id) {
         return transitionTo(id, ScriptStatus.ARCHIVED);
     }
 
-    /** Restore an archived schedule back to {@link ScriptStatus#ACTIVE}. Idempotent. */
+    // Restore an archived schedule back to ACTIVE. Idempotent.
     public ScriptScheduleResponse unarchive(String id) {
         return transitionTo(id, ScriptStatus.ACTIVE);
     }
@@ -387,11 +369,7 @@ public class ScheduleScriptService {
         return schedule;
     }
 
-    /**
-     * Cursors are built from the ENTITIES (not the mapped views) and via the repository,
-     * because the cursor must encode the active sort value alongside the id — the keyset
-     * predicate on the other side has to match it exactly.
-     */
+    // Cursors are built from entities via the repository, because the cursor must encode the active sort value alongside the id.
     private PageInfo buildPageInfo(List<ScheduleScript> items, boolean hasMore,
                                    CursorPaginationCriteria criteria, String sortField) {
         String startCursor = items.isEmpty() ? null
