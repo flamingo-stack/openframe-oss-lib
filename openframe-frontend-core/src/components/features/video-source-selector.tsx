@@ -25,13 +25,14 @@ export interface VideoSourceSelectorProps {
   mainVideoUrl: string;
   /** Callback when uploaded video URL changes */
   /**
-   * Fired with the uploaded/typed URL. May return a promise — the upload
+   * Fired with the uploaded/typed URL. Must return a promise — the upload
    * spinner stays up until it settles, so post-upload work (persisting the
    * URL, capturing + persisting the poster) finishes BEFORE the loading
    * state clears. Without this, the modal can be closed mid-capture and the
-   * thumbnail is silently lost.
+   * thumbnail is silently lost. The `Promise<void>` return type is required
+   * so `await onMainVideoUrlChange(url)` actually waits.
    */
-  onMainVideoUrlChange: (url: string) => void | Promise<void>;
+  onMainVideoUrlChange: (url: string) => Promise<void>;
   /** Callback to handle video upload - receives file and returns URL or throws error */
   onUploadVideo: (file: File, onProgress?: (progress: number) => void) => Promise<string>;
   /** Optional: Show AI generated badge on uploaded video */
@@ -143,12 +144,12 @@ export function VideoSourceSelector({
 
   const handleDeleteVideo = useCallback(() => {
     setUploadError(null);
-    // `onMainVideoUrlChange` is declared `void | Promise<void>` and the host's
+    // `onMainVideoUrlChange` returns `Promise<void>` and the host's
     // implementation persists the change. A rejected detach was previously
     // unhandled, so the card cleared and the user believed the video was
     // removed when the server still had it — surface it in the same error slot
     // the upload path uses.
-    void Promise.resolve(onMainVideoUrlChange('')).catch((err: unknown) => {
+    void onMainVideoUrlChange('').catch((err: unknown) => {
       setUploadError(err instanceof Error ? err.message : 'Failed to remove video');
     });
   }, [onMainVideoUrlChange]);
