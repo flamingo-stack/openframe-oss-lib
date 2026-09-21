@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useMdUp } from '../../hooks';
 
 type ProgressBarProps = {
@@ -33,6 +33,19 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [segmentCount, setSegmentCount] = useState(0);
+
+  // Compute an initial segment count synchronously from the container's
+  // initial measured width, so the bar isn't empty before the first
+  // ResizeObserver callback fires (e.g. during hydration or if the
+  // container's parent never resizes after mount).
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+
+    const width = containerRef.current.offsetWidth;
+    const count = Math.floor((width + segmentGap) / (effectiveSegmentWidth + segmentGap));
+    setSegmentCount(count);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
