@@ -1,7 +1,6 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.software.SoftwareBundle;
-import com.openframe.data.document.rmm.software.SoftwareBundleStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -15,8 +14,4 @@ public interface SoftwareBundleRepository extends MongoRepository<SoftwareBundle
     Optional<SoftwareBundle> findByTenantIdAndId(String tenantId, String id);
 
     List<SoftwareBundle> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
-
-    List<SoftwareBundle> findByTenantIdOrderByIdDesc(String tenantId);
-
-    List<SoftwareBundle> findByTenantIdAndStatusOrderByIdDesc(String tenantId, SoftwareBundleStatus status);
 }

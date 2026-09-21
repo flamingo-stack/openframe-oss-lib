@@ -551,7 +551,7 @@ public class TicketsTest extends BaseTest {
         for (String id : stagedAttachmentIds) {
             try {
                 TicketApi.deleteTempAttachment(id);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException | AssertionError ignored) {
                 // best effort: already discarded by the case, or gone with its ticket
             }
         }
@@ -565,14 +565,14 @@ public class TicketsTest extends BaseTest {
                 if (!"ARCHIVED".equals(kind)) {
                     TicketApi.transitionTicket(ticket.getId(), TicketApi.resolveSystemStatusId("ARCHIVED"));
                 }
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException | AssertionError ignored) {
                 // best effort: a failed cleanup must not mask the case that failed
             }
         }
         for (String id : createdStatusIds) {
             try {
                 TicketApi.deleteTicketStatus(id);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException | AssertionError ignored) {
                 // best effort
             }
         }

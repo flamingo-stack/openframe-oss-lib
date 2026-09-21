@@ -4,11 +4,14 @@ import com.openframe.core.exception.BaseException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
 import graphql.execution.DataFetcherExceptionHandlerResult;
 import graphql.execution.SimpleDataFetcherExceptionHandler;
+import jakarta.validation.ConstraintViolationException;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
@@ -31,6 +34,8 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
 
         if (exception instanceof PinotQueryException) {
             error = buildError("Query failed. Please try again later.", ErrorCode.PINOT_QUERY_ERROR);
+        } else if (exception instanceof LokiQueryException) {
+            error = buildError("Device logs are temporarily unavailable. Please try again later.", ErrorCode.LOKI_QUERY_ERROR);
         } else if (exception instanceof DataAccessException) {
             error = buildError("Database operation failed. Please try again later.", ErrorCode.DATABASE_ERROR);
         } else if (exception instanceof NotFoundException nfe) {
@@ -39,8 +44,9 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             error = buildError(ce.getMessage(), ce.getErrorCode());
         } else if (exception instanceof BaseException be) {
             error = buildError(be.getMessage(), be.getErrorCode());
-        } else if (exception instanceof jakarta.validation.ConstraintViolationException cve) {
-            error = buildError(cve.getMessage(), ErrorCode.VALIDATION_ERROR);
+        } else if (exception instanceof ConstraintViolationException cve) {
+            // Thrown by the @Validated data fetchers for an invalid argument; not an internal error.
+            error = buildError(validationMessage(cve), ErrorCode.VALIDATION_ERROR);
         } else if (exception instanceof IllegalArgumentException || exception instanceof IllegalStateException) {
             error = buildError(exception.getMessage(), ErrorCode.VALIDATION_ERROR);
         } else if (exception instanceof RuntimeException) {
@@ -54,6 +60,13 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
                         .error(error)
                         .build()
         );
+    }
+
+    private static String validationMessage(ConstraintViolationException exception) {
+        return exception.getConstraintViolations().stream()
+                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .sorted()
+                .collect(Collectors.joining("; "));
     }
 
     private GraphQLError buildError(String message, ErrorCode errorCode) {
