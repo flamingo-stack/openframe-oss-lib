@@ -6,11 +6,14 @@ import com.openframe.api.mapper.ScriptFilterOptionMapper;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 import java.util.Map;
 
@@ -48,11 +51,16 @@ public class ScriptExecutionFilterService {
                 .build();
     }
 
+    // History is a user-facing view — platform bootstrap runs are never part of it
+    private static final List<ExecutionSource> HIDDEN_SOURCES = List.of(ExecutionSource.SYSTEM_BOOTSTRAP);
+
     private static ScriptExecutionQueryFilter toQueryFilter(ScriptExecutionFilterInput input) {
+        ScriptExecutionQueryFilter.ScriptExecutionQueryFilterBuilder builder =
+                ScriptExecutionQueryFilter.builder().excludedSources(HIDDEN_SOURCES);
         if (input == null) {
-            return null;
+            return builder.build();
         }
-        return ScriptExecutionQueryFilter.builder()
+        return builder
                 .statuses(input.getStatuses())
                 .initiatedByIds(input.getInitiatorIds())
                 .machineIds(input.getMachineIds())

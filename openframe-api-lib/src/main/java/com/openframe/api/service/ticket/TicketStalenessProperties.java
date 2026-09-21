@@ -9,5 +9,5 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "openframe.tickets.staleness")
 public class TicketStalenessProperties {
 
-    private int defaultMinutes = 120;
+    private int defaultMinutes = 30;
 }

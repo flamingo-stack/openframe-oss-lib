@@ -234,6 +234,25 @@ public class KnowledgeBaseQueries {
             updatedAt
             """;
 
+    public static final String REMOVE_TAG_FROM_ITEM = """
+            mutation($itemId: ID!, $tagId: ID!) {
+                removeTagFromKnowledgeBaseItem(itemId: $itemId, tagId: $tagId) {
+                    %s
+                }
+            }
+            """.formatted(TAG_OP_FIELDS);
+
+    public static final String UNPUBLISH_ARTICLE = """
+            mutation($id: ID!) {
+                unpublishArticle(id: $id) {
+                    id
+                    status
+                    publishedAt
+                    updatedAt
+                }
+            }
+            """;
+
     public static final String ADD_TAG_TO_ITEM = """
             mutation($itemId: ID!, $tagId: ID!) {
                 addTagToKnowledgeBaseItem(itemId: $itemId, tagId: $tagId) {

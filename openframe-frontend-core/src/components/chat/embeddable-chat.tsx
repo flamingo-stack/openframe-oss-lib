@@ -41,6 +41,7 @@ import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
+import { formatCitationIndices } from '../../utils/source-grouping';
 import { EntityIcon } from '../icon-display';
 import { MingoIcon } from '../icons';
 import {
@@ -97,7 +98,10 @@ import type { ChatDialogCapabilities, UnifiedChatState } from './types/unified-c
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
+import { FALLBACK_TOP_RETRIEVED, splitCitedSources } from './utils/cited-sources';
 import { executeNavigation } from './utils/execute-navigation';
+import { flattenAssistantContent } from './utils/flatten-assistant-content';
+import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
@@ -151,7 +155,7 @@ export interface EmbeddableChatProps {
   baseRoute?: string;
   /** When the embedder doesn't host a `[...path]` route to render markdown
    *  chips against, set this to a platform that does. Chips with
-   *  `externalUrl: null` resolve to `getBaseUrl(chipBasePlatform) +
+   *  `externalUrl: null` resolve to `getPlatformUrl(chipBasePlatform) +
    *  '/knowledge-base/' + path` and open in a new tab. */
   chipBasePlatform?: string;
   /** DB-driven list of enabled RAG table ids (chip catalog filter).
@@ -435,12 +439,6 @@ const mentionTokenOf = (key: string, markerByType: Map<string, string>): string 
   return `${markerByType.get(type) ?? type.toLowerCase()}:${id}`;
 };
 
-/**
- * Fallback fan-out when the model didn't cite any source. Show the top-N
- * retrieved sources instead of zero chips. Mirrors Perplexity's behavior.
- */
-const FALLBACK_TOP_RETRIEVED = 3;
-
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
 
@@ -671,7 +669,9 @@ function SourceChip({
       // value is what keeps the handler assertion-free.
       const itemChatRef = itemCta.chatRef;
       return {
-        label: item.name,
+        // A client-built group keeps each row's own citation number, so the
+        // `[3]` in the answer is findable inside the dropdown.
+        label: item.index === undefined ? item.name : `[${item.index}] ${item.name}`,
         icon: <ItemIcon className="h-3.5 w-3.5" />,
         href: itemCta.href ?? undefined,
         targetPlatform: itemCta.targetPlatform,
@@ -686,6 +686,11 @@ function SourceChip({
             : undefined,
       };
     });
+
+    // A server-grouped chip answers to one number; a client-built one answers
+    // to every number its rows were cited by.
+    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
+    const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
 
     return (
       <HoverDropdown
@@ -704,7 +709,7 @@ function SourceChip({
         <span className={`${chipClass} cursor-pointer`}>
           {icon}
           <span className="max-w-[160px] truncate">
-            [{src.index}] {src.name}
+            [{groupIndices}] {src.name}
           </span>
         </span>
       </HoverDropdown>
@@ -885,6 +890,12 @@ function SourceChips({
  * EmbeddableChat — the floating "Ask AI" button + Mingo chat panel.
  * Lib-portable port of the hub's `<GlobalAskAI>`.
  */
+/** What a host hands `EmbeddableChatHandle.prefillDraft`: the composer text plus the context items to attach. */
+export interface ChatPrefillDraft {
+  text: string;
+  mentions?: ChatContextItem[];
+}
+
 /**
  * Imperative escape hatch for the ONE thing a host can't express as a prop:
  * "put the panel on a new chat, now". Everything else the host drives is state
@@ -902,6 +913,14 @@ export interface EmbeddableChatHandle {
    * the compose flag is inert.
    */
   startNewChat: () => void;
+  /**
+   * A new chat with the composer PREFILLED and nothing sent: the host has a
+   * suggested message (e.g. "Fix with Mingo" on an incident) and the user
+   * decides whether to send it. `mentions` are attached as context items up
+   * front, each committed as an inline `@marker:id` chip exactly as if picked
+   * from the `@` picker, and `text` follows them in the draft.
+   */
+  prefillDraft: (draft: ChatPrefillDraft) => void;
 }
 
 export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableChatProps>(
@@ -1442,7 +1461,7 @@ function EmbeddableChatInner({
   // doesn't host an in-app doc viewer should NOT pass an empty baseRoute (that just
   // falls back to the platform default here) — instead it sets a truthy baseRoute +
   // `chipBasePlatform` so doc chips with no externalUrl resolve cross-platform to that
-  // platform's public knowledge hub (`getBaseUrl(chipBasePlatform)/knowledge-base/…`),
+  // platform's public knowledge hub (`getPlatformUrl(chipBasePlatform)/knowledge-base/…`),
   // exactly like the hub's openframe config (baseRoute:'/', chipBasePlatform:'openframe').
   const resolvedBaseRoute = baseRoute || (source === 'flamingo' ? '/knowledge-base' : '/data-room');
 
@@ -1539,56 +1558,12 @@ function EmbeddableChatInner({
       : undefined;
   const guideUserAvatar = activeMode === 'guide' ? identityUser?.avatarUrl?.trim() || undefined : undefined;
 
-  // Map docMessages → lib's Message type, forwarding scrollAnchor.
+  // Map the host's rows → the lib's Message type. The mapping itself lives in
+  // `mapHostMessage`, which is where its pass-through list is pinned by tests.
   const messages: Message[] = useMemo(() => {
-    const cache = timestampCache;
-    const seenIds = new Set<string>();
-
-    const mapped = rawMessages.map(m => {
-      seenIds.add(m.id);
-      let timestamp: Date;
-      if (m.timestamp != null) {
-        timestamp = new Date(m.timestamp);
-      } else {
-        const cached = cache.get(m.id);
-        timestamp = cached ?? new Date();
-        if (!cached) cache.set(m.id, timestamp);
-      }
-
-      return {
-        id: m.id,
-        role: m.role,
-        // Host-supplied per-message name/avatar win (e.g. the signed-in user's
-        // full name + photo on a `user` bubble); fall back to the role default
-        // when the host doesn't provide them.
-        name: m.name ?? (m.role === 'assistant' ? 'Mingo' : (guideUserName ?? 'You')),
-        avatar: m.avatar ?? (m.role === 'user' ? (guideUserAvatar ?? null) : null),
-        // Forward the host's authorType so user bubbles get the same accent
-        // name color as the standalone /mingo page (user → 'admin').
-        ...(m.authorType ? { authorType: m.authorType } : {}),
-        content: m.segments && m.segments.length > 0 ? m.segments : m.content,
-        timestamp,
-        assistantType: m.role === 'assistant' ? ('mingo' as const) : undefined,
-        // `hidden` is load-bearing, NOT cosmetic: it carries synthetic rows
-        // (e.g. an auto-continuation directive) that the LLM must see but the
-        // reader must not. Dropping it here made the raw directive text render
-        // as an ordinary bubble. This field-by-field rebuild has to forward it
-        // explicitly — see `Message.hidden` and `chat-message-list`'s skip.
-        ...(m.hidden ? { hidden: true } : {}),
-        ...(m.scrollAnchor ? { scrollAnchor: m.scrollAnchor } : {}),
-        // Forward attached context items so the user bubble renders its chips.
-        ...(m.contextItems && m.contextItems.length > 0 ? { contextItems: m.contextItems } : {}),
-      };
-    });
-
-    // Drop cached fallbacks for messages no longer present so the map can't
-    // grow unbounded across a long-lived session.
-    if (cache.size > seenIds.size) {
-      for (const id of cache.keys()) {
-        if (!seenIds.has(id)) cache.delete(id);
-      }
-    }
-
+    const options = { userName: guideUserName, userAvatar: guideUserAvatar, timestampCache };
+    const mapped = rawMessages.map(m => mapHostMessage(m, options));
+    pruneTimestampCache(timestampCache, new Set(rawMessages.map(m => m.id)));
     return mapped;
   }, [rawMessages, guideUserName, guideUserAvatar, timestampCache]);
 
@@ -1836,24 +1811,44 @@ function EmbeddableChatInner({
     return out;
   }, [commandsById, enabledSet]);
 
-  // Find sources for the last assistant message; split into cited / uncited.
-  const lastAssistantMsg = [...rawMessages].reverse().find(m => m.role === 'assistant');
-  const lastSources = useMemo(() => {
-    if (chatLoading) return undefined;
-    const sources = lastAssistantMsg?.sources;
-    if (!sources || sources.length === 0) return undefined;
-    const content = lastAssistantMsg?.content || '';
-    const citationOrder = [...content.matchAll(/\[(\d+)\]/g)].map(m => parseInt(m[1], 10));
-    const seenOrder = new Map<number, number>();
-    citationOrder.forEach(idx => {
-      if (!seenOrder.has(idx)) seenOrder.set(idx, seenOrder.size);
-    });
-    const cited = sources
-      .filter(s => seenOrder.has(s.index))
-      .sort((a, b) => (seenOrder.get(a.index) ?? 0) - (seenOrder.get(b.index) ?? 0));
-    const uncited = sources.filter(s => !seenOrder.has(s.index));
-    return { cited, uncited };
-  }, [lastAssistantMsg, chatLoading]);
+  /**
+   * Source chips, under the answer that cited them.
+   *
+   * Per message, not once per thread. The strip names where THAT answer came
+   * from, and a conversation holds several answers — pinning one strip to the
+   * bottom of the thread attributes the newest answer's sources to whichever
+   * answer the reader is looking at. Both transports produce them now, so this
+   * is no longer a Guide-mode-only affordance either.
+   */
+  const renderMessageSources = useCallback(
+    (message: Message, index: number) => {
+      if (message.role !== 'assistant') return null;
+      // Suppressed only on the answer still being written: the citation markers
+      // the order is derived from arrive WITH the text, so a strip rendered
+      // mid-turn reshuffles under the reader as more sentences land.
+      //
+      // Scoped to the trailing row on purpose. `chatLoading` is a property of
+      // the THREAD, so testing it alone pulls the strips off every earlier
+      // answer too — a reader scrolled up watches finished citations blink out
+      // for the duration of an unrelated turn.
+      if (chatLoading && index === messages.length - 1) return null;
+      const { cited, uncited } = splitCitedSources(message.sources, flattenAssistantContent(message.content));
+      if (cited.length === 0 && uncited.length === 0) return null;
+      return (
+        <div className="pb-2">
+          <SourceChips
+            cited={cited}
+            uncited={uncited}
+            baseRoute={resolvedBaseRoute}
+            chipBasePlatform={chipBasePlatform}
+            onClose={handleNavigationClose}
+            onDiscuss={discussRef}
+          />
+        </div>
+      );
+    },
+    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, discussRef],
+  );
 
   // Host node for in-panel Radix portals (see the body wrapper below).
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
@@ -2052,6 +2047,43 @@ function EmbeddableChatInner({
     resetToNewChat();
   }, [resetToNewChat]);
 
+  // Host prefill (`prefillDraft`) — staged, not written at once. The composer
+  // it goes into may only mount on the commit `resetToNewChat` +
+  // `setComposeOpen(true)` produce (narrow layout: list → compose; or the
+  // archive closing), and those are ordinary updates React commits on its own
+  // schedule — a frame-timed write raced them and lost on a phone. So the
+  // draft waits in state: the context strip is seeded while rendering (AFTER
+  // the dialog-change reset above, which would otherwise wipe it), and the
+  // effect writes the chips + text once `chatInputRef` is attached, re-running
+  // on each layout change until it is. `mentionKeysRef` is cleared by the
+  // dialog-change effect above, so this one must stay declared after it.
+  const [pendingDraft, setPendingDraft] = useState<Required<ChatPrefillDraft> | null>(null);
+  const [seededDraft, setSeededDraft] = useState<Required<ChatPrefillDraft> | null>(null);
+  if (pendingDraft && seededDraft !== pendingDraft) {
+    setSeededDraft(pendingDraft);
+    setContextItems(pendingDraft.mentions);
+  }
+  const appliedDraftRef = useRef<Required<ChatPrefillDraft> | null>(null);
+  useEffect(() => {
+    const draft = pendingDraft;
+    if (!draft || appliedDraftRef.current === draft) return;
+    const input = chatInputRef.current;
+    if (!input) return;
+    appliedDraftRef.current = draft;
+    input.clear();
+    for (const item of draft.mentions) {
+      const key = `${item.type}:${item.id}`;
+      input.commitMention(mentionTokenOf(key, mentionMarkerByType), {
+        label: item.label,
+        icon: resolveContextIcon(item),
+      });
+      mentionKeysRef.current.add(key);
+    }
+    // The text starts on its own line — its first line is a heading, not a
+    // continuation of the chip run.
+    if (draft.text) input.setValue(`${input.getValue()}${draft.mentions.length > 0 ? '\n' : ''}${draft.text}`);
+  }, [pendingDraft, composeOpen, activeDialogId, activeMode, archiveOpen, mentionMarkerByType, resolveContextIcon]);
+
   // Host-driven "Start New Chat" (see EmbeddableChatHandle). Same reset as the
   // rail button, plus the narrow layout's list→compose navigation that the
   // in-panel button gets from the list itself — a host has no other way in.
@@ -2062,8 +2094,19 @@ function EmbeddableChatInner({
         resetToNewChat();
         setComposeOpen(true);
       },
+      prefillDraft: ({ text, mentions = [] }) => {
+        resetToNewChat();
+        setComposeOpen(true);
+        // The effect below clears the draft, which invalidates every key held
+        // here. Dropped now rather than there: with no dialog change nothing
+        // else clears them, and a composer mounting on this commit reports
+        // `onValueChange('')` before that effect runs — a stale key equal to
+        // one of the new mentions would strip the freshly seeded item.
+        mentionKeysRef.current.clear();
+        setPendingDraft({ text, mentions: mentions.slice(0, contextMaxItems) });
+      },
     }),
-    [resetToNewChat],
+    [resetToNewChat, contextMaxItems],
   );
 
   // Desktop split header ⋯ menu (active, non-archived conversation only).
@@ -2434,6 +2477,7 @@ function EmbeddableChatInner({
                                   resolveContextIcon={resolveContextIcon}
                                   renderContextItem={renderContextItem}
                                   renderMention={renderMention}
+                                  renderAfterMessage={renderMessageSources}
                                   // Gated on `chatLoading` for the same reason the composer
                                   // is: no second send while a turn is in flight. Passive
                                   // demo hosts (previewMode) stay read-only.
@@ -2471,20 +2515,6 @@ function EmbeddableChatInner({
                                   onLoadMore={loadMoreMessages}
                                 />
                               )}
-                              {lastSources &&
-                                (lastSources.cited.length > 0 || lastSources.uncited.length > 0) &&
-                                !chatLoading && (
-                                  <div className="flex-shrink-0 pb-2">
-                                    <SourceChips
-                                      cited={lastSources.cited}
-                                      uncited={lastSources.uncited}
-                                      baseRoute={resolvedBaseRoute}
-                                      chipBasePlatform={chipBasePlatform}
-                                      onClose={handleNavigationClose}
-                                      onDiscuss={discussRef}
-                                    />
-                                  </div>
-                                )}
                             </div>
                           ) : activeMode === 'mingo' ? (
                             /* Figma node 7532:222444 — default (Mingo-mode) empty state:

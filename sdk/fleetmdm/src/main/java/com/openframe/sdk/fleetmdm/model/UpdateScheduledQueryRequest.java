@@ -1,6 +1,7 @@
 package com.openframe.sdk.fleetmdm.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,4 +16,7 @@ public class UpdateScheduledQueryRequest {
     private String description;
     private Integer interval;
     private String platform;
+
+    @JsonProperty("openframe_managed")
+    private Boolean openframeManaged;
 }

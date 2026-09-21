@@ -47,7 +47,7 @@ export type ProductReleaseCardSize = 'lg' | 'sm';
 export interface ProductReleaseCardAnchorProps {
   href: string;
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 

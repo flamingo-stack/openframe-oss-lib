@@ -41,7 +41,7 @@ public class ScriptExecutionWatchdogService {
         log.info("Found {} stuck Execution row(s) — transitioning to FAILED", stuck.size());
         stuck.forEach(row -> markFailing(row, now));
         scriptExecutionRepository.saveAll(stuck);
-        watchdogMetrics.recordScriptReaped(stuck.size());
+        watchdogMetrics.recordScriptReaped(stuck);
         log.info("Marked {} Execution row(s) as FAILED", stuck.size());
 
         headerWatchdogService.finalizeAffectedHeaders(stuck);

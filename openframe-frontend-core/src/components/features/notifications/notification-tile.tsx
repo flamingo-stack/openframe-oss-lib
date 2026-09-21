@@ -45,6 +45,12 @@ export interface NotificationTileProps {
   children?: ReactNode;
   /** Pin the tile: cancel the live auto-dismiss countdown (timer + progress bar) without settling it. */
   paused?: boolean;
+  /**
+   * Lines the title may take before it is cut with an ellipsis. `1` (default)
+   * keeps drawer rows one height; a narrow host that cannot widen (a
+   * watch-face mock, a side rail) passes `2` so the title is read, not cut.
+   */
+  titleLines?: 1 | 2;
 }
 
 export function NotificationTile({
@@ -56,6 +62,7 @@ export function NotificationTile({
   actions,
   children,
   paused = false,
+  titleLines = 1,
 }: NotificationTileProps) {
   const {
     id,
@@ -181,7 +188,13 @@ export function NotificationTile({
 
         <div className="flex min-w-0 flex-col">
           {title ? (
-            <p className="truncate text-ods-text-primary text-h4" title={typeof title === 'string' ? title : undefined}>
+            <p
+              className={cn(
+                'text-ods-text-primary text-h4',
+                titleLines === 2 ? 'line-clamp-2 break-words' : 'truncate',
+              )}
+              title={typeof title === 'string' ? title : undefined}
+            >
               {title}
             </p>
           ) : null}

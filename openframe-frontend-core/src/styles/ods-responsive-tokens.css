@@ -57,6 +57,14 @@
   --font-size-badge: 0.625rem; /* 10px */
   --font-line-space-badge: 0.75rem; /* 12px */
 
+  /* CHIP WALL PITCH — THE gap between quick-action chips, wherever a wall of
+   * them is drawn: the in-app QuickActionWall (its `copyGap` default, which
+   * also sets the clone seam and the row stack) and the marketing decks' own
+   * walls. These are one component, so they get one gap and it is defined
+   * here, once. Following the spacing scale's `m` step, so it breathes on a
+   * wide viewport and tightens on a phone. */
+  --chip-wall-gap: var(--spacing-system-m);
+
   /* =================================================== */
   /* RESPONSIVE ICON SYSTEM */
   /* =================================================== */

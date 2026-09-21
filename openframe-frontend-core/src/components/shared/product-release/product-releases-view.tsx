@@ -32,7 +32,7 @@ import { buildProductReleaseCardProps } from '../../chat/entity-cards/product-re
 import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link';
 import { isModifierClick } from '../../chat/utils/chat-nav-resolution';
 import { executeNavigationImperative } from '../../chat/utils/execute-navigation';
-import { EmptyState } from '../../empty-state';
+import { ListEmptyState } from '../../list-empty-state';
 import { PersistentPaginationWrapper } from '../../persistent-pagination';
 import { LoadError } from '../../ui/error-state';
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
@@ -194,23 +194,16 @@ export function ProductReleasesView({
       <div className="min-h-[600px]">
         {showEmpty ? (
           <div className="flex h-[600px] items-center justify-center">
-            {hasActiveFilters ? (
-              <EmptyState
-                type="search"
-                title="No releases found"
-                description="No releases match your current filters. Try adjusting your search or status filter."
-                showCTA
-                ctaText="Reset Filters"
-                onCtaClick={resetFilters}
-              />
-            ) : (
-              <EmptyState
-                type="generic"
-                title="No releases available"
-                description="Check back soon for product updates!"
-                showCTA={false}
-              />
-            )}
+            <ListEmptyState
+              isFiltered={hasActiveFilters}
+              filtered={{
+                title: 'No releases found',
+                description: 'No releases match your current filters. Try adjusting your search or status filter.',
+                clearText: 'Reset Filters',
+              }}
+              onClearFilters={resetFilters}
+              empty={{ title: 'No releases available', description: 'Check back soon for product updates!' }}
+            />
           </div>
         ) : (
           <>

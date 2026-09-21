@@ -15,8 +15,10 @@ export type {
   TranscriptWord,
   SpeakerMapping,
   ExcludedRange,
+  EntityQuote,
 } from './video-processing';
 import type {
+  EntityQuote,
   VideoTeaser,
   Speaker,
   VideoClip,
@@ -43,6 +45,8 @@ export interface CustomerInterview {
   // Video content
   main_video_url: string | null;
   teasers: VideoTeaser[]; // JSONB array
+  /** Short customer quotes (JSONB array, never null — column default `[]`). */
+  quotes: EntityQuote[];
 
   // Highlight video (AI-generated summary video)
   highlight_video_url?: string | null;
@@ -134,6 +138,7 @@ export interface CreateCustomerInterviewData {
   highlight_video_url?: string | null;
   main_video_thumbnail?: string | null;
   teasers?: VideoTeaser[];
+  quotes?: EntityQuote[];
   case_study_id?: number | null;
   seo_title?: string;
   seo_description?: string;

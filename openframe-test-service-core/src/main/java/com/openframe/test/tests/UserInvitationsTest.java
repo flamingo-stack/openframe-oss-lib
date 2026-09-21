@@ -143,4 +143,20 @@ public class UserInvitationsTest extends BaseTest {
         assertThat(apiInvitation.getStatus()).as("Invitation status should be PENDING").isEqualTo(InvitationStatus.PENDING);
         assertThat(apiInvitation.getEmail()).as("Invitation email should match deleted user email").isEqualTo(deletedUser.getEmail());
     }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Resending an invitation that has not expired is refused")
+    public void testResendUnexpiredInvitationRefused() {
+        // InvitationService.renewInvitation renews only PENDING invitations whose expiry has passed
+        // ("Only expired invitations can be resent"); a fresh one is refused with 409, and the E2E suite
+        // cannot age an invitation, so the refusal is the contract this case pins down.
+        Invitation invitation = InvitationApi.inviteUser(InvitationGenerator.newUserInvitationRequest());
+        try {
+            assertThat(InvitationApi.attemptResendInvitation(invitation.getId()))
+                    .as("A pending invitation that has not expired cannot be resent").isEqualTo(409);
+        } finally {
+            InvitationApi.revokeInvitation(invitation.getId());
+        }
+    }
 }

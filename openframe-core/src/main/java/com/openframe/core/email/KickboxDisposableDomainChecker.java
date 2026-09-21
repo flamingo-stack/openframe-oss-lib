@@ -32,8 +32,9 @@ public class KickboxDisposableDomainChecker implements DisposableDomainChecker {
             DisposableDomainResponse response = client.check(domain);
             return response != null && response.disposable();
         } catch (Exception e) {
-            log.warn("Disposable-domain check failed for '{}', allowing: {}", domain, e.toString());
+            log.warn("Disposable-domain check failed for '{}', allowing", domain, e);
             return false;
         }
     }
 }
+
