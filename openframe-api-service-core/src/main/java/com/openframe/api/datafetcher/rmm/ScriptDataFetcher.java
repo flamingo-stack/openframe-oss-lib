@@ -27,8 +27,10 @@ import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterOption;
 import com.openframe.api.dto.rmm.script.ScriptFilters;
+import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
+import com.openframe.api.mapper.ScriptEnvVarMapper;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -167,6 +169,12 @@ public class ScriptDataFetcher {
             return;
         }
         options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
+    }
+
+    @DgsData(parentType = "Script", field = "envVars")
+    public List<ScriptEnvVarInput> envVars(DgsDataFetchingEnvironment dfe) {
+        ScriptResponse script = dfe.getSource();
+        return ScriptEnvVarMapper.mask(script.getEnvVars());
     }
 
     /** Resolves the {@code Script.tags} field, batched per request via the data loader. */

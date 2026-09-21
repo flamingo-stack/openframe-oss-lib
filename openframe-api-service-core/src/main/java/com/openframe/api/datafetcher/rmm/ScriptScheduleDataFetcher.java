@@ -38,6 +38,7 @@ import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -276,7 +277,20 @@ public class ScriptScheduleDataFetcher {
                 .map(p -> ScheduledScriptCustomParams.builder()
                         .scriptId(RELAY.toGlobalId("Script", p.getScriptId()))
                         .args(p.getArgs())
-                        .envVars(p.getEnvVars())
+                        .envVars(maskEnvVars(p.getEnvVars()))
+                        .build())
+                .toList();
+    }
+
+    private static List<ScriptEnvVar> maskEnvVars(List<ScriptEnvVar> envVars) {
+        if (envVars == null) {
+            return null;
+        }
+        return envVars.stream()
+                .map(v -> com.openframe.data.document.rmm.script.ScriptEnvVar.builder()
+                        .name(v.getName())
+                        .value(v.isSecret() ? null : v.getValue())
+                        .secret(v.isSecret())
                         .build())
                 .toList();
     }
