@@ -3,8 +3,8 @@ package com.openframe.data.repository.rmm;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
-import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareActionSummary;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +19,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -32,6 +33,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAggregationRepository {
 
+    private static final String SCRIPT_EXECUTIONS = "script_executions";
     private static final List<String> TERMINAL = List.of(ExecutionStatus.SUCCESS.name(), ExecutionStatus.FAILED.name());
     private static final List<String> IN_PROGRESS = List.of(ExecutionStatus.QUEUED.name(), ExecutionStatus.RUNNING.name());
     private static final String DEFAULT_SORT = "dispatchedAt";
@@ -45,22 +47,19 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
         List<AggregationOperation> stages = new ArrayList<>(pipeline(tenantId, filter, search));
         String sort = SORTABLE.contains(sortField) ? sortField : DEFAULT_SORT;
         int dir = direction == Sort.Direction.ASC ? 1 : -1;
-        stages.add(ctx -> new Document("$sort", new Document(sort, dir).append("_id", 1)));
+        stages.add(ctx -> new Document("$sort", new Document(sort, dir).append("executionId", 1)));
         stages.add(ctx -> new Document("$skip", (long) Math.max(0, skip)));
         stages.add(ctx -> new Document("$limit", limit));
 
-        AggregationResults<Document> results =
-                mongoTemplate.aggregate(Aggregation.newAggregation(stages), ScriptExecution.class, Document.class);
-        return results.getMappedResults().stream().map(SoftwareActionAggregationRepositoryImpl::toSummary).toList();
+        return aggregate(stages).getMappedResults().stream()
+                .map(SoftwareActionAggregationRepositoryImpl::toSummary).toList();
     }
 
     @Override
     public long count(String tenantId, SoftwareActionQueryFilter filter, String search) {
         List<AggregationOperation> stages = new ArrayList<>(pipeline(tenantId, filter, search));
         stages.add(ctx -> new Document("$count", "total"));
-        AggregationResults<Document> results =
-                mongoTemplate.aggregate(Aggregation.newAggregation(stages), ScriptExecution.class, Document.class);
-        Document doc = results.getUniqueMappedResult();
+        Document doc = aggregate(stages).getUniqueMappedResult();
         return doc == null ? 0 : ((Number) doc.get("total")).longValue();
     }
 
@@ -68,10 +67,8 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
     public Map<String, Integer> facet(String tenantId, SoftwareActionQueryFilter filter, String search, String field) {
         List<AggregationOperation> stages = new ArrayList<>(pipeline(tenantId, filter, search));
         stages.add(ctx -> new Document("$group", new Document("_id", "$" + field).append("count", new Document("$sum", 1))));
-        AggregationResults<Document> results =
-                mongoTemplate.aggregate(Aggregation.newAggregation(stages), ScriptExecution.class, Document.class);
         Map<String, Integer> counts = new LinkedHashMap<>();
-        for (Document doc : results.getMappedResults()) {
+        for (Document doc : aggregate(stages).getMappedResults()) {
             Object id = doc.get("_id");
             if (id != null) {
                 counts.put(id.toString(), intValue(doc.get("count")));
@@ -83,14 +80,12 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
     @Override
     public Optional<SoftwareActionSummary> findByExecutionId(String tenantId, String executionId) {
         List<AggregationOperation> stages = new ArrayList<>();
-        stages.add(ctx -> new Document("$match", new Document("tenantId", tenantId)
-                .append("executionId", executionId).append("softwareAction", new Document("$ne", null))));
-        stages.add(ctx -> new Document("$group", groupDoc()));
+        stages.add(ctx -> new Document("$match", new Document("tenantId", tenantId).append("executionId", executionId)));
+        stages.add(ctx -> lookupExecutions());
+        stages.addAll(reconcileStages());
         stages.add(ctx -> new Document("$project", projectDoc()));
-        AggregationResults<Document> results =
-                mongoTemplate.aggregate(Aggregation.newAggregation(stages), ScriptExecution.class, Document.class);
-        Document doc = results.getUniqueMappedResult();
-        return Optional.ofNullable(doc == null ? null : toSummary(doc));
+        List<Document> docs = aggregate(stages).getMappedResults();
+        return docs.isEmpty() ? Optional.empty() : Optional.of(toSummary(docs.get(0)));
     }
 
     @Override
@@ -103,11 +98,18 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
         return DEFAULT_SORT;
     }
 
+    private AggregationResults<Document> aggregate(List<AggregationOperation> stages) {
+        return mongoTemplate.aggregate(Aggregation.newAggregation(stages), SoftwareActionResult.class, Document.class);
+    }
+
     private static List<AggregationOperation> pipeline(String tenantId, SoftwareActionQueryFilter filter, String search) {
         List<AggregationOperation> stages = new ArrayList<>();
         stages.add(ctx -> new Document("$match", matchDoc(tenantId, filter, search)));
-        stages.add(ctx -> new Document("$group", groupDoc()));
+        stages.add(ctx -> lookupExecutions());
+        stages.addAll(reconcileStages());
         stages.add(ctx -> new Document("$project", projectDoc()));
+        stages.add(ctx -> new Document("$match", new Document("status",
+                new Document("$ne", SoftwareActionStatus.SCHEDULED.name()))));
         List<String> statusNames = statusNames(filter);
         if (statusNames != null) {
             stages.add(ctx -> new Document("$match", new Document("status", new Document("$in", statusNames))));
@@ -116,10 +118,10 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
     }
 
     private static Document matchDoc(String tenantId, SoftwareActionQueryFilter filter, String search) {
-        Document match = new Document("tenantId", tenantId).append("softwareAction", new Document("$ne", null));
+        Document match = new Document("tenantId", tenantId);
         if (filter != null) {
             if (filter.getActions() != null && !filter.getActions().isEmpty()) {
-                match.append("softwareAction", new Document("$in", names(filter.getActions())));
+                match.append("action", new Document("$in", names(filter.getActions())));
             }
             if (filter.getEngines() != null && !filter.getEngines().isEmpty()) {
                 match.append("packageManager", new Document("$in", names(filter.getEngines())));
@@ -131,28 +133,45 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
         return match;
     }
 
-    private static Document groupDoc() {
-        return new Document("_id", "$executionId")
-                .append("packageManager", new Document("$first", "$packageManager"))
-                .append("packageName", new Document("$first", "$packageName"))
-                .append("action", new Document("$first", "$softwareAction"))
-                .append("initiatedBy", new Document("$first", "$initiatedBy"))
-                .append("bundleId", new Document("$first", "$softwareBundleId"))
-                .append("scheduleId", new Document("$first", "$softwareScheduleId"))
-                .append("dispatchedAt", new Document("$max", "$dispatchedAt"))
-                .append("machines", new Document("$addToSet", "$machineId"))
-                .append("responded", new Document("$addToSet", cond(inArr("$status", TERMINAL), "$machineId", null)))
-                .append("hasInProgress", new Document("$max", cond(inArr("$status", IN_PROGRESS), 1, 0)))
-                .append("failed", new Document("$max", cond(new Document("$eq", List.of("$status", ExecutionStatus.FAILED.name())), 1, 0)));
+    private static Document lookupExecutions() {
+        List<Object> subPipeline = List.of(
+                new Document("$match", new Document("$expr", new Document("$and", List.of(
+                        new Document("$eq", Arrays.asList("$executionId", "$$eid")),
+                        new Document("$eq", Arrays.asList("$tenantId", "$$tid")),
+                        new Document("$ne", Arrays.asList("$softwareAction", null)))))),
+                new Document("$group", new Document("_id", null)
+                        .append("responded", new Document("$addToSet", cond(inArr("$status", TERMINAL), "$machineId", null)))
+                        .append("hasInProgress", new Document("$max", cond(inArr("$status", IN_PROGRESS), 1, 0)))
+                        .append("failed", new Document("$max",
+                                cond(new Document("$eq", Arrays.asList("$status", ExecutionStatus.FAILED.name())), 1, 0)))
+                        .append("execCount", new Document("$sum", 1))));
+        return new Document("$lookup", new Document("from", SCRIPT_EXECUTIONS)
+                .append("let", new Document("eid", "$executionId").append("tid", "$tenantId"))
+                .append("pipeline", subPipeline)
+                .append("as", "exec"));
+    }
+
+    private static List<AggregationOperation> reconcileStages() {
+        List<AggregationOperation> stages = new ArrayList<>();
+        stages.add(ctx -> new Document("$addFields",
+                new Document("_exec", new Document("$arrayElemAt", Arrays.asList("$exec", 0)))));
+        Object hasLeaves = new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.execCount", 0)), 0));
+        Object responded = new Document("$size", new Document("$setDifference", List.of(
+                new Document("$ifNull", Arrays.asList("$_exec.responded", Collections.emptyList())),
+                Collections.singletonList(null))));
+        Object liveStatus = cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.hasInProgress", 0)), 0)),
+                SoftwareActionStatus.IN_PROGRESS.name(),
+                cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.failed", 0)), 0)),
+                        SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.COMPLETED.name()));
+        stages.add(ctx -> new Document("$addFields", new Document()
+                .append("respondedMachineCount", cond(hasLeaves, responded, 0))
+                .append("status", cond(hasLeaves, liveStatus, "$status"))));
+        return stages;
     }
 
     private static Document projectDoc() {
-        Object respondedCount = new Document("$size", new Document("$setDifference",
-                List.of("$responded", Collections.singletonList(null))));
-        Object status = cond(new Document("$gt", List.of("$hasInProgress", 0)), SoftwareActionStatus.IN_PROGRESS.name(),
-                cond(new Document("$gt", List.of("$failed", 0)), SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.COMPLETED.name()));
         return new Document("_id", 0)
-                .append("executionId", "$_id")
+                .append("executionId", 1)
                 .append("packageManager", 1)
                 .append("packageName", 1)
                 .append("action", 1)
@@ -160,21 +179,17 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .append("bundleId", 1)
                 .append("scheduleId", 1)
                 .append("dispatchedAt", 1)
-                .append("totalMachineCount", new Document("$size", "$machines"))
-                .append("respondedMachineCount", respondedCount)
-                .append("status", status);
+                .append("totalMachineCount", 1)
+                .append("respondedMachineCount", 1)
+                .append("status", 1);
     }
 
     private static Document inArr(Object value, List<String> arr) {
-        return new Document("$in", List.of(value, arr));
+        return new Document("$in", Arrays.asList(value, arr));
     }
 
     private static Document cond(Object ifExpr, Object thenExpr, Object elseExpr) {
-        List<Object> args = new ArrayList<>();
-        args.add(ifExpr);
-        args.add(thenExpr);
-        args.add(elseExpr);
-        return new Document("$cond", args);
+        return new Document("$cond", Arrays.asList(ifExpr, thenExpr, elseExpr));
     }
 
     private static List<String> statusNames(SoftwareActionQueryFilter filter) {

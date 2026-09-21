@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -53,7 +54,7 @@ class SoftwareInventoryServiceTest {
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver, tenantIdProvider);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "fleet", fleet);
+        ReflectionTestUtils.setField(service, "fleet", fleet);
     }
 
     @Test
@@ -74,7 +75,7 @@ class SoftwareInventoryServiceTest {
         title.setVersions(List.of(version));
 
         Host enrolled = host(1L, "u1", "host-1");
-        Host foreign = host(2L, "u2", "host-2");   // no matching Machine → dropped
+        Host foreign = host(2L, "u2", "host-2");   // no matching Machine -> dropped
 
         when(fleet.getSoftwareTitle(42L)).thenReturn(title);
         when(fleet.searchHosts(any(HostSearchRequest.class))).thenReturn(List.of(enrolled, foreign));
@@ -94,7 +95,7 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
-    @DisplayName("getSoftwareFilters: no titles → valid empty facet lists (never null)")
+    @DisplayName("getSoftwareFilters: no titles -> valid empty facet lists (never null)")
     void getSoftwareFilters_noTitles_emptyFacets() {
         SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
         when(response.getSoftwareTitles()).thenReturn(List.of());
@@ -115,7 +116,7 @@ class SoftwareInventoryServiceTest {
                 titleWithCves("Bravo", 5),
                 titleWithCves("Alpha", 5),
                 titleWithCves("Chrome", 40)));
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response); // meta null → single page in the scan
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response); // meta null -> single page in the scan
 
         PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, sort("cveCount", SortDirection.DESC), null);
 
@@ -131,7 +132,7 @@ class SoftwareInventoryServiceTest {
                 titleWithSource("Chocolatey app 1", "chocolatey_packages"),
                 titleWithSource("Chocolatey app 2", "chocolatey_packages"),
                 titleWithSource("Homebrew tool",    "homebrew_packages"),
-                titleWithSource("Random pkg",       "programs")));      // unknown → UNMANAGED
+                titleWithSource("Random pkg",       "programs")));      // unknown -> UNMANAGED
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
 
         SoftwareFilters filters = service.getSoftwareFilters(null);

@@ -129,7 +129,7 @@ class SoftwareBundleServiceTest {
             assertThat(r.getScheduleId()).isNull();
             assertThat(r.getStatus()).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
             assertThat(r.getMode()).isEqualTo(SoftwareBundleMode.NOW);
-            assertThat(r.getMachineIds()).containsExactlyInAnyOrder("m1", "m2"); // both macOS → both compatible with brew
+            assertThat(r.getMachineIds()).containsExactlyInAnyOrder("m1", "m2"); // both macOS -> both compatible with brew
             assertThat(r.getId()).isEqualTo(r.getExecutionId());
             assertThat(r.getVersion()).isEqualTo("1.2.3"); // catalog version recorded on the action
         });

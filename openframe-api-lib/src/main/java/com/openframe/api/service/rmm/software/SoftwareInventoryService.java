@@ -12,6 +12,8 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
+import com.openframe.api.util.FleetSoftwareMapper;
+import com.openframe.api.util.FleetVulnerabilityMapper;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.IntegratedToolId;

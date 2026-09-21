@@ -66,8 +66,8 @@ class SoftwareActionDetailServiceTest {
                 leaf("m-success", ExecutionStatus.SUCCESS),
                 leaf("m-running", ExecutionStatus.RUNNING)));
         when(bundleOnlineDispatchRepository.findByTenantIdAndBundleId(TENANT, "b1")).thenReturn(List.of(
-                bundleSentinel("m-offline", DeviceOnlineDispatchStatus.NEW),        // waiting → SCHEDULED
-                bundleSentinel("m-skipped", DeviceOnlineDispatchStatus.DISPATCHED)));// dispatched, no leaf → hidden
+                bundleSentinel("m-offline", DeviceOnlineDispatchStatus.NEW),
+                bundleSentinel("m-skipped", DeviceOnlineDispatchStatus.DISPATCHED)));
 
         List<SoftwareActionDeviceResponse> rows = service.devices(EXEC, "b1", null, null, null);
 
