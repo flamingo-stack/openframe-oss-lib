@@ -38,6 +38,8 @@ const mountRendered = async (props: { zoomable?: boolean } = {}) => {
   await flushUntil(() => renders.length >= 1, 'a mermaid.render call');
   await act(async () => {
     renders[0].resolve({ svg: '<svg width="10" height="10"><g/></svg>' });
+    // Let the resolved render settle inside `act` (and give the async callback its await).
+    await Promise.resolve();
   });
   await flushUntil(() => !!screen.queryByTestId('mermaid-svg-container'), 'the rendered diagram');
 };

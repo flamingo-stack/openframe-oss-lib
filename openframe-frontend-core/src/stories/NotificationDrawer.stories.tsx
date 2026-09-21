@@ -243,6 +243,45 @@ export const AllTileVariants: Story = {
 };
 
 /**
+ * `titleLines={2}` for a narrow host that cannot widen (here a 280px column,
+ * the width of a watch-face mock): the title wraps to a second line before
+ * the ellipsis instead of being cut after a few words.
+ */
+export const TwoLineTitleInNarrowHost: Story = {
+  render: () => {
+    const base = { createdAt: Date.now() - 60_000, read: true } as const;
+    const title = 'Disk filling 4x faster than normal on ACME-DC01';
+    return (
+      <div className="flex w-[280px] flex-col gap-2">
+        <NotificationTile
+          notification={{
+            id: 't-one-line',
+            variant: 'success',
+            type: 'Fixed by Mingo',
+            title,
+            description: 'titleLines={1} (default)',
+            ...base,
+          }}
+          onComplete={() => {}}
+        />
+        <NotificationTile
+          notification={{
+            id: 't-two-lines',
+            variant: 'success',
+            type: 'Fixed by Mingo',
+            title,
+            description: 'titleLines={2}',
+            ...base,
+          }}
+          onComplete={() => {}}
+          titleLines={2}
+        />
+      </div>
+    );
+  },
+};
+
+/**
  * The new header fields: `severity` colors the type label and icon slot
  * (INFO grey, WARNING amber, DANGER red) and overrides `variant`; `imageUrl`
  * wins over `icon`, which wins over the dot fallback.
