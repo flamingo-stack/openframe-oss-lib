@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.WebUtils;
 
-import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
@@ -41,13 +41,7 @@ import static com.openframe.core.constants.SsoFlowCookieNames.OF_SSO_LOGIN;
 import static java.util.Locale.ROOT;
 import static org.springframework.util.StringUtils.hasText;
 
-/**
- * The "one last step" consent gate: when an SSO flow is about to CREATE a new user (invitation
- * acceptance, or a shared-domain first login), the flow parks the user here to confirm the
- * account they're joining and accept Terms before the user is created. Identity comes only from
- * the authenticated SAS session; the pending flow cookie ({@code of_sso_invite} /
- * {@code of_sso_login}, kept by the handler) says which flow and carries redirect/mobile context.
- */
+// The "one last step" consent gate: SSO flows that are about to CREATE a new user park here to confirm and accept Terms first.
 @Slf4j
 @RestController
 @RequestMapping(path = "/oauth/join", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -104,7 +98,7 @@ public class SsoJoinController {
     public void complete(@RequestParam(value = "agreeTerms", defaultValue = "false") boolean agreeTerms,
                          Authentication authentication,
                          HttpServletRequest request,
-                         HttpServletResponse response) throws IOException {
+                         HttpServletResponse response) {
         OidcUser user = requireSessionOidcUser(authentication);
         if (!agreeTerms) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "terms_not_accepted");
@@ -174,3 +168,4 @@ public class SsoJoinController {
         return new ResponseStatusException(HttpStatus.CONFLICT, "Your sign-in session expired. Please sign in again.");
     }
 }
+
