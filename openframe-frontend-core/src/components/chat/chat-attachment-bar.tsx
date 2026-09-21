@@ -329,7 +329,7 @@ function AttachmentChip({ attachment, onRemove, disabled, size = 'default' }: At
 function extLabel(fileName: string): string {
   const dot = fileName.lastIndexOf('.');
   if (dot === -1 || dot === fileName.length - 1) return '?';
-  return fileName.slice(dot + 1, dot + 4).toLowerCase();
+  return fileName.slice(dot + 1).toLowerCase();
 }
 
 /** One blob URL per `File`, so a render React discards (StrictMode's double
@@ -370,3 +370,4 @@ function useObjectUrl(file: File | null): string | null {
 
   return url;
 }
+
