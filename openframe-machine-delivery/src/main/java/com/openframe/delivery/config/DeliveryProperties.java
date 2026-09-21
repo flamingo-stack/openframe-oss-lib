@@ -8,7 +8,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
@@ -22,9 +21,11 @@ import static java.util.Objects.requireNonNullElse;
 @Setter
 @Validated
 @Component
-@ConditionalOnProperty(name = "openframe.delivery.enabled", havingValue = "true")
 @ConfigurationProperties(prefix = "openframe.delivery")
 public class DeliveryProperties {
+
+    @NotNull
+    private Boolean enabled;
 
     @Valid
     @NotNull
@@ -36,6 +37,10 @@ public class DeliveryProperties {
 
     // deliberately not @Valid: a per-type entry lists only the fields it overrides
     private Map<DeliveryType, Policy> types = new EnumMap<>(DeliveryType.class);
+
+    public boolean isEnabled() {
+        return enabled;
+    }
 
     public Policy resolve(DeliveryType type) {
         Policy override = types.get(type);

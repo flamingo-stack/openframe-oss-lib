@@ -5,14 +5,12 @@ import com.openframe.data.document.delivery.DeliveryType;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "openframe.delivery.enabled", havingValue = "true")
 public class DeliveryMetrics {
 
     private static final String RETRIED_COUNTER = "openframe.delivery.retried";

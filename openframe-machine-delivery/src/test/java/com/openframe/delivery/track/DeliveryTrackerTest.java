@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class MongoDeliveryTrackerTest {
+class DeliveryTrackerTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String TARGET_ID = "fleetmdm-agent";
@@ -35,11 +35,11 @@ class MongoDeliveryTrackerTest {
     @Captor private ArgumentCaptor<Instant> atCaptor;
     @Captor private ArgumentCaptor<Instant> untilCaptor;
 
-    private MongoDeliveryTracker tracker;
+    private DeliveryTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker = new MongoDeliveryTracker(repository, DeliveryTestPolicies.properties());
+        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties());
     }
 
     @Test

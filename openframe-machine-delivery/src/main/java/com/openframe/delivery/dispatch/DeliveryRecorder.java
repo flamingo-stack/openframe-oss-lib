@@ -1,8 +1,67 @@
 package com.openframe.delivery.dispatch;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.data.document.delivery.DeliveryStatus;
+import com.openframe.data.document.delivery.MachineDelivery;
+import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.spec.DeliveryRequest;
+import com.openframe.delivery.track.DeliveryId;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
-public interface DeliveryRecorder {
+import java.time.Instant;
 
-    void record(DeliveryRequest<?> request);
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class DeliveryRecorder {
+
+    private final MachineDeliveryRepository repository;
+    private final DeliveryProperties properties;
+    private final ObjectMapper objectMapper;
+
+    public void record(DeliveryRequest<?> request) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+        MachineDelivery delivery = pendingRow(request);
+        repository.upsertPending(delivery);
+        log.info("Delivery recorded: type={} targetId={} machineId={}",
+                request.getType(), request.getTargetId(), request.getMachineId());
+    }
+
+    private MachineDelivery pendingRow(DeliveryRequest<?> request) {
+        Instant now = Instant.now();
+        String id = DeliveryId.of(request.getType(), request.getTargetId(), request.getMachineId());
+        String payloadJson = toJson(request.getPayload());
+        Policy policy = properties.resolve(request.getType());
+        long ackThresholdSeconds = policy.getAckThresholdSeconds();
+        return MachineDelivery.builder()
+                .id(id)
+                .type(request.getType())
+                .targetId(request.getTargetId())
+                .machineId(request.getMachineId())
+                .status(DeliveryStatus.PENDING)
+                .attempts(0)
+                .payloadJson(payloadJson)
+                .dispatchedAt(now)
+                .lastAttemptAt(now)
+                .dueAt(now.plusSeconds(ackThresholdSeconds))
+                .offlineBehavior(request.getOfflineBehavior())
+                .reconnectWindowSeconds(request.getReconnectWindowSeconds())
+                .build();
+    }
+
+    private String toJson(Object payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            String payloadType = payload.getClass().getSimpleName();
+            throw new IllegalArgumentException("Delivery payload is not serializable: " + payloadType, e);
+        }
+    }
 }

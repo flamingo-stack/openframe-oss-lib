@@ -6,6 +6,7 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.TestPayload;
@@ -20,9 +21,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
-class MongoDeliveryRecorderTest {
+class DeliveryRecorderTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String VALUE = "issued";
@@ -31,8 +33,9 @@ class MongoDeliveryRecorderTest {
 
     @Captor private ArgumentCaptor<MachineDelivery> deliveryCaptor;
 
-    private MongoDeliveryRecorder recorder;
+    private DeliveryRecorder recorder;
 
+    private DeliveryProperties properties;
     private DeliveryRequest<TestPayload> request;
 
     @BeforeEach
@@ -46,7 +49,8 @@ class MongoDeliveryRecorderTest {
                 .payload(payload)
                 .offlineBehavior(DeliveryOfflineBehavior.RETRY_ON_RECONNECT)
                 .build();
-        recorder = new MongoDeliveryRecorder(repository, DeliveryTestPolicies.properties(), new ObjectMapper());
+        properties = DeliveryTestPolicies.properties();
+        recorder = new DeliveryRecorder(repository, properties, new ObjectMapper());
     }
 
     @Test
@@ -67,5 +71,17 @@ class MongoDeliveryRecorderTest {
         assertThat(saved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
         assertThat(saved.getDispatchedAt()).isEqualTo(saved.getLastAttemptAt());
         assertThat(saved.getDueAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(ACK_THRESHOLD));
+    }
+
+    @Test
+    void record_engineDisabled_nothingWritten() {
+        // setup
+        properties.setEnabled(false);
+
+        // execution
+        recorder.record(request);
+
+        // verifications
+        verifyNoInteractions(repository);
     }
 }
