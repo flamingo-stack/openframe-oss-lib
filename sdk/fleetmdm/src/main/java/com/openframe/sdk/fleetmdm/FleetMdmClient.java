@@ -305,17 +305,21 @@ public class FleetMdmClient {
         }
     }
 
-    private HttpRequest buildRunQueryRequest(long hostId, String query) throws IOException {
-        String requestBody = MAPPER.writeValueAsString(
-                MAPPER.createObjectNode().put("query", query)
-        );
+    private HttpRequest buildRunQueryRequest(long hostId, String query) {
+        try {
+            String requestBody = MAPPER.writeValueAsString(
+                    MAPPER.createObjectNode().put("query", query)
+            );
 
-        return addHeaders(HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + HOSTS_URL + "/" + hostId + "/query"))
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .header("Content-Type", "application/json"))
-                .timeout(Duration.ofSeconds(90))
-                .build();
+            return addHeaders(HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + HOSTS_URL + "/" + hostId + "/query"))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .header("Content-Type", "application/json"))
+                    .timeout(Duration.ofSeconds(90))
+                    .build();
+        } catch (IOException e) {
+            throw new FleetMdmException("Failed to build query request for host: " + hostId, e);
+        }
     }
 
     private static void checkRunQueryResponse(HttpResponse<String> response, long hostId) {
