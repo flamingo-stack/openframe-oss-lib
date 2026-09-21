@@ -254,12 +254,12 @@ export function OnboardingGuideCard({
                   />
                 )}
                 {hasVideoCover && coverImage && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <span className="absolute inset-0 flex items-center justify-center bg-ods-overlay">
                     <Play className="h-10 w-10 text-ods-text-on-dark" fill="white" />
                   </span>
                 )}
                 {durationLabel && (
-                  <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-ods-text-on-dark text-code">
+                  <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-ods-overlay-strong px-2 py-1 text-ods-text-on-dark text-code">
                     <Clock className="h-3 w-3" />
                     {durationLabel}
                   </span>
@@ -316,7 +316,7 @@ export function OnboardingGuideCard({
             </span>
           )}
           {hasVideoCover && compactCover && (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <span className="absolute inset-0 flex items-center justify-center bg-ods-overlay">
               <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
             </span>
           )}
