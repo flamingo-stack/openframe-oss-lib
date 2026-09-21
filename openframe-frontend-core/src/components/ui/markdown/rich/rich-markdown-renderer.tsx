@@ -114,15 +114,25 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
 
   // ONE link-resolution code path: the engine's callback seam. This is the
   // fetch implementation the old Rich renderer had inline in its <a>
-  // handler — the engine's base `a` component now drives it.
+  // handler — the engine's base `a` component now drives it. Network
+  // failures, non-OK responses, and non-JSON bodies all degrade to
+  // `{ success: false }` rather than throwing inside the engine's
+  // link-click handler.
   const onResolveLink = useCallback(
     async (href: string, path: string): Promise<ResolveLinkResult> => {
-      const response = await fetch(resolveLinkEndpointUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ link: href, currentPath: path, source: resolveSource }),
-      });
-      return toResolveLinkResult(await response.json());
+      try {
+        const response = await fetch(resolveLinkEndpointUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ link: href, currentPath: path, source: resolveSource }),
+        });
+        if (!response.ok) {
+          return { success: false };
+        }
+        return toResolveLinkResult(await response.json());
+      } catch {
+        return { success: false };
+      }
     },
     [resolveLinkEndpointUrl, resolveSource],
   );
