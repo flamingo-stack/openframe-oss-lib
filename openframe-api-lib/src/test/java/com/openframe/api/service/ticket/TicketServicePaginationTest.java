@@ -47,6 +47,7 @@ class TicketServicePaginationTest {
     @Mock private TicketNumberService ticketNumberService;
     @Mock private TicketTagService ticketTagService;
     @Mock private TicketIdsForFilter ticketIdsForFilter;
+    @Mock private TicketStalenessResolver ticketStalenessResolver;
     @Mock private MachineRepository machineRepository;
     @Mock private OrganizationRepository organizationRepository;
     @Mock private UserRepository userRepository;
@@ -85,15 +86,15 @@ class TicketServicePaginationTest {
         assertThat(result.getPageInfo().isHasNextPage()).isFalse();
     }
 
-    /** A full page with nothing beyond it still counts as "there may be more" — the extra row decides. */
+    /** The extra row is what proves another page exists: a full page without it is the last one. */
     @Test
-    void getTickets_withExactlyAFullPage_reportsANextPage() {
+    void getTickets_withExactlyAFullPage_reportsNoNextPage() {
         givenPage(tickets(3));
 
         CountedGenericQueryResult<Ticket> result = service.getTickets(admin, null, paging(3, null), null, null);
 
         assertThat(result.getItems()).hasSize(3);
-        assertThat(result.getPageInfo().isHasNextPage()).isTrue();
+        assertThat(result.getPageInfo().isHasNextPage()).isFalse();
     }
 
     @Test

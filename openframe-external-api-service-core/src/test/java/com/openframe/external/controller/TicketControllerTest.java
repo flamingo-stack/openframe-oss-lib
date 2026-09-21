@@ -347,7 +347,6 @@ class TicketControllerTest {
         AuthPrincipal principal = resolvedPrincipal();
         when(ticketStatisticsService.getStatistics(same(principal))).thenReturn(TicketStatistics.builder()
                 .totalCount(12)
-                .statusCounts(List.of(new TicketStatusCount(TicketStatus.ACTIVE, 7)))
                 .statusDefinitionCounts(List.of(new TicketStatusDefinitionCount(
                         TicketStatusDefinition.builder().id("st-1").kind(TicketStatusKind.CUSTOM).name("Open").build(), 5)))
                 .averageResolutionTimeFormatted("2h 15m")
@@ -357,8 +356,6 @@ class TicketControllerTest {
         mockMvc.perform(get(BASE + "/statistics"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalCount").value(12))
-                .andExpect(jsonPath("$.statusCounts[0].status").value("ACTIVE"))
-                .andExpect(jsonPath("$.statusCounts[0].count").value(7))
                 .andExpect(jsonPath("$.statusDefinitionCounts[0].status.id").value("st-1"))
                 .andExpect(jsonPath("$.statusDefinitionCounts[0].status.name").value("Open"))
                 .andExpect(jsonPath("$.statusDefinitionCounts[0].count").value(5))
