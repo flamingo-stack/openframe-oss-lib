@@ -43,7 +43,7 @@ const variantColors: Record<CircularProgressVariant, { progress: string; track: 
     track: 'var(--color-error-secondary)',
   },
   info: {
-    progress: 'var(--ods-system-greys-white)',
+    progress: 'var(--color-info)',
     track: SUBTLE_TRACK,
   },
   accent: {
