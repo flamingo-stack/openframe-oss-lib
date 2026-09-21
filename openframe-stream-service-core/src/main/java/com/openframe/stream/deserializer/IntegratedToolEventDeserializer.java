@@ -13,11 +13,13 @@ import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,6 +32,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
 
     private static final String COMPOSITE_KEY_PATTERN = "%s_%s_id_%s";
     private static final String HASH_KEY_PATTERN = "%s_%s_hash_%s";
+    private static final String SHA_256 = "SHA-256";
     protected final ObjectMapper mapper;
     private final List<String> eventsToSkip;
     private final List<String> eventsInvisible;
@@ -195,9 +198,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
                 .orElseGet(() -> {
                     log.warn("Event missing primary key from {}.{} - using content hash fallback", toolName, tableName);
 
-                    String contentHash = Integer.toHexString(
-                            Objects.hash(toolName, tableName, after.toString())
-                    );
+                    String contentHash = sha256Hex(toolName + "|" + tableName + "|" + after.toString());
 
                     return String.format(HASH_KEY_PATTERN, toolName, tableName, contentHash);
                 });
@@ -205,6 +206,25 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
         //Generate deterministic UUID
         UUID uuid = UUID.nameUUIDFromBytes(compositeKey.getBytes());
         return uuid.toString();
+    }
+
+    /**
+     * Computes a SHA-256 hex digest of the given content. Used as a strong content hash
+     * fallback for composite ID generation when no primary key is available, to avoid the
+     * collision risk of a 32-bit hash (e.g. Objects.hash) at scale.
+     */
+    private static String sha256Hex(String content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance(SHA_256);
+            byte[] hashBytes = digest.digest(content.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(hashBytes.length * 2);
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
+        }
     }
 
     /**
@@ -302,3 +322,4 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
         }
     }
 }
+
