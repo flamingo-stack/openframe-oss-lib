@@ -17,14 +17,11 @@ public class DeviceLogFilterInput {
 
     private List<DeviceLogLevel> levels;
 
-    @Size(max = 5, message = "contains cannot hold more than 5 terms")
-    private List<@Size(max = 256, message = "search terms cannot exceed 256 characters") String> contains;
+    @Size(max = 5, message = "cannot hold more than 5 terms")
+    private List<@Size(max = 256, message = "cannot exceed 256 characters") String> contains;
 
-    @Size(max = 5, message = "excludes cannot hold more than 5 terms")
-    private List<@Size(max = 256, message = "search terms cannot exceed 256 characters") String> excludes;
-
-    @Size(max = 256, message = "regex cannot exceed 256 characters")
-    private String regex;
+    @Size(max = 5, message = "cannot hold more than 5 terms")
+    private List<@Size(max = 256, message = "cannot exceed 256 characters") String> excludes;
 
     private Instant from;
 

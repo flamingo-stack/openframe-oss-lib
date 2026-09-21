@@ -25,7 +25,6 @@ public class GraphQLDeviceLogMapper {
                 .levels(input.getLevels())
                 .contains(input.getContains())
                 .excludes(input.getExcludes())
-                .regex(input.getRegex())
                 .from(input.getFrom())
                 .to(input.getTo())
                 .build();
