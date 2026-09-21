@@ -10,8 +10,8 @@ const alertVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-background text-foreground',
-        destructive: 'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
+        default: 'bg-ods-bg-secondary text-ods-text-primary',
+        destructive: 'border-ods-error/50 text-ods-error dark:border-ods-error [&>svg]:text-ods-error',
         warning: 'border-transparent bg-ods-warning-secondary text-ods-warning [&>svg]:text-ods-warning',
         error: 'border-transparent bg-ods-error-secondary text-ods-error [&>svg]:text-ods-error',
       },
