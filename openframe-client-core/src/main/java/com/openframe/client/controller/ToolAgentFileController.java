@@ -1,10 +1,13 @@
 package com.openframe.client.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 
+@Slf4j
 @RestController
 @RequestMapping("/tool-agent/{assetId}")
 public class ToolAgentFileController {
@@ -28,11 +31,13 @@ public class ToolAgentFileController {
 
         try (InputStream stream = ToolAgentFileController.class.getResourceAsStream(path)) {
             if (stream == null) {
-                throw new RuntimeException("No content");
+                log.error("No content found for tool agent file at path: {}", path);
+                throw new IllegalStateException("No content");
             }
             return stream.readAllBytes();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            log.error("Failed to read tool agent file at path: {}", path, e);
+            throw new UncheckedIOException(e);
         }
     }
 
