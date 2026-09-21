@@ -28,10 +28,6 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-mongo-sync</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-machine-delivery</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
