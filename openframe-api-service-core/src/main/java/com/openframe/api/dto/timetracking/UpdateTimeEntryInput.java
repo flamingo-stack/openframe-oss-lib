@@ -1,6 +1,7 @@
 package com.openframe.api.dto.timetracking;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,5 +23,8 @@ public class UpdateTimeEntryInput {
     private String organizationId;
     private String notes;
     private Instant startedAt;
+
+    @Positive
     private Long durationSeconds;
 }
+
