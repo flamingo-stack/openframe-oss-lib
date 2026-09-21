@@ -87,7 +87,7 @@ export function CyclingPhrase({ words, className, charMs = 60, holdMs = 4500 }: 
       setCursor(c => c + 1);
     }, charMs);
     return () => clearTimeout(timeoutId);
-  }, [wordIndex, cursor, text, holding, target, words, charMs, holdMs]);
+  }, [wordIndex, cursor, holding, target, words, charMs, holdMs]);
 
   if (words.length === 0) return null;
 
