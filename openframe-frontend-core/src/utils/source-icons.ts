@@ -39,6 +39,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   events: 'calendar',
   podcasts: 'headphones',
   'customer-interviews': 'users',
+  faqs: 'info',
 
   // Financials
   'investor-updates': 'mail',
@@ -68,6 +69,16 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
 
   // Communications
   'slack-messages': 'slack',
+
+  // People-hub employee content
+  'what-i-shipped': 'package',
+  'how-i-work': 'book-open',
+  'ai-prompts': 'message-square',
+
+  // Product-hub internal
+  'design-docs': 'file-text',
+  'openframe-tenants': 'openframe',
+  'prospect-calls': 'phone',
 };
 
 /** Lookup an icon name by RagTableConfig.id. Returns undefined when
@@ -104,6 +115,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   events: 'Events',
   podcasts: 'Podcasts',
   'customer-interviews': 'Customer Interviews',
+  faqs: 'FAQs',
 
   // Financials
   'investor-updates': 'Investor Updates',
@@ -139,6 +151,16 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
 
   // Communications
   'slack-messages': 'OpenMSP Community',
+
+  // People-hub employee content
+  'what-i-shipped': 'What I Shipped',
+  'how-i-work': 'How I Work',
+  'ai-prompts': 'Squawkbox',
+
+  // Product-hub internal
+  'design-docs': 'Design Docs',
+  'openframe-tenants': 'OpenFrame Tenants',
+  'prospect-calls': 'Prospect calls',
 };
 
 /** Lookup a human-readable label by RagTableConfig.id. Falls back
@@ -183,6 +205,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   event: 'events',
   podcast: 'podcasts',
   customer_interview: 'customer-interviews',
+  faq: 'faqs',
 
   // Financials
   investor_update: 'investor-updates',
@@ -212,6 +235,16 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
 
   // Communications
   slack_message: 'slack-messages',
+
+  // People-hub employee content
+  what_i_shipped: 'what-i-shipped',
+  how_i_work: 'how-i-work',
+  ai_prompt: 'ai-prompts',
+
+  // Product-hub internal
+  design_doc: 'design-docs',
+  openframe_tenant: 'openframe-tenants',
+  prospect_call: 'prospect-calls',
 };
 
 /**
@@ -222,4 +255,17 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
  */
 export function defaultTableIdForDocumentType(documentType: string): string | null {
   return DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID[documentType] ?? null;
+}
+
+/**
+ * The reverse lookup: a table's canonical `documentType`. The map above is
+ * 1:1 (the hub's per-source contract test pins one type per table), so a row
+ * that names its table but arrived with no type still has one. `null` for a
+ * table the map does not list.
+ */
+export function defaultDocumentTypeForTableId(tableId: string): string | null {
+  for (const [documentType, table] of Object.entries(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID)) {
+    if (table === tableId) return documentType;
+  }
+  return null;
 }

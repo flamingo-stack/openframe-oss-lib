@@ -75,6 +75,18 @@ export interface ChatRuntime {
      *  prefix covers it). Set explicitly only when the history route lives
      *  elsewhere. */
     chatHistoryUrl?: string;
+    /**
+     * Conversation-list surface for the SSE/Guide chat — the server-side
+     * transcript store exposed as a dialog list:
+     *   GET  `<url>?status=active|archived&cursor=&limit=&search=` → `{ dialogs, nextCursor }`
+     *   PATCH `<url>/<id>` with `{ title }` (rename) or `{ archived }` (archive / restore)
+     * Hub: '/api/docs/chat/conversations'. OPTIONAL and NEVER derived: unset =
+     * the Guide adapter has no dialog list and the panel keeps its single-thread
+     * UI. Set it to enable the "Current Chats" rail / archive / rename in Guide
+     * mode (the same UX openframe gets in Mingo mode). Selecting a row hydrates
+     * through `chatHistoryUrl`.
+     */
+    chatConversationsUrl?: string;
     /** GET RAG-search endpoint behind `<DocSearchBar>` (the in-source search
      *  bar mounted by `<DocViewer>` / `<DocsHubPage>` when `showAIChat` is on).
      *  Hub: '/api/docs/search'. OPTIONAL — falls back to the hub path so
@@ -234,7 +246,7 @@ export interface ChatRuntime {
    *  the single `chipBasePlatform` prop. Maps a doc-table documentType
    *  (`'markdown'`, `'data_room_doc'`, …) → `{ platform, basePath }` for the PUBLIC
    *  doc viewer that hosts it. Doc chips with no `externalUrl` resolve PER ROW to
-   *  `getBaseUrl(platform)/<basePath>/<path>`, so a chat mixing several doc sources
+   *  `getPlatformUrl(platform)/<basePath>/<path>`, so a chat mixing several doc sources
    *  sends EACH to its own home (markdown→flamingo/knowledge-base,
    *  data_room_doc→company-hub/data-room) instead of one static fallback. The hub
    *  may keep using `chipBasePlatform` (one doc source per platform); embedders that

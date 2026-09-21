@@ -27,7 +27,9 @@ import static com.openframe.data.document.ticket.TicketStatusKind.TECH_REQUIRED;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
-@ChangeUnit(id = "migrate-ticket-status-model", order = "003", author = "openframe")
+// runAlways: seeding is what gives a tenant its statuses, and a tenant can appear after this service
+// started, so the unit has to re-run on every boot — a one-shot unit would leave those tenants empty.
+@ChangeUnit(id = "migrate-ticket-status-model", order = "003", author = "openframe", runAlways = true)
 public class MigrateTicketStatusesChangeUnit {
 
     private static final String FIELD_ID = "_id";

@@ -1,4 +1,5 @@
 import type { RowData } from '@tanstack/react-table';
+import type { ReactNode } from 'react';
 
 export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl';
 
@@ -6,6 +7,19 @@ export interface DataTableFilterOption {
   id: string;
   label: string;
   value: string | number | boolean;
+  /**
+   * How many rows this option would match, rendered right-aligned beside the
+   * label by `FiltersDropdown`. Optional: a list whose options come from a
+   * plain enum rather than a server facet has no honest number to show, and
+   * `undefined` draws nothing at all — which is the correct answer there.
+   *
+   * A facet is expected to be SELF-EXCLUDING (computed with every active
+   * filter EXCEPT its own field), so the number reads "how many rows if you
+   * pick this" and stays put as the user ticks options in the same dropdown.
+   * A count narrowed by its own filter collapses every unpicked option to 0
+   * the moment one is picked — do not feed one in.
+   */
+  count?: number;
 }
 
 declare module '@tanstack/react-table' {
@@ -48,5 +62,13 @@ declare module '@tanstack/react-table' {
     cellClassName?: string;
     /** Extra class names applied to the header cell wrapper. */
     headerClassName?: string;
+    /**
+     * A definition shown in an `InfoHint` beside the header label — for a
+     * column whose NAME is a term of art a reader may not know. The header owns
+     * the icon, its spacing and its accessible name (`About <label>`), so every
+     * table explains a column the same way instead of each hand-rolling a node
+     * header to fit one in.
+     */
+    hint?: ReactNode;
   }
 }

@@ -3,6 +3,7 @@
 import { ChevronRight } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { cn } from '../../utils/cn';
+import { formatDateWithTimezone, formatTimeWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention';
 import { Button, DatePickerCalendar, Skeleton } from '../ui';
 
@@ -56,6 +57,13 @@ export interface SlotPickerProps {
   onSelectDay: (dayKey: string) => void;
   /** Availability refetch in flight (month change) → per-region skeletons. */
   isLoading?: boolean;
+  /**
+   * A booking POST is in flight (details-first, where the slot click IS the
+   * submit). DISTINCT from `isLoading`, which swaps the whole times column for
+   * a skeleton — here the grid must stay up with the clicked chip spinning, so
+   * the visitor can see WHICH time is being booked.
+   */
+  isSubmitting?: boolean;
 }
 
 /** Stable per-zone day key for an instant, e.g. "2026-08-14" (exported — the
@@ -82,7 +90,7 @@ function dateFromDayKey(key: string): Date {
 }
 
 function timeLabelInZone(ms: number, timeZone: string): string {
-  return new Intl.DateTimeFormat(undefined, { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(ms));
+  return formatTimeWithTimezone(ms, timeZone, { viewerLocale: true });
 }
 
 /**
@@ -204,7 +212,7 @@ const COLUMN_DIVIDER = 'border-b border-ods-border md:border-b-0 md:border-r lg:
 export function monthLabelFor(offset: number): string {
   const now = new Date();
   const month = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(month);
+  return formatDateWithTimezone(month, VIEWER_TIMEZONE, 'monthYear');
 }
 
 /** Nothing is bookable yet — used while a month is still loading. */
@@ -330,6 +338,7 @@ export function SlotPicker({
   selectedDay,
   onSelectDay,
   isLoading = false,
+  isSubmitting = false,
 }: SlotPickerProps) {
   const slotsByDay = useMemo(() => {
     const map = new Map<string, number[]>();
@@ -378,11 +387,7 @@ export function SlotPicker({
             <p className={COLUMN_HEADING_CLASS}>
               {/* Format the DAY-KEY itself (plain calendar date) — re-zoning a
                   local instant could label an adjacent day. */}
-              {new Intl.DateTimeFormat(undefined, {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-              }).format(dateFromDayKey(selectedDay))}
+              {formatDateWithTimezone(dateFromDayKey(selectedDay), VIEWER_TIMEZONE, 'weekday', { viewerLocale: true })}
             </p>
             <div className={CHIP_GRID_CLASS}>
               {daySlots.map(ms => {
@@ -391,7 +396,15 @@ export function SlotPicker({
                   <Button
                     key={ms}
                     variant={isSelected ? undefined : 'outline'}
-                    onClick={() => onSelectSlot(ms)}
+                    // The click is the submit in details-first, so the grid
+                    // itself is the double-book guard — the form button that
+                    // used to carry `disabled={isSubmitting}` is not on screen.
+                    disabled={isSubmitting}
+                    loading={isSubmitting && isSelected}
+                    onClick={() => {
+                      if (isSubmitting) return;
+                      onSelectSlot(ms);
+                    }}
                     className={CHIP_CLASS}
                   >
                     {timeLabelInZone(ms, timezone)}

@@ -18,6 +18,7 @@ import {
 } from 'react';
 
 import { cn } from '../../utils/cn';
+import { clamp } from '../../utils/common';
 import {
   DrawerBody,
   DrawerDescription,
@@ -213,11 +214,6 @@ const HORIZONTAL_SIDES: ReadonlySet<DrawerSide> = new Set(['left', 'right']);
  * so there's nothing to snap back.
  */
 const PERSIST_CLOSED_HOLD = 'data-[state=closed]:fill-mode-forwards';
-
-function clamp(value: number, min: number, max: number): number {
-  if (max < min) return min;
-  return Math.min(max, Math.max(min, value));
-}
 
 interface UseContainedResizableSizeArgs {
   enabled: boolean;

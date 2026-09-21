@@ -6,29 +6,70 @@ import { cn } from '../../../utils/cn';
 import { Button } from '../../ui/button';
 import { CheckboxBlock } from '../../ui/checkbox-block';
 import { Input } from '../../ui/input';
+import { AccountDetailsFields } from './account-details-fields';
+import { LabeledDivider } from './labeled-divider';
 import type { AuthSsoProvider } from './sso-providers';
 import { SsoProviderButtons } from './sso-providers';
 import { TermsAgreementLabel } from './terms-agreement-label';
 
 export interface CreateOrganizationFormProps {
-  /** Controlled field values */
-  email: string;
+  /**
+   * Controlled field values. Omit `email` entirely for flows that neither collect nor show an
+   * address — the native Apple signup, where the provider asserted it and may only have handed the
+   * app a relay alias the user has never seen. Pass it with `emailReadOnly` to show it uneditable.
+   */
+  email?: string;
   organizationName: string;
   domain: string;
   agreedToTerms: boolean;
-  /** Change handlers */
-  onEmailChange: (value: string) => void;
+  // Change handlers
+  /** Omit together with `email` when the form collects no address. */
+  onEmailChange?: (value: string) => void;
   onOrganizationNameChange: (value: string) => void;
   onDomainChange: (value: string) => void;
   onAgreedToTermsChange: (checked: boolean) => void;
   /** Primary submit ("Continue") */
   onSubmit: () => void;
+  /**
+   * Personal details and credentials, collected on the same screen as the organization. Supply the
+   * four handlers to render them; omit them and the form stays organization-only (the SSO paths,
+   * where the provider is the credential and there is no password to set).
+   */
+  firstName?: string;
+  lastName?: string;
+  password?: string;
+  confirmPassword?: string;
+  onFirstNameChange?: (value: string) => void;
+  onLastNameChange?: (value: string) => void;
+  onPasswordChange?: (value: string) => void;
+  onConfirmPasswordChange?: (value: string) => void;
+  /**
+   * Renders the email as a read-only field instead of an input, for flows where the address was
+   * fixed by an earlier step and this form cannot change it — a signup that collected it on a
+   * previous step, or an SSO login where the provider asserted it and the server reads it from the
+   * session. `onEmailChange` is not called in this mode.
+   */
+  emailReadOnly?: boolean;
+  /** Label above the read-only email, e.g. "Signed in with Google". Ignored unless `emailReadOnly`. */
+  emailReadOnlyLabel?: string;
+  /** Overrides the default heading. */
+  title?: string;
+  /** Overrides the default sub-heading. */
+  subtitle?: ReactNode;
   /** Suffix rendered inside the domain input, e.g. ".openframe.ai" */
   domainSuffix?: string;
   domainPlaceholder?: string;
   termsUrl?: string;
   privacyPolicyUrl?: string;
   submitLabel?: string;
+  /**
+   * Extra fields, rendered after the account block and before the terms — the same slot
+   * CompleteAccountForm offers, for inputs a deployment adds conditionally (a dev-only PR number).
+   */
+  children?: ReactNode;
+  /** Renders a back action beside the submit when supplied (e.g. to return to an earlier step). */
+  onBack?: () => void;
+  backLabel?: string;
   /** Disables just the primary submit (fields stay editable). */
   submitDisabled?: boolean;
   loading?: boolean;
@@ -38,6 +79,10 @@ export interface CreateOrganizationFormProps {
     organizationName?: string;
     domain?: string;
     terms?: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
   };
   /** Informational status under the email field (e.g. live availability). `errors.email` wins. */
   emailStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' };
@@ -54,7 +99,7 @@ export interface CreateOrganizationFormProps {
   onSsoClick?: (provider: AuthSsoProvider) => void;
   /** Disables the provider buttons (e.g. until the form validates). */
   ssoDisabled?: boolean;
-  /** Verb prefix for provider buttons, e.g. "Continue with". Ignored for "openframe". */
+  /** Verb prefix for provider buttons, e.g. "Continue with". */
   ssoActionLabel?: string;
   /** Divider text between the primary submit and the SSO buttons. */
   dividerLabel?: string;
@@ -76,11 +121,26 @@ export function CreateOrganizationForm({
   onDomainChange,
   onAgreedToTermsChange,
   onSubmit,
+  firstName = '',
+  lastName = '',
+  password = '',
+  confirmPassword = '',
+  onFirstNameChange,
+  onLastNameChange,
+  onPasswordChange,
+  onConfirmPasswordChange,
+  emailReadOnly = false,
+  emailReadOnlyLabel = 'Email',
+  title = 'Create Organization',
+  subtitle = 'Start your journey with OpenFrame.',
   domainSuffix,
   domainPlaceholder = 'company-name',
   termsUrl = '#',
   privacyPolicyUrl = '#',
   submitLabel = 'Continue',
+  children,
+  onBack,
+  backLabel = 'Back',
   submitDisabled = false,
   loading = false,
   disabled = false,
@@ -99,12 +159,14 @@ export function CreateOrganizationForm({
   const fieldsDisabled = disabled || loading;
 
   // Validation messages are deferred while the user is typing (shown on blur or after a pause).
-  const emailErr = useDeferredError(errors?.email, email);
+  const emailErr = useDeferredError(errors?.email, email ?? '');
   const orgNameErr = useDeferredError(errors?.organizationName, organizationName);
   const domainErr = useDeferredError(errors?.domain, domain);
-
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' && !fieldsDisabled) {
+    // `submitDisabled` too, not just `fieldsDisabled`: Enter must be the same gate as the button.
+    // The fields stay editable while the form is incomplete, so checking only `fieldsDisabled`
+    // let Enter submit a form the button was still refusing.
+    if (event.key === 'Enter' && !fieldsDisabled && !submitDisabled) {
       onSubmit();
     }
   };
@@ -118,23 +180,27 @@ export function CreateOrganizationForm({
     >
       {/* Header */}
       <div className="flex flex-col">
-        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">Create Organization</h1>
-        <p className="text-ods-text-secondary text-h4">Start your journey with OpenFrame.</p>
+        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
+        <p className="text-ods-text-secondary text-h4">{subtitle}</p>
       </div>
 
       {/* Email + Organization Name — single column on every breakpoint */}
-      <Input
-        type="email"
-        label="Email"
-        placeholder="username@mail.com"
-        value={email}
-        error={emailErr.error ?? emailStatus?.message}
-        errorVariant={emailErr.error ? 'error' : emailStatus?.variant}
-        disabled={fieldsDisabled}
-        onBlur={emailErr.onBlur}
-        onChange={event => onEmailChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
+      {email === undefined ? null : emailReadOnly ? (
+        <Input type="email" label={emailReadOnlyLabel} value={email} readOnly disabled />
+      ) : (
+        <Input
+          type="email"
+          label="Email"
+          placeholder="username@mail.com"
+          value={email}
+          error={emailErr.error ?? emailStatus?.message}
+          errorVariant={emailErr.error ? 'error' : emailStatus?.variant}
+          disabled={fieldsDisabled}
+          onBlur={emailErr.onBlur}
+          onChange={event => onEmailChange?.(event.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+      )}
       <Input
         label="Organization Name"
         placeholder="Your Company Name"
@@ -163,6 +229,27 @@ export function CreateOrganizationForm({
         {domainSlot && <div className="pt-[var(--spacing-system-s)]">{domainSlot}</div>}
       </div>
 
+      {/* All four handlers or none: the account block is one decision, and checking them here
+          rather than through a derived boolean is what lets TypeScript narrow them. */}
+      {onFirstNameChange && onLastNameChange && onPasswordChange && onConfirmPasswordChange && (
+        <AccountDetailsFields
+          layout="paired"
+          firstName={firstName}
+          lastName={lastName}
+          password={password}
+          confirmPassword={confirmPassword}
+          onFirstNameChange={onFirstNameChange}
+          onLastNameChange={onLastNameChange}
+          onPasswordChange={onPasswordChange}
+          onConfirmPasswordChange={onConfirmPasswordChange}
+          errors={errors}
+          disabled={fieldsDisabled}
+          onKeyDown={handleKeyDown}
+        />
+      )}
+
+      {children}
+
       {/* Terms & Privacy — deliberately NOT `truncateLabel`. That prop suits a
           one-line value; this label is a sentence carrying the Terms and Privacy
           Policy links, and ellipsizing it clipped the row to "Agree to Terms &
@@ -178,26 +265,37 @@ export function CreateOrganizationForm({
         onCheckedChange={onAgreedToTermsChange}
       />
 
-      {/* Actions */}
-      <Button
-        type="button"
-        variant="accent"
-        fullWidth
-        loading={loading}
-        disabled={disabled || submitDisabled}
-        onClick={onSubmit}
-      >
-        {submitLabel}
-      </Button>
+      {/* Actions — optional back + submit */}
+      <div className="flex items-center gap-[var(--spacing-system-l)]">
+        {onBack && (
+          <Button
+            type="button"
+            variant="transparent"
+            fullWidth
+            className="flex-1"
+            disabled={fieldsDisabled}
+            onClick={onBack}
+          >
+            {backLabel}
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="accent"
+          fullWidth
+          className="flex-1"
+          loading={loading}
+          disabled={disabled || submitDisabled}
+          onClick={onSubmit}
+        >
+          {submitLabel}
+        </Button>
+      </div>
 
       {/* SSO registration alternatives */}
       {hasSso && (
         <>
-          <div className="flex items-center gap-[var(--spacing-system-s)]">
-            <div className="h-px flex-1 bg-ods-border" />
-            <span className="text-ods-text-secondary text-h6">{dividerLabel}</span>
-            <div className="h-px flex-1 bg-ods-border" />
-          </div>
+          <LabeledDivider label={dividerLabel} />
           <SsoProviderButtons
             providers={ssoProviders}
             onSsoClick={onSsoClick}

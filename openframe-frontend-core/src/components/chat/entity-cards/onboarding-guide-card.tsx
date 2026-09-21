@@ -48,7 +48,7 @@ export interface OnboardingGuideCardProps {
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   targetPlatform?: string | null;
   /** OG placeholder URL used by the catalog + sm variants when no cover. */
   placeholderUrl?: string | null;

@@ -21,7 +21,7 @@ import java.util.List;
 public class TicketQueryFilter {
     private List<String> statusIds;
     private List<TicketStatusKind> statusKinds;
-
+    private List<Integer> ticketNumbers;
     private List<String> organizationIds;
     private List<String> assigneeIds;
     private List<String> tagIds;
@@ -29,4 +29,5 @@ public class TicketQueryFilter {
     private List<TicketCreationSource> creationSources;
     private Instant createdAtFrom;
     private Instant createdAtTo;
+    private TicketActivityCriteria activity;
 }

@@ -84,4 +84,9 @@ export * from './utils';
 // EmbeddableChat — full chat orchestrator (lib-portable port of hub's
 // `<GlobalAskAI>`). Hosts mount it once at the root after providing a
 // <ChatRuntimeContext.Provider>.
-export { EmbeddableChat, type EmbeddableChatHandle, type EmbeddableChatProps } from './embeddable-chat';
+export {
+  type ChatPrefillDraft,
+  EmbeddableChat,
+  type EmbeddableChatHandle,
+  type EmbeddableChatProps,
+} from './embeddable-chat';

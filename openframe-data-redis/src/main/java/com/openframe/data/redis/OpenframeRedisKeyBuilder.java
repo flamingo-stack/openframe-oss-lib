@@ -44,6 +44,14 @@ public class OpenframeRedisKeyBuilder {
         return build(relativeKey, tenantId.trim());
     }
 
+    /**
+     * Builds a key outside any tenant namespace, for state shared by the whole installation
+     * (e.g. cross-tenant locks). Cannot collide with tenant keys: those always carry a tenant segment.
+     */
+    public String globalKey(String relativeKey) {
+        return build(relativeKey, null);
+    }
+
     public String requireTenantId() {
         String tenantId = props.getTenantId();
         if (!StringUtils.hasText(tenantId)) {

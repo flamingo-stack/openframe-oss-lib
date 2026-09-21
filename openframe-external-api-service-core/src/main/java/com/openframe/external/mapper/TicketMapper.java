@@ -145,7 +145,7 @@ public class TicketMapper extends BaseRestMapper {
 
     public TicketFiltersResponse toFiltersResponse(TicketFilters filters) {
         if (filters == null) {
-            return TicketFiltersResponse.builder().build();
+            filters = new TicketFilters();
         }
         return TicketFiltersResponse.builder()
                 .statuses(toFilterOptions(filters.getStatuses()))

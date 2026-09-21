@@ -5,8 +5,9 @@
  * Handles type coercion, nested paths, and array parameters.
  */
 
+import { positiveInt } from '../../utils/search-params';
+import type { JSType } from '../../utils/search-params';
 import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
-import type { JSType } from './graphql-parser';
 
 /** A single URL-decodable value. */
 export type UrlScalar = string | number | boolean | null;
@@ -155,6 +156,13 @@ function coerceScalar(value: string, type: JSType): UrlScalar {
       const num = parseFloat(value);
       return isNaN(num) ? null : num;
     }
+
+    case 'int':
+      // THE integer grammar has ONE owner. This used to inline its own copy,
+      // which then drifted (the shared one honours a configured `max`).
+      // `positiveInt` returns the fallback for anything unparseable, and this
+      // path has no schema config to read a default from, so `null` it is.
+      return positiveInt<null>(value, null);
 
     case 'boolean':
       return value === 'true' || value === '1';

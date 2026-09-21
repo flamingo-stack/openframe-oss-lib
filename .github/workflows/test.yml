@@ -2,6 +2,7 @@ name: OpenFrame OSS Libs Test
 
 permissions:
   contents: read
+  pull-requests: read
 
 on:
   pull_request:
@@ -27,6 +28,26 @@ jobs:
     uses: ./.github/workflows/changes.yaml
     if: github.event.pull_request.state == 'open' && !github.event.pull_request.draft
 
+
+  scan:
+    name: "Scan Code"
+    runs-on: ubuntu-latest
+    needs: [changes]
+    permissions:
+      contents: read
+      packages: read
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Scan code
+        uses: ./.github/steps/trivy
+        with:
+          scan: code
 
   test-java:
     name: Test Java
@@ -80,7 +101,7 @@ jobs:
     name: Test Node (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [changes]
-    # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s 
+    # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
       NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
@@ -108,6 +129,17 @@ jobs:
           # one fails the step outright with "paths were not resolved".
           cache: npm
           cache-dependency-path: ${{ matrix.path }}/package.json
+
+      # Works around an Arborist bug in the npm version `actions/setup-node`'s
+      # Node 22 image currently bundles: resolving this project's tree with no
+      # lockfile to pin it (see the comment on Install Dependencies below)
+      # intermittently throws "Cannot read properties of null (reading
+      # 'edgesOut')" — reproduced on unrelated PRs the same day, not
+      # reproducible locally on npm 11.9.0. Pin removed once the bundled npm
+      # on that image picks up the fix upstream.
+      - name: Upgrade npm (workaround for a bundled-npm Arborist bug)
+        if: steps.should_run.outputs.run == 'true'
+        run: npm install -g npm@11.9.0
 
       # `install`, not `ci`: `npm ci` requires a committed lockfile and this
       # repo has none. The consequence is that CI resolves dependencies afresh
@@ -166,6 +198,11 @@ jobs:
           OLD_VERSION=$(npm view "$(jq -r .name package.json)" dist-tags.latest)
           echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}.${{ github.run_number }}.${{ github.run_attempt }}" >> $GITHUB_ENV
 
+      - name: Check publish manifest
+        if: steps.should_run.outputs.run == 'true'
+        # No local (file:/link:/.yalc) specs may reach the registry - see the script.
+        run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
+
       - name: Publish ${{ env.NEW_VERSION }} (pr-${{ github.event.pull_request.number }} tag)
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
@@ -214,6 +251,11 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: ${{ matrix.path }}/package.json
+
+      # See the identical step in test-node above for why this is here.
+      - name: Upgrade npm (workaround for a bundled-npm Arborist bug)
+        if: steps.should_run.outputs.run == 'true'
+        run: npm install -g npm@11.9.0
 
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
@@ -307,7 +349,7 @@ jobs:
     needs: [changes, test-java, test-node, test-node-cycles, test-rust]
     runs-on: ubuntu-latest
     if: |
-      always() && 
+      always() &&
       (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || !contains(needs.*.result, 'skipped'))
     steps:
       - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}

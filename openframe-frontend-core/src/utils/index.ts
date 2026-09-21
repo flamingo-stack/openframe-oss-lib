@@ -4,7 +4,15 @@ export { cn } from './cn';
 // here so existing `/utils` callers keep working; the new resolver/helpers
 // (getPlatformByHostname/hostOf/expandWwwApex/…) are exposed via the `/platform-domains`
 // subpath ONLY (one import surface for the new API).
-export { getPlatformProductionUrl, getAllPlatformBaseDomains } from '../platform-domains';
+export {
+  getPlatformUrl,
+  getPlatformProductionUrl,
+  getAllPlatformBaseDomains,
+  getDeploymentUrl,
+  getRequestOrigin,
+  isLocalUrl,
+  resolveRedirectTarget,
+} from '../platform-domains';
 // Number / currency / byte / date formatters live in `./format` (single
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
@@ -14,6 +22,10 @@ export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/
 export {
   getPlatformAccentColor,
   getCurrentPlatform,
+  getPlatformConfig,
+  usePlatformColors,
+  switchPlatformTheme,
+  getSemanticColor,
   type ColorCategory,
   HEX_PATTERN,
   // Custom-color helpers so consumers (e.g. the chat client's accent theming)
@@ -32,8 +44,10 @@ export {
   deepClone,
   getSlackCommunityJoinUrl,
   serializeJsonLd,
+  clamp,
+  pick,
+  NO_CLIENT_CACHE,
 } from './common';
-export { getBaseUrl } from '../utils/cn';
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title';
@@ -125,11 +139,21 @@ export {
   formatLargeNumber,
   formatAbbreviatedNumber,
   nameInitials,
-  getFirstLastInitials,
+  personFirstName,
+  personInitials,
+  singleInitial,
   formatDurationMMSS,
   formatDurationCompact,
   formatTimeWithTimezone,
+  formatDateWithTimezone,
+  formatDateTimeYmd,
+  VIEWER_TIMEZONE,
+  formatWebinarTimeMeta,
+  formatProgramDate,
+  formatProgramTimeRange,
+  type ZonedDateStyle,
   formatDurationFromRange,
+  isOrderedRange,
   type FormatDateUTCOptions,
   formatDateUTC,
   formatEntryMonthUTC,
@@ -172,6 +196,17 @@ export {
 // instead of src/components/chat/utils/ so server-side hub callers like
 // doc-chat-utils can use them without tripping the 'use client' boundary)
 export { SOURCE_ICON_NAMES, getSourceIconName, SOURCE_LABELS_BY_TABLE, getSourceLabel } from './source-icons';
+// Grouped source chips: the one rule + the one constructor, for the hub
+// (server) and the chat strip (client) alike.
+export {
+  DOC_TABLE_TYPES,
+  groupsByTable,
+  recordCountLabel,
+  buildGroupedSource,
+  groupSourcesByTable,
+  formatCitationIndices,
+  type GroupedSourceRow,
+} from './source-grouping';
 
 // Embed-surface auth — generic across chat AND ticket center (and any
 // future embedded React component that needs to identify as the proxied
@@ -363,5 +398,40 @@ export * from './embed-url-converters';
 // HubSpot meeting-link naming convention — the executable SSOT (parser,
 // validator, label + name-split helpers, MAX_MONTH_OFFSET). Pure + server-safe.
 export * from './hubspot-meetings-convention';
+export * from './hubspot-collected-forms';
 export * from './page-header-constants';
 export * from './first-touch-attribution';
+
+// Media type SSOT — `media_type` discriminator predicates (leaf, zero imports)
+export * from './media-type';
+
+// ── JSX-free leaves (each also has its own `exports` subpath, so hub scripts
+// and `server-only` modules can import them without pulling in React) ────────
+// Platform identity + brand SSOT (strings, stems, brand record, surface).
+export * from './platform-identity';
+// URL parameter schema engine (the int grammar, page limits, parse/serialize).
+export * from './search-params';
+// ODS spacing tokens + the Tailwind-step conversion table.
+export * from './ods-spacing';
+// CSV quoting + formula neutralization.
+export * from './csv';
+// Social platform vocabulary, host table, link type, picker.
+export * from './social-platforms';
+// The ODS badge palette a row whose colour is data picks from (departments).
+export { BADGE_PALETTE, isBadgePaletteKey, pickBadgePaletteColor, type BadgePaletteKey } from './badge-palette';
+
+// "Which instant does a program render, in which zone, and does it have a
+// clock" — THE resolver every webinar/event/podcast surface reads, in this
+// package and in the hub. Exported because the hub re-derived it by hand while
+// it was package-private, and the copies drifted.
+export {
+  programDateInstant,
+  programMetaFormatters,
+  programMetaLine,
+  programStr,
+  webinarTiming,
+} from './program-instant';
+// The concrete renderer bundle, so every surface in BOTH repos builds its meta
+// line from one set rather than mirroring the triple.
+export { PROGRAM_META_RENDERERS } from './program-meta-renderers';
+export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './program-instant';

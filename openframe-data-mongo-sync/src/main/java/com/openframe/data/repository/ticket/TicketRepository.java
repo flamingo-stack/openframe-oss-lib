@@ -29,6 +29,9 @@ public interface TicketRepository extends MongoRepository<Ticket, String>, Custo
     @Query("{ '_id': ?0, 'owner.machineId': ?1 }")
     Optional<Ticket> findByIdAndOwnerMachineId(String id, String machineId);
 
+    @Query("{ 'ticketNumber': ?0, 'owner.machineId': ?1 }")
+    Optional<Ticket> findByTicketNumberAndOwnerMachineId(Integer ticketNumber, String machineId);
+
     long countByStatusId(String statusId);
 
     @Aggregation(pipeline = {

@@ -7,6 +7,7 @@ import type { EntityPlatformAssoc } from './entity-platform';
 import type { PlatformRecord } from './platform';
 import type { MSP } from './stack';
 import type { UserProfile } from './user';
+import type { EntityQuote } from './video-processing';
 
 export interface CaseStudy {
   id: number;
@@ -42,6 +43,8 @@ export interface CaseStudy {
   srt_content?: string | null;
   highlight_srt_content?: string | null;
   video_summary?: string | null;
+  /** Short customer quotes (JSONB array, column default `[]`) — the landing hero marquee reads these. */
+  quotes?: EntityQuote[];
   custom_instructions?: string | null;
   config?: Record<string, unknown> | null; // clip/highlight processing config
   highlight_video_url?: string | null;
@@ -101,6 +104,7 @@ export interface CreateCaseStudyData {
   srt_content?: string | null;
   highlight_srt_content?: string | null;
   video_summary?: string | null;
+  quotes?: EntityQuote[];
   custom_instructions?: string | null;
   config?: Record<string, unknown> | null;
   highlight_video_url?: string | null;

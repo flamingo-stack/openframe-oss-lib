@@ -59,10 +59,17 @@ export function SourceTooltip({ intro, sources, note, iconClassName, triggerAnch
           {intro && <span className="font-semibold text-ods-text-primary">{intro}</span>}
           {sources.map(s => (
             <span key={s.href} className="flex flex-col gap-1">
+              {/* A source row is PROSE, not a control: the figure plus a
+                  publication name routinely runs past the tooltip's width, and
+                  the button's own `whitespace-nowrap` + fixed `compact` height
+                  then push it under the rounded clip, cutting the name mid-word.
+                  It wraps and grows instead, label left and the external-link
+                  glyph parked on the right edge. */}
               <Button
                 variant="outline"
                 size="compact"
                 fullWidth
+                className="h-auto min-h-6 justify-between gap-[var(--spacing-system-xs)] whitespace-normal py-[var(--spacing-system-xxs)] text-left"
                 linkProps={{ href: s.href, target: '_blank', rel: 'noopener noreferrer' }}
                 rightIcon={<ExternalLink />}
               >

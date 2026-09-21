@@ -1,7 +1,21 @@
 /**
  * Unified Date Utilities for OpenMSP Platform
- * Provides consistent date formatting across all components
+ *
+ * Relative-time logic lives here; every ABSOLUTE date or time these helpers
+ * print is rendered by `formatDateWithTimezone` in `./format`, with the zone
+ * stated explicitly — never by a local `toLocale*` call or hand-built string.
  */
+
+import { formatDateWithTimezone } from './format';
+
+/** `mediumDateTime`'s fields, spread so a caller's own options still override. */
+const ZONED_DATE_FIELDS_MEDIUM_DATETIME: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+};
 
 /**
  * Relative display label for a ticket timestamp (ISO string).
@@ -17,30 +31,17 @@ export function formatTicketRelativeTime(iso: string): string {
   if (diffMin < 60) return `${diffMin} min ago`;
   const diffHours = Math.floor(diffMin / 60);
   if (diffHours < 24) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-  // UTC getters so the MM/DD/YYYY tail is identical on server (UTC) and client
-  // (local) — otherwise React #418 hydration mismatch.
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  const yyyy = date.getUTCFullYear();
-  return `${mm}/${dd}/${yyyy}`;
+  // UTC-pinned through the one renderer — see `formatDateWithTimezone`.
+  return formatDateWithTimezone(date, null, 'numeric');
 }
 
 /**
  * Full tooltip timestamp in "MM/DD/YYYY, H:MM AM/PM" format.
  */
 export function formatTicketFullTimestamp(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  // UTC getters so the tooltip timestamp is identical on server (UTC) and
-  // client (local) — otherwise React #418 hydration mismatch.
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  const yyyy = date.getUTCFullYear();
-  let hours = date.getUTCHours();
-  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12 || 12;
-  return `${mm}/${dd}/${yyyy}, ${hours}:${minutes} ${ampm}`;
+  // UTC-pinned through the one renderer — see `formatDateWithTimezone`. This was
+  // a hand-assembled `MM/DD/YYYY, H:MM AM` built from `getUTC*` getters.
+  return formatDateWithTimezone(iso, null, 'numericDateTime');
 }
 
 /**
@@ -95,11 +96,10 @@ export function formatRelativeTime(timestamp: string | Date): string {
   // Older than 30 days - show formatted date, pinned to UTC so SSR (UTC) and
   // the client agree (React #418). Year comparison also uses UTC for the same
   // reason (avoids a server/client split right at a year boundary).
-  return targetTime.toLocaleDateString('en-US', {
+  return formatDateWithTimezone(targetTime, null, {
     month: 'short',
     day: 'numeric',
     year: targetTime.getUTCFullYear() !== now.getUTCFullYear() ? 'numeric' : undefined,
-    timeZone: 'UTC',
   });
 }
 
@@ -118,17 +118,13 @@ export function formatAbsoluteDate(timestamp: string | Date, options: Intl.DateT
     return 'Invalid date';
   }
 
-  const defaultOptions: Intl.DateTimeFormatOptions = {
+  // UTC unless the caller names a zone; `options.timeZone` is passed as THE zone.
+  return formatDateWithTimezone(targetTime, options.timeZone ?? null, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-    // Pin to UTC so SSR (Vercel = UTC) and the client agree (React #418).
-    // Caller can override via `options`.
-    timeZone: 'UTC',
     ...options,
-  };
-
-  return targetTime.toLocaleDateString('en-US', defaultOptions);
+  });
 }
 
 /**
@@ -146,19 +142,10 @@ export function formatDateTime(timestamp: string | Date, options: Intl.DateTimeF
     return 'Invalid date';
   }
 
-  const defaultOptions: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    // Pin to UTC so SSR (Vercel = UTC) and the client agree (React #418).
-    // Caller can override via `options`.
-    timeZone: 'UTC',
+  return formatDateWithTimezone(targetTime, options.timeZone ?? null, {
+    ...ZONED_DATE_FIELDS_MEDIUM_DATETIME,
     ...options,
-  };
-
-  return targetTime.toLocaleDateString('en-US', defaultOptions);
+  });
 }
 
 /**

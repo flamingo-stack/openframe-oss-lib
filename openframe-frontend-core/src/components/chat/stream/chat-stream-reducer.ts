@@ -60,6 +60,7 @@ import {
   type ParticipantEvent,
   type UsageEvent,
 } from '../../../chat-protocol/events';
+import { mergeSourceMetadata, type SourceMetadata } from '../../../chat-protocol/source-metadata';
 import type {
   ApprovalBatchSegment,
   ApprovalRequestSegment,
@@ -755,22 +756,56 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     return [...next.slice(0, -1), { ...last, streamSeq: seq }];
   }
 
+  /**
+   * Source metadata accumulated for the CURRENT turn.
+   *
+   * The chunk is published when a remote tool returns, so it lands inside the
+   * turn but usually BEFORE the answer text the reader will see it under —
+   * sometimes before the assistant bubble exists at all. Holding it here and
+   * stamping it on every trailing-assistant write is what makes the arrival
+   * order stop mattering.
+   *
+   * Reset at `turn-start`, so metadata can never leak onto the next answer.
+   * Losing a chunk that somehow arrived outside a turn is the better failure of
+   * the two: a stale citation strip under an unrelated answer is a wrong
+   * statement about where that answer came from.
+   */
+  let turnSourceMetadata: SourceMetadata | null = null;
+
+  /** Stamp the turn's metadata onto the trailing assistant bubble. A no-op
+   *  when there is none yet — the next write through here picks it up. */
+  function stampTrailingAssistantSourceMetadata(next: UnifiedChatMessage[]): UnifiedChatMessage[] {
+    const metadata = turnSourceMetadata;
+    if (!metadata) return next;
+    const last = next[next.length - 1];
+    if (!last || last.role !== 'assistant') return next;
+    if (last.sources === metadata.sources && last.refs === metadata.refs) return next;
+    return [...next.slice(0, -1), { ...last, ...metadata }];
+  }
+
+  /** The two stamps every trailing-assistant write needs, in one place — a
+   *  write that skips either loses the seq the merge decides with, or the
+   *  citations the answer was built from. */
+  function commitTrailingAssistant(next: UnifiedChatMessage[], seq: number | undefined): UnifiedChatMessage[] {
+    return stampTrailingAssistantSourceMetadata(stampTrailingAssistantSeq(next, seq));
+  }
+
   function applySegmentsToState(segments: MessageSegment[], meta?: SegmentsUpdateMetadata): void {
     const seq = meta?.streamSeq;
     // Standalone compaction updates carry the accumulator's cumulative
     // array — apply only the compaction segment (upsert) or interleaved
     // continuation text would duplicate.
     if (meta?.append && meta.isCompacting) {
-      setMessagesInternal(stampTrailingAssistantSeq(upsertTrailingCompaction(messages, segments), seq));
+      setMessagesInternal(commitTrailingAssistant(upsertTrailingCompaction(messages, segments), seq));
       return;
     }
     // Post-MESSAGE_END continuation fragments append into the existing
     // bubble; replacing would wipe the completed reply.
     if (meta?.append) {
-      setMessagesInternal(stampTrailingAssistantSeq(appendToTrailingAssistant(messages, segments), seq));
+      setMessagesInternal(commitTrailingAssistant(appendToTrailingAssistant(messages, segments), seq));
       return;
     }
-    setMessagesInternal(stampTrailingAssistantSeq(updateTrailingAssistant(messages, segments), seq));
+    setMessagesInternal(commitTrailingAssistant(updateTrailingAssistant(messages, segments), seq));
   }
 
   function applyStreamStartToState(): void {
@@ -969,6 +1004,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         isInStream = true;
         hasEverStreamed = true;
         turnStartedAt = Date.now();
+        turnSourceMetadata = null;
         emit('onStreamStart');
         applyStreamStartToState();
         accumulator.resetSegments();
@@ -981,6 +1017,15 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         emit('onStreamEnd');
         setPhaseInternal('idle');
         accumulator.resetSegments();
+        break;
+      }
+
+      // Per-answer source metadata. Applied to the trailing assistant bubble
+      // immediately when there is one, and held for the next write when the
+      // chunk beat the answer text to the reducer.
+      case 'sources': {
+        turnSourceMetadata = mergeSourceMetadata(turnSourceMetadata, event);
+        setMessagesInternal(stampTrailingAssistantSourceMetadata(messages));
         break;
       }
 

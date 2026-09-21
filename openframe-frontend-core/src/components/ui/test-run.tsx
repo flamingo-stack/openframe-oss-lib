@@ -189,15 +189,17 @@ export function TimingStat({ value, label, className }: { value: string; label: 
 }
 
 /** Overall run outcome shown in a test-run controls row. */
-export type TestRunStatus = 'idle' | 'running' | 'success' | 'error';
+export type TestRunStatus = 'idle' | 'running' | 'success' | 'error' | 'timeout' | 'canceled';
 
 const TEST_RUN_STATUS_TAGS: Record<
   Exclude<TestRunStatus, 'idle'>,
-  { label: string; variant: 'warning' | 'success' | 'error' }
+  { label: string; variant: 'warning' | 'success' | 'error' | 'grey' }
 > = {
   running: { label: 'IN PROCESS', variant: 'warning' },
   success: { label: 'SUCCESS', variant: 'success' },
   error: { label: 'ERROR', variant: 'error' },
+  timeout: { label: 'TIMED OUT', variant: 'error' },
+  canceled: { label: 'CANCELED', variant: 'grey' },
 };
 
 /** Status stat cell: "-" before the first run, then a colored state tag. */
@@ -220,11 +222,25 @@ export function TestRunStatusStat({ status, className }: { status: TestRunStatus
  * of a live-campaign hook (e.g. Fleet live queries in OpenFrame) without
  * depending on any concrete backend.
  */
+/**
+ * WHY the campaign ended. Without it every ended run collapses into
+ * `campaignStatus: 'finished'` and the Status stat reads SUCCESS even when
+ * the run was killed by the client timeout, canceled by the user, or lost
+ * its connection before a single host responded.
+ */
+export type TestRunStopReason = 'completed' | 'timeout' | 'canceled' | 'error';
+
 export interface TestRunCampaignState {
   isRunning: boolean;
   startedAt: Date | null;
   /** '' before the first run, then 'pending' → 'finished'. */
   campaignStatus: string;
+  /**
+   * Set when the campaign reaches 'finished'; null while idle/running.
+   * Omitting it keeps the legacy behavior (every finish counts as
+   * 'completed').
+   */
+  stopReason?: TestRunStopReason | null;
   results: QueryResultRow[];
   errors: Array<{ error: string }>;
   stopCampaign: () => void;
@@ -304,13 +320,18 @@ export function useTestRunState(campaign: TestRunCampaignState) {
   const firstError = isFinished && campaign.errors.length > 0 ? campaign.errors[0].error : null;
 
   // Overall run outcome for the Status stat: '-' until a run starts, then
-  // IN PROCESS while active, and SUCCESS/ERROR once the campaign finishes.
+  // IN PROCESS while active. Once finished the reason decides the tag —
+  // only a server-completed run may claim SUCCESS; timeout/cancel/transport
+  // failure show as what they are instead of a false green.
+  const stopReason = campaign.stopReason ?? 'completed';
   const status: TestRunStatus = isActive
     ? 'running'
     : hasRun && isFinished
-      ? firstError
-        ? 'error'
-        : 'success'
+      ? stopReason === 'completed'
+        ? firstError
+          ? 'error'
+          : 'success'
+        : stopReason
       : 'idle';
 
   // Started/Duration show zeros until the current run's timing is real:

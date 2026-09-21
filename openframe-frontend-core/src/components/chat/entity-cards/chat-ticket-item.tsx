@@ -27,6 +27,18 @@ export interface ChatTicketItemData {
   statusColor?: string;
   category?: string;
   timeAgo?: string;
+  /** Explicit secondary line under the title. When set, it replaces the
+   *  default `ticketNumber • category • timeAgo` composition verbatim, so
+   *  the host decides how the reference reads - the Fae client passes
+   *  `Ticket Number: 165 • 6m ago` (reference labelled but visually
+   *  secondary). An empty string hides the line. */
+  subtitle?: string;
+  /** The ticket has activity the customer has not opened yet
+   *  (Figma fae-chat 1-5592): the secondary line and the chevron switch to
+   *  the brand yellow, and the line reads the unread notice unless
+   *  `subtitle` overrides it. The host clears it once the ticket is
+   *  opened, and the reference line comes back. */
+  unread?: boolean;
   /** When set, renders a "Linked work" chip with a wrench icon next to
    *  the status tag — tells the customer at a glance that an internal
    *  delivery task is in flight for this ticket, even before they
@@ -43,6 +55,8 @@ export interface ChatTicketItemProps extends Omit<ButtonHTMLAttributes<HTMLButto
   /** Render a non-interactive skeleton placeholder sized to a real row. */
   isLoading?: boolean;
 }
+
+const UNREAD_NOTICE = 'You have a new unread message';
 
 const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
   ({ className, ticket, onClick, isLoading = false, ...props }, ref) => {
@@ -80,7 +94,8 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
     });
     const isResolved = ticket.statusKind === 'RESOLVED' || resolveTicketStatus(ticket.status) === 'RESOLVED';
 
-    const subtitle = [ticket.ticketNumber, ticket.category, ticket.timeAgo].filter(Boolean).join(' \u2022 ');
+    const composedSubtitle = [ticket.ticketNumber, ticket.category, ticket.timeAgo].filter(Boolean).join(' \u2022 ');
+    const subtitle = ticket.subtitle ?? (ticket.unread ? UNREAD_NOTICE : composedSubtitle);
 
     return (
       <button
@@ -110,7 +125,10 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
             {ticket.title}
           </p>
           {subtitle && (
-            <p className="truncate text-ods-text-secondary text-h6" title={subtitle}>
+            <p
+              className={cn('truncate text-h6', ticket.unread ? 'text-ods-open-yellow' : 'text-ods-text-secondary')}
+              title={subtitle}
+            >
               {subtitle}
             </p>
           )}
@@ -132,8 +150,16 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
         )}
         {(statusTagProps.status || statusTagProps.label) && <TicketStatusTag {...statusTagProps} />}
 
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-md border border-ods-border bg-ods-card">
-          <ChevronRight className="size-6 text-ods-text-secondary" />
+        <div
+          data-testid="chat-ticket-item-chevron"
+          className={cn(
+            'flex size-12 shrink-0 items-center justify-center rounded-md border',
+            ticket.unread ? 'border-ods-open-yellow bg-ods-open-yellow' : 'border-ods-border bg-ods-card',
+          )}
+        >
+          <ChevronRight
+            className={cn('size-6', ticket.unread ? 'text-ods-text-on-accent' : 'text-ods-text-secondary')}
+          />
         </div>
       </button>
     );

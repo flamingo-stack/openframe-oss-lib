@@ -109,6 +109,7 @@ export interface CreateAIContentInput {
 // AI Media Types
 // =============================================================================
 
+/** Row union. Compare through `utils/media-type` (`isVideoMedia` / `isImageMedia` / `MEDIA_TYPE`), never a literal. */
 export type MediaType = 'image' | 'video' | 'figma_export';
 export type MediaProvider =
   | 'dalle'
@@ -155,8 +156,9 @@ export interface AIMedia {
   social_account_id: number | null; // FK to social_accounts table - primary source of truth
   created_at: string;
   updated_at: string;
-  // Publishing & Override fields
-  selected_for_publish: boolean;
+  // Override fields. NOTE: there is no `selected_for_publish` on media — a
+  // media item is "selected" by being ATTACHED to a post that is selected
+  // (`ai_content_media`); consumers derive the flag in their DAL.
   override_url: string | null;
   override_at: string | null;
   override_by: string | null;
@@ -366,6 +368,7 @@ export type ContentSourceType =
   | 'walkthrough_video' // Per-platform floating demo video (no slug, no detail page; URL is the platform home)
   | 'what_i_shipped' // What I Shipped employee check-ins (lives on people-hub)
   | 'how_i_work' // How I Work employee AI-workflow sessions (lives on people-hub)
+  | 'ai_prompt' // Squawkbox prompt library entries (lives on people-hub)
   | 'faq' // FAQ Q&A pair (single-page /faqs index; deep-link by category anchor)
   | 'design_doc' // Internal design docs (product-hub admin; preview route only, no public page)
   | 'from_scratch';

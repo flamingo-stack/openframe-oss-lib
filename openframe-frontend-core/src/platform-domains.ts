@@ -45,6 +45,7 @@ export const PLATFORM_DOMAINS: readonly PlatformDomainEntry[] = [
   // ⚠️ DO NOT REORDER — enforced by the module-load self-check at the bottom of this file.
   { key: 'flamingo', defaultUrl: 'https://www.flamingo.run', envVar: 'NEXT_PUBLIC_FLAMINGO_URL' },
   { key: 'tmcg', defaultUrl: 'https://www.tmcg.miami', envVar: 'NEXT_PUBLIC_TMCG_URL' },
+  { key: 'mlg', defaultUrl: 'https://www.mlg.soccer', envVar: 'NEXT_PUBLIC_MLG_URL' },
   {
     key: 'flamingo-teaser',
     defaultUrl: 'https://www.flamingo.run',
@@ -89,6 +90,7 @@ const ENV_OVERRIDES = {
   NEXT_PUBLIC_OPENMSP_URL: process.env.NEXT_PUBLIC_OPENMSP_URL,
   NEXT_PUBLIC_FLAMINGO_URL: process.env.NEXT_PUBLIC_FLAMINGO_URL,
   NEXT_PUBLIC_TMCG_URL: process.env.NEXT_PUBLIC_TMCG_URL,
+  NEXT_PUBLIC_MLG_URL: process.env.NEXT_PUBLIC_MLG_URL,
   NEXT_PUBLIC_OPENFRAME_URL: process.env.NEXT_PUBLIC_OPENFRAME_URL,
   NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL: process.env.NEXT_PUBLIC_OPENFRAME_DASHBOARD_URL,
 } satisfies Record<EnvVarKey, string | undefined>;
@@ -113,9 +115,8 @@ function envOverrideFor(key: string): string | null {
  * base-domain derivation, CSP) receives a parseable URL. Full-URL inputs (the registry
  * `defaultUrl`s, any scheme'd override) pass through unchanged.
  *
- * EXPORTED as the single owner of the scheme-normalization rule (next.config.mjs keeps a
- * byte-identical local copy ONLY because Next evaluates its config outside the TS module
- * graph and cannot import this — see the comment there).
+ * EXPORTED as the single owner of the scheme-normalization rule. This subpath is pure ESM,
+ * so a consumer's next.config.mjs imports it directly rather than keeping a copy.
  *
  * Handles a (theoretical) protocol-relative `//host` too: strips the leading slashes so it
  * doesn't become `https:////host` (empty-host → hostOf null → silent platform drop).
@@ -131,12 +132,108 @@ export function ensureScheme(url: string): string {
  * NEVER throws / undefined — the default guarantees a host (this is what keeps the
  * cookie base-domains, the reverse map, and CSP intact even with every override unset).
  * The result ALWAYS carries a scheme (`ensureScheme`), so the scheme-less env overrides
- * resolve to valid URLs. Unknown-key fallback preserves cn.ts's flamingo.run default.
+ * resolve to valid URLs. Unknown-key fallback is flamingo's URL.
  */
 export function getPlatformProductionUrl(platform: string): string {
   const resolved =
     envOverrideFor(platform) ?? byKey(platform)?.defaultUrl ?? envOverrideFor('flamingo') ?? 'https://www.flamingo.run';
   return ensureScheme(resolved);
+}
+
+/**
+ * THE URL of a platform, for the environment the code is running in, no trailing slash.
+ * The one platform-URL resolver: consumers build every link to a platform from this.
+ *
+ * - `environment: 'current'` (default): the local dev URL (`NEXT_PUBLIC_DEV_URL`, else
+ *   `http://localhost:3000`) outside a production build, the registry's production URL
+ *   in any production build (a preview included — a preview never links to itself as
+ *   canonical).
+ * - `environment: 'production'`: the registry's production URL everywhere, for links that
+ *   leave the machine.
+ *
+ * `platform` is REQUIRED. The former `getBaseUrl()` accepted none and then returned
+ * `VERCEL_PROJECT_PRODUCTION_URL` — whichever domain Vercel lists first for a project
+ * (`flamingo.cx` on flamingo, a 308), and production on previews. A deployment's own
+ * origin is not a platform URL; consumers resolve it themselves.
+ */
+export function getPlatformUrl(platform: string, options: { environment?: 'current' | 'production' } = {}): string {
+  const url =
+    options.environment !== 'production' && process.env.NODE_ENV !== 'production'
+      ? process.env.NEXT_PUBLIC_DEV_URL || 'http://localhost:3000'
+      : getPlatformProductionUrl(platform);
+  return url.replace(/\/+$/, '');
+}
+
+/**
+ * Where THIS app is reachable, no trailing slash: what anything outside the app must
+ * fetch from the code that is running (rendered images, provider callbacks, self-calls).
+ * The one app-origin resolver; each app only supplies its own platform and config.
+ *
+ * In order:
+ * 1. In the browser: the page's origin.
+ * 2. `configuredUrl`: an app whose URL is configured at runtime (a self-hosted OpenFrame
+ *    install's `NEXT_PUBLIC_APP_URL`) — that install's address wins over any default.
+ * 3. On a Vercel preview: the deployment's immutable `VERCEL_URL` (not the branch alias,
+ *    which moves to the next commit and would serve other code).
+ * 4. In any production build: the platform's registry URL.
+ * 5. In development: `NEXT_PUBLIC_DEV_URL`, else localhost on the running port.
+ */
+export function getDeploymentUrl(options: { platform: string; configuredUrl?: string | null }): string {
+  if (typeof window !== 'undefined') return window.location.origin;
+  const configured = options.configuredUrl?.trim();
+  if (configured) return ensureScheme(configured).replace(/\/+$/, '');
+  if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_URL) {
+    return ensureScheme(process.env.VERCEL_URL).replace(/\/+$/, '');
+  }
+  if (process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production') {
+    return getPlatformUrl(options.platform, { environment: 'production' });
+  }
+  return (process.env.NEXT_PUBLIC_DEV_URL || `http://localhost:${process.env.PORT ?? 3000}`).replace(/\/+$/, '');
+}
+
+/** A hostname on the local machine, matched WHOLE: `localhost.example.com` and
+ *  `127.evil.example` are public hosts. */
+const LOCAL_HOSTNAME = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1\])$/i;
+
+/** Is this URL on the local machine, where no external system (a webhook sender, an
+ *  OAuth provider) can reach it? False for anything that is not a URL. */
+export function isLocalUrl(url: string): boolean {
+  try {
+    return LOCAL_HOSTNAME.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The origin a server request arrived on, from its `host` header only (what the edge set
+ * for this request — a client-writable `x-forwarded-host` never chooses where a flow
+ * returns). `http` for a local host unless the proxy says otherwise, else `https`.
+ * With no Host header, the app's own origin (`getDeploymentUrl` for `platform`).
+ */
+export function getRequestOrigin(
+  headers: { get(name: string): string | null },
+  options: { platform: string; configuredUrl?: string | null },
+): string {
+  const host = headers.get('host');
+  if (!host) return getDeploymentUrl(options);
+  const local = LOCAL_HOSTNAME.test(host.replace(/:\d+$/, ''));
+  const proto = headers.get('x-forwarded-proto')?.split(',')[0].trim() || (local ? 'http' : 'https');
+  return `${proto}://${host}`;
+}
+
+/**
+ * Where a redirect goes: a path resolves against `origin`; an explicit absolute
+ * `http(s)://` URL is used as is. THROWS when a relative target resolves to another
+ * origin (`//evil.example`, `/\\evil.example`), so a shared redirect helper built on it
+ * can never be an open redirect.
+ */
+export function resolveRedirectTarget(origin: string, target: string): URL {
+  const url = new URL(target, origin);
+  if (!/^https?:\/\//i.test(target) && url.origin !== new URL(origin).origin) {
+    throw new Error(`resolveRedirectTarget: "${target}" is not a same-origin path`);
+  }
+  return url;
 }
 
 // ── Single-owner host primitives ──

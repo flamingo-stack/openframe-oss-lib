@@ -3,6 +3,7 @@
 import { type ReactNode, useId } from 'react';
 import { InfoHint } from './info-hint';
 import { Label } from './label';
+import { RequiredMark } from './required-mark';
 
 /**
  * Accessibility props handed to the control by the `Field` render-prop.
@@ -69,7 +70,7 @@ export function Field({ label, hint, required, children, error, labelExtras, lab
       <div className="flex items-center gap-1.5">
         <Label htmlFor={controlId}>
           {label}
-          {required && ' *'}
+          {required && <RequiredMark />}
         </Label>
         {hint && <InfoHint label={label}>{hint}</InfoHint>}
         {labelExtras}

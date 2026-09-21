@@ -1,5 +1,6 @@
 package com.openframe.management.initializer;
 
+import com.openframe.data.nats.rmm.model.PackageManagerMissingMessage;
 import com.openframe.management.service.NatsStreamManagementService;
 import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StorageType;
@@ -10,6 +11,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.List;
 
 @Component
@@ -70,10 +72,24 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
             StreamConfiguration.builder()
+                    .name("MACHINE_TIMEZONE")
+                    .subjects(List.of("machine.*.timezone"))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .maxAge(Duration.ofHours(1))
+                    .build(),
+            StreamConfiguration.builder()
                     .name("EXECUTION_ACKNOWLEDGE")
                     .subjects(List.of("machine.*.execution.acknowledge"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
+            StreamConfiguration.builder()
+                    .name(PackageManagerMissingMessage.STREAM)
+                    .subjects(List.of(PackageManagerMissingMessage.SUBJECT_FILTER))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .maxAge(Duration.ofHours(1))
                     .build()
     );
 

@@ -4,7 +4,6 @@ import com.openframe.api.dto.command.BatchRunCommandInput;
 import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
-import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
@@ -39,9 +38,7 @@ public class CommandDispatchService {
     private final CommandExecutionService commandExecutionService;
 
     public DispatchResponse runCommand(RunCommandInput input) {
-        // Target must be a real (tenant-scoped) machine — don't dispatch into the void.
-        deviceService.findByMachineId(input.getMachineId())
-                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + input.getMachineId()));
+        deviceService.verifyDispatchable(input.getMachineId());
 
         String executionId = UUID.randomUUID().toString();
 
@@ -71,11 +68,8 @@ public class CommandDispatchService {
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 
         // Verify every target up front — reject the whole batch if any machine
-        // is unknown, so we never half-dispatch.
-        for (String machineId : machineIds) {
-            deviceService.findByMachineId(machineId)
-                    .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
-        }
+        // is unknown or in an inactive status, so we never half-dispatch.
+        deviceService.verifyDispatchable(machineIds);
 
         String executionId = UUID.randomUUID().toString();
 
