@@ -43,11 +43,18 @@ public final class ScriptEnvVarMapper {
             return null;
         }
         return envVars.stream()
-                .map(v -> ScriptEnvVarInput.builder()
-                        .name(v.getName())
-                        .value(v.isSecret() ? null : v.getValue())
-                        .secret(v.isSecret())
-                        .build())
+                .map(ScriptEnvVarMapper::maskSingle)
                 .toList();
+    }
+
+    private static ScriptEnvVarInput maskSingle(ScriptEnvVarInput v) {
+        String name = v.getName();
+        boolean secret = v.isSecret();
+        String value = secret ? null : v.getValue();
+        return ScriptEnvVarInput.builder()
+                .name(name)
+                .value(value)
+                .secret(secret)
+                .build();
     }
 }
