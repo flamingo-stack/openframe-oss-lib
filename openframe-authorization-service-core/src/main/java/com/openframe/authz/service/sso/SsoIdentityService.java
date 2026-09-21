@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
@@ -38,7 +39,7 @@ public class SsoIdentityService {
      * changes when the app is rotated, so {@code tid:oid} is used instead; Google and Apple
      * subjects are stable as issued.
      */
-    public Optional<String> subjectOf(String provider, Map<String, Object> claims) {
+    private Optional<String> subjectOfOptional(String provider, Map<String, Object> claims) {
         if (MICROSOFT.equals(provider)) {
             Object tid = claims.get("tid");
             Object oid = claims.get("oid");
@@ -51,9 +52,40 @@ public class SsoIdentityService {
         return sub instanceof String s && hasText(s) ? Optional.of(s) : Optional.empty();
     }
 
-    public Optional<SsoIdentity> findLink(String provider, Map<String, Object> claims) {
-        return subjectOf(provider, claims)
-                .flatMap(subject -> findBySubject(provider, subject));
+    /**
+     * True when a provider-stable subject can be resolved from the given claims.
+     */
+    public boolean hasSubject(String provider, Map<String, Object> claims) {
+        return subjectOfOptional(provider, claims).isPresent();
+    }
+
+    /**
+     * Provider-stable subject, throwing if none can be resolved from the given claims.
+     * Callers should check {@link #hasSubject(String, Map)} first, or rely on the exception
+     * when a subject is expected to be present.
+     */
+    public String subjectOf(String provider, Map<String, Object> claims) {
+        return subjectOfOptional(provider, claims)
+                .orElseThrow(() -> new NoSuchElementException("No subject resolvable for provider " + provider));
+    }
+
+    /**
+     * True when a link exists for the subject resolvable from the given claims.
+     */
+    public boolean hasLink(String provider, Map<String, Object> claims) {
+        return subjectOfOptional(provider, claims)
+                .map(subject -> hasSubjectLink(provider, subject))
+                .orElse(false);
+    }
+
+    /**
+     * The existing link for the subject resolvable from the given claims, throwing if either the
+     * subject cannot be resolved or no link exists for it. Callers should check
+     * {@link #hasLink(String, Map)} first.
+     */
+    public SsoIdentity findLink(String provider, Map<String, Object> claims) {
+        String subject = subjectOf(provider, claims);
+        return findBySubject(provider, subject);
     }
 
     /** Explicit lifecycle removal (cross-tenant switch, admin unlink). Not a login side effect. */
@@ -61,8 +93,21 @@ public class SsoIdentityService {
         ssoIdentityRepository.deleteByUserId(userId);
     }
 
-    public Optional<SsoIdentity> findBySubject(String provider, String subject) {
-        return ssoIdentityRepository.findByProviderAndSubject(provider, subject);
+    /**
+     * True when a link exists for the given provider/subject pair.
+     */
+    public boolean hasSubjectLink(String provider, String subject) {
+        return ssoIdentityRepository.findByProviderAndSubject(provider, subject).isPresent();
+    }
+
+    /**
+     * The existing link for the given provider/subject pair, throwing if none exists. Callers
+     * should check {@link #hasSubjectLink(String, String)} first.
+     */
+    public SsoIdentity findBySubject(String provider, String subject) {
+        return ssoIdentityRepository.findByProviderAndSubject(provider, subject)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "No sso identity link found for provider " + provider + " and subject " + subject));
     }
 
     /**
@@ -75,7 +120,7 @@ public class SsoIdentityService {
      * user is created — guarding before that would break the very tenant-switch it enables.
      */
     public void ensureNotAlreadyLinked(String provider, Map<String, Object> claims) {
-        if (findLink(provider, claims).isPresent()) {
+        if (hasLink(provider, claims)) {
             throw new SsoAlreadyLinkedException();
         }
     }
@@ -90,7 +135,7 @@ public class SsoIdentityService {
      * side effect. Best-effort by contract: never fails the login that just succeeded.
      */
     public void link(String provider, Map<String, Object> claims, AuthUser user) {
-        Optional<String> subject = subjectOf(provider, claims);
+        Optional<String> subject = subjectOfOptional(provider, claims);
         if (subject.isEmpty()) {
             return;
         }
@@ -116,3 +161,4 @@ public class SsoIdentityService {
         }
     }
 }
+
