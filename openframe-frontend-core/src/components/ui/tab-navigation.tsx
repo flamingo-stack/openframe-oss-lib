@@ -40,8 +40,15 @@ export interface TabItem {
    * 'scheduleId' is missing"), `never` rejects (b) (TS2769/TS2786 — "'C' cannot
    * be used as a JSX component"). Typing this therefore means migrating the
    * consumers to `TabItem<TheirProps>`, not changing this line.
+   *
+   * `ComponentType<Record<string, unknown>>` is used here rather than `any` as
+   * a narrower stopgap: it still accepts components with arbitrary required
+   * props (structurally) while blocking the worst `any` footguns — e.g. an
+   * accidental non-component value in this slot, or accessing arbitrary
+   * properties on `.component` elsewhere without any check at all. It is not
+   * the full generic-`TabItem<P>` fix described above.
    */
-  component?: React.ComponentType<any>;
+  component?: React.ComponentType<Record<string, unknown>>;
   indicator?: 'success' | 'warning' | 'error';
 }
 
@@ -621,3 +628,4 @@ export const getTabComponent = (tabs: TabItem[], tabId: string): TabItem['compon
   const tab = getTabById(tabs, tabId);
   return tab?.component || null;
 };
+
