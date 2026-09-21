@@ -51,7 +51,6 @@ export function MediaTypeSelector({
       value={value || undefined}
       onValueChange={onValueChange}
       disabled={disabled}
-      defaultValue={value}
     >
       <SelectTrigger className={className}>
         <SelectValue placeholder={placeholder} />
