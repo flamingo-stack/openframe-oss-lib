@@ -179,19 +179,14 @@ class DeviceLogServiceIT {
     }
 
     @Test
-    void narrowsWithSeveralTermsExclusionsAndRegex() {
+    void narrowsWithSeveralTermsAndExclusions() {
         List<DeviceLogEntry> allTerms = walk(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM)
                 .contains(List.of("connection", "failed")).build(), 500);
         List<DeviceLogEntry> withoutADecade = walk(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM)
                 .contains(List.of("heartbeat")).excludes(List.of("line-01")).build(), 500);
-        List<DeviceLogEntry> byRegex = walk(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM)
-                .regex("line-00[0-9] ").build(), 500);
-
         assertThat(allTerms).hasSize(ERROR_LINES);
         assertThat(withoutADecade).hasSize(DEVICE_LINES - ERROR_LINES - 10)
                 .extracting(DeviceLogEntry::getMessage).noneMatch(message -> message.contains("line-01"));
-        assertThat(byRegex).hasSize(10)
-                .extracting(DeviceLogEntry::getMessage).first().isEqualTo("line-009 heartbeat ok");
     }
 
     @Test

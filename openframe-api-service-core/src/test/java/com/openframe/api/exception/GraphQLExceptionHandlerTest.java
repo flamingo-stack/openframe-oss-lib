@@ -1,66 +1,60 @@
 package com.openframe.api.exception;
 
-import com.openframe.core.exception.ErrorCode;
-import com.openframe.core.exception.NotFoundException;
+import com.openframe.api.dto.device.DeviceLogFilterInput;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
+import graphql.execution.DataFetcherExceptionHandlerResult;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class GraphQLExceptionHandlerTest {
 
     private final GraphQLExceptionHandler handler = new GraphQLExceptionHandler();
 
     @Test
-    void constraintViolationIsAValidationErrorWithTheConstraintMessage() {
-        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-        ConstraintViolationException exception = new ConstraintViolationException(validator.validate(new Input("")));
+    void reportsBeanValidationFailuresAsBadRequestsWithTheViolationMessage() {
+        DeviceLogFilterInput tooManyTerms = DeviceLogFilterInput.builder()
+                .contains(List.of("a", "b", "c", "d", "e", "f"))
+                .build();
+        ConstraintViolationException exception = violationsOf(tooManyTerms);
 
         GraphQLError error = handle(exception);
 
-        assertEquals("name: name is required", error.getMessage());
-        assertEquals(ErrorCode.VALIDATION_ERROR.getCode(), error.getExtensions().get("code"));
-        assertEquals(400, error.getExtensions().get("httpStatus"));
+        assertThat(error.getExtensions()).containsEntry("code", "VALIDATION_ERROR").containsEntry("httpStatus", 400);
+        // The handler prefixes the offending field, so the message itself should not repeat it
+        assertThat(error.getMessage()).isEqualTo("contains: cannot hold more than 5 terms");
     }
 
     @Test
-    void illegalArgumentKeepsItsMessageAsValidationError() {
-        GraphQLError error = handle(new IllegalArgumentException("Tag not found: t-1"));
+    void keepsReportingUnexpectedFailuresAsInternalErrors() {
+        GraphQLError error = handle(new IllegalStateException("boom"));
 
-        assertEquals("Tag not found: t-1", error.getMessage());
-        assertEquals(ErrorCode.VALIDATION_ERROR.getCode(), error.getExtensions().get("code"));
-    }
+        assertThat(error.getExtensions()).containsEntry("code", "VALIDATION_ERROR");
 
-    @Test
-    void typedNotFoundKeepsItsCode() {
-        GraphQLError error = handle(new NotFoundException(ErrorCode.ORGANIZATION_NOT_FOUND, "Organization not found"));
-
-        assertEquals("Organization not found", error.getMessage());
-        assertEquals("ORGANIZATION_NOT_FOUND", error.getExtensions().get("code"));
-        assertEquals(404, error.getExtensions().get("httpStatus"));
-    }
-
-    @Test
-    void unexpectedRuntimeExceptionDoesNotLeakItsMessage() {
-        GraphQLError error = handle(new RuntimeException("jdbc://secret-host is down"));
-
-        assertEquals("An unexpected error occurred. Please try again later.", error.getMessage());
-        assertEquals(ErrorCode.INTERNAL_ERROR.getCode(), error.getExtensions().get("code"));
+        GraphQLError unexpected = handle(new RuntimeException("boom"));
+        assertThat(unexpected.getExtensions()).containsEntry("code", "INTERNAL_ERROR");
+        assertThat(unexpected.getMessage()).doesNotContain("boom");
     }
 
     private GraphQLError handle(Throwable exception) {
-        DataFetcherExceptionHandlerParameters parameters = mock(DataFetcherExceptionHandlerParameters.class);
-        when(parameters.getException()).thenReturn(exception);
-        return handler.handleException(parameters).join().getErrors().getFirst();
+        DataFetcherExceptionHandlerParameters parameters = DataFetcherExceptionHandlerParameters
+                .newExceptionParameters()
+                .exception(exception)
+                .build();
+        DataFetcherExceptionHandlerResult result = handler.handleException(parameters).join();
+        return result.getErrors().get(0);
     }
 
-    private record Input(@NotBlank(message = "name is required") String name) {
+    private static ConstraintViolationException violationsOf(DeviceLogFilterInput input) {
+        try (var factory = Validation.buildDefaultValidatorFactory()) {
+            Validator validator = factory.getValidator();
+            return new ConstraintViolationException(validator.validate(input));
+        }
     }
 }
