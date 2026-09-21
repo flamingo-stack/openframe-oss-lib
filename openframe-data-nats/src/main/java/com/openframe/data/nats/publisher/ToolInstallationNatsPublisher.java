@@ -50,15 +50,23 @@ public class ToolInstallationNatsPublisher {
 
     private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
         ToolInstallationMessage message = new ToolInstallationMessage();
-        message.setToolAgentId(toolAgent.getKey());
+        String toolAgentKey = toolAgent.getKey();
+        message.setToolAgentId(toolAgentKey);
         // TODO: need refactoring
-        message.setToolId(toolAgent.getToolId() == null ? "" : toolAgent.getToolId());
-        message.setToolType(tool.getToolType() == null ? "" : tool.getToolType());
+        String toolId = toolAgent.getToolId();
+        message.setToolId(toolId == null ? "" : toolId);
+        String toolType = tool.getToolType();
+        message.setToolType(toolType == null ? "" : toolType);
 
-        message.setVersion(toolAgent.getVersion());
+        String version = toolAgent.getVersion();
+        message.setVersion(version);
         message.setSessionType(toolAgent.getSessionType());
-        message.setDownloadConfigurations(downloadConfigurationMapper.map(toolAgent.getDownloadConfigurations(), toolAgent.getVersion()));
-        message.setAssets(mapAssets(toolAgent.getAssets()));
+        List<?> downloadConfigurations = toolAgent.getDownloadConfigurations();
+        Object mappedDownloadConfigurations = downloadConfigurationMapper.map(downloadConfigurations, version);
+        message.setDownloadConfigurations(mappedDownloadConfigurations);
+        List<ToolAgentAsset> assets = toolAgent.getAssets();
+        List<ToolInstallationMessage.Asset> mappedAssets = mapAssets(assets);
+        message.setAssets(mappedAssets);
         message.setInstallationCommandArgs(toolAgent.getInstallationCommandArgs());
         message.setUninstallationCommandArgs(toolAgent.getUninstallationCommandArgs());
         message.setRunCommandArgs(toolAgent.getRunCommandArgs());
@@ -78,13 +86,19 @@ public class ToolInstallationNatsPublisher {
 
     private ToolInstallationMessage.Asset mapAsset(ToolAgentAsset asset) {
         ToolInstallationMessage.Asset messageAsset = new ToolInstallationMessage.Asset();
-        messageAsset.setId(asset.getId());
-        messageAsset.setVersion(asset.getVersion());
-        messageAsset.setLocalFilenameConfiguration(localFilenameConfigurationMapper.map(asset.getLocalFilenameConfiguration()));
-        messageAsset.setDownloadConfigurations(
-                downloadConfigurationMapper.map(asset.getDownloadConfigurations(), asset.getVersion())
-        );
-        messageAsset.setSource(mapAssetSource(asset.getSource()));
+        String assetId = asset.getId();
+        messageAsset.setId(assetId);
+        String assetVersion = asset.getVersion();
+        messageAsset.setVersion(assetVersion);
+        Object localFilenameConfiguration = asset.getLocalFilenameConfiguration();
+        Object mappedLocalFilenameConfiguration = localFilenameConfigurationMapper.map(localFilenameConfiguration);
+        messageAsset.setLocalFilenameConfiguration(mappedLocalFilenameConfiguration);
+        List<?> assetDownloadConfigurations = asset.getDownloadConfigurations();
+        Object mappedAssetDownloadConfigurations = downloadConfigurationMapper.map(assetDownloadConfigurations, assetVersion);
+        messageAsset.setDownloadConfigurations(mappedAssetDownloadConfigurations);
+        ToolAgentAssetSource assetSource = asset.getSource();
+        ToolInstallationMessage.AssetSource mappedAssetSource = mapAssetSource(assetSource);
+        messageAsset.setSource(mappedAssetSource);
         messageAsset.setPath(asset.getPath());
         messageAsset.setExecutable(asset.isExecutable());
         return messageAsset;
