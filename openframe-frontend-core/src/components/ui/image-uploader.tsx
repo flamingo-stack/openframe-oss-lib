@@ -282,10 +282,10 @@ function ActionIconButton({ onClick, disabled, ariaLabel, children }: ActionIcon
       aria-label={ariaLabel}
       className={cn(
         'flex shrink-0 items-center justify-center rounded-md p-3',
-        'bg-[var(--ods-system-greys-white)] text-ods-text-on-accent',
+        'bg-ods-card text-ods-text-on-accent',
         'transition-colors duration-150',
-        'hover:bg-[var(--ods-system-greys-white-hover)]',
-        'active:bg-[var(--ods-system-greys-white-action)]',
+        'hover:bg-ods-card-hover',
+        'active:bg-ods-card-active',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ods-accent',
         'disabled:cursor-not-allowed disabled:opacity-50',
       )}
