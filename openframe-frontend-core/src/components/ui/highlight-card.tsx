@@ -22,22 +22,33 @@ export function HighlightCard({ item, className = '' }: HighlightCardProps) {
       <div className="relative">
         {/* Mobile highlight */}
         <div
-          className="absolute left-[80px] top-0 h-8 rounded-md md:hidden"
-          style={{
-            backgroundColor: item.highlightBg,
-            width: `${mobileWidth}px`,
-          }}
+          className="absolute left-[80px] top-0 h-8 rounded-md bg-[--highlight-card-bg] md:hidden"
+          style={
+            {
+              '--highlight-card-bg': item.highlightBg,
+              width: `${mobileWidth}px`,
+            } as React.CSSProperties
+          }
         />
         {/* Desktop highlight */}
         <div
-          className="absolute left-[95px] top-0 hidden h-10 rounded-md md:block"
-          style={{
-            backgroundColor: item.highlightBg,
-            width: `${desktopWidth}px`,
-          }}
+          className="absolute left-[95px] top-0 hidden h-10 rounded-md bg-[--highlight-card-bg] md:block"
+          style={
+            {
+              '--highlight-card-bg': item.highlightBg,
+              width: `${desktopWidth}px`,
+            } as React.CSSProperties
+          }
         />
         <h3 className="relative z-10 text-ods-text-primary text-h2">
-          Your <span style={{ color: item.categoryColor }}>{item.category}</span> {item.description}
+          Your{' '}
+          <span
+            className="text-[--highlight-card-category-color]"
+            style={{ '--highlight-card-category-color': item.categoryColor } as React.CSSProperties}
+          >
+            {item.category}
+          </span>{' '}
+          {item.description}
         </h3>
       </div>
     </div>
