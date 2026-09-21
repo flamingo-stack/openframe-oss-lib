@@ -82,7 +82,9 @@ public class SignupTicketService {
 
     private void write(String ticket, SignupTicketPayload payload, Duration ttl) {
         try {
-            redisTemplate.opsForValue().set(key(ticket), objectMapper.writeValueAsString(payload), ttl);
+            String key = key(ticket);
+            String json = objectMapper.writeValueAsString(payload);
+            redisTemplate.opsForValue().set(key, json, ttl);
         } catch (Exception e) {
             throw new IllegalStateException("signup_ticket_write_failed", e);
         }
