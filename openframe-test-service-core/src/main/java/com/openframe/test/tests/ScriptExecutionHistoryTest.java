@@ -49,8 +49,12 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 // @Tag("post-mingo") because dispatching needs an enrolled ONLINE machine, and one only exists after
 // the device and assistant phases have run. Tagged at class level so the class stays inside a single
 // phase — splitting one across two phases is what made ExtApi: Archive customer fail on its second run.
+// @Tag("needs-device") marks the same dependency for runs that are not the pipeline: the dev suite
+// runs the `saas` tag against a long-lived tenant with no agent installed, where every case here
+// aborts on its assumption. The `tenant` env excludes this tag; the pipeline phases do not.
 @Tag("saas")
 @Tag("post-mingo")
+@Tag("needs-device")
 @DisplayName("Script execution history")
 public class ScriptExecutionHistoryTest extends BaseTest {
 
