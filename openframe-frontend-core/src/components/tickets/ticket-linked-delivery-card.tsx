@@ -26,13 +26,15 @@ export interface TicketLinkedDeliveryCardProps {
   className?: string;
 }
 
+const DEFAULT_STATUS_COLOR = 'rgb(var(--ods-text-secondary))';
+
 export function TicketLinkedDeliveryCard({ clickup, className }: TicketLinkedDeliveryCardProps) {
   const item: DeliveryItem = {
     id: clickup.external_id,
     title: clickup.title ?? 'Linked delivery task',
     description: clickup.description ?? '',
     status: clickup.status ?? 'unknown',
-    statusColor: clickup.status_color ?? '#87909e',
+    statusColor: clickup.status_color ?? DEFAULT_STATUS_COLOR,
     taskType: clickup.task_type ?? 'Request',
     customItemId: clickup.custom_item_id,
     listNames: clickup.list_names,

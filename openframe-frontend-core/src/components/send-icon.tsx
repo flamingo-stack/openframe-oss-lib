@@ -3,7 +3,7 @@ interface SendIconProps {
   fill?: string;
 }
 
-export function SendIcon({ className = 'w-6 h-6', fill = '#1A1A1A' }: SendIconProps) {
+export function SendIcon({ className = 'w-6 h-6', fill = 'currentColor' }: SendIconProps) {
   return (
     <svg
       width="24"

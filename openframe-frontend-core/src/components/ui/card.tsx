@@ -11,7 +11,7 @@ const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ class
       // `border` with NO color token resolves to `currentColor` — on a dark card
       // with light text that paints a WHITE outline. Every ODS surface borders
       // on `--color-border`; say so.
-      'rounded-lg border border-ods-border bg-card text-card-foreground shadow-sm',
+      'rounded-lg border border-ods-border bg-ods-card text-ods-text-primary shadow-sm',
       className,
     )}
     {...props}
@@ -30,7 +30,7 @@ const CardTitle = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ 
 CardTitle.displayName = 'CardTitle';
 
 const CardDescription = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('text-muted-foreground text-h6', className)} {...props} />
+  <div ref={ref} className={cn('text-ods-text-secondary text-h6', className)} {...props} />
 ));
 CardDescription.displayName = 'CardDescription';
 
