@@ -2,6 +2,7 @@
 
 import { Sparkles, Upload } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -146,6 +147,8 @@ export function HighlightVideoCombinedSection({
   const defaultButtonLabel = hasResult ? 'Regenerate Highlight' : 'Generate Highlight';
   const defaultDescription = `Generate a ${Math.floor(targetDurationSeconds / 60)}-minute summary video using Claude AI + Shotstack`;
 
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
@@ -160,7 +163,12 @@ export function HighlightVideoCombinedSection({
       const target = e.target as HTMLInputElement;
       const file = target.files?.[0];
       if (!file) return;
-      await onUpload(file);
+      setUploadError(null);
+      try {
+        await onUpload(file);
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : 'Failed to upload highlight video');
+      }
     };
     input.click();
   };
@@ -216,6 +224,8 @@ export function HighlightVideoCombinedSection({
             {isUploading ? 'Uploading...' : 'Upload Highlight'}
           </Button>
         </div>
+
+        {uploadError && <p className="text-h6 text-ods-error">{uploadError}</p>}
 
         {uploadProgressComponent}
 
