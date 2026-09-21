@@ -54,17 +54,59 @@ export function FileManagerTable({
     window.addEventListener('scroll', handleResize, true);
 
     const resizeObserver = new ResizeObserver(handleResize);
-    const parent = containerRef.current?.parentElement;
-    if (parent) {
-      resizeObserver.observe(parent);
-    } else if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
+    let observedParent: Element | null = null;
+
+    const syncObservedParent = () => {
+      const currentParent = containerRef.current?.parentElement ?? null;
+      if (currentParent === observedParent) return;
+
+      if (observedParent) {
+        resizeObserver.unobserve(observedParent);
+      }
+
+      if (currentParent) {
+        resizeObserver.observe(currentParent);
+        observedParent = currentParent;
+      } else if (containerRef.current) {
+        resizeObserver.observe(containerRef.current);
+        observedParent = containerRef.current;
+      } else {
+        observedParent = null;
+      }
+    };
+
+    syncObservedParent();
+
+    // The container's parent can change identity between layout effect runs
+    // (e.g. a conditional wrapper toggling) without `loading` or
+    // `files.length` changing. Poll on a rAF-driven interval-free check tied
+    // to resize/scroll events isn't enough for a silent re-parent, so also
+    // re-sync whenever the ResizeObserver fires, since a re-parent is almost
+    // always accompanied by a layout change on the old or new parent.
+    const handleResizeAndResync = () => {
+      syncObservedParent();
+      handleResize();
+    };
+    resizeObserver.disconnect();
+    const activeObserver = new ResizeObserver(handleResizeAndResync);
+    observedParent = null;
+    syncObservedParentFor(activeObserver);
+
+    function syncObservedParentFor(obs: ResizeObserver) {
+      const currentParent = containerRef.current?.parentElement ?? null;
+      if (currentParent) {
+        obs.observe(currentParent);
+        observedParent = currentParent;
+      } else if (containerRef.current) {
+        obs.observe(containerRef.current);
+        observedParent = containerRef.current;
+      }
     }
 
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('scroll', handleResize, true);
-      resizeObserver.disconnect();
+      activeObserver.disconnect();
     };
   }, [loading, files.length]);
 
