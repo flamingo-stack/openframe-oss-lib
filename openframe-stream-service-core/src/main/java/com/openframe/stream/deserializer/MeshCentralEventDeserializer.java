@@ -133,8 +133,11 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
                 });
     }
 
+    // MeshCentral events carry no additional "details" payload beyond what is
+    // already extracted via getMessage/getSourceEventType; there is
+    // intentionally nothing to return here.
     @Override
-    protected String getDetails(JsonNode after) {
-        return null;
+    protected Optional<String> getDetails(JsonNode after) {
+        return Optional.empty();
     }
 }
