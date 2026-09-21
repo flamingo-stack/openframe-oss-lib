@@ -13,7 +13,7 @@ public class HealthController {
 
     @GetMapping("/health")
     public ResponseEntity<String> health() {
-        logger.info("Health check endpoint called");
+        logger.debug("Health check endpoint called");
         return ResponseEntity.ok("OK");
     }
 } 
