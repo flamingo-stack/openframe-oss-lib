@@ -43,7 +43,6 @@
         <playwright.version>1.44.0</playwright.version>
         <sshj.version>0.38.0</sshj.version>
         <bouncycastle.version>1.78.1</bouncycastle.version>
-        <google-auth.version>1.30.0</google-auth.version>
     </properties>
 
     <dependencies>
@@ -61,13 +60,6 @@
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>
             <version>${jedis.version}</version>
-        </dependency>
-
-        <!-- Application default credentials, for a Redis that authenticates with IAM -->
-        <dependency>
-            <groupId>com.google.auth</groupId>
-            <artifactId>google-auth-library-oauth2-http</artifactId>
-            <version>${google-auth.version}</version>
         </dependency>
         
         <!-- JUnit 5 -->

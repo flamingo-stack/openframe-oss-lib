@@ -1,13 +1,12 @@
 package com.openframe.test.data.redis;
 
-import com.google.auth.oauth2.GoogleCredentials;
 import com.openframe.test.config.RedisConfig;
 import lombok.extern.slf4j.Slf4j;
 import redis.clients.jedis.DefaultJedisClientConfig;
-import redis.clients.jedis.DefaultRedisCredentials;
 import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.RedisCredentials;
+import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
@@ -31,26 +30,25 @@ public class Redis {
      * Find the password-reset token for {@code email}. The auth-server stores it under the tenant-scoped,
      * hash-tagged key {@code of:{<tenant>}:pwdreset:<token>} with the email as the value.
      *
-     * <p>The hash tag is what makes this work on a cluster: Jedis routes a cluster SCAN by the slot of
-     * the MATCH pattern and rejects a pattern without a tag, and every pwdreset key lands in that one
-     * slot. Probing seed nodes one by one, as this did before, stops finding anything once the cluster
-     * is reached through a single discovery endpoint instead of per-pod addresses.
+     * <p>The same scan works either way. On a cluster the hash tag is load-bearing: Jedis routes a
+     * cluster SCAN by the slot of the MATCH pattern and rejects a pattern without a tag, and every
+     * pwdreset key lands in that one slot. On a single instance the tag is just part of the key name.
      *
-     * <p>Every failure - key absent, cluster unreachable, wrong tenant prefix - returns {@code null}.
+     * <p>Every failure - key absent, server unreachable, wrong tenant prefix - returns {@code null}.
      * Callers poll this method, so a failure has to look like a miss; the cause is logged with its stack
      * so a TLS or routing mistake is still diagnosable.
      */
     public static String getResetToken(String email) {
         String pattern = "of:{" + RedisConfig.getTenant() + "}:pwdreset:*";
-        try (JedisCluster cluster = new JedisCluster(RedisConfig.getClusterNodes(), clientConfig())) {
+        try (UnifiedJedis client = client()) {
             ScanParams scanParams = new ScanParams().match(pattern).count(100);
             String cursor = ScanParams.SCAN_POINTER_START;
             do {
-                ScanResult<String> scanResult = cluster.scan(cursor, scanParams);
+                ScanResult<String> scanResult = client.scan(cursor, scanParams);
                 List<String> keys = scanResult.getResult();
                 if (!keys.isEmpty()) {
                     // One slot for the whole batch, so this is a single round trip rather than a GET per key.
-                    List<String> emails = cluster.mget(keys.toArray(new String[0]));
+                    List<String> emails = client.mget(keys.toArray(new String[0]));
                     for (int i = 0; i < keys.size(); i++) {
                         if (email.equals(emails.get(i))) {
                             return keys.get(i).split(":pwdreset:")[1];
@@ -66,17 +64,26 @@ public class Redis {
     }
 
     /**
-     * Auth and TLS are independent and both optional: a token is sent only where the cluster runs
-     * with IAM auth, TLS only where a CA is published. A plain in-cluster Redis has neither.
-     *
-     * <p>The client is built per call rather than cached: a caller polls at most a few dozen times, and
-     * a cached static client would trade those handshakes for a topology-staleness problem.
+     * The client is built per call rather than cached: a caller polls at most a few dozen times, and a
+     * cached static client would trade those handshakes for a topology-staleness problem.
+     */
+    private static UnifiedJedis client() throws GeneralSecurityException, IOException {
+        JedisClientConfig config = clientConfig();
+        return RedisConfig.isCluster()
+                ? new JedisCluster(RedisConfig.getClusterNodes(), config)
+                : new JedisPooled(RedisConfig.getNode(), config);
+    }
+
+    /**
+     * Auth and TLS are independent and both optional: a password is sent only where the server requires
+     * one, TLS only where a CA is published. A plain in-cluster Redis has neither.
      */
     private static JedisClientConfig clientConfig() throws GeneralSecurityException, IOException {
         DefaultJedisClientConfig.Builder builder = DefaultJedisClientConfig.builder();
 
-        if (RedisConfig.isIamAuth()) {
-            builder.credentialsProvider(Redis::iamCredentials);
+        String password = RedisConfig.getPassword();
+        if (password != null) {
+            builder.password(password);
         }
 
         String ca = RedisConfig.getCaCertificate();
@@ -85,23 +92,6 @@ public class Redis {
         }
 
         return builder.build();
-    }
-
-    /**
-     * A managed Redis on IAM takes an access token where a password would go. The supplier is called
-     * per connection on purpose: the token expires within the hour and Google's own guidance is not
-     * to cache one, so refreshing here keeps a long-polling caller from authenticating with a stale
-     * credential. In a pod the identity comes from Workload Identity, so no key material is involved.
-     */
-    private static RedisCredentials iamCredentials() {
-        try {
-            GoogleCredentials credentials = GoogleCredentials.getApplicationDefault()
-                    .createScoped("https://www.googleapis.com/auth/cloud-platform");
-            credentials.refreshIfExpired();
-            return new DefaultRedisCredentials(null, credentials.getAccessToken().getTokenValue());
-        } catch (IOException e) {
-            throw new IllegalStateException("Could not obtain an access token for Redis IAM auth", e);
-        }
     }
 
     /** Trust exactly the published CA - a managed Redis signs with a private one the JVM has never seen. */

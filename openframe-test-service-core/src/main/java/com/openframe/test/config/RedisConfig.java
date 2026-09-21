@@ -26,7 +26,8 @@ public class RedisConfig {
     private static volatile String nodes;
     private static volatile String tenant;
     private static volatile String caCertificate;
-    private static volatile Boolean iamAuth;
+    private static volatile String password;
+    private static volatile Boolean cluster;
 
     public static void setNodes(String csvNodes) {
         nodes = csvNodes;
@@ -53,19 +54,35 @@ public class RedisConfig {
     }
 
     /**
-     * Whether the cluster authenticates with IAM. Where it does, the client sends a short-lived
-     * access token in place of a password and has to fetch a fresh one for every connection. A
-     * cluster with auth disabled leaves this unset and the client connects unauthenticated.
+     * AUTH string. Set where the server requires one (Memorystore creates every instance with auth
+     * enabled); a plain in-cluster Redis leaves it unset and the client connects unauthenticated.
      */
-    public static void setIamAuth(boolean enabled) {
-        iamAuth = enabled;
+    public static void setPassword(String authString) {
+        password = authString;
     }
 
-    public static boolean isIamAuth() {
-        if (iamAuth != null) {
-            return iamAuth;
+    public static String getPassword() {
+        String value = (password != null && !password.trim().isEmpty())
+                ? password
+                : System.getenv("REDIS_PASSWORD");
+        return (value != null && !value.trim().isEmpty()) ? value : null;
+    }
+
+    /**
+     * Whether the server runs in cluster mode. True for the in-cluster shard set every environment
+     * but dev still uses; dev points at a single Memorystore instance, where a cluster client fails
+     * on topology discovery because cluster mode is disabled server-side.
+     */
+    public static void setCluster(boolean enabled) {
+        cluster = enabled;
+    }
+
+    public static boolean isCluster() {
+        if (cluster != null) {
+            return cluster;
         }
-        return Boolean.parseBoolean(System.getenv("REDIS_IAM_AUTH"));
+        String env = System.getenv("REDIS_CLUSTER");
+        return (env == null || env.trim().isEmpty()) || Boolean.parseBoolean(env);
     }
 
     public static Set<HostAndPort> getClusterNodes() {
@@ -79,6 +96,11 @@ public class RedisConfig {
                 .filter(s -> !s.isEmpty())
                 .forEach(s -> hosts.add(HostAndPort.from(s)));
         return hosts;
+    }
+
+    /** The single address a non-cluster server is reached on; the first entry when several are listed. */
+    public static HostAndPort getNode() {
+        return getClusterNodes().iterator().next();
     }
 
     public static String getTenant() {
