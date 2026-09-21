@@ -54,6 +54,7 @@
         <module>openframe-api-lib</module>
         <module>openframe-data-cassandra</module>
         <module>openframe-data-pinot</module>
+        <module>openframe-data-loki</module>
         <module>openframe-data-nats</module>
         <module>openframe-data-device-aspect</module>
         <module>openframe-data-timeentry-aspect</module>
@@ -166,6 +167,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-data-pinot</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-data-loki</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
