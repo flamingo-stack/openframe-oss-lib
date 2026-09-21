@@ -29,7 +29,7 @@ export function StickySectionNav({
   onSectionClick,
   className,
   ribbonPosition = 'left',
-  ribbonColor = 'var(--color-accent-primary)',
+  ribbonColor = 'var(--ods-accent)',
 }: StickySectionNavProps) {
   const navHeight = sections.length * 40; // 40px per item (h-10)
 
