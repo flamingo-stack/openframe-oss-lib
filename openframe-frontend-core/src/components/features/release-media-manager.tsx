@@ -60,11 +60,13 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
       // Upload file
       const url = await onUpload(file, mediaType);
 
-      // Update with uploaded URL
-      const updated = [...media, { ...newMedia, media_url: url, _file: undefined, _uploading: false }];
+      // Update the placeholder in place with the uploaded URL
+      const updated = [...media, newMedia];
+      updated[newIndex] = { ...newMedia, media_url: url, _file: undefined, _uploading: false };
       onChange(updated);
-    } catch {
+    } catch (error) {
       // Remove failed upload
+      console.error('Failed to upload media file:', error);
       onChange(media);
     } finally {
       setUploadingIndex(null);
@@ -248,7 +250,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
 
                   <Input
                     placeholder="Title (optional)"
-                    value={item.title}
+                    value={item.title ?? ''}
                     onChange={e => updateMedia(index, 'title', e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
                     className="h-8 bg-ods-bg text-h6"
