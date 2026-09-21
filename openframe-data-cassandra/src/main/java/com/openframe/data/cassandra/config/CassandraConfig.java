@@ -14,8 +14,10 @@ import org.springframework.data.cassandra.config.CqlSessionFactoryBean;
 import org.springframework.data.cassandra.config.SchemaAction;
 import org.springframework.data.cassandra.repository.config.EnableCassandraRepositories;
 
-import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Configuration
 @ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
@@ -97,8 +99,17 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
     private void ensureKeyspaceExists() {
         logger.info("Ensuring keyspace '{}' exists with replication factor {}", keyspaceName, replicationFactor);
 
+        List<String> contactPointList = Arrays.stream(contactPoints.split(","))
+                .map(String::trim)
+                .filter(cp -> !cp.isEmpty())
+                .map(cp -> cp + ":" + port)
+                .collect(Collectors.toList());
+
         try (CqlSession session = CqlSession.builder()
-                .addContactPoint(new InetSocketAddress(contactPoints, port))
+                .withConfigLoader(DriverConfigLoader.programmaticBuilder()
+                        .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, localDatacenter)
+                        .withStringList(DefaultDriverOption.CONTACT_POINTS, contactPointList)
+                        .build())
                 .withLocalDatacenter(localDatacenter)
                 .build()) {
 
@@ -130,3 +141,4 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
         return new CassandraSessionLogger(session);
     }
 }
+
