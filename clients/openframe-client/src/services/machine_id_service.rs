@@ -43,9 +43,11 @@ impl MachineIdService {
         Ok(id)
     }
 
-    // Cached id only; empty string until get_or_create has run.
-    pub fn get(&self) -> String {
-        self.cached_id.read().unwrap().clone().unwrap_or_default()
+    // Returns the cached id if get_or_create has already populated it. If not yet
+    // initialized, returns None instead of silently masking the missing state as
+    // an empty string, so callers can distinguish "not initialized" from "empty".
+    pub fn get(&self) -> Option<String> {
+        self.cached_id.read().unwrap().clone()
     }
 
     fn read(&self) -> Result<String> {
