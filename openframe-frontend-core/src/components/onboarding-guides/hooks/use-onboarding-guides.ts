@@ -46,6 +46,10 @@ export const onboardingGuideKeys = {
   },
 };
 
+function isValidNonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
 export function useOnboardingGuides(filters?: OnboardingGuideFilters) {
   return useQuery({
     queryKey: onboardingGuideKeys.list(filters || {}),
@@ -53,8 +57,8 @@ export function useOnboardingGuides(filters?: OnboardingGuideFilters) {
       const params = new URLSearchParams();
       if (filters?.search) params.set('search', filters.search);
       if (filters?.section) params.set('section', filters.section);
-      if (filters?.limit) params.set('limit', filters.limit.toString());
-      if (filters?.offset) params.set('offset', filters.offset.toString());
+      if (isValidNonNegativeInteger(filters?.limit)) params.set('limit', filters.limit.toString());
+      if (isValidNonNegativeInteger(filters?.offset)) params.set('offset', filters.offset.toString());
       // Comma-joined, matching the route's `task_ids`-style split. This is the
       // chat-card loader's path: `ids` ALSO tells the route to drop the
       // platform scope, so omitting it silently returned a platform-filtered
