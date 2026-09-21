@@ -7,6 +7,7 @@ import com.openframe.test.data.dto.user.ResetConfirmRequest;
 import com.openframe.test.data.dto.user.User;
 
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Map;
@@ -64,8 +65,8 @@ public class AuthGenerator {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(codeVerifier.getBytes());
             return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to generate code challenge", e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new CodeChallengeGenerationException("Failed to generate code challenge", e);
         }
     }
 
