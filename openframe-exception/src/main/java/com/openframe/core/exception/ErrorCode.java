@@ -69,6 +69,7 @@ public enum ErrorCode {
     // Infrastructure error codes
     TYPE_MISMATCH("TYPE_MISMATCH", 400),
     PINOT_QUERY_ERROR("PINOT_QUERY_ERROR", 503),
+    LOKI_QUERY_ERROR("LOKI_QUERY_ERROR", 503),
     DATABASE_ERROR("DATABASE_ERROR", 503);
 
     private final String code;

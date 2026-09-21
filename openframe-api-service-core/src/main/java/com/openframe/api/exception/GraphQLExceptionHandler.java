@@ -4,6 +4,7 @@ import com.openframe.core.exception.BaseException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
@@ -33,6 +34,8 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
 
         if (exception instanceof PinotQueryException) {
             error = buildError("Query failed. Please try again later.", ErrorCode.PINOT_QUERY_ERROR);
+        } else if (exception instanceof LokiQueryException) {
+            error = buildError("Device logs are temporarily unavailable. Please try again later.", ErrorCode.LOKI_QUERY_ERROR);
         } else if (exception instanceof DataAccessException) {
             error = buildError("Database operation failed. Please try again later.", ErrorCode.DATABASE_ERROR);
         } else if (exception instanceof NotFoundException nfe) {
