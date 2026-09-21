@@ -9,8 +9,8 @@ import {
   TableCellIcon,
 } from '../components/icons-v2-generated';
 import { PageLayout } from '../components/layout/page-layout';
+import { DataTable, useDataTable, type ColumnDef } from '../components/ui/data-table';
 import { TabSelector } from '../components/ui/tab-selector';
-import { Table, type TableColumn } from '../components/ui/table';
 
 interface Device {
   id: string;
@@ -26,12 +26,26 @@ const sampleDevices: Device[] = [
   { id: '3', name: 'Reception PC', status: 'Inactive', os: 'Windows', lastOnline: '24/03/2026 09:11:02' },
 ];
 
-const deviceColumns: TableColumn<Device>[] = [
-  { key: 'name', label: 'Device' },
-  { key: 'status', label: 'Status' },
-  { key: 'os', label: 'OS' },
-  { key: 'lastOnline', label: 'Last Online' },
+// Module-level so `useDataTable` sees stable `data` / `columns` references.
+const deviceColumns: ColumnDef<Device>[] = [
+  { accessorKey: 'name', header: 'Device', meta: { width: 'flex-1 min-w-0' } },
+  { accessorKey: 'status', header: 'Status', meta: { width: 'w-[140px]' } },
+  { accessorKey: 'os', header: 'OS', meta: { width: 'w-[140px]' } },
+  { accessorKey: 'lastOnline', header: 'Last Online', meta: { width: 'w-[200px]' } },
 ];
+
+const getDeviceId = (device: Device) => device.id;
+
+/** Page body stand-in: a small `DataTable` over the sample devices. */
+function DevicesTable() {
+  const table = useDataTable<Device>({ data: sampleDevices, columns: deviceColumns, getRowId: getDeviceId });
+  return (
+    <DataTable table={table}>
+      <DataTable.Header />
+      <DataTable.Body />
+    </DataTable>
+  );
+}
 
 const ORG_LOGO_DATA_URI =
   'data:image/svg+xml;utf8,' +
@@ -63,7 +77,7 @@ The \`subtitle\` and \`image\` props are optional — when set, the title block 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const sampleContent = <Table data={sampleDevices} columns={deviceColumns} rowKey="id" />;
+const sampleContent = <DevicesTable />;
 
 /**
  * Title only — baseline header.

@@ -7,12 +7,12 @@ import { Pagination } from '../../pagination';
 import { Button } from '../button';
 import { CursorPagination } from '../cursor-pagination';
 import { PlaceholderRows, ReservedEmptyState } from '../data-table/data-table-skeleton';
+import { useTableMotion } from '../data-table/use-table-motion';
 import { TableEmptyState } from './table-empty-state';
 import { TableHeader } from './table-header';
 import { TableRow } from './table-row';
 import { COMPACT_ROW_MIN_HEIGHT, TableCardSkeleton } from './table-skeleton';
 import type { RowAction, TableColumn, TableProps, TableRowData } from './types';
-import { useTableMotion } from './use-table-motion';
 
 /**
  * Injects synthetic columns (row actions and/or row-level chevron link) at the end of the columns array.
