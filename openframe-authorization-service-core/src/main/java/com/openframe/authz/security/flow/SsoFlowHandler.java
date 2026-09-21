@@ -60,7 +60,7 @@ public interface SsoFlowHandler {
         return expectedState(cookie).filter(returnedState::equals).isPresent();
     }
 
-    void handle(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws Exception;
+    void handle(HttpServletRequest request, HttpServletResponse response, Authentication authentication);
 
     default OidcUser requireOidcUser(Authentication authentication) {
         if (authentication != null && authentication.getPrincipal() instanceof OidcUser u) return u;
