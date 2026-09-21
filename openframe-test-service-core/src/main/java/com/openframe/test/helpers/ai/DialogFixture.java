@@ -41,17 +41,20 @@ public class DialogFixture {
      * <p>No {@code mode} is sent: the backend honours {@code request.mode} only for ADMIN actors and
      * forces {@link DialogMode#AI} for an AGENT, so passing one would just be misleading.
      *
-     * <p><b>Leaves a ticket behind.</b> For an AGENT with no {@code ticketId}, the backend auto-creates
-     * one ({@code createTicketFromDialog}) and binds the dialog to it — so "the client path needs no
-     * ticket" is true of the caller, not of the result. There is no ticket-delete mutation in the API
-     * layer, and {@link DialogResponse} does not carry the id back, so {@link #cleanup()} cannot remove
-     * it; the tickets accumulate in the test tenant. Worth a Janitor pass before this suite grows.
+     * <p><b>Known resource leak — tracked as a defect.</b> For an AGENT with no {@code ticketId}, the
+     * backend auto-creates one ({@code createTicketFromDialog}) and binds the dialog to it. There is no
+     * ticket-delete mutation in the API layer, and {@link DialogResponse} does not carry the created
+     * ticket id back, so {@link #cleanup()} cannot remove it; the ticket accumulates in the test tenant.
+     * TODO(QA-TICKET-CLEANUP): once the API exposes the created ticket id (or a delete-ticket mutation),
+     * capture it here and archive/delete it from {@link #cleanup()}. Until then, callers of this fixture
+     * should be limited and this leak should be tracked as an open defect rather than expanded.
      */
     public static DialogFixture openClient() {
         DialogResponse dialog = DialogApi.createDialog(CreateDialogRequest.builder()
                 .agentType(AgentType.CLIENT)
                 .build());
-        log.info("Created CLIENT dialog {} (a ticket was auto-created for it server-side)", dialog.getId());
+        log.warn("Created CLIENT dialog {} — a ticket was auto-created for it server-side and cannot be " +
+                "cleaned up (see QA-TICKET-CLEANUP); this leaks test-tenant data", dialog.getId());
         return new DialogFixture(dialog.getId());
     }
 
