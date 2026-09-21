@@ -1,18 +1,22 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.BadRequestException;
-import com.openframe.api.service.rmm.fleet.FleetClientProvider;
+import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
-import com.openframe.api.service.rmm.fleet.FleetTenantTeamResolver;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.Host;
+import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
+import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
@@ -37,16 +41,19 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SoftwareInventoryServiceTest {
 
-    @Mock private FleetClientProvider fleet;
+    @Mock private FleetMdmClient fleet;
+    @Mock private FleetDeviceCountEnricher deviceCountEnricher;
     @Mock private FleetHostMachineResolver hostMachineResolver;
-    @Mock private FleetTenantTeamResolver teamResolver;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private com.openframe.data.repository.tool.IntegratedToolRepository integratedToolRepository;
 
     private SoftwareInventoryService service;
 
     @BeforeEach
     void setUp() {
-        service = new SoftwareInventoryService(fleet, hostMachineResolver, teamResolver, tenantIdProvider);
+        service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver, tenantIdProvider);
+        // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "fleet", fleet);
     }
 
     @Test
@@ -69,8 +76,8 @@ class SoftwareInventoryServiceTest {
         Host enrolled = host(1L, "u1", "host-1");
         Host foreign = host(2L, "u2", "host-2");   // no matching Machine → dropped
 
-        // call 1 = getSoftwareTitle, call 2 = searchHosts(software_version_id=10)
-        when(fleet.call(any(), any())).thenReturn(title, List.of(enrolled, foreign));
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+        when(fleet.searchHosts(any(HostSearchRequest.class))).thenReturn(List.of(enrolled, foreign));
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
         Machine machine = new Machine();
         machine.setMachineId("m-1");
@@ -91,8 +98,7 @@ class SoftwareInventoryServiceTest {
     void getSoftwareFilters_noTitles_emptyFacets() {
         SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
         when(response.getSoftwareTitles()).thenReturn(List.of());
-        when(fleet.call(any(), any())).thenReturn(response);
-        when(teamResolver.currentTenantTeamId()).thenReturn(java.util.Optional.empty());
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
 
         SoftwareFilters filters = service.getSoftwareFilters(null);
 
@@ -109,8 +115,7 @@ class SoftwareInventoryServiceTest {
                 titleWithCves("Bravo", 5),
                 titleWithCves("Alpha", 5),
                 titleWithCves("Chrome", 40)));
-        when(fleet.call(any(), any())).thenReturn(response); // meta null → single page in the scan
-        when(teamResolver.currentTenantTeamId()).thenReturn(java.util.Optional.empty());
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response); // meta null → single page in the scan
 
         PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, sort("cveCount", SortDirection.DESC), null);
 
@@ -119,10 +124,81 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
+    @DisplayName("getSoftwareFilters: with titles → source facet counts each package-manager bucket; unknown fleet source falls back to UNMANAGED")
+    void getSoftwareFilters_countsSourceBucketsAcrossTitles() {
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of(
+                titleWithSource("Chocolatey app 1", "chocolatey_packages"),
+                titleWithSource("Chocolatey app 2", "chocolatey_packages"),
+                titleWithSource("Homebrew tool",    "homebrew_packages"),
+                titleWithSource("Random pkg",       "programs")));      // unknown → UNMANAGED
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+
+        SoftwareFilters filters = service.getSoftwareFilters(null);
+
+        // Each dimension is capped by SoftwareFilterOption; order follows enum ordinal so we assert as-map.
+        java.util.Map<String, Integer> sourceCounts = filters.getSources().stream()
+                .collect(java.util.stream.Collectors.toMap(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount));
+        assertThat(sourceCounts).containsEntry(SoftwareSource.CHOCOLATEY.name(), 2);
+        assertThat(sourceCounts).containsEntry(SoftwareSource.BREW.name(), 1);
+        assertThat(sourceCounts).containsEntry(SoftwareSource.UNMANAGED.name(), 1);
+    }
+
+    @Test
+    @DisplayName("listSoftware: delegates devicesCount enrichment to FleetDeviceCountEnricher — whatever count the enricher sets is what the user sees, and Fleet's raw hosts_count is discarded in the process")
+    void listSoftware_delegatesEnrichmentToEnricher() {
+        // setup — Fleet says 31 devices; simulate the enricher correlating that down to 2 real Machines.
+        SoftwareTitle raw = new SoftwareTitle();
+        raw.setId(42L);
+        raw.setName("Chrome");
+        raw.setHostsCount(31);
+        raw.setVersions(List.of());
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of(raw));
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+        simulateEnricherSetsCount(2);
+
+        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, null, null);
+
+        assertThat(result.items()).hasSize(1);
+        // The critical invariant: user sees the enricher-provided count, not Fleet's raw 31.
+        assertThat(result.items().get(0).getDevicesCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("getSoftwareFilters: bypasses devicesCount enrichment — facet counts don't need it, and firing N Fleet /hosts calls per facet request is wasteful")
+    void getSoftwareFilters_doesNotFireEnrichment() {
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of(
+                titleWithSource("Chocolatey app", "chocolatey_packages")));
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+
+        service.getSoftwareFilters(null);
+
+        // The invariant: facet reads must never fire the enricher — that would explode into N Fleet /hosts
+        // lookups per facet request (up to FILTERS_SCAN_LIMIT titles). Regression guard.
+        org.mockito.Mockito.verify(deviceCountEnricher, org.mockito.Mockito.never())
+                .enrich(anyList(), any(), any());
+    }
+
+    /**
+     * The enricher is external — we don't re-test its correlation math here (that lives in
+     * {@code FleetDeviceCountEnricherTest}). We just simulate its side-effect: for every row the
+     * service hands it, write {@code count} back through the passed {@code countSetter}.
+     */
+    @SuppressWarnings("unchecked")
+    private void simulateEnricherSetsCount(int count) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(2);
+            rows.forEach(row -> setter.accept(row, count));
+            return null;
+        }).when(deviceCountEnricher).enrich(anyList(), any(), any());
+    }
+
+    @Test
     @DisplayName("listSoftware: an unknown sort field is a client error (BadRequest), not a Fleet call")
     void listSoftware_unknownSortField_throwsBadRequest() {
-        when(teamResolver.currentTenantTeamId()).thenReturn(java.util.Optional.empty());
-
         BadRequestException ex = org.junit.jupiter.api.Assertions.assertThrows(BadRequestException.class,
                 () -> service.listSoftware("", 0, 20, sort("bogus", SortDirection.ASC), null));
 
@@ -135,6 +211,16 @@ class SoftwareInventoryServiceTest {
         s.setField(field);
         s.setDirection(direction);
         return s;
+    }
+
+    private static SoftwareTitle titleWithSource(String name, String fleetSource) {
+        SoftwareTitle t = new SoftwareTitle();
+        t.setName(name);
+        t.setSource(fleetSource);
+        SoftwareTitleVersion v = new SoftwareTitleVersion();
+        v.setVersion("1.0");
+        t.setVersions(List.of(v));
+        return t;
     }
 
     private static SoftwareTitle titleWithCves(String name, int cveCount) {
