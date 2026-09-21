@@ -25,6 +25,8 @@ export function getDeviceTypeIcon(type?: DeviceType, props?: DeviceTypeIconProps
     case 'mobile':
     case 'tablet':
     default:
+      // NOTE: No phone/tablet-specific icon is currently available in icons-v2-generated/devices.
+      // Falling back to MonitorIcon until a dedicated mobile/tablet icon is added there.
       return <MonitorIcon className={props?.className} style={{ color: props?.color }} size={props?.size} />;
   }
 }
