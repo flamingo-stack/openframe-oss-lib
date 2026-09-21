@@ -132,6 +132,75 @@ function domainToTitle(domain: string): string {
     .replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/**
+ * Best-effort client-side guard against pointing the OG scraper at
+ * loopback / private / link-local addresses. Deliberately conservative —
+ * this is NOT the SSRF boundary (the backend behind `ogEndpointPath` must
+ * validate independently), it only avoids the obviously-bad, cheaply
+ * detectable cases: bracketed/unbracketed IPv6 loopback and IPv4-mapped
+ * IPv6, decimal/hex-encoded IPv4, case-insensitive loopback hostnames, and
+ * the RFC1918 + link-local (169.254.*, incl. cloud metadata) ranges.
+ */
+function isPotentiallyUnsafeHost(hostname: string): boolean {
+  // `URL.hostname` keeps IPv6 literals bracketed, e.g. "[::1]".
+  let host = hostname.toLowerCase();
+  if (host.startsWith('[') && host.endsWith(']')) {
+    host = host.slice(1, -1);
+  }
+
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+
+  // IPv6 loopback / unspecified, and IPv4-mapped IPv6 loopback forms.
+  if (
+    host === '::1' ||
+    host === '0:0:0:0:0:0:0:1' ||
+    host === '::' ||
+    host === '::ffff:127.0.0.1' ||
+    host === '::ffff:0:0'
+  ) {
+    return true;
+  }
+  if (host.startsWith('::ffff:')) {
+    const mapped = host.slice('::ffff:'.length);
+    if (isPotentiallyUnsafeIPv4(mapped)) return true;
+  }
+
+  // Plain IPv4 dotted-quad private/loopback/link-local ranges.
+  if (isPotentiallyUnsafeIPv4(host)) return true;
+
+  // Decimal or hex-encoded single-integer IPv4 forms, e.g. "2130706433"
+  // (127.0.0.1) or "0x7f000001".
+  if (/^0x[0-9a-f]+$/.test(host) || /^[0-9]+$/.test(host)) {
+    const num = host.startsWith('0x') ? Number.parseInt(host, 16) : Number.parseInt(host, 10);
+    if (Number.isFinite(num) && num >= 0 && num <= 0xffffffff) {
+      const a = (num >>> 24) & 0xff;
+      const b = (num >>> 16) & 0xff;
+      const c = (num >>> 8) & 0xff;
+      const d = num & 0xff;
+      if (isPotentiallyUnsafeIPv4(`${a}.${b}.${c}.${d}`)) return true;
+    }
+  }
+
+  return false;
+}
+
+function isPotentiallyUnsafeIPv4(host: string): boolean {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) return false;
+  const octets = match.slice(1, 5).map(n => Number.parseInt(n, 10));
+  if (octets.some(n => n > 255)) return false;
+  const [a, b] = octets;
+
+  if (a === 127) return true; // loopback
+  if (a === 0) return true; // "this network" / unspecified
+  if (a === 10) return true; // RFC1918
+  if (a === 172 && b >= 16 && b <= 31) return true; // RFC1918
+  if (a === 192 && b === 168) return true; // RFC1918
+  if (a === 169 && b === 254) return true; // link-local incl. cloud metadata
+
+  return false;
+}
+
 const ExternalLinkIcon = ({ size = 16 }: { size?: number }) => (
   <svg
     width={size}
@@ -220,12 +289,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   try {
     if (url && typeof url === 'string') {
       const urlObj = new URL(url);
-      if (
-        ['localhost', '127.0.0.1', '0.0.0.0'].includes(urlObj.hostname) ||
-        urlObj.hostname.startsWith('192.168.') ||
-        urlObj.hostname.startsWith('10.') ||
-        urlObj.hostname.startsWith('172.')
-      ) {
+      if (isPotentiallyUnsafeHost(urlObj.hostname)) {
         isLocalhost = true;
       }
     } else {
