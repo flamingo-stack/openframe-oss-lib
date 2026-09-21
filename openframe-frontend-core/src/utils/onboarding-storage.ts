@@ -19,6 +19,22 @@ const DEFAULT_STATE: OnboardingState = {
 };
 
 /**
+ * Validate that a parsed value matches the expected OnboardingState shape
+ */
+function isValidOnboardingState(value: unknown): value is OnboardingState {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    Array.isArray(candidate.completedSteps) &&
+    candidate.completedSteps.every(item => typeof item === 'string') &&
+    Array.isArray(candidate.skippedSteps) &&
+    candidate.skippedSteps.every(item => typeof item === 'string') &&
+    typeof candidate.dismissed === 'boolean' &&
+    typeof candidate.lastUpdated === 'string'
+  );
+}
+
+/**
  * Save onboarding state to localStorage (atomic write)
  */
 export function saveOnboardingState(key: string, state: OnboardingState): void {
@@ -51,7 +67,11 @@ export function loadOnboardingState(key: string): OnboardingState {
     const raw = localStorage.getItem(key);
     if (!raw) return DEFAULT_STATE;
 
-    const parsed = JSON.parse(raw) as OnboardingState;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isValidOnboardingState(parsed)) {
+      console.warn('[onboarding-storage] Parsed localStorage data has unexpected shape, using default state');
+      return DEFAULT_STATE;
+    }
     return parsed;
   } catch (err) {
     console.warn('[onboarding-storage] Failed parsing localStorage data:', err);
@@ -133,3 +153,4 @@ export function isOnboardingDismissed(key: string): boolean {
   const state = loadOnboardingState(key);
   return state.dismissed;
 }
+
