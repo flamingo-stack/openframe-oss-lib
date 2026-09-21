@@ -14,6 +14,12 @@ export interface UsePlatformConfigResult {
 // Cache for platform configs to avoid repeated fetches
 let platformCache: PlatformConfig[] | null = null;
 let fetchPromise: Promise<PlatformConfig[]> | null = null;
+// Monotonically increasing token identifying the current in-flight fetch.
+// Only the fetch whose token still matches `fetchToken` when it settles is
+// allowed to mutate `fetchPromise`/`platformCache`, so a stale fetch (e.g.
+// one started by an earlier mount) can never clobber state on behalf of a
+// fetch that has since been superseded.
+let fetchToken = 0;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -118,7 +124,13 @@ export function usePlatformConfig(): UsePlatformConfigResult {
       return;
     }
 
-    // Start a new fetch
+    // Start a new fetch. `token` pins this fetch to the current generation:
+    // only the handlers below, and only while `fetchToken` still equals
+    // `token`, are permitted to write `platformCache`/`fetchPromise`. This
+    // prevents a stale fetch (e.g. one whose promise was already reset by a
+    // failure, then superseded by a newer fetch from another mount) from
+    // clobbering state that belongs to a later, still-in-flight fetch.
+    const token = ++fetchToken;
     console.log('🔧 Fetching platform configurations from API (should only happen once)');
 
     fetchPromise = fetch('/api/config/platforms')
@@ -135,15 +147,19 @@ export function usePlatformConfig(): UsePlatformConfigResult {
           throw new Error('Platform config response did not contain a platform list');
         }
         console.log('✅ Platform configurations loaded:', loadedPlatforms.length, 'platforms');
-        platformCache = loadedPlatforms;
-        fetchPromise = null;
+        if (fetchToken === token) {
+          platformCache = loadedPlatforms;
+          fetchPromise = null;
+        }
         return loadedPlatforms;
       });
 
     fetchPromise.then(commit).catch((err: unknown) => {
       console.error('❌ Failed to fetch platform config:', err);
       fail(err);
-      fetchPromise = null;
+      if (fetchToken === token) {
+        fetchPromise = null;
+      }
     });
   }, []);
 
