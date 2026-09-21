@@ -58,33 +58,45 @@ public class OrganizationGenerator {
     }
 
     private static ContactInformationDto contactInformation(boolean mailingAddressSameAsPhysical) {
+        AddressDto physicalAddress = address();
+        ContactPersonDto contactPerson = contactPerson();
         ContactInformationDto.ContactInformationDtoBuilder builder = ContactInformationDto.builder()
-                .physicalAddress(address())
+                .physicalAddress(physicalAddress)
                 .mailingAddressSameAsPhysical(mailingAddressSameAsPhysical)
-                .contacts(List.of(contactPerson()));
+                .contacts(List.of(contactPerson));
         if (!mailingAddressSameAsPhysical) {
-            builder.mailingAddress(address());
+            AddressDto mailingAddress = address();
+            builder.mailingAddress(mailingAddress);
         }
         return builder.build();
     }
 
     private static AddressDto address() {
+        String street1 = faker.address().streetAddress();
+        String street2 = faker.address().secondaryAddress();
+        String city = faker.address().city();
+        String state = faker.address().state();
+        String postalCode = faker.address().postcode();
+        String country = faker.address().country();
         return AddressDto.builder()
-                .street1(faker.address().streetAddress())
-                .street2(faker.address().secondaryAddress())
-                .city(faker.address().city())
-                .state(faker.address().state())
-                .postalCode(faker.address().postcode())
-                .country(faker.address().country())
+                .street1(street1)
+                .street2(street2)
+                .city(city)
+                .state(state)
+                .postalCode(postalCode)
+                .country(country)
                 .build();
     }
 
     private static ContactPersonDto contactPerson() {
+        String contactName = faker.name().fullName();
+        String email = faker.internet().emailAddress();
+        String phone = faker.phoneNumber().phoneNumber();
         return ContactPersonDto.builder()
-                .contactName(faker.name().fullName())
+                .contactName(contactName)
                 .title("CEO")
-                .email(faker.internet().emailAddress())
-                .phone(faker.phoneNumber().phoneNumber())
+                .email(email)
+                .phone(phone)
                 .build();
     }
 }
