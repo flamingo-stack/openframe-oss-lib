@@ -47,7 +47,7 @@ class MachineOnlineStatusTest {
     }
 
     @Test
-    void lookup_deletedAndMissingMachines_bothGone() {
+    void lookup_deletedAndMissingMachines_deletedGoneMissingOnlyOffline() {
         // setup
         Set<String> asked = Set.of(DELETED_ID, MISSING_ID);
         List<Machine> found = List.of(machine(DELETED_ID, DeviceStatus.DELETED));
@@ -58,7 +58,8 @@ class MachineOnlineStatusTest {
 
         // verifications
         assertThat(lookup.isGone(DELETED_ID)).isTrue();
-        assertThat(lookup.isGone(MISSING_ID)).isTrue();
+        assertThat(lookup.isGone(MISSING_ID)).isFalse();
+        assertThat(lookup.isOffline(MISSING_ID)).isTrue();
         assertThat(lookup.isOffline(DELETED_ID)).isTrue();
     }
 

@@ -30,7 +30,9 @@ class CustomMachineDeliveryRepositoryImplTest {
 
     private static final String ID = "TOOL_INSTALLATION:fleetmdm-agent:mach-42";
     private static final String MACHINE_ID = "mach-42";
+    private static final String TENANT_ID = "tenant-1";
     private static final int LIMIT = 500;
+    private static final int ATTEMPTS = 1;
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
     @Mock private MongoConverter converter;
@@ -65,10 +67,11 @@ class CustomMachineDeliveryRepositoryImplTest {
     }
 
     @Test
-    void upsertPending_row_scopedUpsertById() {
+    void upsertPending_row_setsEveryFieldAndTenantWithinScopedUpsert() {
         // setup
         MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).build();
         when(mongoTemplate.getConverter()).thenReturn(converter);
+        when(mongoTemplate.tenantId()).thenReturn(TENANT_ID);
 
         // execution
         repository.upsertPending(delivery);
@@ -76,16 +79,19 @@ class CustomMachineDeliveryRepositoryImplTest {
         // verifications
         verify(mongoTemplate).upsert(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class));
         assertThat(queryCaptor.getValue().getQueryObject().toString()).contains(ID);
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("$set")
+                .contains("tenantId=" + TENANT_ID);
     }
 
     @Test
-    void markRepublished_sameDispatchStillPending_attemptCountedAndTrue() {
+    void markRepublished_sameDispatchAndAttemptStillPending_attemptCountedAndTrue() {
         // setup
         UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
 
         // execution
-        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, now, now);
+        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, ATTEMPTS, now, now);
 
         // verifications
         assertThat(republished).isTrue();
@@ -93,6 +99,7 @@ class CustomMachineDeliveryRepositoryImplTest {
                 .contains(ID)
                 .contains("PENDING")
                 .contains("dispatchedAt")
+                .contains("attempts=" + ATTEMPTS)
                 .doesNotContain("ACKED");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("$inc")
@@ -106,26 +113,43 @@ class CustomMachineDeliveryRepositoryImplTest {
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(noRow);
 
         // execution
-        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, now, now);
+        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, ATTEMPTS, now, now);
 
         // verifications
         assertThat(republished).isFalse();
     }
 
     @Test
-    void markFailed_openRow_failureAndExpiryWrittenPayloadDropped() {
+    void postponeAfterError_pendingRow_errorCountedAndDueMoved() {
         // setup
         UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
 
         // execution
-        boolean failed = repository.markFailed(ID, DeliveryStatus.OPEN, DeliveryFailure.TIMEOUT, now, now);
+        boolean postponed = repository.postponeAfterError(ID, DeliveryStatus.UNACKED, now, now);
+
+        // verifications
+        assertThat(postponed).isTrue();
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("errors=1")
+                .contains("dueAt");
+    }
+
+    @Test
+    void markFailed_openRowSameDispatch_failureAndExpiryWrittenPayloadDropped() {
+        // setup
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
+
+        // execution
+        boolean failed = repository.markFailed(ID, DeliveryStatus.OPEN, now, DeliveryFailure.TIMEOUT, now, now);
 
         // verifications
         assertThat(failed).isTrue();
         assertThat(queryCaptor.getValue().getQueryObject().toString())
                 .contains("PENDING")
-                .contains("ACKED");
+                .contains("ACKED")
+                .contains("dispatchedAt");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("FAILED")
                 .contains("TIMEOUT")

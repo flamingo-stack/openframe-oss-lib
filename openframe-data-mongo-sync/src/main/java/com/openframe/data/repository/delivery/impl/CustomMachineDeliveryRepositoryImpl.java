@@ -24,9 +24,11 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         implements CustomMachineDeliveryRepository {
 
     private static final String FIELD_ID = "_id";
+    private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_ATTEMPTS = "attempts";
+    private static final String FIELD_ERRORS = "errors";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_LAST_ATTEMPT_AT = "lastAttemptAt";
@@ -54,40 +56,48 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         return mongoTemplate.find(query, MachineDelivery.class);
     }
 
-    // tenant-scoped upsert by id: restarts our own open row, refuses (duplicate key) a foreign one
+    // $set of every field (a replacement document would be inserted without the tenant of the scoped filter):
+    // restarts our own open row, refuses a foreign one with the same _id (duplicate key)
     @Override
     public void upsertPending(MachineDelivery delivery) {
         Document document = new Document();
         mongoTemplate.getConverter().write(delivery, document);
-        Update update = Update.fromDocument(document, FIELD_ID);
+        Update update = new Update().set(FIELD_TENANT_ID, tenantId());
+        document.forEach((field, value) -> setField(update, field, value));
         Query byId = new Query(Criteria.where(FIELD_ID).is(delivery.getId()));
         mongoTemplate.upsert(byId, update, MachineDelivery.class);
     }
 
     @Override
-    public boolean markRepublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant attemptAt, Instant dueAt) {
-        Criteria sameDispatch = Criteria.where(FIELD_ID).is(id)
-                .and(FIELD_STATUS).in(from)
-                .and(FIELD_DISPATCHED_AT).is(dispatchedAt);
+    public boolean markRepublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, int attempts, Instant attemptAt, Instant dueAt) {
+        Criteria sameAttempt = sameDispatch(id, from, dispatchedAt).and(FIELD_ATTEMPTS).is(attempts);
         Update update = new Update()
                 .inc(FIELD_ATTEMPTS, 1)
                 .set(FIELD_LAST_ATTEMPT_AT, attemptAt)
                 .set(FIELD_DUE_AT, dueAt);
-        return updateOne(sameDispatch, update);
+        return updateOne(sameAttempt, update);
     }
 
     @Override
-    public boolean postpone(String id, Set<DeliveryStatus> from, Instant dueAt) {
+    public boolean postpone(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt) {
         Update update = new Update().set(FIELD_DUE_AT, dueAt);
-        return transition(id, from, update);
+        return updateOne(sameDispatch(id, from, dispatchedAt), update);
     }
 
     @Override
-    public boolean park(String id, Set<DeliveryStatus> from, Instant dueAt) {
+    public boolean postponeAfterError(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt) {
+        Update update = new Update()
+                .inc(FIELD_ERRORS, 1)
+                .set(FIELD_DUE_AT, dueAt);
+        return updateOne(sameDispatch(id, from, dispatchedAt), update);
+    }
+
+    @Override
+    public boolean park(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt) {
         Update update = new Update()
                 .set(FIELD_DUE_AT, dueAt)
                 .set(FIELD_PARKED, true);
-        return transition(id, from, update);
+        return updateOne(sameDispatch(id, from, dispatchedAt), update);
     }
 
     @Override
@@ -97,26 +107,32 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
                 .set(FIELD_ACKED_AT, ackedAt)
                 .set(FIELD_DUE_AT, dueAt)
                 .set(FIELD_PARKED, false);
-        return transition(id, from, update);
+        return updateOne(stillIn(id, from), update);
     }
 
     @Override
     public boolean markDone(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.DONE, finishedAt, expiresAt);
-        return transition(id, from, update);
+        return updateOne(stillIn(id, from), update);
     }
 
     @Override
     public boolean markCancelled(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.CANCELLED, finishedAt, expiresAt);
-        return transition(id, from, update);
+        return updateOne(stillIn(id, from), update);
     }
 
     @Override
-    public boolean markFailed(String id, Set<DeliveryStatus> from, DeliveryFailure failure, Instant finishedAt, Instant expiresAt) {
+    public boolean markCancelled(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant finishedAt, Instant expiresAt) {
+        Update update = closed(DeliveryStatus.CANCELLED, finishedAt, expiresAt);
+        return updateOne(sameDispatch(id, from, dispatchedAt), update);
+    }
+
+    @Override
+    public boolean markFailed(String id, Set<DeliveryStatus> from, Instant dispatchedAt, DeliveryFailure failure, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.FAILED, finishedAt, expiresAt)
                 .set(FIELD_FAILURE, failure);
-        return transition(id, from, update);
+        return updateOne(sameDispatch(id, from, dispatchedAt), update);
     }
 
     @Override
@@ -132,6 +148,13 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         return result.getModifiedCount();
     }
 
+    private static void setField(Update update, String field, Object value) {
+        if (FIELD_ID.equals(field)) {
+            return;
+        }
+        update.set(field, value);
+    }
+
     private static Update closed(DeliveryStatus status, Instant finishedAt, Instant expiresAt) {
         return new Update()
                 .set(FIELD_STATUS, status)
@@ -140,9 +163,12 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
                 .unset(FIELD_PAYLOAD_JSON);
     }
 
-    private boolean transition(String id, Set<DeliveryStatus> from, Update update) {
-        Criteria rowStillIn = Criteria.where(FIELD_ID).is(id).and(FIELD_STATUS).in(from);
-        return updateOne(rowStillIn, update);
+    private static Criteria stillIn(String id, Set<DeliveryStatus> from) {
+        return Criteria.where(FIELD_ID).is(id).and(FIELD_STATUS).in(from);
+    }
+
+    private static Criteria sameDispatch(String id, Set<DeliveryStatus> from, Instant dispatchedAt) {
+        return stillIn(id, from).and(FIELD_DISPATCHED_AT).is(dispatchedAt);
     }
 
     private boolean updateOne(Criteria criteria, Update update) {

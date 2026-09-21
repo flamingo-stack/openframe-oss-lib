@@ -55,9 +55,14 @@ public class DeliverySweepService {
     private void retryOne(MachineDelivery delivery, Lookup machines, Instant now) {
         try {
             retryOrClose(delivery, machines, now);
+        } catch (DeliveryPublishException e) {
+            metrics.recordPublishFailed(delivery.getType());
+            metrics.recordRowError();
+            backOff(delivery, now);
+            log.error("Delivery publish failed, row postponed: id={}", delivery.getId(), e);
         } catch (Exception e) {
             metrics.recordRowError();
-            postponeAfterError(delivery, now);
+            countErrorAndBackOff(delivery, now);
             log.error("Delivery sweep failed for row, postponed: id={}", delivery.getId(), e);
         }
     }
@@ -80,6 +85,7 @@ public class DeliverySweepService {
         closer.fail(delivery, DeliveryFailure.EXHAUSTED, DeliveryStatus.UNACKED, now);
     }
 
+    // parked rows are re-checked every max-retry-interval: a wake that raced the snapshot is not the only way back
     private void parkSkipOrFailOffline(MachineDelivery delivery, Policy policy, Instant now) {
         if (shouldSkipOffline(policy)) {
             closer.cancel(delivery, DeliveryStatus.UNACKED, "machine not online, type skips offline machines", now);
@@ -90,8 +96,11 @@ public class DeliverySweepService {
             closer.fail(delivery, DeliveryFailure.OFFLINE, DeliveryStatus.UNACKED, now);
             return;
         }
-        repository.park(delivery.getId(), DeliveryStatus.UNACKED, windowEnd);
-        log.debug("Delivery parked until the machine comes online: id={} windowEnd={}", delivery.getId(), windowEnd);
+        long recheckSeconds = policy.getMaxRetryIntervalSeconds();
+        Instant recheckAt = now.plusSeconds(recheckSeconds);
+        Instant dueAt = earliest(windowEnd, recheckAt);
+        repository.park(delivery.getId(), DeliveryStatus.UNACKED, delivery.getDispatchedAt(), dueAt);
+        log.debug("Delivery parked, machine not online: id={} dueAt={} windowEnd={}", delivery.getId(), dueAt, windowEnd);
     }
 
     private void republish(MachineDelivery delivery, Policy policy, Instant now) {
@@ -102,11 +111,12 @@ public class DeliverySweepService {
         String machineId = delivery.getMachineId();
         publish(spec, delivery, machineId, payload);
 
-        int attempt = delivery.getAttempts() + 1;
+        int attempts = delivery.getAttempts();
+        int attempt = attempts + 1;
         long delaySeconds = retryDelaySeconds(attempt, policy);
         Instant dueAt = now.plusSeconds(delaySeconds);
         Instant dispatchedAt = delivery.getDispatchedAt();
-        boolean counted = repository.markRepublished(delivery.getId(), DeliveryStatus.UNACKED, dispatchedAt, now, dueAt);
+        boolean counted = repository.markRepublished(delivery.getId(), DeliveryStatus.UNACKED, dispatchedAt, attempts, now, dueAt);
         if (!counted) {
             log.debug("Delivery moved on while being re-published: id={}", delivery.getId());
             return;
@@ -116,21 +126,44 @@ public class DeliverySweepService {
                 type, delivery.getTargetId(), machineId, attempt, dueAt);
     }
 
-    private void publish(DeliverySpec<DeliverySeed, Object> spec, MachineDelivery delivery, String machineId, Object payload) {
+    private static void publish(DeliverySpec<DeliverySeed, Object> spec, MachineDelivery delivery, String machineId, Object payload) {
         try {
             spec.publish(machineId, payload);
         } catch (RuntimeException e) {
-            metrics.recordPublishFailed(delivery.getType());
-            throw e;
+            throw new DeliveryPublishException(delivery.getId(), e);
         }
     }
 
-    // a row that keeps failing must not be re-selected first every tick: back off without counting an attempt
-    private void postponeAfterError(MachineDelivery delivery, Instant now) {
+    // infrastructure trouble: no attempt counted, the row simply comes back after max-retry-interval
+    private void backOff(MachineDelivery delivery, Instant now) {
+        try {
+            Instant dueAt = recheckAt(delivery, now);
+            repository.postpone(delivery.getId(), DeliveryStatus.UNACKED, delivery.getDispatchedAt(), dueAt);
+        } catch (Exception e) {
+            log.error("Delivery sweep could not postpone row: id={}", delivery.getId(), e);
+        }
+    }
+
+    // a row that keeps failing for its own reasons (no spec, corrupt payload) is bounded like attempts are
+    private void countErrorAndBackOff(MachineDelivery delivery, Instant now) {
+        try {
+            Policy policy = properties.resolve(delivery);
+            int errors = delivery.getErrors() + 1;
+            if (errors >= policy.getMaxAttempts()) {
+                closer.fail(delivery, DeliveryFailure.ERROR, DeliveryStatus.UNACKED, now);
+                return;
+            }
+            Instant dueAt = recheckAt(delivery, now);
+            repository.postponeAfterError(delivery.getId(), DeliveryStatus.UNACKED, delivery.getDispatchedAt(), dueAt);
+        } catch (Exception e) {
+            log.error("Delivery sweep could not postpone row: id={}", delivery.getId(), e);
+        }
+    }
+
+    private Instant recheckAt(MachineDelivery delivery, Instant now) {
         Policy policy = properties.resolve(delivery);
         long delaySeconds = policy.getMaxRetryIntervalSeconds();
-        Instant dueAt = now.plusSeconds(delaySeconds);
-        repository.postpone(delivery.getId(), DeliveryStatus.UNACKED, dueAt);
+        return now.plusSeconds(delaySeconds);
     }
 
     private <P> P readPayload(MachineDelivery delivery, Class<P> payloadClass) {
@@ -149,6 +182,10 @@ public class DeliverySweepService {
         long delay = (long) (firstDelay * growth);
         long cap = policy.getMaxRetryIntervalSeconds();
         return Math.min(delay, cap);
+    }
+
+    private static Instant earliest(Instant first, Instant second) {
+        return first.isBefore(second) ? first : second;
     }
 
     private static boolean hasAttemptsLeft(MachineDelivery delivery, Policy policy) {

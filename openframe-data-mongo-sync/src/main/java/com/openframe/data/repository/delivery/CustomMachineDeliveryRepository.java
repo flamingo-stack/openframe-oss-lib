@@ -14,11 +14,13 @@ public interface CustomMachineDeliveryRepository {
 
     void upsertPending(MachineDelivery delivery);
 
-    boolean markRepublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant attemptAt, Instant dueAt);
+    boolean markRepublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, int attempts, Instant attemptAt, Instant dueAt);
 
-    boolean postpone(String id, Set<DeliveryStatus> from, Instant dueAt);
+    boolean postpone(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt);
 
-    boolean park(String id, Set<DeliveryStatus> from, Instant dueAt);
+    boolean postponeAfterError(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt);
+
+    boolean park(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt);
 
     boolean markAcked(String id, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt);
 
@@ -26,7 +28,9 @@ public interface CustomMachineDeliveryRepository {
 
     boolean markCancelled(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
 
-    boolean markFailed(String id, Set<DeliveryStatus> from, DeliveryFailure failure, Instant finishedAt, Instant expiresAt);
+    boolean markCancelled(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant finishedAt, Instant expiresAt);
+
+    boolean markFailed(String id, Set<DeliveryStatus> from, Instant dispatchedAt, DeliveryFailure failure, Instant finishedAt, Instant expiresAt);
 
     long wake(String machineId, Set<DeliveryStatus> from, Instant dueAt);
 }

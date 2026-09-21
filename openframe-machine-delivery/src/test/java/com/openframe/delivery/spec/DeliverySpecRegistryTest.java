@@ -4,6 +4,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -66,6 +67,33 @@ class DeliverySpecRegistryTest {
 
         // verifications
         assertThat(types).containsExactly(DeliveryType.TOOL_INSTALLATION, DeliveryType.CLIENT_UNINSTALL);
+    }
+
+    @Test
+    void find_registeredType_specPresent() {
+        // setup
+        DeliverySpec<?, ?> spec = spec(DeliveryType.TOOL_INSTALLATION);
+        ObjectProvider<DeliverySpec<?, ?>> specs = provider(spec);
+        DeliverySpecRegistry registry = new DeliverySpecRegistry(specs);
+
+        // execution
+        Optional<DeliverySpec<DeliverySeed, Object>> found = registry.find(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(found).get().isSameAs(spec);
+    }
+
+    @Test
+    void find_unregisteredType_empty() {
+        // setup
+        ObjectProvider<DeliverySpec<?, ?>> specs = provider();
+        DeliverySpecRegistry registry = new DeliverySpecRegistry(specs);
+
+        // execution
+        Optional<DeliverySpec<DeliverySeed, Object>> found = registry.find(DeliveryType.CLIENT_UNINSTALL);
+
+        // verifications
+        assertThat(found).isEmpty();
     }
 
     @SuppressWarnings("unchecked")

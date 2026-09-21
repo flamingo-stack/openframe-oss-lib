@@ -40,6 +40,7 @@ public class DeliveryRecorder {
         String payloadJson = toJson(request.getPayload());
         Policy policy = properties.resolve(request.getType());
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
+        long ttlSeconds = policy.getTtlSeconds();
         return MachineDelivery.builder()
                 .id(id)
                 .type(request.getType())
@@ -47,12 +48,14 @@ public class DeliveryRecorder {
                 .machineId(request.getMachineId())
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
+                .errors(0)
                 .payloadJson(payloadJson)
                 .dispatchedAt(now)
                 .lastAttemptAt(now)
                 .dueAt(now.plusSeconds(ackThresholdSeconds))
                 .offlineBehavior(request.getOfflineBehavior())
                 .reconnectWindowSeconds(request.getReconnectWindowSeconds())
+                .expiresAt(now.plusSeconds(ttlSeconds))
                 .build();
     }
 

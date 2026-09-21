@@ -5,6 +5,7 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +38,20 @@ public class DeliveryWatchdogService {
             closer.fail(delivery, DeliveryFailure.TIMEOUT, DeliveryStatus.AWAITING_RESULT, now);
         } catch (Exception e) {
             metrics.recordRowError();
-            log.error("Delivery watchdog failed for row: id={}", delivery.getId(), e);
+            backOff(delivery, now);
+            log.error("Delivery watchdog failed for row, postponed: id={}", delivery.getId(), e);
+        }
+    }
+
+    // a row whose close keeps failing must not stay at the head of every batch
+    private void backOff(MachineDelivery delivery, Instant now) {
+        try {
+            Policy policy = properties.resolve(delivery);
+            long delaySeconds = policy.getMaxRetryIntervalSeconds();
+            Instant dueAt = now.plusSeconds(delaySeconds);
+            repository.postpone(delivery.getId(), DeliveryStatus.AWAITING_RESULT, delivery.getDispatchedAt(), dueAt);
+        } catch (Exception e) {
+            log.error("Delivery watchdog could not postpone row: id={}", delivery.getId(), e);
         }
     }
 }

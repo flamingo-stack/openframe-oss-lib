@@ -17,6 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -32,11 +33,11 @@ public class DeliveryCloser {
 
     public void fail(MachineDelivery delivery, DeliveryFailure failure, Set<DeliveryStatus> from, Instant now) {
         DeliveryType type = delivery.getType();
-        DeliverySpec<DeliverySeed, Object> spec = registry.require(type);
         Instant expiresAt = expiresAt(type, now);
         String id = delivery.getId();
+        Instant dispatchedAt = delivery.getDispatchedAt();
 
-        boolean stillIn = repository.markFailed(id, from, failure, now, expiresAt);
+        boolean stillIn = repository.markFailed(id, from, dispatchedAt, failure, now, expiresAt);
         if (!stillIn) {
             log.debug("Delivery moved on before the failure could be recorded: id={}", id);
             return;
@@ -47,7 +48,7 @@ public class DeliveryCloser {
         delivery.setExpiresAt(expiresAt);
 
         metrics.recordFailed(type, failure);
-        spec.onFailed(delivery, failure);
+        notifySpec(delivery, failure);
         log.warn("Delivery FAILED: type={} targetId={} machineId={} attempts={} reason={}",
                 type, delivery.getTargetId(), delivery.getMachineId(), delivery.getAttempts(), failure);
     }
@@ -55,11 +56,21 @@ public class DeliveryCloser {
     public void cancel(MachineDelivery delivery, Set<DeliveryStatus> from, String reason, Instant now) {
         DeliveryType type = delivery.getType();
         Instant expiresAt = expiresAt(type, now);
-        boolean cancelled = repository.markCancelled(delivery.getId(), from, now, expiresAt);
+        Instant dispatchedAt = delivery.getDispatchedAt();
+        boolean cancelled = repository.markCancelled(delivery.getId(), from, dispatchedAt, now, expiresAt);
         if (cancelled) {
             log.info("Delivery CANCELLED by sweep: type={} targetId={} machineId={} reason={}",
                     type, delivery.getTargetId(), delivery.getMachineId(), reason);
         }
+    }
+
+    // the row is closed regardless: a type whose spec is not registered here must still be able to fail
+    private void notifySpec(MachineDelivery delivery, DeliveryFailure failure) {
+        DeliveryType type = delivery.getType();
+        Optional<DeliverySpec<DeliverySeed, Object>> spec = registry.find(type);
+        spec.ifPresentOrElse(
+                registered -> registered.onFailed(delivery, failure),
+                () -> log.warn("No spec registered for delivery type {}, onFailed skipped: id={}", type, delivery.getId()));
     }
 
     private Instant expiresAt(DeliveryType type, Instant now) {

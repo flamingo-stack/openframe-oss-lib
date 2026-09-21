@@ -12,6 +12,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.Duration;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -62,6 +63,13 @@ public class DeliveryProperties {
     @Setter
     public static class Sweep {
 
+        @NotNull
+        @Positive
+        private Long interval;
+        @NotNull
+        private Duration lockAtMostFor;
+        @NotNull
+        private Duration lockAtLeastFor;
         @NotNull
         @Positive
         private Integer batchSize;

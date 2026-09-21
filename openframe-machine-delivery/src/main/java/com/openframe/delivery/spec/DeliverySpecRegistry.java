@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static java.util.function.Function.identity;
@@ -32,12 +33,14 @@ public class DeliverySpecRegistry {
     }
 
     @SuppressWarnings("unchecked")
+    public <S extends DeliverySeed, P> Optional<DeliverySpec<S, P>> find(DeliveryType type) {
+        DeliverySpec<S, P> spec = (DeliverySpec<S, P>) byType.get(type);
+        return Optional.ofNullable(spec);
+    }
+
     public <S extends DeliverySeed, P> DeliverySpec<S, P> require(DeliveryType type) {
-        DeliverySpec<?, ?> spec = byType.get(type);
-        if (spec == null) {
-            throw new IllegalArgumentException("No spec registered for delivery type: " + type.name());
-        }
-        return (DeliverySpec<S, P>) spec;
+        Optional<DeliverySpec<S, P>> spec = find(type);
+        return spec.orElseThrow(() -> new IllegalArgumentException("No spec registered for delivery type: " + type.name()));
     }
 
     public Set<DeliveryType> types() {

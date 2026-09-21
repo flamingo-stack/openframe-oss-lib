@@ -36,9 +36,6 @@ public class MachineOnlineStatus {
         private final Map<String, DeviceStatus> statusById;
 
         public boolean isGone(String machineId) {
-            if (!statusById.containsKey(machineId)) {
-                return true;
-            }
             DeviceStatus status = statusById.get(machineId);
             return GONE.contains(status);
         }

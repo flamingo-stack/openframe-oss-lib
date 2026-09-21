@@ -39,9 +39,11 @@ class DeliveryWatchdogServiceTest {
 
     private MachineDelivery silentDelivery;
     private MachineDelivery otherSilentDelivery;
+    private Instant dispatchedAt;
 
     @BeforeEach
     void setUp() {
+        dispatchedAt = Instant.now().minusSeconds(900);
         silentDelivery = silentRow(FIRST_ID);
         otherSilentDelivery = silentRow(SECOND_ID);
         DeliveryProperties properties = DeliveryTestPolicies.properties();
@@ -62,7 +64,7 @@ class DeliveryWatchdogServiceTest {
     }
 
     @Test
-    void reapAcked_firstRowThrows_secondRowStillFailedAndErrorCounted() {
+    void reapAcked_firstRowThrows_firstPostponedSecondStillFailed() {
         // setup
         stubOverdue(silentDelivery, otherSilentDelivery);
         doThrow(new IllegalStateException("boom"))
@@ -72,6 +74,7 @@ class DeliveryWatchdogServiceTest {
         service.reapAcked();
 
         // verifications
+        verify(repository).postpone(eq(FIRST_ID), eq(DeliveryStatus.AWAITING_RESULT), eq(dispatchedAt), any(Instant.class));
         verify(closer).fail(eq(otherSilentDelivery), eq(DeliveryFailure.TIMEOUT), eq(DeliveryStatus.AWAITING_RESULT), any(Instant.class));
         verify(metrics).recordRowError();
     }
@@ -92,11 +95,12 @@ class DeliveryWatchdogServiceTest {
         when(repository.findDue(eq(DeliveryStatus.ACKED), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
     }
 
-    private static MachineDelivery silentRow(String id) {
+    private MachineDelivery silentRow(String id) {
         return MachineDelivery.builder()
                 .id(id)
                 .type(DeliveryType.CLIENT_UNINSTALL)
                 .status(DeliveryStatus.ACKED)
+                .dispatchedAt(dispatchedAt)
                 .build();
     }
 }
