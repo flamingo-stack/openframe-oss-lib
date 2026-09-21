@@ -71,14 +71,10 @@ public class DeliverySweepService {
     private void retryOrClose(MachineDelivery delivery, Lookup machines, Instant now) {
         String machineId = delivery.getMachineId();
         if (machines.isGone(machineId)) {
-            cancel(delivery, "machine gone");
+            cancelMachineGone(delivery);
             return;
         }
         DeliverySpec<?, ?> spec = registry.require(delivery.getType());
-        if (!spec.stillWanted(delivery)) {
-            cancel(delivery, "no longer wanted");
-            return;
-        }
         Policy policy = properties.resolve(delivery);
         if (machines.isOffline(machineId)) {
             parkOrFailOffline(delivery, policy, now);
@@ -91,9 +87,9 @@ public class DeliverySweepService {
         failureRecorder.fail(delivery, DeliveryFailure.EXHAUSTED, now);
     }
 
-    private void cancel(MachineDelivery delivery, String reason) {
+    private void cancelMachineGone(MachineDelivery delivery) {
         tracker.cancel(delivery.getType(), delivery.getTargetId(), delivery.getMachineId());
-        log.info("Delivery cancelled by sweep: id={} reason={}", delivery.getId(), reason);
+        log.info("Delivery cancelled by sweep, machine gone: id={}", delivery.getId());
     }
 
     private void parkOrFailOffline(MachineDelivery delivery, Policy policy, Instant now) {

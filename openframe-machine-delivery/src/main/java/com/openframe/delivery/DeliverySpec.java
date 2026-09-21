@@ -16,9 +16,5 @@ public interface DeliverySpec<S extends DeliverySeed, P> {
 
     void publish(String machineId, P payload);
 
-    default boolean stillWanted(MachineDelivery delivery) {
-        return true;
-    }
-
     void onFailed(MachineDelivery delivery, DeliveryFailure failure);
 }

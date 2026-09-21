@@ -87,7 +87,7 @@ class DeliverySweepServiceTest {
         Instant before = Instant.now();
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
-        stubSpecWanting();
+        stubSpec();
         when(spec.getPayloadClass()).thenReturn(TestPayload.class);
         when(repository.markRepublished(eq(delivery.getId()), any(Instant.class), nextAttemptCaptor.capture())).thenReturn(true);
 
@@ -112,7 +112,7 @@ class DeliverySweepServiceTest {
         delivery.setAttempts(ATTEMPTS_PAST_CAP);
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
-        stubSpecWanting();
+        stubSpec();
         when(spec.getPayloadClass()).thenReturn(TestPayload.class);
         when(repository.markRepublished(eq(delivery.getId()), any(Instant.class), nextAttemptCaptor.capture())).thenReturn(true);
 
@@ -130,7 +130,7 @@ class DeliverySweepServiceTest {
         // setup
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
-        stubSpecWanting();
+        stubSpec();
         when(repository.markRepublished(eq(delivery.getId()), any(Instant.class), any(Instant.class))).thenReturn(false);
 
         // execution
@@ -147,7 +147,7 @@ class DeliverySweepServiceTest {
         delivery.setAttempts(MAX_ATTEMPTS);
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
-        stubSpecWanting();
+        stubSpec();
 
         // execution
         service.retryPending();
@@ -163,7 +163,7 @@ class DeliverySweepServiceTest {
         // setup
         stubDue(delivery);
         stubMachine(DeviceStatus.OFFLINE);
-        stubSpecWanting();
+        stubSpec();
 
         // execution
         service.retryPending();
@@ -181,7 +181,7 @@ class DeliverySweepServiceTest {
         delivery.setDispatchedAt(twoDaysAgo);
         stubDue(delivery);
         stubMachine(DeviceStatus.OFFLINE);
-        stubSpecWanting();
+        stubSpec();
 
         // execution
         service.retryPending();
@@ -197,7 +197,7 @@ class DeliverySweepServiceTest {
         delivery.setOfflineBehavior(ScheduleOfflineBehavior.SKIP);
         stubDue(delivery);
         stubMachine(DeviceStatus.OFFLINE);
-        stubSpecWanting();
+        stubSpec();
 
         // execution
         service.retryPending();
@@ -235,23 +235,6 @@ class DeliverySweepServiceTest {
     }
 
     @Test
-    void retryPending_specNoLongerWantsIt_cancelled() {
-        // setup
-        stubDue(delivery);
-        stubMachine(DeviceStatus.ONLINE);
-        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
-        when(spec.stillWanted(delivery)).thenReturn(false);
-
-        // execution
-        service.retryPending();
-
-        // verifications
-        verify(tracker).cancel(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
-        verify(spec, never()).publish(eq(MACHINE_ID), any(TestPayload.class));
-        verifyNoInteractions(failureRecorder, metrics);
-    }
-
-    @Test
     void retryPending_oneRowCorrupt_otherRowStillRepublished() {
         // setup
         MachineDelivery corrupt = row(OTHER_MACHINE_ID, CORRUPT_JSON);
@@ -260,8 +243,6 @@ class DeliverySweepServiceTest {
         Map<String, DeviceStatus> bothOnline = Map.of(OTHER_MACHINE_ID, DeviceStatus.ONLINE, MACHINE_ID, DeviceStatus.ONLINE);
         when(machineOnlineStatus.lookup(both)).thenReturn(new Lookup(bothOnline));
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
-        when(spec.stillWanted(corrupt)).thenReturn(true);
-        when(spec.stillWanted(delivery)).thenReturn(true);
         when(spec.getPayloadClass()).thenReturn(TestPayload.class);
         when(repository.markRepublished(eq(corrupt.getId()), any(Instant.class), any(Instant.class))).thenReturn(true);
         when(repository.markRepublished(eq(delivery.getId()), any(Instant.class), any(Instant.class))).thenReturn(true);
@@ -315,8 +296,7 @@ class DeliverySweepServiceTest {
         when(machineOnlineStatus.lookup(Set.of(MACHINE_ID))).thenReturn(lookup);
     }
 
-    private void stubSpecWanting() {
+    private void stubSpec() {
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
-        when(spec.stillWanted(delivery)).thenReturn(true);
     }
 }
