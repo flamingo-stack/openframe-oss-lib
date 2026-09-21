@@ -39,6 +39,7 @@ class TicketServiceGetTicketsTest {
     @Mock private TicketNumberService ticketNumberService;
     @Mock private TicketTagService ticketTagService;
     @Mock private TicketIdsForFilter ticketIdsForFilter;
+    @Mock private TicketStalenessResolver ticketStalenessResolver;
     @Mock private MachineRepository machineRepository;
     @Mock private OrganizationRepository organizationRepository;
     @Mock private UserRepository userRepository;
@@ -54,7 +55,7 @@ class TicketServiceGetTicketsTest {
     @BeforeEach
     void setUp() {
         ticketService = new TicketService(ticketRepository, ticketNumberService, ticketTagService, ticketIdsForFilter,
-                machineRepository, organizationRepository, userRepository, assignmentService,
+                ticketStalenessResolver, machineRepository, organizationRepository, userRepository, assignmentService,
                 ticketOrderCalculationService, ticketLifecycleService, ticketResolverStamp, List.of());
     }
 
