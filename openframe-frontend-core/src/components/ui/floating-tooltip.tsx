@@ -206,7 +206,11 @@ export function FloatingTooltip({
             <div className="min-h-0 overflow-y-auto whitespace-pre-line px-3 py-2.5 text-ods-text-primary text-h6">
               {parsedContent}
             </div>
-            {/* Arrow element */}
+            {/* Arrow element. The arrow sits on the edge of the floating box that
+                faces the reference element (`staticSide`), so its visible border must
+                trace the two edges of the diamond that point back toward that edge:
+                'left' -> bottom+right, 'bottom' -> right+top, 'right' -> top+left,
+                'top' -> left+bottom. Each side is its own distinct case. */}
             <div
               ref={setArrowEl}
               style={{
@@ -217,14 +221,8 @@ export function FloatingTooltip({
               className={cn('absolute h-2 w-2 rotate-45', 'border-ods-border bg-ods-card', {
                 'border-b border-r': staticSide === 'left',
                 'border-r border-t': staticSide === 'bottom',
-                // `right` and `top` were separate keys spelling the same two
-                // classes in different order ('border-l border-b' vs
-                // 'border-b border-l'); sorting collapsed them into a duplicate
-                // key, which would have dropped the `right` branch entirely.
-                // Merged to keep the emitted CSS identical to before.
-                // NOTE: that both sides ever wanted the same border pair looks
-                // like a latent bug — worth a designer's eye. (2026-08-24)
-                'border-b border-l': staticSide === 'right' || staticSide === 'top',
+                'border-l border-t': staticSide === 'right',
+                'border-b border-l': staticSide === 'top',
               })}
             />
           </div>
