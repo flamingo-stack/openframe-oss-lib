@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -228,7 +229,7 @@ public class TimeEntryDataFetcher {
         if (entry.getOrganizationId() == null) {
             return CompletableFuture.completedFuture(null);
         }
-        DataLoader<String, Organization> loader = dfe.getDataLoader("organizationDataLoader");
+        DataLoader<String, Organization> loader = dfe.getDataLoader(OrganizationDataLoader.NAME);
         return loader.load(entry.getOrganizationId());
     }
 
