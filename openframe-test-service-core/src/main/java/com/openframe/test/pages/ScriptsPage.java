@@ -4,19 +4,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.WaitForSelectorState;
 
-/**
- * Page Object for the Scripts section.
- * URL: /scripts/                       → Scripts List tab
- * URL: /scripts/?tab=schedules         → Scripts Schedules tab
- * <p>
- * ── Layout ───────────────────────────────────────────────────────────────────
- * A top tab bar switches between two sub-views:
- * • Scripts List     – searchable/filterable list of scripts, each with a
- * Run button and a ⋯ context menu (Edit Script, Script Details)
- * • Scripts Schedules – list of scheduled runs, each with an Edit button
- * <p>
- * Active tab is identified by a child <div class="…bg-ods-accent"> underline.
- */
+// Active tab is identified by a child <div class="…bg-ods-accent"> underline.
 public class ScriptsPage {
 
     public static final String URL = "https://test-qa.openframe.build/scripts";
