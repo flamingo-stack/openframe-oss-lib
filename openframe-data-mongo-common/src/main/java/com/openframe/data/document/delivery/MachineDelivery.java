@@ -19,6 +19,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "machine_delivery")
 @CompoundIndex(name = "machine_delivery_sweep", def = "{'tenantId': 1, 'type': 1, 'status': 1, 'nextAttemptAt': 1}")
+@CompoundIndex(name = "machine_delivery_watchdog", def = "{'tenantId': 1, 'type': 1, 'status': 1, 'ackedAt': 1}")
 public class MachineDelivery implements TenantScoped {
 
     @Id
