@@ -63,11 +63,12 @@ class RmmResultParserTest {
     }
 
     @Test
-    @DisplayName("parse: malformed JSON propagates an IOException — listeners are expected to catch it and keep the core-NATS dispatcher alive")
+    @DisplayName("parse: malformed JSON propagates an unchecked exception wrapping the underlying IOException — listeners are expected to catch it and keep the core-NATS dispatcher alive")
     void parse_malformedThrows() {
         byte[] payload = "not-json".getBytes(StandardCharsets.UTF_8);
 
         assertThatThrownBy(() -> parser.parse(payload, CommandResultMessage.class))
-                .isInstanceOf(java.io.IOException.class);
+                .isInstanceOf(RuntimeException.class)
+                .hasCauseInstanceOf(java.io.IOException.class);
     }
 }
