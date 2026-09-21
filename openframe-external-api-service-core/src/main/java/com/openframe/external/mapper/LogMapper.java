@@ -49,7 +49,7 @@ public class LogMapper extends BaseRestMapper {
                     .build();
         }
 
-        List<LogResponse> logs = result.getItems().stream()
+        List<LogResponse> logs = result.getItems() == null ? List.of() : result.getItems().stream()
                 .map(this::toLogResponse)
                 .collect(Collectors.toList());
 
@@ -64,7 +64,7 @@ public class LogMapper extends BaseRestMapper {
             return LogFilterResponse.builder().build();
         }
 
-        List<CustomerFilterResponse> customers = filters.getOrganizations().stream()
+        List<CustomerFilterResponse> customers = filters.getOrganizations() == null ? List.of() : filters.getOrganizations().stream()
                 .map(org -> new CustomerFilterResponse(org.getId(), org.getName()))
                 .collect(Collectors.toList());
 

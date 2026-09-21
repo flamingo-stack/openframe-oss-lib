@@ -64,6 +64,47 @@ public class ProxyUrlResolver {
     }
 
     /**
+     * Same target as {@link #resolve}, but the path and query are forwarded exactly as the client
+     * sent them. {@code resolve} rebuilds them from their decoded form, so a percent-encoded
+     * reserved character changes meaning on the way ({@code q=a%26b} arrives as {@code q=a&b},
+     * {@code %2B} as {@code +}, a {@code %2F} inside a path segment as a separator).
+     * <p>
+     * Opt-in: callers of {@code resolve} keep their behaviour. Whatever this method cannot handle on
+     * the raw form (tool id percent-encoded in the path, unusable port...) is delegated to
+     * {@code resolve}, so it never fails where {@code resolve} would not.
+     */
+    public URI resolvePreservingEncoding(String toolId, String toolUrl, String toolPort, URI originalUri, String prefix) {
+        try {
+            String rawPath = originalUri.getRawPath();
+            String toolPath = prefix + "/" + toolId;
+            int toolPathStart = rawPath == null ? -1 : rawPath.indexOf(toolPath);
+            if (toolPathStart >= 0) {
+                String pathToProxy = rawPath.substring(toolPathStart + toolPath.length());
+                if (pathToProxy.isEmpty()) {
+                    pathToProxy = "/";
+                }
+                if (pathToProxy.startsWith("/")) {
+                    URI integratedToolUri = new URI(toolUrl);
+                    String base = UriComponentsBuilder.newInstance()
+                            .scheme(integratedToolUri.getScheme())
+                            .host(isLocalProfile() ? "localhost" : integratedToolUri.getHost())
+                            .port(toolPort)
+                            .build()
+                            .toUriString();
+                    String rawQuery = originalUri.getRawQuery();
+                    // Raw parts of an already parsed URI: they re-parse as they are, no re-encoding.
+                    URI targetUri = new URI(base + pathToProxy + (rawQuery != null ? "?" + rawQuery : ""));
+                    log.debug("Resolved target URI (encoding preserved): {}", targetUri);
+                    return targetUri;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not resolve {} on its raw form, using the decoded form", originalUri, e);
+        }
+        return resolve(toolId, toolUrl, toolPort, originalUri, prefix);
+    }
+
+    /**
      * Checks if the application is running in local profile
      *
      * @return true if local profile is active or no profiles are set
