@@ -18,15 +18,12 @@ impl Default for EncryptionService {
 }
 
 impl EncryptionService {
-    // TODO: use generated key
-    const KEY: &'static str = "12345678901234567890123456789012";
-
     pub fn new() -> Self {
         Self
     }
 
-    pub fn encrypt(&self, data: &str) -> Result<String> {
-        let key = Aes256Gcm::new_from_slice(Self::KEY.as_bytes())
+    pub fn encrypt(&self, data: &str, key: &[u8]) -> Result<String> {
+        let key = Aes256Gcm::new_from_slice(key)
             .map_err(|e| anyhow::anyhow!("Failed to create encryption key: {}", e))?;
 
         let mut nonce_bytes = [0u8; 12];
