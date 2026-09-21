@@ -202,6 +202,9 @@ public class FaeCapabilityTest extends FaeBaseTest {
             String resolved = TicketApi.resolveSystemStatusId("RESOLVED");
             if (resolved != null) {
                 TicketApi.transitionTicket(seededTicket.getId(), resolved);
+            } else {
+                log.warn("No 'RESOLVED' system status found — leaving seeded ticket {} ({}) untransitioned",
+                        seededTicket.getId(), seededTicket.getTicketNumber());
             }
         } catch (RuntimeException e) {
             log.warn("Failed to resolve seeded ticket {}: {}", seededTicket.getId(), e.getMessage());
