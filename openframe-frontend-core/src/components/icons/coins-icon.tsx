@@ -8,7 +8,7 @@ interface CoinsIconProps {
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export const CoinsIcon: React.FC<CoinsIconProps> = ({ className = '', width = 20, height = 20, color = 'white' }) => {
+export const CoinsIconTwoCoins: React.FC<CoinsIconProps> = ({ className = '', width = 20, height = 20, color = 'white' }) => {
   return (
     <svg
       width={width}
@@ -25,3 +25,4 @@ export const CoinsIcon: React.FC<CoinsIconProps> = ({ className = '', width = 20
     </svg>
   );
 };
+
