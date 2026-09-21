@@ -20,8 +20,10 @@ public class MonitoringGenerator {
     }
 
     public static Policy.Host policyHost(Machine device) {
+        String fleetId = getFleetId(device);
+        Integer id = Integer.valueOf(fleetId);
         return Policy.Host.builder()
-                .id(Integer.valueOf(getFleetId(device)))
+                .id(id)
                 .hostname(device.getHostname())
                 .build();
     }
