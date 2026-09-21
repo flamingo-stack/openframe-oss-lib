@@ -11,14 +11,14 @@ pub fn parse_version(raw: &str) -> Option<Version> {
     Version::parse(bare).ok()
 }
 
-/// Orders `to` against `from` by semver precedence (build metadata ignored): Less is a downgrade.
+/// Semver precedence: build metadata carries no order, unlike the crate's `Ord`.
+pub fn precedence(a: &Version, b: &Version) -> Ordering {
+    (a.major, a.minor, a.patch, &a.pre).cmp(&(b.major, b.minor, b.patch, &b.pre))
+}
+
+/// Orders `to` against `from` by precedence: Less is a downgrade.
 pub fn compare_versions(from: &str, to: &str) -> Option<Ordering> {
-    let from = parse_version(from)?;
-    let to = parse_version(to)?;
-    Some(
-        (to.major, to.minor, to.patch, &to.pre)
-            .cmp(&(from.major, from.minor, from.patch, &from.pre)),
-    )
+    Some(precedence(&parse_version(to)?, &parse_version(from)?))
 }
 
 #[cfg(test)]

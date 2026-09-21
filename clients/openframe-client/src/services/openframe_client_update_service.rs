@@ -136,7 +136,10 @@ impl OpenFrameClientUpdateService {
             };
             if let Some(anchor) = anchor {
                 match Self::parse_version(&anchor) {
-                    Ok(anchor_semver) if requested_semver < anchor_semver => {
+                    Ok(anchor_semver)
+                        if version_comparator::precedence(&requested_semver, &anchor_semver)
+                            == std::cmp::Ordering::Less =>
+                    {
                         warn!(
                             "refusing downgrade to {} — anchored at {}",
                             requested_version, anchor

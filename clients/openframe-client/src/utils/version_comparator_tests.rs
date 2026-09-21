@@ -37,6 +37,18 @@ fn same_precedence_is_equal_regardless_of_spelling_or_build_metadata() {
 }
 
 #[test]
+fn precedence_ignores_build_metadata_where_the_crate_does_not() {
+    let a = Version::parse("1.3.44+b1").unwrap();
+    let b = Version::parse("1.3.44+b2").unwrap();
+    assert!(a < b);
+    assert_eq!(precedence(&a, &b), Ordering::Equal);
+    assert_eq!(
+        precedence(&Version::parse("1.3.45").unwrap(), &b),
+        Ordering::Greater
+    );
+}
+
+#[test]
 fn unparseable_versions_do_not_compare() {
     assert_eq!(parse_version("latest"), None);
     assert_eq!(parse_version("vv1.3.41"), None);
