@@ -160,7 +160,7 @@ public class TestRunner {
                                     selectors.add(selectClass(clazz));
                                     log.info("Discovered test class: {}", className);
                                 } catch (ClassNotFoundException | NoClassDefFoundError e) {
-                                    log.warn("Could not load class: {}", className);
+                                    log.warn("Could not load class: {}", className, e);
                                 }
                             }
                         }
@@ -168,7 +168,7 @@ public class TestRunner {
                         log.info("URLConnection type: {}", conn.getClass().getName());
                     }
                 } catch (Exception e) {
-                    log.warn("Failed to scan URL: {} - {}", url, e.getMessage());
+                    log.warn("Failed to scan URL: {}", url, e);
                 }
             }
         } catch (Exception e) {
