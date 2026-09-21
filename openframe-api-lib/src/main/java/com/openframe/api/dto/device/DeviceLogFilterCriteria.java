@@ -30,11 +30,6 @@ public class DeviceLogFilterCriteria {
     private List<String> excludes;
 
     /**
-     * Opt-in RE2 pattern, applied case-insensitively.
-     */
-    private String regex;
-
-    /**
      * Inclusive lower bound; defaults to {@code to} minus the default lookback.
      */
     private Instant from;
