@@ -82,7 +82,7 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-[95vw]">
-      <div className="relative flex items-center justify-center rounded-lg bg-black">
+      <div className="relative flex items-center justify-center rounded-lg bg-ods-bg">
         {/* Navigation Buttons */}
         {images.length > 1 && (
           <>
@@ -92,7 +92,7 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
                   variant="transparent"
                   size="small-legacy"
                   onClick={goToPreviousImage}
-                  className="rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                  className="rounded-full bg-ods-bg/50 p-2 text-ods-text-on-accent hover:bg-ods-bg/70"
                   leftIcon={<ChevronLeft className="h-6 w-6" />}
                 />
               </div>
@@ -103,7 +103,7 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
                   variant="transparent"
                   size="small-legacy"
                   onClick={goToNextImage}
-                  className="rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+                  className="rounded-full bg-ods-bg/50 p-2 text-ods-text-on-accent hover:bg-ods-bg/70"
                   leftIcon={<ChevronRight className="h-6 w-6" />}
                 />
               </div>
@@ -133,10 +133,10 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
                 if (parent && !parent.querySelector('.image-error')) {
                   const errorDiv = document.createElement('div');
                   errorDiv.className =
-                    'image-error flex flex-col items-center justify-center text-white text-center px-8';
+                    'image-error flex flex-col items-center justify-center text-ods-text-on-accent text-center px-8';
                   errorDiv.innerHTML = `
                     <p class="text-xl mb-4">${isHeic ? 'HEIC format not supported in browser' : 'Failed to load image'}</p>
-                    <a href="${imageUrl}" download class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-colors">
+                    <a href="${imageUrl}" download class="px-4 py-2 bg-ods-bg/10 hover:bg-ods-bg/20 rounded border border-ods-border transition-colors">
                       Download original file
                     </a>
                   `;
@@ -149,7 +149,7 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
 
         {/* Image Counter */}
         {images.length > 1 && (
-          <div className="absolute bottom-4 left-1/2 z-[10000] -translate-x-1/2 rounded-full bg-black/50 px-4 py-2 text-white text-h6">
+          <div className="absolute bottom-4 left-1/2 z-[10000] -translate-x-1/2 rounded-full bg-ods-bg/50 px-4 py-2 text-ods-text-on-accent text-h6">
             {selectedImageIndex + 1} / {images.length}
           </div>
         )}
@@ -157,3 +157,4 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
     </Modal>
   );
 }
+
