@@ -46,7 +46,15 @@ public class LogsTest extends BaseTest {
             assertThat(log.getToolType()).as("Log toolType should not be empty").isNotEmpty();
             assertThat(log.getTimestamp()).as("Log timestamp should not be empty").isNotEmpty();
             assertThat(log.getIngestDay()).as("Log ingestDay should not be empty").isNotEmpty();
-            assertThat(log.getHostname()).as("Log hostname should not be empty").isNotEmpty();
+            // Only device-bound events carry a hostname. Account-level activities — LOGIN,
+            // POLICY_APPLIED, and Fleet activities with no host — arrive with deviceId=null and an
+            // empty hostname, so asserting one on every entry fails whenever such an event is on
+            // the first page.
+            if (log.getDeviceId() != null) {
+                assertThat(log.getHostname())
+                        .as("Log hostname should not be empty for device-bound event %s", log.getToolEventId())
+                        .isNotEmpty();
+            }
         });
     }
 
