@@ -224,9 +224,21 @@ impl ToolUpdater for ServiceToolUpdater {
             }
 
             info!(tool_id = %tool_agent_id, "Starting service: {}", service_name);
-            system_service::start_service(service_name)
-                .await
-                .with_context(|| format!("Failed to start service: {}", service_name))?;
+            if let Err(e) = system_service::start_service(service_name).await {
+                // A wedged SCM can fail the call although the service did come up; the process scan needs no SCM.
+                if self
+                    .deps
+                    .tool_kill_service
+                    .is_installed_tool_running(tool)
+                    .await
+                {
+                    warn!(tool_id = %tool_agent_id,
+                          "start_service failed but {service_name} is running — treating as started: {e:#}");
+                } else {
+                    return Err(e)
+                        .with_context(|| format!("Failed to start service: {}", service_name));
+                }
+            }
         }
 
         cleanup_backup(ctx.backup_path.as_ref(), tool_agent_id).await;

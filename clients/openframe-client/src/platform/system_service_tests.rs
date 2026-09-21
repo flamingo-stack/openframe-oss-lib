@@ -46,3 +46,25 @@ fn scm_errors_classify_by_os_code_and_keep_the_stage() {
     assert!(matches!(held, ServiceStartFailure::Transient(_)));
     assert!(held.message().contains("os error 32"));
 }
+
+#[cfg(target_os = "windows")]
+#[test]
+fn a_busy_pool_retries_but_a_parked_start_call_bails() {
+    let busy = PermitPoolError::Busy {
+        what: "SCM start call for service Mesh Agent".to_string(),
+        max: 4,
+    };
+    assert!(matches!(
+        classify_pool_failure(busy),
+        ServiceStartFailure::Transient(_)
+    ));
+
+    let parked = PermitPoolError::TimedOut {
+        what: "SCM start call for service Mesh Agent".to_string(),
+        ms: 30000,
+    };
+    assert!(matches!(
+        classify_pool_failure(parked),
+        ServiceStartFailure::ScmUnresponsive(_)
+    ));
+}
