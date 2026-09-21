@@ -118,7 +118,6 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
           </div>
 
           {/* Value input with delete button */}
-          {/* Value input with delete button */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <Input
