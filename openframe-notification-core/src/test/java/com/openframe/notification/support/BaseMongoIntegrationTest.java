@@ -5,7 +5,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
-// Copy of data-mongo-sync's base — test support isn't shared across modules as an artifact.
+// TODO: Extract to a shared test-fixtures artifact (test-jar) consumed by both
+// this module and data-mongo-sync, so Mongo test bootstrapping (container
+// version, connection string resolution) is maintained in exactly one place.
 public abstract class BaseMongoIntegrationTest {
 
     private static final String EXTERNAL_URI = System.getProperty("mongo.external.uri");
