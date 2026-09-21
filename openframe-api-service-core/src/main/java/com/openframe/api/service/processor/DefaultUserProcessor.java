@@ -3,36 +3,31 @@ package com.openframe.api.service.processor;
 import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.data.document.user.User;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 /**
- * Default implementation of UserProcessor for API service.
- * This bean will be used if no other implementation is provided.
+ * Default no-op implementation of {@link UserProcessor}.
+ * Used when no SaaS-specific override is provided, so the api-service-core
+ * module can start up standalone.
  */
-@Slf4j
 @Component
-@ConditionalOnMissingBean(value = UserProcessor.class, ignored = DefaultUserProcessor.class)
+@ConditionalOnMissingBean(UserProcessor.class)
 public class DefaultUserProcessor implements UserProcessor {
 
     @Override
     public void postProcessUserDeleted(User user) {
-        log.debug("User deleted: {}", user.getId());
     }
 
     @Override
     public void postProcessUserGet(UserPageResponse response) {
-        log.debug("Users fetched. Count: {}", response.getItems().size());
     }
 
     @Override
     public void postProcessUserGet(UserResponse response) {
-        log.debug("User fetched: {}", response.getId());
     }
 
     @Override
     public void postProcessUserUpdated(User user) {
-        log.debug("User updated: {}", user.getId());
     }
 }
