@@ -2,7 +2,7 @@ interface IconProps {
   className?: string;
 }
 
-export function CheckCircleIcon({ className }: IconProps) {
+export function SuccessCheckCircleIcon({ className }: IconProps) {
   return (
     <svg
       width="25"
@@ -43,3 +43,4 @@ export function XCircleIcon({ className }: IconProps) {
     </svg>
   );
 }
+
