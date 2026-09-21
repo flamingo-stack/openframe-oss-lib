@@ -6,6 +6,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.organization.OrganizationCommandService;
 import com.openframe.api.service.organization.OrganizationQueryService;
 import com.openframe.core.dto.ErrorResponse;
+import com.openframe.data.document.organization.Organization;
 import com.openframe.data.service.OrganizationService;
 import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.customer.CreateCustomerRequest;
@@ -122,9 +123,7 @@ public class CustomerController {
 
         log.debug("Getting customer by id: {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
 
-        var organization = organizationService.getOrganizationByOrganizationId(id)
-                .orElseThrow(() -> new CustomerNotFoundException(id));
-        return customerMapper.toResponse(organization);
+        return customerMapper.toResponse(requireCustomer(id));
     }
 
     @Operation(summary = "Create a new customer")
@@ -176,6 +175,7 @@ public class CustomerController {
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.debug("Checking if customer {} can be archived - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
+        requireCustomer(id);
         return organizationService.canArchiveOrganization(id);
     }
 
@@ -196,6 +196,12 @@ public class CustomerController {
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.info("Updating customer {} status to {} - userId: {}, apiKeyId: {}", id, request.status(), caller.userId(), caller.apiKeyId());
+        requireCustomer(id);
         organizationCommandService.updateOrganizationStatus(id, customerMapper.toStatusRequest(request));
+    }
+
+    private Organization requireCustomer(String id) {
+        return organizationService.getOrganizationByOrganizationId(id)
+                .orElseThrow(() -> new CustomerNotFoundException(id));
     }
 }
