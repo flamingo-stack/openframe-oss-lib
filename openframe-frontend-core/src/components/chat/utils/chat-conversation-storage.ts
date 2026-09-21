@@ -15,28 +15,23 @@
  * Key shape: `mingo-chat-<source>[-u-<email>].conversation`
  */
 
-import {
-  createLocalStorageAdapter,
-  type LocalStorageAdapter,
-} from '../../../utils/local-storage-adapter'
-import { getChatProxyAuth } from './chat-proxy-auth-storage'
+import { getEmbedProxyAuth } from '../../../utils/embed-proxy-auth-storage';
+import { createLocalStorageAdapter, type LocalStorageAdapter } from '../../../utils/local-storage-adapter';
 
 export interface PersistedChatConversation {
-  conversationId: string
+  conversationId: string;
 }
 
-const STORAGE_KEY = 'conversation'
+const STORAGE_KEY = 'conversation';
 
 const namespaceFor = (source: string): string => {
-  const base = `mingo-chat-${source}`
-  const auth = getChatProxyAuth()
-  return auth?.email ? `${base}-u-${encodeURIComponent(auth.email.toLowerCase())}` : base
-}
+  const base = `mingo-chat-${source}`;
+  const auth = getEmbedProxyAuth();
+  return auth?.email ? `${base}-u-${encodeURIComponent(auth.email.toLowerCase())}` : base;
+};
 
 /** One adapter per chat `source` (= platform). Memoize per mount. */
-export function createChatConversationStorage(
-  source: string,
-): LocalStorageAdapter<PersistedChatConversation> {
+export function createChatConversationStorage(source: string): LocalStorageAdapter<PersistedChatConversation> {
   return createLocalStorageAdapter<PersistedChatConversation>({
     key: STORAGE_KEY,
     namespace: () => namespaceFor(source),
@@ -45,7 +40,7 @@ export function createChatConversationStorage(
       typeof (parsed as PersistedChatConversation).conversationId === 'string' &&
       (parsed as PersistedChatConversation).conversationId.length > 0,
     logTag: '[chat-conversation-storage]',
-  })
+  });
 }
 
 /**
@@ -59,23 +54,23 @@ export function createChatConversationStorage(
  * per-key and Web Storage only exposes iteration on the raw object.
  */
 export function pruneStaleChatConversationStorage(source: string): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') return;
   try {
-    const base = `mingo-chat-${source}`
-    const currentKey = `${namespaceFor(source)}.${STORAGE_KEY}`
+    const base = `mingo-chat-${source}`;
+    const currentKey = `${namespaceFor(source)}.${STORAGE_KEY}`;
     const ownedKey = (k: string) =>
       k === base || // retired raw key (pre-adapter shape)
       k === `${base}.${STORAGE_KEY}` || // current no-identity shape
       k.startsWith(`${base}-u-`) || // per-identity shapes (current + retired)
-      k.startsWith(`${base}-v`) // retired versioned full-history shapes
-    const toRemove: string[] = []
+      k.startsWith(`${base}-v`); // retired versioned full-history shapes
+    const toRemove: string[] = [];
     for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i)
-      if (!k) continue
-      if (ownedKey(k) && k !== currentKey) toRemove.push(k)
+      const k = window.localStorage.key(i);
+      if (!k) continue;
+      if (ownedKey(k) && k !== currentKey) toRemove.push(k);
     }
     for (const k of toRemove) {
-      window.localStorage.removeItem(k)
+      window.localStorage.removeItem(k);
     }
   } catch {
     // localStorage access blocked (Safari private mode etc.) — non-fatal.

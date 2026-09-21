@@ -1,15 +1,9 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { Button } from './button'
-import {
-  ModalV2,
-  ModalV2Content,
-  ModalV2Footer,
-  ModalV2Header,
-  ModalV2Title
-} from './modal-v2'
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { cn } from '../../utils/cn';
+import { Button } from './button';
+import { ModalV2, ModalV2Content, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
 
 /**
  * The unified dirty-state contract for modals: a promise-based house confirm
@@ -34,51 +28,51 @@ import {
  * tick, which `useState` alone races.
  */
 export function useConfirm() {
-  const [open, setOpen] = React.useState(false)
-  const [pending, setPending] = React.useState<{
-    title: string
-    body: string
-    resolve: (ok: boolean) => void
-  } | null>(null)
-  const askingRef = React.useRef(false)
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<{
+    title: string;
+    body: string;
+    resolve: (ok: boolean) => void;
+  } | null>(null);
+  const askingRef = useRef(false);
   // Mirror of the active request, so unmount cleanup can settle it without
   // depending on (already-frozen) state.
-  const pendingRef = React.useRef<{ resolve: (ok: boolean) => void } | null>(null)
-  const ask = React.useCallback((title: string, body: string) => {
-    return new Promise<boolean>((resolve) => {
+  const pendingRef = useRef<{ resolve: (ok: boolean) => void } | null>(null);
+  const ask = useCallback((title: string, body: string) => {
+    return new Promise<boolean>(resolve => {
       if (askingRef.current) {
-        resolve(false)
-        return
+        resolve(false);
+        return;
       }
-      askingRef.current = true
-      const entry = { title, body, resolve }
-      pendingRef.current = entry
-      setPending(entry)
-      setOpen(true)
-    })
-  }, [])
-  const decide = React.useCallback(
+      askingRef.current = true;
+      const entry = { title, body, resolve };
+      pendingRef.current = entry;
+      setPending(entry);
+      setOpen(true);
+    });
+  }, []);
+  const decide = useCallback(
     (ok: boolean) => {
-      askingRef.current = false
+      askingRef.current = false;
       // Clear the ref FIRST so a later unmount cleanup can't re-resolve a
       // request the user already decided.
-      pendingRef.current = null
-      setOpen(false)
-      pending?.resolve(ok)
-      setPending(null)
+      pendingRef.current = null;
+      setOpen(false);
+      pending?.resolve(ok);
+      setPending(null);
     },
-    [pending]
-  )
+    [pending],
+  );
   // Host unmounted while the confirmation was open: the decision UI is gone,
   // so settle the promise as "no" — otherwise the caller awaits forever.
-  React.useEffect(
+  useEffect(
     () => () => {
-      pendingRef.current?.resolve(false)
-      pendingRef.current = null
-      askingRef.current = false
+      pendingRef.current?.resolve(false);
+      pendingRef.current = null;
+      askingRef.current = false;
     },
-    []
-  )
+    [],
+  );
 
   const dialog = pending ? (
     <ModalV2 isOpen={open} onClose={() => decide(false)}>
@@ -86,7 +80,7 @@ export function useConfirm() {
         <ModalV2Title>{pending.title}</ModalV2Title>
       </ModalV2Header>
       <ModalV2Content>
-        <p className="text-h6 text-ods-text-secondary">{pending.body}</p>
+        <p className="text-ods-text-secondary text-h6">{pending.body}</p>
       </ModalV2Content>
       <ModalV2Footer>
         <Button variant="outline" onClick={() => decide(false)}>
@@ -97,16 +91,16 @@ export function useConfirm() {
         </Button>
       </ModalV2Footer>
     </ModalV2>
-  ) : null
+  ) : null;
 
-  return { ask, dialog }
+  return { ask, dialog };
 }
 
 export interface UseGuardedCloseOptions {
   /** Confirm dialog title. */
-  title?: string
+  title?: string;
   /** Confirm dialog body. */
-  body?: string
+  body?: string;
 }
 
 /**
@@ -120,32 +114,28 @@ export function useGuardedClose(
   onClose: () => void,
   {
     title = 'Discard unsaved changes?',
-    body = 'Your edits have not been saved. Close and discard them?'
-  }: UseGuardedCloseOptions = {}
+    body = 'Your edits have not been saved. Close and discard them?',
+  }: UseGuardedCloseOptions = {},
 ) {
-  const { ask, dialog } = useConfirm()
-  const guardedClose = React.useCallback(async () => {
-    if (dirty && !(await ask(title, body))) return
-    onClose()
-  }, [dirty, ask, title, body, onClose])
-  return { guardedClose, dialog }
+  const { ask, dialog } = useConfirm();
+  const guardedClose = useCallback(async () => {
+    if (dirty && !(await ask(title, body))) return;
+    onClose();
+  }, [dirty, ask, title, body, onClose]);
+  return { guardedClose, dialog };
 }
 
 export interface UnsavedChangesChipProps {
   /** Names WHAT is dirty (hover tooltip) — turns "why is this dirty?!" into a hover. */
-  detail?: string
-  className?: string
+  detail?: string;
+  className?: string;
 }
 
 /** The standing "Unsaved changes" signal for a dirty modal's footer. */
 export function UnsavedChangesChip({ detail, className }: UnsavedChangesChipProps) {
   return (
-    <span
-      className={cn('text-h6 text-ods-warning', className)}
-      role="status"
-      title={detail}
-    >
+    <span className={cn('text-ods-warning text-h6', className)} role="status" title={detail}>
       Unsaved changes
     </span>
-  )
+  );
 }

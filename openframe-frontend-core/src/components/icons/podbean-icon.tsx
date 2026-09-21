@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 interface PodbeanIconProps extends React.SVGProps<SVGSVGElement> {
   className?: string;
@@ -12,12 +12,7 @@ interface PodbeanIconProps extends React.SVGProps<SVGSVGElement> {
  * Default color is 'currentColor' for easy styling
  */
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function PodbeanIcon({
-  className = '',
-  size = 24,
-  color = 'currentColor',
-  ...props
-}: PodbeanIconProps) {
+export function PodbeanIcon({ className = '', size = 24, color = 'currentColor', ...props }: PodbeanIconProps) {
   return (
     <svg
       width={size}
@@ -29,21 +24,9 @@ export function PodbeanIcon({
       {...props}
     >
       {/* Outer arc - centered vertically */}
-      <path
-        d="M3 10a12 12 0 0 1 18 0"
-        stroke={color}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        fill="none"
-      />
+      <path d="M3 10a12 12 0 0 1 18 0" stroke={color} strokeWidth="2.5" strokeLinecap="round" fill="none" />
       {/* Inner arc */}
-      <path
-        d="M7 14a7 7 0 0 1 10 0"
-        stroke={color}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        fill="none"
-      />
+      <path d="M7 14a7 7 0 0 1 10 0" stroke={color} strokeWidth="2.5" strokeLinecap="round" fill="none" />
       {/* Center circle */}
       <circle cx="12" cy="19" r="2.5" fill={color} />
     </svg>

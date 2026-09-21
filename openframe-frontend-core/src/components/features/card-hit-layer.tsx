@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * <CardHitLayer> — THE full-bleed click target for media cards.
@@ -22,7 +22,7 @@
  * bite strip's touch gating, `isTouch && !isActive`).
  */
 
-import React from 'react';
+import type React from 'react';
 import { cn } from '../../utils/cn';
 
 export interface CardHitLayerProps {
@@ -58,9 +58,7 @@ export function CardHitLayer({
   className,
   decorative = false,
 }: CardHitLayerProps): React.ReactElement {
-  const a11y = decorative
-    ? { 'aria-hidden': true as const, tabIndex: -1 }
-    : { 'aria-label': label };
+  const a11y = decorative ? { 'aria-hidden': true as const, tabIndex: -1 } : { 'aria-label': label };
   if (href) {
     return (
       <a

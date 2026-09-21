@@ -19,21 +19,13 @@
  *     '@flamingo-stack/openframe-frontend-core/components/chat'
  */
 
-export {
-  OnboardingGuidesCatalogView,
-  type OnboardingGuidesCatalogViewProps,
-} from './onboarding-guides-catalog-view'
-export {
-  OnboardingGuideDetailView,
-  type OnboardingGuideDetailViewProps,
-} from './onboarding-guide-detail-view'
-export {
-  OnboardingGuidesCatalogSkeleton,
-} from './onboarding-guides-catalog-skeleton'
+export { OnboardingGuidesCatalogView, type OnboardingGuidesCatalogViewProps } from './onboarding-guides-catalog-view';
+export { OnboardingGuideDetailView, type OnboardingGuideDetailViewProps } from './onboarding-guide-detail-view';
+export { OnboardingGuidesCatalogSkeleton } from './onboarding-guides-catalog-skeleton';
 
 export {
   useOnboardingGuides,
   useOnboardingGuide,
   useOnboardingGuideSections,
   onboardingGuideKeys,
-} from './hooks/use-onboarding-guides'
+} from './hooks/use-onboarding-guides';

@@ -17,9 +17,9 @@
  *     right row.
  */
 
-import { DeliveryRow } from './delivery-row';
 import type { DeliveryItem } from '../../../types/delivery';
 import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
+import { DeliveryRow } from './delivery-row';
 
 interface DeliveryTableProps {
   items: DeliveryItem[];
@@ -31,32 +31,32 @@ interface DeliveryTableProps {
  */
 function SkeletonRow() {
   return (
-    <div className="border-b border-ods-border last:border-b-0 p-[12px] md:p-[16px]">
-      <div className="flex flex-col md:flex-row items-start justify-between gap-[12px] md:gap-[16px] w-full">
+    <div className="border-b border-ods-border p-[12px] last:border-b-0 md:p-[16px]">
+      <div className="flex w-full flex-col items-start justify-between gap-[12px] md:flex-row md:gap-[16px]">
         {/* Left: Title, subtitle, and description skeleton */}
-        <div className="flex-1 min-w-0 w-full md:w-auto flex flex-col gap-[12px] md:gap-[16px]">
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] md:w-auto md:gap-[16px]">
           {/* Title skeleton - responsive */}
-          <div className="min-h-[24px] flex items-center">
-            <div className="h-[20px] bg-ods-border rounded animate-pulse w-full"></div>
+          <div className="flex min-h-[24px] items-center">
+            <div className="h-[20px] w-full animate-pulse rounded bg-ods-border"></div>
           </div>
           {/* Subtitle skeleton - 1 line */}
-          <div className="min-h-[20px] flex items-center">
-            <div className="h-[20px] bg-ods-border rounded animate-pulse w-1/2"></div>
+          <div className="flex min-h-[20px] items-center">
+            <div className="h-[20px] w-1/2 animate-pulse rounded bg-ods-border"></div>
           </div>
           {/* Description skeleton - 3 lines */}
-          <div className="min-h-[72px] flex items-center">
+          <div className="flex min-h-[72px] items-center">
             <div className="flex-1 space-y-1">
-              <div className="h-[20px] bg-ods-border rounded animate-pulse w-full"></div>
-              <div className="h-[20px] bg-ods-border rounded animate-pulse w-full"></div>
-              <div className="h-[20px] bg-ods-border rounded animate-pulse w-2/3"></div>
+              <div className="h-[20px] w-full animate-pulse rounded bg-ods-border"></div>
+              <div className="h-[20px] w-full animate-pulse rounded bg-ods-border"></div>
+              <div className="h-[20px] w-2/3 animate-pulse rounded bg-ods-border"></div>
             </div>
           </div>
         </div>
 
         {/* Right: Badge skeleton - two stacked badges */}
-        <div className="flex-shrink-0 self-start flex flex-col gap-2">
-          <div className="h-[32px] w-[100px] bg-ods-border rounded animate-pulse"></div>
-          <div className="h-[32px] w-[120px] bg-ods-border rounded animate-pulse"></div>
+        <div className="flex flex-shrink-0 flex-col gap-2 self-start">
+          <div className="h-[32px] w-[100px] animate-pulse rounded bg-ods-border"></div>
+          <div className="h-[32px] w-[120px] animate-pulse rounded bg-ods-border"></div>
         </div>
       </div>
     </div>
@@ -71,9 +71,9 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
   // Show skeletons while loading
   if (isLoading) {
     return (
-      <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden w-full">
+      <div className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
         <div className="w-full">
-          {[1, 2, 3, 4, 5].map((i) => (
+          {[1, 2, 3, 4, 5].map(i => (
             <SkeletonRow key={i} />
           ))}
         </div>
@@ -84,27 +84,22 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
   // Empty state
   if (items.length === 0) {
     return (
-      <div className="bg-ods-card border border-ods-border rounded-[6px] p-[40px] text-center w-full">
-        <p className="text-h6 text-ods-text-secondary">
-          No tasks available
-        </p>
+      <div className="w-full rounded-[6px] border border-ods-border bg-ods-card p-[40px] text-center">
+        <p className="text-ods-text-secondary text-h6">No tasks available</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-ods-card border border-ods-border rounded-[6px] overflow-hidden w-full">
+    <div className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
       <div className="w-full">
-        {items.map((item) => (
+        {items.map(item => (
           // DOM id lives on DeliveryRow's own outer element (no wrapper
           // div). Anchor mirrors `buildDevSectionUrl('delivery', <id>)`
           // → `#delivery-<external_id>`; `useScrollToHash` in
           // `delivery-lists.tsx` finds the row by id and scrolls. The
           // outer wrapper here ONLY exists for the row separators.
-          <div
-            key={item.id}
-            className="border-b border-ods-border last:border-b-0"
-          >
+          <div key={item.id} className="border-b border-ods-border last:border-b-0">
             <DeliveryRow item={item} id={devSectionAnchorId('delivery', item.id)} />
           </div>
         ))}

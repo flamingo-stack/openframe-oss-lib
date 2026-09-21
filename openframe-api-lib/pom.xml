@@ -25,6 +25,10 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-mongo-sync</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-redis</artifactId>
+        </dependency>
 
         <!-- OpenFrame Dependencies -->
         <dependency>
@@ -34,6 +38,10 @@
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-pinot</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-loki</artifactId>
         </dependency>
 
         <!-- Spring Framework -->
@@ -66,14 +74,38 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-device-aspect</artifactId>
         </dependency>
+        <!-- Ticket domain services take the acting AuthPrincipal -->
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-security-core</artifactId>
+        </dependency>
+        <!-- LexoRank ordering for ticket board columns and custom statuses -->
+        <dependency>
+            <groupId>com.github.pravin-raha</groupId>
+            <artifactId>lexorank4j</artifactId>
+            <version>0.1.0</version>
+        </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-timeentry-aspect</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>fleetmdm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
         </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -1,39 +1,39 @@
-'use client'
+'use client';
 
-import { useMemo } from 'react'
-import type { CursorPaginationProps } from '../../components/ui/cursor-pagination'
+import { useMemo } from 'react';
+import type { CursorPaginationProps } from '../../components/ui/cursor-pagination';
 
 /**
  * Client-side pagination configuration
  */
 export interface ClientPaginationConfig {
-  type: 'client'
-  currentPage: number
-  totalPages: number
-  itemCount: number
-  itemName?: string
-  onNext: () => void
-  onPrevious: () => void
-  showInfo?: boolean
+  type: 'client';
+  currentPage: number;
+  totalPages: number;
+  itemCount: number;
+  itemName?: string;
+  onNext: () => void;
+  onPrevious: () => void;
+  showInfo?: boolean;
 }
 
 /**
  * Server-side cursor pagination configuration
  */
 export interface ServerPaginationConfig {
-  type: 'server'
-  hasNextPage: boolean
-  hasLoadedBeyondFirst: boolean
-  startCursor?: string | null
-  endCursor?: string | null
-  itemCount: number
-  itemName?: string
-  onNext: () => void | Promise<void>
-  onReset: () => void | Promise<void>
-  showInfo?: boolean
+  type: 'server';
+  hasNextPage: boolean;
+  hasLoadedBeyondFirst: boolean;
+  startCursor?: string | null;
+  endCursor?: string | null;
+  itemCount: number;
+  itemName?: string;
+  onNext: () => void | Promise<void>;
+  onReset: () => void | Promise<void>;
+  showInfo?: boolean;
 }
 
-export type PaginationConfig = ClientPaginationConfig | ServerPaginationConfig
+export type PaginationConfig = ClientPaginationConfig | ServerPaginationConfig;
 
 /**
  * Unified pagination hook that works for both client-side and server-side pagination
@@ -67,15 +67,13 @@ export type PaginationConfig = ClientPaginationConfig | ServerPaginationConfig
  * })
  * ```
  */
-export function useTablePagination(
-  config: PaginationConfig | null
-): CursorPaginationProps | undefined {
+export function useTablePagination(config: PaginationConfig | null): CursorPaginationProps | undefined {
   return useMemo(() => {
-    if (!config) return undefined
+    if (!config) return undefined;
 
     if (config.type === 'client') {
       // Client-side pagination: show if more than 1 page
-      if (config.totalPages <= 1) return undefined
+      if (config.totalPages <= 1) return undefined;
 
       return {
         hasNextPage: config.currentPage < config.totalPages,
@@ -87,8 +85,8 @@ export function useTablePagination(
         itemName: config.itemName || 'items',
         onNext: () => config.onNext(),
         onPrevious: () => config.onPrevious(),
-        showInfo: config.showInfo ?? true
-      }
+        showInfo: config.showInfo ?? true,
+      };
     } else {
       // Server-side pagination: show if pageInfo exists
       return {
@@ -101,8 +99,8 @@ export function useTablePagination(
         itemName: config.itemName || 'items',
         onNext: config.onNext,
         onPrevious: config.onReset, // Previous button goes back to first page
-        showInfo: config.showInfo ?? true
-      }
+        showInfo: config.showInfo ?? true,
+      };
     }
-  }, [config])
+  }, [config]);
 }

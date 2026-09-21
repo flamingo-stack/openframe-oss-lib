@@ -1,12 +1,13 @@
 package com.openframe.client.listener;
 
 import com.openframe.client.event.DeviceCameOnlineEvent;
+import com.openframe.client.listener.rmm.DeviceOnlineCriteriaArmingListener;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
-import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
@@ -49,8 +50,8 @@ class DeviceOnlineCriteriaArmingListenerTest {
         return m;
     }
 
-    private static ScriptSchedule schedule() {
-        return ScriptSchedule.builder().id(SCHEDULE).tenantId(TENANT).build();
+    private static ScheduleScript schedule() {
+        return ScheduleScript.builder().id(SCHEDULE).tenantId(TENANT).build();
     }
 
     private DeviceCameOnlineEvent event() {
@@ -60,8 +61,8 @@ class DeviceOnlineCriteriaArmingListenerTest {
     @Test
     @DisplayName("criteria matches + no sentinel yet → arms a NEW sentinel for (tenant, machine, schedule)")
     void armsSentinel_whenCriteriaMatchesAndNoneExists() {
-        ScriptSchedule schedule = schedule();
-        when(scheduleRepository.findByTenantIdAndTriggerAndStatus(TENANT, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
+        ScheduleScript schedule = schedule();
+        when(scheduleRepository.findByTenantIdAndTriggerAndStatus(TENANT, ScheduleScriptTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
                 .thenReturn(List.of(schedule));
         when(targetResolver.matchesCriteria(eq(schedule), any(Machine.class))).thenReturn(true);
         when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT, MACHINE, SCHEDULE))
@@ -81,8 +82,8 @@ class DeviceOnlineCriteriaArmingListenerTest {
     @Test
     @DisplayName("fire-once: a sentinel already exists for (schedule, device) → does NOT re-arm")
     void doesNotArm_whenSentinelAlreadyExists() {
-        ScriptSchedule schedule = schedule();
-        when(scheduleRepository.findByTenantIdAndTriggerAndStatus(TENANT, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
+        ScheduleScript schedule = schedule();
+        when(scheduleRepository.findByTenantIdAndTriggerAndStatus(TENANT, ScheduleScriptTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
                 .thenReturn(List.of(schedule));
         when(targetResolver.matchesCriteria(eq(schedule), any(Machine.class))).thenReturn(true);
         when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT, MACHINE, SCHEDULE))
@@ -98,8 +99,8 @@ class DeviceOnlineCriteriaArmingListenerTest {
     @Test
     @DisplayName("device does not match the criteria → nothing armed, existence not even checked")
     void doesNotArm_whenCriteriaDoesNotMatch() {
-        ScriptSchedule schedule = schedule();
-        when(scheduleRepository.findByTenantIdAndTriggerAndStatus(TENANT, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
+        ScheduleScript schedule = schedule();
+        when(scheduleRepository.findByTenantIdAndTriggerAndStatus(TENANT, ScheduleScriptTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
                 .thenReturn(List.of(schedule));
         when(targetResolver.matchesCriteria(eq(schedule), any(Machine.class))).thenReturn(false);
 

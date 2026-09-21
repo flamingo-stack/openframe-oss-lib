@@ -24,7 +24,7 @@
  * (`utils/same-page-hash-nav`) is the ONE resolver every hash consumer goes
  * through, and it applies this as its last pass.
  */
-import { slugifyHeadingText } from './markdown-heading-id'
+import { slugifyHeadingText } from './markdown-heading-id';
 
 /**
  * Reduce an anchor id (ours or GitHub's) to a comparable form.
@@ -41,14 +41,16 @@ import { slugifyHeadingText } from './markdown-heading-id'
  *   `'Getting Started'`      → `'getting-started'`
  */
 export function normalizeAnchorId(raw: string): string {
-  return slugifyHeadingText(raw).replace(/-+/g, '-').replace(/^-+|-+$/g, '')
+  return slugifyHeadingText(raw)
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 /** Heading elements carrying an id — the candidate set for the fuzzy pass. */
-const HEADING_SELECTOR = 'h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]'
+const HEADING_SELECTOR = 'h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]';
 
 /** A `base-N` id, split into its base and ordinal. */
-const DUPLICATE_SUFFIX_RE = /^(.+)-(\d+)$/
+const DUPLICATE_SUFFIX_RE = /^(.+)-(\d+)$/;
 
 /**
  * The two sides also disagree on where duplicate-heading numbering STARTS.
@@ -62,11 +64,11 @@ const DUPLICATE_SUFFIX_RE = /^(.+)-(\d+)$/
  * the shift is the one pass that can match an id it was not asked for.
  */
 function findDuplicateShifted(normalized: string, doc: Document): HTMLElement | null {
-  const parts = DUPLICATE_SUFFIX_RE.exec(normalized)
-  if (!parts) return null
-  const ordinal = Number(parts[2])
-  if (!Number.isSafeInteger(ordinal)) return null
-  return doc.getElementById(`${parts[1]}-${ordinal + 1}`)
+  const parts = DUPLICATE_SUFFIX_RE.exec(normalized);
+  if (!parts) return null;
+  const ordinal = Number(parts[2]);
+  if (!Number.isSafeInteger(ordinal)) return null;
+  return doc.getElementById(`${parts[1]}-${ordinal + 1}`);
 }
 
 /**
@@ -84,23 +86,20 @@ function findDuplicateShifted(normalized: string, doc: Document): HTMLElement | 
  *      because it is the only pass that resolves to an id the fragment did
  *      not name.
  */
-export function findAnchorElementByNormalizedId(
-  rawId: string,
-  doc: Document,
-): HTMLElement | null {
-  const normalized = normalizeAnchorId(rawId)
-  if (!normalized) return null
+export function findAnchorElementByNormalizedId(rawId: string, doc: Document): HTMLElement | null {
+  const normalized = normalizeAnchorId(rawId);
+  if (!normalized) return null;
 
   if (normalized !== rawId) {
-    const direct = doc.getElementById(normalized)
-    if (direct) return direct
+    const direct = doc.getElementById(normalized);
+    if (direct) return direct;
   }
 
   for (const heading of Array.from(doc.querySelectorAll<HTMLElement>(HEADING_SELECTOR))) {
-    if (normalizeAnchorId(heading.id) === normalized) return heading
+    if (normalizeAnchorId(heading.id) === normalized) return heading;
   }
 
   // Last: the shift would happily match an unrelated `x-3` for a `x-2` that
   // has no heading at all, so it runs only once the scan has come up empty.
-  return findDuplicateShifted(normalized, doc)
+  return findDuplicateShifted(normalized, doc);
 }

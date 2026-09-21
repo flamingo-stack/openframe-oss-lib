@@ -1,22 +1,22 @@
-'use client'
+'use client';
 
-import { cn } from '../../../utils/cn'
-import { useDataTableContext } from './data-table'
+import { cn } from '../../../utils/cn';
+import { useDataTableContext } from './data-table';
 
 export interface DataTableRowCountProps {
   /** Singular item name. Pluralized by adding an "s". */
-  itemName?: string
+  itemName?: string;
   /**
    * Override the count. Use this for server-paginated tables where the table
    * context only knows about loaded rows, not the total. Defaults to the
    * number of rows currently in the table's row model.
    */
-  totalCount?: number
+  totalCount?: number;
   /** Custom pluralizer for irregular nouns. */
-  pluralize?: (count: number, itemName: string) => string
+  pluralize?: (count: number, itemName: string) => string;
   /** Hide when the count is zero. Default `true`. */
-  hideWhenEmpty?: boolean
-  className?: string
+  hideWhenEmpty?: boolean;
+  className?: string;
 }
 
 /**
@@ -39,23 +39,16 @@ export function DataTableRowCount({
   hideWhenEmpty = true,
   className,
 }: DataTableRowCountProps) {
-  const table = useDataTableContext()
-  const count = totalCount ?? table.getRowModel().rows.length
+  const table = useDataTableContext();
+  const count = totalCount ?? table.getRowModel().rows.length;
 
-  if (hideWhenEmpty && count === 0) return null
+  if (hideWhenEmpty && count === 0) return null;
 
-  const label =
-    pluralize?.(count, itemName) ??
-    (count === 1 ? itemName : `${itemName}s`)
+  const label = pluralize?.(count, itemName) ?? (count === 1 ? itemName : `${itemName}s`);
 
   return (
-    <span
-      className={cn(
-        'text-h6 text-ods-text-secondary whitespace-nowrap',
-        className,
-      )}
-    >
+    <span className={cn('whitespace-nowrap text-ods-text-secondary text-h6', className)}>
       {count} {label}
     </span>
-  )
+  );
 }

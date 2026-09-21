@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 export const GoogleLogo = ({ className, ...props }: { className?: string } & React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -29,4 +29,4 @@ export const GoogleLogo = ({ className, ...props }: { className?: string } & Rea
       />
     </g>
   </svg>
-); 
+);

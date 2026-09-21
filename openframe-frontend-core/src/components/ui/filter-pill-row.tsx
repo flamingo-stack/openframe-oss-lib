@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Shared filter section wrapper with responsive layout.
@@ -12,27 +12,28 @@
  * injected slot.
  */
 
-import { Filter } from 'lucide-react'
-import { Button } from './button'
+import { Filter } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Button } from './button';
 
 export interface FilterPillRowOption {
-  value: string
-  label: string
+  value: string;
+  label: string;
 }
 
 export interface FilterPillRowProps {
   /** Label shown next to the filter icon, e.g. "Section", "Platform". */
-  label: string
+  label: string;
   /** The currently selected filter value. */
-  selectedValue: string
+  selectedValue: string;
   /** Callback when a filter option is selected. */
-  onValueChange: (value: string) => void
+  onValueChange: (value: string) => void;
   /** Available filter options. */
-  options: FilterPillRowOption[]
+  options: FilterPillRowOption[];
   /** Optional count label, e.g. "Showing 1-10 of 42 items". */
-  countLabel?: string
+  countLabel?: string;
   /** Optional children to render instead of options (for custom filter content). */
-  children?: React.ReactNode
+  children?: ReactNode;
 }
 
 export function FilterPillRow({
@@ -44,13 +45,13 @@ export function FilterPillRow({
   children,
 }: FilterPillRowProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3 p-4 bg-ods-card border border-ods-border rounded-lg">
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-ods-border bg-ods-card p-4">
       <div className="flex items-center gap-2">
         <Filter className="h-4 w-4 text-ods-accent" />
-        <span className="text-h5 text-ods-text-secondary">{label}</span>
+        <span className="text-ods-text-secondary text-h5">{label}</span>
       </div>
       {children ||
-        options.map((opt) => (
+        options.map(opt => (
           <Button
             key={opt.value}
             type="button"
@@ -62,11 +63,7 @@ export function FilterPillRow({
             {opt.label}
           </Button>
         ))}
-      {countLabel && (
-        <div className="ml-auto text-h6 text-ods-text-secondary shrink-0">
-          {countLabel}
-        </div>
-      )}
+      {countLabel && <div className="ml-auto shrink-0 text-ods-text-secondary text-h6">{countLabel}</div>}
     </div>
-  )
+  );
 }

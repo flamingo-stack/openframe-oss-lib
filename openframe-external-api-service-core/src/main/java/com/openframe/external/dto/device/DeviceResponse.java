@@ -51,8 +51,8 @@ public class DeviceResponse {
     @Schema(description = "Last seen timestamp")
     private Instant lastSeen;
 
-    @Schema(description = "Organization ID")
-    private String organizationId;
+    @Schema(description = "Customer id the device belongs to")
+    private String customerId;
 
     @Schema(description = "Serial number")
     private String serialNumber;

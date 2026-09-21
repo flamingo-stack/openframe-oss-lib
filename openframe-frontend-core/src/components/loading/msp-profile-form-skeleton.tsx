@@ -1,17 +1,12 @@
-import React from 'react'
-import { cn } from "../../utils/cn"
-import {
-  UnifiedSkeleton,
-  TextSkeleton,
-  InteractiveSkeleton
-} from './unified-skeleton'
+import { cn } from '../../utils/cn';
+import { UnifiedSkeleton, TextSkeleton, InteractiveSkeleton } from './unified-skeleton';
 
 interface SkeletonProps {
-  className?: string
+  className?: string;
   /**
    * Number of input fields to render on the right column (defaults to 4).
    */
-  fields?: number
+  fields?: number;
 }
 
 /**
@@ -28,37 +23,31 @@ interface SkeletonProps {
  * – Mobile (<768px) collapses to one column via grid existing classes.
  * – Uses UnifiedSkeleton system to stay consistent with global loading design.
  */
-export function MspProfileFormSkeleton({
-  className,
-  fields = 4,
-}: SkeletonProps) {
+export function MspProfileFormSkeleton({ className, fields = 4 }: SkeletonProps) {
   return (
     <div
-      className={cn(
-        'grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch',
-        className,
-      )}
+      className={cn('grid grid-cols-1 items-stretch gap-6 md:grid-cols-2', className)}
       role="status"
       aria-label="Loading MSP profile form"
     >
       {/* Left – Logo uploader placeholder */}
-      <div className="flex flex-col space-y-2 h-full">
+      <div className="flex h-full flex-col space-y-2">
         {/* Label skeleton */}
         <TextSkeleton.Body className="w-28" />
-        <div className="flex-1 min-h-[180px] md:min-h-full">
-          <UnifiedSkeleton className="w-full h-full rounded-lg" aria-label="Loading company logo" />
+        <div className="min-h-[180px] flex-1 md:min-h-full">
+          <UnifiedSkeleton className="h-full w-full rounded-lg" aria-label="Loading company logo" />
         </div>
       </div>
 
       {/* Right – Input fields grid (mirrors form) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {Array.from({ length: fields }).map((_, idx) => (
-          <div key={idx} className="space-y-2 flex flex-col">
+          <div key={idx} className="flex flex-col space-y-2">
             <TextSkeleton.Body className="w-40" />
             <InteractiveSkeleton.Input />
           </div>
         ))}
       </div>
     </div>
-  )
-} 
+  );
+}

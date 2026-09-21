@@ -51,8 +51,8 @@ function getObserverFor(rootMargin: string, threshold: number): IntersectionObse
   if (existing) return existing;
 
   const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
+    entries => {
+      entries.forEach(entry => {
         // Enforce the threshold EXPLICITLY. `isIntersecting` is spec-defined as
         // `intersectionRatio > 0` (any overlap), so the initial `observe()`
         // firing can report `true` at, say, 20% visible even with
@@ -72,7 +72,7 @@ function getObserverFor(rootMargin: string, threshold: number): IntersectionObse
         }
       });
     },
-    { rootMargin, threshold }
+    { rootMargin, threshold },
   );
   observers.set(key, io);
   return io;
@@ -103,7 +103,7 @@ export interface UseNearViewportResult<T extends Element = HTMLElement> {
  */
 export function useNearViewport<T extends Element = HTMLElement>(
   rootMargin: string = NEAR_VIEWPORT_ROOT_MARGIN,
-  threshold: number = 0
+  threshold: number = 0,
 ): UseNearViewportResult<T> {
   const [isNear, setIsNear] = useState(false);
   const elRef = useRef<T | null>(null);
@@ -131,7 +131,7 @@ export function useNearViewport<T extends Element = HTMLElement>(
       subscribers.set(node, cb);
       getObserverFor(rootMargin, threshold).observe(node);
     },
-    [key, rootMargin, threshold]
+    [key, rootMargin, threshold],
   );
 
   // Unsubscribe on unmount. Identity check guards the StrictMode race.

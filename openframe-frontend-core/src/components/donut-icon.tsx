@@ -18,4 +18,4 @@ export function DonutIcon({ className = '' }: { className?: string }) {
       />
     </svg>
   );
-} 
+}

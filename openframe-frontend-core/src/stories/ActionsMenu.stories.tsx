@@ -12,11 +12,7 @@ import {
   StarIcon,
   TrashBlankIcon,
 } from '../components/icons-v2-generated';
-import {
-  ActionsMenu,
-  ActionsMenuDropdown,
-  type ActionsMenuGroup,
-} from '../components/ui/actions-menu';
+import { ActionsMenu, ActionsMenuDropdown, type ActionsMenuGroup } from '../components/ui/actions-menu';
 
 const meta = {
   title: 'UI/ActionsMenu',
@@ -44,7 +40,7 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div
         style={{
           padding: '4rem',
@@ -146,7 +142,7 @@ export const WithCheckboxes: Story = {
  * (the inline `ActionsMenu` panel has no menu context).
  */
 export const WithSubmenu: StoryObj<typeof ActionsMenuDropdown> = {
-  render: (args) => <ActionsMenuDropdown {...args} />,
+  render: args => <ActionsMenuDropdown {...args} />,
   args: {
     groups: [
       {
@@ -208,7 +204,7 @@ export const WithSecondaryAction: Story = {
             icon: <EyeIcon />,
             onClick: fn(),
             iconAction: {
-              icon: <ArrowRightUpIcon className="w-5 h-5 text-ods-text-secondary" />,
+              icon: <ArrowRightUpIcon className="h-5 w-5 text-ods-text-secondary" />,
               'aria-label': 'Open in new tab',
               href: 'https://example.com',
               openInNewTab: true,
@@ -248,7 +244,7 @@ const dropdownGroups: ActionsMenuGroup[] = [
  * `ActionsMenuDropdown` attaches the menu to a default ellipsis trigger button.
  */
 export const Dropdown: StoryObj<typeof ActionsMenuDropdown> = {
-  render: (args) => <ActionsMenuDropdown {...args} />,
+  render: args => <ActionsMenuDropdown {...args} />,
   args: {
     groups: dropdownGroups,
     onItemClick: fn(),

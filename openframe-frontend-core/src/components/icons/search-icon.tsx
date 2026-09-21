@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface SearchIconProps {
   color?: string;
   width?: number;
@@ -8,12 +6,7 @@ interface SearchIconProps {
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function SearchIcon({
-  width = 22,
-  height = 22,
-  className = '',
-  color = '#888888'
-}: SearchIconProps) {
+export function SearchIcon({ width = 22, height = 22, className = '', color = '#888888' }: SearchIconProps) {
   return (
     <svg
       width={width}

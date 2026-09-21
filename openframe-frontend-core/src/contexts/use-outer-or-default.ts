@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Outer-forward provider helper — used by hub + embedder providers
@@ -27,16 +27,15 @@
  * the deps themselves (typically via `useCallback`).
  */
 
-import { useContext, useMemo, type Context } from 'react'
+import { useContext, useMemo, type Context } from 'react';
 
 export function useOuterOrDefault<T>(
   context: Context<T | null>,
   factory: () => T,
   deps: ReadonlyArray<unknown> = [],
 ): T {
-  const outer = useContext(context)
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the contract;
+  const outer = useContext(context);
   // factory identity is intentionally ignored (caller controls re-creation via deps).
-  const fallback = useMemo(factory, deps)
-  return outer ?? fallback
+  const fallback = useMemo(factory, deps);
+  return outer ?? fallback;
 }

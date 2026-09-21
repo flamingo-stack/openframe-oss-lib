@@ -22,6 +22,7 @@ const NAV = [
   { to: '/contact', label: 'Contact' },
   { to: '/schedule-a-call', label: 'Schedule' },
   { to: '/tickets', label: 'Tickets' },
+  { to: '/mcp', label: 'MCP' },
 ] as const
 
 export function AppShell() {

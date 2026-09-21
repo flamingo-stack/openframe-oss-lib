@@ -57,4 +57,21 @@ public class UserConfig {
         return EnvironmentConfig.getUserDomain();
     }
 
+    /**
+     * Whether an admin login is possible, without throwing. Mirrors the lazy reads above; suites gate on
+     * this via {@code @EnabledIf} so an environment with no credentials reports as skipped rather than
+     * erroring on the first request.
+     */
+    public static boolean hasCredentials() {
+        return isAvailable(email, "TEST_USER_EMAIL") && isAvailable(password, "TEST_USER_PASSWORD");
+    }
+
+    private static boolean isAvailable(String configured, String envVarName) {
+        if (configured != null) {
+            return true;
+        }
+        String envVar = System.getenv(envVarName);
+        return envVar != null && !envVar.trim().isEmpty();
+    }
+
 }

@@ -1,72 +1,88 @@
-import * as React from "react"
-import { cn } from "../../utils/cn"
-import { SquareAvatar as Avatar } from "../ui/square-avatar"
-import { Button } from "../ui/button"
-import { PlusCircleIcon } from "../plus-circle-icon"
-import { XmarkIcon } from "../icons-v2-generated/signs-and-symbols/xmark-icon"
-import { Chevron02LeftIcon } from "../icons-v2-generated"
-import { TicketStatusTag, resolveStatusTagProps } from "../ui/ticket-status-tag"
-import { Skeleton } from "../ui/skeleton"
-import { MspOrganizationCard } from "./msp-organization-card"
-import { MspOrganizationCardSkeleton } from "./msp-organization-card-skeleton"
-import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from "./types"
+import { type FC, type HTMLAttributes, forwardRef } from 'react';
+import { cn } from '../../utils/cn';
+import { Chevron02LeftIcon } from '../icons-v2-generated';
+import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { PlusCircleIcon } from '../plus-circle-icon';
+import { Button } from '../ui/button';
+import { Skeleton } from '../ui/skeleton';
+import { SquareAvatar as Avatar } from '../ui/square-avatar';
+import { TicketStatusTag, resolveStatusTagProps } from '../ui/ticket-status-tag';
+import { MspOrganizationCard } from './msp-organization-card';
+import { MspOrganizationCardSkeleton } from './msp-organization-card-skeleton';
+import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from './types';
 
-const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({ status }) => {
+const ConnectionIndicator: FC<ConnectionIndicatorProps> = ({ status }) => {
   const getStatusStyles = () => {
     switch (status) {
       // ODS semantic status tokens — preset-defined utilities aliasing the same
       // green/yellow/red as the raw ods-attention palette (which is CSS-vars only).
       case 'connected':
-        return 'bg-ods-success'
+        return 'bg-ods-success';
       case 'connecting':
-        return 'bg-ods-warning animate-pulse'
+        return 'bg-ods-warning animate-pulse';
       case 'disconnected':
-        return 'bg-ods-error'
+        return 'bg-ods-error';
       default:
-        return 'bg-ods-text-tertiary'
+        return 'bg-ods-text-tertiary';
     }
-  }
+  };
 
   return (
     <div className="flex items-center">
       <output
-        className={cn(
-          "w-2 h-2 rounded-full block",
-          getStatusStyles()
-        )}
+        className={cn('block h-2 w-2 rounded-full', getStatusStyles())}
         aria-label={`Connection status: ${status}`}
         title={status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'}
       />
     </div>
-  )
-}
+  );
+};
 
-const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
-  ({ className, children, ...props }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          "flex h-screen w-full flex-col",
-          "bg-ods-bg text-ods-text-primary",
-          "px-4 md:px-6 lg:px-8 pt-10 pb-8",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    )
-  }
-)
+const ChatContainer = forwardRef<HTMLDivElement, ChatContainerProps>(({ className, children, ...props }, ref) => {
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'flex h-screen w-full flex-col',
+        'bg-ods-bg text-ods-text-primary',
+        'px-4 pb-8 pt-10 md:px-6 lg:px-8',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+});
 
-ChatContainer.displayName = "ChatContainer"
+ChatContainer.displayName = 'ChatContainer';
 
-const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
-  ({ className, userName = 'Grace "Fae" Meadows', userTitle = "Your Personal Assistant", userAvatar, userIcon, onSettingsClick, onNewChat, onClose, onBack, showNewChat = false, connectionStatus = 'disconnected', serverUrl = null, headerActions, ticketInfo, mspOrganization, isMspLoading = false, fullWidth = false, bare = false, isLoading = false, ...props }, ref) => {
-    const cardClasses = bare
-      ? ""
-      : "rounded-md bg-ods-card border border-ods-border"
+const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
+  (
+    {
+      className,
+      userName = 'Grace "Fae" Meadows',
+      userAvatar,
+      userIcon,
+      onSettingsClick,
+      onNewChat,
+      onClose,
+      onBack,
+      showNewChat = false,
+      connectionStatus = 'disconnected',
+      serverUrl = null,
+      headerActions,
+      ticketInfo,
+      mspOrganization,
+      isMspLoading = false,
+      fullWidth = false,
+      bare = false,
+      isLoading = false,
+      ...props
+    },
+    ref,
+  ) => {
+    const cardClasses = bare ? '' : 'rounded-md bg-ods-card border border-ods-border';
     return (
       <div
         ref={ref}
@@ -74,8 +90,8 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
           // `fullWidth` drops the centered-narrow content column for
           // chats hosted in side panels where 600px would float in
           // the middle of a wider container.
-          fullWidth ? "relative w-full" : "relative mx-auto w-full max-w-ods-content-narrow",
-          className
+          fullWidth ? 'relative w-full' : 'relative mx-auto w-full max-w-ods-content-narrow',
+          className,
         )}
         {...props}
       >
@@ -86,10 +102,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
             size="icon"
             aria-label="Back"
             leftIcon={<Chevron02LeftIcon size={24} className="text-ods-text-primary" />}
-            className={cn(
-              cardClasses,
-              "absolute top-0 right-full mr-[var(--spacing-system-s)] hover:bg-ods-bg-hover"
-            )}
+            className={cn(cardClasses, 'absolute right-full top-0 mr-[var(--spacing-system-s)] hover:bg-ods-bg-hover')}
           />
         )}
         <div className={cardClasses}>
@@ -98,7 +111,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
               <div className="flex items-center gap-3">
                 {/* 64px round avatar placeholder — matches the `w-16 h-16`
                     rounded-full avatar / userIcon block below. */}
-                <Skeleton className="w-16 h-16 rounded-full shrink-0" />
+                <Skeleton className="h-16 w-16 shrink-0 rounded-full" />
                 <div className="flex flex-col gap-1">
                   {/* Name line — sized to the `text-h3` name. */}
                   <Skeleton className="h-6 w-40" />
@@ -109,7 +122,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
             ) : (
               <div className="flex items-center gap-3">
                 {userIcon ? (
-                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-ods-accent">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ods-accent">
                     {userIcon}
                   </div>
                 ) : (
@@ -127,7 +140,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
                   <div className="flex items-center gap-2">
                     {serverUrl && (
                       <>
-                        <span className="text-h4 text-ods-text-secondary">{serverUrl}</span>
+                        <span className="text-ods-text-secondary text-h4">{serverUrl}</span>
                         <ConnectionIndicator status={connectionStatus} />
                       </>
                     )}
@@ -141,7 +154,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
                   onClick={onNewChat}
                   variant="transparent"
                   size="small-legacy"
-                  leftIcon={<PlusCircleIcon className="w-5 h-5" whiteOverlay/>}
+                  leftIcon={<PlusCircleIcon className="h-5 w-5" whiteOverlay />}
                   className="text-ods-text-primary hover:bg-ods-bg-hover"
                 >
                   New Chat
@@ -153,7 +166,7 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
                   variant="transparent"
                   size="small-legacy"
                   aria-label="Close"
-                  className="text-ods-text-muted hover:text-ods-text-primary hover:bg-ods-bg-hover !p-1.5"
+                  className="!p-1.5 text-ods-text-muted hover:bg-ods-bg-hover hover:text-ods-text-primary"
                 >
                   <XmarkIcon size={16} />
                 </Button>
@@ -169,11 +182,11 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
             <>
               <div className="h-px bg-ods-border" />
               {isMspLoading || !mspOrganization ? (
-                <MspOrganizationCardSkeleton className={cn("ring-0 rounded-none", !bare && "rounded-b-md")} />
+                <MspOrganizationCardSkeleton className={cn('rounded-none ring-0', !bare && 'rounded-b-md')} />
               ) : (
                 <MspOrganizationCard
                   {...mspOrganization}
-                  className={cn("ring-0 rounded-none", !bare && "rounded-b-md", mspOrganization.className)}
+                  className={cn('rounded-none ring-0', !bare && 'rounded-b-md', mspOrganization.className)}
                 />
               )}
             </>
@@ -182,10 +195,20 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
             <>
               <div className="h-px bg-ods-border" />
               <div className="flex items-center justify-between gap-4 px-4 py-2">
-                <div className="flex flex-col min-w-0">
-                  <span className="text-heading-3 truncate" title={typeof ticketInfo.title === 'string' ? ticketInfo.title : undefined}>{ticketInfo.title}</span>
+                <div className="flex min-w-0 flex-col">
+                  <span
+                    className="truncate text-heading-3"
+                    title={typeof ticketInfo.title === 'string' ? ticketInfo.title : undefined}
+                  >
+                    {ticketInfo.title}
+                  </span>
                   {ticketInfo.meta && (
-                    <div className="text-h6 text-ods-text-secondary truncate" title={typeof ticketInfo.meta === 'string' ? ticketInfo.meta : undefined}>{ticketInfo.meta}</div>
+                    <div
+                      className="truncate text-ods-text-secondary text-h6"
+                      title={typeof ticketInfo.meta === 'string' ? ticketInfo.meta : undefined}
+                    >
+                      {ticketInfo.meta}
+                    </div>
                   )}
                 </div>
                 {(ticketInfo.status || ticketInfo.statusName) && (
@@ -203,28 +226,21 @@ const ChatHeader = React.forwardRef<HTMLDivElement, ChatHeaderProps>(
           )}
         </div>
       </div>
-    )
-  }
-)
-ChatHeader.displayName = "ChatHeader"
+    );
+  },
+);
+ChatHeader.displayName = 'ChatHeader';
 
-const ChatContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+const ChatContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, children, ...props }, ref) => {
     return (
-      <div
-        ref={ref}
-        className={cn(
-          "flex-1 flex flex-col min-h-0",
-          className
-        )}
-        {...props}
-      >
+      <div ref={ref} className={cn('flex min-h-0 flex-1 flex-col', className)} {...props}>
         {children}
       </div>
-    )
-  }
-)
-ChatContent.displayName = "ChatContent"
+    );
+  },
+);
+ChatContent.displayName = 'ChatContent';
 
 /**
  * `ChatFooter` props.
@@ -236,28 +252,21 @@ ChatContent.displayName = "ChatContent"
  *     applied to the inner wrapper. Use only when `fullWidth` is too
  *     coarse (e.g. custom max-w value).
  */
-export interface ChatFooterProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface ChatFooterProps extends HTMLAttributes<HTMLDivElement> {
   /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
    *  the inner wrapper's `max-w-ods-content-narrow` so the footer
    *  spans the full parent width. */
-  fullWidth?: boolean
+  fullWidth?: boolean;
   /** @deprecated Prefer `fullWidth` for the full-panel-width use case.
    *  This prop remains supported for callers that need a NON-binary
    *  override (custom max-w value, custom padding, etc.). */
-  contentClassName?: string
+  contentClassName?: string;
 }
 
-const ChatFooter = React.forwardRef<HTMLDivElement, ChatFooterProps>(
+const ChatFooter = forwardRef<HTMLDivElement, ChatFooterProps>(
   ({ className, contentClassName, fullWidth = false, children, ...props }, ref) => {
     return (
-      <div
-        ref={ref}
-        className={cn(
-          "w-full px-0 pb-0 pt-2 md:px-0 flex-shrink-0",
-          className
-        )}
-        {...props}
-      >
+      <div ref={ref} className={cn('w-full flex-shrink-0 px-0 pb-0 pt-2 md:px-0', className)} {...props}>
         <div
           className={cn(
             // `fullWidth=true` opts out of the centered-narrow column;
@@ -265,16 +274,16 @@ const ChatFooter = React.forwardRef<HTMLDivElement, ChatFooterProps>(
             // max-width. `contentClassName` is appended last so a
             // legacy caller passing it can still tweak after the
             // fullWidth decision.
-            fullWidth ? "w-full" : "mx-auto w-full max-w-ods-content-narrow",
-            contentClassName
+            fullWidth ? 'w-full' : 'mx-auto w-full max-w-ods-content-narrow',
+            contentClassName,
           )}
         >
           {children}
         </div>
       </div>
-    )
-  }
-)
-ChatFooter.displayName = "ChatFooter"
+    );
+  },
+);
+ChatFooter.displayName = 'ChatFooter';
 
-export { ChatContainer, ChatHeader, ChatContent, ChatFooter }
+export { ChatContainer, ChatHeader, ChatContent, ChatFooter };

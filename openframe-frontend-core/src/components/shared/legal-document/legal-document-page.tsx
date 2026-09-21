@@ -18,11 +18,11 @@
  */
 
 import type { ComponentType } from 'react';
+import { useRouter } from '../../../embed-shims/next-navigation';
+import { formatLegalDate } from '../../../utils/format';
 import { PageShell, PageLayout } from '../../ui';
 import { RichMarkdownRenderer } from '../../ui/markdown';
-import { useRouter } from '../../../embed-shims/next-navigation';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
-import { formatLegalDate } from '../../../utils/format';
 
 export interface LegalDocumentMarkdownRendererProps {
   content: string;
@@ -98,8 +98,7 @@ export function LegalDocumentPage({
           onClick: () => router.push(backButton?.href ?? '/'),
         };
 
-  const fallbackLastUpdatedLabel =
-    data?.lastSynced != null ? formatLegalDate(data.lastSynced) : null;
+  const fallbackLastUpdatedLabel = data?.lastSynced != null ? formatLegalDate(data.lastSynced) : null;
   const effectiveLastUpdatedLabel = initialLastUpdatedLabel ?? fallbackLastUpdatedLabel;
 
   // Subtitle routes through the frozen `PageLayout` `TitleBlock` (text-h2 title
@@ -109,64 +108,58 @@ export function LegalDocumentPage({
 
   const inner = (
     <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1" titleWrap>
-      {data?.sourceFile && (
-        <p className="text-h6 text-ods-text-secondary opacity-75">Source: {data.sourceFile}</p>
-      )}
+      {data?.sourceFile && <p className="text-ods-text-secondary opacity-75 text-h6">Source: {data.sourceFile}</p>}
 
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-start flex-1">
-          <div className="flex-1">
-            <div className="w-full">
-              <article className="space-y-2">
-                {isLoading ? (
-                  // Loading skeleton matching Knowledge Hub pattern
-                  <div className="space-y-6">
-                    <div className="h-10 bg-ods-skeleton rounded-lg w-3/4 animate-pulse"></div>
-                    <div className="space-y-4">
-                      <div className="h-4 bg-ods-skeleton rounded w-full animate-pulse"></div>
-                      <div className="h-4 bg-ods-skeleton rounded w-full animate-pulse"></div>
-                      <div className="h-4 bg-ods-skeleton rounded w-5/6 animate-pulse"></div>
-                    </div>
-                    <div className="h-32 bg-ods-card border border-ods-border rounded-lg animate-pulse"></div>
-                    <div className="space-y-4">
-                      <div className="h-4 bg-ods-skeleton rounded w-full animate-pulse"></div>
-                      <div className="h-4 bg-ods-skeleton rounded w-4/5 animate-pulse"></div>
-                    </div>
+      <div className="flex flex-1 flex-col items-start gap-6 lg:flex-row lg:gap-10">
+        <div className="flex-1">
+          <div className="w-full">
+            <article className="space-y-2">
+              {isLoading ? (
+                // Loading skeleton matching Knowledge Hub pattern
+                <div className="space-y-6">
+                  <div className="h-10 w-3/4 animate-pulse rounded-lg bg-ods-skeleton"></div>
+                  <div className="space-y-4">
+                    <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
+                    <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
+                    <div className="h-4 w-5/6 animate-pulse rounded bg-ods-skeleton"></div>
                   </div>
-                ) : error ? (
-                  <div className="text-center space-y-4">
-                    <div className="bg-ods-error-secondary border border-ods-error rounded-lg p-6">
-                      <p className="text-ods-error mb-2">{errorTitle}</p>
-                      <p className="text-ods-error text-h6">{error}</p>
-                    </div>
-                    <div className="text-ods-text-secondary">
-                      <p>{errorContactPrompt}</p>
-                      <a href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
-                        {contactEmail}
-                      </a>
-                    </div>
+                  <div className="h-32 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+                  <div className="space-y-4">
+                    <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
+                    <div className="h-4 w-4/5 animate-pulse rounded bg-ods-skeleton"></div>
                   </div>
-                ) : data ? (
-                  <MarkdownRenderer
-                    content={data.content}
-                    sectionIds={data.sections || []}
-                    demoteMarkdownH1ToH2
-                  />
-                ) : (
-                  <div className="text-center text-ods-text-secondary py-16">
-                    <p className="text-h4">{emptyStateMessage}</p>
-                    <p className="mt-2">
-                      Please contact{' '}
-                      <a href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
-                        {contactEmail}
-                      </a>{' '}
-                      for more information.
-                    </p>
+                </div>
+              ) : error ? (
+                <div className="space-y-4 text-center">
+                  <div className="rounded-lg border border-ods-error bg-ods-error-secondary p-6">
+                    <p className="mb-2 text-ods-error">{errorTitle}</p>
+                    <p className="text-ods-error text-h6">{error}</p>
                   </div>
-                )}
-              </article>
-            </div>
+                  <div className="text-ods-text-secondary">
+                    <p>{errorContactPrompt}</p>
+                    <a href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
+                      {contactEmail}
+                    </a>
+                  </div>
+                </div>
+              ) : data ? (
+                <MarkdownRenderer content={data.content} sectionIds={data.sections || []} demoteMarkdownH1ToH2 />
+              ) : (
+                <div className="py-16 text-center text-ods-text-secondary">
+                  <p className="text-h4">{emptyStateMessage}</p>
+                  <p className="mt-2">
+                    Please contact{' '}
+                    <a href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
+                      {contactEmail}
+                    </a>{' '}
+                    for more information.
+                  </p>
+                </div>
+              )}
+            </article>
           </div>
         </div>
+      </div>
     </PageLayout>
   );
 

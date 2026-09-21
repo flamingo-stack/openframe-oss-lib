@@ -80,11 +80,18 @@ impl ClientUninstallMessageListener {
         let machine_id = self.config_service.get_machine_id()?;
 
         loop {
+            let mut client_rx = self.nats_connection_manager.on_client_replaced();
             let client = self.nats_connection_manager.get_client().await?;
             let mut reconnect_rx = self.nats_connection_manager.subscribe_reconnect();
             let js = jetstream::new((*client).clone());
 
-            let consumer = self.create_consumer(&js, &machine_id).await;
+            let consumer = tokio::select! {
+                consumer = self.create_consumer(&js, &machine_id) => consumer,
+                _ = client_rx.changed() => {
+                    info!("NATS client replaced, rebinding client uninstall consumer");
+                    continue;
+                }
+            };
 
             info!("Start listening for client uninstall messages");
             let mut messages = consumer.messages().await?;
@@ -111,9 +118,19 @@ impl ClientUninstallMessageListener {
                             }
                         }
                     }
+                    _ = client_rx.changed() => {
+                        info!("NATS client replaced, rebinding client uninstall consumer");
+                        break;
+                    }
                     _ = reconnect_rx.recv() => {
                         info!("NATS reconnected, re-provisioning client uninstall consumer");
-                        self.create_consumer(&js, &machine_id).await;
+                        tokio::select! {
+                            _ = self.create_consumer(&js, &machine_id) => {}
+                            _ = client_rx.changed() => {
+                                info!("NATS client replaced, rebinding client uninstall consumer");
+                                break;
+                            }
+                        }
                     }
                 }
             }

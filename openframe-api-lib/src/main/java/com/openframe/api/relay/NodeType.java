@@ -3,7 +3,6 @@ package com.openframe.api.relay;
 public enum NodeType {
     MACHINE("Machine"),
     ORGANIZATION("Organization"),
-    EVENT("Event"),
     INTEGRATED_TOOL("IntegratedTool"),
     TENANT("Tenant"),
     DIALOG("Dialog"),

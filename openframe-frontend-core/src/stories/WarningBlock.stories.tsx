@@ -18,7 +18,7 @@ const meta = {
     title: { control: 'text' },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ maxWidth: 720 }}>
         <Story />
       </div>
@@ -40,7 +40,7 @@ export const Default: Story = {
   args: {
     title: 'Administrator privileges are required to install the OpenFrame agent.',
     children: (
-      <p className="text-h4 text-ods-text-primary">
+      <p className="text-ods-text-primary text-h4">
         Run the command with the appropriate permissions for your platform.
       </p>
     ),
@@ -61,9 +61,9 @@ export const AntivirusWarning: Story = {
           paths={['C:\\Program Files\\OpenFrame\\', 'C:\\Users\\[Username]\\AppData\\Local\\OpenFrame\\']}
           onCopyPath={copyPath}
         />
-        <p className="text-h4 text-ods-text-primary">
-          Or temporarily disable protection during installation. OpenFrame is safe open-source software.
-          Blocks happen because new software needs time to build reputation with security vendors.
+        <p className="text-ods-text-primary text-h4">
+          Or temporarily disable protection during installation. OpenFrame is safe open-source software. Blocks happen
+          because new software needs time to build reputation with security vendors.
         </p>
       </>
     ),
@@ -79,14 +79,11 @@ export const DoctorMode: Story = {
     title: 'Device not appearing or stuck pending?',
     children: (
       <>
-        <p className="text-h4 text-ods-text-primary">
-          Run the doctor command to diagnose installation issues and repair the agent. It works even if
-          the agent didn&apos;t install correctly.
+        <p className="text-ods-text-primary text-h4">
+          Run the doctor command to diagnose installation issues and repair the agent. It works even if the agent
+          didn&apos;t install correctly.
         </p>
-        <PathsDisplay
-          paths={[OPENFRAME_DOCTOR_COMMANDS.windows]}
-          onCopyPath={copyPath}
-        />
+        <PathsDisplay paths={[OPENFRAME_DOCTOR_COMMANDS.windows]} onCopyPath={copyPath} />
       </>
     ),
   },
@@ -101,7 +98,7 @@ export const AdministratorPrivileges: Story = {
     title: 'Administrator privileges are required to install the OpenFrame agent.',
     children: (
       <>
-        <p className="text-h4 text-ods-text-primary">
+        <p className="text-ods-text-primary text-h4">
           Run the command with the appropriate permissions for your platform:
         </p>
         <PathsDisplay
@@ -109,10 +106,9 @@ export const AdministratorPrivileges: Story = {
           showCopyButtons={false}
           leadingIcon={<OSTypeIcon osType="windows" size="w-6 h-6" />}
         />
-        <p className="text-h4 text-ods-text-primary">
-          Without elevated privileges, the installation will fail silently. Right-click PowerShell and
-          select &quot;Run as administrator,&quot; or contact your IT admin if you don&apos;t have local
-          admin rights.
+        <p className="text-ods-text-primary text-h4">
+          Without elevated privileges, the installation will fail silently. Right-click PowerShell and select &quot;Run
+          as administrator,&quot; or contact your IT admin if you don&apos;t have local admin rights.
         </p>
       </>
     ),
@@ -125,7 +121,7 @@ export const NewDeviceBlocks: Story = {
   render: () => (
     <div className="flex flex-col gap-6">
       <WarningBlock title="Administrator privileges are required to install the OpenFrame agent.">
-        <p className="text-h4 text-ods-text-primary">
+        <p className="text-ods-text-primary text-h4">
           Run the command with the appropriate permissions for your platform:
         </p>
         <PathsDisplay
@@ -133,10 +129,9 @@ export const NewDeviceBlocks: Story = {
           showCopyButtons={false}
           leadingIcon={<OSTypeIcon osType="windows" size="w-6 h-6" />}
         />
-        <p className="text-h4 text-ods-text-primary">
-          Without elevated privileges, the installation will fail silently. Right-click PowerShell and
-          select &quot;Run as administrator,&quot; or contact your IT admin if you don&apos;t have local
-          admin rights.
+        <p className="text-ods-text-primary text-h4">
+          Without elevated privileges, the installation will fail silently. Right-click PowerShell and select &quot;Run
+          as administrator,&quot; or contact your IT admin if you don&apos;t have local admin rights.
         </p>
       </WarningBlock>
 
@@ -146,21 +141,18 @@ export const NewDeviceBlocks: Story = {
           paths={['C:\\Program Files\\OpenFrame\\', 'C:\\Users\\[Username]\\AppData\\Local\\OpenFrame\\']}
           onCopyPath={copyPath}
         />
-        <p className="text-h4 text-ods-text-primary">
-          Or temporarily disable protection during installation. OpenFrame is safe open-source software.
-          Blocks happen because new software needs time to build reputation with security vendors.
+        <p className="text-ods-text-primary text-h4">
+          Or temporarily disable protection during installation. OpenFrame is safe open-source software. Blocks happen
+          because new software needs time to build reputation with security vendors.
         </p>
       </WarningBlock>
 
       <WarningBlock title="Device not appearing or stuck pending?">
-        <p className="text-h4 text-ods-text-primary">
-          Run the doctor command to diagnose installation issues and repair the agent. It works even if
-          the agent didn&apos;t install correctly.
+        <p className="text-ods-text-primary text-h4">
+          Run the doctor command to diagnose installation issues and repair the agent. It works even if the agent
+          didn&apos;t install correctly.
         </p>
-        <PathsDisplay
-          paths={[OPENFRAME_DOCTOR_COMMANDS.windows]}
-          onCopyPath={copyPath}
-        />
+        <PathsDisplay paths={[OPENFRAME_DOCTOR_COMMANDS.windows]} onCopyPath={copyPath} />
       </WarningBlock>
     </div>
   ),

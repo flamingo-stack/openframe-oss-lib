@@ -1,117 +1,128 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Chevron02DownIcon } from "../icons-v2-generated/arrows/chevron-02-down-icon"
-import { UserIcon } from "../icons-v2-generated/users/user-icon"
-import { cn } from "../../utils/cn"
-import { AssigneeDropdown, type TicketAssigneeOption } from "./assignee-dropdown"
-import { SquareAvatar } from "./square-avatar"
-import { Tag } from "./tag"
-import { TicketStatusTag, type TicketStatusTagOption } from "./ticket-status-tag"
-import { TicketDetailSection } from "./ticket-detail-section"
-import { type TicketAttachment, TicketAttachmentsList } from "./ticket-attachments-list"
-import type { TicketNote } from "./ticket-note-card"
-import { TicketNotesSection } from "./ticket-notes-section"
-import { SimpleMarkdownRenderer } from "./markdown/simple-markdown-renderer"
+import type { ReactNode } from 'react';
+import { cn } from '../../utils/cn';
+import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
+import { UserIcon } from '../icons-v2-generated/users/user-icon';
+import { AssigneeDropdown, type TicketAssigneeOption } from './assignee-dropdown';
+import { SimpleMarkdownRenderer } from './markdown/simple-markdown-renderer';
+import { SquareAvatar } from './square-avatar';
+import { Tag } from './tag';
+import { type TicketAttachment, TicketAttachmentsList } from './ticket-attachments-list';
+import { TicketDetailSection } from './ticket-detail-section';
+import type { TicketNote } from './ticket-note-card';
+import { TicketNotesSection } from './ticket-notes-section';
+import { TicketStatusTag, type TicketStatusTagOption } from './ticket-status-tag';
 
-export type { TicketAssigneeOption }
+export type { TicketAssigneeOption };
 
 export interface TicketInfoSectionProps {
   /** Organization name and image */
   organization?: {
-    name: string
-    imageSrc?: string
-  }
+    name: string;
+    imageSrc?: string;
+  };
   /** User name */
-  user?: string
+  user?: string;
   /** Device info */
   device?: {
-    name: string
-    icon?: React.ReactNode
-    onClick?: () => void
-  }
+    name: string;
+    icon?: ReactNode;
+    onClick?: () => void;
+  };
   /** Status tag */
-  status?: string
+  status?: string;
   /** Display label for the status tag (e.g. a custom status name). */
-  statusLabel?: string
+  statusLabel?: string;
   /** Hex color for the status tag (e.g. a custom status color). */
-  statusColor?: string
+  statusColor?: string;
   /** When provided, the status tag becomes an inline changer with these options. */
-  statusOptions?: TicketStatusTagOption[]
+  statusOptions?: TicketStatusTagOption[];
   /** Called with the chosen status id from the inline status dropdown. */
-  onStatusSelect?: (id: string) => void
+  onStatusSelect?: (id: string) => void;
   /** Disables the inline status dropdown while a change is in flight. */
-  isStatusPending?: boolean
+  isStatusPending?: boolean;
+  /** Locks the status: renders the plain tag instead of the dropdown (e.g. a pending approval blocks the transition). */
+  isStatusDisabled?: boolean;
+  /** Reason shown in a tooltip over the status tag when `isStatusDisabled`. */
+  statusDisabledReason?: string;
   /** Expand button click handler */
-  onExpand?: () => void
+  onExpand?: () => void;
   /** Whether the section is expanded */
-  expanded?: boolean
+  expanded?: boolean;
   /** Additional className */
-  className?: string
+  className?: string;
 
   // --- Expanded view props ---
 
   /** Assigned person info with inline dropdown */
   assigned?: {
     currentAssignee?: {
-      id: string
-      name: string
-      avatarSrc?: string
+      id: string;
+      name: string;
+      avatarSrc?: string;
       /** Deleted account (DELETED / SELF_DELETED) — renders the red user-x placeholder + red name. */
-      deleted?: boolean
-    }
-    options: TicketAssigneeOption[]
-    isLoading?: boolean
-    isPending?: boolean
-    onAssign: (userId: string | null) => void
-  }
+      deleted?: boolean;
+    };
+    options: TicketAssigneeOption[];
+    isLoading?: boolean;
+    isPending?: boolean;
+    onAssign: (userId: string | null) => void;
+  };
   /** Created date string */
-  createdAt?: string
+  createdAt?: string;
   /** Ticket description — markdown/HTML content */
-  description?: string
+  description?: string;
   /** File attachments (view-only with download) */
-  attachments?: TicketAttachment[]
+  attachments?: TicketAttachment[];
   /** Tag labels */
-  tags?: string[]
+  tags?: string[];
   /** Notes */
-  notes?: TicketNote[]
-  onAddNote?: (text: string) => void
-  onEditNote?: (id: string, text: string) => void
-  onDeleteNote?: (id: string) => void
+  notes?: TicketNote[];
+  onAddNote?: (text: string) => void;
+  onEditNote?: (id: string, text: string) => void;
+  onDeleteNote?: (id: string) => void;
   /** Disables the note input while a note is being added */
-  isAddingNote?: boolean
+  isAddingNote?: boolean;
 }
 
-function InfoCell({ value, label, icon, onClick }: {
-  value: string
-  label: string
-  icon?: React.ReactNode
-  onClick?: () => void
+function InfoCell({
+  value,
+  label,
+  icon,
+  onClick,
+}: {
+  value: string;
+  label: string;
+  icon?: ReactNode;
+  onClick?: () => void;
 }) {
   return (
-    <div className="flex-1 min-w-0 overflow-hidden">
+    <div className="min-w-0 flex-1 overflow-hidden">
       <div className="flex flex-col justify-center">
-        <div className="flex items-center gap-1 w-full min-w-0">
+        <div className="flex w-full min-w-0 items-center gap-1">
           {icon && (
-            <span className="shrink-0 size-4 flex items-center justify-center text-ods-text-secondary">
-              {icon}
-            </span>
+            <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary">{icon}</span>
           )}
           {onClick ? (
             <button
               type="button"
               onClick={onClick}
-              className="text-h4 text-ods-text-primary truncate hover:text-ods-accent transition-colors cursor-pointer text-left" title={value}>
+              className="cursor-pointer truncate text-left text-ods-text-primary transition-colors text-h4 hover:text-ods-accent"
+              title={value}
+            >
               {value}
             </button>
           ) : (
-            <span className="text-h4 text-ods-text-primary truncate" title={value}>{value}</span>
+            <span className="truncate text-ods-text-primary text-h4" title={value}>
+              {value}
+            </span>
           )}
         </div>
-        <span className="text-h6 text-ods-text-secondary truncate">{label}</span>
+        <span className="truncate text-ods-text-secondary text-h6">{label}</span>
       </div>
     </div>
-  )
+  );
 }
 
 export function TicketInfoSection({
@@ -123,6 +134,8 @@ export function TicketInfoSection({
   statusOptions,
   onStatusSelect,
   isStatusPending,
+  isStatusDisabled,
+  statusDisabledReason,
   onExpand,
   expanded = false,
   className,
@@ -138,24 +151,19 @@ export function TicketInfoSection({
   isAddingNote,
 }: TicketInfoSectionProps) {
   return (
-    <div
-      className={cn(
-        "rounded-[6px] border border-ods-border overflow-hidden",
-        className,
-      )}
-    >
+    <div className={cn('overflow-hidden rounded-[6px] border border-ods-border', className)}>
       {/* Header row */}
-      <div className="grid grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] gap-4 px-4 py-3 bg-ods-card border-b border-ods-border items-center">
+      <div className="grid grid-cols-2 items-center gap-4 border-b border-ods-border bg-ods-card px-4 py-3 lg:grid-cols-[1fr_1fr_1fr_auto]">
         {/* Organization with image */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
           <SquareAvatar
             src={organization?.imageSrc}
             alt={organization?.name}
-            fallback={organization?.name || "Org"}
+            fallback={organization?.name || 'Org'}
             size="md"
             className="shrink-0"
           />
-          <InfoCell value={organization?.name || "Unassigned"} label="Organization" />
+          <InfoCell value={organization?.name || 'Unassigned'} label="Organization" />
         </div>
 
         {/* Assigned */}
@@ -170,34 +178,31 @@ export function TicketInfoSection({
             />
           ) : (
             <div className="min-w-0">
-              <div className="flex items-center gap-1 text-h4 text-ods-text-secondary">
+              <div className="flex items-center gap-1 text-ods-text-secondary text-h4">
                 <UserIcon className="size-4 shrink-0" />
                 <span className="truncate">Unassigned</span>
               </div>
-              <span className="text-h6 text-ods-text-secondary truncate block">Assigned</span>
+              <span className="block truncate text-ods-text-secondary text-h6">Assigned</span>
             </div>
           )}
         </div>
 
         {/* Device */}
-        <InfoCell
-          value={device?.name || "Unassigned"}
-          label="Device"
-          icon={device?.icon}
-          onClick={device?.onClick}
-        />
+        <InfoCell value={device?.name || 'Unassigned'} label="Device" icon={device?.icon} onClick={device?.onClick} />
 
         {/* Status tag + expand button */}
-        <div className="flex items-center gap-4 min-w-0">
+        <div className="flex min-w-0 items-center gap-4">
           {(status || statusLabel) && (
             <div className="min-w-0">
               <TicketStatusTag
-                status={status ?? ""}
+                status={status ?? ''}
                 label={statusLabel}
                 color={statusColor}
                 options={statusOptions}
                 onSelect={onStatusSelect}
                 isPending={isStatusPending}
+                disabled={isStatusDisabled}
+                disabledReason={statusDisabledReason}
               />
             </div>
           )}
@@ -206,16 +211,16 @@ export function TicketInfoSection({
               type="button"
               onClick={onExpand}
               className={cn(
-                "shrink-0 flex items-center justify-center p-3 rounded-[6px]",
-                "bg-ods-card border border-ods-border",
-                "hover:bg-ods-bg-hover transition-colors duration-150",
+                'flex shrink-0 items-center justify-center rounded-[6px] p-3',
+                'border border-ods-border bg-ods-card',
+                'transition-colors duration-150 hover:bg-ods-bg-hover',
               )}
-              aria-label={expanded ? "Collapse" : "Expand"}
+              aria-label={expanded ? 'Collapse' : 'Expand'}
             >
               <Chevron02DownIcon
                 className={cn(
-                  "size-6 text-ods-text-primary transition-transform duration-200",
-                  expanded && "rotate-180",
+                  'size-6 text-ods-text-primary transition-transform duration-200',
+                  expanded && 'rotate-180',
                 )}
               />
             </button>
@@ -228,17 +233,15 @@ export function TicketInfoSection({
         <>
           {/* Second info row: Created */}
           {createdAt && (
-            <div className="grid grid-cols-2 gap-4 px-4 py-3 bg-ods-bg border-b border-ods-border items-center">
+            <div className="grid grid-cols-2 items-center gap-4 border-b border-ods-border bg-ods-bg px-4 py-3">
               <InfoCell value={createdAt} label="Created" />
             </div>
           )}
 
           {/* Content area */}
-          <div className="flex flex-col gap-4 p-4 bg-ods-bg border-b border-ods-border">
+          <div className="flex flex-col gap-4 border-b border-ods-border bg-ods-bg p-4">
             {/* Description */}
-            {description && (
-              <SimpleMarkdownRenderer content={description} />
-            )}
+            {description && <SimpleMarkdownRenderer content={description} />}
 
             {/* Attachments */}
             {attachments && attachments.length > 0 && (
@@ -250,7 +253,7 @@ export function TicketInfoSection({
             {/* Tags */}
             {tags && tags.length > 0 && (
               <TicketDetailSection label="Tags">
-                <div className="flex flex-wrap gap-2 min-w-0">
+                <div className="flex min-w-0 flex-wrap gap-2">
                   {tags.map(tag => (
                     <Tag key={tag} label={tag} variant="outline" className="max-w-full" />
                   ))}
@@ -274,5 +277,5 @@ export function TicketInfoSection({
         </>
       )}
     </div>
-  )
+  );
 }

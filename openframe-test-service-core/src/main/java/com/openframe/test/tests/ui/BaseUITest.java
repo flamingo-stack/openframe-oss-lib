@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.openframe.test.config.UserConfig.getUser;
 
@@ -71,6 +72,27 @@ abstract class BaseUITest {
         page.onRequestFailed(req ->
                 log.warn("[requestFailed] {} {} ({})",
                         req.method(), req.url(), req.failure()));
+        // The remote desktop/shell/file-manager sessions all run over a MeshCentral relay socket, and
+        // that hop is the one the trace cannot see: Playwright records no WebSocket events in
+        // trace.network, so a relay that opens and then never carries a frame is indistinguishable
+        // from one that was never opened. Frames are counted rather than logged — a desktop stream
+        // pushes thousands — because the diagnostic question is only ever "did anything come back,
+        // and how long did the socket live".
+        page.onWebSocket(ws -> {
+            long openedAt = System.currentTimeMillis();
+            AtomicLong sent = new AtomicLong();
+            AtomicLong received = new AtomicLong();
+            log.info("[ws:open] {}", ws.url());
+            ws.onFrameSent(frame -> sent.incrementAndGet());
+            ws.onFrameReceived(frame -> {
+                if (received.getAndIncrement() == 0) {
+                    log.info("[ws:first-frame] {} after {}ms", ws.url(), System.currentTimeMillis() - openedAt);
+                }
+            });
+            ws.onSocketError(error -> log.error("[ws:error] {} {}", ws.url(), error));
+            ws.onClose(closed -> log.warn("[ws:close] {} after {}ms, frames sent={} received={}",
+                    closed.url(), System.currentTimeMillis() - openedAt, sent.get(), received.get()));
+        });
         User user = getUser();
         UILoginFlow loginFlow = new UILoginFlow(page);
         navigationSidebar = loginFlow.login(user.getEmail(), user.getPassword());

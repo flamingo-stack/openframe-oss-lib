@@ -27,6 +27,7 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
     private static final String FIELD_TOKEN = "token";
     private static final String FIELD_USER_ID = "userId";
     private static final String FIELD_PLATFORM = "platform";
+    private static final String FIELD_APP_VERSION = "appVersion";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
 
@@ -35,13 +36,13 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
     }
 
     @Override
-    public boolean registerToken(String userId, String token, PushPlatform platform) {
+    public boolean registerToken(String userId, String token, PushPlatform platform, String appVersion) {
         Query byToken = new Query(Criteria.where(FIELD_TOKEN).is(token));
         Instant now = Instant.now();
 
         try {
             UpdateResult result = mongoTemplate.upsert(byToken,
-                    getUpdateQuery(userId, platform, now).setOnInsert(FIELD_CREATED_AT, now),
+                    getUpdateQuery(userId, platform, appVersion, now).setOnInsert(FIELD_CREATED_AT, now),
                     PushDevice.class);
             boolean created = result.getUpsertedId() != null;
             log.debug("Push token {} for user {}", created ? "registered" : "re-associated", userId);
@@ -49,22 +50,26 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
         } catch (DuplicateKeyException ex) {
             // Upsert is not atomic against the unique index; a concurrent register won the insert.
             // Retrying the upsert would race again — its row exists now, so a plain update settles it.
-            UpdateResult result = mongoTemplate.updateFirst(byToken, getUpdateQuery(userId, platform, now),
+            UpdateResult result = mongoTemplate.updateFirst(byToken,
+                    getUpdateQuery(userId, platform, appVersion, now),
                     PushDevice.class);
             if (result.getMatchedCount() > 0) {
                 log.debug("Push token re-associated to user {} after losing an insert race", userId);
                 return false;
             }
             return mongoTemplate.upsert(byToken,
-                    getUpdateQuery(userId, platform, now).setOnInsert(FIELD_CREATED_AT, now),
+                    getUpdateQuery(userId, platform, appVersion, now).setOnInsert(FIELD_CREATED_AT, now),
                     PushDevice.class).getUpsertedId() != null;
         }
     }
 
-    private Update getUpdateQuery(String userId, PushPlatform platform, Instant now) {
+    // appVersion is set verbatim on every registration, null included: the row must reflect the app
+    // that registered LAST, or a reinstalled older build would keep a capability it no longer has.
+    private Update getUpdateQuery(String userId, PushPlatform platform, String appVersion, Instant now) {
         return new Update()
                 .set(FIELD_USER_ID, userId)
                 .set(FIELD_PLATFORM, platform)
+                .set(FIELD_APP_VERSION, appVersion)
                 .set(FIELD_UPDATED_AT, now);
     }
 }

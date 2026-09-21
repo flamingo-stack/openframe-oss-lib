@@ -43,41 +43,41 @@
  * through some OTHER API still won't auto-re-render here — embedders
  * that need that should register a real router or supply their own.
  */
-'use client'
-import { useEffect, useState } from 'react'
+'use client';
+import { useEffect, useState, type Context, type ReactNode } from 'react';
 
 // --- Router shape — matches Next's AppRouterInstance surface enough to
 // --- satisfy hub callsites that pass options like `{ scroll: false }`.
 interface NavigateOptions {
-  scroll?: boolean
+  scroll?: boolean;
 }
 
 interface PrefetchOptions {
-  kind?: unknown
+  kind?: unknown;
 }
 
 interface RouterStub {
-  push: (href: string, options?: NavigateOptions) => void
-  replace: (href: string, options?: NavigateOptions) => void
-  back: () => void
-  forward: () => void
-  refresh: () => void
-  prefetch: (href: string, options?: PrefetchOptions) => void
+  push: (href: string, options?: NavigateOptions) => void;
+  replace: (href: string, options?: NavigateOptions) => void;
+  back: () => void;
+  forward: () => void;
+  refresh: () => void;
+  prefetch: (href: string, options?: PrefetchOptions) => void;
 }
 
 // --- Registration surface — partial so a host can register only the
 // --- hooks it needs (e.g. routes that don't use redirect()).
 export interface NavigationImpl {
-  useRouter: () => RouterStub
-  usePathname: () => string
-  useSearchParams: () => URLSearchParams
-  useParams: <T extends Record<string, string | string[]>>() => T
-  redirect: (url: string, type?: unknown) => never
-  permanentRedirect: (url: string, type?: unknown) => never
-  notFound: () => never
+  useRouter: () => RouterStub;
+  usePathname: () => string;
+  useSearchParams: () => URLSearchParams;
+  useParams: <T extends Record<string, string | string[]>>() => T;
+  redirect: (url: string, type?: unknown) => never;
+  permanentRedirect: (url: string, type?: unknown) => never;
+  notFound: () => never;
 }
 
-let impl: Partial<NavigationImpl> = {}
+let impl: Partial<NavigationImpl> = {};
 
 /**
  * Register real `next/navigation` exports. Merges with any prior
@@ -85,7 +85,7 @@ let impl: Partial<NavigationImpl> = {}
  * in a Next.js host.
  */
 export function registerNavigation(nav: Partial<NavigationImpl>): void {
-  impl = { ...impl, ...nav }
+  impl = { ...impl, ...nav };
 }
 
 // --- Fallback impls ----------------------------------------------------
@@ -97,7 +97,7 @@ const noopRouter: RouterStub = {
   forward: () => {},
   refresh: () => {},
   prefetch: () => {},
-}
+};
 
 /**
  * SPA navigation for the unregistered fallback. Uses the History API instead of
@@ -111,29 +111,34 @@ const noopRouter: RouterStub = {
  * navigation, which is the only correct behavior there.
  */
 function softNavigate(href: string, mode: 'push' | 'replace'): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') return;
   try {
-    const url = new URL(href, window.location.href)
+    const url = new URL(href, window.location.href);
     if (url.origin !== window.location.origin) {
       // Preserve the caller's history semantics: replace() must not leave a
       // back-button entry, so it uses `location.replace`, not `location.assign`.
-      if (mode === 'push') window.location.assign(url.href)
-      else window.location.replace(url.href)
-      return
+      if (mode === 'push') window.location.assign(url.href);
+      else window.location.replace(url.href);
+      return;
     }
-    if (mode === 'push') window.history.pushState(null, '', url.href)
-    else window.history.replaceState(null, '', url.href)
-    window.dispatchEvent(new PopStateEvent('popstate'))
+    if (mode === 'push') window.history.pushState(null, '', url.href);
+    else window.history.replaceState(null, '', url.href);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   } catch {
     // Malformed href — a real navigation is safer than swallowing it, but still
     // honor push vs replace history semantics.
-    if (mode === 'push') window.location.assign(href)
-    else window.location.replace(href)
+    if (mode === 'push') window.location.assign(href);
+    else window.location.replace(href);
   }
 }
 
-function fallbackUseRouter(): RouterStub {
-  if (typeof window === 'undefined') return noopRouter
+// `useFallback*`, not `fallbackUse*`: two of these call hooks, and the
+// linter identifies a custom hook purely by the `use` PREFIX. Under the old
+// names `useLocationSubscription` looked like a hook called from a plain
+// function, which is the one shape the rules-of-hooks check cannot verify.
+// The whole family is renamed together so the set stays symmetric.
+function useFallbackRouter(): RouterStub {
+  if (typeof window === 'undefined') return noopRouter;
   return {
     push: (href: string) => softNavigate(href, 'push'),
     replace: (href: string) => softNavigate(href, 'replace'),
@@ -141,11 +146,11 @@ function fallbackUseRouter(): RouterStub {
     forward: () => window.history.forward(),
     refresh: () => window.location.reload(),
     prefetch: () => {},
-  }
+  };
 }
 
 function readLocation<T>(read: () => T, fallback: T): T {
-  return typeof window === 'undefined' ? fallback : read()
+  return typeof window === 'undefined' ? fallback : read();
 }
 
 /** Subscribes to `popstate` only. pushState/replaceState do NOT fire
@@ -153,45 +158,42 @@ function readLocation<T>(read: () => T, fallback: T): T {
  *  (and want their component to re-render in response) need a real
  *  router. */
 function useLocationSubscription(): number {
-  const [tick, setTick] = useState(0)
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const onChange = () => setTick((t) => t + 1)
-    window.addEventListener('popstate', onChange)
-    return () => window.removeEventListener('popstate', onChange)
-  }, [])
-  return tick
+    if (typeof window === 'undefined') return undefined;
+    const onChange = () => setTick(t => t + 1);
+    window.addEventListener('popstate', onChange);
+    return () => window.removeEventListener('popstate', onChange);
+  }, []);
+  return tick;
 }
 
-function fallbackUsePathname(): string {
-  useLocationSubscription()
-  return readLocation(() => window.location.pathname, '/')
+function useFallbackPathname(): string {
+  useLocationSubscription();
+  return readLocation(() => window.location.pathname, '/');
 }
 
-function fallbackUseSearchParams(): URLSearchParams {
-  useLocationSubscription()
-  return readLocation(
-    () => new URLSearchParams(window.location.search),
-    new URLSearchParams(),
-  )
+function useFallbackSearchParams(): URLSearchParams {
+  useLocationSubscription();
+  return readLocation(() => new URLSearchParams(window.location.search), new URLSearchParams());
 }
 
-function fallbackUseParams<T extends Record<string, string | string[]>>(): T {
-  return {} as T
+function useFallbackParams<T extends Record<string, string | string[]>>(): T {
+  return {} as T;
 }
 
 function fallbackRedirect(url: string): never {
-  if (typeof window !== 'undefined') window.location.assign(url)
-  throw new Error(`[next-navigation shim] redirect(${url})`)
+  if (typeof window !== 'undefined') window.location.assign(url);
+  throw new Error(`[next-navigation shim] redirect(${url})`);
 }
 
 function fallbackPermanentRedirect(url: string): never {
-  if (typeof window !== 'undefined') window.location.replace(url)
-  throw new Error(`[next-navigation shim] permanentRedirect(${url})`)
+  if (typeof window !== 'undefined') window.location.replace(url);
+  throw new Error(`[next-navigation shim] permanentRedirect(${url})`);
 }
 
 function fallbackNotFound(): never {
-  throw new Error('[next-navigation shim] notFound()')
+  throw new Error('[next-navigation shim] notFound()');
 }
 
 // --- Public surface — each export checks the registry and falls
@@ -200,39 +202,43 @@ function fallbackNotFound(): never {
 // --- and the registered impl is a hook in its own right.
 
 export function useRouter(): RouterStub {
-  return (impl.useRouter ?? fallbackUseRouter)()
+  return (impl.useRouter ?? useFallbackRouter)();
 }
 
 export function usePathname(): string {
-  return (impl.usePathname ?? fallbackUsePathname)()
+  return (impl.usePathname ?? useFallbackPathname)();
 }
 
 export function useSearchParams(): URLSearchParams {
-  return (impl.useSearchParams ?? fallbackUseSearchParams)()
+  return (impl.useSearchParams ?? useFallbackSearchParams)();
 }
 
 export function useParams<T extends Record<string, string | string[]>>(): T {
-  return ((impl.useParams as (() => T) | undefined) ?? fallbackUseParams)()
+  return ((impl.useParams as (() => T) | undefined) ?? useFallbackParams)();
 }
 
 export function redirect(url: string, type?: unknown): never {
-  return (impl.redirect ?? fallbackRedirect)(url, type)
+  return (impl.redirect ?? fallbackRedirect)(url, type);
 }
 
 export function permanentRedirect(url: string, type?: unknown): never {
-  return (impl.permanentRedirect ?? fallbackPermanentRedirect)(url, type)
+  return (impl.permanentRedirect ?? fallbackPermanentRedirect)(url, type);
 }
 
 export function notFound(): never {
-  return (impl.notFound ?? fallbackNotFound)()
+  return (impl.notFound ?? fallbackNotFound)();
 }
 
 /** Match Next's RedirectType enum surface for code that imports it. */
 export const RedirectType = {
   push: 'push' as const,
   replace: 'replace' as const,
-}
+};
 
 /** Match Next's ServerInsertedHTMLContext surface — non-functional in
- *  the embed environment but importable so consumers don't crash. */
-export const ServerInsertedHTMLContext = null as any
+ *  the embed environment but importable so consumers don't crash.
+ *
+ *  Typed as the context Next exports rather than `any`: the value stays
+ *  `null` (nothing to insert outside an SSR shell), and the declared type
+ *  documents what a Next host would put here. */
+export const ServerInsertedHTMLContext: Context<((callback: () => ReactNode) => void) | null> | null = null;

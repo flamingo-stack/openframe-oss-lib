@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Lib-side `<a>` wrapper for chat-rendered links (markdown bodies,
@@ -22,22 +22,22 @@
  * the hub keeps its own `useNavLink`-based anchor.
  */
 
-import type { ReactNode, MouseEvent } from 'react'
-import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context'
-import { useRouter } from '../../embed-shims/next-navigation'
-import { handleChatNavClick } from './utils/nav-click-handler'
-import { resolveHrefForRuntime } from './utils/chat-nav-resolution'
-import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props'
-import { useChatPanel } from './chat-panel-context'
+import type { ReactNode, MouseEvent } from 'react';
+import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
+import { useRouter } from '../../embed-shims/next-navigation';
+import { useChatPanel } from './chat-panel-context';
+import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
+import { executeNavigation } from './utils/execute-navigation';
+import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
 
 export interface NavLinkAnchorViaRuntimeProps {
-  href: string
-  path?: string | null
-  targetPlatform?: string | null
-  className?: string
+  href: string;
+  path?: string | null;
+  targetPlatform?: string | null;
+  className?: string;
   /** Optional — matches `NavLinkAnchorComponent`'s contract so the
    *  markdown-anchor slot can render an empty anchor (rare but legal). */
-  children?: ReactNode
+  children?: ReactNode;
 }
 
 export function NavLinkAnchorViaRuntime({
@@ -47,28 +47,26 @@ export function NavLinkAnchorViaRuntime({
   className,
   children,
 }: NavLinkAnchorViaRuntimeProps) {
-  const runtime = useRequiredChatRuntime()
-  const router = useRouter()
-  const panel = useChatPanel()
-  const resolvedHref = resolveHrefForRuntime(href, runtime)
-  const isNewTab = computeIsNewTab(runtime, resolvedHref, targetPlatform ?? null)
+  const runtime = useRequiredChatRuntime();
+  const router = useRouter();
+  const panel = useChatPanel();
+  const resolvedHref = resolveHrefForRuntime(href, runtime);
+  const isNewTab = computeIsNewTab(runtime, resolvedHref, targetPlatform ?? null);
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
-    const handled = handleChatNavClick(e, runtime, {
+    const handled = executeNavigation({
+      event: e,
+      runtime,
       href: resolvedHref,
       path,
       targetPlatform,
-    }, router.push)
-    if (handled && !isNewTab && panel?.closeChat) panel.closeChat()
-  }
+      fallbackNavigate: router.push,
+    });
+    if (handled && !isNewTab && panel?.closeChat) panel.closeChat();
+  };
   return (
-    <a
-      href={resolvedHref}
-      {...newTabAnchorAttrs(isNewTab)}
-      onClick={onClick}
-      className={className}
-    >
+    <a href={resolvedHref} {...newTabAnchorAttrs(isNewTab)} onClick={onClick} className={className}>
       {children}
     </a>
-  )
+  );
 }

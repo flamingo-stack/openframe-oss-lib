@@ -1,17 +1,9 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { BenefitCard, BenefitCardGrid } from '../ui'
-import {
-  G2Icon,
-  CapterraIcon,
-  TrustpilotIcon,
-  GetAppIcon,
-} from '../icons'
-import {
-  ContactForm,
-  type ContactFormProps,
-} from '../contact'
+import type React from 'react';
+import { ContactForm, type ContactFormProps } from '../contact';
+import { G2Icon, CapterraIcon, TrustpilotIcon, GetAppIcon } from '../icons';
+import { BenefitCard, BenefitCardGrid } from '../ui';
 
 /**
  * `<ShareExperienceSection>` — the case-studies "Share Your Experience"
@@ -42,20 +34,20 @@ export interface ShareExperienceSectionProps {
   /** Override the section heading. JSX so the host can break lines /
    *  colorize the accent the same way the hub does. Default: the
    *  hub's two-line "Share Your Experience / with Fellow MSPs:" copy. */
-  title?: React.ReactNode
+  title?: React.ReactNode;
   /** Override the lead paragraph. Default: the hub's review-incentive
    *  copy referencing Flamingo. Pass a brand-neutral string in embeds. */
-  subtitle?: React.ReactNode
+  subtitle?: React.ReactNode;
   /** Override the "How it works?" sub-heading. */
-  howItWorksTitle?: React.ReactNode
+  howItWorksTitle?: React.ReactNode;
   /** Override the "How it works?" body copy. */
-  howItWorksBody?: React.ReactNode
+  howItWorksBody?: React.ReactNode;
   /** Forwarded to the inner `<ContactForm>`. The hub passes its
    *  auto-resolved `userId` / `helpCategoryOptions` / `rdtCid` /
    *  `onSubmitSuccess` here. Embedders pass overrides like
    *  `successRedirectUrl` or extra prefill copy. */
-  contactFormProps?: Partial<ContactFormProps>
-  className?: string
+  contactFormProps?: Partial<ContactFormProps>;
+  className?: string;
 }
 
 const DEFAULT_TITLE: React.ReactNode = (
@@ -64,30 +56,28 @@ const DEFAULT_TITLE: React.ReactNode = (
     <br />
     with Fellow MSPs<span className="text-ods-accent">:</span>
   </>
-)
+);
 
 const DEFAULT_SUBTITLE: React.ReactNode = (
   <>
-    We know your time is valuable. When you leave an honest review about
-    your Flamingo experience, we&apos;d like to thank you with a gift
-    certificate – not as payment for a review, but as appreciation for
-    the time you invest in helping other MSPs make informed decisions.
+    We know your time is valuable. When you leave an honest review about your Flamingo experience, we&apos;d like to
+    thank you with a gift certificate – not as payment for a review, but as appreciation for the time you invest in
+    helping other MSPs make informed decisions.
   </>
-)
+);
 
 const DEFAULT_HOW_IT_WORKS_TITLE: React.ReactNode = (
   <>
     How it works<span className="text-ods-accent">?</span>
   </>
-)
+);
 
 const DEFAULT_HOW_IT_WORKS_BODY: React.ReactNode = (
   <>
-    Share your name and email with us, and we&apos;ll reach out to guide
-    you through the review process and arrange your thank-you gift
-    certificate.
+    Share your name and email with us, and we&apos;ll reach out to guide you through the review process and arrange your
+    thank-you gift certificate.
   </>
-)
+);
 
 /** Defaults that match the hub's existing /case-studies behavior. Host
  *  overrides via `contactFormProps` win over these. */
@@ -103,7 +93,7 @@ const DEFAULT_CONTACT_FORM_PROPS = {
   buttonVariant: 'outline' as ContactFormProps['buttonVariant'],
   buttonClassName: 'w-full',
   successToastMessage: "Thank you! We'll reach out to schedule your case study.",
-} satisfies Partial<ContactFormProps>
+} satisfies Partial<ContactFormProps>;
 
 export function ShareExperienceSection({
   title = DEFAULT_TITLE,
@@ -116,11 +106,11 @@ export function ShareExperienceSection({
   return (
     <section className={`flex flex-col gap-10${className ? ` ${className}` : ''}`}>
       <div className="text-ods-text-primary">
-        <h2 className="text-h1 text-ods-text-primary">{title}</h2>
-        <p className="text-h4 mt-6 max-w-[765px]">{subtitle}</p>
+        <h2 className="text-ods-text-primary text-h1">{title}</h2>
+        <p className="mt-6 max-w-[765px] text-h4">{subtitle}</p>
       </div>
 
-      <div className="bg-ods-bg border border-ods-border rounded-md p-10">
+      <div className="rounded-md border border-ods-border bg-ods-bg p-10">
         <div className="flex flex-col gap-10">
           <div className="flex flex-col gap-6 text-ods-text-primary">
             <h3 className="text-h2">{howItWorksTitle}</h3>
@@ -130,7 +120,7 @@ export function ShareExperienceSection({
           <BenefitCardGrid columns={4}>
             <BenefitCard
               icon={
-                <div className="bg-ods-bg border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ods-border bg-ods-bg p-2">
                   <G2Icon width={24} height={24} />
                 </div>
               }
@@ -140,7 +130,7 @@ export function ShareExperienceSection({
             />
             <BenefitCard
               icon={
-                <div className="bg-ods-bg border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ods-border bg-ods-bg p-2">
                   <CapterraIcon width={24} height={24} />
                 </div>
               }
@@ -150,7 +140,7 @@ export function ShareExperienceSection({
             />
             <BenefitCard
               icon={
-                <div className="bg-ods-bg border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ods-border bg-ods-bg p-2">
                   <TrustpilotIcon width={24} height={24} />
                 </div>
               }
@@ -160,7 +150,7 @@ export function ShareExperienceSection({
             />
             <BenefitCard
               icon={
-                <div className="bg-ods-bg border border-ods-border rounded-md p-2 w-12 h-12 flex items-center justify-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ods-border bg-ods-bg p-2">
                   <GetAppIcon width={24} height={24} />
                 </div>
               }
@@ -174,12 +164,9 @@ export function ShareExperienceSection({
            *  no per-call-site wiring needed for embeds behind a reverse
            *  proxy. Hub's auto-resolving wrapper passes userId / rdtCid /
            *  onSubmitSuccess via `contactFormProps`. */}
-          <ContactForm
-            {...DEFAULT_CONTACT_FORM_PROPS}
-            {...contactFormProps}
-          />
+          <ContactForm {...DEFAULT_CONTACT_FORM_PROPS} {...contactFormProps} />
         </div>
       </div>
     </section>
-  )
+  );
 }

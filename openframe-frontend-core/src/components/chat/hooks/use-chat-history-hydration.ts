@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * useChatHistoryHydration — mount-time rebuild of the chat message list from
@@ -17,129 +17,181 @@
  * is never lost when hydration misses.
  */
 
-import { useEffect, useRef, useState, type MutableRefObject } from 'react'
-import type { Message } from './use-chat'
-import { chatAuthedFetch } from '../utils/chat-authed-fetch'
-import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive'
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { isRecord, unwrapEnvelope } from '../../../chat-protocol/wire-narrow';
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive';
+import type { Message } from './use-chat';
 
 export interface UseChatHistoryHydrationArgs {
   /** Mirrors the adapter's `active` gate — an idle (Mingo-mode) mount never fetches. */
-  active: boolean
+  active: boolean;
   /** Chat source (= platform); part of the once-per-conversation guard key. */
-  source: string
+  source: string;
   /** Resolved history endpoint (`<chatStreamUrl>/history` by default). */
-  historyUrl: string
-  /** The server-issued conversation id (null = nothing to hydrate). */
-  conversationIdRef: MutableRefObject<string | null>
+  historyUrl: string;
+  /** The server-issued conversation id (null = nothing to hydrate). A VALUE,
+   *  not a ref: switching conversations (`selectDialog`) must re-run the
+   *  fetch, so the id is an effect dependency. */
+  conversationId: string | null;
   /** User-send counter — set to the hydrated user-turn count so the next
    *  live send lands on the following `sendIdx`. */
-  sendCountRef: MutableRefObject<number>
+  sendCountRef: MutableRefObject<number>;
   /** `useChat`'s injection primitive (replace-or-prepend). */
   hydrateMessages: (
     history: Message[],
     /** Per-send "Sources used" chips restored from the persisted audit copy
      *  (`[sendIdx, sources[]]` entries for the reducer's sourcesMap). */
     sourcesSeed?: Array<[number, unknown[]]>,
-  ) => void
+  ) => void;
   /** Invalidates the adapter's `latestMeta` memo after hydration lands. */
-  bumpMetaTick: () => void
+  bumpMetaTick: () => void;
+  /** The server answered OK and reported the id as NOT READABLE by this caller
+   *  (`found: false`) — it no longer exists, or is no longer ours (e.g. the
+   *  thread was claimed by an account and this browser is now signed out).
+   *  Distinct from a fetch FAILURE, which keeps the id so a transient outage
+   *  never loses context, and from a legitimately EMPTY but owned thread, which
+   *  also keeps it. A host that persists the id should drop it here — otherwise
+   *  every later turn streams an answer the server refuses to record. */
+  onOrphanedConversation?: (conversationId: string) => void;
 }
 
 export interface UseChatHistoryHydrationResult {
   /** True while the rebuild request is in flight. */
-  isHydratingHistory: boolean
+  isHydratingHistory: boolean;
   /** Once-per-`source:conversationId` guard. The adapter's `clearMessages`
    *  resets it to null alongside the stored id (a fresh conversation has no
    *  server history to fetch). */
-  hydratedKeyRef: MutableRefObject<string | null>
+  hydratedKeyRef: MutableRefObject<string | null>;
 }
 
 export function useChatHistoryHydration({
   active,
   source,
   historyUrl,
-  conversationIdRef,
+  conversationId,
   sendCountRef,
   hydrateMessages,
   bumpMetaTick,
+  onOrphanedConversation,
 }: UseChatHistoryHydrationArgs): UseChatHistoryHydrationResult {
-  const [isHydratingHistory, setIsHydratingHistory] = useState(false)
-  const hydratedKeyRef = useRef<string | null>(null)
+  const [isHydratingHistory, setIsHydratingHistory] = useState(false);
+  const hydratedKeyRef = useRef<string | null>(null);
+  // Monotonic run id: only the LATEST hydration owns the loading flag, so a
+  // slow superseded run resolving after a newer one started cannot clear the
+  // skeleton out from under it. (Same guard `useManagedDialogList` uses.)
+  const runIdRef = useRef(0);
 
   useEffect(() => {
-    if (!active) return
-    // No stored conversation id → nothing to hydrate (fresh visitor / after
-    // "new chat"); the first send establishes the conversation server-side.
-    const conversationId = conversationIdRef.current
-    if (!conversationId) return
-    const key = `${source}:${conversationId}`
-    if (hydratedKeyRef.current === key) return
-    hydratedKeyRef.current = key
-    let cancelled = false
-    setIsHydratingHistory(true)
-    ;(async () => {
+    // The flag is owned by the fetch below and released in its `finally`; the
+    // CLEANUP releases it for every early exit and for a superseded run.
+    // `conversationId` is a DEPENDENCY (a dialog switch must re-fetch), so that
+    // path is reachable in normal use: before this, "new chat" or archiving the
+    // open thread mid-fetch left the flag stuck true forever and the panel
+    // wedged on a message skeleton.
+    if (!active || !conversationId) return () => setIsHydratingHistory(false);
+    const key = `${source}:${conversationId}`;
+    if (hydratedKeyRef.current === key) return () => setIsHydratingHistory(false);
+    hydratedKeyRef.current = key;
+    let cancelled = false;
+    let completed = false;
+    const runId = ++runIdRef.current;
+    const isCurrentRun = () => runIdRef.current === runId;
+    setIsHydratingHistory(true);
+    // Self-contained: try/catch/finally below, and every state write is gated
+    // on `cancelled` so a superseded effect can't hydrate the new conversation.
+    void (async () => {
       try {
-        const res = await chatAuthedFetch(
-          `${historyUrl}?conversationId=${encodeURIComponent(conversationId)}`,
-          { method: 'GET' },
-        )
-        if (!res.ok) return
-        const payload = await res.json().catch(() => null)
-        // route-base successResponse envelope ({ data }) with a raw-body fallback.
-        const body = (payload?.data ?? payload) as
-          | { messages?: Array<Record<string, unknown>> }
-          | null
-        const rows = Array.isArray(body?.messages) ? body!.messages! : []
-        if (cancelled || rows.length === 0) return
-        const hydrated: Message[] = []
+        const res = await embedAuthedFetch(`${historyUrl}?conversationId=${encodeURIComponent(conversationId)}`, {
+          method: 'GET',
+        });
+        if (!res.ok) {
+          // Releases the once-guard exactly like the catch below — this path
+          // returns BEFORE it, and a transient 429/5xx must not mark the
+          // conversation hydrated for the rest of the mount. `isCurrentRun` so
+          // a superseded run can't release a key its replacement re-claimed
+          // (same key string, different run).
+          if (isCurrentRun() && hydratedKeyRef.current === key) hydratedKeyRef.current = null;
+          return;
+        }
+        // `.json()` is `any` — this is untrusted wire, so narrow it rather than
+        // asserting the shape we hope for.
+        const payload: unknown = await res.json().catch(() => null);
+        const body = unwrapEnvelope(payload);
+        const rawRows = isRecord(body) ? body.messages : undefined;
+        // Non-object rows are DROPPED, not carried into the loop below. The
+        // loop reads `row.role` unguarded, so a single `null` row threw a
+        // TypeError that the effect's outer `catch` swallowed — abandoning the
+        // hydration wholesale and rendering an EMPTY conversation on refresh.
+        // Skipping the bad row keeps every good one.
+        const rows: Array<Record<string, unknown>> = Array.isArray(rawRows) ? rawRows.filter(isRecord) : [];
+        if (cancelled) return;
+        if (rows.length === 0) {
+          // `found === false` = unknown or foreign id → the stored id is dead.
+          // An owned-but-empty thread (`found === true`, or a server that
+          // predates the flag) keeps it.
+          const found = isRecord(body) ? body.found : undefined;
+          if (found === false) onOrphanedConversation?.(conversationId);
+          return;
+        }
+        const hydrated: Message[] = [];
         // Per-send "Sources used" chips, restored from the persisted audit
         // copy the history route projects as `sources` on assistant rows —
         // seeded into the reducer's sourcesMap so chips survive a refresh
         // exactly like live turns. Keyed by send index (last row wins).
-        const sourcesSeed = new Map<number, unknown[]>()
-        let userTurns = 0
+        const sourcesSeed = new Map<number, unknown[]>();
+        let userTurns = 0;
         for (const row of rows) {
-          const role =
-            row.role === 'assistant' ? 'assistant' : row.role === 'user' ? 'user' : null
-          if (!role) continue
-          const content = typeof row.content === 'string' ? row.content : ''
+          const role = row.role === 'assistant' ? 'assistant' : row.role === 'user' ? 'user' : null;
+          if (!role) continue;
+          const content = typeof row.content === 'string' ? row.content : '';
           // The approval placeholder ('') and the server-built auto-continuation
           // directive are part of the LLM history but never rendered.
-          const hidden =
-            role === 'user' &&
-            (content === '' || content.startsWith(AUTO_CONTINUATION_DIRECTIVE_PREFIX))
+          const hidden = role === 'user' && (content === '' || content.startsWith(AUTO_CONTINUATION_DIRECTIVE_PREFIX));
           if (role === 'user') {
-            userTurns += 1
+            userTurns += 1;
           }
           if (role === 'assistant' && Array.isArray(row.sources) && row.sources.length > 0) {
-            sourcesSeed.set(Math.max(0, userTurns - 1), row.sources as unknown[])
+            sourcesSeed.set(Math.max(0, userTurns - 1), row.sources as unknown[]);
           }
           hydrated.push({
             id: `hydrated-${String(row.seq ?? hydrated.length)}`,
             role,
             content,
-            ...(typeof row.created_at === 'string'
-              ? { timestamp: new Date(row.created_at) }
-              : {}),
+            ...(typeof row.created_at === 'string' ? { timestamp: new Date(row.created_at) } : {}),
             ...(hidden ? { hidden: true } : {}),
-          } as Message)
+          });
         }
-        if (cancelled || hydrated.length === 0) return
-        sendCountRef.current = userTurns
-        hydrateMessages(hydrated, Array.from(sourcesSeed.entries()))
-        bumpMetaTick()
+        if (cancelled || hydrated.length === 0) return;
+        sendCountRef.current = userTurns;
+        hydrateMessages(hydrated, Array.from(sourcesSeed.entries()));
+        bumpMetaTick();
       } catch {
         // Fetch failed — start empty; the server still owns history (above).
+        // Release the once-guard so re-selecting the conversation retries
+        // (a transient 429/5xx must not mark it hydrated for the mount).
+        if (isCurrentRun() && hydratedKeyRef.current === key) hydratedKeyRef.current = null;
       } finally {
-        if (!cancelled) setIsHydratingHistory(false)
+        completed = true;
+        // Only the latest run owns the flag (React no-ops updates after unmount).
+        if (isCurrentRun()) setIsHydratingHistory(false);
       }
-    })()
+    })();
     return () => {
-      cancelled = true
-    }
-    // Refs are stable across renders — the effect keys on the identity-ish deps only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, source, historyUrl, hydrateMessages, bumpMetaTick])
+      cancelled = true;
+      // An INCOMPLETE run must hand the key back, or a re-run for the SAME key
+      // (a mode toggle flipping `active`, a StrictMode remount) early-returns
+      // on the guard, drops the in-flight response and never refetches — the
+      // thread would render empty for the rest of the mount while the server
+      // keeps answering from history the user cannot see.
+      if (!completed && isCurrentRun() && hydratedKeyRef.current === key) hydratedKeyRef.current = null;
+      // Release the skeleton unless a newer run has already claimed it (that
+      // run raises the flag itself and owns clearing it).
+      if (isCurrentRun()) setIsHydratingHistory(false);
+    };
+    // `sendCountRef` is a ref: a stable identity, so listing it costs nothing;
+    // `conversationId` is the real re-run trigger (dialog switch).
+  }, [active, source, historyUrl, conversationId, hydrateMessages, bumpMetaTick, onOrphanedConversation, sendCountRef]);
 
-  return { isHydratingHistory, hydratedKeyRef }
+  return { isHydratingHistory, hydratedKeyRef };
 }

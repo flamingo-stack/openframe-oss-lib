@@ -10,7 +10,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'A tab-style selector with primary (accent) and secondary (soft grey) variants. Supports icons, disabled states, and badges.',
+        component:
+          'A tab-style selector with primary (accent) and secondary (soft grey) variants. Supports icons, disabled states, and badges.',
       },
     },
   },
@@ -27,7 +28,7 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '600px' }}>
         <Story />
       </div>
@@ -53,9 +54,9 @@ const fiveItems: TabSelectorItem[] = [
 ];
 
 const itemsWithIcons: TabSelectorItem[] = [
-  { id: 'desktop', label: 'Desktop', icon: <Monitor className="w-5 h-5" /> },
-  { id: 'tablet', label: 'Tablet', icon: <Tablet className="w-5 h-5" /> },
-  { id: 'mobile', label: 'Mobile', icon: <Smartphone className="w-5 h-5" /> },
+  { id: 'desktop', label: 'Desktop', icon: <Monitor className="h-5 w-5" /> },
+  { id: 'tablet', label: 'Tablet', icon: <Tablet className="h-5 w-5" /> },
+  { id: 'mobile', label: 'Mobile', icon: <Smartphone className="h-5 w-5" /> },
 ];
 
 /**
@@ -202,9 +203,9 @@ export const PlatformExample: Story = {
   args: {
     value: 'macos',
     items: [
-      { id: 'windows', label: 'Windows', icon: <Monitor className="w-5 h-5" /> },
-      { id: 'macos', label: 'macOS', icon: <Apple className="w-5 h-5" /> },
-      { id: 'linux', label: 'Linux', icon: <Globe className="w-5 h-5" /> },
+      { id: 'windows', label: 'Windows', icon: <Monitor className="h-5 w-5" /> },
+      { id: 'macos', label: 'macOS', icon: <Apple className="h-5 w-5" /> },
+      { id: 'linux', label: 'Linux', icon: <Globe className="h-5 w-5" /> },
     ],
     variant: 'primary',
     label: 'Select Platform',
@@ -261,15 +262,15 @@ export const WithBadges: Story = {
   render: function Render() {
     const [value, setValue] = useState('basic');
     const items: TabSelectorItem[] = [
-      { id: 'basic', label: 'Basic', icon: <Shield className="w-5 h-5" /> },
-      { id: 'pro', label: 'Pro', icon: <Shield className="w-5 h-5" /> },
+      { id: 'basic', label: 'Basic', icon: <Shield className="h-5 w-5" /> },
+      { id: 'pro', label: 'Pro', icon: <Shield className="h-5 w-5" /> },
       {
         id: 'enterprise',
         label: 'Enterprise',
-        icon: <Shield className="w-5 h-5" />,
+        icon: <Shield className="h-5 w-5" />,
         disabled: true,
         badge: (
-          <span className="text-[10px] bg-[var(--ods-flamingo-cyan-base)] text-ods-text-on-accent px-1.5 py-0.5 rounded font-mono uppercase">
+          <span className="rounded bg-[var(--ods-flamingo-cyan-base)] px-1.5 py-0.5 font-mono text-[10px] uppercase text-ods-text-on-accent">
             Soon
           </span>
         ),

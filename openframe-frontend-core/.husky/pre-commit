@@ -1,0 +1,20 @@
+#!/bin/sh
+# The git root is a POLYGLOT monorepo (Java, Rust, Node) and husky sets
+# `core.hooksPath` repo-wide, so this hook fires on every commit — including
+# ones that touch no JS/TS at all. Both guards below exist to make those a
+# no-op rather than a foot-gun for contributors who never installed node.
+
+# 1. Nothing staged under the node package? Not our business.
+git diff --cached --name-only --diff-filter=ACMR -- openframe-frontend-core | grep -q . || exit 0
+
+cd openframe-frontend-core || exit 1
+
+# 2. No install here (fresh clone, or someone wiped node_modules). Say so and
+#    let the commit through — CI is the gate that actually blocks a merge.
+if [ ! -x node_modules/.bin/lint-staged ]; then
+  echo "pre-commit: openframe-frontend-core/node_modules is missing, skipping lint-staged."
+  echo "            run 'npm install' there to get pre-commit checks back."
+  exit 0
+fi
+
+exec node_modules/.bin/lint-staged

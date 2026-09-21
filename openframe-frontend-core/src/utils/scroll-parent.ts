@@ -1,14 +1,14 @@
 /** Anything the browser can scroll. */
-const SCROLLABLE = /(auto|scroll|overlay)/
+const SCROLLABLE = /(auto|scroll|overlay)/;
 
 /** Every scrollable ancestor of `element`, innermost first. */
 export function scrollableAncestorsOf(element: HTMLElement): HTMLElement[] {
-  const found: HTMLElement[] = []
+  const found: HTMLElement[] = [];
   for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
-    const style = getComputedStyle(node)
-    if (SCROLLABLE.test(style.overflowY) || SCROLLABLE.test(style.overflowX)) found.push(node)
+    const style = getComputedStyle(node);
+    if (SCROLLABLE.test(style.overflowY) || SCROLLABLE.test(style.overflowX)) found.push(node);
   }
-  return found
+  return found;
 }
 
 /**
@@ -19,5 +19,5 @@ export function scrollableAncestorsOf(element: HTMLElement): HTMLElement[] {
  * region a user considers to be the page.
  */
 export function nearestScrollableAncestor(element: HTMLElement): HTMLElement | null {
-  return scrollableAncestorsOf(element)[0] ?? null
+  return scrollableAncestorsOf(element)[0] ?? null;
 }

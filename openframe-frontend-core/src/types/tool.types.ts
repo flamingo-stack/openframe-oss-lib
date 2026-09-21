@@ -14,10 +14,10 @@ export const ToolTypeValues = {
   OPENFRAME_CLIENT: 'OPENFRAME_CLIENT',
   OPENFRAME_RMM: 'OPENFRAME_RMM',
   OSQUERY: 'OSQUERY',
-  SYSTEM: 'SYSTEM'
-} as const
+  SYSTEM: 'SYSTEM',
+} as const;
 
-export type ToolType = (typeof ToolTypeValues)[keyof typeof ToolTypeValues]
+export type ToolType = (typeof ToolTypeValues)[keyof typeof ToolTypeValues];
 
 /**
  * Maps tool types to display labels
@@ -31,5 +31,5 @@ export const toolLabels: Record<ToolType, string> = {
   OPENFRAME_CLIENT: 'OpenFrame Client',
   OPENFRAME_RMM: 'RMM',
   OSQUERY: 'Osquery',
-  SYSTEM: 'System'
-}
+  SYSTEM: 'System',
+};

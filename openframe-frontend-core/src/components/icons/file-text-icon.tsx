@@ -1,10 +1,10 @@
-import React from "react"
+import type React from 'react';
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export interface FileTextIconProps extends React.SVGProps<SVGSVGElement> { }
+export interface FileTextIconProps extends React.SVGProps<SVGSVGElement> {}
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function FileTextIcon({ className = "h-6 w-6", color = 'white', ...props }: FileTextIconProps) {
+export function FileTextIcon({ className = 'h-6 w-6', color = 'white', ...props }: FileTextIconProps) {
   return (
     <svg
       width="24"
@@ -22,34 +22,10 @@ export function FileTextIcon({ className = "h-6 w-6", color = 'white', ...props 
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path
-        d="M14 2V8H20"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M16 13H8"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M16 17H8"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M10 9H9H8"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M14 2V8H20" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 13H8" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 17H8" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 9H9H8" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  )
+  );
 }

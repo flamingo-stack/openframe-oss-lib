@@ -1,7 +1,7 @@
-'use client'
+'use client';
 
-import { useEffect, useReducer } from 'react'
-import { embedAuthedFetch, needsBearerAssetFetch } from '../utils/embed-authed-fetch'
+import { useEffect, useReducer } from 'react';
+import { embedAuthedFetch, needsBearerAssetFetch } from '../utils/embed-authed-fetch';
 
 /**
  * Resolve ANY asset URL the browser would load natively — `<img src>`,
@@ -29,9 +29,9 @@ import { embedAuthedFetch, needsBearerAssetFetch } from '../utils/embed-authed-f
  * via `clearAuthedAssetCache`.
  */
 
-const resolvedCache = new Map<string, string>()
-const inFlight = new Map<string, Promise<void>>()
-let cacheGeneration = 0
+const resolvedCache = new Map<string, string>();
+const inFlight = new Map<string, Promise<void>>();
+let cacheGeneration = 0;
 
 /**
  * Drop every cached blob and revoke its object URL. Hosts call this at
@@ -41,32 +41,32 @@ let cacheGeneration = 0
  * by a generation counter — their results are revoked instead of cached.
  */
 export function clearAuthedAssetCache(): void {
-  cacheGeneration++
-  for (const url of resolvedCache.values()) URL.revokeObjectURL(url)
-  resolvedCache.clear()
-  inFlight.clear()
+  cacheGeneration++;
+  for (const url of resolvedCache.values()) URL.revokeObjectURL(url);
+  resolvedCache.clear();
+  inFlight.clear();
 }
 
 function fetchAsBlobUrl(src: string, accept: string): Promise<void> {
-  let pending = inFlight.get(src)
+  let pending = inFlight.get(src);
   if (!pending) {
-    const startedGeneration = cacheGeneration
+    const startedGeneration = cacheGeneration;
     pending = embedAuthedFetch(src, { headers: { Accept: accept } })
       .then(async response => {
-        if (!response.ok) throw new Error(`asset fetch failed: ${response.status}`)
-        const blobUrl = URL.createObjectURL(await response.blob())
+        if (!response.ok) throw new Error(`asset fetch failed: ${response.status}`);
+        const blobUrl = URL.createObjectURL(await response.blob());
         if (startedGeneration === cacheGeneration) {
-          resolvedCache.set(src, blobUrl)
+          resolvedCache.set(src, blobUrl);
         } else {
-          URL.revokeObjectURL(blobUrl)
+          URL.revokeObjectURL(blobUrl);
         }
       })
       .finally(() => {
-        if (inFlight.get(src) === pending) inFlight.delete(src)
-      })
-    inFlight.set(src, pending)
+        if (inFlight.get(src) === pending) inFlight.delete(src);
+      });
+    inFlight.set(src, pending);
   }
-  return pending
+  return pending;
 }
 
 /**
@@ -76,23 +76,23 @@ function fetchAsBlobUrl(src: string, accept: string): Promise<void> {
  *               `embedAuthedFetch`'s default JSON `Content-Type` on the GET.
  */
 export function useAuthedAssetSrc(src?: string | null, accept = '*/*'): string | undefined {
-  const bearerSrc = src && needsBearerAssetFetch(src) ? src : null
-  const [, rerender] = useReducer((c: number) => c + 1, 0)
+  const bearerSrc = src && needsBearerAssetFetch(src) ? src : null;
+  const [, rerender] = useReducer((c: number) => c + 1, 0);
 
   useEffect(() => {
-    if (!bearerSrc || resolvedCache.has(bearerSrc)) return
-    let cancelled = false
+    if (!bearerSrc || resolvedCache.has(bearerSrc)) return undefined;
+    let cancelled = false;
     fetchAsBlobUrl(bearerSrc, accept)
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) rerender()
-      })
+        if (!cancelled) rerender();
+      });
     return () => {
-      cancelled = true
-    }
-  }, [bearerSrc, accept])
+      cancelled = true;
+    };
+  }, [bearerSrc, accept]);
 
-  if (!src) return undefined
-  if (!bearerSrc) return src
-  return resolvedCache.get(bearerSrc)
+  if (!src) return undefined;
+  if (!bearerSrc) return src;
+  return resolvedCache.get(bearerSrc);
 }

@@ -27,7 +27,7 @@ import { useDebounce, useMediaQuery, useToast } from '@flamingo-stack/openframe-
 ### Utilities
 
 ```tsx
-import { cn, formatDate, formatPrice, getBaseUrl } from '@flamingo-stack/openframe-frontend-core/utils'
+import { cn, formatDate, formatPrice, getPlatformUrl } from '@flamingo-stack/openframe-frontend-core/utils'
 ```
 
 ### Styles
@@ -65,7 +65,7 @@ export default {
 | `./components/navigation` | Navigation components (Header, StickySectionNav) |
 | `./components/toast` | Toast notification system |
 | `./hooks` | React hooks (useDebounce, useMediaQuery, useToast, etc.) |
-| `./utils` | Utilities (cn, formatDate, formatPrice, getBaseUrl, platform-config) |
+| `./utils` | Utilities (cn, formatDate, formatPrice, getPlatformUrl, platform-config) |
 | `./types` | TypeScript type definitions |
 | `./styles` | CSS styles and ODS design tokens |
 | `./nats` | NATS WebSocket utilities |

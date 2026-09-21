@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import type React from "react";
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type React from 'react';
 
-import { ApprovalRequestMessage } from "../components/chat/approval-request-message";
-import type { ApprovalRequestData } from "../components/chat/types";
+import { ApprovalRequestMessage } from '../components/chat/approval-request-message';
+import type { ApprovalRequestData } from '../components/chat/types';
 
 /**
  * Single-command approval card (the legacy, non-batch variant of the Figma
@@ -19,36 +19,40 @@ const LONG_COMMAND = `Get-CimInstance Win32_Process |
   Where-Object { $_.Path -like 'C:\\Users\\Public\\*' }`;
 
 const baseData: ApprovalRequestData = {
-	command: LONG_COMMAND,
-	requestId: "req-1",
-	approvalType: "ADMIN",
-	fields: [
-		{ label: "Tool", value: "OpenFrame RMM" },
-		{ label: "RunAsUser", value: "False" },
-		{ label: "timeoutSeconds", value: "60" },
-	],
+  command: LONG_COMMAND,
+  requestId: 'req-1',
+  approvalType: 'ADMIN',
+  fields: [
+    { label: 'Tool', value: 'OpenFrame RMM' },
+    { label: 'RunAsUser', value: 'False' },
+    { label: 'timeoutSeconds', value: '60' },
+  ],
 };
 
-const constrainedDecorator =
-	(width?: number) => (Story: React.ComponentType) => (
-		<div style={{ maxWidth: width ?? 400, background: "var(--color-bg)" }}>
-			<Story />
-		</div>
-	);
+const constrainedDecorator = (width?: number) =>
+  // Named function expression: Storybook renders decorators as components, so
+  // the name is what shows up in the React tree instead of `Anonymous`.
+  function ConstrainedDecorator(Story: React.ComponentType) {
+    return (
+      <div style={{ maxWidth: width ?? 400, background: 'var(--color-bg)' }}>
+        <Story />
+      </div>
+    );
+  };
 
 const meta = {
-	title: "Chat/Admin/ApprovalRequestMessage",
-	component: ApprovalRequestMessage,
-	tags: ["autodocs"],
-	parameters: {
-		docs: {
-			description: {
-				component:
-					"Single-command approval card — the legacy variant of the Figma Command Block. Prefer ApprovalBatchMessage for new work.",
-			},
-		},
-	},
-	decorators: [constrainedDecorator()],
+  title: 'Chat/Admin/ApprovalRequestMessage',
+  component: ApprovalRequestMessage,
+  tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Single-command approval card — the legacy variant of the Figma Command Block. Prefer ApprovalBatchMessage for new work.',
+      },
+    },
+  },
+  decorators: [constrainedDecorator()],
 } satisfies Meta<typeof ApprovalRequestMessage>;
 
 export default meta;
@@ -56,40 +60,40 @@ type Story = StoryObj<typeof meta>;
 
 /** Pending — Approve / Reject buttons shown. */
 export const Pending: Story = {
-	args: {
-		data: baseData,
-		status: "pending",
-		onApprove: () => {},
-		onReject: () => {},
-	},
+  args: {
+    data: baseData,
+    status: 'pending',
+    onApprove: () => {},
+    onReject: () => {},
+  },
 };
 
 /** Approved — green status tag. */
 export const Approved: Story = {
-	args: { data: baseData, status: "approved" },
+  args: { data: baseData, status: 'approved' },
 };
 
 /** Rejected — red status tag. */
 export const Rejected: Story = {
-	args: { data: baseData, status: "rejected" },
+  args: { data: baseData, status: 'rejected' },
 };
 
 /** Cancelled — grey status tag. */
 export const Cancelled: Story = {
-	args: { data: baseData, status: "cancelled" },
+  args: { data: baseData, status: 'cancelled' },
 };
 
 /** Explanation prose instead of a structured field list. */
 export const WithExplanation: Story = {
-	args: {
-		data: {
-			command: LONG_COMMAND,
-			requestId: "req-2",
-			explanation:
-				"This runs a read-only diagnostic to inspect processes launched from the public folder. It does not modify the endpoint.",
-		},
-		status: "pending",
-		onApprove: () => {},
-		onReject: () => {},
-	},
+  args: {
+    data: {
+      command: LONG_COMMAND,
+      requestId: 'req-2',
+      explanation:
+        'This runs a read-only diagnostic to inspect processes launched from the public folder. It does not modify the endpoint.',
+    },
+    status: 'pending',
+    onApprove: () => {},
+    onReject: () => {},
+  },
 };

@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Fetch the conversation timeline (Note engagements + attachments) for
@@ -14,30 +14,30 @@
  * guessing ticket ids.
  */
 
-import { useQuery } from '@tanstack/react-query'
-import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
-import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
-import { useChatIdentity } from '../../chat/hooks/use-chat-identity'
+import { useQuery } from '@tanstack/react-query';
+import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { useChatIdentity } from '../../chat/hooks/use-chat-identity';
 
-const LIST_ENGAGEMENTS_ENDPOINT = '/api/chat/agent/list-engagements'
+const LIST_ENGAGEMENTS_ENDPOINT = '/api/chat/agent/list-engagements';
 
 export interface TicketEngagementFile {
-  id: string
-  name: string | null
-  url: string | null
-  mime: string | null
-  size: number | null
+  id: string;
+  name: string | null;
+  url: string | null;
+  mime: string | null;
+  size: number | null;
 }
 
 export interface TicketEngagement {
-  id: string
-  body: string | null
-  authorId: string | null
+  id: string;
+  body: string | null;
+  authorId: string | null;
   /** Whether this engagement is customer-authored (Custom Channels
    *  Messages — INCOMING direction) or team-authored (Notes + future
    *  OUTGOING messages). Drives avatar variant + the "Customer"/"Support
    *  team" header label in the drawer's conversation thread. */
-  authorRole: 'customer' | 'support'
+  authorRole: 'customer' | 'support';
   /** Display name. Server resolves it differently per role:
    *    - `support` (Notes) → HubSpot owner id is resolved to an owner
    *      email, then matched against our `profiles` table; the matched
@@ -47,55 +47,50 @@ export interface TicketEngagement {
    *      (drawer renders identity.user.name LIVE for the current
    *      user's own messages). Set only on legacy rows from earlier
    *      migrations. */
-  authorName: string | null
+  authorName: string | null;
   /** Resolved author email — for `support` it's the HubSpot owner's
    *  email; for `customer` it's the message sender. Used by the
    *  drawer to cross-check "is this me?" against `identity.user.email`. */
-  authorEmail: string | null
+  authorEmail: string | null;
   /** Avatar URL. For `support`, resolved from the matched `profiles`
    *  row's `avatar_url`. Null when the owner isn't a known Flamingo
    *  employee. For `customer`, always null on the wire (drawer reads
    *  identity.user.avatarUrl live for own messages). */
-  authorAvatarUrl: string | null
-  createdAt: string
-  attachments: TicketEngagementFile[]
+  authorAvatarUrl: string | null;
+  createdAt: string;
+  attachments: TicketEngagementFile[];
 }
 
 interface ListEngagementsResponse {
-  engagements?: TicketEngagement[]
-  count?: number
+  engagements?: TicketEngagement[];
+  count?: number;
 }
 
 export interface UseTicketEngagementsReturn {
-  engagements: TicketEngagement[]
-  isLoading: boolean
-  isFetching: boolean
-  error: Error | null
-  refetch: () => void
+  engagements: TicketEngagement[];
+  isLoading: boolean;
+  isFetching: boolean;
+  error: Error | null;
+  refetch: () => void;
 }
 
 export function useTicketEngagements(
   externalTicketId: string | null | undefined,
   enabled = true,
 ): UseTicketEngagementsReturn {
-  const identity = useChatIdentity()
-  const identityKey = identity.user?.email ?? 'anon'
+  const identity = useChatIdentity();
+  const identityKey = identity.user?.email ?? 'anon';
   // Endpoint from the runtime config (like every other endpoint); falls back to
   // the bare hub path when unconfigured.
-  const listEngagementsEndpoint =
-    useRequiredChatRuntime().endpoints.listEngagementsUrl ?? LIST_ENGAGEMENTS_ENDPOINT
+  const listEngagementsEndpoint = useRequiredChatRuntime().endpoints.listEngagementsUrl ?? LIST_ENGAGEMENTS_ENDPOINT;
 
   // "Will this ticket fetch its timeline once identity is ready?" — i.e. it's a
   // real, non-optimistic ticket the caller enabled. INDEPENDENT of whether
   // identity has resolved yet, so the loading state is correct from the very
   // first render (before `useChatIdentity` settles).
-  const fetchable =
-    enabled &&
-    !!externalTicketId &&
-    !externalTicketId.startsWith('temp-') // optimistic placeholders have no real id yet
+  const fetchable = enabled && !!externalTicketId && !externalTicketId.startsWith('temp-'); // optimistic placeholders have no real id yet
 
-  const queryEnabled =
-    fetchable && identity.authTier !== 'anon' && !!identity.user?.email
+  const queryEnabled = fetchable && identity.authTier !== 'anon' && !!identity.user?.email;
 
   const query = useQuery({
     queryKey: ['ticket-engagements', externalTicketId, identityKey],
@@ -115,15 +110,15 @@ export function useTicketEngagements(
       const response = await embedAuthedFetch(listEngagementsEndpoint, {
         method: 'POST',
         body: JSON.stringify({ ticket_id: externalTicketId }),
-      })
+      });
       if (!response.ok) {
-        const text = await response.text().catch(() => '')
-        throw new Error(`list-engagements failed: ${response.status} ${text.slice(0, 200)}`)
+        const text = await response.text().catch(() => '');
+        throw new Error(`list-engagements failed: ${response.status} ${text.slice(0, 200)}`);
       }
-      const body = (await response.json()) as ListEngagementsResponse
-      return Array.isArray(body.engagements) ? body.engagements : []
+      const body = (await response.json()) as ListEngagementsResponse;
+      return Array.isArray(body.engagements) ? body.engagements : [];
     },
-  })
+  });
 
   return {
     engagements: query.data ?? [],
@@ -140,13 +135,11 @@ export function useTicketEngagements(
     // cold query fetch (`data === undefined`). A background poll keeps
     // `query.data` defined, so it never re-flashes the skeleton. Non-fetchable
     // (optimistic/disabled) or a resolved-anon viewer → not loading.
-    isLoading:
-      fetchable &&
-      (identity.isLoading || (queryEnabled && query.data === undefined)),
+    isLoading: fetchable && (identity.isLoading || (queryEnabled && query.data === undefined)),
     isFetching: query.isFetching,
-    error: (query.error as Error | null) ?? null,
+    error: query.error ?? null,
     refetch: () => {
-      void query.refetch()
+      void query.refetch();
     },
-  }
+  };
 }

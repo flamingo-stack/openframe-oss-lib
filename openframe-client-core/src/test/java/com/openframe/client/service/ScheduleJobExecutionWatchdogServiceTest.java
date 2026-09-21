@@ -1,9 +1,9 @@
 package com.openframe.client.service;
 
 import com.openframe.client.service.rmm.watchdog.ScheduleJobExecutionWatchdogService;
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.ScheduleScriptExecution;
-import com.openframe.data.document.rmm.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.repository.rmm.CustomScriptExecutionRepository.LeafStatusCounts;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -108,12 +109,38 @@ class ScheduleJobExecutionWatchdogServiceTest {
         verify(scheduleScriptExecutionRepository).transitionIfRunning(eq(TENANT), eq("exec-b"), eq(ExecutionStatus.FAILED), any());
     }
 
+    @Test
+    @DisplayName("finalizeAffectedHeaders: leaves of the same fire collapse to a single finalize; ad-hoc (no scheduleId) leaves are ignored")
+    void finalizeAffectedHeaders_dedupesPerFireAndIgnoresAdhoc() {
+        ScriptExecution fireA = leaf(TENANT, "sch-1", EXEC, "m-1");
+        ScriptExecution fireB = leaf(TENANT, "sch-1", EXEC, "m-2");
+        ScriptExecution adhoc = leaf(TENANT, null, "exec-adhoc", "m-3");
+        when(scriptExecutionRepository.countLeavesByStatus(TENANT, EXEC))
+                .thenReturn(new LeafStatusCounts(1, 0));
+
+        service.finalizeAffectedHeaders(List.of(fireA, fireB, adhoc));
+
+        verify(scriptExecutionRepository, times(1)).countLeavesByStatus(TENANT, EXEC);
+        verify(scriptExecutionRepository, never()).countLeavesByStatus(TENANT, "exec-adhoc");
+        verify(scheduleScriptExecutionRepository, never()).transitionIfRunning(any(), any(), any(), any());
+    }
+
     private static ScheduleScriptExecution header(String tenantId, String executionId) {
         return ScheduleScriptExecution.builder()
                 .tenantId(tenantId)
                 .executionId(executionId)
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(Instant.now().minusSeconds(1000))
+                .build();
+    }
+
+    private static ScriptExecution leaf(String tenantId, String scheduleId, String executionId, String machineId) {
+        return ScriptExecution.builder()
+                .tenantId(tenantId)
+                .scheduleId(scheduleId)
+                .executionId(executionId)
+                .machineId(machineId)
+                .status(ExecutionStatus.FAILED)
                 .build();
     }
 }

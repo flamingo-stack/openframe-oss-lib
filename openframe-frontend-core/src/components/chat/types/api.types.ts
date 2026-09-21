@@ -3,59 +3,53 @@
  * Contains types for API interactions and React hooks
  */
 
-import type { ChunkData, NatsMessageType, FetchChunksFunction } from './network.types'
-import type { ChatType, ChatApprovalStatus } from './chat.types'
-import type {
-  MessageSegment,
-  PendingToolCallData,
-  TokenUsageData,
-  ExecutingToolState,
-  ToolExecutionSegment,
-} from './message.types'
+import type { ChatType, ChatApprovalStatus } from './chat.types';
+import type { MessageSegment, TokenUsageData, ToolExecutionSegment } from './message.types';
+import type { ChunkData, NatsMessageType, FetchChunksFunction } from './network.types';
 
 // ========== Hook Options ==========
 
 export interface UseChunkCatchupOptions {
-  dialogId: string | null
-  onChunkReceived: (chunk: ChunkData, messageType: NatsMessageType) => void
+  dialogId: string | null;
+  onChunkReceived: (chunk: ChunkData, messageType: NatsMessageType) => void;
   /**
    * Chat types to fetch during catchup
    * Default: ['CLIENT_CHAT']
    */
-  chatTypes?: ChatType[]
+  chatTypes?: ChatType[];
   /**
    * Custom function to fetch chunks from the API
    * If not provided, a default implementation using fetch will be used
    */
-  fetchChunks?: FetchChunksFunction
+  fetchChunks?: FetchChunksFunction;
 }
 
 export interface UseNatsDialogSubscriptionOptions {
-  enabled: boolean
-  dialogId: string | null
+  enabled: boolean;
+  dialogId: string | null;
   /**
    * NATS topics to subscribe to
    * Default: ['message']
    */
-  topics?: NatsMessageType[]
-  onEvent?: (payload: unknown, messageType: NatsMessageType) => void
-  onConnect?: () => void
-  onDisconnect?: () => void
-  onSubscribed?: () => void
+  topics?: NatsMessageType[];
+  onEvent?: (payload: unknown, messageType: NatsMessageType) => void;
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onSubscribed?: () => void;
   /** Called on disconnect, before nats.ws attempts reconnection. Use to refresh auth (cookies/tokens). */
-  onBeforeReconnect?: () => Promise<void> | void
+  onBeforeReconnect?: () => Promise<void> | void;
   /**
    * Function to get the NATS WebSocket URL
    */
-  getNatsWsUrl: () => string | null
+  getNatsWsUrl: () => string | null;
   /**
    * NATS client configuration options
    */
   clientConfig?: {
-    name?: string
-    user?: string
-    pass?: string
-  }
+    name?: string;
+    user?: string;
+    pass?: string;
+  };
   /**
    * Reconnection backoff tuning. All fields optional; omitted values fall back to NETWORK_CONFIG defaults.
    * Schedule: the first `fastRetries` attempts use `fastRetryDelayMs`, then exponential
@@ -64,73 +58,78 @@ export interface UseNatsDialogSubscriptionOptions {
    */
   reconnectionBackoff?: {
     /** Attempts to fire at `fastRetryDelayMs` before exponential phase kicks in. Default: 0. */
-    fastRetries?: number
+    fastRetries?: number;
     /** Delay used during the fast-retry phase. Default: NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS. */
-    fastRetryDelayMs?: number
+    fastRetryDelayMs?: number;
     /** Base delay for the exponential phase. Default: NETWORK_CONFIG.RETRY_INITIAL_DELAY_MS. */
-    initialDelayMs?: number
+    initialDelayMs?: number;
     /** Upper cap on any single retry delay. Default: NETWORK_CONFIG.RETRY_MAX_DELAY_MS. */
-    maxDelayMs?: number
+    maxDelayMs?: number;
     /** Per-attempt multiplier during exponential phase. Default: NETWORK_CONFIG.RETRY_BACKOFF_MULTIPLIER. */
-    multiplier?: number
-  }
+    multiplier?: number;
+  };
 }
 
 // ========== Hook Return Types ==========
 
 export interface UseChunkCatchupReturn {
-  catchUpChunks: (fromSequenceId?: number | null) => Promise<void>
-  processChunk: (chunk: ChunkData, messageType: NatsMessageType, forceProcess?: boolean) => boolean
-  resetChunkTracking: () => void
-  startInitialBuffering: () => void
-  isBufferingActive: () => boolean
-  processedCount: number
+  catchUpChunks: (fromSequenceId?: number | null) => Promise<void>;
+  processChunk: (chunk: ChunkData, messageType: NatsMessageType, forceProcess?: boolean) => boolean;
+  resetChunkTracking: () => void;
+  startInitialBuffering: () => void;
+  isBufferingActive: () => boolean;
+  /**
+   * De-duplicated chunk tally. A getter, not a number: the count is bumped by
+   * chunk callbacks with no re-render behind it, so a snapshot read at render
+   * time went stale the moment the next chunk landed.
+   */
+  processedCount: () => number;
   /** Reset internal guards and re-run catch-up from the last known sequence ID. Use after reconnection to fetch missed messages. */
-  resetAndCatchUp: () => Promise<void>
+  resetAndCatchUp: () => Promise<void>;
 }
 
 export interface UseNatsDialogSubscriptionReturn {
-  isConnected: boolean
-  isSubscribed: boolean
+  isConnected: boolean;
+  isSubscribed: boolean;
   /** Incremented each time the NATS client reconnects after a disconnect. Starts at 0. */
-  reconnectionCount: number
+  reconnectionCount: number;
 }
 
 export interface UseJetStreamDialogSubscriptionOptions {
-  enabled: boolean
-  dialogId: string | null
+  enabled: boolean;
+  dialogId: string | null;
   /** JetStream stream name. Default: 'CHAT_CHUNKS'. */
-  streamName?: string
+  streamName?: string;
   /** Single topic to subscribe to. */
-  topic: NatsMessageType
+  topic: NatsMessageType;
   /**
    * Resume from this JetStream sequence + 1. When null/undefined, the consumer starts with
    * DeliverPolicy.New (live tail only).
    */
-  optStartSeq?: number | null
-  onEvent?: (payload: unknown, messageType: NatsMessageType) => void
-  onConnect?: () => void
-  onDisconnect?: () => void
-  onSubscribed?: () => void
+  optStartSeq?: number | null;
+  onEvent?: (payload: unknown, messageType: NatsMessageType) => void;
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onSubscribed?: () => void;
   /** Called on disconnect, before reconnect attempt. Use to refresh auth. */
-  onBeforeReconnect?: () => Promise<void> | void
+  onBeforeReconnect?: () => Promise<void> | void;
   /** Build the NATS WebSocket URL (or null when not yet available). */
-  getNatsWsUrl: () => string | null
+  getNatsWsUrl: () => string | null;
   clientConfig?: {
-    name?: string
-    user?: string
-    pass?: string
-  }
+    name?: string;
+    user?: string;
+    pass?: string;
+  };
   reconnectionBackoff?: {
-    fastRetries?: number
-    fastRetryDelayMs?: number
-    initialDelayMs?: number
-    maxDelayMs?: number
-    multiplier?: number
-  }
+    fastRetries?: number;
+    fastRetryDelayMs?: number;
+    initialDelayMs?: number;
+    maxDelayMs?: number;
+    multiplier?: number;
+  };
   /** Consumer inactivity threshold in ms before NATS auto-cleans it. Defaults to the
    *  client's, and applies only to the first consumer — recreations use nats.ws's. */
-  inactiveThresholdMs?: number
+  inactiveThresholdMs?: number;
   /**
    * A counter the host bumps when it knows, from outside the page, that the tail
    * may have missed something.
@@ -146,12 +145,12 @@ export interface UseJetStreamDialogSubscriptionOptions {
    * an increase arriving alongside a `visibilitychange` costs one rebuild, not
    * two.
    */
-  resyncSignal?: number
+  resyncSignal?: number;
 }
 
 export interface UseJetStreamDialogSubscriptionReturn {
-  isConnected: boolean
-  isSubscribed: boolean
+  isConnected: boolean;
+  isSubscribed: boolean;
   /**
    * Incremented each time the live tail is re-established: a NATS reconnect, a
    * JetStream ordered-consumer recreation, the page returning to view after
@@ -161,53 +160,77 @@ export interface UseJetStreamDialogSubscriptionReturn {
    * refetched. One absence counts once even when two sources report it.
    * Starts at 0.
    */
-  reconnectionCount: number
+  reconnectionCount: number;
   /** Highest JetStream stream sequence observed so far (null before first delivery). */
-  currentStreamSeq: number | null
+  currentStreamSeq: number | null;
 }
 
 export interface SegmentsUpdateMetadata {
   /** Segments should be appended to the last assistant message */
-  append?: boolean
+  append?: boolean;
   /** The update was triggered by context compaction */
-  isCompacting?: boolean
+  isCompacting?: boolean;
   /** streamSeq of the content chunk that produced this update, when the
    *  transport carries one (JetStream). Hosts stamp it onto the streaming
    *  message so `mergeHistoryWithRealtime` can dedup per-message against
    *  persisted history. Undefined for legacy NATS chunks. */
-  streamSeq?: number
+  streamSeq?: number;
 }
 
 export interface RealtimeChunkCallbacks {
   /** Called when MESSAGE_START is received */
-  onStreamStart?: () => void
+  onStreamStart?: () => void;
   /** Called when MESSAGE_END is received */
-  onStreamEnd?: () => void
+  onStreamEnd?: () => void;
   /** Called when AI_METADATA is received */
-  onMetadata?: (metadata: { modelDisplayName: string; modelName: string; providerName: string; contextWindow: number }) => void
+  onMetadata?: (metadata: {
+    modelDisplayName: string;
+    modelName: string;
+    providerName: string;
+    contextWindow: number;
+  }) => void;
   /** Called when segments are updated */
-  onSegmentsUpdate?: (segments: MessageSegment[], metadata?: SegmentsUpdateMetadata) => void
+  onSegmentsUpdate?: (segments: MessageSegment[], metadata?: SegmentsUpdateMetadata) => void;
   /** Called when an error is received */
-  onError?: (error: string, details?: string) => void
+  onError?: (error: string, details?: string) => void;
   /** Called when a user message request is received (echo). `streamSeq` (when
    *  the transport carries one) lets hosts stamp the synthetic so the history
    *  merge can dedup it against its persisted twin by sequence. */
-  onUserMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number, contextItems?: Array<{ type: string; id: string }> }) => void
+  onUserMessage?: (
+    text: string,
+    metadata?: {
+      ownerType?: string;
+      displayName?: string;
+      userId?: string;
+      streamSeq?: number;
+      contextItems?: Array<{ type: string; id: string }>;
+    },
+  ) => void;
   /** Called when TOKEN_USAGE chunk is received with token stats */
-  onTokenUsage?: (data: TokenUsageData) => void
+  onTokenUsage?: (data: TokenUsageData) => void;
   /** Called when a direct message is received (immediately displayed). Carries
    *  `streamSeq` for the same per-message dedup as `onUserMessage`. */
-  onDirectMessage?: (text: string, metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number }) => void
+  onDirectMessage?: (
+    text: string,
+    metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number },
+  ) => void;
   /** Called when a system message is received (e.g. "User joined the chat"). */
-  onSystemMessage?: (text: string, metadata?: { streamSeq?: number }) => void
+  onSystemMessage?: (text: string, metadata?: { streamSeq?: number }) => void;
   /** Callback for approval actions */
-  onApprove?: (requestId?: string) => Promise<void> | void
+  onApprove?: (requestId?: string) => Promise<void> | void;
   /** Callback for rejection actions */
-  onReject?: (requestId?: string) => Promise<void> | void
+  onReject?: (requestId?: string) => Promise<void> | void;
   /** Called when a non-client approval request is received (for escalation) */
-  onEscalatedApproval?: (requestId: string, data: { command: string; explanation?: string; approvalType: string }) => void
+  onEscalatedApproval?: (
+    requestId: string,
+    data: { command: string; explanation?: string; approvalType: string },
+  ) => void;
   /** Called when an escalated approval result is received */
-  onEscalatedApprovalResult?: (requestId: string, approved: boolean, data: { command: string; explanation?: string; approvalType: string }) => void
+  onEscalatedApprovalResult?: (
+    requestId: string,
+    approved: boolean,
+    data: { command: string; explanation?: string; approvalType: string },
+  ) => void;
   /**
    * Called whenever an `APPROVAL_RESULT` chunk is processed. Fires in addition
    * to the accumulator's in-message status flip so consumers can find the
@@ -216,14 +239,19 @@ export interface RealtimeChunkCallbacks {
    * a new assistant message is streaming). Idempotent — safe to no-op if no
    * matching segment is found dialog-wide.
    */
-  onApprovalResolved?: (requestId: string, status: ChatApprovalStatus, approvalType: string, resolvedByName?: string | null) => void
+  onApprovalResolved?: (
+    requestId: string,
+    status: ChatApprovalStatus,
+    approvalType: string,
+    resolvedByName?: string | null,
+  ) => void;
   /**
    * Called whenever an `EXECUTED_TOOL` chunk is processed. Lets consumers
    * merge the result into the originating `EXECUTING_TOOL` (or batch
    * `executions[execId]`) segment in an earlier message bubble when the tool
    * outlived its message scope. Idempotent.
    */
-  onToolExecuted?: (segment: ToolExecutionSegment) => void
+  onToolExecuted?: (segment: ToolExecutionSegment) => void;
   /**
    * Called when a chunk implies the agent is actively working OUTSIDE an open
    * MESSAGE_START/MESSAGE_END window: an `EXECUTING_TOOL` chunk, or an
@@ -233,9 +261,9 @@ export interface RealtimeChunkCallbacks {
    * execute. The busy window is closed by the continuation's MESSAGE_END, an
    * ERROR chunk, or a user stop.
    */
-  onAgentBusy?: () => void
+  onAgentBusy?: () => void;
   /** Called when a DIALOG_CLOSED chunk is received */
-  onDialogClosed?: () => void
+  onDialogClosed?: () => void;
 }
 
 // NOTE: `UseRealtimeChunkProcessorOptions` / `UseRealtimeChunkProcessorReturn`
@@ -248,79 +276,79 @@ export interface RealtimeChunkCallbacks {
 // ========== API Request Types ==========
 
 export interface ChatAPIRequest {
-  dialogId: string
-  message: string
-  metadata?: Record<string, any>
+  dialogId: string;
+  message: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ChatAPIResponse {
-  success: boolean
-  messageId?: string
-  error?: string
+  success: boolean;
+  messageId?: string;
+  error?: string;
 }
 
 export interface DialogCreateRequest {
-  name?: string
-  metadata?: Record<string, any>
+  name?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DialogCreateResponse {
-  id: string
-  name?: string
-  createdAt: string
+  id: string;
+  name?: string;
+  createdAt: string;
 }
 
 export interface DialogListRequest {
-  page?: number
-  pageSize?: number
-  orderBy?: 'createdAt' | 'updatedAt' | 'name'
-  orderDirection?: 'asc' | 'desc'
+  page?: number;
+  pageSize?: number;
+  orderBy?: 'createdAt' | 'updatedAt' | 'name';
+  orderDirection?: 'asc' | 'desc';
 }
 
 export interface DialogListResponse {
   dialogs: Array<{
-    id: string
-    name?: string
-    createdAt: string
-    updatedAt?: string
-    lastMessage?: string
-    messageCount?: number
-  }>
-  total: number
-  page: number
-  pageSize: number
+    id: string;
+    name?: string;
+    createdAt: string;
+    updatedAt?: string;
+    lastMessage?: string;
+    messageCount?: number;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 // ========== Approval API Types ==========
 
 export interface ApprovalRequest {
-  requestId: string
-  approved: boolean
-  reason?: string
+  requestId: string;
+  approved: boolean;
+  reason?: string;
 }
 
 export interface ApprovalResponse {
-  success: boolean
-  error?: string
+  success: boolean;
+  error?: string;
 }
 
 // ========== Settings API Types ==========
 
 export interface ChatSettings {
-  assistantName?: string
-  assistantType?: string
-  avatarUrl?: string
-  autoScroll?: boolean
-  soundEnabled?: boolean
-  notificationsEnabled?: boolean
+  assistantName?: string;
+  assistantType?: string;
+  avatarUrl?: string;
+  autoScroll?: boolean;
+  soundEnabled?: boolean;
+  notificationsEnabled?: boolean;
 }
 
 export interface UpdateSettingsRequest {
-  settings: Partial<ChatSettings>
+  settings: Partial<ChatSettings>;
 }
 
 export interface UpdateSettingsResponse {
-  success: boolean
-  settings?: ChatSettings
-  error?: string
+  success: boolean;
+  settings?: ChatSettings;
+  error?: string;
 }

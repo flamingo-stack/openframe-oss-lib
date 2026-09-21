@@ -1,12 +1,11 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { FolderPlus, Clipboard, Upload, CheckSquare, Copy, Scissors } from 'lucide-react'
-import { Button } from '../button'
-import { cn } from '../../../utils/cn'
-import type { FileManagerActionBarProps } from './types'
+import { FolderPlus, Clipboard, Upload, CheckSquare, Copy, Scissors } from 'lucide-react';
+import { cn } from '../../../utils/cn';
+import { Button } from '../button';
+import type { FileManagerActionBarProps } from './types';
 
-export function FileManagerActionBar({ 
+export function FileManagerActionBar({
   canPaste = false,
   hasSelection = false,
   onNewFolder,
@@ -15,16 +14,11 @@ export function FileManagerActionBar({
   onCut,
   onUpload,
   onSelectAll,
-  className 
+  className,
 }: FileManagerActionBarProps) {
   return (
-    <div className={cn('flex items-center gap-4 flex-wrap md:justify-end', className)}>
-      <Button
-        variant="outline"
-        size="small-legacy"
-        onClick={onNewFolder}
-        leftIcon={<FolderPlus className="h-4 w-4" />}
-      >
+    <div className={cn('flex flex-wrap items-center gap-4 md:justify-end', className)}>
+      <Button variant="outline" size="small-legacy" onClick={onNewFolder} leftIcon={<FolderPlus className="h-4 w-4" />}>
         New Folder
       </Button>
 
@@ -58,12 +52,7 @@ export function FileManagerActionBar({
         Paste
       </Button>
 
-      <Button
-        variant="outline"
-        size="small-legacy"
-        onClick={onUpload}
-        leftIcon={<Upload className="h-4 w-4" />}
-      >
+      <Button variant="outline" size="small-legacy" onClick={onUpload} leftIcon={<Upload className="h-4 w-4" />}>
         Upload
       </Button>
 
@@ -76,5 +65,5 @@ export function FileManagerActionBar({
         Select All
       </Button>
     </div>
-  )
+  );
 }

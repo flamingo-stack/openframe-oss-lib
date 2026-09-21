@@ -15,19 +15,23 @@
 // Endpoint paths are passed in via `apiEndpoint` on each call so embedders
 // can route through their own reverse proxy (e.g. `/content/api/blog/reddit-proxy`).
 
-// Per-pageload memory cache shared between component instances.
-const dataCache = new Map<string, any>();
+// Per-pageload memory cache shared between component instances. The cache is
+// payload-agnostic — each caller's `dataValidator` is what turns an entry back
+// into its own concrete shape.
+const dataCache = new Map<string, unknown>();
 
 // In-flight GET dedupe: several embeds of the same URL mount concurrently
 // (before any of them has populated the memory cache).
-const inflightRequests = new Map<string, Promise<any | null>>();
+const inflightRequests = new Map<string, Promise<unknown>>();
 
-interface FetchOptions {
+export interface FetchOptions<TData> {
   platform: 'reddit' | 'twitter';
   url: string;
   apiEndpoint: string;
-  dataValidator: (data: any) => boolean;
-  onDataUpdate: (data: any) => void;
+  /** Type guard for the proxy payload. This module never knows the shape, so
+   *  the caller's guard is the single place `unknown` becomes `TData`. */
+  dataValidator: (data: unknown) => data is TData;
+  onDataUpdate: (data: TData) => void;
   onError: (error: string) => void;
   onLoading: (loading: boolean) => void;
 }
@@ -42,11 +46,11 @@ export class SocialEmbedCache {
     return SocialEmbedCache.instance;
   }
 
-  getFromMemory(url: string): any | null {
-    return dataCache.get(url) || null;
+  getFromMemory(url: string): unknown {
+    return dataCache.get(url) ?? null;
   }
 
-  setInMemory(url: string, data: any): void {
+  setInMemory(url: string, data: unknown): void {
     dataCache.set(url, data);
   }
 
@@ -54,11 +58,11 @@ export class SocialEmbedCache {
    * Memory → proxy. Kept the historical name so the embed clients'
    * call sites are unchanged.
    */
-  async fetchWithHierarchy(options: FetchOptions): Promise<void> {
+  async fetchWithHierarchy<TData>(options: FetchOptions<TData>): Promise<void> {
     const { url, platform, apiEndpoint, dataValidator, onDataUpdate, onError, onLoading } = options;
 
     const memoryData = this.getFromMemory(url);
-    if (memoryData && dataValidator(memoryData)) {
+    if (dataValidator(memoryData)) {
       onDataUpdate(memoryData);
       onLoading(false);
       return;
@@ -86,32 +90,36 @@ export class SocialEmbedCache {
    * unavailable" 404, and throws for everything else. Concurrent calls for
    * the same URL share one request.
    */
-  private fetchFromProxy(
+  private fetchFromProxy<TData>(
     url: string,
     apiEndpoint: string,
-    dataValidator: (data: any) => boolean
-  ): Promise<any | null> {
+    dataValidator: (data: unknown) => data is TData,
+  ): Promise<TData | null> {
     const inflight = inflightRequests.get(url);
-    if (inflight) return inflight;
+    // A shared in-flight request resolves to `unknown` (the map is
+    // payload-agnostic) — re-run THIS caller's guard on the result rather
+    // than asserting it. Rejections still propagate to every sharer.
+    if (inflight) return inflight.then(data => (dataValidator(data) ? data : null));
 
-    const request = (async () => {
+    const request = (async (): Promise<TData | null> => {
       const response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(url)}`, {
         signal: AbortSignal.timeout(15_000),
       });
       if (response.ok) {
-        const data = await response.json();
-        if (data && dataValidator(data)) return data;
+        const data: unknown = await response.json();
+        if (dataValidator(data)) return data;
         throw new Error('Server proxy returned invalid data shape');
       }
       if (response.status === 404) return null;
       throw new Error(`Server proxy failed: ${response.status}`);
     })();
 
-    inflightRequests.set(
-      url,
-      request.finally(() => inflightRequests.delete(url))
-    );
-    return inflightRequests.get(url)!;
+    // Hold the tracked promise instead of storing it and reading it back out
+    // of the map: it is the same object, and the caller now gets it directly
+    // rather than through a lookup whose key the `finally` above will delete.
+    const tracked = request.finally(() => inflightRequests.delete(url));
+    inflightRequests.set(url, tracked);
+    return tracked;
   }
 }
 

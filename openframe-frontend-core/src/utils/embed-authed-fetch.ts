@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Shared `fetch` wrapper for any embedded surface (chat, ticket center,
@@ -20,7 +20,7 @@
  * (e.g. `/api/profile/me`) keep using vanilla `fetch`.
  */
 
-import { applyProxyAuth } from './embed-proxy-auth-storage'
+import { applyProxyAuth } from './embed-proxy-auth-storage';
 
 // =============================================================================
 // Host-supplied auth adapter (opt-in)
@@ -60,11 +60,11 @@ export interface EmbedAuthAdapter {
    *  `{ Authorization: token ? 'Bearer …' : undefined }` (or a conditional
    *  `token ? { Authorization: … } : {}`) assigns cleanly — `undefined`
    *  values are filtered before being merged into the request headers. */
-  getHeaders?: () => Record<string, string | undefined>
+  getHeaders?: () => Record<string, string | undefined>;
   /** `RequestInit.credentials` mode. Default when no adapter: callers'
    *  `init.credentials` or `'same-origin'`. Use `'include'` for cookie
    *  auth against a different origin (CORS + `SameSite=None` required). */
-  credentials?: RequestCredentials
+  credentials?: RequestCredentials;
   /**
    * Optional 401 self-heal. When a request comes back `401`,
    * `embedAuthedFetch` calls this once, and — if it resolves `true` —
@@ -85,7 +85,7 @@ export interface EmbedAuthAdapter {
    * returns the original 401 — logout/redirect decisions belong to the
    * host's own auth layer, not to this fetch wrapper.
    */
-  refresh?: () => Promise<boolean>
+  refresh?: () => Promise<boolean>;
   /**
    * Exact extra origins (`scheme://host[:port]`, as produced by `URL.origin`)
    * the same-origin guard additionally accepts. The guard normally rejects
@@ -98,7 +98,7 @@ export interface EmbedAuthAdapter {
    * never be allowlisted. Omit (or leave empty) everywhere else — same-origin
    * remains the rule, this is the narrow exception.
    */
-  allowedOrigins?: string[]
+  allowedOrigins?: string[];
 }
 
 /**
@@ -113,16 +113,16 @@ export interface EmbedAuthAdapter {
  * `globalThis` slot is shared across every copy, so registration always
  * reaches the fetch path.
  */
-const ADAPTER_GLOBAL_KEY = '__embedAuthedFetchAdapter__'
+const ADAPTER_GLOBAL_KEY = '__embedAuthedFetchAdapter__';
 
 function getRegisteredAuthAdapter(): EmbedAuthAdapter | null {
-  if (typeof globalThis === 'undefined') return null
-  return (globalThis as Record<string, unknown>)[ADAPTER_GLOBAL_KEY] as EmbedAuthAdapter | null ?? null
+  if (typeof globalThis === 'undefined') return null;
+  return ((globalThis as Record<string, unknown>)[ADAPTER_GLOBAL_KEY] as EmbedAuthAdapter | null) ?? null;
 }
 
 function storeRegisteredAuthAdapter(adapter: EmbedAuthAdapter | null): void {
-  if (typeof globalThis === 'undefined') return
-  ;(globalThis as Record<string, unknown>)[ADAPTER_GLOBAL_KEY] = adapter
+  if (typeof globalThis === 'undefined') return;
+  (globalThis as Record<string, unknown>)[ADAPTER_GLOBAL_KEY] = adapter;
 }
 
 /**
@@ -141,9 +141,9 @@ export function setEmbedAuthAdapter(adapter: EmbedAuthAdapter | null): void {
       '[setEmbedAuthAdapter] overwriting a previously-registered auth ' +
         'adapter. Two chat-runtime providers should not coexist — verify ' +
         'mount order and pass `null` from the unmounting provider.',
-    )
+    );
   }
-  storeRegisteredAuthAdapter(adapter)
+  storeRegisteredAuthAdapter(adapter);
 }
 
 /**
@@ -153,7 +153,7 @@ export function setEmbedAuthAdapter(adapter: EmbedAuthAdapter | null): void {
  * single auth knob (the adapter), not a second content-fetch registration.
  */
 export function hasEmbedAuthAdapter(): boolean {
-  return getRegisteredAuthAdapter() !== null
+  return getRegisteredAuthAdapter() !== null;
 }
 
 /**
@@ -185,22 +185,22 @@ export function hasEmbedAuthAdapter(): boolean {
  * reach of the token by the same origin rules `embedAuthedFetch` enforces.
  */
 export function needsBearerAssetFetch(url: string): boolean {
-  if (typeof window === 'undefined') return false
-  const adapter = getRegisteredAuthAdapter()
-  if (!adapter || adapter.getHeaders?.().Authorization === undefined) return false
-  let target: URL
-  let pageOrigin: string
+  if (typeof window === 'undefined') return false;
+  const adapter = getRegisteredAuthAdapter();
+  if (!adapter || adapter.getHeaders?.().Authorization === undefined) return false;
+  let target: URL;
+  let pageOrigin: string;
   try {
-    target = new URL(url, window.location.href)
+    target = new URL(url, window.location.href);
     // Same reason `assertSameOrigin` derives it this way: test environments
     // mock `window.location` as a plain object with no `origin` field.
-    pageOrigin = new URL(window.location.href).origin
+    pageOrigin = new URL(window.location.href).origin;
   } catch {
-    return false
+    return false;
   }
-  if (target.protocol !== 'http:' && target.protocol !== 'https:') return false
-  if (target.origin === pageOrigin) return true
-  return adapter.allowedOrigins?.includes(target.origin) ?? false
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') return false;
+  if (target.origin === pageOrigin) return true;
+  return adapter.allowedOrigins?.includes(target.origin) ?? false;
 }
 
 /**
@@ -237,7 +237,7 @@ export function embedAuthedFetch(url: string, init: RequestInit = {}): Promise<R
   // Same-origin guard runs SYNCHRONOUSLY (not awaited inside the async
   // helper below) so a bearer-leaking cross-origin URL throws before any
   // promise is created — callers and tests rely on the synchronous throw.
-  assertSameOrigin(url)
+  assertSameOrigin(url);
 
   // `applyProxyAuth` accepts `Record<string, string>`; normalize the
   // caller's headers to that shape ONCE, up front. RequestInit accepts
@@ -250,23 +250,23 @@ export function embedAuthedFetch(url: string, init: RequestInit = {}): Promise<R
   // so JSON POSTs keep their content-type when only `embedAuthedFetch(url)`
   // is used at the call site. GET callers that explicitly want no body
   // headers can pass `init.headers = {}` to opt out.
-  let baseHeaders: Record<string, string>
+  let baseHeaders: Record<string, string>;
   if (init.headers === undefined) {
-    baseHeaders = { 'Content-Type': 'application/json' }
+    baseHeaders = { 'Content-Type': 'application/json' };
   } else {
-    baseHeaders = {}
+    baseHeaders = {};
     if (init.headers instanceof Headers) {
       init.headers.forEach((v, k) => {
-        baseHeaders[k] = v
-      })
+        baseHeaders[k] = v;
+      });
     } else if (Array.isArray(init.headers)) {
-      for (const [k, v] of init.headers) baseHeaders[k] = v
+      for (const [k, v] of init.headers) baseHeaders[k] = v;
     } else {
-      Object.assign(baseHeaders, init.headers as Record<string, string>)
+      Object.assign(baseHeaders, init.headers);
     }
   }
 
-  return fetchWithRefresh(url, init, baseHeaders, false)
+  return fetchWithRefresh(url, init, baseHeaders, false);
 }
 
 /**
@@ -282,40 +282,43 @@ export function embedAuthedFetch(url: string, init: RequestInit = {}): Promise<R
 // of this module (e.g. across chunks or a host + embedded build); a per-module
 // variable would let each copy run its own refresh cycle, re-creating the
 // thundering-herd this dedupe exists to prevent.
-const IN_FLIGHT_REFRESH_GLOBAL_KEY = '__embedAuthedFetchInFlightRefresh__'
+const IN_FLIGHT_REFRESH_GLOBAL_KEY = '__embedAuthedFetchInFlightRefresh__';
 
 function getInFlightRefresh(): Promise<boolean> | null {
-  if (typeof globalThis === 'undefined') return null
+  if (typeof globalThis === 'undefined') return null;
   return (
-    ((globalThis as Record<string, unknown>)[IN_FLIGHT_REFRESH_GLOBAL_KEY] as
-      | Promise<boolean>
-      | null
-      | undefined) ?? null
-  )
+    ((globalThis as Record<string, unknown>)[IN_FLIGHT_REFRESH_GLOBAL_KEY] as Promise<boolean> | null | undefined) ??
+    null
+  );
 }
 
 function setInFlightRefresh(refresh: Promise<boolean> | null): void {
-  if (typeof globalThis === 'undefined') return
-  ;(globalThis as Record<string, unknown>)[IN_FLIGHT_REFRESH_GLOBAL_KEY] = refresh
+  if (typeof globalThis === 'undefined') return;
+  (globalThis as Record<string, unknown>)[IN_FLIGHT_REFRESH_GLOBAL_KEY] = refresh;
 }
 
 function dedupedRefresh(): Promise<boolean> {
-  const adapter = getRegisteredAuthAdapter()
-  if (!adapter?.refresh) return Promise.resolve(false)
-  let inFlightRefresh = getInFlightRefresh()
+  const adapter = getRegisteredAuthAdapter();
+  // Bound and captured BEFORE the closure below. `refresh` is an optional
+  // property, so TypeScript drops the `if (!adapter?.refresh)` narrowing inside
+  // the `.then()` callback — the property could in principle be reassigned
+  // between the guard and the call. `bind` keeps the adapter as the receiver.
+  const refresh = adapter?.refresh?.bind(adapter);
+  if (!refresh) return Promise.resolve(false);
+  let inFlightRefresh = getInFlightRefresh();
   if (!inFlightRefresh) {
     // Wrap in `Promise.resolve` so an adapter that throws synchronously
     // (rather than rejecting) still funnels through the shared slot and
     // clears it. A rejected refresh is treated as "could not refresh".
     inFlightRefresh = Promise.resolve()
-      .then(() => adapter.refresh!())
+      .then(() => refresh())
       .catch(() => false)
       .finally(() => {
-        setInFlightRefresh(null)
-      })
-    setInFlightRefresh(inFlightRefresh)
+        setInFlightRefresh(null);
+      });
+    setInFlightRefresh(inFlightRefresh);
   }
-  return inFlightRefresh
+  return inFlightRefresh;
 }
 
 /**
@@ -334,23 +337,23 @@ async function fetchWithRefresh(
   // proxy creds and `getHeaders()` reads the latest bearer, so a retry after
   // refresh carries the rotated token rather than the stale one. `{...baseHeaders}`
   // keeps the caller's normalized headers immutable across attempts.
-  const { url: authedUrl, headers } = applyProxyAuth(url, { ...baseHeaders })
+  const { url: authedUrl, headers } = applyProxyAuth(url, { ...baseHeaders });
 
   // Host-supplied auth adapter layer. Runs AFTER the proxy-auth merge so
   // adapter headers override both caller and proxy values — the adapter
   // is the host's explicit "this is my auth model" override, intentionally
   // last-writer-wins. When no adapter is registered, this is a zero-cost
   // no-op (object spread of `{}`).
-  const adapter = getRegisteredAuthAdapter()
+  const adapter = getRegisteredAuthAdapter();
   if (adapter?.getHeaders) {
     // Filter `undefined` values — the adapter type allows them so consumers
     // don't have to narrow `{ Authorization: token ? '…' : undefined }`-shaped
     // returns, but `fetch` headers must be strings.
     for (const [k, v] of Object.entries(adapter.getHeaders())) {
-      if (v !== undefined) headers[k] = v
+      if (v !== undefined) headers[k] = v;
     }
   }
-  const credentials = adapter?.credentials ?? init.credentials ?? 'same-origin'
+  const credentials = adapter?.credentials ?? init.credentials ?? 'same-origin';
 
   const response = await fetch(authedUrl, {
     ...init,
@@ -361,19 +364,19 @@ async function fetchWithRefresh(
     // adapter to make their own cookies travel cross-origin (CORS +
     // `SameSite=None` must be configured server-side for that to work).
     credentials,
-  })
+  });
 
   // 401 self-heal: refresh the token once and retry. Only when an adapter
   // opted into `refresh`, and only on the first attempt — a 401 on the
   // retry means the fresh token is also unauthorized, so surface it.
   if (response.status === 401 && !isRetry && adapter?.refresh) {
-    const refreshed = await dedupedRefresh()
+    const refreshed = await dedupedRefresh();
     if (refreshed) {
-      return fetchWithRefresh(url, init, baseHeaders, true)
+      return fetchWithRefresh(url, init, baseHeaders, true);
     }
   }
 
-  return response
+  return response;
 }
 
 /**
@@ -396,23 +399,23 @@ async function fetchWithRefresh(
  * on the server, so there's nothing to leak anyway.
  */
 function assertSameOrigin(url: string): void {
-  if (typeof window === 'undefined') return
-  let target: URL
-  let pageOrigin: string
+  if (typeof window === 'undefined') return;
+  let target: URL;
+  let pageOrigin: string;
   try {
-    target = new URL(url, window.location.href)
+    target = new URL(url, window.location.href);
     // Derive the page origin from `href` rather than reading
     // `window.location.origin` directly so the check works in test
     // environments that mock `window.location` to a plain object
     // without an `origin` field (jsdom setups do this).
-    pageOrigin = new URL(window.location.href).origin
+    pageOrigin = new URL(window.location.href).origin;
   } catch {
-    throw new Error(`embedAuthedFetch: refusing to fetch malformed URL (${JSON.stringify(url)})`)
+    throw new Error(`embedAuthedFetch: refusing to fetch malformed URL (${JSON.stringify(url)})`);
   }
   if (target.protocol !== 'http:' && target.protocol !== 'https:') {
     throw new Error(
       `embedAuthedFetch: refusing non-http(s) URL (${target.protocol}) — pass a relative /api/* path instead`,
-    )
+    );
   }
   if (target.origin !== pageOrigin) {
     // Host-sanctioned cross-origin target (`EmbedAuthAdapter.allowedOrigins`).
@@ -421,7 +424,7 @@ function assertSameOrigin(url: string): void {
     // with this bearer — is unavoidably cross-origin. Exact `URL.origin`
     // match, and only reachable for http(s) targets (checked above).
     if (getRegisteredAuthAdapter()?.allowedOrigins?.includes(target.origin)) {
-      return
+      return;
     }
     // Dev-mode escape hatch — embedded apps (e.g. openframe-frontend)
     // run on a different origin from their gateway during local dev,
@@ -436,11 +439,11 @@ function assertSameOrigin(url: string): void {
         `[embedAuthedFetch] cross-origin fetch to ${target.origin} ` +
           `allowed in dev (NODE_ENV !== 'production'). Production builds ` +
           `will reject this — wire a same-origin proxy before shipping.`,
-      )
-      return
+      );
+      return;
     }
     throw new Error(
       `embedAuthedFetch: refusing cross-origin fetch to ${target.origin} — pass a relative /api/* path instead`,
-    )
+    );
   }
 }

@@ -45,38 +45,31 @@
  *      components mid-render. The notify is deferred to a microtask.
  */
 
+import type { ChatStreamEvent } from '../../../chat-protocol/events';
 import {
   createChatStreamReducer,
   type ChatReducerState,
   type ChatStreamReducer,
   type ChatStreamReducerOptions,
   type PendingEcho,
-} from './chat-stream-reducer'
-import type { ChatStreamEvent } from '../../../chat-protocol/events'
+} from './chat-stream-reducer';
 
-export type ChatDialogSide = string
+export type ChatDialogSide = string;
 
 /** Factory for a key's reducer options, consulted ONCE at creation. A plain
  *  `() => options` thunk remains assignable. */
-export type CreateReducerOptionsFn = (
-  dialogId: string,
-  side: ChatDialogSide,
-) => ChatStreamReducerOptions
+export type CreateReducerOptionsFn = (dialogId: string, side: ChatDialogSide) => ChatStreamReducerOptions;
 
 export interface ChatDialogStore {
   /** Create-or-get the reducer for `(dialogId, side)`. `createOptions` is
    *  consulted ONLY when the instance is first created. */
-  getReducer(
-    dialogId: string,
-    side?: ChatDialogSide,
-    createOptions?: CreateReducerOptionsFn,
-  ): ChatStreamReducer
+  getReducer(dialogId: string, side?: ChatDialogSide, createOptions?: CreateReducerOptionsFn): ChatStreamReducer;
   /** Apply one event to a side, then fan out the cross-side projections to
    *  the other sides of the same dialog. */
-  apply(dialogId: string, side: ChatDialogSide, event: ChatStreamEvent): void
+  apply(dialogId: string, side: ChatDialogSide, event: ChatStreamEvent): void;
   /** Run adapter commands against a reducer; subscribers are notified. */
-  mutate<T>(dialogId: string, side: ChatDialogSide, fn: (reducer: ChatStreamReducer) => T): T
-  subscribe(listener: () => void): () => void
+  mutate<T>(dialogId: string, side: ChatDialogSide, fn: (reducer: ChatStreamReducer) => T): T;
+  subscribe(listener: () => void): () => void;
   /**
    * Referentially-stable snapshot for `useSyncExternalStore`. PURE — an
    * unknown key returns the shared frozen `EMPTY_STATE` rather than
@@ -84,20 +77,20 @@ export interface ChatDialogStore {
    * reducers in a process-global map, and would make React's snapshot read
    * a mutation).
    */
-  getSnapshot(dialogId: string, side?: ChatDialogSide): ChatReducerState
+  getSnapshot(dialogId: string, side?: ChatDialogSide): ChatReducerState;
   /** `useSyncExternalStore`'s server getter — always `EMPTY_STATE`. There is
    *  no per-request store on the server, so a live thread cannot be rendered
    *  server-side; the client hydrates from the real reducer. */
-  getServerSnapshot(): ChatReducerState
+  getServerSnapshot(): ChatReducerState;
   /** Drop a side's reducer (or every side of the dialog when omitted). */
-  remove(dialogId: string, side?: ChatDialogSide): void
+  remove(dialogId: string, side?: ChatDialogSide): void;
   /**
    * PIN `(dialogId, side)` against LRU eviction while a consumer is live.
    * Returns the release fn (idempotent; refcounted, so nested retains are
    * safe). Creation is NOT implied — retaining an absent key simply means the
    * key is protected once it exists.
    */
-  retain(dialogId: string, side?: ChatDialogSide): () => void
+  retain(dialogId: string, side?: ChatDialogSide): () => void;
   /**
    * POLICY retain: keep exactly `keys` pinned by this store-level set and
    * release every key the set previously pinned. Independent of the refcounted
@@ -109,15 +102,15 @@ export interface ChatDialogStore {
    * present in both the old and the new set never momentarily drops to zero
    * retains and becomes evictable mid-swap.
    */
-  setRetained(keys: Array<{ dialogId: string; side?: ChatDialogSide }>): void
+  setRetained(keys: Array<{ dialogId: string; side?: ChatDialogSide }>): void;
 }
 
-export const DEFAULT_DIALOG_SIDE: ChatDialogSide = 'main'
+export const DEFAULT_DIALOG_SIDE: ChatDialogSide = 'main';
 
 /** Most-recently-used reducer keys retained before eviction. Ten covers
  *  every realistic multi-panel / dialog-switching session while bounding an
  *  agent that cycles hundreds of dialogs. */
-export const DEFAULT_MAX_REDUCERS = 10
+export const DEFAULT_MAX_REDUCERS = 10;
 
 /**
  * Hard cap on keys held in the "created by `getReducer`, `retain()` still
@@ -132,12 +125,12 @@ export const DEFAULT_MAX_REDUCERS = 10
  * before any effect runs — not a per-commit budget. Past it, the oldest pending
  * key falls through to ordinary LRU.
  */
-export const MAX_PENDING_RETAIN_KEYS = 256
+export const MAX_PENDING_RETAIN_KEYS = 256;
 
 export interface CreateChatDialogStoreOptions {
   /** LRU cap on retained reducers (keys are `(dialogId, side)` pairs).
    *  Values < 1 are clamped to 1. Default `DEFAULT_MAX_REDUCERS`. */
-  maxReducers?: number
+  maxReducers?: number;
   /**
    * Options applied to any reducer this store creates WITHOUT an explicit
    * per-call `createOptions` — i.e. every reducer first materialized by
@@ -147,7 +140,7 @@ export interface CreateChatDialogStoreOptions {
    * apply-created instance would keep those semantics missing for its whole
    * lifetime, including for a later `getReducer(..., options)` caller.
    */
-  defaultCreateOptions?: CreateReducerOptionsFn
+  defaultCreateOptions?: CreateReducerOptionsFn;
   /**
    * Called when LRU eviction actually DROPS a key. The store knows this
    * exactly; without publishing it, hosts are left inferring eviction by
@@ -173,11 +166,7 @@ export interface CreateChatDialogStoreOptions {
    * replay from the host's own cursor re-applies events the dropped instance
    * had already consumed.
    */
-  onEvict?: (
-    dialogId: string,
-    side: ChatDialogSide,
-    parked: EvictedReducerState,
-  ) => void
+  onEvict?: (dialogId: string, side: ChatDialogSide, parked: EvictedReducerState) => void;
 }
 
 /**
@@ -188,10 +177,10 @@ export interface CreateChatDialogStoreOptions {
  * copy does not have to.
  */
 export interface EvictedReducerState {
-  messages: ChatReducerState['messages']
-  approvalStatuses: ChatReducerState['approvalStatuses']
+  messages: ChatReducerState['messages'];
+  approvalStatuses: ChatReducerState['approvalStatuses'];
   /** `-Infinity` when the instance never applied a seq-carrying event. */
-  lastAppliedSeq: number
+  lastAppliedSeq: number;
   /**
    * Optimistic-echo entries still armed at eviction time. A key dropped
    * between `pushOptimisticSend` and its `MESSAGE_REQUEST` echo would
@@ -201,7 +190,7 @@ export interface EvictedReducerState {
    * entries already past `OWN_ECHO_AUTHOR_TTL_MS`. Empty for a key with no
    * send in flight (the common case).
    */
-  pendingEchoes: readonly PendingEcho[]
+  pendingEchoes: readonly PendingEcho[];
 }
 
 /** Shared, frozen "no reducer for this key" snapshot. ONE instance, so
@@ -214,40 +203,46 @@ const EMPTY_STATE: ChatReducerState = Object.freeze({
     meta: new Map(),
     sources: new Map(),
     sendCount: 0,
-  }) as ChatReducerState['turnMeta'],
+  }),
   dialogTokenUsage: null,
   liveModel: null,
   approvalStatuses: Object.freeze({}) as ChatReducerState['approvalStatuses'],
-}) as ChatReducerState
+});
 
 /** Shared frozen empty list for a key with no send in flight. */
-const EMPTY_PENDING_ECHOES: readonly PendingEcho[] = Object.freeze([])
+const EMPTY_PENDING_ECHOES: readonly PendingEcho[] = Object.freeze([]);
 
-const KEY_SEP = '\u0000'
-const keyOf = (dialogId: string, side: ChatDialogSide) => `${dialogId}${KEY_SEP}${side}`
+const KEY_SEP = '\u0000';
+const keyOf = (dialogId: string, side: ChatDialogSide) => `${dialogId}${KEY_SEP}${side}`;
 
-export function createChatDialogStore(
-  options: CreateChatDialogStoreOptions = {},
-): ChatDialogStore {
-  const maxReducers = Math.max(1, options.maxReducers ?? DEFAULT_MAX_REDUCERS)
-  const defaultCreateOptions = options.defaultCreateOptions
-  const onEvict = options.onEvict
+export function createChatDialogStore(options: CreateChatDialogStoreOptions = {}): ChatDialogStore {
+  const maxReducers = Math.max(1, options.maxReducers ?? DEFAULT_MAX_REDUCERS);
+  const defaultCreateOptions = options.defaultCreateOptions;
+  const onEvict = options.onEvict;
   // Insertion order IS the LRU order: `touch` re-inserts at the tail, so the
   // FIRST key is always the least-recently-used one.
-  const reducers = new Map<string, ChatStreamReducer>()
-  const listeners = new Set<() => void>()
+  const reducers = new Map<string, ChatStreamReducer>();
+  const listeners = new Set<() => void>();
   /** key → live retain count (see EVICTION SAFETY #1). */
-  const retained = new Map<string, number>()
+  const retained = new Map<string, number>();
 
   function notify(): void {
-    for (const listener of listeners) listener()
+    for (const listener of listeners) listener();
   }
 
   /** Notify OUTSIDE the current task — `getReducer` (and therefore eviction)
    *  runs during React's render phase. See EVICTION SAFETY #4. */
   function notifyDeferred(): void {
-    if (typeof queueMicrotask === 'function') queueMicrotask(notify)
-    else Promise.resolve().then(notify)
+    if (typeof queueMicrotask === 'function') queueMicrotask(notify);
+    // Legacy fallback only. A listener that throws surfaces as an uncaught
+    // error on the `queueMicrotask` path; on the promise path it would become
+    // a silent unhandled rejection, so report it explicitly instead.
+    else
+      void Promise.resolve()
+        .then(notify)
+        .catch((err: unknown) => {
+          console.error('[chatDialogStore] listener threw during notify:', err);
+        });
   }
 
   /**
@@ -289,30 +284,30 @@ export function createChatDialogStore(
    * within the same task. They protect only the key currently being written,
    * via `evictExcess`'s `protectKey`.
    */
-  const pendingRetain = new Set<string>()
+  const pendingRetain = new Set<string>();
 
   function markPendingRetain(key: string): void {
-    pendingRetain.add(key)
-    if (pendingRetain.size <= MAX_PENDING_RETAIN_KEYS) return
+    pendingRetain.add(key);
+    if (pendingRetain.size <= MAX_PENDING_RETAIN_KEYS) return;
     // Set iteration is insertion-ordered: the oldest still-unretained key is
     // the one least likely to belong to a live consumer.
-    const oldest = pendingRetain.values().next().value
-    if (oldest !== undefined) pendingRetain.delete(oldest)
+    const oldest = pendingRetain.values().next().value;
+    if (oldest !== undefined) pendingRetain.delete(oldest);
   }
 
   /** Mark `key` most-recently-used. */
   function touch(key: string): void {
-    const reducer = reducers.get(key)
-    if (reducer === undefined) return
-    reducers.delete(key)
-    reducers.set(key, reducer)
+    const reducer = reducers.get(key);
+    if (reducer === undefined) return;
+    reducers.delete(key);
+    reducers.set(key, reducer);
   }
 
   /** A key is evictable only when nothing pins it and its turn is finished. */
   function isEvictable(key: string): boolean {
-    if ((retained.get(key) ?? 0) > 0) return false
-    const reducer = reducers.get(key)
-    return reducer === undefined || reducer.state.streamingPhase === 'idle'
+    if ((retained.get(key) ?? 0) > 0) return false;
+    const reducer = reducers.get(key);
+    return reducer === undefined || reducer.state.streamingPhase === 'idle';
   }
 
   /** Evict least-recently-used EVICTABLE keys down to the cap, through the
@@ -330,30 +325,30 @@ export function createChatDialogStore(
    *  `EMPTY_STATE` forever). See `pendingRetain` for why every key still
    *  awaiting a retain is protected, not just the one being inserted. */
   function evictExcess(protectKey: string): boolean {
-    let evicted = false
-    let overBy = reducers.size - maxReducers
-    if (overBy <= 0) return false
+    let evicted = false;
+    let overBy = reducers.size - maxReducers;
+    if (overBy <= 0) return false;
     for (const key of [...reducers.keys()]) {
-      if (overBy <= 0) break
-      if (key === protectKey || pendingRetain.has(key)) continue
-      if (!isEvictable(key)) continue
+      if (overBy <= 0) break;
+      if (key === protectKey || pendingRetain.has(key)) continue;
+      if (!isEvictable(key)) continue;
       // Capture BEFORE the drop — after `delete` the instance is unreachable
       // and its approval statuses / seq cursor would be lost with it.
-      const dropped = onEvict ? reducers.get(key) : undefined
-      reducers.delete(key)
-      evicted = true
-      overBy -= 1
+      const dropped = onEvict ? reducers.get(key) : undefined;
+      reducers.delete(key);
+      evicted = true;
+      overBy -= 1;
       if (onEvict) {
-        const sep = key.indexOf(KEY_SEP)
+        const sep = key.indexOf(KEY_SEP);
         onEvict(key.slice(0, sep), key.slice(sep + 1), {
           messages: dropped?.state.messages ?? EMPTY_STATE.messages,
           approvalStatuses: dropped?.state.approvalStatuses ?? EMPTY_STATE.approvalStatuses,
           lastAppliedSeq: dropped?.getLastAppliedSeq() ?? Number.NEGATIVE_INFINITY,
           pendingEchoes: dropped?.getPendingEchoes() ?? EMPTY_PENDING_ECHOES,
-        })
+        });
       }
     }
-    return evicted
+    return evicted;
   }
 
   /**
@@ -368,8 +363,8 @@ export function createChatDialogStore(
     createOptions?: CreateReducerOptionsFn,
     groupProtect = true,
   ): ChatStreamReducer {
-    const key = keyOf(dialogId, side)
-    let reducer = reducers.get(key)
+    const key = keyOf(dialogId, side);
+    let reducer = reducers.get(key);
     if (!reducer) {
       // `apply()` / `mutate()` can be the FIRST toucher of a key (an event for
       // a dialog no component has rendered yet). Without the store-level
@@ -377,68 +372,64 @@ export function createChatDialogStore(
       // `ownEchoIncludesAdmin` / `callbacks` / `batchApprovalsEnabled`, and a
       // later `getReducer(..., options)` would hand back that mis-configured
       // instance (create-options are consulted at creation only).
-      const base = (createOptions ?? defaultCreateOptions)?.(dialogId, side) ?? {}
-      const userOnChange = base.onChange
+      const base = (createOptions ?? defaultCreateOptions)?.(dialogId, side) ?? {};
+      const userOnChange = base.onChange;
       reducer = createChatStreamReducer({
         ...base,
         onChange: () => {
-          userOnChange?.()
-          notify()
+          userOnChange?.();
+          notify();
         },
-      })
-      reducers.set(key, reducer)
+      });
+      reducers.set(key, reducer);
       // An already-retained key needs no stand-in — it is protected by its
       // retain count, and marking it would burn a slot of the bounded set.
-      if (groupProtect && (retained.get(key) ?? 0) === 0) markPendingRetain(key)
-      if (evictExcess(key)) notifyDeferred()
+      if (groupProtect && (retained.get(key) ?? 0) === 0) markPendingRetain(key);
+      if (evictExcess(key)) notifyDeferred();
     } else {
-      touch(key)
+      touch(key);
     }
-    return reducer
+    return reducer;
   }
 
   const getReducer: ChatDialogStore['getReducer'] = (dialogId, side, createOptions) =>
-    getReducerInternal(dialogId, side, createOptions, true)
+    getReducerInternal(dialogId, side, createOptions, true);
 
   function otherSides(dialogId: string, side: ChatDialogSide): ChatStreamReducer[] {
-    const prefix = `${dialogId}${KEY_SEP}`
-    const selfKey = keyOf(dialogId, side)
-    const out: ChatStreamReducer[] = []
+    const prefix = `${dialogId}${KEY_SEP}`;
+    const selfKey = keyOf(dialogId, side);
+    const out: ChatStreamReducer[] = [];
     for (const [key, reducer] of reducers) {
-      if (key !== selfKey && key.startsWith(prefix)) out.push(reducer)
+      if (key !== selfKey && key.startsWith(prefix)) out.push(reducer);
     }
-    return out
+    return out;
   }
 
   function apply(dialogId: string, side: ChatDialogSide, event: ChatStreamEvent): void {
-    const reducer = getReducerInternal(dialogId, side, undefined, false)
-    reducer.apply(event)
+    const reducer = getReducerInternal(dialogId, side, undefined, false);
+    reducer.apply(event);
 
     // Cross-side fan-out — the ONLY two operations that cross sides.
     if (event.type === 'approval-resolved' && event.requestId) {
       for (const other of otherSides(dialogId, side)) {
-        other.projectApprovalResolution(event.requestId, event.status, event.resolvedByName)
+        other.projectApprovalResolution(event.requestId, event.status, event.resolvedByName);
       }
     } else if (event.type === 'tool-execution') {
       for (const other of otherSides(dialogId, side)) {
-        other.projectToolExecution({ type: 'tool_execution', data: event.data })
+        other.projectToolExecution({ type: 'tool_execution', data: event.data });
       }
     }
   }
 
-  function mutate<T>(
-    dialogId: string,
-    side: ChatDialogSide,
-    fn: (reducer: ChatStreamReducer) => T,
-  ): T {
-    return fn(getReducerInternal(dialogId, side, undefined, false))
+  function mutate<T>(dialogId: string, side: ChatDialogSide, fn: (reducer: ChatStreamReducer) => T): T {
+    return fn(getReducerInternal(dialogId, side, undefined, false));
   }
 
   function subscribe(listener: () => void): () => void {
-    listeners.add(listener)
+    listeners.add(listener);
     return () => {
-      listeners.delete(listener)
-    }
+      listeners.delete(listener);
+    };
   }
 
   /** PURE read — deliberately does NOT go through `getReducer`, which would
@@ -446,15 +437,12 @@ export function createChatDialogStore(
    *  SSR) and make a React snapshot read mutate the store. Callers that need
    *  a reducer to exist call `getReducer` explicitly first (the
    *  `useChatStreamReducer` hook does exactly that, during render). */
-  function getSnapshot(
-    dialogId: string,
-    side: ChatDialogSide = DEFAULT_DIALOG_SIDE,
-  ): ChatReducerState {
-    return reducers.get(keyOf(dialogId, side))?.state ?? EMPTY_STATE
+  function getSnapshot(dialogId: string, side: ChatDialogSide = DEFAULT_DIALOG_SIDE): ChatReducerState {
+    return reducers.get(keyOf(dialogId, side))?.state ?? EMPTY_STATE;
   }
 
   function getServerSnapshot(): ChatReducerState {
-    return EMPTY_STATE
+    return EMPTY_STATE;
   }
 
   /** Notifies only when something was ACTUALLY dropped — an unconditional
@@ -471,53 +459,53 @@ export function createChatDialogStore(
    *  still holding. The entries are bounded by live retainers (never by removed
    *  dialogs) and are deleted when the last release runs. */
   function remove(dialogId: string, side?: ChatDialogSide): void {
-    let removed = false
+    let removed = false;
     if (side !== undefined) {
-      removed = reducers.delete(keyOf(dialogId, side))
+      removed = reducers.delete(keyOf(dialogId, side));
     } else {
-      const prefix = `${dialogId}${KEY_SEP}`
+      const prefix = `${dialogId}${KEY_SEP}`;
       for (const key of [...reducers.keys()]) {
-        if (key.startsWith(prefix) && reducers.delete(key)) removed = true
+        if (key.startsWith(prefix) && reducers.delete(key)) removed = true;
       }
     }
-    if (removed) notify()
+    if (removed) notify();
   }
 
   function retainKey(key: string): () => void {
     // The retain this key was waiting for has landed: the refcount below now
     // protects it, so the stand-in must go (leaving it would keep an unmounted
     // key pinned and hold a slot of the bounded `pendingRetain` set).
-    pendingRetain.delete(key)
-    retained.set(key, (retained.get(key) ?? 0) + 1)
-    let released = false
+    pendingRetain.delete(key);
+    retained.set(key, (retained.get(key) ?? 0) + 1);
+    let released = false;
     return () => {
-      if (released) return
-      released = true
-      const next = (retained.get(key) ?? 1) - 1
-      if (next <= 0) retained.delete(key)
-      else retained.set(key, next)
-    }
+      if (released) return;
+      released = true;
+      const next = (retained.get(key) ?? 1) - 1;
+      if (next <= 0) retained.delete(key);
+      else retained.set(key, next);
+    };
   }
 
   function retain(dialogId: string, side: ChatDialogSide = DEFAULT_DIALOG_SIDE): () => void {
-    return retainKey(keyOf(dialogId, side))
+    return retainKey(keyOf(dialogId, side));
   }
 
   /** Store-level policy retains, keyed the same way. Held separately from the
    *  per-consumer `retain()` handles so the two never clobber each other. */
-  const policyRetains = new Map<string, () => void>()
+  const policyRetains = new Map<string, () => void>();
 
   function setRetained(keys: Array<{ dialogId: string; side?: ChatDialogSide }>): void {
-    const next = new Set(keys.map((k) => keyOf(k.dialogId, k.side ?? DEFAULT_DIALOG_SIDE)))
+    const next = new Set(keys.map(k => keyOf(k.dialogId, k.side ?? DEFAULT_DIALOG_SIDE)));
     // Retain the additions BEFORE releasing the removals: a key in both sets is
     // simply left alone, and nothing in the new set is ever unpinned in between.
     for (const key of next) {
-      if (!policyRetains.has(key)) policyRetains.set(key, retainKey(key))
+      if (!policyRetains.has(key)) policyRetains.set(key, retainKey(key));
     }
     for (const [key, release] of [...policyRetains]) {
-      if (next.has(key)) continue
-      release()
-      policyRetains.delete(key)
+      if (next.has(key)) continue;
+      release();
+      policyRetains.delete(key);
     }
   }
 
@@ -531,5 +519,5 @@ export function createChatDialogStore(
     remove,
     retain,
     setRetained,
-  }
+  };
 }

@@ -12,54 +12,72 @@
  * below stays a separate shape by design.
  */
 export interface VideoTeaser {
-  id?: string // Stable 8-char lowercase-hex element id (see utils/video-bite-id.ts). Stamped at creation (editor + AI save) and lazily backfilled by the Mux reconciliation sweep. Identity key for the Mux transcode pipeline — never derived from url (urls have real-world duplicates).
-  url: string
-  source_url?: string // Original storage URL, set by the Mux pipeline when it flips `url` to the HLS playback URL. Merge-identity leg for redelivered ingests + transcode dedup. Never set by editors.
-  title?: string
-  thumbnail_url?: string // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
-  published?: boolean // Controls visibility on public preview page (default: false, admin must select)
-  featured?: boolean // Opts the bite into cross-entity featured pulls (homepage/configured surfaces). Independent of `published`.
-  featured_at?: string // ISO timestamp stamped when an admin features the bite (cleared on unfeature; all featured bites backfilled 2026-08-19). Featured surfaces rank by THIS — ranking by created_at made featuring an old bite invisible under the surface cap.
-  source?: 'manual' | 'ai_generated' // Track origin of teaser
-  created_at?: string // ISO timestamp for sorting (newer items first)
-  start_time_ms?: number // Vizard extraction: clip start offset in the source video
-  end_time_ms?: number // Vizard extraction: clip end offset in the source video
-  confidence?: number // Vizard extraction: 0-100 virality confidence
-  viral_reason?: string // Vizard extraction: why this clip was picked
+  id?: string; // Stable 8-char lowercase-hex element id (see utils/video-bite-id.ts). Stamped at creation (editor + AI save) and lazily backfilled by the Mux reconciliation sweep. Identity key for the Mux transcode pipeline — never derived from url (urls have real-world duplicates).
+  url: string;
+  source_url?: string; // Original storage URL, set by the Mux pipeline when it flips `url` to the HLS playback URL. Merge-identity leg for redelivered ingests + transcode dedup. Never set by editors.
+  title?: string;
+  thumbnail_url?: string; // Optional thumbnail image URL for video preview. If not provided, video player will show first frame automatically.
+  published?: boolean; // Controls visibility on public preview page (default: false, admin must select)
+  featured?: boolean; // Opts the bite into cross-entity featured pulls (homepage/configured surfaces). Independent of `published`.
+  featured_at?: string; // ISO timestamp stamped when an admin features the bite (cleared on unfeature; all featured bites backfilled 2026-08-19). Featured surfaces rank by THIS — ranking by created_at made featuring an old bite invisible under the surface cap.
+  source?: 'manual' | 'ai_generated'; // Track origin of teaser
+  created_at?: string; // ISO timestamp for sorting (newer items first)
+  start_time_ms?: number; // Vizard extraction: clip start offset in the source video
+  end_time_ms?: number; // Vizard extraction: clip end offset in the source video
+  confidence?: number; // Vizard extraction: 0-100 virality confidence
+  viral_reason?: string; // Vizard extraction: why this clip was picked
   // Duration auto-detected from video file
 }
 
 /**
  * Speaker identification for transcription
  */
+/**
+ * A short customer quote pulled from a video entity (case study, customer
+ * interview) — a headline line in the customer's own words. Attribution is NOT
+ * stored on the item: it is the entity's customer (`user_id` → profile + MSP).
+ * `key` is stable across edits so list editors can reconcile rows.
+ */
+export interface EntityQuote {
+  key: string;
+  text: string;
+  /** Who said it, when the recording has several voices (a prospect call). Case studies attribute to their customer instead. */
+  speaker?: string | null;
+  /** `ai` while the text is exactly what Transcribe & Summarize extracted; an editor edit makes it `manual`. */
+  source?: 'ai' | 'manual';
+}
+
+/** The caption every quote list carries: the admin editor and the `EntityQuotesPanel` display. */
+export const ENTITY_QUOTES_TITLE = 'Key Quotes';
+
 export interface Speaker {
-  label: string
-  name?: string
-  confidence?: number
+  label: string;
+  name?: string;
+  confidence?: number;
 }
 
 /**
  * VideoClip represents a segment identified by AI analysis
  */
 export interface VideoClip {
-  start_time: number
-  end_time: number
-  description: string
-  query_used: string
-  confidence: number
-  twelve_labs_id?: string
-  thumbnail_url?: string
+  start_time: number;
+  end_time: number;
+  description: string;
+  query_used: string;
+  confidence: number;
+  twelve_labs_id?: string;
+  thumbnail_url?: string;
 }
 
 /**
  * Word-level transcript data for precise video processing
  */
 export interface TranscriptWord {
-  text: string
-  start: number // milliseconds
-  end: number // milliseconds
-  confidence: number
-  speaker?: string
+  text: string;
+  start: number; // milliseconds
+  end: number; // milliseconds
+  confidence: number;
+  speaker?: string;
 }
 
 /**
@@ -68,38 +86,38 @@ export interface TranscriptWord {
  */
 export interface SpeakerMapping {
   [label: string]: {
-    name: string
-    role: 'interviewer' | 'interviewee' | 'presenter' | 'host' | 'guest'
-    userId?: string
-  }
+    name: string;
+    role: 'interviewer' | 'interviewee' | 'presenter' | 'host' | 'guest';
+    userId?: string;
+  };
 }
 
 /**
  * Excluded time ranges (e.g., for incentive mentions)
  */
 export interface ExcludedRange {
-  start: number // seconds
-  end: number // seconds
+  start: number; // seconds
+  end: number; // seconds
 }
 
 /**
  * Base video processing fields shared across entities
  */
 export interface VideoProcessingFields {
-  main_video_url: string | null
-  transcript: string | null
-  transcript_words_data?: TranscriptWord[]
-  srt_content?: string | null
-  highlight_video_url?: string | null
-  highlight_video_thumbnail?: string | null
-  highlight_video_duration_ms?: number | null
-  highlight_video_source?: 'manual' | 'ai_generated' | null
+  main_video_url: string | null;
+  transcript: string | null;
+  transcript_words_data?: TranscriptWord[];
+  srt_content?: string | null;
+  highlight_video_url?: string | null;
+  highlight_video_thumbnail?: string | null;
+  highlight_video_duration_ms?: number | null;
+  highlight_video_source?: 'manual' | 'ai_generated' | null;
   /** Persisted first-frame thumbnail from main video upload (client-side canvas extraction) */
-  main_video_thumbnail?: string | null
-  ai_transcript_formatted?: string
-  speaker_mapping?: SpeakerMapping
-  ai_confidence_transcript?: number | null
-  ai_confidence_summary?: number | null
+  main_video_thumbnail?: string | null;
+  ai_transcript_formatted?: string;
+  speaker_mapping?: SpeakerMapping;
+  ai_confidence_transcript?: number | null;
+  ai_confidence_summary?: number | null;
 }
 
 /**
@@ -124,4 +142,5 @@ export type VideoProcessingEntityType =
   | 'what_i_shipped'
   | 'how_i_work'
   | 'walkthrough_video'
+  | 'prospect_call';
 // Fri May 15 14:58:59 EDT 2026

@@ -1,6 +1,5 @@
-"use client";
+'use client';
 
-import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { AIEnrichSection } from './ai-enrich';
 import type { AIRequiredField } from './ai-enrich';
@@ -53,18 +52,18 @@ export function HighlightGenerationSection({
   requiredFields,
   status,
   statusMessage,
-  disabledMessage = "Upload a video and run transcription first",
+  disabledMessage = 'Upload a video and run transcription first',
   showCancel = true,
   onCancel,
   isCancelling = false,
   hasResult = false,
   targetDurationSeconds = 180,
-  title = "Highlight Video",
+  title = 'Highlight Video',
   description,
   buttonLabel,
-  loadingLabel = "Generating highlight...",
+  loadingLabel = 'Generating highlight...',
 }: HighlightGenerationSectionProps) {
-  const defaultButtonLabel = hasResult ? "Regenerate Highlight" : "Generate Highlight";
+  const defaultButtonLabel = hasResult ? 'Regenerate Highlight' : 'Generate Highlight';
   const defaultDescription = `Generate a ${Math.floor(targetDurationSeconds / 60)}-minute summary video using Claude AI + Shotstack`;
 
   return (

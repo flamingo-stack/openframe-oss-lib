@@ -12,7 +12,7 @@
  * iframe while still exercising the anchor markup (hover, copy-link, etc.).
  */
 
-import type React from 'react'
+import type React from 'react';
 
 /**
  * Wraps a story in a chat-message-column-like container: constrained width,
@@ -24,7 +24,7 @@ export function ChatColumnDecorator({ children }: { children: React.ReactNode })
     <div className="min-h-screen w-full bg-ods-bg p-6">
       <div className="mx-auto w-full max-w-[420px]">{children}</div>
     </div>
-  )
+  );
 }
 
 /**
@@ -34,11 +34,11 @@ export function ChatColumnDecorator({ children }: { children: React.ReactNode })
  * iframe when the card is clicked.
  */
 export function makeAnchorProps(href: string): {
-  href: string
-  onClick: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  href: string;
+  onClick: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 } {
   return {
     href,
-    onClick: (e) => e.preventDefault(),
-  }
+    onClick: e => e.preventDefault(),
+  };
 }

@@ -9,7 +9,6 @@ import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
-import org.springframework.core.env.Environment;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -28,7 +27,8 @@ import static com.openframe.data.document.ticket.TicketStatusKind.TECH_REQUIRED;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
-// TODO(lifecycle-rollout): drop runAlways=true after flag is permanently on — body becomes a normal one-shot migration
+// runAlways: seeding is what gives a tenant its statuses, and a tenant can appear after this service
+// started, so the unit has to re-run on every boot — a one-shot unit would leave those tenants empty.
 @ChangeUnit(id = "migrate-ticket-status-model", order = "003", author = "openframe", runAlways = true)
 public class MigrateTicketStatusesChangeUnit {
 
@@ -40,7 +40,6 @@ public class MigrateTicketStatusesChangeUnit {
     private static final String FIELD_LEGACY_STATUS = "status";
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String COLLECTION_TICKETS = "tickets";
-    private static final String LIFECYCLE_FLAG = "openframe.features.tickets.lifecycle.enabled";
 
     private static final String LEGACY_ON_HOLD = "ON_HOLD";
 
@@ -52,12 +51,7 @@ public class MigrateTicketStatusesChangeUnit {
     );
 
     @Execution
-    public void execution(MongoTemplate mongoTemplate, Environment environment, TenantIdProvider tenantIdProvider) {
-        // TODO(lifecycle-rollout): remove flag guard + drop Environment param after rollout
-        if (!environment.getProperty(LIFECYCLE_FLAG, Boolean.class, false)) {
-            log.info("Migrate ticket statuses: lifecycle feature disabled; skipping");
-            return;
-        }
+    public void execution(MongoTemplate mongoTemplate, TenantIdProvider tenantIdProvider) {
         log.info("Migrate ticket statuses: starting");
 
         String tenantId = tenantIdProvider.getTenantId();

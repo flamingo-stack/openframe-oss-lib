@@ -1,8 +1,16 @@
-"use client";
+'use client';
 
-import Image from "../embed-shims/next-image";
-import { getProxiedImageUrl } from "../utils/image-proxy-stub";
+import Image from '../embed-shims/next-image';
+import { getProxiedImageUrl } from '../utils/image-proxy-stub';
 
+/**
+ * NOTE — this is the STUB user summary (see the filename). Five props below are
+ * declared and accepted so host apps can write their call sites against the
+ * final shape, but the stub does not act on them yet: `editHref`, `userId`,
+ * `profileData` (there is no EditProfileButton here — `showEditButton` renders
+ * a plain label), and `editablePhoto` / `onPhotoChange` (no ProfilePhotoUpload
+ * widget). Each is marked below. Wiring them up is a feature, not a cleanup.
+ */
 interface Props {
   name: string;
   email: string;
@@ -13,11 +21,13 @@ interface Props {
   authProviders?: string[];
   /** Show an outline Edit Profile button that routes to editHref */
   showEditButton?: boolean;
-  /** Path to navigate when Edit button clicked (default "/profile/edit") */
+  /** NOT IMPLEMENTED in the stub. Path to navigate when Edit is clicked. */
   editHref?: string;
-  /** Optional userId/profile passed through to EditProfileButton (for analytics) */
+  /** NOT IMPLEMENTED in the stub. Passed through to EditProfileButton for analytics. */
   userId?: string;
-  profileData?: any;
+  /** NOT IMPLEMENTED in the stub — accepted and ignored, so its shape is the
+   *  host's business. */
+  profileData?: unknown;
   /** Optional MSP preview info to render below email */
   mspPreview?: {
     name?: string | null;
@@ -31,25 +41,25 @@ interface Props {
   /** Avatar size in px for compact mode (defaults 40) */
   avatarSize?: number;
 
-  /** When true, replaces the static avatar with the ProfilePhotoUpload widget */
+  /** NOT IMPLEMENTED in the stub. Would swap the avatar for ProfilePhotoUpload. */
   editablePhoto?: boolean;
-  /** Required when editablePhoto=true – receives new photo URL */
+  /** NOT IMPLEMENTED in the stub. Would receive the new photo URL. */
   onPhotoChange?: (url: string | null) => void;
 }
 
 const getAuthProviderIcon = (provider: string) => {
   const p = provider.toLowerCase();
   switch (p) {
-    case "google":
-      return <Image src="/icons/google-logo.svg" alt="Google" width={16} height={16} className="w-4 h-4" />;
-    case "microsoft":
-    case "azure":
-      return <Image src="/icons/microsoft-logo.svg" alt="Microsoft" width={16} height={16} className="w-4 h-4" />;
-    case "slack":
-    case "slack_oidc":
-      return <div className="w-4 h-4 bg-ods-text-secondary rounded-full" />;
+    case 'google':
+      return <Image src="/icons/google-logo.svg" alt="Google" width={16} height={16} className="h-4 w-4" />;
+    case 'microsoft':
+    case 'azure':
+      return <Image src="/icons/microsoft-logo.svg" alt="Microsoft" width={16} height={16} className="h-4 w-4" />;
+    case 'slack':
+    case 'slack_oidc':
+      return <div className="h-4 w-4 rounded-full bg-ods-text-secondary" />;
     default:
-      return <div className="w-4 h-4 bg-ods-text-secondary rounded-full" />;
+      return <div className="h-4 w-4 rounded-full bg-ods-text-secondary" />;
   }
 };
 
@@ -76,43 +86,60 @@ export function UserSummary({
   avatarUrl,
   authProviders,
   showEditButton = false,
-  editHref = "/profile/edit",
-  userId,
-  profileData,
   mspPreview,
   compact = false,
   avatarSize = 40,
-  editablePhoto = false,
-  onPhotoChange,
 }: Props) {
   // Compact variant: minimal horizontal row
   if (compact) {
     return (
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex min-w-0 items-center gap-3">
         <div className="relative shrink-0">
           {avatarUrl ? (
-            <Image src={getProxiedImageUrl(avatarUrl) ?? avatarUrl} alt={name} width={avatarSize} height={avatarSize} className="object-cover rounded-lg" />
+            <Image
+              src={getProxiedImageUrl(avatarUrl) ?? avatarUrl}
+              alt={name}
+              width={avatarSize}
+              height={avatarSize}
+              className="rounded-lg object-cover"
+            />
           ) : (
-            <div className="rounded-lg bg-ods-accent flex items-center justify-center text-ods-text-on-accent font-heading font-bold" style={{ width: avatarSize, height: avatarSize }}>
-              {name.split(' ').map((n: string) => n.charAt(0)).join('').slice(0, 2)}
+            <div
+              className="flex items-center justify-center rounded-lg bg-ods-accent font-heading font-bold text-ods-text-on-accent"
+              style={{ width: avatarSize, height: avatarSize }}
+            >
+              {name
+                .split(' ')
+                .map((n: string) => n.charAt(0))
+                .join('')
+                .slice(0, 2)}
             </div>
           )}
           {mspPreview && mspPreview.logoUrl && (
-            <Image src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl} alt={mspPreview.name || 'MSP'} width={24} height={24} className="absolute -bottom-1 -right-1 size-6 rounded-full object-cover select-none z-10" />
+            <Image
+              src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
+              alt={mspPreview.name || 'MSP'}
+              width={24}
+              height={24}
+              className="absolute -bottom-1 -right-1 z-10 size-6 select-none rounded-full object-cover"
+            />
           )}
         </div>
         <div className="min-w-0 flex-1">
           <p
-            className="text-h4 text-ods-text-primary truncate"
+            className="truncate text-ods-text-primary text-h4"
             title={mspPreview?.name ? `${name} • ${mspPreview.name}` : name}
           >
             {name}
-            {mspPreview?.name && (
-              <span className="text-ods-text-secondary"> • {mspPreview.name}</span>
-            )}
+            {mspPreview?.name && <span className="text-ods-text-secondary"> • {mspPreview.name}</span>}
           </p>
-          <p className="text-h6 text-ods-text-secondary truncate" title={subtitle && subtitle.trim().length > 0 ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}>
-            {subtitle && subtitle.trim().length > 0 ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}
+          <p
+            className="truncate text-ods-text-secondary text-h6"
+            title={
+              subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'
+            }
+          >
+            {subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'}
           </p>
         </div>
       </div>
@@ -120,22 +147,28 @@ export function UserSummary({
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className="flex w-full flex-col gap-4">
       {/* Header Row */}
-    <div className="flex gap-6 w-full items-start">
+      <div className="flex w-full items-start gap-6">
         {/* Avatar with badge wrapper */}
-        <div className="relative shrink-0 h-24 w-24 overflow-visible">
+        <div className="relative h-24 w-24 shrink-0 overflow-visible">
           {avatarUrl ? (
-            <Image src={getProxiedImageUrl(avatarUrl) ?? avatarUrl} alt={name} width={96} height={96} className="object-cover rounded-full" />
+            <Image
+              src={getProxiedImageUrl(avatarUrl) ?? avatarUrl}
+              alt={name}
+              width={96}
+              height={96}
+              className="rounded-full object-cover"
+            />
           ) : (
-            <div className="rounded-full bg-ods-card border border-ods-border w-full h-full flex items-center justify-center text-3xl text-ods-text-secondary font-heading">
+            <div className="flex h-full w-full items-center justify-center rounded-full border border-ods-border bg-ods-card font-heading text-3xl text-ods-text-secondary">
               {name.charAt(0).toUpperCase()}
             </div>
           )}
 
           {/* MSP logo badge (show only when MSP exists) */}
           {mspPreview && (
-            <div className="absolute -bottom-1 -right-1 size-10 rounded-full bg-ods-bg ring-2 ring-ods-border overflow-hidden flex items-center justify-center select-none">
+            <div className="absolute -bottom-1 -right-1 flex size-10 select-none items-center justify-center overflow-hidden rounded-full bg-ods-bg ring-2 ring-ods-border">
               {mspPreview.logoUrl ? (
                 <Image
                   src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
@@ -145,7 +178,7 @@ export function UserSummary({
                   className="object-cover"
                 />
               ) : (
-                <span className="text-ods-text-primary font-heading text-sm font-bold">
+                <span className="font-heading text-sm font-bold text-ods-text-primary">
                   {mspPreview.name?.charAt(0).toUpperCase() || '?'}
                 </span>
               )}
@@ -154,65 +187,65 @@ export function UserSummary({
         </div>
 
         {/* Info + actions block */}
-        <div className="flex-1 grid grid-cols-[1fr_auto] gap-4">
+        <div className="grid flex-1 grid-cols-[1fr_auto] gap-4">
           {/* LEFT : text stack */}
-          <div className="min-h-[6rem] flex flex-col justify-center space-y-3 truncate">
-          <p className="text-h2 text-ods-text-primary leading-none truncate" title={name}>
-            {name}
-          </p>
-            <p className="text-h4 text-ods-text-secondary break-all truncate" title={(subtitle && subtitle.trim().length > 0) ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}>
-              {(subtitle && subtitle.trim().length > 0) ? subtitle : (email && email.trim().length > 0 ? email : '\u00A0')}
+          <div className="flex min-h-[6rem] flex-col justify-center space-y-3 truncate">
+            <p className="truncate leading-none text-ods-text-primary text-h2" title={name}>
+              {name}
             </p>
-            {mspPreview && (() => {
-              const mspSegments = [
-                mspPreview.name ?? '—',
-                typeof mspPreview.seatCount === 'number'
-                  ? `${formatNumber(mspPreview.seatCount)} Seats`
-                  : null,
-                typeof mspPreview.technicianCount === 'number'
-                  ? `${formatNumber(mspPreview.technicianCount)} Technicians`
-                  : null,
-                typeof mspPreview.annualRevenue === 'number'
-                  ? `$${formatNumber(mspPreview.annualRevenue)}`
-                  : null,
-              ].filter(Boolean) as string[];
-              const mspTitle = mspSegments.join(' • ');
-              return (
-                <p className="text-h6 text-ods-text-primary truncate" title={mspTitle}>
-                  {/* Build string with separators */}
-                  {mspSegments
-                    .flatMap((txt, idx) => (idx === 0 ? [txt] : [' • ', txt]))
-                    .map((seg, idx) => (
-                      <span key={idx} className={seg === ' • ' ? 'text-ods-text-secondary' : ''}>{seg}</span>
-                    ))}
-                </p>
-              );
-            })()}
+            <p
+              className="truncate break-all text-ods-text-secondary text-h4"
+              title={
+                subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'
+              }
+            >
+              {subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'}
+            </p>
+            {mspPreview &&
+              (() => {
+                const mspSegments = [
+                  mspPreview.name ?? '—',
+                  typeof mspPreview.seatCount === 'number' ? `${formatNumber(mspPreview.seatCount)} Seats` : null,
+                  typeof mspPreview.technicianCount === 'number'
+                    ? `${formatNumber(mspPreview.technicianCount)} Technicians`
+                    : null,
+                  typeof mspPreview.annualRevenue === 'number' ? `$${formatNumber(mspPreview.annualRevenue)}` : null,
+                ].filter(Boolean) as string[];
+                const mspTitle = mspSegments.join(' • ');
+                return (
+                  <p className="truncate text-ods-text-primary text-h6" title={mspTitle}>
+                    {/* Build string with separators */}
+                    {mspSegments
+                      .flatMap((txt, idx) => (idx === 0 ? [txt] : [' • ', txt]))
+                      .map((seg, idx) => (
+                        <span key={idx} className={seg === '•' ? 'text-ods-text-secondary' : ''}>
+                          {seg}
+                        </span>
+                      ))}
+                  </p>
+                );
+              })()}
           </div>
 
           {/* RIGHT (desktop) */}
           {(authProviders?.length || showEditButton) && (
-            <div className="hidden md:flex flex-col items-end justify-between flex-shrink-0 min-h-[6rem]">
+            <div className="hidden min-h-[6rem] flex-shrink-0 flex-col items-end justify-between md:flex">
               {/* top part */}
-          {authProviders && authProviders.length > 0 && (
+              {authProviders && authProviders.length > 0 && (
                 <div className="flex items-center gap-2">
-              <span className="text-h6 text-ods-text-secondary whitespace-nowrap select-none">
-                Authorized by
-              </span>
-              <div className="flex items-center gap-2">
-                {authProviders.map((p) => (
-                  <div key={p} className="flex items-center justify-center w-4 h-4">
-                    {getAuthProviderIcon(p)}
+                  <span className="select-none whitespace-nowrap text-ods-text-secondary text-h6">Authorized by</span>
+                  <div className="flex items-center gap-2">
+                    {authProviders.map(p => (
+                      <div key={p} className="flex h-4 w-4 items-center justify-center">
+                        {getAuthProviderIcon(p)}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                </div>
+              )}
 
               {/* bottom part - Edit button would go here */}
-          {showEditButton && (
-                <div className="text-h6 text-ods-text-secondary">Edit Profile</div>
-              )}
+              {showEditButton && <div className="text-ods-text-secondary text-h6">Edit Profile</div>}
             </div>
           )}
         </div>
@@ -220,13 +253,13 @@ export function UserSummary({
 
       {/* Mobile row: Authorized by left, Edit btn right */}
       {(authProviders?.length || showEditButton) && (
-        <div className="flex md:hidden items-center justify-between w-full gap-4">
+        <div className="flex w-full items-center justify-between gap-4 md:hidden">
           {authProviders && authProviders.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-h6 text-ods-text-secondary whitespace-nowrap select-none">Authorized by</span>
+              <span className="select-none whitespace-nowrap text-ods-text-secondary text-h6">Authorized by</span>
               <div className="flex items-center gap-2">
-                {authProviders.map((p) => (
-                  <div key={p} className="flex items-center justify-center w-4 h-4">
+                {authProviders.map(p => (
+                  <div key={p} className="flex h-4 w-4 items-center justify-center">
                     {getAuthProviderIcon(p)}
                   </div>
                 ))}
@@ -234,9 +267,7 @@ export function UserSummary({
             </div>
           )}
 
-          {showEditButton && (
-            <div className="text-h6 text-ods-text-secondary">Edit Profile</div>
-          )}
+          {showEditButton && <div className="text-ods-text-secondary text-h6">Edit Profile</div>}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { ScriptInfoSection } from '../components/platform/ScriptInfoSection'
-import type { ShellType } from '../types/shell.types'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { ScriptInfoSection } from '../components/platform/ScriptInfoSection';
+import type { ShellType } from '../types/shell.types';
 
 const meta = {
   title: 'Platform/ScriptInfoSection',
@@ -10,61 +10,53 @@ const meta = {
     docs: {
       description: {
         component:
-          'Displays script information in a card with header (title, description) and detail cells (shell type, supported platforms, category, author). Responsive layout adapts to screen size.'
-      }
-    }
+          'Displays script information in a card with header (title, description) and detail cells (shell type, supported platforms, category, author). Responsive layout adapts to screen size.',
+      },
+    },
   },
   tags: ['autodocs'],
   argTypes: {
     headline: {
       control: 'text',
-      description: 'Script title/name'
+      description: 'Script title/name',
     },
     subheadline: {
       control: 'text',
-      description: 'Script description'
+      description: 'Script description',
     },
     shellType: {
       control: 'select',
-      options: [
-        'POWERSHELL',
-        'CMD',
-        'BASH',
-        'PYTHON',
-        'NUSHELL',
-        'DENO',
-        'SHELL'
-      ] as ShellType[],
-      description: 'Shell type (POWERSHELL, BASH, CMD, etc.)'
+      options: ['POWERSHELL', 'CMD', 'BASH', 'PYTHON', 'NUSHELL', 'DENO', 'SHELL'] as ShellType[],
+      description: 'Shell type (POWERSHELL, BASH, CMD, etc.)',
     },
     supportedPlatforms: {
       control: 'object',
-      description: 'Array of supported platform strings'
+      description: 'Array of supported platform strings',
     },
     category: {
       control: 'text',
-      description: 'Script category'
+      description: 'Script category',
     },
     author: {
       control: 'object',
-      description: 'Author information with name, initials, and photoUrl'
+      description: 'Author information with name, initials, and photoUrl',
     },
     className: {
       control: 'text',
-      description: 'Additional CSS classes'
-    }
+      description: 'Additional CSS classes',
+    },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div>
         <Story />
       </div>
-    )
-  ]
-} satisfies Meta<typeof ScriptInfoSection>
+    ),
+  ],
+} satisfies Meta<typeof ScriptInfoSection>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default ScriptInfoSection with all fields populated.
@@ -79,10 +71,10 @@ export const Default: Story = {
     category: 'System Maintenance',
     author: {
       name: 'John Doe',
-      photoUrl: 'https://i.pravatar.cc/150?img=68'
-    }
-  }
-}
+      photoUrl: 'https://i.pravatar.cc/150?img=68',
+    },
+  },
+};
 
 /**
  * Script with PowerShell shell type for Windows.
@@ -90,17 +82,16 @@ export const Default: Story = {
 export const PowerShellScript: Story = {
   args: {
     headline: 'Windows Registry Cleanup',
-    subheadline:
-      'Cleans up obsolete registry entries and optimizes Windows performance',
+    subheadline: 'Cleans up obsolete registry entries and optimizes Windows performance',
     shellType: 'POWERSHELL',
     supportedPlatforms: ['windows'],
     category: 'System Optimization',
     author: {
       name: 'Alice Smith',
-      initials: 'AS'
-    }
-  }
-}
+      initials: 'AS',
+    },
+  },
+};
 
 /**
  * Script supporting multiple platforms.
@@ -108,17 +99,16 @@ export const PowerShellScript: Story = {
 export const MultiPlatform: Story = {
   args: {
     headline: 'Cross-Platform Installer',
-    subheadline:
-      'Universal installer script that works across Windows, macOS, and Linux',
+    subheadline: 'Universal installer script that works across Windows, macOS, and Linux',
     shellType: 'PYTHON',
     supportedPlatforms: ['windows', 'darwin', 'linux'],
     category: 'Installation',
     author: {
       name: 'Bob Johnson',
-      photoUrl: 'https://i.pravatar.cc/150?img=12'
-    }
-  }
-}
+      photoUrl: 'https://i.pravatar.cc/150?img=12',
+    },
+  },
+};
 
 /**
  * Script with minimal information (no description, no author).
@@ -128,9 +118,9 @@ export const Minimal: Story = {
     headline: 'Quick Deploy',
     shellType: 'SHELL',
     supportedPlatforms: ['linux'],
-    category: 'System Maintenance'
-  }
-}
+    category: 'System Maintenance',
+  },
+};
 
 /**
  * Script with long description that truncates.
@@ -145,10 +135,10 @@ export const LongDescription: Story = {
     category: 'Backup & Recovery',
     author: {
       name: 'Enterprise Admin',
-      initials: 'EA'
-    }
-  }
-}
+      initials: 'EA',
+    },
+  },
+};
 
 /**
  * Script without category field.
@@ -162,10 +152,10 @@ export const WithoutCategory: Story = {
     category: 'System Maintenance',
     author: {
       name: 'System Admin',
-      photoUrl: 'https://i.pravatar.cc/150?img=3'
-    }
-  }
-}
+      photoUrl: 'https://i.pravatar.cc/150?img=3',
+    },
+  },
+};
 
 /**
  * Script with macOS only support.
@@ -173,17 +163,16 @@ export const WithoutCategory: Story = {
 export const MacOSOnly: Story = {
   args: {
     headline: 'Xcode Cleanup',
-    subheadline:
-      'Removes derived data and archives to free up space on macOS development machines',
+    subheadline: 'Removes derived data and archives to free up space on macOS development machines',
     shellType: 'BASH',
     supportedPlatforms: ['darwin'],
     category: 'Development',
     author: {
       name: 'Dev Ops',
-      initials: 'DO'
-    }
-  }
-}
+      initials: 'DO',
+    },
+  },
+};
 
 /**
  * All platforms supported (when supportedPlatforms is empty or undefined).
@@ -197,10 +186,10 @@ export const AllPlatforms: Story = {
     category: 'Monitoring',
     author: {
       name: 'Health Bot',
-      initials: 'HB'
-    }
-  }
-}
+      initials: 'HB',
+    },
+  },
+};
 
 /**
  * Deno script example.
@@ -214,10 +203,10 @@ export const DenoScript: Story = {
     category: 'Testing',
     author: {
       name: 'QA Team',
-      initials: 'QA'
-    }
-  }
-}
+      initials: 'QA',
+    },
+  },
+};
 
 /**
  * Multiple scripts displayed together for visual comparison.
@@ -226,7 +215,7 @@ export const MultipleScripts: Story = {
   args: {
     headline: 'System Backup Script',
     shellType: 'BASH',
-    category: 'System Maintenance'
+    category: 'System Maintenance',
   },
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -255,5 +244,5 @@ export const MultipleScripts: Story = {
         author={{ name: 'Dev Team', initials: 'DT' }}
       />
     </div>
-  )
-}
+  ),
+};

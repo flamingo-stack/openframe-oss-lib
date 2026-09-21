@@ -50,37 +50,37 @@
 export interface ScrollElementIntoViewOptions {
   /** Pixels to subtract from the target element's `top` so it lands BELOW
    *  sticky chrome. Defaults to 0. Pass `96` for the standard hub header. */
-  headerOffset?: number
+  headerOffset?: number;
   /** `'smooth'` (default) runs the self-driven tween; `'instant'` / `'auto'`
    *  jump in one synchronous write (deep-link land, programmatic focus moves). */
-  behavior?: ScrollBehavior
+  behavior?: ScrollBehavior;
   /** Optional adjustment applied to the computed pixel target each frame. The
    *  callback receives the "raw" Y (`element.top + scrollY - headerOffset`) and
    *  returns the FINAL target. Use when the caller knows about a layout shift
    *  (e.g. a sibling drawer collapsing) the geometry can't yet reflect. */
-  adjustTargetY?: (rawTargetY: number) => number
+  adjustTargetY?: (rawTargetY: number) => number;
   /** Tween duration in ms (smooth only). Default 320. */
-  durationMs?: number
+  durationMs?: number;
 }
 
 /** Module-level handle to the in-flight tween so a new call (or a user
  *  gesture) cancels the previous one — only ever one page-scroll animation at
  *  a time. */
-let activeRaf = 0
-let teardownActive: (() => void) | null = null
+let activeRaf = 0;
+let teardownActive: (() => void) | null = null;
 
 function cancelActiveScroll(): void {
   if (activeRaf) {
-    cancelAnimationFrame(activeRaf)
-    activeRaf = 0
+    cancelAnimationFrame(activeRaf);
+    activeRaf = 0;
   }
   if (teardownActive) {
-    teardownActive()
-    teardownActive = null
+    teardownActive();
+    teardownActive = null;
   }
 }
 
-const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3)
+const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
 
 /** Nearest ancestor that is a *real* scroll container, or `null` when the
  *  window/document is the scroller. Only `auto | scroll | overlay` count —
@@ -88,15 +88,15 @@ const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3)
  *  purely to round corners must let the scroll bubble to the page). */
 function getScrollableAncestor(el: HTMLElement): HTMLElement | null {
   for (let node = el.parentElement; node; node = node.parentElement) {
-    const overflowY = getComputedStyle(node).overflowY
+    const overflowY = getComputedStyle(node).overflowY;
     if (
       (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') &&
       node.scrollHeight > node.clientHeight
     ) {
-      return node
+      return node;
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -108,18 +108,18 @@ export function scrollElementIntoView(
   target: HTMLElement | null | undefined,
   options: ScrollElementIntoViewOptions = {},
 ): void {
-  if (typeof window === 'undefined' || !target) return
-  const { headerOffset = 0, behavior = 'smooth', adjustTargetY, durationMs = 320 } = options
+  if (typeof window === 'undefined' || !target) return;
+  const { headerOffset = 0, behavior = 'smooth', adjustTargetY, durationMs = 320 } = options;
 
   // Pick the scroller ONCE: a fixed-height `<main overflow-y-auto>` shell scrolls
   // the element, a plain document scrolls the window. The choice can't change
   // mid-tween, so resolve it up front and route every read/write through it.
-  const container = getScrollableAncestor(target)
-  const readCurrent = (): number => (container ? container.scrollTop : window.scrollY)
+  const container = getScrollableAncestor(target);
+  const readCurrent = (): number => (container ? container.scrollTop : window.scrollY);
   const writeTo = (y: number): void => {
-    if (container) container.scrollTop = y
-    else window.scrollTo(0, y)
-  }
+    if (container) container.scrollTop = y;
+    else window.scrollTo(0, y);
+  };
 
   // Target is recomputed every frame: the row's absolute position can move as
   // the page reflows (a sibling drawer collapsing) and the reachable max grows
@@ -129,62 +129,61 @@ export function scrollElementIntoView(
       ? container.scrollTop +
         (target.getBoundingClientRect().top - container.getBoundingClientRect().top) -
         headerOffset
-      : target.getBoundingClientRect().top + window.scrollY - headerOffset
-    const adjusted = adjustTargetY ? adjustTargetY(raw) : raw
+      : target.getBoundingClientRect().top + window.scrollY - headerOffset;
+    const adjusted = adjustTargetY ? adjustTargetY(raw) : raw;
     const maxScroll = container
       ? Math.max(0, container.scrollHeight - container.clientHeight)
-      : Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
-    return Math.min(Math.max(0, adjusted), maxScroll)
-  }
+      : Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    return Math.min(Math.max(0, adjusted), maxScroll);
+  };
 
   // Any prior animation loses — one page scroll at a time.
-  cancelActiveScroll()
+  cancelActiveScroll();
 
   const prefersReduced =
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Instant paths: a single synchronous write. No tween, no anchoring race.
   if (behavior === 'instant' || behavior === 'auto' || prefersReduced) {
-    writeTo(computeTarget())
-    return
+    writeTo(computeTarget());
+    return;
   }
 
   // Smooth: self-driven tween with instant per-frame writes (anchoring-proof).
-  let startY: number | null = null
-  let startTime = 0
+  let startY: number | null = null;
+  let startTime = 0;
 
   // Bail the moment the user takes over with a real scroll gesture — we must
   // never fight them. (Not keydown: the ticket composer auto-focuses on open,
   // and typing there should not abort the scroll.)
-  const onUserGesture = () => cancelActiveScroll()
-  window.addEventListener('wheel', onUserGesture, { passive: true })
-  window.addEventListener('touchmove', onUserGesture, { passive: true })
+  const onUserGesture = () => cancelActiveScroll();
+  window.addEventListener('wheel', onUserGesture, { passive: true });
+  window.addEventListener('touchmove', onUserGesture, { passive: true });
   teardownActive = () => {
-    window.removeEventListener('wheel', onUserGesture)
-    window.removeEventListener('touchmove', onUserGesture)
-  }
+    window.removeEventListener('wheel', onUserGesture);
+    window.removeEventListener('touchmove', onUserGesture);
+  };
 
   const step = (now: number) => {
     if (startY === null) {
-      startY = readCurrent()
-      startTime = now
+      startY = readCurrent();
+      startTime = now;
     }
-    const targetY = computeTarget()
-    const t = Math.min(1, (now - startTime) / durationMs)
-    const y = startY + (targetY - startY) * easeOutCubic(t)
-    writeTo(y)
+    const targetY = computeTarget();
+    const t = Math.min(1, (now - startTime) / durationMs);
+    const y = startY + (targetY - startY) * easeOutCubic(t);
+    writeTo(y);
     if (t < 1) {
-      activeRaf = requestAnimationFrame(step)
+      activeRaf = requestAnimationFrame(step);
     } else {
       // Final exact write in case easing left a sub-pixel gap, then teardown.
-      writeTo(computeTarget())
-      activeRaf = 0
+      writeTo(computeTarget());
+      activeRaf = 0;
       if (teardownActive) {
-        teardownActive()
-        teardownActive = null
+        teardownActive();
+        teardownActive = null;
       }
     }
-  }
-  activeRaf = requestAnimationFrame(step)
+  };
+  activeRaf = requestAnimationFrame(step);
 }

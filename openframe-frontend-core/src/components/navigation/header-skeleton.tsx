@@ -1,4 +1,4 @@
-import { HeaderConfig } from '../../types/navigation';
+import type { HeaderConfig } from '../../types/navigation';
 import { cn } from '../../utils';
 
 export interface HeaderSkeletonProps {

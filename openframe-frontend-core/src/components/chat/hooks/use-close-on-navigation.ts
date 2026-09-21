@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Close a layout-mounted overlay when the URL pathname changes.
@@ -52,36 +52,35 @@
  * useEffect cleanup pattern. This is for the persistent layout shell.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react';
 
-export function useCloseOnNavigation(
-  close: () => void,
-  pathname: string | null,
-): void {
-  const prevPathnameRef = useRef<string | null>(null)
+export function useCloseOnNavigation(close: () => void, pathname: string | null): void {
+  const prevPathnameRef = useRef<string | null>(null);
   // Track whether we've seen the first render. Using a ref instead of
   // a `null` sentinel on prevPathnameRef so callers passing `null` as
   // a legitimate pathname value (server-side / pre-route-resolve) don't
   // get the first-render skip retriggered every time pathname rebinds
   // to null.
-  const initializedRef = useRef(false)
+  const initializedRef = useRef(false);
+  // Latest `close` without making it a dependency: the effect must fire on a
+  // pathname change and NOTHING else, but it must still call the current
+  // callback rather than the one captured on mount.
+  const closeRef = useRef(close);
+  useEffect(() => {
+    closeRef.current = close;
+  });
 
   useEffect(() => {
     // First render: just record the starting pathname, do NOT close.
     if (!initializedRef.current) {
-      initializedRef.current = true
-      prevPathnameRef.current = pathname
-      return
+      initializedRef.current = true;
+      prevPathnameRef.current = pathname;
+      return;
     }
     // Subsequent renders: fire close ONLY on a real pathname change.
     if (prevPathnameRef.current !== pathname) {
-      prevPathnameRef.current = pathname
-      close()
+      prevPathnameRef.current = pathname;
+      closeRef.current();
     }
-    // We intentionally exclude `close` from deps — the caller is expected
-    // to pass a stable callback. Including `close` would re-run the effect
-    // every render and require every caller to memoize, which is a worse
-    // ergonomic trade-off than the documented "stable callback" contract.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
+  }, [pathname]);
 }

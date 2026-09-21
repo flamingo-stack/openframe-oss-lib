@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { useEffect, useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react';
 
 /**
  * `useLayoutEffect` in the browser, `useEffect` on the server.
@@ -16,5 +16,4 @@ import { useEffect, useLayoutEffect } from 'react'
  * `useLayoutEffect` gets the timing right and pays for it with the warning. This
  * gets both: paint-blocking where there is a paint, a no-op where there is not.
  */
-export const useIsomorphicLayoutEffect =
-  typeof window !== 'undefined' ? useLayoutEffect : useEffect
+export const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;

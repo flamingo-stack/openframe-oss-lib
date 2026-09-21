@@ -10,43 +10,43 @@
  * maps it to concrete colors.
  */
 
-export type ColorScheme = 'success' | 'error' | 'warning' | 'cyan' | 'default'
+export type ColorScheme = 'success' | 'error' | 'warning' | 'cyan' | 'default';
 
 /**
  * Map a status to a color scheme name for StatusBadge components.
  * Supports job/processing statuses, ClickUp task statuses, and log levels.
  */
 export function getStatusColorScheme(status: string): ColorScheme {
-  const s = status?.toLowerCase() || ''
+  const s = status?.toLowerCase() || '';
 
   // Exact matches first (most common)
   switch (status) {
     case 'completed':
     case 'success':
-    case 'active':          // review cycles, feature flags, etc.
-      return 'success'
+    case 'active': // review cycles, feature flags, etc.
+      return 'success';
     case 'failed':
     case 'failure':
     case 'cancelled':
     case 'error':
-      return 'error'
+      return 'error';
     case 'running':
     case 'processing':
-    case 'closed':          // review cycles past their active window
-      return 'cyan'
+    case 'closed': // review cycles past their active window
+      return 'cyan';
     case 'pending':
     case 'warning':
-      return 'warning'
-    case 'draft':           // review cycles not yet opened to reviewers
+      return 'warning';
+    case 'draft': // review cycles not yet opened to reviewers
     case 'info':
-      return 'default'
+      return 'default';
   }
 
   // Partial matches for ClickUp-style statuses (Complete, Done, Working, etc.)
-  if (s.includes('complete') || s.includes('done')) return 'success'
-  if (s.includes('review')) return 'cyan'
-  if (s.includes('working') || s.includes('progress')) return 'warning'
-  if (s.includes('blocked') || s.includes('failed')) return 'error'
+  if (s.includes('complete') || s.includes('done')) return 'success';
+  if (s.includes('review')) return 'cyan';
+  if (s.includes('working') || s.includes('progress')) return 'warning';
+  if (s.includes('blocked') || s.includes('failed')) return 'error';
 
-  return 'default'
+  return 'default';
 }
