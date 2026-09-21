@@ -143,7 +143,7 @@ export interface NatsSubscriptionHandle {
   unsubscribe(): void;
 }
 
-export type NatsStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'closed' | 'error';
+export type NatsStatus = 'connecting' | 'connected' | 'disconnected' | 'stale' | 'reconnecting' | 'closed' | 'error';
 
 export interface NatsStatusEvent {
   status: NatsStatus;
@@ -296,13 +296,14 @@ function mapOptionsToConnectionOptions(opts: NatsClientOptions, backoff?: Expone
  * `staleConnection` is the one an idle mobile app hits routinely: no pong
  * within `pingInterval * maxPingOut`, i.e. after a spell in the background.
  *
- * `StaleConnection` maps to `disconnected` rather than being ignored on the
- * grounds that `Disconnect` follows it anyway — it does not always. nats.ws
- * tears the transport down by draining `bufferedAmount` first, and a
- * black-holed socket (no FIN, which is how a mobile link usually dies) never
- * drains, so `Disconnect` can fail to arrive at all. Reporting it is then the
- * only honest answer available: consumers stop trusting a tail the client has
- * already given up on. It does NOT by itself recover that connection — the
+ * `StaleConnection` maps to its own `'stale'` status rather than the plain
+ * `'disconnected'` that `Disconnect` reports — it does not always precede a
+ * `Disconnect`. nats.ws tears the transport down by draining `bufferedAmount`
+ * first, and a black-holed socket (no FIN, which is how a mobile link usually
+ * dies) never drains, so `Disconnect` can fail to arrive at all. Reporting it
+ * distinctly is then the only honest answer available: consumers stop
+ * trusting a tail the client has already given up on, without conflating it
+ * with a confirmed close. It does NOT by itself recover that connection — the
  * retry it arms short-circuits, because a protocol that never closed still
  * reports `isConnected()`. Getting the socket back from that state needs a
  * force-close path the client does not currently expose.
@@ -328,7 +329,7 @@ function mapNatsTypeToStatus(
     case debugEvents.ClientInitiatedReconnect:
       return 'reconnecting';
     case debugEvents.StaleConnection:
-      return 'disconnected';
+      return 'stale';
     // Events.Update (cluster gossip), Events.LDM and DebugEvents.PingTimer say
     // nothing about reachability.
     default:
@@ -728,3 +729,4 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     onStatus,
   };
 }
+
