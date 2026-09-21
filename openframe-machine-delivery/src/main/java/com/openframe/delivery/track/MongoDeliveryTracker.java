@@ -39,7 +39,7 @@ public class MongoDeliveryTracker implements DeliveryTracker {
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Instant expiresAt = expiresAt(type, now);
-        boolean done = repository.markDone(id, DeliveryStatus.OPEN, now, expiresAt);
+        boolean done = repository.markDone(id, DeliveryStatus.COMPLETABLE, now, expiresAt);
         if (done) {
             log.info("Delivery DONE: type={} targetId={} machineId={}", type, targetId, machineId);
         }

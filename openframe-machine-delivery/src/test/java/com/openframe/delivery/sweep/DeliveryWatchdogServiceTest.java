@@ -7,14 +7,12 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryTestPolicies;
+import com.openframe.delivery.metrics.DeliveryMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.util.List;
@@ -32,10 +30,10 @@ class DeliveryWatchdogServiceTest {
 
     private static final String FIRST_ID = "CLIENT_UNINSTALL:openframe-client:mach-1";
     private static final String SECOND_ID = "CLIENT_UNINSTALL:openframe-client:mach-2";
-    private static final Pageable BATCH = PageRequest.of(0, BATCH_SIZE, Sort.by("dueAt"));
 
     @Mock private MachineDeliveryRepository repository;
-    @Mock private DeliveryFailureRecorder failureRecorder;
+    @Mock private DeliveryCloser closer;
+    @Mock private DeliveryMetrics metrics;
 
     private DeliveryWatchdogService service;
 
@@ -47,11 +45,11 @@ class DeliveryWatchdogServiceTest {
         silentDelivery = silentRow(FIRST_ID);
         otherSilentDelivery = silentRow(SECOND_ID);
         DeliveryProperties properties = DeliveryTestPolicies.properties();
-        service = new DeliveryWatchdogService(repository, properties, failureRecorder);
+        service = new DeliveryWatchdogService(repository, properties, closer, metrics);
     }
 
     @Test
-    void reapAcked_ackedRowPastResultDeadline_failedTimeout() {
+    void reapAcked_ackedRowPastResultDeadline_failedTimeoutOnlyIfStillAcked() {
         // setup
         stubOverdue(silentDelivery);
 
@@ -59,21 +57,23 @@ class DeliveryWatchdogServiceTest {
         service.reapAcked();
 
         // verifications
-        verify(failureRecorder).record(eq(silentDelivery), eq(DeliveryFailure.TIMEOUT), any(Instant.class));
+        verify(closer).fail(eq(silentDelivery), eq(DeliveryFailure.TIMEOUT), eq(DeliveryStatus.AWAITING_RESULT), any(Instant.class));
+        verifyNoInteractions(metrics);
     }
 
     @Test
-    void reapAcked_firstRowThrows_secondRowStillFailed() {
+    void reapAcked_firstRowThrows_secondRowStillFailedAndErrorCounted() {
         // setup
         stubOverdue(silentDelivery, otherSilentDelivery);
         doThrow(new IllegalStateException("boom"))
-                .when(failureRecorder).record(eq(silentDelivery), eq(DeliveryFailure.TIMEOUT), any(Instant.class));
+                .when(closer).fail(eq(silentDelivery), eq(DeliveryFailure.TIMEOUT), eq(DeliveryStatus.AWAITING_RESULT), any(Instant.class));
 
         // execution
         service.reapAcked();
 
         // verifications
-        verify(failureRecorder).record(eq(otherSilentDelivery), eq(DeliveryFailure.TIMEOUT), any(Instant.class));
+        verify(closer).fail(eq(otherSilentDelivery), eq(DeliveryFailure.TIMEOUT), eq(DeliveryStatus.AWAITING_RESULT), any(Instant.class));
+        verify(metrics).recordRowError();
     }
 
     @Test
@@ -85,12 +85,11 @@ class DeliveryWatchdogServiceTest {
         service.reapAcked();
 
         // verifications
-        verifyNoInteractions(failureRecorder);
+        verifyNoInteractions(closer, metrics);
     }
 
     private void stubOverdue(MachineDelivery... rows) {
-        when(repository.findByStatusAndDueAtBefore(eq(DeliveryStatus.ACKED), any(Instant.class), eq(BATCH)))
-                .thenReturn(List.of(rows));
+        when(repository.findDue(eq(DeliveryStatus.ACKED), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
     }
 
     private static MachineDelivery silentRow(String id) {

@@ -33,7 +33,7 @@ public class DeliverySweepScheduler {
     private void runPass(String pass, Runnable body) {
         try {
             metrics.timeSweepPass(pass, body);
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             log.error("Delivery sweep pass failed: pass={}", pass, e);
         }
     }

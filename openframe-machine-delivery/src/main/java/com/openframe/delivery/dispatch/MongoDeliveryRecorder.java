@@ -29,7 +29,7 @@ public class MongoDeliveryRecorder implements DeliveryRecorder {
     @Override
     public void record(DeliveryRequest<?> request) {
         MachineDelivery delivery = pendingRow(request);
-        repository.save(delivery);
+        repository.upsertPending(delivery);
         log.info("Delivery recorded: type={} targetId={} machineId={}",
                 request.getType(), request.getTargetId(), request.getMachineId());
     }

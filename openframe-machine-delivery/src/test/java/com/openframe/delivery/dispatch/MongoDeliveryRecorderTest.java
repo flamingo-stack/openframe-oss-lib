@@ -50,14 +50,14 @@ class MongoDeliveryRecorderTest {
     }
 
     @Test
-    void record_request_pendingRowSavedDueAfterAckThreshold() {
+    void record_request_pendingRowUpsertedDueAfterAckThreshold() {
         // setup
 
         // execution
         recorder.record(request);
 
         // verifications
-        verify(repository).save(deliveryCaptor.capture());
+        verify(repository).upsertPending(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
         assertThat(saved.getId()).isEqualTo("CLIENT_UNINSTALL:mach-42:mach-42");
         assertThat(saved.getType()).isEqualTo(DeliveryType.CLIENT_UNINSTALL);

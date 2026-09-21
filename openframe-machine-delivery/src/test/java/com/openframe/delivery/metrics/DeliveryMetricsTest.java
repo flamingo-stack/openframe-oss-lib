@@ -56,6 +56,34 @@ class DeliveryMetricsTest {
     }
 
     @Test
+    void timeSweepPass_bodyThrowsError_timerTaggedError() {
+        // setup
+        Runnable body = () -> {
+            throw new AssertionError("boom");
+        };
+
+        // execution + verifications
+        assertThatThrownBy(() -> metrics.timeSweepPass(PASS, body))
+                .isInstanceOf(AssertionError.class);
+        Timer timer = registry.find(SWEEP_TIMER).tags("pass", PASS, "outcome", "error").timer();
+        assertThat(timer).isNotNull();
+        assertThat(timer.count()).isEqualTo(1L);
+    }
+
+    @Test
+    void recordRowError_called_counterIncremented() {
+        // setup
+
+        // execution
+        metrics.recordRowError();
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.sweep.row_errors").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
     void recordFailed_typeAndReason_counterTaggedLowercase() {
         // setup
 

@@ -5,6 +5,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -57,6 +58,7 @@ public class DeliveryProperties {
     public static class Sweep {
 
         @NotNull
+        @Positive
         private Integer batchSize;
     }
 
@@ -65,20 +67,27 @@ public class DeliveryProperties {
     public static class Policy {
 
         @NotNull
+        @Positive
         private Long ackThresholdSeconds;
         @NotNull
+        @Positive
         private Integer maxAttempts;
         @NotNull
+        @Positive
         private Integer backoffMultiplier;
         @NotNull
+        @Positive
         private Long maxRetryIntervalSeconds;
         @NotNull
         private DeliveryOfflineBehavior offlineBehavior;
         @NotNull
+        @Positive
         private Long reconnectWindowSeconds;
         @NotNull
+        @Positive
         private Long resultTimeoutSeconds;
         @NotNull
+        @Positive
         private Long ttlSeconds;
 
         Policy mergeOver(Policy base) {

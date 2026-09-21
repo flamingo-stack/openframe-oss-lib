@@ -44,7 +44,7 @@ public class MachineOnlineStatus {
         }
 
         public boolean isOffline(String machineId) {
-            return statusById.get(machineId) == DeviceStatus.OFFLINE;
+            return statusById.get(machineId) != DeviceStatus.ONLINE;
         }
     }
 }

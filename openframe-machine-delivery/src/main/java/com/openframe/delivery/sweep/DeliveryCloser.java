@@ -17,28 +17,28 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Set;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "openframe.delivery.enabled", havingValue = "true")
-public class DeliveryFailureRecorder {
+public class DeliveryCloser {
 
     private final MachineDeliveryRepository repository;
     private final DeliverySpecRegistry registry;
     private final DeliveryProperties properties;
     private final DeliveryMetrics metrics;
 
-    public void record(MachineDelivery delivery, DeliveryFailure failure, Instant now) {
+    public void fail(MachineDelivery delivery, DeliveryFailure failure, Set<DeliveryStatus> from, Instant now) {
         DeliveryType type = delivery.getType();
-        Policy policy = properties.resolve(type);
-        long ttlSeconds = policy.getTtlSeconds();
-        Instant expiresAt = now.plusSeconds(ttlSeconds);
+        DeliverySpec<DeliverySeed, Object> spec = registry.require(type);
+        Instant expiresAt = expiresAt(type, now);
         String id = delivery.getId();
 
-        boolean stillOpen = repository.markFailed(id, DeliveryStatus.OPEN, failure, now, expiresAt);
-        if (!stillOpen) {
-            log.debug("Delivery closed before the failure could be recorded: id={}", id);
+        boolean stillIn = repository.markFailed(id, from, failure, now, expiresAt);
+        if (!stillIn) {
+            log.debug("Delivery moved on before the failure could be recorded: id={}", id);
             return;
         }
         delivery.setStatus(DeliveryStatus.FAILED);
@@ -47,9 +47,24 @@ public class DeliveryFailureRecorder {
         delivery.setExpiresAt(expiresAt);
 
         metrics.recordFailed(type, failure);
-        DeliverySpec<DeliverySeed, Object> spec = registry.require(type);
         spec.onFailed(delivery, failure);
         log.warn("Delivery FAILED: type={} targetId={} machineId={} attempts={} reason={}",
                 type, delivery.getTargetId(), delivery.getMachineId(), delivery.getAttempts(), failure);
+    }
+
+    public void cancel(MachineDelivery delivery, Set<DeliveryStatus> from, String reason, Instant now) {
+        DeliveryType type = delivery.getType();
+        Instant expiresAt = expiresAt(type, now);
+        boolean cancelled = repository.markCancelled(delivery.getId(), from, now, expiresAt);
+        if (cancelled) {
+            log.info("Delivery CANCELLED by sweep: type={} targetId={} machineId={} reason={}",
+                    type, delivery.getTargetId(), delivery.getMachineId(), reason);
+        }
+    }
+
+    private Instant expiresAt(DeliveryType type, Instant now) {
+        Policy policy = properties.resolve(type);
+        long ttlSeconds = policy.getTtlSeconds();
+        return now.plusSeconds(ttlSeconds);
     }
 }

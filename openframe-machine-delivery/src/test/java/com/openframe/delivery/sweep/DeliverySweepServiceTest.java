@@ -17,7 +17,6 @@ import com.openframe.delivery.spec.TestPayload;
 import com.openframe.delivery.spec.TestSeed;
 import com.openframe.delivery.sweep.MachineOnlineStatus.Lookup;
 import com.openframe.delivery.track.DeliveryId;
-import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,9 +24,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.util.List;
@@ -63,13 +59,11 @@ class DeliverySweepServiceTest {
     private static final long CLOCK_SLACK_SECONDS = 5L;
     private static final int MANY_ATTEMPTS_ALLOWED = 10;
     private static final int ATTEMPTS_PAST_CAP = 5;
-    private static final Pageable BATCH = PageRequest.of(0, BATCH_SIZE, Sort.by("dueAt"));
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private MachineOnlineStatus machineOnlineStatus;
     @Mock private DeliverySpecRegistry registry;
-    @Mock private DeliveryFailureRecorder failureRecorder;
-    @Mock private DeliveryTracker tracker;
+    @Mock private DeliveryCloser closer;
     @Mock private DeliveryMetrics metrics;
     @Mock private DeliverySpec<TestSeed, TestPayload> spec;
 
@@ -87,18 +81,17 @@ class DeliverySweepServiceTest {
         dispatchedAt = Instant.now().minusSeconds(ACK_THRESHOLD * 2);
         delivery = row(MACHINE_ID, PAYLOAD_JSON);
         properties = DeliveryTestPolicies.properties();
-        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties,
-                failureRecorder, tracker, metrics, new ObjectMapper());
+        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, new ObjectMapper());
     }
 
     @Test
-    void retryPending_onlineWithAttemptsLeft_publishedThenCountedWithBackoff() {
+    void retryPending_onlineWithAttemptsLeft_publishedThenCountedAgainstSameDispatchWithBackoff() {
         // setup
         Instant before = Instant.now();
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), any(Instant.class), dueAtCaptor.capture())).thenReturn(true);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class), dueAtCaptor.capture())).thenReturn(true);
 
         // execution
         service.retryPending();
@@ -110,7 +103,7 @@ class DeliverySweepServiceTest {
                 .isAfterOrEqualTo(before.plusSeconds(FIRST_RETRY_DELAY))
                 .isBefore(before.plusSeconds(FIRST_RETRY_DELAY + CLOCK_SLACK_SECONDS));
         verify(metrics).recordRetried(DeliveryType.TOOL_INSTALLATION);
-        verifyNoInteractions(failureRecorder, tracker);
+        verifyNoInteractions(closer);
     }
 
     @Test
@@ -122,7 +115,7 @@ class DeliverySweepServiceTest {
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), any(Instant.class), dueAtCaptor.capture())).thenReturn(true);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class), dueAtCaptor.capture())).thenReturn(true);
 
         // execution
         service.retryPending();
@@ -134,8 +127,9 @@ class DeliverySweepServiceTest {
     }
 
     @Test
-    void retryPending_publishThrows_attemptNotCountedAndPublishFailureCounted() {
+    void retryPending_publishThrows_attemptNotCountedRowPostponedErrorsCounted() {
         // setup
+        Instant before = Instant.now();
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
         stubSpec();
@@ -145,19 +139,41 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(repository, never()).markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), any(Instant.class), any(Instant.class));
+        verify(repository, never()).markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class), any(Instant.class));
+        verify(repository).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), dueAtCaptor.capture());
+        assertThat(dueAtCaptor.getValue())
+                .isAfterOrEqualTo(before.plusSeconds(MAX_RETRY_INTERVAL))
+                .isBefore(before.plusSeconds(MAX_RETRY_INTERVAL + CLOCK_SLACK_SECONDS));
         verify(metrics).recordPublishFailed(DeliveryType.TOOL_INSTALLATION);
+        verify(metrics).recordRowError();
         verify(metrics, never()).recordRetried(DeliveryType.TOOL_INSTALLATION);
-        verifyNoInteractions(failureRecorder, tracker);
+        verifyNoInteractions(closer);
     }
 
     @Test
-    void retryPending_ackedWhilePublishing_publishedButNotCounted() {
+    void retryPending_typeWithoutSpec_rowPostponedNotFailed() {
+        // setup
+        stubDue(delivery);
+        stubMachine(DeviceStatus.ONLINE);
+        when(registry.require(DeliveryType.TOOL_INSTALLATION))
+                .thenThrow(new IllegalArgumentException("No spec registered for delivery type: TOOL_INSTALLATION"));
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(repository).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), any(Instant.class));
+        verify(metrics).recordRowError();
+        verifyNoInteractions(closer, spec);
+    }
+
+    @Test
+    void retryPending_rowMovedOnWhilePublishing_publishedButNotCounted() {
         // setup
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), any(Instant.class), any(Instant.class))).thenReturn(false);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class), any(Instant.class))).thenReturn(false);
 
         // execution
         service.retryPending();
@@ -165,11 +181,11 @@ class DeliverySweepServiceTest {
         // verifications
         verify(spec).publish(eq(MACHINE_ID), any(TestPayload.class));
         verify(metrics, never()).recordRetried(DeliveryType.TOOL_INSTALLATION);
-        verifyNoInteractions(failureRecorder, tracker);
+        verifyNoInteractions(closer);
     }
 
     @Test
-    void retryPending_onlineAttemptsExhausted_failedExhausted() {
+    void retryPending_onlineAttemptsExhausted_failedExhaustedOnlyIfStillUnacked() {
         // setup
         delivery.setAttempts(MAX_ATTEMPTS);
         stubDue(delivery);
@@ -179,8 +195,8 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(failureRecorder).record(eq(delivery), eq(DeliveryFailure.EXHAUSTED), any(Instant.class));
-        verifyNoInteractions(registry, metrics, tracker);
+        verify(closer).fail(eq(delivery), eq(DeliveryFailure.EXHAUSTED), eq(DeliveryStatus.UNACKED), any(Instant.class));
+        verifyNoInteractions(registry, metrics);
     }
 
     @Test
@@ -193,8 +209,22 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(repository).postpone(delivery.getId(), DeliveryStatus.UNACKED, dispatchedAt.plusSeconds(RECONNECT_WINDOW));
-        verifyNoInteractions(registry, failureRecorder, tracker, metrics);
+        verify(repository).park(delivery.getId(), DeliveryStatus.UNACKED, dispatchedAt.plusSeconds(RECONNECT_WINDOW));
+        verifyNoInteractions(registry, closer, metrics);
+    }
+
+    @Test
+    void retryPending_machineStillPendingFirstHeartbeat_parkedLikeOffline() {
+        // setup
+        stubDue(delivery);
+        stubMachine(DeviceStatus.PENDING);
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(repository).park(delivery.getId(), DeliveryStatus.UNACKED, dispatchedAt.plusSeconds(RECONNECT_WINDOW));
+        verifyNoInteractions(registry, closer, metrics);
     }
 
     @Test
@@ -209,12 +239,12 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(failureRecorder).record(eq(delivery), eq(DeliveryFailure.OFFLINE), any(Instant.class));
-        verify(repository, never()).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), any(Instant.class));
+        verify(closer).fail(eq(delivery), eq(DeliveryFailure.OFFLINE), eq(DeliveryStatus.UNACKED), any(Instant.class));
+        verify(repository, never()).park(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), any(Instant.class));
     }
 
     @Test
-    void retryPending_offlineWithRowSkipOverride_cancelledNotFailed() {
+    void retryPending_offlineWithSkipBehavior_cancelledNotFailed() {
         // setup
         delivery.setOfflineBehavior(DeliveryOfflineBehavior.SKIP);
         stubDue(delivery);
@@ -224,8 +254,9 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(tracker).cancel(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
-        verifyNoInteractions(failureRecorder, registry, metrics);
+        verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
+        verify(closer, never()).fail(eq(delivery), any(DeliveryFailure.class), eq(DeliveryStatus.UNACKED), any(Instant.class));
+        verifyNoInteractions(registry, metrics);
     }
 
     @Test
@@ -238,8 +269,8 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(tracker).cancel(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
-        verifyNoInteractions(registry, failureRecorder, metrics);
+        verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
+        verifyNoInteractions(registry, metrics);
     }
 
     @Test
@@ -252,12 +283,12 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(tracker).cancel(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
-        verifyNoInteractions(registry, failureRecorder, metrics);
+        verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
+        verifyNoInteractions(registry, metrics);
     }
 
     @Test
-    void retryPending_oneRowCorrupt_otherRowStillRepublished() {
+    void retryPending_oneRowCorrupt_corruptPostponedOtherRepublished() {
         // setup
         MachineDelivery corrupt = row(OTHER_MACHINE_ID, CORRUPT_JSON);
         stubDue(corrupt, delivery);
@@ -265,16 +296,18 @@ class DeliverySweepServiceTest {
         Map<String, DeviceStatus> bothOnline = Map.of(OTHER_MACHINE_ID, DeviceStatus.ONLINE, MACHINE_ID, DeviceStatus.ONLINE);
         when(machineOnlineStatus.lookup(both)).thenReturn(new Lookup(bothOnline));
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), any(Instant.class), any(Instant.class))).thenReturn(true);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class), any(Instant.class))).thenReturn(true);
 
         // execution
         service.retryPending();
 
         // verifications
+        verify(repository).postpone(eq(corrupt.getId()), eq(DeliveryStatus.UNACKED), any(Instant.class));
         verify(spec).publish(eq(MACHINE_ID), payloadCaptor.capture());
         assertThat(payloadCaptor.getValue().getValue()).isEqualTo(TARGET_ID);
         verify(spec, never()).publish(eq(OTHER_MACHINE_ID), any(TestPayload.class));
         verify(metrics).recordRetried(DeliveryType.TOOL_INSTALLATION);
+        verify(metrics).recordRowError();
     }
 
     @Test
@@ -286,7 +319,7 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verifyNoInteractions(machineOnlineStatus, registry, failureRecorder, tracker, metrics);
+        verifyNoInteractions(machineOnlineStatus, registry, closer, metrics);
     }
 
     private MachineDelivery row(String machineId, String payloadJson) {
@@ -305,8 +338,7 @@ class DeliverySweepServiceTest {
     }
 
     private void stubDue(MachineDelivery... rows) {
-        when(repository.findByStatusAndDueAtBefore(eq(DeliveryStatus.PENDING), any(Instant.class), eq(BATCH)))
-                .thenReturn(List.of(rows));
+        when(repository.findDue(eq(DeliveryStatus.PENDING), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
     }
 
     private void stubMachine(DeviceStatus status) {

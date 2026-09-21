@@ -56,9 +56,9 @@ class MongoDeliveryTrackerTest {
     }
 
     @Test
-    void complete_typedKey_openRowMarkedDoneWithTtlExpiry() {
+    void complete_typedKey_openOrFailedRowMarkedDoneWithTtlExpiry() {
         // setup
-        when(repository.markDone(eq(DELIVERY_ID), eq(DeliveryStatus.OPEN), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
+        when(repository.markDone(eq(DELIVERY_ID), eq(DeliveryStatus.COMPLETABLE), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
 
         // execution
         tracker.complete(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);

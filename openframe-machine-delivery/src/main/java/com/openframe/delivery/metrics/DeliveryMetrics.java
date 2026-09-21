@@ -18,6 +18,7 @@ public class DeliveryMetrics {
     private static final String RETRIED_COUNTER = "openframe.delivery.retried";
     private static final String FAILED_COUNTER = "openframe.delivery.failed";
     private static final String PUBLISH_FAILED_COUNTER = "openframe.delivery.publish_failed";
+    private static final String ROW_ERROR_COUNTER = "openframe.delivery.sweep.row_errors";
     private static final String SWEEP_TIMER = "openframe.delivery.sweep.duration";
     private static final String TAG_TYPE = "type";
     private static final String TAG_REASON = "reason";
@@ -44,14 +45,16 @@ public class DeliveryMetrics {
         meterRegistry.counter(PUBLISH_FAILED_COUNTER, TAG_TYPE, typeTag).increment();
     }
 
+    public void recordRowError() {
+        meterRegistry.counter(ROW_ERROR_COUNTER).increment();
+    }
+
     public void timeSweepPass(String pass, Runnable body) {
         Timer.Sample sample = Timer.start(meterRegistry);
-        String outcome = OUTCOME_OK;
+        String outcome = OUTCOME_ERROR;
         try {
             body.run();
-        } catch (RuntimeException e) {
-            outcome = OUTCOME_ERROR;
-            throw e;
+            outcome = OUTCOME_OK;
         } finally {
             Timer timer = meterRegistry.timer(SWEEP_TIMER, TAG_PASS, pass, TAG_OUTCOME, outcome);
             sample.stop(timer);

@@ -1,5 +1,6 @@
 package com.openframe.data.repository.delivery.impl;
 
+import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
@@ -12,13 +13,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.convert.MongoConverter;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,8 +30,10 @@ class CustomMachineDeliveryRepositoryImplTest {
 
     private static final String ID = "TOOL_INSTALLATION:fleetmdm-agent:mach-42";
     private static final String MACHINE_ID = "mach-42";
+    private static final int LIMIT = 500;
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
+    @Mock private MongoConverter converter;
 
     @Captor private ArgumentCaptor<Query> queryCaptor;
     @Captor private ArgumentCaptor<Update> updateCaptor;
@@ -43,19 +49,50 @@ class CustomMachineDeliveryRepositoryImplTest {
     }
 
     @Test
-    void markRepublished_rowStillPending_attemptCountedAndTrue() {
+    void findDue_statusAndDeadline_readsPrimaryOldestFirstWithLimit() {
+        // setup
+        when(mongoTemplate.find(queryCaptor.capture(), eq(MachineDelivery.class))).thenReturn(List.of());
+
+        // execution
+        repository.findDue(DeliveryStatus.PENDING, now, LIMIT);
+
+        // verifications
+        Query query = queryCaptor.getValue();
+        assertThat(query.getReadPreference()).isEqualTo(ReadPreference.primary());
+        assertThat(query.getLimit()).isEqualTo(LIMIT);
+        assertThat(query.getQueryObject().toString()).contains("PENDING").contains("$lt");
+        assertThat(query.getSortObject().toString()).contains("dueAt");
+    }
+
+    @Test
+    void upsertPending_row_scopedUpsertById() {
+        // setup
+        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).build();
+        when(mongoTemplate.getConverter()).thenReturn(converter);
+
+        // execution
+        repository.upsertPending(delivery);
+
+        // verifications
+        verify(mongoTemplate).upsert(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class));
+        assertThat(queryCaptor.getValue().getQueryObject().toString()).contains(ID);
+    }
+
+    @Test
+    void markRepublished_sameDispatchStillPending_attemptCountedAndTrue() {
         // setup
         UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
 
         // execution
-        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, now);
+        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, now, now);
 
         // verifications
         assertThat(republished).isTrue();
         assertThat(queryCaptor.getValue().getQueryObject().toString())
                 .contains(ID)
                 .contains("PENDING")
+                .contains("dispatchedAt")
                 .doesNotContain("ACKED");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("$inc")
@@ -63,20 +100,20 @@ class CustomMachineDeliveryRepositoryImplTest {
     }
 
     @Test
-    void markRepublished_rowAckedMeanwhile_false() {
+    void markRepublished_rowMovedOn_false() {
         // setup
         UpdateResult noRow = UpdateResult.acknowledged(0, 0L, null);
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(noRow);
 
         // execution
-        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, now);
+        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, now, now);
 
         // verifications
         assertThat(republished).isFalse();
     }
 
     @Test
-    void markFailed_openRow_failureAndExpiryWritten() {
+    void markFailed_openRow_failureAndExpiryWrittenPayloadDropped() {
         // setup
         UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
@@ -92,11 +129,13 @@ class CustomMachineDeliveryRepositoryImplTest {
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("FAILED")
                 .contains("TIMEOUT")
-                .contains("expiresAt");
+                .contains("expiresAt")
+                .contains("$unset")
+                .contains("payloadJson");
     }
 
     @Test
-    void wake_parkedRowsForMachine_modifiedCountReturned() {
+    void wake_parkedRowsOfMachine_unparkedAndModifiedCountReturned() {
         // setup
         UpdateResult twoRows = UpdateResult.acknowledged(2, 2L, null);
         when(mongoTemplate.updateMulti(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(twoRows);
@@ -109,6 +148,9 @@ class CustomMachineDeliveryRepositoryImplTest {
         assertThat(queryCaptor.getValue().getQueryObject().toString())
                 .contains(MACHINE_ID)
                 .contains("PENDING")
-                .contains("$gt");
+                .contains("parked=true");
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("parked=false")
+                .contains("dueAt");
     }
 }

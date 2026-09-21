@@ -15,13 +15,9 @@ import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
 import com.openframe.delivery.sweep.MachineOnlineStatus.Lookup;
-import com.openframe.delivery.track.DeliveryTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -36,22 +32,18 @@ import static java.util.stream.Collectors.toSet;
 @ConditionalOnProperty(name = "openframe.delivery.enabled", havingValue = "true")
 public class DeliverySweepService {
 
-    private static final Sort OLDEST_DUE_FIRST = Sort.by("dueAt");
-
     private final MachineDeliveryRepository repository;
     private final MachineOnlineStatus machineOnlineStatus;
     private final DeliverySpecRegistry registry;
     private final DeliveryProperties properties;
-    private final DeliveryFailureRecorder failureRecorder;
-    private final DeliveryTracker tracker;
+    private final DeliveryCloser closer;
     private final DeliveryMetrics metrics;
     private final ObjectMapper objectMapper;
 
     public void retryPending() {
         Instant now = Instant.now();
         int batchSize = properties.getSweep().getBatchSize();
-        Pageable batch = PageRequest.of(0, batchSize, OLDEST_DUE_FIRST);
-        List<MachineDelivery> due = repository.findByStatusAndDueAtBefore(DeliveryStatus.PENDING, now, batch);
+        List<MachineDelivery> due = repository.findDue(DeliveryStatus.PENDING, now, batchSize);
         if (due.isEmpty()) {
             return;
         }
@@ -63,15 +55,17 @@ public class DeliverySweepService {
     private void retryOne(MachineDelivery delivery, Lookup machines, Instant now) {
         try {
             retryOrClose(delivery, machines, now);
-        } catch (RuntimeException e) {
-            log.error("Delivery sweep failed for row: id={}", delivery.getId(), e);
+        } catch (Exception e) {
+            metrics.recordRowError();
+            postponeAfterError(delivery, now);
+            log.error("Delivery sweep failed for row, postponed: id={}", delivery.getId(), e);
         }
     }
 
     private void retryOrClose(MachineDelivery delivery, Lookup machines, Instant now) {
         String machineId = delivery.getMachineId();
         if (machines.isGone(machineId)) {
-            cancel(delivery, "machine gone");
+            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine gone", now);
             return;
         }
         Policy policy = properties.resolve(delivery);
@@ -83,25 +77,20 @@ public class DeliverySweepService {
             republish(delivery, policy, now);
             return;
         }
-        failureRecorder.record(delivery, DeliveryFailure.EXHAUSTED, now);
-    }
-
-    private void cancel(MachineDelivery delivery, String reason) {
-        tracker.cancel(delivery.getType(), delivery.getTargetId(), delivery.getMachineId());
-        log.info("Delivery cancelled by sweep: id={} reason={}", delivery.getId(), reason);
+        closer.fail(delivery, DeliveryFailure.EXHAUSTED, DeliveryStatus.UNACKED, now);
     }
 
     private void parkSkipOrFailOffline(MachineDelivery delivery, Policy policy, Instant now) {
         if (shouldSkipOffline(policy)) {
-            cancel(delivery, "machine offline, type skips offline machines");
+            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine not online, type skips offline machines", now);
             return;
         }
         Instant windowEnd = reconnectWindowEnd(delivery, policy);
         if (now.isAfter(windowEnd)) {
-            failureRecorder.record(delivery, DeliveryFailure.OFFLINE, now);
+            closer.fail(delivery, DeliveryFailure.OFFLINE, DeliveryStatus.UNACKED, now);
             return;
         }
-        repository.postpone(delivery.getId(), DeliveryStatus.UNACKED, windowEnd);
+        repository.park(delivery.getId(), DeliveryStatus.UNACKED, windowEnd);
         log.debug("Delivery parked until the machine comes online: id={} windowEnd={}", delivery.getId(), windowEnd);
     }
 
@@ -116,9 +105,10 @@ public class DeliverySweepService {
         int attempt = delivery.getAttempts() + 1;
         long delaySeconds = retryDelaySeconds(attempt, policy);
         Instant dueAt = now.plusSeconds(delaySeconds);
-        boolean counted = repository.markRepublished(delivery.getId(), DeliveryStatus.UNACKED, now, dueAt);
+        Instant dispatchedAt = delivery.getDispatchedAt();
+        boolean counted = repository.markRepublished(delivery.getId(), DeliveryStatus.UNACKED, dispatchedAt, now, dueAt);
         if (!counted) {
-            log.debug("Delivery left PENDING while being re-published: id={}", delivery.getId());
+            log.debug("Delivery moved on while being re-published: id={}", delivery.getId());
             return;
         }
         metrics.recordRetried(type);
@@ -133,6 +123,14 @@ public class DeliverySweepService {
             metrics.recordPublishFailed(delivery.getType());
             throw e;
         }
+    }
+
+    // a row that keeps failing must not be re-selected first every tick: back off without counting an attempt
+    private void postponeAfterError(MachineDelivery delivery, Instant now) {
+        Policy policy = properties.resolve(delivery);
+        long delaySeconds = policy.getMaxRetryIntervalSeconds();
+        Instant dueAt = now.plusSeconds(delaySeconds);
+        repository.postpone(delivery.getId(), DeliveryStatus.UNACKED, dueAt);
     }
 
     private <P> P readPayload(MachineDelivery delivery, Class<P> payloadClass) {

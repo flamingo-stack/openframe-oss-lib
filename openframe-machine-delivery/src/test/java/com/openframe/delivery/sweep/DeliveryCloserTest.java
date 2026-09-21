@@ -22,22 +22,24 @@ import java.time.Instant;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class DeliveryFailureRecorderTest {
+class DeliveryCloserTest {
 
     private static final String DELIVERY_ID = "CLIENT_UNINSTALL:openframe-client:mach-42";
+    private static final String REASON = "machine gone";
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliveryMetrics metrics;
     @Mock private DeliverySpec<TestSeed, TestPayload> spec;
 
-    private DeliveryFailureRecorder recorder;
+    private DeliveryCloser closer;
 
     private MachineDelivery delivery;
     private Instant now;
@@ -52,18 +54,18 @@ class DeliveryFailureRecorderTest {
                 .attempts(5)
                 .build();
         DeliveryProperties properties = DeliveryTestPolicies.properties();
-        recorder = new DeliveryFailureRecorder(repository, registry, properties, metrics);
+        closer = new DeliveryCloser(repository, registry, properties, metrics);
     }
 
     @Test
-    void record_openRow_rowFailedMetricCountedSpecNotified() {
+    void fail_rowStillUnacked_rowFailedMetricCountedSpecNotified() {
         // setup
         Instant expiresAt = now.plusSeconds(TTL);
-        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.OPEN, DeliveryFailure.EXHAUSTED, now, expiresAt)).thenReturn(true);
         doReturn(spec).when(registry).require(DeliveryType.CLIENT_UNINSTALL);
+        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, DeliveryFailure.EXHAUSTED, now, expiresAt)).thenReturn(true);
 
         // execution
-        recorder.record(delivery, DeliveryFailure.EXHAUSTED, now);
+        closer.fail(delivery, DeliveryFailure.EXHAUSTED, DeliveryStatus.UNACKED, now);
 
         // verifications
         assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.FAILED);
@@ -75,16 +77,44 @@ class DeliveryFailureRecorderTest {
     }
 
     @Test
-    void record_rowClosedMeanwhile_nothingRecorded() {
+    void fail_rowAckedMeanwhile_nothingRecorded() {
         // setup
         Instant expiresAt = now.plusSeconds(TTL);
-        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.OPEN, DeliveryFailure.TIMEOUT, now, expiresAt)).thenReturn(false);
+        doReturn(spec).when(registry).require(DeliveryType.CLIENT_UNINSTALL);
+        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, DeliveryFailure.EXHAUSTED, now, expiresAt)).thenReturn(false);
 
         // execution
-        recorder.record(delivery, DeliveryFailure.TIMEOUT, now);
+        closer.fail(delivery, DeliveryFailure.EXHAUSTED, DeliveryStatus.UNACKED, now);
 
         // verifications
         assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.PENDING);
-        verifyNoInteractions(metrics, registry);
+        verifyNoInteractions(metrics, spec);
+    }
+
+    @Test
+    void fail_unregisteredType_throwsBeforeAnyWrite() {
+        // setup
+        when(registry.require(DeliveryType.CLIENT_UNINSTALL))
+                .thenThrow(new IllegalArgumentException("No spec registered for delivery type: CLIENT_UNINSTALL"));
+
+        // execution + verifications
+        assertThatThrownBy(() -> closer.fail(delivery, DeliveryFailure.TIMEOUT, DeliveryStatus.AWAITING_RESULT, now))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("CLIENT_UNINSTALL");
+        verifyNoInteractions(repository, metrics);
+    }
+
+    @Test
+    void cancel_rowStillUnacked_rowCancelledWithTtlExpiry() {
+        // setup
+        Instant expiresAt = now.plusSeconds(TTL);
+        when(repository.markCancelled(DELIVERY_ID, DeliveryStatus.UNACKED, now, expiresAt)).thenReturn(true);
+
+        // execution
+        closer.cancel(delivery, DeliveryStatus.UNACKED, REASON, now);
+
+        // verifications
+        verify(repository).markCancelled(DELIVERY_ID, DeliveryStatus.UNACKED, now, expiresAt);
+        verifyNoInteractions(registry, metrics);
     }
 }
