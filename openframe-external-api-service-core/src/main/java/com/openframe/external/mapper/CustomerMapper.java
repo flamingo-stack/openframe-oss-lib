@@ -30,7 +30,8 @@ public class CustomerMapper extends BaseRestMapper {
     public CustomerResponse toResponse(Organization organization) {
         OrganizationResponse response = sharedMapper.toResponse(organization);
         if (response == null) {
-            return null;
+            throw new IllegalStateException(
+                    "Unable to map organization to response: organization is missing or invalid");
         }
         return CustomerResponse.builder()
                 .id(response.getOrganizationId())
