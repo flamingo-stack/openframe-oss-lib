@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -181,7 +182,7 @@ public class DeviceDataFetcher {
 
     @DgsData(parentType = "Machine")
     public CompletableFuture<Organization> organization(DgsDataFetchingEnvironment dfe) {
-        DataLoader<String, Organization> dataLoader = dfe.getDataLoader("organizationDataLoader");
+        DataLoader<String, Organization> dataLoader = dfe.getDataLoader(OrganizationDataLoader.NAME);
         Machine machine = dfe.getSource();
         String organizationId = machine.getOrganizationId();
         
