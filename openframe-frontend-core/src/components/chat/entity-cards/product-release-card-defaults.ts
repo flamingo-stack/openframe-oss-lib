@@ -32,29 +32,34 @@ interface DerivedSmProps {
   formattedDate: string;
 }
 
-/** Pick the first usable image URL from the row's cover-candidate fields.
- *  This is an INTENTIONALLY SIMPLER sm-subset heuristic — it does NOT mirror the
- *  hub's `resolveReleaseCover`: when a video URL is set this prefers
- *  `main_video_thumbnail` (then `highlight_video_thumbnail`) over `featured_image`,
- *  and keys `hasVideoCover` off `main_video_url`/`youtube_url` (fields the hub
- *  helper never reads). It's the builder-less default (chat sm cards + any embedder
- *  that doesn't pass its own `buildCardProps` to `ProductReleasesView`); hosts
- *  wanting hub-identical covers pass their richer builder (the hub does — see
- *  the hub's `product-release-card-props.ts` / `resolveReleaseCover`). */
-function pickCover(item: ReleaseLike): string | null {
+/** Pick the first usable image URL from the row's cover-candidate fields, and
+ *  report whether that pick is actually a video thumbnail. This is an
+ *  INTENTIONALLY SIMPLER sm-subset heuristic — it does NOT mirror the hub's
+ *  `resolveReleaseCover`: when a video URL is set this prefers
+ *  `main_video_thumbnail` (then `highlight_video_thumbnail`) over
+ *  `featured_image`, and keys the video thumbnail off `main_video_url`/
+ *  `youtube_url` (fields the hub helper never reads). `hasVideoCover` is
+ *  derived from the SAME branch that picked the cover, so it can never be
+ *  true while the returned cover is a plain (non-video) image. It's the
+ *  builder-less default (chat sm cards + any embedder that doesn't pass its
+ *  own `buildCardProps` to `ProductReleasesView`); hosts wanting
+ *  hub-identical covers pass their richer builder (the hub does — see the
+ *  hub's `product-release-card-props.ts` / `resolveReleaseCover`). */
+function pickCover(item: ReleaseLike): { coverImage: string | null; hasVideoCover: boolean } {
   const hasVideo = Boolean(item.main_video_url || item.youtube_url);
   if (hasVideo) {
-    if (item.main_video_thumbnail) return item.main_video_thumbnail;
-    if (item.highlight_video_thumbnail) return item.highlight_video_thumbnail;
+    if (item.main_video_thumbnail) return { coverImage: item.main_video_thumbnail, hasVideoCover: true };
+    if (item.highlight_video_thumbnail) return { coverImage: item.highlight_video_thumbnail, hasVideoCover: true };
   }
-  return item.featured_image ?? item.og_image_url ?? null;
+  return { coverImage: item.featured_image ?? item.og_image_url ?? null, hasVideoCover: false };
 }
 
 export function defaultBuildProductReleaseCardProps(item: unknown): DerivedSmProps {
   const row = (item ?? {}) as ReleaseLike;
+  const { coverImage, hasVideoCover } = pickCover(row);
   return {
-    coverImage: pickCover(row),
-    hasVideoCover: Boolean(row.main_video_url || row.youtube_url),
+    coverImage,
+    hasVideoCover,
     // `formatReleaseDate` is TZ-safe (splits the `YYYY-MM-DD` head before
     // constructing the Date). Using `new Date(input).toLocaleDateString`
     // here would shift the date by one day west of UTC for date-only
