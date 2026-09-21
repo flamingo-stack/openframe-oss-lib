@@ -251,7 +251,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
                 Criteria cursorCriteria = buildCursorCriteria(cursorId, sortField, isDesc);
                 pageQuery = withCursorBound(query, cursorCriteria);
             } catch (IllegalArgumentException ex) {
-                log.warn("Invalid ObjectId cursor format: {}", cursor);
+                log.warn("Invalid ObjectId cursor format: {}", cursor, ex);
             }
         }
         pageQuery.limit(limit);
