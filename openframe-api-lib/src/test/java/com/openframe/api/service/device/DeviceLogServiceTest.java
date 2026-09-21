@@ -248,7 +248,6 @@ class DeviceLogServiceTest {
         DeviceLogFilterCriteria filter = DeviceLogFilterCriteria.builder()
                 .contains(List.of("connection", "failed"))
                 .excludes(List.of("heartbeat"))
-                .regex("fd=\\d+")
                 .from(FROM)
                 .to(TO)
                 .build();
@@ -257,27 +256,21 @@ class DeviceLogServiceTest {
 
         verify(lokiClient).queryRange(
                 "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}"
-                        + " |~ \"(?i)connection\" |~ \"(?i)failed\" !~ \"(?i)heartbeat\" |~ \"(?i)fd=\\\\d+\""
+                        + " |~ \"(?i)connection\" |~ \"(?i)failed\" !~ \"(?i)heartbeat\""
                         + " | machine_id=\"machine-1\"",
                 FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD);
     }
 
     @Test
-    void rejectsTooManyTermsAndPatternsLokiCannotRun() {
+    void rejectsMoreThanFiveTerms() {
         assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
                 .contains(List.of("a", "b", "c", "d", "e", "f")).build(), page(null, null)))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
-                .regex("(?=lookahead)").build(), page(null, null)))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
-                .regex("unclosed(").build(), page(null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(lokiClient);
     }
 
     @Test
-    void ignoresBlankTermsAndRejectsAtomicGroups() {
+    void ignoresBlankTerms() {
         service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
                 .contains(List.of("a", "", "  ", "b", "c", "d", "e")).build(), page(null, null));
 
@@ -287,11 +280,6 @@ class DeviceLogServiceTest {
                         + " |~ \"(?i)a\" |~ \"(?i)b\" |~ \"(?i)c\" |~ \"(?i)d\" |~ \"(?i)e\""
                         + " | machine_id=\"machine-1\"",
                 FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD);
-
-        // Java compiles an atomic group, Loki's RE2 engine does not
-        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, DeviceLogFilterCriteria.builder().from(FROM).to(TO)
-                .regex("(?>atomic)").build(), page(null, null)))
-                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static DeviceLogFilterCriteria window() {
