@@ -124,16 +124,22 @@ export function getEntityCaptionUrls(
  * identity alone; a video without subtitles costs one silent 404 `<track>`
  * fetch. No `?v=` cache-buster (no content to hash) — the route's own
  * Cache-Control governs freshness.
+ *
+ * `hasHighlight` lets callers who know whether a highlight variant exists at
+ * all (as opposed to merely lacking subtitles) omit `highlightCaptionsUrl`
+ * entirely rather than guarantee a permanent 404 `<track>` fetch. Defaults to
+ * `true` to preserve prior behavior for callers that can't tell.
  */
 export function getEntityCaptionUrlsById(
   endpoints: CaptionsEndpoints | null | undefined,
   entityType: string,
   entityId: string | number,
-): Required<EntityCaptionUrls> {
+  hasHighlight = true,
+): EntityCaptionUrls {
   const base = resolveCaptionsBase(endpoints);
   return {
     captionsUrl: `${base}/${entityType}/${entityId}`,
-    highlightCaptionsUrl: `${base}/${entityType}/${entityId}?variant=highlight`,
+    ...(hasHighlight ? { highlightCaptionsUrl: `${base}/${entityType}/${entityId}?variant=highlight` } : {}),
   };
 }
 
