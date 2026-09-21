@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.delivery.DeliveryProperties.Policy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -19,6 +20,7 @@ import java.time.Instant;
 public class MongoDeliveryRecorder implements DeliveryRecorder {
 
     private final MachineDeliveryRepository repository;
+    private final DeliveryProperties properties;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -33,6 +35,8 @@ public class MongoDeliveryRecorder implements DeliveryRecorder {
         Instant now = Instant.now();
         String id = DeliveryId.of(request.getType(), request.getTargetId(), request.getMachineId());
         String payloadJson = toJson(request.getPayload());
+        Policy policy = properties.resolve(request.getType());
+        long ackThresholdSeconds = policy.getAckThresholdSeconds();
         return MachineDelivery.builder()
                 .id(id)
                 .type(request.getType())
@@ -43,6 +47,7 @@ public class MongoDeliveryRecorder implements DeliveryRecorder {
                 .payloadJson(payloadJson)
                 .dispatchedAt(now)
                 .lastAttemptAt(now)
+                .nextAttemptAt(now.plusSeconds(ackThresholdSeconds))
                 .offlineBehavior(request.getOfflineBehavior())
                 .reconnectWindowSeconds(request.getReconnectWindowSeconds())
                 .build();

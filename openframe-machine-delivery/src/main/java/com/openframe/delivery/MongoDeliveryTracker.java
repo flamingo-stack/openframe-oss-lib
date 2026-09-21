@@ -1,8 +1,6 @@
 package com.openframe.delivery;
 
-import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.DeliveryProperties.Policy;
 import lombok.RequiredArgsConstructor;
@@ -24,46 +22,47 @@ public class MongoDeliveryTracker implements DeliveryTracker {
     @Override
     public void acknowledge(DeliveryType type, String targetId, String machineId) {
         String id = DeliveryId.of(type, targetId, machineId);
-        repository.findById(id)
-                .filter(MongoDeliveryTracker::isPending)
-                .ifPresent(this::markAcked);
+        Instant now = Instant.now();
+        boolean acked = repository.markAcked(id, now);
+        if (acked) {
+            log.info("Delivery ACKED: type={} targetId={} machineId={}", type, targetId, machineId);
+        }
     }
 
     @Override
     public void complete(DeliveryType type, String targetId, String machineId) {
         String id = DeliveryId.of(type, targetId, machineId);
-        repository.findById(id)
-                .filter(MongoDeliveryTracker::isOpen)
-                .ifPresent(this::markDone);
+        Instant now = Instant.now();
+        Instant expiresAt = expiresAt(type, now);
+        boolean done = repository.markDone(id, now, expiresAt);
+        if (done) {
+            log.info("Delivery DONE: type={} targetId={} machineId={}", type, targetId, machineId);
+        }
     }
 
-    private void markAcked(MachineDelivery delivery) {
+    @Override
+    public void cancel(DeliveryType type, String targetId, String machineId) {
+        String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
-        delivery.setStatus(DeliveryStatus.ACKED);
-        delivery.setAckedAt(now);
-        repository.save(delivery);
-        log.info("Delivery ACKED: type={} targetId={} machineId={}",
-                delivery.getType(), delivery.getTargetId(), delivery.getMachineId());
+        Instant expiresAt = expiresAt(type, now);
+        boolean cancelled = repository.markCancelled(id, now, expiresAt);
+        if (cancelled) {
+            log.info("Delivery CANCELLED: type={} targetId={} machineId={}", type, targetId, machineId);
+        }
     }
 
-    private void markDone(MachineDelivery delivery) {
+    @Override
+    public void wake(String machineId) {
         Instant now = Instant.now();
-        Policy policy = properties.resolve(delivery.getType());
+        long woken = repository.wake(machineId, now);
+        if (woken > 0) {
+            log.info("Delivery rows woken for retry: machineId={} count={}", machineId, woken);
+        }
+    }
+
+    private Instant expiresAt(DeliveryType type, Instant now) {
+        Policy policy = properties.resolve(type);
         long ttlSeconds = policy.getTtlSeconds();
-        delivery.setStatus(DeliveryStatus.DONE);
-        delivery.setFinishedAt(now);
-        delivery.setExpiresAt(now.plusSeconds(ttlSeconds));
-        repository.save(delivery);
-        log.info("Delivery DONE: type={} targetId={} machineId={} attempts={}",
-                delivery.getType(), delivery.getTargetId(), delivery.getMachineId(), delivery.getAttempts());
-    }
-
-    private static boolean isPending(MachineDelivery delivery) {
-        return delivery.getStatus() == DeliveryStatus.PENDING;
-    }
-
-    private static boolean isOpen(MachineDelivery delivery) {
-        DeliveryStatus status = delivery.getStatus();
-        return status == DeliveryStatus.PENDING || status == DeliveryStatus.ACKED;
+        return now.plusSeconds(ttlSeconds);
     }
 }

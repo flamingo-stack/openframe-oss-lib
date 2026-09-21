@@ -10,7 +10,10 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static com.openframe.delivery.DeliveryTestPolicies.ACK_THRESHOLD;
+import static com.openframe.delivery.DeliveryTestPolicies.BACKOFF_MULTIPLIER;
+import static com.openframe.delivery.DeliveryTestPolicies.BATCH_SIZE;
 import static com.openframe.delivery.DeliveryTestPolicies.MAX_ATTEMPTS;
+import static com.openframe.delivery.DeliveryTestPolicies.MAX_RETRY_INTERVAL;
 import static com.openframe.delivery.DeliveryTestPolicies.RECONNECT_WINDOW;
 import static com.openframe.delivery.DeliveryTestPolicies.RESULT_TIMEOUT;
 import static com.openframe.delivery.DeliveryTestPolicies.TTL;
@@ -57,6 +60,9 @@ class DeliveryPropertiesTest {
         assertThat(resolved.getReconnectWindowSeconds()).isEqualTo(RECONNECT_WINDOW);
         assertThat(resolved.getResultTimeoutSeconds()).isEqualTo(RESULT_TIMEOUT);
         assertThat(resolved.getTtlSeconds()).isEqualTo(TTL);
+        assertThat(resolved.getBackoffMultiplier()).isEqualTo(BACKOFF_MULTIPLIER);
+        assertThat(resolved.getMaxRetryIntervalSeconds()).isEqualTo(MAX_RETRY_INTERVAL);
+        assertThat(resolved.getBatchSize()).isEqualTo(BATCH_SIZE);
     }
 
     @Test

@@ -5,9 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toUnmodifiableMap;
@@ -17,15 +18,17 @@ import static java.util.stream.Collectors.toUnmodifiableMap;
 public class DeliverySpecRegistry {
 
     private final Map<DeliveryType, DeliverySpec<?, ?>> byType;
+    private final Set<DeliveryType> types;
 
     // ObjectProvider, not List: a service with zero specs on the classpath must still boot.
     // toUnmodifiableMap throws IllegalStateException on a duplicate type — the wanted fail-fast.
     public DeliverySpecRegistry(ObjectProvider<DeliverySpec<?, ?>> specs) {
         this.byType = specs.stream()
                 .collect(toUnmodifiableMap(DeliverySpec::getType, identity()));
-        Set<DeliveryType> registered = byType.keySet();
-        Set<DeliveryType> sortedTypes = new TreeSet<>(registered);
-        log.info("Registered {} delivery spec(s): {}", byType.size(), sortedTypes);
+        Set<DeliveryType> inEnumOrder = EnumSet.noneOf(DeliveryType.class);
+        inEnumOrder.addAll(byType.keySet());
+        this.types = Collections.unmodifiableSet(inEnumOrder);
+        log.info("Registered {} delivery spec(s): {}", byType.size(), types);
     }
 
     public DeliverySpec<?, ?> require(DeliveryType type) {
@@ -37,6 +40,6 @@ public class DeliverySpecRegistry {
     }
 
     public Set<DeliveryType> types() {
-        return byType.keySet();
+        return types;
     }
 }

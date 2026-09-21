@@ -17,9 +17,13 @@ import static com.openframe.delivery.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DeliveryFailureRecorderTest {
+
+    private static final String DELIVERY_ID = "CLIENT_UNINSTALL:openframe-client:mach-42";
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliverySpecRegistry registry;
@@ -29,10 +33,13 @@ class DeliveryFailureRecorderTest {
     private DeliveryFailureRecorder recorder;
 
     private MachineDelivery delivery;
+    private Instant now;
 
     @BeforeEach
     void setUp() {
+        now = Instant.now();
         delivery = MachineDelivery.builder()
+                .id(DELIVERY_ID)
                 .type(DeliveryType.CLIENT_UNINSTALL)
                 .status(DeliveryStatus.PENDING)
                 .attempts(5)
@@ -42,9 +49,10 @@ class DeliveryFailureRecorderTest {
     }
 
     @Test
-    void fail_exhausted_rowFailedMetricCountedSpecNotified() {
+    void fail_openRow_rowFailedMetricCountedSpecNotified() {
         // setup
-        Instant now = Instant.now();
+        Instant expiresAt = now.plusSeconds(TTL);
+        when(repository.markFailed(DELIVERY_ID, DeliveryFailure.EXHAUSTED, now, expiresAt)).thenReturn(true);
         doReturn(spec).when(registry).require(DeliveryType.CLIENT_UNINSTALL);
 
         // execution
@@ -54,9 +62,22 @@ class DeliveryFailureRecorderTest {
         assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(delivery.getFailure()).isEqualTo(DeliveryFailure.EXHAUSTED);
         assertThat(delivery.getFinishedAt()).isEqualTo(now);
-        assertThat(delivery.getExpiresAt()).isEqualTo(now.plusSeconds(TTL));
-        verify(repository).save(delivery);
+        assertThat(delivery.getExpiresAt()).isEqualTo(expiresAt);
         verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.EXHAUSTED);
         verify(spec).onFailed(delivery, DeliveryFailure.EXHAUSTED);
+    }
+
+    @Test
+    void fail_rowClosedMeanwhile_nothingRecorded() {
+        // setup
+        Instant expiresAt = now.plusSeconds(TTL);
+        when(repository.markFailed(DELIVERY_ID, DeliveryFailure.TIMEOUT, now, expiresAt)).thenReturn(false);
+
+        // execution
+        recorder.fail(delivery, DeliveryFailure.TIMEOUT, now);
+
+        // verifications
+        assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.PENDING);
+        verifyNoInteractions(metrics, registry);
     }
 }

@@ -7,20 +7,44 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-
-import static java.util.stream.Collectors.toSet;
 
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "openframe.delivery.enabled", havingValue = "true")
 public class MachineOnlineStatus {
 
+    private static final Set<DeviceStatus> GONE = EnumSet.of(
+            DeviceStatus.DELETED, DeviceStatus.ARCHIVED, DeviceStatus.DECOMMISSIONED);
+
     private final MachineRepository machineRepository;
 
-    public Set<String> offline(Set<String> machineIds) {
-        List<Machine> offline = machineRepository.findByMachineIdInAndStatus(machineIds, DeviceStatus.OFFLINE);
-        return offline.stream().map(Machine::getMachineId).collect(toSet());
+    public Lookup lookup(Set<String> machineIds) {
+        List<Machine> machines = machineRepository.findByMachineIdIn(machineIds);
+        Map<String, DeviceStatus> statusById = new HashMap<>();
+        machines.forEach(machine -> statusById.put(machine.getMachineId(), machine.getStatus()));
+        return new Lookup(statusById);
+    }
+
+    @RequiredArgsConstructor
+    public static class Lookup {
+
+        private final Map<String, DeviceStatus> statusById;
+
+        public boolean isGone(String machineId) {
+            if (!statusById.containsKey(machineId)) {
+                return true;
+            }
+            DeviceStatus status = statusById.get(machineId);
+            return GONE.contains(status);
+        }
+
+        public boolean isOffline(String machineId) {
+            return statusById.get(machineId) == DeviceStatus.OFFLINE;
+        }
     }
 }

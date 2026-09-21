@@ -28,12 +28,18 @@ public class DeliveryFailureRecorder {
         DeliveryType type = delivery.getType();
         Policy policy = properties.resolve(type);
         long ttlSeconds = policy.getTtlSeconds();
+        Instant expiresAt = now.plusSeconds(ttlSeconds);
+        String id = delivery.getId();
 
+        boolean stillOpen = repository.markFailed(id, failure, now, expiresAt);
+        if (!stillOpen) {
+            log.debug("Delivery closed before the failure could be recorded: id={}", id);
+            return;
+        }
         delivery.setStatus(DeliveryStatus.FAILED);
         delivery.setFailure(failure);
         delivery.setFinishedAt(now);
-        delivery.setExpiresAt(now.plusSeconds(ttlSeconds));
-        repository.save(delivery);
+        delivery.setExpiresAt(expiresAt);
 
         metrics.recordFailed(type, failure);
         DeliverySpec<?, ?> spec = registry.require(type);

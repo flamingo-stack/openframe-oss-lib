@@ -57,6 +57,12 @@ public class DeliveryProperties {
         @NotNull
         private Integer maxAttempts;
         @NotNull
+        private Integer backoffMultiplier;
+        @NotNull
+        private Long maxRetryIntervalSeconds;
+        @NotNull
+        private Integer batchSize;
+        @NotNull
         private ScheduleOfflineBehavior offlineBehavior;
         @NotNull
         private Long reconnectWindowSeconds;
@@ -69,6 +75,9 @@ public class DeliveryProperties {
             Policy merged = new Policy();
             merged.ackThresholdSeconds = requireNonNullElse(ackThresholdSeconds, base.ackThresholdSeconds);
             merged.maxAttempts = requireNonNullElse(maxAttempts, base.maxAttempts);
+            merged.backoffMultiplier = requireNonNullElse(backoffMultiplier, base.backoffMultiplier);
+            merged.maxRetryIntervalSeconds = requireNonNullElse(maxRetryIntervalSeconds, base.maxRetryIntervalSeconds);
+            merged.batchSize = requireNonNullElse(batchSize, base.batchSize);
             merged.offlineBehavior = requireNonNullElse(offlineBehavior, base.offlineBehavior);
             merged.reconnectWindowSeconds = requireNonNullElse(reconnectWindowSeconds, base.reconnectWindowSeconds);
             merged.resultTimeoutSeconds = requireNonNullElse(resultTimeoutSeconds, base.resultTimeoutSeconds);

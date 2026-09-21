@@ -1,20 +1,21 @@
 package com.openframe.delivery;
 
-import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
+import java.time.Instant;
 
 import static com.openframe.delivery.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,91 +25,67 @@ class MongoDeliveryTrackerTest {
     private static final String MACHINE_ID = "mach-42";
     private static final String TARGET_ID = "tactical-agent";
     private static final String DELIVERY_ID = DeliveryId.of(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+    private static final long TWO_ROWS = 2L;
 
     @Mock private MachineDeliveryRepository repository;
 
-    private MongoDeliveryTracker tracker;
+    @Captor private ArgumentCaptor<Instant> finishedAtCaptor;
+    @Captor private ArgumentCaptor<Instant> expiresAtCaptor;
 
-    private MachineDelivery delivery;
+    private MongoDeliveryTracker tracker;
 
     @BeforeEach
     void setUp() {
-        delivery = MachineDelivery.builder()
-                .id(DELIVERY_ID)
-                .type(DeliveryType.TOOL_INSTALLATION)
-                .targetId(TARGET_ID)
-                .machineId(MACHINE_ID)
-                .status(DeliveryStatus.PENDING)
-                .build();
         tracker = new MongoDeliveryTracker(repository, DeliveryTestPolicies.properties());
     }
 
     @Test
-    void acknowledge_pendingRow_ackedWithTimestamp() {
+    void acknowledge_typedKey_pendingRowMarkedAckedByCompositeId() {
         // setup
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.of(delivery));
+        when(repository.markAcked(eq(DELIVERY_ID), any(Instant.class))).thenReturn(true);
 
         // execution
         tracker.acknowledge(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
 
         // verifications
-        assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.ACKED);
-        assertThat(delivery.getAckedAt()).isNotNull();
-        verify(repository).save(delivery);
+        verify(repository).markAcked(eq(DELIVERY_ID), any(Instant.class));
     }
 
     @Test
-    void acknowledge_alreadyAcked_untouched() {
+    void complete_typedKey_openRowMarkedDoneWithTtlExpiry() {
         // setup
-        delivery.setStatus(DeliveryStatus.ACKED);
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.of(delivery));
-
-        // execution
-        tracker.acknowledge(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
-
-        // verifications
-        verify(repository, never()).save(delivery);
-    }
-
-    @Test
-    void acknowledge_unknownRow_noop() {
-        // setup
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.empty());
-
-        // execution
-        tracker.acknowledge(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
-
-        // verifications
-        verify(repository, never()).save(delivery);
-    }
-
-    @Test
-    void complete_ackedRow_doneWithExpiry() {
-        // setup
-        delivery.setStatus(DeliveryStatus.ACKED);
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.of(delivery));
+        when(repository.markDone(eq(DELIVERY_ID), finishedAtCaptor.capture(), expiresAtCaptor.capture())).thenReturn(true);
 
         // execution
         tracker.complete(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
 
         // verifications
-        assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.DONE);
-        assertThat(delivery.getFinishedAt()).isNotNull();
-        assertThat(delivery.getExpiresAt()).isEqualTo(delivery.getFinishedAt().plusSeconds(TTL));
-        verify(repository).save(delivery);
+        Instant finishedAt = finishedAtCaptor.getValue();
+        assertThat(expiresAtCaptor.getValue()).isEqualTo(finishedAt.plusSeconds(TTL));
     }
 
     @Test
-    void complete_failedRow_untouched() {
+    void cancel_typedKey_openRowMarkedCancelledWithTtlExpiry() {
         // setup
-        delivery.setStatus(DeliveryStatus.FAILED);
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.of(delivery));
+        when(repository.markCancelled(eq(DELIVERY_ID), finishedAtCaptor.capture(), expiresAtCaptor.capture())).thenReturn(true);
 
         // execution
-        tracker.complete(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+        tracker.cancel(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
 
         // verifications
-        assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.FAILED);
-        verify(repository, never()).save(delivery);
+        Instant finishedAt = finishedAtCaptor.getValue();
+        assertThat(expiresAtCaptor.getValue()).isEqualTo(finishedAt.plusSeconds(TTL));
+    }
+
+    @Test
+    void wake_machineId_parkedRowsOfThatMachineWoken() {
+        // setup
+        when(repository.wake(eq(MACHINE_ID), any(Instant.class))).thenReturn(TWO_ROWS);
+
+        // execution
+        tracker.wake(MACHINE_ID);
+
+        // verifications
+        verify(repository).wake(eq(MACHINE_ID), any(Instant.class));
     }
 }

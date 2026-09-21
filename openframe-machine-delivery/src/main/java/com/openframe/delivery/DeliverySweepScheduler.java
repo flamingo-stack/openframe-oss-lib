@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "openframe.delivery.sweep.enabled", havingValue = "true")
+@ConditionalOnProperty(name = {"openframe.delivery.enabled", "openframe.delivery.sweep.enabled"}, havingValue = "true")
 public class DeliverySweepScheduler {
 
     private final DeliverySweepService sweepService;

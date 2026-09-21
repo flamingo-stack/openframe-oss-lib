@@ -15,4 +15,12 @@ public class NoopDeliveryTracker implements DeliveryTracker {
     @Override
     public void complete(DeliveryType type, String targetId, String machineId) {
     }
+
+    @Override
+    public void cancel(DeliveryType type, String targetId, String machineId) {
+    }
+
+    @Override
+    public void wake(String machineId) {
+    }
 }

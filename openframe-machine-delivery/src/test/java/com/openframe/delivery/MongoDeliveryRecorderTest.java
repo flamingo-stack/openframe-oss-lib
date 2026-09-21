@@ -14,6 +14,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static com.openframe.delivery.DeliveryTestPolicies.ACK_THRESHOLD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
@@ -42,7 +43,7 @@ class MongoDeliveryRecorderTest {
                 .payload(payload)
                 .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT)
                 .build();
-        recorder = new MongoDeliveryRecorder(repository, new ObjectMapper());
+        recorder = new MongoDeliveryRecorder(repository, DeliveryTestPolicies.properties(), new ObjectMapper());
     }
 
     @Test
@@ -62,5 +63,6 @@ class MongoDeliveryRecorderTest {
         assertThat(saved.getPayloadJson()).contains(VALUE);
         assertThat(saved.getOfflineBehavior()).isEqualTo(ScheduleOfflineBehavior.RETRY_ON_RECONNECT);
         assertThat(saved.getDispatchedAt()).isEqualTo(saved.getLastAttemptAt());
+        assertThat(saved.getNextAttemptAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(ACK_THRESHOLD));
     }
 }

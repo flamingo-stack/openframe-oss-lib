@@ -4,6 +4,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,6 +68,21 @@ class DeliverySpecRegistryTest {
     }
 
     @SuppressWarnings("unchecked")
+    @Test
+    void types_registeredOutOfEnumOrder_enumOrderKept() {
+        // setup
+        DeliverySpec<?, ?> uninstall = spec(DeliveryType.CLIENT_UNINSTALL);
+        DeliverySpec<?, ?> install = spec(DeliveryType.TOOL_INSTALLATION);
+        ObjectProvider<DeliverySpec<?, ?>> specs = provider(uninstall, install);
+        DeliverySpecRegistry registry = new DeliverySpecRegistry(specs);
+
+        // execution
+        Set<DeliveryType> types = registry.types();
+
+        // verifications
+        assertThat(types).containsExactly(DeliveryType.TOOL_INSTALLATION, DeliveryType.CLIENT_UNINSTALL);
+    }
+
     private static ObjectProvider<DeliverySpec<?, ?>> provider(DeliverySpec<?, ?>... specs) {
         ObjectProvider<DeliverySpec<?, ?>> provider = mock(ObjectProvider.class);
         when(provider.stream()).thenReturn(Stream.of(specs));

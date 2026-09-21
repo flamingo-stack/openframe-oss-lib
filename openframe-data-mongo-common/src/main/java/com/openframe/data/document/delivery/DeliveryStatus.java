@@ -4,5 +4,6 @@ public enum DeliveryStatus {
     PENDING,
     ACKED,
     DONE,
-    FAILED
+    FAILED,
+    CANCELLED
 }
