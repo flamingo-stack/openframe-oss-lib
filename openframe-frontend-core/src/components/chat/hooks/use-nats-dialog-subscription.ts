@@ -203,6 +203,48 @@ export function useNatsDialogSubscription({
 
   const currentDialogIdRef = useRef<string | null>(null);
 
+  // Single subscribe implementation shared by both the dialogId-change effect
+  // and the reconnect-recovery effect below, so a future change to the
+  // subscribe logic (headers, decode logic, etc.) cannot be applied to only
+  // one of the two paths. Reads dialogId/currentDialogIdRef itself so callers
+  // don't need to agree on which value to pass.
+  const subscribeForCurrentDialog = () => {
+    const client = clientRef.current;
+    const targetDialogId = currentDialogIdRef.current;
+    if (!client || !targetDialogId) {
+      return;
+    }
+
+    if (!abortControllerRef.current) {
+      abortControllerRef.current = new AbortController();
+    }
+    const abort = abortControllerRef.current;
+
+    const decoder = new TextDecoder();
+
+    const handleMessage = (messageType: NatsMessageType) => (msg: Msg) => {
+      if (!onEventRef.current) return;
+      try {
+        const dataStr = decoder.decode(msg.data);
+        const parsed: unknown = JSON.parse(dataStr);
+        onEventRef.current(parsed, messageType);
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    topicsRef.current.forEach(topic => {
+      const subscription = client.subscribeBytes(`chat.${targetDialogId}.${topic}`, handleMessage(topic), {
+        signal: abort.signal,
+      });
+      subscriptionRefs.current.set(topic, subscription);
+    });
+
+    lastSubscribedDialogIdRef.current = targetDialogId;
+    setIsSubscribed(true);
+    onSubscribedRef.current?.();
+  };
+
   useEffect(() => {
     currentDialogIdRef.current = dialogId;
 
@@ -245,43 +287,8 @@ export function useNatsDialogSubscription({
     abortControllerRef.current = new AbortController();
     const abort = abortControllerRef.current;
 
-    const createSubscriptions = () => {
-      if (!isConnectedRef.current) {
-        return;
-      }
-
-      const client = clientRef.current;
-      if (!client || currentDialogIdRef.current !== dialogId) {
-        return;
-      }
-
-      const decoder = new TextDecoder();
-
-      const handleMessage = (messageType: NatsMessageType) => (msg: Msg) => {
-        if (!onEventRef.current) return;
-        try {
-          const dataStr = decoder.decode(msg.data);
-          const parsed: unknown = JSON.parse(dataStr);
-          onEventRef.current(parsed, messageType);
-        } catch {
-          // Ignore parse errors
-        }
-      };
-
-      topicsRef.current.forEach(topic => {
-        const subscription = client.subscribeBytes(`chat.${dialogId}.${topic}`, handleMessage(topic), {
-          signal: abort.signal,
-        });
-        subscriptionRefs.current.set(topic, subscription);
-      });
-
-      lastSubscribedDialogIdRef.current = dialogId;
-      setIsSubscribed(true);
-      onSubscribedRef.current?.();
-    };
-
-    if (isConnectedRef.current) {
-      createSubscriptions();
+    if (isConnectedRef.current && currentDialogIdRef.current === dialogId) {
+      subscribeForCurrentDialog();
     }
 
     // Captured, not read through the ref in cleanup: the Map identity is
@@ -309,41 +316,8 @@ export function useNatsDialogSubscription({
     }
 
     if (subscriptionRefs.current.size === 0 && lastSubscribedDialogIdRef.current !== currentDialogIdRef.current) {
-      const client = clientRef.current;
-      if (!client) return;
-
-      // Ref, not the `dialogId` prop in this effect's closure — the same
-      // `current*` naming as use-chunk-catchup, and the only thing telling a
-      // reader which of the two values this branch reads.
-      const currentDialogId = currentDialogIdRef.current;
-      const decoder = new TextDecoder();
-
-      const abort = abortControllerRef.current || new AbortController();
-      if (!abortControllerRef.current) {
-        abortControllerRef.current = abort;
-      }
-
-      const handleMessage = (messageType: NatsMessageType) => (msg: Msg) => {
-        if (!onEventRef.current) return;
-        try {
-          const dataStr = decoder.decode(msg.data);
-          const parsed: unknown = JSON.parse(dataStr);
-          onEventRef.current(parsed, messageType);
-        } catch {
-          // Ignore parse errors
-        }
-      };
-
-      topicsRef.current.forEach(topic => {
-        const subscription = client.subscribeBytes(`chat.${currentDialogId}.${topic}`, handleMessage(topic), {
-          signal: abort.signal,
-        });
-        subscriptionRefs.current.set(topic, subscription);
-      });
-
-      lastSubscribedDialogIdRef.current = currentDialogId;
-      setIsSubscribed(true);
-      onSubscribedRef.current?.();
+      if (!clientRef.current) return;
+      subscribeForCurrentDialog();
     } else if (subscriptionRefs.current.size > 0) {
       setIsSubscribed(true);
     }
