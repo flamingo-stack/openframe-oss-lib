@@ -134,11 +134,19 @@ impl LastKnownGoodService {
                 self.promote(running_version).await
             }
             Some(anchor_version) => {
-                warn!(
-                    "Rollback protection degraded: reserve missing, running {} below anchor {} — rebuilding reserve from running binary, anchor unchanged",
-                    running_version, anchor_version
-                );
-                self.copy_running_to_reserve()
+                if running_version < anchor_version.as_str() {
+                    warn!(
+                        "Rollback protection degraded: reserve missing, running {} below anchor {} — rebuilding reserve from running binary, anchor unchanged",
+                        running_version, anchor_version
+                    );
+                    self.copy_running_to_reserve()
+                } else {
+                    info!(
+                        "Reserve missing and running {} is newer than anchor {} — promoting running binary as new last-known-good",
+                        running_version, anchor_version
+                    );
+                    self.promote(running_version).await
+                }
             }
             None => {
                 info!(
