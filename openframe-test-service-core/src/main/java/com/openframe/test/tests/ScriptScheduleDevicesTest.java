@@ -38,7 +38,11 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * device to it never dispatches anything.
  */
 @Slf4j
+// @Tag("needs-device") because every case needs an enrolled machine to target: the six of them abort
+// on requireDevice() in every dev-suite run, which has no agent in its tenant. The `tenant` env
+// excludes this tag; the pipeline phases, which run after a device is enrolled, do not.
 @Tag("saas")
+@Tag("needs-device")
 @DisplayName("Script schedule devices")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class ScriptScheduleDevicesTest extends BaseTest {
