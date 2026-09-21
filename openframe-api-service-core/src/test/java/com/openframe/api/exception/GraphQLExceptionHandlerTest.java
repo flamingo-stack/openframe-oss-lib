@@ -32,14 +32,21 @@ class GraphQLExceptionHandlerTest {
     }
 
     @Test
-    void keepsReportingUnexpectedFailuresAsInternalErrors() {
-        GraphQLError error = handle(new IllegalStateException("boom"));
+    void reportsRejectedArgumentsAsBadRequests() {
+        // The handler maps IllegalArgumentException and IllegalStateException to VALIDATION_ERROR:
+        // services throw them for input they refuse, such as a time range over 30 days
+        GraphQLError error = handle(new IllegalStateException("range too wide"));
 
         assertThat(error.getExtensions()).containsEntry("code", "VALIDATION_ERROR");
+        assertThat(error.getMessage()).isEqualTo("range too wide");
+    }
 
-        GraphQLError unexpected = handle(new RuntimeException("boom"));
-        assertThat(unexpected.getExtensions()).containsEntry("code", "INTERNAL_ERROR");
-        assertThat(unexpected.getMessage()).doesNotContain("boom");
+    @Test
+    void keepsReportingUnexpectedFailuresAsInternalErrors() {
+        GraphQLError error = handle(new RuntimeException("boom"));
+
+        assertThat(error.getExtensions()).containsEntry("code", "INTERNAL_ERROR").containsEntry("httpStatus", 500);
+        assertThat(error.getMessage()).doesNotContain("boom");
     }
 
     private GraphQLError handle(Throwable exception) {
