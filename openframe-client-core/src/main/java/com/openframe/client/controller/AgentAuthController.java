@@ -36,7 +36,7 @@ public class AgentAuthController {
                     ));
         } catch (Exception e) {
             log.error("Token issue error: {}", e.getMessage(), e);
-            return ResponseEntity.status(400)
+            return ResponseEntity.status(500)
                     .body(Map.of(
                             "error", "server_error",
                             "error_description", "An error occurred processing the request"
