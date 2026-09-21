@@ -78,7 +78,7 @@ impl ToolRestartMessageListener {
             let mut reconnect_rx = self.nats_connection_manager.subscribe_reconnect();
             let js = jetstream::new((*client).clone());
 
-            let consumer = tokio::select! {
+            let mut consumer = tokio::select! {
                 consumer = self.create_consumer(&js, &machine_id) => consumer,
                 _ = client_rx.changed() => {
                     info!("NATS client replaced, rebinding tool restart consumer");
@@ -115,7 +115,10 @@ impl ToolRestartMessageListener {
                     _ = reconnect_rx.recv() => {
                         info!("NATS reconnected, re-provisioning tool restart consumer");
                         tokio::select! {
-                            _ = self.create_consumer(&js, &machine_id) => {}
+                            new_consumer = self.create_consumer(&js, &machine_id) => {
+                                consumer = new_consumer;
+                                messages = consumer.messages().await?;
+                            }
                             _ = client_rx.changed() => {
                                 info!("NATS client replaced, rebinding tool restart consumer");
                                 break;
