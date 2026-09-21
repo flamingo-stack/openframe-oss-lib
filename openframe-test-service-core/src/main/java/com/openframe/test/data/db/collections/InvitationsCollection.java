@@ -5,14 +5,15 @@ import com.mongodb.client.model.Sorts;
 import com.openframe.test.data.dto.invitation.Invitation;
 import com.openframe.test.data.dto.invitation.InvitationStatus;
 
-import static com.openframe.test.data.db.MongoDB.closeConnection;
 import static com.openframe.test.data.db.MongoDB.getCollection;
 
 public class InvitationsCollection {
 
     public static Invitation findInvitation(String email) {
         Invitation invitation = getCollection("invitations", Invitation.class).find(Filters.eq("email", email)).first();
-        closeConnection();
+        if (invitation == null) {
+            throw new IllegalStateException("Invitation not found for email: " + email);
+        }
         return invitation;
     }
 
@@ -23,8 +24,11 @@ public class InvitationsCollection {
                 .find(Filters.eq("status", status))
                 .sort(Sorts.descending("createdAt"))
                 .first();
-        closeConnection();
+        if (invitation == null) {
+            throw new IllegalStateException("Invitation not found for status: " + status);
+        }
         return invitation;
     }
 
 }
+
