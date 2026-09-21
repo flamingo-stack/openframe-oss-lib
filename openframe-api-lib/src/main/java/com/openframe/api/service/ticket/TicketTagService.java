@@ -144,7 +144,7 @@ public class TicketTagService {
             List<String> notFound = tagIds.stream()
                     .filter(id -> !existingIds.contains(id))
                     .toList();
-            throw new IllegalArgumentException("Tags not found: " + notFound);
+            throw new TicketTagsNotFoundException("Tags not found: " + notFound);
         }
     }
 
@@ -177,7 +177,7 @@ public class TicketTagService {
 
     private void validateTicketExists(String ticketId) {
         if (!ticketRepository.existsById(ticketId)) {
-            throw new IllegalArgumentException("Ticket not found: " + ticketId);
+            throw new TicketNotFoundException("Ticket not found: " + ticketId);
         }
     }
 }
