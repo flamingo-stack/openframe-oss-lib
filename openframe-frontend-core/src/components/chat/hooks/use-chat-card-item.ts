@@ -33,6 +33,33 @@ export interface UseChatCardItemResult<T = unknown> {
   isFetched: boolean;
 }
 
+/** Thrown from the queryFn when `embedAuthedFetch` itself rejects (network
+ *  failure, CORS, aborted request, etc.) as opposed to a completed HTTP
+ *  response with a non-OK status. Carries no HTTP status because none was
+ *  ever received — callers (e.g. the tombstone gate in
+ *  entity-cards/dispatch.tsx) can `instanceof`-check this to keep "fetch
+ *  never completed" distinct from "server said non-OK", even though both
+ *  currently just surface as `isError` with no per-case UI branching yet. */
+export class ChatCardNetworkError extends Error {
+  constructor(cause: unknown) {
+    super('chat card fetch failed: network error');
+    this.name = 'ChatCardNetworkError';
+    this.cause = cause;
+  }
+}
+
+/** Thrown from the queryFn when `embedAuthedFetch` resolves with a non-OK
+ *  HTTP response (401 refresh miss, 5xx, 429, etc.). Carries the status so
+ *  callers can distinguish transient failures from a genuine "not found". */
+export class ChatCardHttpError extends Error {
+  status: number;
+  constructor(status: number) {
+    super(`chat card fetch failed: ${status}`);
+    this.name = 'ChatCardHttpError';
+    this.status = status;
+  }
+}
+
 // `extractItems` / `extractItemId` hoisted to `src/utils/extract-items.ts`
 // (shared with the related-content rail — react-query-free home).
 
@@ -52,13 +79,24 @@ export function useChatCardItem<T = unknown>(type: string, id: string): UseChatC
       // cross-origin, dev-ticket Bearer, 401 refresh-and-retry). Bare `fetch`
       // sent no credentials, so list endpoints behind the gateway returned
       // 401 and the card rendered blank.
-      const res = await embedAuthedFetch(url);
+      let res: Response;
+      try {
+        res = await embedAuthedFetch(url);
+      } catch (err) {
+        // `embedAuthedFetch` itself rejected (network failure, aborted
+        // request, etc.) — no HTTP response was ever received. Wrap in a
+        // distinct error type rather than letting the raw rejection
+        // (or an unrelated shape) reach TanStack, so this case is at
+        // least distinguishable from `ChatCardHttpError` by callers that
+        // inspect `query.error`.
+        throw new ChatCardNetworkError(err);
+      }
       // THROW on non-OK (was `return null`): callers must be able to
       // tell "fetched fine, entity absent" (→ deleted tombstone) from
       // "fetch failed" (401 refresh miss, 5xx, 429 → transient; render
       // nothing, never a false 'deleted' claim). TanStack surfaces the
       // throw as `isError`.
-      if (!res.ok) throw new Error(`chat card fetch failed: ${res.status}`);
+      if (!res.ok) throw new ChatCardHttpError(res.status);
       // `.json()` is `any`; `extractItems` already takes `unknown` and does the
       // shape normalization, so keep the boundary honest and let it do its job.
       const data: unknown = await res.json();
