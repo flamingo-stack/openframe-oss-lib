@@ -1,6 +1,7 @@
 package com.openframe.management.config.pinot;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -95,37 +96,33 @@ public class PinotConfigInitializer {
     private void deployPinotConfig(PinotConfig config) {
         log.info("Deploying Pinot configuration for: {}", config.getName());
 
-        try {
-            String schemaConfig = resolvePlaceholders(loadResource(config.getSchemaFile()));
-            String realtimeTableConfig = resolvePlaceholders(loadResource(config.getTableRealtimeConfigFile()));
+        String schemaConfig = resolvePlaceholders(loadResource(config.getSchemaFile()));
+        String realtimeTableConfig = resolvePlaceholders(loadResource(config.getTableRealtimeConfigFile()));
 
-            deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + config.getName());
-            deployWithRetry(() -> deployTableConfig(realtimeTableConfig, config.getName()), "realtime table config for " + config.getName());
+        deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + config.getName());
+        deployWithRetry(() -> deployTableConfig(realtimeTableConfig, config.getName()), "realtime table config for " + config.getName());
 
 
-            if (config.getTableOfflineConfigFile() != null) {
-                String offlineTableConfig = resolvePlaceholders(loadResource(config.getTableOfflineConfigFile()));
-                deployWithRetry(() -> deployTableConfig(offlineTableConfig, config.getName()), "offline table config for " + config.getName());
+        if (config.getTableOfflineConfigFile() != null) {
+            String offlineTableConfig = resolvePlaceholders(loadResource(config.getTableOfflineConfigFile()));
+            deployWithRetry(() -> deployTableConfig(offlineTableConfig, config.getName()), "offline table config for " + config.getName());
 
-            }
-
-            deployWithRetry(() -> reloadSegments(realtimeTableConfig), "segment reload for " + config.getName());
-
-            log.info("Successfully deployed Pinot configuration for: {}", config.getName());
-
-        } catch (Exception e) {
-            log.error("Failed to load Pinot configuration files for {}", config.getName(), e);
-            throw new RuntimeException("Failed to load Pinot configuration for " + config.getName(), e);
         }
+
+        deployWithRetry(() -> reloadSegments(realtimeTableConfig), "segment reload for " + config.getName());
+
+        log.info("Successfully deployed Pinot configuration for: {}", config.getName());
     }
 
-    private String loadResource(String resourcePath) throws IOException {
+    private String loadResource(String resourcePath) {
         Resource resource = resourceLoader.getResource("classpath:pinot/config/" + resourcePath);
         if (!resource.exists()) {
-            throw new IOException("Resource not found: " + resourcePath);
+            throw new UncheckedIOException(new IOException("Resource not found: " + resourcePath));
         }
         try (var inputStream = resource.getInputStream()) {
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read resource: " + resourcePath, e);
         }
     }
 
