@@ -31,11 +31,7 @@ public class TicketGenerator {
         return firstTicket(connection).getId();
     }
 
-    /**
-     * First ticket whose lifecycle status kind is none of the excluded kinds. Useful on a lifecycle
-     * tenant where the legacy `status` filter can still return tickets that have since moved to
-     * another lifecycle status (the legacy `status` field is not synced by transitionTicket).
-     */
+    // legacy `status` filter can miss tickets that moved to another lifecycle status since it is not synced by transitionTicket
     public static Ticket firstTicketWithStatusKindNotIn(TicketConnection connection, String... excludedKinds) {
         Set<String> excluded = Set.of(excludedKinds);
         return connection.getEdges().stream()
@@ -50,11 +46,7 @@ public class TicketGenerator {
         return connection.getEdges().getLast().getNode();
     }
 
-    /**
-     * Reorders the column's bottom ticket to the top (before the current first ticket). Uses a single
-     * anchor so the new rank is derived from one neighbor's rank (never a between-two-equal-ranks
-     * collision), and keeps the ticket in its own lifecycle column (no statusId change).
-     */
+    // single anchor avoids a between-two-equal-ranks collision and keeps the ticket in its own lifecycle column
     public static ReorderTicketInput moveLastBeforeFirst(TicketConnection connection) {
         List<TicketEdge> edges = connection.getEdges();
         return ReorderTicketInput.builder()
@@ -89,18 +81,7 @@ public class TicketGenerator {
                 .build();
     }
 
-    /**
-     * One lifecycle column, restricted to records the reorder mutation will actually accept as anchors.
-     * <p>
-     * {@code statusIds} selects the column; the legacy {@code status} enum is a separate axis, and a
-     * column listing carries archived records alongside live ones. Reorder requires the moved ticket and
-     * its neighbour to agree on that enum, so an unfiltered listing eventually fails with
-     * {@code "Neighbor <id> is in status ACTIVE, expected ARCHIVED"} — the bottom of the column is where
-     * archived leftovers settle, and that is exactly the ticket {@code moveLastBeforeFirst} picks up.
-     * <p>
-     * This is tenant state, not a one-off: every pipeline run archives the tickets it created, so a
-     * shared tenant reaccumulates them and the failure returns however often the data is cleaned.
-     */
+    // filters out archived tickets, which reorder rejects as neighbors of an active ticket
     public static TicketFilterInput activeTicketsWithStatusId(String statusId) {
         return TicketFilterInput.builder()
                 .statusIds(List.of(statusId))
@@ -108,10 +89,7 @@ public class TicketGenerator {
                 .build();
     }
 
-    /**
-     * A custom status create request with a unique name (backend enforces uniqueness and a 32-char
-     * limit) and a valid 6-digit hex color (backend pattern: {@code ^#[0-9A-Fa-f]{6}$}).
-     */
+    // backend enforces unique name (32-char limit) and a 6-digit hex color pattern ^#[0-9A-Fa-f]{6}$
     public static CreateTicketStatusInput createStatusRequest() {
         return CreateTicketStatusInput.builder()
                 .name("qa-" + faker.random().hex(8))
