@@ -51,7 +51,7 @@ public class MachineHeartbeatListener {
     private void handleMessage(Message message) {
         String subject = message.getSubject();
 
-        String machineId = machineIdExtractor.extract(subject);;
+        String machineId = machineIdExtractor.extract(subject);
         try {
             // Generate timestamp at service side
             Instant eventTimestamp = Instant.now();
@@ -79,3 +79,4 @@ public class MachineHeartbeatListener {
         }
     }
 }
+
