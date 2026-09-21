@@ -151,7 +151,6 @@ public class SoftwareBundleService {
         entity.setExpireAt(null); // completed bundles are history — never reaped
         bundleRepository.save(entity);
 
-        // Persist one Software Action result per package, targeting the OS-compatible subset of the devices.
         writeActionResults(entity, packages, deviceOsTypes, now, actor);
 
         log.info("Submitted software bundle id={} mode={} action={} devices={} packages={} actor={}",

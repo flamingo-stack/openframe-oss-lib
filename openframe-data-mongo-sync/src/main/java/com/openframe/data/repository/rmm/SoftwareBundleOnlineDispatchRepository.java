@@ -18,7 +18,6 @@ public interface SoftwareBundleOnlineDispatchRepository extends MongoRepository<
 
     Optional<SoftwareBundleOnlineDispatch> findByTenantIdAndMachineIdAndBundleId(String tenantId, String machineId, String bundleId);
 
-    /** All sentinels of a bundle — the device drill-down uses NEW ones as still-scheduled devices. */
     List<SoftwareBundleOnlineDispatch> findByTenantIdAndBundleId(String tenantId, String bundleId);
 
     long deleteByTenantIdAndBundleId(String tenantId, String bundleId);

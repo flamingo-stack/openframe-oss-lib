@@ -79,7 +79,6 @@ class SoftwareScheduleOnlineDispatchServiceTest {
 
         service.processReconnectedDevices();
 
-        // Only the reconnected (online, in-window) device is fired.
         verify(fireDispatcher).dispatch(eq(schedule), eq(List.of("m-online")), any());
         verify(fireDispatcher, never()).dispatch(eq(schedule), eq(List.of("m-offline")), any());
 

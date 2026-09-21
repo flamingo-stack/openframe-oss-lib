@@ -38,29 +38,27 @@ class FleetDeviceCountEnricherTest {
 
     @Test
     void enrich_setsCountToCorrelatedHostsPerRow_orphansDropped() {
-        // setup — two "rows" (represent titles/CVEs whatever); Fleet returns 3 hosts total, only 2 correlate.
         Row rowA = new Row("A");
         Row rowB = new Row("B");
-        Host h1 = host(1L);   // rowA — correlates
-        Host h2 = host(2L);   // rowA — orphan (no matching Machine)
-        Host h3 = host(3L);   // rowB — correlates
+        Host h1 = host(1L);
+        Host h2 = host(2L);   // orphan — no matching Machine
+        Host h3 = host(3L);
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
         when(hostMachineResolver.resolve(eq("t1"), anyList()))
-                .thenReturn(Map.of(1L, new Machine(), 3L, new Machine())); // h2 (id=2) is not in the map
+                .thenReturn(Map.of(1L, new Machine(), 3L, new Machine()));
 
         enricher.enrich(
                 List.of(rowA, rowB),
                 row -> row.name.equals("A") ? List.of(h1, h2) : List.of(h3),
                 Row::setCount);
 
-        assertThat(rowA.count).isEqualTo(1);   // h1 counted, h2 dropped as orphan
-        assertThat(rowB.count).isEqualTo(1);   // h3 counted
+        assertThat(rowA.count).isEqualTo(1);   // h2 dropped as orphan
+        assertThat(rowB.count).isEqualTo(1);
     }
 
     @Test
     void enrich_batchesCorrelateIntoOneResolverCall_notPerRow() {
-        // The invariant: N rows → 1 resolver.resolve(...) call over the UNION of every row's hosts.
-        // If we regress into per-row correlation, this fails.
+        // Invariant: N rows → 1 resolver.resolve(...) call over the UNION of every row's hosts.
         List<Row> rows = List.of(new Row("A"), new Row("B"), new Row("C"));
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of());
@@ -72,8 +70,7 @@ class FleetDeviceCountEnricherTest {
 
     @Test
     void enrich_callsHostFetcherOncePerRow_neverMore() {
-        // The invariant: exactly one Fleet /hosts call per row (parallel is OK, N > per-row is NOT).
-        // Regressions into repeated fetches would fail this.
+        // Invariant: exactly one Fleet /hosts call per row (parallel is OK, N > per-row is NOT).
         AtomicInteger fetchCalls = new AtomicInteger();
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of());
@@ -88,8 +85,8 @@ class FleetDeviceCountEnricherTest {
 
     @Test
     void enrich_correlateReceivesTheUnionOfAllRows_hosts() {
-        // The invariant: the resolver is asked about the FULL union — so a host that appears on more
-        // than one row is still resolved once, and every row's hosts are eligible for correlation.
+        // Invariant: the resolver is asked about the FULL union — a host appearing on more than one
+        // row is still resolved once, and every row's hosts are eligible for correlation.
         Row rowA = new Row("A");
         Row rowB = new Row("B");
         Host shared = host(1L);

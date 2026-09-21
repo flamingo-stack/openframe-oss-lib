@@ -120,11 +120,7 @@ public class SoftwareInventoryService {
         return pageResult;
     }
 
-    /**
-     * Replace Fleet's raw {@code hosts_count} with the count of OpenFrame Machines that correlate
-     * to the title's Fleet hosts. Delegates to {@link FleetDeviceCountEnricher} — the shared
-     * enrichment plumbing that also serves the vulnerability reader.
-     */
+    // Replace Fleet's raw hosts_count with the count of correlated OpenFrame Machines.
     private void enrichRealDevicesCount(List<SoftwareResponse> titles) {
         deviceCountEnricher.enrich(titles,
                 row -> hostsForTitle(row.getId()),
@@ -312,12 +308,9 @@ public class SoftwareInventoryService {
     private record HostVersion(Host host, String version) {
     }
 
-    private static final int FILTERS_SCAN_LIMIT = 1000;
-
     public SoftwareFilters getSoftwareFilters(String search) {
-        // Facet counts are by source/versionStatus/severity — none of them depends on the enriched
-        // devicesCount, so we deliberately bypass enrichRealDevicesCount here (it would fire N Fleet
-        // /hosts lookups just to produce numbers we don't use).
+        // Facet counts don't depend on the enriched devicesCount, so bypass enrichRealDevicesCount
+        // here — it would fire N Fleet /hosts lookups just to produce numbers we don't use.
         List<SoftwareResponse> titles = fetchAllTitles(search, null);
         return SoftwareFilters.builder()
                 .sources(facet(titles, SoftwareResponse::getSource))

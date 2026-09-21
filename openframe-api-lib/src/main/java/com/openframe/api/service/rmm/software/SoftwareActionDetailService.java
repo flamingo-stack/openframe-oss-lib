@@ -31,13 +31,6 @@ import java.util.Set;
 
 import static org.springframework.util.StringUtils.hasText;
 
-/**
- * The device drill-down for one Software Action: every target device with its result. Rows are layered so the
- * most concrete state wins — the schedule's assigned machines seed a SCHEDULED baseline (a not-yet-fired
- * schedule has no leaves/sentinels), reconnect sentinels overlay it (EXPIRED → FAILED), and execution leaves
- * overlay everything with the real outcome and output for "Show Result". Each device is enriched with its
- * hostname and customer (organization) and can be filtered by status / customer / search.
- */
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -105,7 +98,7 @@ public class SoftwareActionDetailService {
         }
     }
 
-    /** Batch-loads each device's hostname and customer (organization) in two queries, not per row. */
+    // Batch-load hostname and customer in two queries, not per row.
     private void enrichWithCustomer(String tenantId, Map<String, SoftwareActionDeviceResponse> byMachine) {
         if (byMachine.isEmpty()) {
             return;

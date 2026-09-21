@@ -112,7 +112,6 @@ class SoftwareActionDetailServiceTest {
         when(organizationRepository.findByOrganizationIdIn(any())).thenReturn(List.of(
                 org("org-1", "Acme"), org("org-2", "Globex")));
 
-        // No filter → all three, enriched with hostname + customer name.
         List<SoftwareActionDeviceResponse> all = service.devices(EXEC, null, null, null, null);
         assertThat(all).hasSize(3);
         SoftwareActionDeviceResponse alpha = all.stream().filter(r -> r.getMachineId().equals("alpha")).findFirst().orElseThrow();
@@ -120,15 +119,12 @@ class SoftwareActionDetailServiceTest {
         assertThat(alpha.getOrganizationId()).isEqualTo("org-1");
         assertThat(alpha.getOrganizationName()).isEqualTo("Acme");
 
-        // Status filter.
         List<SoftwareActionDeviceResponse> completed = service.devices(EXEC, null, null, filter(List.of(SoftwareActionStatus.COMPLETED), null), null);
         assertThat(completed).extracting(SoftwareActionDeviceResponse::getMachineId).containsExactlyInAnyOrder("alpha", "beta");
 
-        // Customer filter.
         List<SoftwareActionDeviceResponse> org1 = service.devices(EXEC, null, null, filter(null, List.of("org-1")), null);
         assertThat(org1).extracting(SoftwareActionDeviceResponse::getMachineId).containsExactlyInAnyOrder("alpha", "gamma");
 
-        // Search by hostname.
         List<SoftwareActionDeviceResponse> search = service.devices(EXEC, null, null, null, "BETA-HOST");
         assertThat(search).extracting(SoftwareActionDeviceResponse::getMachineId).containsExactly("beta");
     }

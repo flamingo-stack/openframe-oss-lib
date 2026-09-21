@@ -147,7 +147,7 @@ class SoftwareInventoryServiceTest {
     @Test
     @DisplayName("listSoftware: delegates devicesCount enrichment to FleetDeviceCountEnricher — whatever count the enricher sets is what the user sees, and Fleet's raw hosts_count is discarded in the process")
     void listSoftware_delegatesEnrichmentToEnricher() {
-        // setup — Fleet says 31 devices; simulate the enricher correlating that down to 2 real Machines.
+        // Fleet says 31 devices; enricher correlates down to 2 real Machines.
         SoftwareTitle raw = new SoftwareTitle();
         raw.setId(42L);
         raw.setName("Chrome");
@@ -175,17 +175,14 @@ class SoftwareInventoryServiceTest {
 
         service.getSoftwareFilters(null);
 
-        // The invariant: facet reads must never fire the enricher — that would explode into N Fleet /hosts
-        // lookups per facet request (up to FILTERS_SCAN_LIMIT titles). Regression guard.
+        // Invariant: facet reads must never fire the enricher — that would explode into N Fleet
+        // /hosts lookups per facet request.
         org.mockito.Mockito.verify(deviceCountEnricher, org.mockito.Mockito.never())
                 .enrich(anyList(), any(), any());
     }
 
-    /**
-     * The enricher is external — we don't re-test its correlation math here (that lives in
-     * {@code FleetDeviceCountEnricherTest}). We just simulate its side-effect: for every row the
-     * service hands it, write {@code count} back through the passed {@code countSetter}.
-     */
+    // Simulate the enricher's side-effect: write count back via the passed countSetter.
+    // Its correlation math is tested in FleetDeviceCountEnricherTest, not here.
     @SuppressWarnings("unchecked")
     private void simulateEnricherSetsCount(int count) {
         org.mockito.Mockito.doAnswer(inv -> {

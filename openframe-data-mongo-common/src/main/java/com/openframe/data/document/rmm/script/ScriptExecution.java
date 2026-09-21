@@ -14,10 +14,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/**
- * Persisted record of a single script-execution attempt — one row in the
- * Script Details → Execution History UI.
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -39,14 +35,7 @@ import java.time.Instant;
 )
 public class ScriptExecution implements TenantScoped {
 
-    /**
-     * Maximum number of bytes of stdout / stderr persisted on the document.
-     * Output larger than this is truncated and the corresponding
-     * {@code *Truncated} flag is set; full output stays on the agent side.
-     * 64 KiB is chosen as a balance — comfortably accommodates a typical
-     * script run while staying well under Mongo's 16 MiB document ceiling
-     * even when many fields accumulate.
-     */
+    // stdout/stderr above this is truncated (with the *Truncated flag set); keeps the doc well under Mongo's 16 MiB limit
     public static final int MAX_OUTPUT_BYTES = 64 * 1024;
 
     @Id
@@ -54,11 +43,6 @@ public class ScriptExecution implements TenantScoped {
 
     private String tenantId;
 
-    /**
-     * Correlation id minted server-side at dispatch — same value that goes to
-     * the agent in {@code ScriptMessage.executionId} and comes back in
-     * {@code RmmResultMessage.executionId}.
-     */
     @Indexed
     private String executionId;
 

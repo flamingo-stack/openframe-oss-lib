@@ -103,7 +103,6 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
         return DEFAULT_SORT;
     }
 
-    /** $match → $group(by executionId) → $project(status + X/Y) → optional $match(status filter). */
     private static List<AggregationOperation> pipeline(String tenantId, SoftwareActionQueryFilter filter, String search) {
         List<AggregationOperation> stages = new ArrayList<>();
         stages.add(ctx -> new Document("$match", matchDoc(tenantId, filter, search)));

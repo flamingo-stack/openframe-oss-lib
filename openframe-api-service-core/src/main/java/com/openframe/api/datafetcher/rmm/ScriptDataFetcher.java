@@ -138,7 +138,6 @@ public class ScriptDataFetcher {
         return scriptDispatchService.batchRunScript(input, getCurrentUserId(), ExecutionSource.MANUAL);
     }
 
-    /** Returns the Relay global id (Base64 "Script:&lt;rawId&gt;") for the {@code id} field. */
     @DgsData(parentType = "Script", field = "id")
     public String scriptNodeId(DgsDataFetchingEnvironment dfe) {
         ScriptResponse script = dfe.getSource();
@@ -153,7 +152,6 @@ public class ScriptDataFetcher {
         return globalIds == null ? null : globalIds.stream().map(ScriptDataFetcher::decodeId).toList();
     }
 
-    /** Re-encode a facet's raw option values to Relay global ids of the given node type (in place). */
     private static void encodeNodeOptions(List<ScriptFilterOption> options, String nodeType) {
         if (options == null) {
             return;
@@ -161,7 +159,6 @@ public class ScriptDataFetcher {
         options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
     }
 
-    /** Resolves the {@code Script.tags} field, batched per request via the data loader. */
     @DgsData(parentType = "Script", field = "tags")
     public CompletableFuture<List<Tag>> tags(DgsDataFetchingEnvironment dfe) {
         ScriptResponse script = dfe.getSource();
@@ -169,7 +166,6 @@ public class ScriptDataFetcher {
         return loader.load(script.getId());
     }
 
-    /** Resolves the {@code Script.author} field from {@code createdBy}, batched via the user loader. */
     @DgsData(parentType = "Script", field = "author")
     public CompletableFuture<UserResponse> author(DgsDataFetchingEnvironment dfe) {
         ScriptResponse script = dfe.getSource();

@@ -73,7 +73,6 @@ class SoftwareBundleOnlineDispatchServiceTest {
 
         service.processDevicesBecameOnline();
 
-        // Only the online device is dispatched.
         ArgumentCaptor<Machine> fired = ArgumentCaptor.forClass(Machine.class);
         verify(bundleDispatcher).dispatch(eq(bundle), fired.capture());
         assertThat(fired.getValue().getMachineId()).isEqualTo("m-online");

@@ -120,7 +120,6 @@ public class SoftwareScheduleService {
                 .stream().map(this::toResponse).toList();
     }
 
-    /** Soft-delete (status DELETED). Idempotent; returns the id. */
     public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = scheduleRepository.findByTenantIdAndId(tenantId, id)
@@ -133,12 +132,10 @@ public class SoftwareScheduleService {
         return id;
     }
 
-    /** Archive a schedule (idempotent). */
     public SoftwareScheduleResponse archive(String id) {
         return transitionTo(id, ScriptStatus.ARCHIVED);
     }
 
-    /** Restore an archived schedule back to ACTIVE (idempotent). */
     public SoftwareScheduleResponse unarchive(String id) {
         return transitionTo(id, ScriptStatus.ACTIVE);
     }
@@ -243,7 +240,7 @@ public class SoftwareScheduleService {
         return timeReference != null ? timeReference : ScheduleTimeReference.SERVER;
     }
 
-    /** SERVER runs off {@code nextRunAt}=startAt; DEVICE_LOCAL is timezone-driven, so its nextRunAt is null. */
+    // DEVICE_LOCAL is timezone-driven → no seeded nextRunAt; SERVER runs off startAt.
     private static Instant seedNextRunAt(ScheduleTimeReference timeReference, Instant startAt) {
         return timeReference == ScheduleTimeReference.DEVICE_LOCAL ? null : startAt;
     }

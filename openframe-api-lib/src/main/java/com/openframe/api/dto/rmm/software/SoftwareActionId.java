@@ -16,7 +16,6 @@ public record SoftwareActionId(String executionId, String bundleId, String sched
         return new SoftwareActionId(executionId, bundleId, scheduleId);
     }
 
-    /** Decodes a token; falls back to treating a non-token value as a bare executionId (backward-safe). */
     public static SoftwareActionId decode(String actionId) {
         if (actionId == null || actionId.isBlank()) {
             return new SoftwareActionId(null, null, null);
@@ -28,7 +27,6 @@ public record SoftwareActionId(String executionId, String bundleId, String sched
                 return new SoftwareActionId(emptyToNull(parts[0]), emptyToNull(parts[1]), emptyToNull(parts[2]));
             }
         } catch (IllegalArgumentException ignored) {
-            // not a token — treat as a raw executionId
         }
         return new SoftwareActionId(actionId, null, null);
     }

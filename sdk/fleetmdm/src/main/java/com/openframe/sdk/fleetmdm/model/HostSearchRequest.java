@@ -1,8 +1,5 @@
 package com.openframe.sdk.fleetmdm.model;
 
-/**
- * Request parameters for host search
- */
 public class HostSearchRequest {
 
     private String query;
@@ -15,7 +12,6 @@ public class HostSearchRequest {
     private String cve;
 
     public HostSearchRequest() {
-        // Default values
         this.page = 0;
         this.perPage = 100;
     }

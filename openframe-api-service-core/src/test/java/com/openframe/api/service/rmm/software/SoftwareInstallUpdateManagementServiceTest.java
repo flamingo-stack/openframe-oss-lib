@@ -87,7 +87,6 @@ class SoftwareInstallUpdateManagementServiceTest {
         // System script resolved once for both brew packages (cached).
         verify(scriptService, times(1)).getSoftwareScript(SoftwareScriptCode.BREW_INSTALL);
 
-        // Two dispatches, with cask/formula-correct args.
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> argsCaptor = ArgumentCaptor.forClass(List.class);
         verify(softwareDispatchService, times(2))
@@ -174,7 +173,6 @@ class SoftwareInstallUpdateManagementServiceTest {
 
         List<SoftwareDispatchResult> results = service.install(in, USER, ExecutionSource.MANUAL);
 
-        // brew dispatched to the macOS device; winget skipped entirely (no Windows device).
         assertThat(results).extracting(SoftwareDispatchResult::getPackageName).containsExactly("slack");
         verify(softwareDispatchService).dispatch(eq(brew), eq(List.of("m-mac")), anyList(), eq(USER),
                 eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.INSTALL));
