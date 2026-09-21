@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::future::Future;
 
 use anyhow::{Context, Result};
-use redb::{Database, ReadableTable, ReadableTableMetadata, TableDefinition};
+use redb::{Database, ReadableTable, ReadableTableMetadata, TableDefinition, WriteTransaction};
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
@@ -24,6 +24,8 @@ const ERROR_INTERRUPTED: &str = "interrupted by agent restart; outcome unknown";
 
 pub trait ResultPublisher: Send + Sync {
     fn publish_raw(&self, subject: &str, bytes: &[u8]) -> impl Future<Output = Result<()>> + Send;
+    fn publish_acked(&self, subject: &str, bytes: &[u8])
+        -> impl Future<Output = Result<()>> + Send;
     fn max_payload(&self) -> impl Future<Output = Option<usize>> + Send;
 }
 
@@ -211,21 +213,23 @@ impl ResultStore {
         .await
     }
 
+    pub async fn enqueue(&self, key: String, subject: String, bytes: Vec<u8>) -> Result<()> {
+        self.with_db(move |db| {
+            let txn = db.begin_write()?;
+            write_outbox_entry(&txn, &key, subject, &bytes)?;
+            txn.commit()?;
+            Ok(())
+        })
+        .await?;
+        self.prune_over_cap().await;
+        Ok(())
+    }
+
     pub async fn complete(&self, key: String, subject: String, bytes: Vec<u8>) -> Result<()> {
         self.with_db(move |db| {
             let txn = db.begin_write()?;
-            {
-                let mut meta = txn.open_table(OUTBOX_META)?;
-                let mut payload = txn.open_table(OUTBOX_PAYLOAD)?;
-                let m = OutboxMeta {
-                    subject,
-                    created_at_secs: now_secs(),
-                };
-                meta.insert(key.as_str(), serde_json::to_vec(&m)?.as_slice())?;
-                payload.insert(key.as_str(), bytes.as_slice())?;
-                let mut journal = txn.open_table(JOURNAL)?;
-                journal.remove(key.as_str())?;
-            }
+            write_outbox_entry(&txn, &key, subject, &bytes)?;
+            txn.open_table(JOURNAL)?.remove(key.as_str())?;
             txn.commit()?;
             Ok(())
         })
@@ -382,6 +386,22 @@ impl ResultStore {
         })
         .await
     }
+}
+
+fn write_outbox_entry(
+    txn: &WriteTransaction,
+    key: &str,
+    subject: String,
+    bytes: &[u8],
+) -> Result<()> {
+    let meta = OutboxMeta {
+        subject,
+        created_at_secs: now_secs(),
+    };
+    txn.open_table(OUTBOX_META)?
+        .insert(key, serde_json::to_vec(&meta)?.as_slice())?;
+    txn.open_table(OUTBOX_PAYLOAD)?.insert(key, bytes)?;
+    Ok(())
 }
 
 fn journal_contains_batch(

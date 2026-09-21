@@ -1,7 +1,7 @@
 package com.openframe.data.integration.repository.rmm;
 
-import com.openframe.data.document.rmm.ExecutionStatus;
-import com.openframe.data.document.rmm.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.filter.ScheduleRunQueryFilter;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;

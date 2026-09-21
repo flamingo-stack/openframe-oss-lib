@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { OpenFrameSsoLoginForm, OpenFrameSsoSignUpForm, SsoAuthShell } from '../../components/features/auth'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { OpenFrameSsoLoginForm, OpenFrameSsoSignUpForm, SsoAuthShell } from '../../components/features/auth';
 
 const meta = {
   title: 'Auth/OpenFrame SSO',
@@ -14,16 +14,22 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta
+} satisfies Meta;
 
-export default meta
-type Story = StoryObj
+export default meta;
+type Story = StoryObj;
 
-function SsoLoginPage({ initialEmail = '', initialPassword = '' }: { initialEmail?: string; initialPassword?: string }) {
-  const [email, setEmail] = useState(initialEmail)
-  const [password, setPassword] = useState(initialPassword)
+function SsoLoginPage({
+  initialEmail = '',
+  initialPassword = '',
+}: {
+  initialEmail?: string;
+  initialPassword?: string;
+}) {
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState(initialPassword);
 
-  const isValid = !!email.trim() && password.length > 0
+  const isValid = !!email.trim() && password.length > 0;
 
   return (
     <SsoAuthShell>
@@ -37,22 +43,18 @@ function SsoLoginPage({ initialEmail = '', initialPassword = '' }: { initialEmai
         submitDisabled={!isValid}
       />
     </SsoAuthShell>
-  )
+  );
 }
 
 function SsoSignUpPage({ filled = false }: { filled?: boolean }) {
-  const [email, setEmail] = useState(filled ? 'ada@example.com' : '')
-  const [firstName, setFirstName] = useState(filled ? 'Ada' : '')
-  const [lastName, setLastName] = useState(filled ? 'Lovelace' : '')
-  const [password, setPassword] = useState(filled ? 'SuperSecretPassphrase2024!' : '')
-  const [confirmPassword, setConfirmPassword] = useState(filled ? 'SuperSecretPassphrase2024!' : '')
+  const [email, setEmail] = useState(filled ? 'ada@example.com' : '');
+  const [firstName, setFirstName] = useState(filled ? 'Ada' : '');
+  const [lastName, setLastName] = useState(filled ? 'Lovelace' : '');
+  const [password, setPassword] = useState(filled ? 'SuperSecretPassphrase2024!' : '');
+  const [confirmPassword, setConfirmPassword] = useState(filled ? 'SuperSecretPassphrase2024!' : '');
 
   const isValid =
-    !!email.trim() &&
-    !!firstName.trim() &&
-    !!lastName.trim() &&
-    password.length >= 8 &&
-    password === confirmPassword
+    !!email.trim() && !!firstName.trim() && !!lastName.trim() && password.length >= 8 && password === confirmPassword;
 
   return (
     <SsoAuthShell>
@@ -72,25 +74,25 @@ function SsoSignUpPage({ filled = false }: { filled?: boolean }) {
         submitDisabled={!isValid}
       />
     </SsoAuthShell>
-  )
+  );
 }
 
 /** Login — empty email + password, submit disabled. */
 export const LoginEmpty: Story = {
   render: () => <SsoLoginPage />,
-}
+};
 
 /** Login — filled, submit enabled. */
 export const LoginFilled: Story = {
   render: () => <SsoLoginPage initialEmail="ada@example.com" initialPassword="SuperSecret1" />,
-}
+};
 
 /** Sign Up — empty fields, submit disabled. */
 export const SignUpEmpty: Story = {
   render: () => <SsoSignUpPage />,
-}
+};
 
 /** Sign Up — filled and terms accepted, submit enabled. */
 export const SignUpFilled: Story = {
   render: () => <SsoSignUpPage filled />,
-}
+};

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test'
+import { fn } from 'storybook/test';
 import { FileManager } from '../components/ui/file-manager/file-manager';
 import type { FileItem } from '../components/ui/file-manager/types';
 
@@ -12,7 +12,7 @@ const sampleFiles: FileItem[] = [
   { id: '6', name: 'deploy.sh', type: 'file', size: '856 B', modified: '2026-03-06', path: '/deploy.sh' },
   { id: '7', name: 'package.json', type: 'file', size: '2.3 KB', modified: '2026-03-04', path: '/package.json' },
   { id: '8', name: '.env.local', type: 'file', size: '312 B', modified: '2026-02-20', path: '/.env.local' },
-]
+];
 
 const meta = {
   title: 'UI/FileManager',
@@ -64,9 +64,29 @@ export const NestedPath: Story = {
     currentPath: '/Documents/Projects/my-app',
     files: [
       { id: '1', name: 'src', type: 'folder', modified: '2026-03-08', path: '/Documents/Projects/my-app/src' },
-      { id: '2', name: 'node_modules', type: 'folder', modified: '2026-03-01', path: '/Documents/Projects/my-app/node_modules' },
-      { id: '3', name: 'index.ts', type: 'file', size: '1.5 KB', modified: '2026-03-08', path: '/Documents/Projects/my-app/index.ts' },
-      { id: '4', name: 'tsconfig.json', type: 'file', size: '680 B', modified: '2026-03-02', path: '/Documents/Projects/my-app/tsconfig.json' },
+      {
+        id: '2',
+        name: 'node_modules',
+        type: 'folder',
+        modified: '2026-03-01',
+        path: '/Documents/Projects/my-app/node_modules',
+      },
+      {
+        id: '3',
+        name: 'index.ts',
+        type: 'file',
+        size: '1.5 KB',
+        modified: '2026-03-08',
+        path: '/Documents/Projects/my-app/index.ts',
+      },
+      {
+        id: '4',
+        name: 'tsconfig.json',
+        type: 'file',
+        size: '680 B',
+        modified: '2026-03-02',
+        path: '/Documents/Projects/my-app/tsconfig.json',
+      },
     ],
   },
 };
@@ -108,7 +128,14 @@ export const Searching: Story = {
     searchQuery: 'config',
     files: [
       { id: '5', name: 'config.json', type: 'file', size: '1.1 KB', modified: '2026-03-07', path: '/config.json' },
-      { id: '9', name: 'tsconfig.json', type: 'file', size: '680 B', modified: '2026-03-02', path: '/src/tsconfig.json' },
+      {
+        id: '9',
+        name: 'tsconfig.json',
+        type: 'file',
+        size: '680 B',
+        modified: '2026-03-02',
+        path: '/src/tsconfig.json',
+      },
     ],
     resultsCount: 2,
   },
@@ -152,8 +179,21 @@ export const WindowsPath: Story = {
   args: {
     currentPath: 'C:\\Users\\admin\\Desktop',
     files: [
-      { id: '1', name: 'Projects', type: 'folder', modified: '2026-03-08', path: 'C:\\Users\\admin\\Desktop\\Projects' },
-      { id: '2', name: 'notes.txt', type: 'file', size: '2.1 KB', modified: '2026-03-07', path: 'C:\\Users\\admin\\Desktop\\notes.txt' },
+      {
+        id: '1',
+        name: 'Projects',
+        type: 'folder',
+        modified: '2026-03-08',
+        path: 'C:\\Users\\admin\\Desktop\\Projects',
+      },
+      {
+        id: '2',
+        name: 'notes.txt',
+        type: 'file',
+        size: '2.1 KB',
+        modified: '2026-03-07',
+        path: 'C:\\Users\\admin\\Desktop\\notes.txt',
+      },
     ],
   },
 };

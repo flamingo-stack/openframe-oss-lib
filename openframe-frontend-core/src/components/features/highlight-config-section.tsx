@@ -1,6 +1,5 @@
-"use client";
+'use client';
 
-import React from 'react';
 import { Field } from '../ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
@@ -30,29 +29,29 @@ export function HighlightConfigSection({
   className = '',
 }: HighlightConfigSectionProps) {
   return (
-    <div className={`space-y-3 p-4 bg-ods-card rounded-lg border border-ods-border ${className}`}>
+    <div className={`space-y-3 rounded-lg border border-ods-border bg-ods-card p-4 ${className}`}>
       <div className="flex items-center gap-4">
         <div className="flex-1">
           {/* Field, not a raw Label + margin hack — same label system as every
               other form field so adjacent columns stay on one baseline. */}
           <Field label="Target Duration">
-            {(f) => (
-          <Select
-            value={targetDurationSeconds.toString()}
-            onValueChange={(value) => onTargetDurationChange(parseInt(value))}
-            disabled={disabled}
-          >
-            <SelectTrigger id={f.id} className="bg-ods-bg">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-ods-card">
-              <SelectItem value="60">1 minute</SelectItem>
-              <SelectItem value="120">2 minutes</SelectItem>
-              <SelectItem value="180">3 minutes (Recommended)</SelectItem>
-              <SelectItem value="240">4 minutes</SelectItem>
-              <SelectItem value="300">5 minutes</SelectItem>
-            </SelectContent>
-          </Select>
+            {f => (
+              <Select
+                value={targetDurationSeconds.toString()}
+                onValueChange={value => onTargetDurationChange(parseInt(value))}
+                disabled={disabled}
+              >
+                <SelectTrigger id={f.id} className="bg-ods-bg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-ods-card">
+                  <SelectItem value="60">1 minute</SelectItem>
+                  <SelectItem value="120">2 minutes</SelectItem>
+                  <SelectItem value="180">3 minutes (Recommended)</SelectItem>
+                  <SelectItem value="240">4 minutes</SelectItem>
+                  <SelectItem value="300">5 minutes</SelectItem>
+                </SelectContent>
+              </Select>
             )}
           </Field>
         </div>

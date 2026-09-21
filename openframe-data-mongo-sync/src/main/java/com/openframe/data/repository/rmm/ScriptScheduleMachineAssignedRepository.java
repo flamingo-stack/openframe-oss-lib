@@ -1,6 +1,6 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptMachineAssigned;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -8,20 +8,20 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Repository for {@link ScriptScheduleMachineAssigned} — the schedule &harr; machine
+ * Repository for {@link ScheduleScriptMachineAssigned} — the schedule &harr; machine
  * association documents, one per pair. All operations are tenant-scoped.
  */
 @Repository
 public interface ScriptScheduleMachineAssignedRepository
-        extends MongoRepository<ScriptScheduleMachineAssigned, String> {
+        extends MongoRepository<ScheduleScriptMachineAssigned, String> {
 
-    List<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
+    List<ScheduleScriptMachineAssigned> findByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
 
-    List<ScriptScheduleMachineAssigned> findByTenantIdAndScriptScheduleIdIn(String tenantId, Collection<String> scriptScheduleIds);
+    List<ScheduleScriptMachineAssigned> findByTenantIdAndScriptScheduleIdIn(String tenantId, Collection<String> scriptScheduleIds);
 
-    List<ScriptScheduleMachineAssigned> findByTenantIdAndMachineId(String tenantId, String machineId);
+    List<ScheduleScriptMachineAssigned> findByTenantIdAndMachineId(String tenantId, String machineId);
 
-    List<ScriptScheduleMachineAssigned> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds);
+    List<ScheduleScriptMachineAssigned> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds);
 
     long deleteByTenantIdAndScriptScheduleId(String tenantId, String scriptScheduleId);
 

@@ -16,6 +16,8 @@ pub use windows::execute_script;
 pub enum Privilege {
     Agent,
     User,
+    #[cfg(windows)]
+    ElevatedUser,
 }
 
 pub struct ScriptParams<'a> {

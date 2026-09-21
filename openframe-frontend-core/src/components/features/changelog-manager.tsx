@@ -1,9 +1,25 @@
-"use client";
+'use client';
 
-import { Button, Input, Textarea, Label } from '../ui';
 import { Trash2, Plus, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { ChangelogEntry } from '../../types/product-release';
+import {
+  Button,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusBadge,
+  Textarea,
+} from '../ui';
+
+export interface ChangelogTagOption {
+  value: string;
+  label: string;
+}
 
 interface ChangelogManagerProps {
   title: string;
@@ -18,6 +34,18 @@ interface ChangelogManagerProps {
    * — leave undefined for product releases so they keep their existing UX.
    */
   showVisibilityToggle?: boolean;
+  /**
+   * When given, each entry gets a tag select (stored as `entry.tag`) and its header
+   * shows the chosen tag as a badge. New entries start on the first option.
+   */
+  tagOptions?: readonly ChangelogTagOption[];
+  /** Label of the tag select. Default "Tag". */
+  tagLabel?: string;
+  /** Entry field labels and placeholders. Defaults are the product-release wording. */
+  titleLabel?: string;
+  titlePlaceholder?: string;
+  descriptionLabel?: string;
+  descriptionPlaceholder?: string;
 }
 
 export function ChangelogManager({
@@ -27,21 +55,42 @@ export function ChangelogManager({
   className = '',
   expandAll = false,
   showVisibilityToggle = false,
+  tagOptions,
+  tagLabel = 'Tag',
+  titleLabel = 'Title',
+  titlePlaceholder = 'e.g., New dark mode theme support',
+  descriptionLabel = 'Description',
+  descriptionPlaceholder = 'Detailed explanation of the change...',
 }: ChangelogManagerProps) {
-  const [expandedIndices, setExpandedIndices] = useState<Set<number>>(new Set());
+  const tagLabelOf = (value?: string) => tagOptions?.find(o => o.value === value)?.label;
+  const entryCount = entries.length;
+  const allExpanded = () => new Set(Array.from({ length: entryCount }, (_, i) => i));
 
-  // When expandAll changes to true and there are entries, expand all
-  useEffect(() => {
-    if (expandAll && entries.length > 0) {
-      setExpandedIndices(new Set(entries.map((_, i) => i)));
+  // Mounting already-expanded is a one-shot initial value, so it is a lazy
+  // `useState` initialiser rather than the first run of an effect.
+  const [expandedIndices, setExpandedIndices] = useState<Set<number>>(() =>
+    expandAll && entryCount > 0 ? allExpanded() : new Set(),
+  );
+
+  // When expandAll changes to true and there are entries, expand all — and
+  // likewise when enrichment appends entries while it is already true. Adjusted
+  // while rendering (React's prop-sync pattern): the prop flip has already
+  // scheduled this render, so expanding here shows the entries in it instead of
+  // painting them collapsed and re-rendering to open them.
+  const [expandSync, setExpandSync] = useState({ expandAll, entryCount });
+  if (expandSync.expandAll !== expandAll || expandSync.entryCount !== entryCount) {
+    setExpandSync({ expandAll, entryCount });
+    if (expandAll && entryCount > 0) {
+      setExpandedIndices(allExpanded());
     }
-  }, [expandAll, entries.length]);
+  }
 
   const addEntry = () => {
     const newEntry: ChangelogEntry = {
       title: '',
       description: '',
       ...(showVisibilityToggle && { visibility: 'public' as const }),
+      ...(tagOptions?.length && { tag: tagOptions[0].value }),
     };
     onChange([...entries, newEntry]);
     // Expand the newly added entry
@@ -89,9 +138,7 @@ export function ChangelogManager({
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="flex items-center justify-between">
-        <Label>
-          {title}
-        </Label>
+        <Label>{title}</Label>
         <Button
           type="button"
           variant="outline"
@@ -109,7 +156,7 @@ export function ChangelogManager({
         const hasContent = entry.title.trim().length > 0;
 
         return (
-          <div key={index} className="bg-ods-bg-surface rounded-lg border border-ods-border overflow-hidden">
+          <div key={index} className="overflow-hidden rounded-lg border border-ods-border bg-ods-bg-surface">
             {/* Header - always visible */}
             <div className="flex items-center gap-3 p-3">
               <Button
@@ -122,17 +169,22 @@ export function ChangelogManager({
                 {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </Button>
 
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 {hasContent ? (
-                  <p className="text-h6 text-ods-text-primary truncate">
-                    {entry.title}
-                  </p>
+                  <p className="truncate text-ods-text-primary text-h6">{entry.title}</p>
                 ) : (
-                  <p className="text-h6 text-ods-text-secondary italic">
-                    New entry (click to edit)
-                  </p>
+                  <p className="italic text-ods-text-secondary text-h6">New entry (click to edit)</p>
                 )}
               </div>
+
+              {tagOptions && tagLabelOf(entry.tag) && (
+                <StatusBadge
+                  variant="button"
+                  singleLine
+                  text={tagLabelOf(entry.tag) as string}
+                  className="shrink-0 whitespace-nowrap"
+                />
+              )}
 
               {showVisibilityToggle && (
                 <Button
@@ -141,11 +193,7 @@ export function ChangelogManager({
                   size="icon"
                   onClick={() => toggleVisibility(index)}
                   className="shrink-0"
-                  title={
-                    (entry.visibility ?? 'public') === 'public'
-                      ? 'Visible to investors'
-                      : 'Internal only'
-                  }
+                  title={(entry.visibility ?? 'public') === 'public' ? 'Visible to investors' : 'Internal only'}
                 >
                   {(entry.visibility ?? 'public') === 'public' ? (
                     <Eye className="h-4 w-4 text-ods-accent" />
@@ -160,7 +208,7 @@ export function ChangelogManager({
                 variant="transparent"
                 size="icon"
                 onClick={() => removeEntry(index)}
-                className="text-ods-error hover:text-ods-error-hover hover:bg-ods-error-secondary shrink-0"
+                className="shrink-0 text-ods-error hover:bg-ods-error-secondary hover:text-ods-error-hover"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -168,30 +216,49 @@ export function ChangelogManager({
 
             {/* Expanded content */}
             {isExpanded && (
-              <div className="px-3 pb-3 space-y-3 border-t border-ods-border pt-3">
+              <div className="space-y-3 border-t border-ods-border px-3 pb-3 pt-3">
                 {/* Title */}
                 <div className="space-y-1">
-                  <Label className="text-ods-text-secondary">Title *</Label>
+                  <Label className="text-ods-text-secondary">{titleLabel} *</Label>
                   <Input
-                    placeholder="e.g., New dark mode theme support"
+                    placeholder={titlePlaceholder}
                     value={entry.title}
-                    onChange={(e) => updateEntry(index, 'title', e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                    onChange={e => updateEntry(index, 'title', e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
                     className="bg-ods-bg"
                   />
                 </div>
 
                 {/* Description */}
                 <div className="space-y-1">
-                  <Label className="text-ods-text-secondary">Description</Label>
+                  <Label className="text-ods-text-secondary">{descriptionLabel}</Label>
                   <Textarea
-                    placeholder="Detailed explanation of the change..."
+                    placeholder={descriptionPlaceholder}
                     value={entry.description || ''}
-                    onChange={(e) => updateEntry(index, 'description', e.target.value)}
+                    onChange={e => updateEntry(index, 'description', e.target.value)}
                     rows={2}
                     className="bg-ods-bg"
                   />
                 </div>
+
+                {/* Tag */}
+                {tagOptions && (
+                  <div className="space-y-1">
+                    <Label className="text-ods-text-secondary">{tagLabel}</Label>
+                    <Select value={entry.tag ?? ''} onValueChange={value => updateEntry(index, 'tag', value)}>
+                      <SelectTrigger className="bg-ods-bg">
+                        <SelectValue placeholder={tagLabel} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tagOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -199,7 +266,7 @@ export function ChangelogManager({
       })}
 
       {entries.length === 0 && (
-        <div className="text-center py-4 px-4 bg-ods-bg-surface border border-ods-border rounded-lg">
+        <div className="rounded-lg border border-ods-border bg-ods-bg-surface px-4 py-4 text-center">
           <p className="text-ods-text-secondary text-h6">
             No entries added. Click "Add Entry" to create {title.toLowerCase()}.
           </p>

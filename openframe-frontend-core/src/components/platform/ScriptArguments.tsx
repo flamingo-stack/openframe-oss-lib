@@ -6,24 +6,24 @@
  * Includes an "Add Script Argument" button to add new entries.
  */
 
-import { Trash2 } from 'lucide-react'
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Label } from '../ui/label'
-import { PlusCircleIcon } from '../icons-v2-generated'
+import { Trash2 } from 'lucide-react';
+import type React from 'react';
+import { cn } from '../../utils/cn';
+import { PlusCircleIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 /**
  * Single script argument with key and value
  */
 export interface ScriptArgument {
   /** Unique identifier for the argument */
-  id: string
+  id: string;
   /** Argument name/key */
-  key: string
+  key: string;
   /** Argument value (empty string for flag-type arguments) */
-  value: string
+  value: string;
 }
 
 /**
@@ -31,21 +31,21 @@ export interface ScriptArgument {
  */
 export interface ScriptArgumentsProps {
   /** Array of script arguments */
-  arguments: ScriptArgument[]
+  arguments: ScriptArgument[];
   /** Callback when arguments change */
-  onArgumentsChange?: (args: ScriptArgument[]) => void
+  onArgumentsChange?: (args: ScriptArgument[]) => void;
   /** Placeholder for key input */
-  keyPlaceholder?: string
+  keyPlaceholder?: string;
   /** Placeholder for value input */
-  valuePlaceholder?: string
+  valuePlaceholder?: string;
   /** Label for the add button */
-  addButtonLabel?: string
+  addButtonLabel?: string;
   /** Whether the component is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Additional CSS classes */
-  className?: string
+  className?: string;
   /** Label for the title input */
-  titleLabel: string
+  titleLabel: string;
 }
 
 /**
@@ -70,57 +70,48 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
   addButtonLabel = 'Add Script Argument',
   disabled = false,
   className,
-  titleLabel
+  titleLabel,
 }) => {
   const handleKeyChange = (id: string, newKey: string) => {
-    if (!onArgumentsChange) return
-    const updated = args.map((arg) =>
-      arg.id === id ? { ...arg, key: newKey } : arg
-    )
-    onArgumentsChange(updated)
-  }
+    if (!onArgumentsChange) return;
+    const updated = args.map(arg => (arg.id === id ? { ...arg, key: newKey } : arg));
+    onArgumentsChange(updated);
+  };
 
   const handleValueChange = (id: string, newValue: string) => {
-    if (!onArgumentsChange) return
-    const updated = args.map((arg) =>
-      arg.id === id ? { ...arg, value: newValue } : arg
-    )
-    onArgumentsChange(updated)
-  }
+    if (!onArgumentsChange) return;
+    const updated = args.map(arg => (arg.id === id ? { ...arg, value: newValue } : arg));
+    onArgumentsChange(updated);
+  };
 
   const handleDelete = (id: string) => {
-    if (!onArgumentsChange) return
-    const updated = args.filter((arg) => arg.id !== id)
-    onArgumentsChange(updated)
-  }
+    if (!onArgumentsChange) return;
+    const updated = args.filter(arg => arg.id !== id);
+    onArgumentsChange(updated);
+  };
 
   const handleAdd = () => {
-    if (!onArgumentsChange) return
+    if (!onArgumentsChange) return;
     const newArg: ScriptArgument = {
       id: crypto.randomUUID(),
       key: '',
-      value: ''
-    }
-    onArgumentsChange([...args, newArg])
-  }
+      value: '',
+    };
+    onArgumentsChange([...args, newArg]);
+  };
 
-  const isFirstRow = (index: number) => index === 0
+  const isFirstRow = (index: number) => index === 0;
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       {args.map((arg, index) => (
-        <div
-          key={arg.id}
-          className="flex gap-2 items-end w-full"
-        >
+        <div key={arg.id} className="flex w-full items-end gap-2">
           {/* Key input - with label only on first row */}
-          <div className="flex flex-1 flex-col gap-1 min-w-0">
-            {isFirstRow(index) && (
-              <Label spacing="tight">{titleLabel}</Label>
-            )}
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {isFirstRow(index) && <Label spacing="tight">{titleLabel}</Label>}
             <Input
               value={arg.key}
-              onChange={(e) => handleKeyChange(arg.id, e.target.value)}
+              onChange={e => handleKeyChange(arg.id, e.target.value)}
               placeholder={keyPlaceholder}
               disabled={disabled}
             />
@@ -128,16 +119,14 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
 
           {/* Value input with delete button */}
           {/* Value input with delete button */}
-          <div className="flex flex-1 gap-2 items-center min-w-0">
-            <div className="flex flex-1 flex-col gap-1 min-w-0">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
               <Input
                 value={arg.value}
-                onChange={(e) => handleValueChange(arg.id, e.target.value)}
+                onChange={e => handleValueChange(arg.id, e.target.value)}
                 placeholder={valuePlaceholder}
                 disabled={disabled}
-                className={cn(
-                  !arg.value && 'placeholder:text-ods-text-muted'
-                )}
+                className={cn(!arg.value && 'placeholder:text-ods-text-muted')}
               />
             </div>
             <Button
@@ -147,7 +136,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
               onClick={() => handleDelete(arg.id)}
               disabled={disabled}
               aria-label="Delete argument"
-              leftIcon={<Trash2 className="size-4 md:size-6 " color="var(--color-error)" />}
+              leftIcon={<Trash2 className="size-4 md:size-6" color="var(--color-error)" />}
             />
           </div>
         </div>
@@ -168,7 +157,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-ScriptArguments.displayName = 'ScriptArguments'
+ScriptArguments.displayName = 'ScriptArguments';

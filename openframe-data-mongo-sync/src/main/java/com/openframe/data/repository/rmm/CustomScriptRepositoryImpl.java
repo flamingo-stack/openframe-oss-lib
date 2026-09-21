@@ -1,8 +1,9 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +58,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_CREATED_BY = "createdBy";
+    private static final String FIELD_TYPE = "type";
 
     // tag_assignments fields used to resolve the tagIds filter into script ids.
     private static final String FIELD_TA_TAG_ID = "tagId";
@@ -103,6 +105,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
      */
     private Criteria buildBaseCriteria(String tenantId, ScriptQueryFilter filter, String search) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        applyManagedScriptShield(criteria);
         applyStatusFilter(criteria, filter);
         applyShellsFilter(criteria, filter);
         applyPlatformsFilter(criteria, filter);
@@ -135,6 +138,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
      */
     private Criteria facetCriteria(String tenantId, ScriptQueryFilter filter, String excludeField) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
+        applyManagedScriptShield(criteria);
         applyStatusFilter(criteria, filter);
         if (!FIELD_SHELL.equals(excludeField)) {
             applyShellsFilter(criteria, filter);
@@ -179,6 +183,10 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     @Override
     public String getDefaultSortField() {
         return FIELD_ID;
+    }
+
+    private static void applyManagedScriptShield(Criteria criteria) {
+        criteria.and(FIELD_TYPE).nin(ScriptType.SYSTEM, ScriptType.SOFTWARE);
     }
 
     private static void applyStatusFilter(Criteria criteria, ScriptQueryFilter filter) {

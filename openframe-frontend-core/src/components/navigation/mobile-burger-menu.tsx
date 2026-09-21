@@ -1,45 +1,45 @@
-"use client"
+'use client';
 
-import React, { useCallback, useRef } from 'react'
-import { usePreventScroll } from '@react-aria/overlays'
-import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
-import { cn } from '../../utils'
-import { useFocusTrap } from '../../hooks/ui/use-focus-trap'
-import { Logout02Icon, PenEditIcon, UserSearchIcon } from '../icons-v2-generated'
-import { Button, SquareAvatar } from '../ui'
-import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer'
+import { usePreventScroll } from '@react-aria/overlays';
+import React, { useCallback, useRef } from 'react';
+import { useFocusTrap } from '../../hooks/ui/use-focus-trap';
+import type { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation';
+import { cn } from '../../utils';
+import { Logout02Icon, PenEditIcon, UserSearchIcon } from '../icons-v2-generated';
+import { Button, SquareAvatar } from '../ui';
+import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer';
 
 // Header height constant — the unified top-navigation `small` bar (56px on all screens)
-const HEADER_HEIGHT = 56
+const HEADER_HEIGHT = 56;
 
 export interface MobileBurgerMenuProps {
   /** Whether the menu is open */
-  isOpen: boolean
+  isOpen: boolean;
   /** Callback to close the menu */
-  onClose: () => void
+  onClose: () => void;
   /** Sidebar configuration */
-  config: NavigationSidebarConfig
+  config: NavigationSidebarConfig;
   /** User info for the header card */
   user?: {
-    userName?: string
-    userEmail?: string
-    userAvatarUrl?: string | null
-    userRole?: string
-  }
+    userName?: string;
+    userEmail?: string;
+    userAvatarUrl?: string | null;
+    userRole?: string;
+  };
   /** Callback when search user button is clicked */
-  onSearchUser?: () => void
+  onSearchUser?: () => void;
   /** Callback when edit profile button is clicked */
-  onEditProfile?: () => void
+  onEditProfile?: () => void;
   /** Callback when logout button is clicked */
-  onLogout?: () => void
+  onLogout?: () => void;
   /**
    * When true, all interactive items inside the menu (nav items, action buttons,
    * logout) are disabled. The burger toggle and backdrop click to close still work.
    */
-  disabled?: boolean
+  disabled?: boolean;
 }
 
-export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
+export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
   isOpen,
   onClose,
   config,
@@ -49,28 +49,31 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
   onLogout,
   disabled = false,
 }: MobileBurgerMenuProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Shared ref-counted, iOS-aware scroll lock (react-aria) while open.
-  usePreventScroll({ isDisabled: !isOpen })
+  usePreventScroll({ isDisabled: !isOpen });
   // Initial focus, Tab containment, Escape-to-close, guarded focus restore.
-  useFocusTrap(panelRef, isOpen, { onEscape: onClose })
+  useFocusTrap(panelRef, isOpen, { onEscape: onClose });
 
-  const handleItemClick = useCallback((item: NavigationSidebarItem) => {
-    if (item.onClick) {
-      item.onClick()
-    } else if (item.path) {
-      config.onNavigate?.(item.path)
-    }
-    onClose()
-  }, [config, onClose])
+  const handleItemClick = useCallback(
+    (item: NavigationSidebarItem) => {
+      if (item.onClick) {
+        item.onClick();
+      } else if (item.path) {
+        config.onNavigate?.(item.path);
+      }
+      onClose();
+    },
+    [config, onClose],
+  );
 
   // Separate primary and secondary items
-  const primaryItems = config.items.filter(item => item.section !== 'secondary')
-  const secondaryItems = config.items.filter(item => item.section === 'secondary')
+  const primaryItems = config.items.filter(item => item.section !== 'secondary');
+  const secondaryItems = config.items.filter(item => item.section === 'secondary');
 
   const renderNavigationItem = (item: NavigationSidebarItem, isGridItem = false) => {
-    const isActive = item.isActive ?? false
+    const isActive = item.isActive ?? false;
 
     return (
       <button
@@ -78,52 +81,52 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         onClick={() => handleItemClick(item)}
         disabled={disabled}
         className={cn(
-          "flex items-center gap-1 p-3 relative",
-          "focus:outline-none focus-visible:outline-none",
-          "transition-colors duration-200",
-          "bg-ods-card border border-ods-border rounded-md",
-          !disabled && "hover:bg-ods-bg-hover",
-          isGridItem ? "w-full min-w-0" : "w-full",
+          'relative flex items-center gap-1 p-3',
+          'focus:outline-none focus-visible:outline-none',
+          'transition-colors duration-200',
+          'rounded-md border border-ods-border bg-ods-card',
+          !disabled && 'hover:bg-ods-bg-hover',
+          isGridItem ? 'w-full min-w-0' : 'w-full',
           // Active state
-          isActive && !disabled && "border-ods-accent",
+          isActive && !disabled && 'border-ods-accent',
           // Disabled state
-          disabled && "cursor-not-allowed opacity-50"
+          disabled && 'cursor-not-allowed opacity-50',
         )}
         aria-current={isActive ? 'page' : undefined}
       >
         {/* Icon */}
         {item.icon && (
-          <div className="flex-shrink-0 size-4 flex items-center justify-center">
-            {React.cloneElement(item.icon as React.ReactElement<any>, {
+          <div className="flex size-4 flex-shrink-0 items-center justify-center">
+            {React.cloneElement(item.icon as React.ReactElement<{ size?: number; color?: string }>, {
               size: 16,
-              color: isActive && !disabled ? "var(--color-accent-primary)" : "var(--color-text-secondary)"
+              color: isActive && !disabled ? 'var(--color-accent-primary)' : 'var(--color-text-secondary)',
             })}
           </div>
         )}
 
         {/* Label */}
-        <span className={cn(
-          "text-h6 flex-1 text-left truncate",
-          isActive && !disabled ? "text-ods-accent" : "text-ods-text-primary"
-        )}>
+        <span
+          className={cn(
+            'flex-1 truncate text-left text-h6',
+            isActive && !disabled ? 'text-ods-accent' : 'text-ods-text-primary',
+          )}
+        >
           {item.label}
         </span>
       </button>
-    )
-  }
+    );
+  };
 
   // Render grid of navigation items (2 columns). CSS grid keeps a lone last-row
   // item exactly one column wide (aligned with the column above) instead of
   // stretching to fill the row.
   const renderNavigationGrid = (items: NavigationSidebarItem[]) => (
     <div className="grid grid-cols-2 gap-3">
-      {items.map((item) => (
-        <React.Fragment key={item.id}>
-          {renderNavigationItem(item, true)}
-        </React.Fragment>
+      {items.map(item => (
+        <React.Fragment key={item.id}>{renderNavigationItem(item, true)}</React.Fragment>
       ))}
     </div>
-  )
+  );
 
   return (
     <>
@@ -135,10 +138,10 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
           row fills the viewport, so this is identical to the previous behavior. */}
       <div
         className={cn(
-          "absolute inset-0 z-[100] md:hidden",
+          'absolute inset-0 z-[100] md:hidden',
           OVERLAY_BACKDROP_CLASS,
-          "transition-all duration-300 motion-reduce:transition-none",
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          'transition-all duration-300 motion-reduce:transition-none',
+          isOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         style={{ top: HEADER_HEIGHT }}
         onClick={onClose}
@@ -150,14 +153,12 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
       <div
         ref={panelRef}
         className={cn(
-          "absolute left-0 right-0 z-[101] md:hidden",
-          "flex flex-col",
-          "bg-ods-bg border-b border-ods-border",
-          "transition-all duration-300 ease-out motion-reduce:transition-none",
-          "overflow-hidden",
-          isOpen
-            ? "opacity-100 translate-y-0"
-            : "opacity-0 -translate-y-4 pointer-events-none"
+          'absolute left-0 right-0 z-[101] md:hidden',
+          'flex flex-col',
+          'border-b border-ods-border bg-ods-bg',
+          'transition-all duration-300 ease-out motion-reduce:transition-none',
+          'overflow-hidden',
+          isOpen ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-4 opacity-0',
         )}
         style={{
           top: HEADER_HEIGHT,
@@ -172,13 +173,13 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
         inert={!isOpen || undefined}
       >
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 flex flex-col gap-4">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden overscroll-contain p-4">
           {/* User Card */}
           {user && (
             <div
               className={cn(
-                "flex items-center gap-3 p-3 bg-ods-card border border-ods-border rounded-md",
-                disabled && "pointer-events-none opacity-50"
+                'flex items-center gap-3 rounded-md border border-ods-border bg-ods-card p-3',
+                disabled && 'pointer-events-none opacity-50',
               )}
               aria-disabled={disabled || undefined}
             >
@@ -188,47 +189,31 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
                 fallback={user.userName}
                 size="lg"
                 variant="round"
-                className="w-14 h-14 shrink-0"
+                className="h-14 w-14 shrink-0"
               />
 
               {/* User Info */}
-              <div className="flex-1 min-w-0 flex flex-col">
+              <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center gap-2">
-                  <span className="text-h6 text-ods-text-primary truncate">
-                    {user.userName || 'User'}
-                  </span>
+                  <span className="truncate text-ods-text-primary text-h6">{user.userName || 'User'}</span>
                   {user.userRole && (
-                    <span className="shrink-0 px-2 py-0.5 bg-ods-card border border-ods-border rounded-md text-h6 uppercase text-ods-text-primary">
+                    <span className="shrink-0 rounded-md border border-ods-border bg-ods-card px-2 py-0.5 uppercase text-ods-text-primary text-h6">
                       {user.userRole}
                     </span>
                   )}
                 </div>
-                {user.userEmail && (
-                  <span className="text-h6 text-ods-text-secondary truncate">
-                    {user.userEmail}
-                  </span>
-                )}
+                {user.userEmail && <span className="truncate text-ods-text-secondary text-h6">{user.userEmail}</span>}
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
                 {onSearchUser && (
-                  <Button
-                    size="icon"
-                    onClick={onSearchUser}
-                    variant="outline"
-                    aria-label="Search users"
-                  >
+                  <Button size="icon" onClick={onSearchUser} variant="outline" aria-label="Search users">
                     <UserSearchIcon className="size-4 text-ods-text-primary" />
                   </Button>
                 )}
                 {onEditProfile && (
-                  <Button
-                    size="icon"
-                    onClick={onEditProfile}
-                    variant="outline"
-                    aria-label="Edit profile"
-                  >
+                  <Button size="icon" onClick={onEditProfile} variant="outline" aria-label="Edit profile">
                     <PenEditIcon className="size-4 text-ods-text-primary" />
                   </Button>
                 )}
@@ -242,17 +227,13 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
           {config.topSlot?.({ minimized: false })}
 
           {/* Primary Navigation Items - Grid Layout */}
-          <nav aria-label="Primary navigation">
-            {renderNavigationGrid(primaryItems)}
-          </nav>
+          <nav aria-label="Primary navigation">{renderNavigationGrid(primaryItems)}</nav>
 
           {/* Secondary Navigation Items - Full Width */}
           {secondaryItems.length > 0 && (
             <nav aria-label="Secondary navigation" className="flex flex-col gap-3">
-              {secondaryItems.map((item) => (
-                <React.Fragment key={item.id}>
-                  {renderNavigationItem(item, false)}
-                </React.Fragment>
+              {secondaryItems.map(item => (
+                <React.Fragment key={item.id}>{renderNavigationItem(item, false)}</React.Fragment>
               ))}
             </nav>
           )}
@@ -263,20 +244,17 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenu({
               onClick={onLogout}
               disabled={disabled}
               className={cn(
-                "w-full flex items-center gap-1 p-3 bg-ods-card border border-ods-border rounded-md transition-colors",
-                !disabled && "hover:bg-ods-bg-hover",
-                disabled && "cursor-not-allowed opacity-50"
+                'flex w-full items-center gap-1 rounded-md border border-ods-border bg-ods-card p-3 transition-colors',
+                !disabled && 'hover:bg-ods-bg-hover',
+                disabled && 'cursor-not-allowed opacity-50',
               )}
             >
               <Logout02Icon className="size-4 text-ods-error" />
-              <span className="text-h6 flex-1 text-left text-ods-text-primary">
-                Log Out
-              </span>
+              <span className="flex-1 text-left text-ods-text-primary text-h6">Log Out</span>
             </button>
           )}
         </div>
-
       </div>
     </>
-  )
-})
+  );
+});

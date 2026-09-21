@@ -1,6 +1,6 @@
 /**
  * createDeltaBatcher — framework-free, append-only batching of the
- * `text-delta` / `thinking-delta` / `guide-delta` events.
+ * `text-delta` / `thinking-delta` events.
  *
  * WHY THIS IS SHARED (and not a hook-private detail): every host that drives a
  * `ChatStreamReducer` from a raw transport needs the SAME batching, and a
@@ -23,32 +23,23 @@
  *     deltas never land on the wrong dialog/side.
  */
 
-import type {
-  ChatStreamEvent,
-  GuideDeltaEvent,
-  TextDeltaEvent,
-  ThinkingDeltaEvent,
-} from '../../../chat-protocol/events'
+import type { ChatStreamEvent, TextDeltaEvent, ThinkingDeltaEvent } from '../../../chat-protocol/events';
 
-export const DELTA_FLUSH_FALLBACK_MS = 50
+export const DELTA_FLUSH_FALLBACK_MS = 50;
 
-export type DeltaEvent = TextDeltaEvent | ThinkingDeltaEvent | GuideDeltaEvent
+export type DeltaEvent = TextDeltaEvent | ThinkingDeltaEvent;
 
 export function isDeltaEvent(event: ChatStreamEvent): event is DeltaEvent {
-  return (
-    event.type === 'text-delta' ||
-    event.type === 'thinking-delta' ||
-    event.type === 'guide-delta'
-  )
+  return event.type === 'text-delta' || event.type === 'thinking-delta';
 }
 
 export interface CreateDeltaBatcherOptions<K> {
   /** Apply one (possibly coalesced) delta against `key`'s reducer. */
-  applyOne: (event: DeltaEvent, key: K | undefined) => void
+  applyOne: (event: DeltaEvent, key: K | undefined) => void;
   /** Called after a flush that applied at least one delta. */
-  onFlushed?: (appliedCount: number) => void
+  onFlushed?: (appliedCount: number) => void;
   /** Timer fallback in ms (default `DELTA_FLUSH_FALLBACK_MS`). */
-  fallbackMs?: number
+  fallbackMs?: number;
 }
 
 export interface DeltaBatcher<K = unknown> {
@@ -56,13 +47,13 @@ export interface DeltaBatcher<K = unknown> {
    * Queue `event` when it is a delta (returns true). Non-delta events are NOT
    * queued and return false — the caller flushes and applies them itself.
    */
-  push(event: ChatStreamEvent, key?: K): boolean
+  push(event: ChatStreamEvent, key?: K): boolean;
   /** Synchronously apply the pending batch and cancel any scheduled flush. */
-  flush(): void
+  flush(): void;
   /** Flush and release timers — call on teardown so tail deltas aren't lost. */
-  dispose(): void
+  dispose(): void;
   /** Queued (post-coalescing) delta count. Test/diagnostic surface. */
-  readonly pendingCount: number
+  readonly pendingCount: number;
 }
 
 export function createDeltaBatcher<K = unknown>({
@@ -70,46 +61,46 @@ export function createDeltaBatcher<K = unknown>({
   onFlushed,
   fallbackMs = DELTA_FLUSH_FALLBACK_MS,
 }: CreateDeltaBatcherOptions<K>): DeltaBatcher<K> {
-  let pending: DeltaEvent[] = []
-  let pendingKey: K | undefined
-  let hasKey = false
-  let raf: number | null = null
-  let timer: ReturnType<typeof setTimeout> | null = null
+  let pending: DeltaEvent[] = [];
+  let pendingKey: K | undefined;
+  let hasKey = false;
+  let raf: number | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
   function cancelScheduled(): void {
     if (raf !== null) {
-      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf)
-      raf = null
+      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
+      raf = null;
     }
     if (timer !== null) {
-      clearTimeout(timer)
-      timer = null
+      clearTimeout(timer);
+      timer = null;
     }
   }
 
   function flush(): void {
-    cancelScheduled()
-    if (pending.length === 0) return
-    const batch = pending
-    pending = []
-    const key = pendingKey
-    for (const delta of batch) applyOne(delta, key)
-    onFlushed?.(batch.length)
+    cancelScheduled();
+    if (pending.length === 0) return;
+    const batch = pending;
+    pending = [];
+    const key = pendingKey;
+    for (const delta of batch) applyOne(delta, key);
+    onFlushed?.(batch.length);
   }
 
   function schedule(): void {
-    if (raf !== null || timer !== null) return
+    if (raf !== null || timer !== null) return;
     if (typeof requestAnimationFrame === 'function') {
       raf = requestAnimationFrame(() => {
-        raf = null
-        flush()
-      })
+        raf = null;
+        flush();
+      });
     }
     // Timer fallback ALWAYS armed: rAF pauses in background tabs.
     timer = setTimeout(() => {
-      timer = null
-      flush()
-    }, fallbackMs)
+      timer = null;
+      flush();
+    }, fallbackMs);
   }
 
   return {
@@ -117,12 +108,12 @@ export function createDeltaBatcher<K = unknown>({
       // A pending batch belonging to a previous key must land on ITS reducer
       // before we start queueing for the new one.
       if (!hasKey || !Object.is(pendingKey, key)) {
-        flush()
-        pendingKey = key
-        hasKey = true
+        flush();
+        pendingKey = key;
+        hasKey = true;
       }
-      if (!isDeltaEvent(event)) return false
-      const tail = pending[pending.length - 1]
+      if (!isDeltaEvent(event)) return false;
+      const tail = pending[pending.length - 1];
       // NEVER coalesce a delta whose seq does not ADVANCE past the tail's.
       // Coalescing stamps the merged entry with the LAST pushed seq, so a
       // redelivered / out-of-order delta arriving inside one frame would both
@@ -136,33 +127,31 @@ export function createDeltaBatcher<K = unknown>({
       // then treats as the batch's position — a redelivered delta could rewind
       // it. Coalesce onto a seq-less tail only when the incoming delta is
       // likewise seq-less (a uniformly seq-less stream, e.g. SSE).
-      const seqAdvances =
-        tail?.seq == null ? event.seq == null : event.seq != null && event.seq > tail.seq
+      const seqAdvances = tail?.seq == null ? event.seq == null : event.seq != null && event.seq > tail.seq;
       if (
         tail &&
         seqAdvances &&
         tail.type === event.type &&
-        (tail.type !== 'text-delta' ||
-          (tail as TextDeltaEvent).leading === (event as TextDeltaEvent).leading)
+        (tail.type !== 'text-delta' || tail.leading === (event as TextDeltaEvent).leading)
       ) {
         pending[pending.length - 1] = {
           ...tail,
           text: tail.text + event.text,
           ...(event.seq != null ? { seq: event.seq } : {}),
-        } as DeltaEvent
+        };
       } else {
-        pending.push({ ...event })
+        pending.push({ ...event });
       }
-      schedule()
-      return true
+      schedule();
+      return true;
     },
     flush,
     dispose() {
-      flush()
-      cancelScheduled()
+      flush();
+      cancelScheduled();
     },
     get pendingCount() {
-      return pending.length
+      return pending.length;
     },
-  }
+  };
 }

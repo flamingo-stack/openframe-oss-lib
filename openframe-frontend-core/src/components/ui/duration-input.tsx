@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { Fragment, type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { cn } from "../../utils/cn";
+import { Fragment, type KeyboardEvent, useRef, useState, type ChangeEvent } from 'react';
+import { cn } from '../../utils/cn';
 
 export interface DurationInputProps {
   /** Duration as `HH:MM:SS`. */
@@ -14,16 +14,16 @@ export interface DurationInputProps {
 type Segments = [string, string, string];
 
 const SEGMENT_META = [
-  { label: "Hours", placeholder: "HH", max: 99 },
-  { label: "Minutes", placeholder: "MM", max: 59 },
-  { label: "Seconds", placeholder: "SS", max: 59 },
+  { label: 'Hours', placeholder: 'HH', max: 99 },
+  { label: 'Minutes', placeholder: 'MM', max: 59 },
+  { label: 'Seconds', placeholder: 'SS', max: 59 },
 ] as const;
 
-const pad2 = (s: string): string => s.padStart(2, "0").slice(-2);
+const pad2 = (s: string): string => s.padStart(2, '0').slice(-2);
 const compose = (s: Segments): string => `${pad2(s[0])}:${pad2(s[1])}:${pad2(s[2])}`;
 const split = (value: string): Segments => {
-  const parts = value.split(":");
-  return [parts[0] || "00", parts[1] || "00", parts[2] || "00"];
+  const parts = value.split(':');
+  return [parts[0] || '00', parts[1] || '00', parts[2] || '00'];
 };
 
 /**
@@ -36,9 +36,17 @@ export function DurationInput({ value, onChange, invalid, className }: DurationI
   const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
 
   // Adopt an externally-set value (edit pre-fill / form reset) without clobbering in-progress typing.
-  useEffect(() => {
-    setSegments((prev) => (compose(prev) === value ? prev : split(value)));
-  }, [value]);
+  // Adjusted while rendering (React's documented prop-sync pattern), not from an
+  // effect: the segments ARE what this render draws, so an effect painted the
+  // old duration once and replaced it on the next pass. Edge-triggered on the
+  // prop rather than comparing `compose(segments)` to `value` on every render —
+  // an uncontrolled caller that ignores `onChange` would never converge, and
+  // that comparison would then re-set state forever.
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (syncedValue !== value) {
+    setSyncedValue(value);
+    setSegments(prev => (compose(prev) === value ? prev : split(value)));
+  }
 
   const focusSegment = (i: number) => {
     const el = refs[i]?.current;
@@ -53,8 +61,8 @@ export function DurationInput({ value, onChange, invalid, className }: DurationI
     if (advanceFrom !== undefined && advanceFrom < 2) focusSegment(advanceFrom + 1);
   };
 
-  const handleChange = (i: number) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = event.target.value.replace(/\D/g, "").slice(-2);
+  const handleChange = (i: number) => (event: ChangeEvent<HTMLInputElement>) => {
+    const digits = event.target.value.replace(/\D/g, '').slice(-2);
     const { max } = SEGMENT_META[i];
     const next = [...segments] as Segments;
 
@@ -75,24 +83,24 @@ export function DurationInput({ value, onChange, invalid, className }: DurationI
     const el = event.currentTarget;
     const { max } = SEGMENT_META[i];
 
-    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
       event.preventDefault();
-      const delta = event.key === "ArrowUp" ? 1 : -1;
-      const nextValue = (Number(segments[i] || "0") + delta + (max + 1)) % (max + 1);
+      const delta = event.key === 'ArrowUp' ? 1 : -1;
+      const nextValue = (Number(segments[i] || '0') + delta + (max + 1)) % (max + 1);
       const next = [...segments] as Segments;
       next[i] = String(nextValue);
       commit(next);
       requestAnimationFrame(() => el.select());
-    } else if (event.key === "ArrowLeft" && el.selectionStart === 0 && i > 0) {
+    } else if (event.key === 'ArrowLeft' && el.selectionStart === 0 && i > 0) {
       event.preventDefault();
       focusSegment(i - 1);
-    } else if (event.key === "ArrowRight" && el.selectionEnd === el.value.length && i < 2) {
+    } else if (event.key === 'ArrowRight' && el.selectionEnd === el.value.length && i < 2) {
       event.preventDefault();
       focusSegment(i + 1);
-    } else if (event.key === "Backspace" && el.value === "" && i > 0) {
+    } else if (event.key === 'Backspace' && el.value === '' && i > 0) {
       event.preventDefault();
       focusSegment(i - 1);
-    } else if (event.key === ":" && i < 2) {
+    } else if (event.key === ':' && i < 2) {
       event.preventDefault();
       focusSegment(i + 1);
     }
@@ -100,16 +108,16 @@ export function DurationInput({ value, onChange, invalid, className }: DurationI
 
   return (
     <div
-      onMouseDown={(event) => {
+      onMouseDown={event => {
         if (event.target === event.currentTarget) {
           event.preventDefault();
           focusSegment(0);
         }
       }}
       className={cn(
-        "flex h-11 w-full items-center gap-[var(--spacing-system-xxs)] rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-sf)] transition-colors duration-200 md:h-12",
-        "cursor-text focus-within:border-ods-accent",
-        invalid && "border-ods-error focus-within:border-ods-error",
+        'flex h-11 w-full items-center gap-[var(--spacing-system-xxs)] rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-sf)] transition-colors duration-200 md:h-12',
+        'cursor-text focus-within:border-ods-accent',
+        invalid && 'border-ods-error focus-within:border-ods-error',
         className,
       )}
     >
@@ -123,9 +131,9 @@ export function DurationInput({ value, onChange, invalid, className }: DurationI
             value={segments[i]}
             onChange={handleChange(i)}
             onKeyDown={handleKeyDown(i)}
-            onFocus={(event) => event.currentTarget.select()}
+            onFocus={event => event.currentTarget.select()}
             onBlur={() =>
-              setSegments((prev) => {
+              setSegments(prev => {
                 const padded = [...prev] as Segments;
                 padded[i] = pad2(prev[i]);
                 return padded;
@@ -133,7 +141,7 @@ export function DurationInput({ value, onChange, invalid, className }: DurationI
             }
             placeholder={meta.placeholder}
             aria-label={meta.label}
-            className="rounded-sm bg-transparent text-center !font-mono text-h4 tabular-nums text-ods-text-primary outline-none placeholder:text-ods-text-secondary focus:bg-ods-bg-hover"
+            className="rounded-sm bg-transparent text-center !font-mono tabular-nums text-ods-text-primary outline-none text-h4 placeholder:text-ods-text-secondary focus:bg-ods-bg-hover"
           />
         </Fragment>
       ))}

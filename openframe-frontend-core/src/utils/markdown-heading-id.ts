@@ -14,12 +14,11 @@
  */
 
 /** Emoji ranges stripped from heading text before slugification. */
-export const HEADING_EMOJI_RE =
-  /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu
+export const HEADING_EMOJI_RE = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu;
 
 /** Remove emoji characters and trim. */
 export function stripHeadingEmojis(text: string): string {
-  return text.replace(HEADING_EMOJI_RE, '').trim()
+  return text.replace(HEADING_EMOJI_RE, '').trim();
 }
 
 /**
@@ -35,12 +34,12 @@ export function slugifyHeadingBase(text: string): string {
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')
     .replace(/\s+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/^-+|-+$/g, '');
 }
 
 /** The full default chain used by the renderers: emoji strip + slugify. */
 export function slugifyHeadingText(text: string): string {
-  return slugifyHeadingBase(stripHeadingEmojis(text))
+  return slugifyHeadingBase(stripHeadingEmojis(text));
 }
 
 // ---------------------------------------------------------------------------
@@ -69,21 +68,16 @@ export function slugifyHeadingText(text: string): string {
 // streaming renderer imported its fence state from a module named after
 // heading slugs. It now lives in `./markdown-fences`; re-exported here so the
 // public `utils` surface (and every existing import) is unchanged.
-export {
-  createFenceTracker,
-  isBlankLine,
-  type FenceTracker,
-  type FenceLineRole,
-} from './markdown-fences'
-import { createFenceTracker, isBlankLine } from './markdown-fences'
+export { createFenceTracker, isBlankLine, type FenceTracker, type FenceLineRole } from './markdown-fences';
+import { createFenceTracker, isBlankLine } from './markdown-fences';
 
 /** A heading the renderer will emit, located in the source. */
 export interface ScannedHeading {
   /** 1-based line of the heading's FIRST line (setext: the title line). */
-  line: number
-  level: number
+  line: number;
+  level: number;
   /** Raw title text, before `stripInlineMarkdown` / slugification. */
-  text: string
+  text: string;
 }
 
 export interface ScanHeadingsOptions {
@@ -94,14 +88,14 @@ export interface ScanHeadingsOptions {
    * frontmatter toggle (what the extractor used to do) silently swallowed
    * every heading until the next one.
    */
-  skipFrontmatter?: boolean
+  skipFrontmatter?: boolean;
   /** Include raw-HTML headings (`<h2>Title</h2>`). Default true. */
-  includeRawHtml?: boolean
+  includeRawHtml?: boolean;
   /**
    * Skip fenced-code blocks. Default true — a `##` inside a code fence is
    * code, not a heading, and the renderer emits no id for it.
    */
-  skipFences?: boolean
+  skipFences?: boolean;
 }
 
 /**
@@ -123,16 +117,16 @@ export interface ScanHeadingsOptions {
  * rewritten source.
  */
 /** CommonMark ATX heading (closing `#` run is not part of the title). */
-const ATX_HEADING_RE = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*\r?$/
+const ATX_HEADING_RE = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*\r?$/;
 /** ATX with no title at all (`###`, `## ###`) — still a heading, empty text. */
-const ATX_EMPTY_RE = /^ {0,3}(#{1,6})[ \t]*#*[ \t]*\r?$/
+const ATX_EMPTY_RE = /^ {0,3}(#{1,6})[ \t]*#*[ \t]*\r?$/;
 /**
  * Raw-HTML heading (`<h2 id="x">Title</h2>`) — rehype-raw renders these too.
  * GLOBAL: two `<h3>`s on one line are two headings, and a non-global scan
  * silently dropped the second (it then fell through to the renderer's
  * suffix-free fallback and emitted a DUPLICATE DOM id).
  */
-const RAW_HEADING_RE = /<h([1-6])\b[^>]*>([\s\S]*?)(?:<\/h\1>|$)/gi
+const RAW_HEADING_RE = /<h([1-6])\b[^>]*>([\s\S]*?)(?:<\/h\1>|$)/gi;
 /**
  * Blockquote markers and list-item markers preceding an ATX heading
  * (`> ## Setup`, `- ## Setup`, `1. ## Setup`). mdast emits a REAL `<h2>` for
@@ -140,17 +134,17 @@ const RAW_HEADING_RE = /<h([1-6])\b[^>]*>([\s\S]*?)(?:<\/h\1>|$)/gi
  * `> ## Setup` headings both hit the suffix-free fallback and emitted the
  * duplicate DOM ids this whole module exists to prevent.
  */
-const CONTAINER_PREFIX_RE = /^ {0,3}(?:(?:>[ \t]?)+|(?:[-+*]|\d{1,9}[.)])[ \t]+)+/
+const CONTAINER_PREFIX_RE = /^ {0,3}(?:(?:>[ \t]?)+|(?:[-+*]|\d{1,9}[.)])[ \t]+)+/;
 /** Setext underline (`===` → h1, `---` → h2), AFTER container-prefix strip. */
-const SETEXT_UNDERLINE_RE = /^ {0,3}(=+|-+)[ \t]*\r?$/
+const SETEXT_UNDERLINE_RE = /^ {0,3}(=+|-+)[ \t]*\r?$/;
 /** Thematic break — ends a paragraph run, never underlines it. */
-const THEMATIC_BREAK_RE = /^ {0,3}(\*|_){3,}[ \t]*\r?$/
+const THEMATIC_BREAK_RE = /^ {0,3}(\*|_){3,}[ \t]*\r?$/;
 /**
  * CommonMark HTML-block type 6 tag names — these open a raw HTML block no
  * matter what follows them on the line.
  */
 const HTML_BLOCK_TAGS =
-  'address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul'
+  'address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul';
 
 /**
  * A line that OPENS a raw HTML block. mdast hands the whole block to the HTML
@@ -182,7 +176,7 @@ const HTML_BLOCK_OPENER_RE = new RegExp(
     '|</[a-zA-Z][a-zA-Z0-9-]*[ \\t]*>[ \\t]*\\r?$' +
     ')',
   'i',
-)
+);
 
 /**
  * The paragraph RUN that a setext underline would convert into a heading.
@@ -196,7 +190,7 @@ const HTML_BLOCK_OPENER_RE = new RegExp(
  */
 interface SetextRun {
   /** 1-based line of the run's FIRST line — where mdast puts the heading. */
-  line: number
+  line: number;
   /**
    * Container prefix (`> `, `- `, …) every line of the run shares. The
    * underline must carry the IDENTICAL prefix, which is why `> Quote` +
@@ -209,11 +203,11 @@ interface SetextRun {
    * simply emits nothing (the pre-existing behavior), which costs a TOC entry
    * and never produces a WRONG id.
    */
-  prefix: string
+  prefix: string;
   /** Run lines with the container prefix stripped, in order. */
-  lines: string[]
+  lines: string[];
   /** Run opened with a raw-HTML block line — mdast emits no heading for it. */
-  disqualified: boolean
+  disqualified: boolean;
 }
 
 /**
@@ -221,87 +215,84 @@ interface SetextRun {
  * THE single definition of "which lines are headings" for both the extractor
  * and the renderer's id map.
  */
-export function scanHeadings(
-  content: string,
-  options: ScanHeadingsOptions = {},
-): ScannedHeading[] {
-  const { skipFrontmatter = true, includeRawHtml = true, skipFences = true } = options
-  const out: ScannedHeading[] = []
-  const lines = content.split('\n')
+export function scanHeadings(content: string, options: ScanHeadingsOptions = {}): ScannedHeading[] {
+  const { skipFrontmatter = true, includeRawHtml = true, skipFences = true } = options;
+  const out: ScannedHeading[] = [];
+  const lines = content.split('\n');
   // ONE fenced-code state machine (utils/markdown-fences), shared with
   // markdown/streaming.ts.
-  const fences = skipFences ? createFenceTracker() : null
+  const fences = skipFences ? createFenceTracker() : null;
 
-  let start = 0
+  let start = 0;
   if (skipFrontmatter && lines[0]?.trim() === '---') {
     for (let i = 1; i < lines.length; i++) {
       if (lines[i].trim() === '---' || lines[i].trim() === '...') {
-        start = i + 1
-        break
+        start = i + 1;
+        break;
       }
     }
   }
 
   // The paragraph run a setext underline would convert (see SetextRun).
-  let setextRun: SetextRun | null = null
+  let setextRun: SetextRun | null = null;
 
   for (let i = start; i < lines.length; i++) {
-    const line = lines[i]
+    const line = lines[i];
     if (fences) {
-      const role = fences.push(line)
+      const role = fences.push(line);
       if (role !== 'text') {
-        setextRun = null
-        continue
+        setextRun = null;
+        continue;
       }
     }
 
     // Container prefix (`> `, `- `, `1. `) is stripped from EVERY construct
     // below, so a blockquote/list-nested heading is scanned in both its ATX
     // (`> ## Setup`) and setext (`> Quote title` / `> ---`) spellings.
-    const prefix = CONTAINER_PREFIX_RE.exec(line)?.[0] ?? ''
-    const body = prefix ? line.slice(prefix.length) : line
+    const prefix = CONTAINER_PREFIX_RE.exec(line)?.[0] ?? '';
+    const body = prefix ? line.slice(prefix.length) : line;
 
     // --- setext (`Title` / `===`): a REAL h1/h2 in mdast, positioned at the
     // run's FIRST line — which is the line the heading-id map is keyed by.
     // The underline must carry the SAME container prefix as the run it
     // closes; `> Quote` followed by a bare `---` is a quote and a thematic
     // break, not a heading.
-    const setext = SETEXT_UNDERLINE_RE.exec(body)
+    const setext = SETEXT_UNDERLINE_RE.exec(body);
     if (setext) {
       if (setextRun && !setextRun.disqualified && setextRun.prefix === prefix) {
         out.push({
           line: setextRun.line,
           level: setext[1][0] === '=' ? 1 : 2,
           text: setextRun.lines.join('\n'),
-        })
+        });
       }
-      setextRun = null
-      continue
+      setextRun = null;
+      continue;
     }
 
     // --- ATX, including inside a blockquote / list item.
-    const atx = ATX_HEADING_RE.exec(body) ?? ATX_EMPTY_RE.exec(body)
+    const atx = ATX_HEADING_RE.exec(body) ?? ATX_EMPTY_RE.exec(body);
     if (atx) {
-      out.push({ line: i + 1, level: atx[1].length, text: (atx[2] ?? '').trim() })
-      setextRun = null
-      continue
+      out.push({ line: i + 1, level: atx[1].length, text: (atx[2] ?? '').trim() });
+      setextRun = null;
+      continue;
     }
 
     if (includeRawHtml && line.indexOf('<') !== -1) {
-      RAW_HEADING_RE.lastIndex = 0
-      let raw: RegExpExecArray | null
-      let matched = false
+      RAW_HEADING_RE.lastIndex = 0;
+      let raw: RegExpExecArray | null;
+      let matched = false;
       while ((raw = RAW_HEADING_RE.exec(line)) !== null) {
-        matched = true
+        matched = true;
         out.push({
           line: i + 1,
           level: Number(raw[1]),
           text: raw[2].replace(/<[^>]*>/g, '').trim(),
-        })
+        });
       }
       if (matched) {
-        setextRun = null
-        continue
+        setextRun = null;
+        continue;
       }
     }
 
@@ -312,22 +303,22 @@ export function scanHeadings(
     // is paragraph CONTENT to remark, so ending the run there would move a
     // setext heading's reported line off the run's first line.
     if (isBlankLine(body) || THEMATIC_BREAK_RE.test(body)) {
-      setextRun = null
-      continue
+      setextRun = null;
+      continue;
     }
     if (setextRun && setextRun.prefix === prefix) {
-      setextRun.lines.push(body.trim())
+      setextRun.lines.push(body.trim());
     } else {
       setextRun = {
         line: i + 1,
         prefix,
         lines: [body.trim()],
         disqualified: HTML_BLOCK_OPENER_RE.test(body),
-      }
+      };
     }
   }
 
-  return out
+  return out;
 }
 
 /**
@@ -336,13 +327,13 @@ export function scanHeadings(
  * renderer MUST use the same counter or `#anchor` deep links diverge.
  */
 export function createHeadingIdDeduper(): (cleanId: string) => string {
-  const counts: Record<string, number> = {}
+  const counts: Record<string, number> = {};
   return (cleanId: string): string => {
     if (counts[cleanId]) {
-      counts[cleanId]++
-      return `${cleanId}-${counts[cleanId]}`
+      counts[cleanId]++;
+      return `${cleanId}-${counts[cleanId]}`;
     }
-    counts[cleanId] = 1
-    return cleanId
-  }
+    counts[cleanId] = 1;
+    return cleanId;
+  };
 }

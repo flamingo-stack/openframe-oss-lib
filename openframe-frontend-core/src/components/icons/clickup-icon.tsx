@@ -1,16 +1,10 @@
-import React from 'react'
-
 interface ClickUpIconProps {
-  width?: number | string
-  height?: number | string
-  className?: string
+  width?: number | string;
+  height?: number | string;
+  className?: string;
 }
 
-export function ClickUpIcon({
-  width = 24,
-  height = 24,
-  className = '',
-}: ClickUpIconProps) {
+export function ClickUpIcon({ width = 24, height = 24, className = '' }: ClickUpIconProps) {
   return (
     <svg
       width={width}
@@ -21,11 +15,27 @@ export function ClickUpIcon({
       className={className}
     >
       <defs>
-        <linearGradient id="clickup-grad-1" gradientUnits="userSpaceOnUse" x1="0" y1="15.0492" x2="54.8446" y2="15.0492" gradientTransform="matrix(1 0 0 -1 0 69.3604)">
+        <linearGradient
+          id="clickup-grad-1"
+          gradientUnits="userSpaceOnUse"
+          x1="0"
+          y1="15.0492"
+          x2="54.8446"
+          y2="15.0492"
+          gradientTransform="matrix(1 0 0 -1 0 69.3604)"
+        >
           <stop offset="0" stopColor="#8930FD" />
           <stop offset="1" stopColor="#49CCF9" />
         </linearGradient>
-        <linearGradient id="clickup-grad-2" gradientUnits="userSpaceOnUse" x1="1.1953" y1="53.166" x2="53.7447" y2="53.166" gradientTransform="matrix(1 0 0 -1 0 69.3604)">
+        <linearGradient
+          id="clickup-grad-2"
+          gradientUnits="userSpaceOnUse"
+          x1="1.1953"
+          y1="53.166"
+          x2="53.7447"
+          y2="53.166"
+          gradientTransform="matrix(1 0 0 -1 0 69.3604)"
+        >
           <stop offset="0" stopColor="#FF02F0" />
           <stop offset="1" stopColor="#FFC800" />
         </linearGradient>
@@ -43,5 +53,5 @@ export function ClickUpIcon({
         fill="url(#clickup-grad-2)"
       />
     </svg>
-  )
+  );
 }

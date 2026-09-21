@@ -1,16 +1,16 @@
-'use client'
+'use client';
 
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import { contentFetch } from '../utils/embed-content-fetch'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { contentFetch } from '../utils/embed-content-fetch';
 
 export interface UseSelfFetchResult<T> {
-  data: T | null
+  data: T | null;
   /** Imperatively patch the fetched data (e.g. optimistic vote updates). */
-  setData: Dispatch<SetStateAction<T | null>>
-  isLoading: boolean
-  error: boolean
+  setData: Dispatch<SetStateAction<T | null>>;
+  isLoading: boolean;
+  error: boolean;
   /** Re-run the fetch (error-retry affordance). */
-  reload: () => void
+  reload: () => void;
 }
 
 /**
@@ -45,51 +45,64 @@ export function useSelfFetch<T>(
   url: string | null,
   options?: { initialData?: T; revalidateOnVisibleAfterMs?: number },
 ): UseSelfFetchResult<T> {
-  const initialData = options?.initialData
-  const revalidateOnVisibleAfterMs = options?.revalidateOnVisibleAfterMs
-  const [data, setData] = useState<T | null>(initialData ?? null)
-  const [isLoading, setIsLoading] = useState(initialData === undefined && url !== null)
-  const [error, setError] = useState(false)
-  const [reloadKey, setReloadKey] = useState(0)
+  const initialData = options?.initialData;
+  const revalidateOnVisibleAfterMs = options?.revalidateOnVisibleAfterMs;
+  const [data, setData] = useState<T | null>(initialData ?? null);
+  const [isLoading, setIsLoading] = useState(initialData === undefined && url !== null);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   // When the held data was obtained: seeded at mount for SSR-hydrated data,
   // stamped after each completed fetch. Drives the visibility revalidation age
   // check. 0 = nothing held yet (first visible event may fetch).
-  const dataAtRef = useRef<number>(initialData !== undefined ? Date.now() : 0)
+  // The mount timestamp comes from a lazy `useState` initialiser — a
+  // `useRef(Date.now())` argument is re-evaluated on every render.
+  const [mountedAt] = useState(() => Date.now());
+  const dataAtRef = useRef<number>(initialData !== undefined ? mountedAt : 0);
   // The url whose data we currently hold — seeded from SSR `initialData`, then set after
   // each completed fetch. The effect skips the fetch when this equals `url` (so server-
   // rendered data isn't re-fetched on mount). A VALUE compare (not a one-shot flag) so the
   // SSR-hydration skip survives React 18 StrictMode's mount→unmount→remount in dev;
   // `reload()` nulls it to force a re-fetch of the same url.
-  const dataUrlRef = useRef<string | null>(initialData !== undefined ? url : null)
+  const dataUrlRef = useRef<string | null>(initialData !== undefined ? url : null);
 
-  // Re-sync when a CONTROLLED `initialData` changes (e.g. the host navigates
-  // between detail slugs without remounting). No-op in self-fetch mode, where
-  // `initialData` is `undefined`.
-  useEffect(() => {
-    if (initialData !== undefined) setData(initialData)
-  }, [initialData])
-
-  useEffect(() => {
-    if (url === null) {
-      setIsLoading(false)
-      return
+  // Both resets below are prop-driven, so they use React's "adjust state while
+  // rendering" pattern rather than an effect. From an effect each one commits a
+  // frame showing the superseded data (or a spinner that will never resolve)
+  // and then immediately re-renders to correct it; done here the wrong frame
+  // never reaches the screen.
+  const [syncedProps, setSyncedProps] = useState({ url, initialData });
+  if (syncedProps.url !== url || syncedProps.initialData !== initialData) {
+    setSyncedProps({ url, initialData });
+    // A CONTROLLED `initialData` changed (e.g. the host navigates between
+    // detail slugs without remounting). No-op in self-fetch mode, where
+    // `initialData` is `undefined`.
+    if (syncedProps.initialData !== initialData && initialData !== undefined) {
+      setData(initialData);
     }
+    // Fetching just got disabled — nothing will land to clear the spinner.
+    if (syncedProps.url !== url && url === null) {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (url === null) return undefined;
     // Already hold data for this exact url (SSR-hydrated, or a prior completed fetch) →
     // skip. `reload()` clears `dataUrlRef` so a retry of the same url still fetches.
-    if (dataUrlRef.current === url) return
-    const ctrl = new AbortController()
-    let cancelled = false
+    if (dataUrlRef.current === url) return undefined;
+    const ctrl = new AbortController();
+    let cancelled = false;
     async function load() {
       try {
-        setIsLoading(true)
-        setError(false)
-        const res = await contentFetch(url as string, { signal: ctrl.signal })
-        if (!res.ok) throw new Error(`Request failed (${res.status})`)
-        const json = (await res.json()) as T
+        setIsLoading(true);
+        setError(false);
+        const res = await contentFetch(url as string, { signal: ctrl.signal });
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
+        const json = (await res.json()) as T;
         if (!cancelled) {
-          setData(json)
-          dataUrlRef.current = url // remember the url we now hold data for
-          dataAtRef.current = Date.now()
+          setData(json);
+          dataUrlRef.current = url; // remember the url we now hold data for
+          dataAtRef.current = Date.now();
         }
       } catch (err) {
         // AbortError on cleanup (unmount / stale-url change / React StrictMode's dev
@@ -97,41 +110,42 @@ export function useSelfFetch<T>(
         // also means the orphaned StrictMode fetch shows as "cancelled" instead of
         // completing as a wasted duplicate (parity with useChatIdentity). Only real
         // failures fall through to the error state + console.
-        if (cancelled || (err as Error)?.name === 'AbortError') return
-        setError(true)
-        console.error('useSelfFetch:', url, err)
+        if (cancelled || (err as Error)?.name === 'AbortError') return;
+        setError(true);
+        console.error('useSelfFetch:', url, err);
       } finally {
-        if (!cancelled) setIsLoading(false)
+        if (!cancelled) setIsLoading(false);
       }
     }
-    load()
+    // Never rejects — try/catch/finally, every write gated on `cancelled`.
+    void load();
     return () => {
-      cancelled = true
-      ctrl.abort()
-    }
+      cancelled = true;
+      ctrl.abort();
+    };
     // `url` folds in every query param; `reloadKey` drives retry.
-  }, [url, reloadKey])
+  }, [url, reloadKey]);
 
   // ONE force-refetch mechanic shared by reload() and the visibility
   // revalidation: clear the held-url skip, bump the effect key.
   const forceReload = () => {
-    dataUrlRef.current = null
-    setReloadKey((k) => k + 1)
-  }
+    dataUrlRef.current = null;
+    setReloadKey(k => k + 1);
+  };
 
   // Opt-in visibility-driven revalidation. Registered only when the option is
   // set and fetching is enabled; SSR-safe (effects don't run on the server)
   // and StrictMode-safe (idempotent listener, cleaned up per mount cycle).
   useEffect(() => {
-    if (!revalidateOnVisibleAfterMs || url === null) return
+    if (!revalidateOnVisibleAfterMs || url === null) return undefined;
     const onVisible = () => {
-      if (document.visibilityState !== 'visible') return
-      if (Date.now() - dataAtRef.current < revalidateOnVisibleAfterMs) return
-      forceReload()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [url, revalidateOnVisibleAfterMs])
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - dataAtRef.current < revalidateOnVisibleAfterMs) return;
+      forceReload();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [url, revalidateOnVisibleAfterMs]);
 
   return {
     data,
@@ -140,5 +154,5 @@ export function useSelfFetch<T>(
     error,
     // Force a re-fetch of the current url (error-retry affordance).
     reload: forceReload,
-  }
+  };
 }

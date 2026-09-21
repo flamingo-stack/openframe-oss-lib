@@ -1,34 +1,34 @@
-import React from "react"
+import React from 'react';
 
-import { cn } from "../../../utils/cn"
-import { Button, type ButtonProps } from "../button"
-import { NoDataMessage } from "./no-data-message"
-import { NoDataActions, type NoDataActionProps } from "./no-data-actions"
+import { cn } from '../../../utils/cn';
+import { Button, type ButtonProps } from '../button';
+import { NoDataActions, type NoDataActionProps } from './no-data-actions';
+import { NoDataMessage } from './no-data-message';
 
-interface NoDataProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
+interface NoDataProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   // --- Message ---
   /** Leading glyph, sized to 16px (mobile) / 24px (md+). */
-  icon?: React.ReactNode
+  icon?: React.ReactNode;
   /** Primary line. */
-  title?: React.ReactNode
+  title?: React.ReactNode;
   /** Secondary line. */
-  description?: React.ReactNode
+  description?: React.ReactNode;
 
   // --- Clickable blocks ---
   /** Clickable blocks. Dynamic count. Hidden when empty/omitted. */
-  actions?: NoDataActionProps[]
+  actions?: NoDataActionProps[];
 
   // --- Footer button ---
   /** Footer button label. When set (and `button` is not), renders the button. */
-  buttonLabel?: React.ReactNode
+  buttonLabel?: React.ReactNode;
   /** Leading icon for the footer button. */
-  buttonIcon?: React.ReactNode
+  buttonIcon?: React.ReactNode;
   /** Click handler for the footer button. */
-  onButtonClick?: ButtonProps["onClick"]
+  onButtonClick?: ButtonProps['onClick'];
   /** Extra props forwarded to the footer button (variant, href, loading, …). */
-  buttonProps?: Partial<ButtonProps>
+  buttonProps?: Partial<ButtonProps>;
   /** Fully custom footer node; overrides the `buttonLabel`/`buttonIcon` path. */
-  button?: React.ReactNode
+  button?: React.ReactNode;
 }
 
 /**
@@ -38,7 +38,7 @@ interface NoDataProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"
  * inputs are present, so the same component covers a bare message, a message
  * with a button, the full layout, and everything in between.
  */
-const NoData = React.forwardRef<HTMLDivElement, NoDataProps>(function NoData(
+const NoData = React.forwardRef<HTMLDivElement, NoDataProps>(function NoDataImpl(
   {
     icon,
     title,
@@ -54,8 +54,8 @@ const NoData = React.forwardRef<HTMLDivElement, NoDataProps>(function NoData(
   },
   ref,
 ) {
-  const hasMessage = !!(icon || title || description)
-  const hasActions = !!actions?.length
+  const hasMessage = !!(icon || title || description);
+  const hasActions = !!actions?.length;
 
   const footerButton =
     button ??
@@ -65,17 +65,17 @@ const NoData = React.forwardRef<HTMLDivElement, NoDataProps>(function NoData(
         leftIcon={buttonIcon}
         onClick={onButtonClick}
         {...buttonProps}
-        className={cn("w-full md:w-auto", buttonProps?.className)}
+        className={cn('w-full md:w-auto', buttonProps?.className)}
       >
         {buttonLabel}
       </Button>
-    ) : null)
+    ) : null);
 
   return (
     <div
       ref={ref}
       className={cn(
-        "flex w-full flex-col items-center justify-center gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)]",
+        'flex w-full flex-col items-center justify-center gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)]',
         className,
       )}
       {...props}
@@ -84,7 +84,8 @@ const NoData = React.forwardRef<HTMLDivElement, NoDataProps>(function NoData(
       {hasActions && <NoDataActions actions={actions} />}
       {footerButton}
     </div>
-  )
-})
+  );
+});
+NoData.displayName = 'NoData';
 
-export { NoData, type NoDataProps }
+export { NoData, type NoDataProps };

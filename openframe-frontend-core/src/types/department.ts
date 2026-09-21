@@ -1,0 +1,48 @@
+/**
+ * Departments — THE single source of truth for the org's department
+ * vocabulary.
+ *
+ * The `departments` table is populated from Google Workspace (the org chart)
+ * by the hub's Google sync, which auto-creates a row the first time it sees a
+ * new department name. `profiles.department_id` is an FK to it; there is no
+ * free-text department column and no enum anywhere in code — every consumer
+ * reads the row (or the embedded `DepartmentRef`) and every picker lists the
+ * ACTIVE rows ordered by `display_order`.
+ *
+ * Hub owner module: `lib/data/department-utils.ts`.
+ */
+
+export interface Department {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  parent_department_id?: string | null;
+  display_order: number;
+  is_active: boolean;
+  /** The department's badge colour: a `BADGE_PALETTE` key (an ODS colour scheme) picked at random (`pickBadgePaletteColor`) when the row is created. */
+  color: string | null;
+}
+
+/** The embedded shape a reader gets through the `department:departments(…)` PostgREST embed. */
+export type DepartmentRef = Pick<Department, 'id' | 'name' | 'slug'> & {
+  display_order?: number;
+  color?: string | null;
+};
+
+/** `GET /api/admin/departments?counts=…` row — a department plus how many profiles carry it. */
+export interface DepartmentSummary {
+  id: string;
+  name: string;
+  slug: string;
+  color?: string | null;
+  count: number;
+}
+
+/** Population a department count is taken over. */
+/**
+ * Populations the department count endpoint supports. The hub's runtime
+ * allowlist (`DEPARTMENT_COUNT_POPULATIONS` in lib/data/department-constants.ts)
+ * is the value form of this union — keep the two in step.
+ */
+export type DepartmentCountPopulation = 'directory' | 'scored';

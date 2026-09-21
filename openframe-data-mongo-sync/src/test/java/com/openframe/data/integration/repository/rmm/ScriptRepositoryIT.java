@@ -1,9 +1,9 @@
 package com.openframe.data.integration.repository.rmm;
 
-import com.openframe.data.document.rmm.Script;
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScriptShell;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.ScriptShell;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;

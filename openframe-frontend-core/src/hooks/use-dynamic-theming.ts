@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-interface ThemeConfig {
+export interface ThemeConfig {
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
@@ -21,16 +21,16 @@ export function useDynamicTheming() {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    // Check for system preference
+    // Check for system preference. The initial read and the change listener are
+    // the same operation against the same external source, so they share one
+    // callback — `matchMedia` is not readable during SSR, which is why this
+    // cannot be a lazy `useState` initialiser.
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDark(mediaQuery.matches);
+    const syncFromMediaQuery = () => setIsDark(mediaQuery.matches);
+    syncFromMediaQuery();
 
-    const handleChange = (e: MediaQueryListEvent) => {
-      setIsDark(e.matches);
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    mediaQuery.addEventListener('change', syncFromMediaQuery);
+    return () => mediaQuery.removeEventListener('change', syncFromMediaQuery);
   }, []);
 
   const updateTheme = (newTheme: Partial<ThemeConfig>) => {

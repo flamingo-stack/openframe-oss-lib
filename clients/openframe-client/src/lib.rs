@@ -47,7 +47,10 @@ use crate::listener::tool_installation_message_listener::ToolInstallationMessage
 use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
 use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
-use crate::models::{CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage};
+use crate::models::{
+    BootstrapScriptMessage, CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage,
+    SoftwareScriptMessage,
+};
 use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
@@ -62,11 +65,17 @@ use crate::services::installed_agent_message_publisher::InstalledAgentMessagePub
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::machine_heartbeat_publisher::MachineHeartbeatPublisher;
 use crate::services::machine_heartbeat_run_manager::MachineHeartbeatRunManager;
+use crate::services::machine_timezone_publisher::MachineTimezonePublisher;
+use crate::services::machine_timezone_run_manager::MachineTimezoneRunManager;
 use crate::services::mesh_self_heal_service::MeshSelfHealService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::package_manager::presence_report::{
+    PackageManagerPresenceReporter, PackageManagerPresenceRunManager,
+};
+use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::ResultStore;
@@ -88,6 +97,7 @@ use crate::services::{
     InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
+use crate::services::{MachineIdService, MACHINE_ID_HEADER};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -163,13 +173,18 @@ pub struct Client {
     client_uninstall_message_listener: ClientUninstallMessageListener,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
+    script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
+    software_execution_listener: ExecutionListener<SoftwareScriptMessage>,
     script_schedule_execution_listener: ExecutionListener<ScriptScheduleExecutionMessage>,
     tool_run_manager: ToolRunManager,
     token_refresh_run_manager: TokenRefreshRunManager,
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
+    package_manager_presence_run_manager: PackageManagerPresenceRunManager,
+    package_manager_update_run_manager: PackageManagerUpdateRunManager,
     hostname_report_publisher: HostnameReportPublisher,
+    machine_timezone_run_manager: MachineTimezoneRunManager,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
@@ -210,8 +225,21 @@ impl Client {
         let config_service = AgentConfigurationService::new(directory_manager.clone())
             .context("Failed to initialize device configuration service")?;
 
+        let machine_id_service = MachineIdService::new(&directory_manager);
+        let machine_id = machine_id_service
+            .get_or_create()
+            .context("Failed to get or create machine ID")?;
+
+        let mut default_headers = reqwest::header::HeaderMap::new();
+        default_headers.insert(
+            MACHINE_ID_HEADER,
+            reqwest::header::HeaderValue::from_str(&machine_id)
+                .context("Invalid machine ID for header")?,
+        );
+
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS))
+            .default_headers(default_headers.clone())
             // disable TLS verification for dev mode only
             .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
             .no_proxy()
@@ -222,6 +250,7 @@ impl Client {
 
         let download_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS))
+            .default_headers(default_headers)
             .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
             .no_proxy()
             .pool_max_idle_per_host(0)
@@ -280,11 +309,8 @@ impl Client {
 
         // Initialize proactive token refresh run manager (keeps shared_token.enc valid
         // independent of NATS reconnects)
-        let token_refresh_run_manager = TokenRefreshRunManager::new(
-            auth_service.clone(),
-            config_service.clone(),
-            deactivation_service.clone(),
-        );
+        let token_refresh_run_manager =
+            TokenRefreshRunManager::new(auth_service.clone(), deactivation_service.clone());
 
         // Initialize NATS connection manager
         let ws_url = format!("wss://{}", initial_configuration_service.get_server_url()?);
@@ -297,6 +323,7 @@ impl Client {
             auth_service.clone(),
             tls_config_provider,
             deactivation_service.clone(),
+            machine_id_service.clone(),
         );
 
         // Initialize tool agent file client
@@ -371,6 +398,7 @@ impl Client {
             config_service.clone(),
             tool_run_manager.clone(),
             deactivation_service.clone(),
+            http_client.clone(),
         );
 
         // Initialize tool connection service
@@ -405,6 +433,16 @@ impl Client {
         let last_known_good_service = LastKnownGoodService::new(directory_manager.clone())
             .context("Failed to initialize last-known-good service")?;
 
+        // Initialize update handler service (boot-time and in-process failure handling)
+        let update_handler_service = UpdateHandlerService::new(
+            update_state_service.clone(),
+            openframe_client_info_service.clone(),
+            update_cleanup_service.clone(),
+            last_known_good_service.clone(),
+            installed_agent_message_publisher.clone(),
+            config_service.clone(),
+        );
+
         // Initialize tool installation service
         let tool_installation_service = ToolInstallationService::new(
             github_download_service.clone(),
@@ -428,6 +466,7 @@ impl Client {
             update_state_service.clone(),
             last_known_good_service.clone(),
             tool_run_manager.clone(),
+            update_handler_service.clone(),
         );
 
         // Initialize tool agent update service
@@ -525,6 +564,22 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let script_bootstrap_execution_listener = ExecutionListener::<BootstrapScriptMessage>::new(
+            nats_connection_manager.clone(),
+            nats_message_publisher.clone(),
+            execution_service.clone(),
+            config_service.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
+        let software_execution_listener = ExecutionListener::<SoftwareScriptMessage>::new(
+            nats_connection_manager.clone(),
+            nats_message_publisher.clone(),
+            execution_service.clone(),
+            config_service.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
         let script_schedule_execution_listener =
             ExecutionListener::<ScriptScheduleExecutionMessage>::new(
                 nats_connection_manager.clone(),
@@ -541,20 +596,23 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
+        let package_manager_presence_run_manager =
+            PackageManagerPresenceRunManager::new(PackageManagerPresenceReporter::new(
+                nats_message_publisher.clone(),
+                config_service.clone(),
+            ));
+        let package_manager_update_run_manager = PackageManagerUpdateRunManager::new();
+
         let hostname_report_publisher = HostnameReportPublisher::new(
             nats_message_publisher.clone(),
             config_service.clone(),
             device_data_fetcher.clone(),
         );
 
-        // Initialize update handler service
-        let update_handler_service = UpdateHandlerService::new(
-            update_state_service.clone(),
-            openframe_client_info_service.clone(),
-            update_cleanup_service.clone(),
-            last_known_good_service.clone(),
-            installed_agent_message_publisher.clone(),
-            config_service.clone(),
+        let machine_timezone_run_manager = MachineTimezoneRunManager::new(
+            MachineTimezonePublisher::new(nats_message_publisher.clone(), config_service.clone()),
+            device_data_fetcher.clone(),
+            nats_connection_manager.clone(),
         );
 
         Ok(Self {
@@ -571,13 +629,18 @@ impl Client {
             client_uninstall_message_listener,
             command_execution_listener,
             script_execution_listener,
+            script_bootstrap_execution_listener,
+            software_execution_listener,
             script_schedule_execution_listener,
             tool_run_manager,
             token_refresh_run_manager,
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
+            package_manager_presence_run_manager,
+            package_manager_update_run_manager,
             hostname_report_publisher,
+            machine_timezone_run_manager,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             update_handler_service,
@@ -640,6 +703,8 @@ impl Client {
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
 
+        self.nats_connection_manager.start_connection_watchdog();
+
         // Handle any pending update from previous run (after NATS is connected)
         if let Err(e) = self.update_handler_service.handle_pending_update().await {
             error!("Failed to handle pending update: {:#}", e);
@@ -648,6 +713,11 @@ impl Client {
 
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();
+        self.machine_timezone_run_manager.start();
+
+        self.package_manager_update_run_manager.start();
+
+        self.package_manager_presence_run_manager.start();
 
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
@@ -682,6 +752,12 @@ impl Client {
         info!("Starting script execution listener...");
         self.script_execution_listener.start().await?;
         info!("Script execution listener started");
+        info!("Starting script bootstrap execution listener...");
+        self.script_bootstrap_execution_listener.start().await?;
+        info!("Script bootstrap execution listener started");
+        info!("Starting software execution listener...");
+        self.software_execution_listener.start().await?;
+        info!("Software execution listener started");
         info!("Starting script schedule execution listener...");
         self.script_schedule_execution_listener.start().await?;
         info!("Script schedule execution listener started");

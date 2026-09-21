@@ -1,11 +1,16 @@
 # GraphQL schema for the Script Execution History tab.
 #
-# Executions are persisted server-side at NATS dispatch time (status RUNNING),
+# Executions are persisted server-side at NATS dispatch time (status QUEUED for
+# scheduled scripts until the agent acknowledges, RUNNING for ad-hoc runs),
 # transitioned to SUCCESS / FAILED when the agent's result frame arrives, and
 # observed here as a per-Script list. Tenant scoping is implicit via
 # TenantIdProvider — clients never specify tenantId.
 
 extend type Query {
+    """A single execution by its Relay id. Typed refetch — the alternative to node(id).
+    Throws (not null) if the id is absent or in another tenant."""
+    scriptExecution(id: ID!): ScriptExecution!
+
     scriptExecutions(
         scriptId: ID!
         filter: ScriptExecutionFilterInput,
@@ -35,6 +40,32 @@ extend type Query {
 
     """Facet options for a schedule's Execution History — parallel to scriptExecutionFilters."""
     scheduleExecutionFilters(scheduleId: ID!, filter: ScriptExecutionFilterInput, search: String): ScriptExecutionFilters!
+
+    """Execution History rows for one software package's install/update runs — parallel to
+    scriptExecutions but scoped by (packageManager, packageName, action). All packages of a manager
+    share one generic script, so the package identity (not scriptId) narrows the rows. Same
+    ScriptExecutionConnection shape, same filter / search / sort options."""
+    softwareExecutions(
+        packageManager: PackageManagerType!,
+        packageName: String!,
+        action: SoftwareAction!,
+        filter: ScriptExecutionFilterInput,
+        search: String,
+        sort: SortInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String
+    ): ScriptExecutionConnection!
+
+    """Facet options for a software package's Execution History — parallel to scriptExecutionFilters."""
+    softwareExecutionFilters(
+        packageManager: PackageManagerType!,
+        packageName: String!,
+        action: SoftwareAction!,
+        filter: ScriptExecutionFilterInput,
+        search: String
+    ): ScriptExecutionFilters!
 }
 
 type ScriptExecutionFilters {
@@ -45,6 +76,7 @@ type ScriptExecutionFilters {
 }
 
 enum ScriptExecutionStatus {
+    QUEUED
     RUNNING
     SUCCESS
     FAILED
@@ -79,6 +111,11 @@ type ScriptExecution implements Node {
     scriptId: ID!
     # Resolved at read time from scriptId
     scriptName: String
+    # Software install/update identity — set only for software executions, null for ordinary
+    # script/command runs. Lets History label the row by its package instead of the shared script.
+    packageManager: PackageManagerType
+    packageName: String
+    softwareAction: SoftwareAction
     # Schedule this execution originated from, stamped at dispatch.
     # Null for ad-hoc runs (runScript / batchRunScript). Backs "execution history per schedule job".
     scheduleId: ID

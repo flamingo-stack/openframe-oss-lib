@@ -1,29 +1,24 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { CompassIcon } from '../icons-v2-generated/map-and-travel/compass-icon'
-import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '../ui/tooltip'
+import type { ReactNode } from 'react';
+import { cn } from '../../utils/cn';
+import { CompassIcon } from '../icons-v2-generated/map-and-travel/compass-icon';
+import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
-const DEFAULT_LABEL = 'Guide Mode Chat'
+const DEFAULT_LABEL = 'Guide Mode Chat';
 
 const DEFAULT_TOOLTIP =
   'A quick session chat for exploring OpenFrame. Mingo answers how-to ' +
   'questions and guides you through configuration, but won’t touch devices, ' +
-  'run scripts, or perform any actions.'
+  'run scripts, or perform any actions.';
 
 export interface GuideModeBannerProps {
   /** Banner label (uppercased by the `text-h5` style). */
-  label?: React.ReactNode
+  label?: ReactNode;
   /** Help-icon tooltip copy. `null` hides the help icon entirely. */
-  tooltip?: React.ReactNode | null
-  className?: string
+  tooltip?: ReactNode | null;
+  className?: string;
 }
 
 /**
@@ -32,11 +27,7 @@ export interface GuideModeBannerProps {
  * Chat" label, and a trailing help icon whose tooltip explains the temporary,
  * read-only nature of Guide mode.
  */
-export function GuideModeBanner({
-  label = DEFAULT_LABEL,
-  tooltip = DEFAULT_TOOLTIP,
-  className,
-}: GuideModeBannerProps) {
+export function GuideModeBanner({ label = DEFAULT_LABEL, tooltip = DEFAULT_TOOLTIP, className }: GuideModeBannerProps) {
   return (
     <div
       className={cn(
@@ -45,9 +36,7 @@ export function GuideModeBanner({
       )}
     >
       <CompassIcon size={16} className="shrink-0 text-ods-text-on-accent" />
-      <p className="flex-1 truncate text-h5 uppercase text-ods-text-on-accent">
-        {label}
-      </p>
+      <p className="flex-1 truncate uppercase text-ods-text-on-accent text-h5">{label}</p>
       {tooltip != null && (
         <TooltipProvider delayDuration={0}>
           <Tooltip>
@@ -60,16 +49,12 @@ export function GuideModeBanner({
                 <QuestionCircleIcon size={16} />
               </button>
             </TooltipTrigger>
-            <TooltipContent
-              side="bottom"
-              align="end"
-              className="max-w-[280px] text-h6 normal-case"
-            >
+            <TooltipContent side="bottom" align="end" className="max-w-[280px] normal-case text-h6">
               {tooltip}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
       )}
     </div>
-  )
+  );
 }

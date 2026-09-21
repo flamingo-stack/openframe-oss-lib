@@ -68,6 +68,10 @@ public class MachineStatusService {
 
     private void applyStatusUpdate(Machine machine, DeviceStatus newStatus, Instant eventTimestamp) {
         DeviceStatus previousStatus = machine.getStatus();
+        if (previousStatus == newStatus) {
+            touchLastSeen(machine, eventTimestamp);
+            return;
+        }
         machine.setStatus(newStatus);
         machine.setLastSeen(eventTimestamp);
         machineRepository.save(machine);
@@ -82,6 +86,16 @@ public class MachineStatusService {
             log.info("Device came online (offline->online): machineId={}", machine.getMachineId());
             eventPublisher.publishEvent(new DeviceCameOnlineEvent(this, machine));
         }
+    }
+
+    /**
+     * Persists the heartbeat without going through {@code save}: nothing that reaches Pinot has changed,
+     * and {@code save} would make the publishing aspect emit a duplicate message for every heartbeat.
+     */
+    private void touchLastSeen(Machine machine, Instant eventTimestamp) {
+        machineRepository.updateLastSeen(machine.getMachineId(), eventTimestamp);
+        log.debug("Refreshed lastSeen for machineId={} at {} (status unchanged: {})",
+                machine.getMachineId(), eventTimestamp, machine.getStatus());
     }
 
     private void logStaleEvent(Machine machine, Instant eventTimestamp) {

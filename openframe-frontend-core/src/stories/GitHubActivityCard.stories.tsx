@@ -1,14 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { GitHubActivityCard } from '../components/chat/entity-cards'
-import {
-  ChatColumnDecorator,
-  makeAnchorProps,
-} from './__fixtures__/chat-card-decorator'
-import {
-  githubCommitItem,
-  githubPullRequestItem,
-  githubPrReviewItem,
-} from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { GitHubActivityCard } from '../components/chat/entity-cards';
+import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator';
+import { githubCommitItem, githubPullRequestItem, githubPrReviewItem } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof GitHubActivityCard> = {
   title: 'Chat/EntityCards/GitHubActivityCard',
@@ -22,11 +15,17 @@ const meta: Meta<typeof GitHubActivityCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Commit: Story = {
   args: {
@@ -34,7 +33,7 @@ export const Commit: Story = {
     variant: 'compact',
     anchorProps: makeAnchorProps(githubCommitItem.url ?? '#'),
   },
-}
+};
 
 export const PullRequest: Story = {
   args: {
@@ -42,7 +41,7 @@ export const PullRequest: Story = {
     variant: 'compact',
     anchorProps: makeAnchorProps(githubPullRequestItem.url ?? '#'),
   },
-}
+};
 
 export const PullRequestReview: Story = {
   args: {
@@ -50,7 +49,7 @@ export const PullRequestReview: Story = {
     variant: 'compact',
     anchorProps: makeAnchorProps(githubPrReviewItem.url ?? '#'),
   },
-}
+};
 
 export const RowVariant: Story = {
   args: {
@@ -58,4 +57,4 @@ export const RowVariant: Story = {
     variant: 'row',
     anchorProps: makeAnchorProps(githubPullRequestItem.url ?? '#'),
   },
-}
+};

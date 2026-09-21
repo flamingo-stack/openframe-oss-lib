@@ -1,88 +1,81 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Label } from './label'
-import { X, Plus } from "lucide-react"
-import { Input } from "./input"
-import { Button } from "./button"
-import { Badge } from "./badge"
-import { cn } from "../../utils/cn"
+import { X, Plus } from 'lucide-react';
+import { type KeyboardEvent, useState } from 'react';
+import { cn } from '../../utils/cn';
+import { Badge } from './badge';
+import { Button } from './button';
+import { Input } from './input';
+import { Label } from './label';
 
 interface TagsInputProps {
-  value: string[]
-  onChange: (tags: string[]) => void
-  placeholder?: string
-  className?: string
-  disabled?: boolean
-  maxTags?: number
-  inputClassName?: string
-  badgeClassName?: string
-  label?: string
+  value: string[];
+  onChange: (tags: string[]) => void;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+  maxTags?: number;
+  inputClassName?: string;
+  badgeClassName?: string;
+  label?: string;
 }
 
 export function TagsInput({
   value = [],
   onChange,
-  placeholder = "Add a tag...",
+  placeholder = 'Add a tag...',
   className,
   disabled = false,
   maxTags,
   inputClassName,
   badgeClassName,
-  label
+  label,
 }: TagsInputProps) {
-  const [inputValue, setInputValue] = React.useState("")
+  const [inputValue, setInputValue] = useState('');
 
   const handleAddTag = () => {
-    const trimmedValue = inputValue.trim()
-    
-    if (!trimmedValue) return
-    
+    const trimmedValue = inputValue.trim();
+
+    if (!trimmedValue) return;
+
     // Check if tag already exists
     if (value.includes(trimmedValue)) {
-      setInputValue("")
-      return
+      setInputValue('');
+      return;
     }
-    
+
     // Check max tags limit
     if (maxTags && value.length >= maxTags) {
-      return
+      return;
     }
-    
-    onChange([...value, trimmedValue])
-    setInputValue("")
-  }
+
+    onChange([...value, trimmedValue]);
+    setInputValue('');
+  };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    onChange(value.filter(tag => tag !== tagToRemove))
-  }
+    onChange(value.filter(tag => tag !== tagToRemove));
+  };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAddTag()
+      e.preventDefault();
+      handleAddTag();
     }
-  }
+  };
 
   return (
-    <div className={cn("space-y-2", className)}>
-      {label && (
-        <Label>
-          {label}
-        </Label>
-      )}
-      
+    <div className={cn('space-y-2', className)}>
+      {label && <Label>{label}</Label>}
+
       <div className="flex items-center gap-2">
         <Input
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={e => setInputValue(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder={placeholder}
           disabled={disabled || (maxTags ? value.length >= maxTags : false)}
-          className={cn(
-            "flex-1 bg-ods-bg border-ods-border text-ods-text-primary",
-            inputClassName
-          )}
+          className={cn('flex-1 border-ods-border bg-ods-bg text-ods-text-primary', inputClassName)}
         />
         <Button
           type="button"
@@ -94,23 +87,17 @@ export function TagsInput({
           Add
         </Button>
       </div>
-      
+
       {value.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {value.map((tag) => (
-            <Badge
-              key={tag}
-              className={cn(
-                "pl-2 pr-1 py-1 flex items-center gap-1",
-                badgeClassName
-              )}
-            >
+          {value.map(tag => (
+            <Badge key={tag} className={cn('flex items-center gap-1 py-1 pl-2 pr-1', badgeClassName)}>
               {tag}
               {!disabled && (
                 <button
                   type="button"
                   onClick={() => handleRemoveTag(tag)}
-                  className="hover:bg-white/20 rounded p-0.5 transition-colors"
+                  className="rounded p-0.5 transition-colors hover:bg-white/20"
                   aria-label={`Remove ${tag} tag`}
                 >
                   <X className="h-3 w-3" />
@@ -120,12 +107,12 @@ export function TagsInput({
           ))}
         </div>
       )}
-      
+
       {maxTags && (
-        <p className="text-h6 text-ods-text-secondary">
+        <p className="text-ods-text-secondary text-h6">
           {value.length}/{maxTags} tags
         </p>
       )}
     </div>
-  )
+  );
 }

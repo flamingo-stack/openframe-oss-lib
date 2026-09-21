@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<HelpCenterCard />` — single ticket row inside the Help Center list.
@@ -15,41 +15,38 @@
  * is a SIBLING of the toggle button, not nested inside it.
  */
 
-import { useCallback, useEffect, useRef } from 'react'
-import { StatusBadge, type StatusBadgeProps } from '../ui'
-import { formatRelativeTime } from '../../utils/date-utils'
-import { scrollElementIntoView } from '../../utils/scroll-into-view'
-import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
-import { getStatusColorScheme } from '../chat/utils/agent-status-message'
-import { DevCardRowContent } from '../shared/dev-section/dev-card-row'
-import {
-  TicketDetailDrawer,
-  type TicketDetailDrawerProps,
-} from './ticket-detail-drawer'
-import { useOptionalTicketLive } from './ticket-live-provider'
-import type { AnyTicket } from './types'
-import { isOptimistic } from './types'
+import { useCallback, useEffect, useRef } from 'react';
+import { formatRelativeTime } from '../../utils/date-utils';
+import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
+import { scrollElementIntoView } from '../../utils/scroll-into-view';
+import { getStatusColorScheme } from '../chat/utils/agent-status-message';
+import { DevCardRowContent } from '../shared/dev-section/dev-card-row';
+import { StatusBadge, type StatusBadgeProps } from '../ui';
+import { TicketDetailDrawer, type TicketDetailDrawerProps } from './ticket-detail-drawer';
+import { useOptionalTicketLive } from './ticket-live-provider';
+import type { AnyTicket } from './types';
+import { isOptimistic } from './types';
 
 export interface HelpCenterCardProps {
-  ticket: AnyTicket
-  expanded: boolean
-  onToggle: (id: string) => void
-  busy: boolean
-  supportSystemDown: boolean
-  onSendMessage: TicketDetailDrawerProps['onSendMessage']
-  onClose: TicketDetailDrawerProps['onClose']
-  onReopen: TicketDetailDrawerProps['onReopen']
-  onActionCollapsed: () => void
+  ticket: AnyTicket;
+  expanded: boolean;
+  onToggle: (id: string) => void;
+  busy: boolean;
+  supportSystemDown: boolean;
+  onSendMessage: TicketDetailDrawerProps['onSendMessage'];
+  onClose: TicketDetailDrawerProps['onClose'];
+  onReopen: TicketDetailDrawerProps['onReopen'];
+  onActionCollapsed: () => void;
   /** Persisted reply-failure banner — forwarded to the drawer. Parent
    *  (`HelpCenterList`) reads via `actions.replyErrorFor(external_id)`. */
-  replyError?: TicketDetailDrawerProps['replyError']
-  onClearReplyError?: TicketDetailDrawerProps['onClearReplyError']
+  replyError?: TicketDetailDrawerProps['replyError'];
+  onClearReplyError?: TicketDetailDrawerProps['onClearReplyError'];
   /** DOM `id` applied to the row's outer element. Parent (`HelpCenterList`)
    *  sets `ticket-<external_id>` so `useScrollToHash` can deep-link from
    *  a chat card's `?ticket=<id>#ticket-<id>` URL. The sticky-header
    *  offset is already baked in via `STICKY_HEADER_OFFSET_PX` so the row
    *  lands BELOW the chrome regardless of whether `id` is set. */
-  id?: string
+  id?: string;
 }
 
 export function HelpCenterCard({
@@ -66,34 +63,32 @@ export function HelpCenterCard({
   onClearReplyError,
   id,
 }: HelpCenterCardProps) {
-  const optimistic = isOptimistic(ticket)
-  const rawStatus = (ticket.status ?? 'OPEN').toUpperCase()
-  const priority = (ticket.priority ?? '').toUpperCase()
+  const optimistic = isOptimistic(ticket);
+  const rawStatus = (ticket.status ?? 'OPEN').toUpperCase();
+  const priority = (ticket.priority ?? '').toUpperCase();
 
-  const relativeUpdated = ticket.hubspot_updated_at
-    ? formatRelativeTime(ticket.hubspot_updated_at)
-    : 'recently'
+  const relativeUpdated = ticket.hubspot_updated_at ? formatRelativeTime(ticket.hubspot_updated_at) : 'recently';
 
   // Use `||` not `??` so an EMPTY-STRING subject (legacy rows, partial
   // server data) falls through to the placeholder instead of rendering
   // a blank h3.
-  const title = (ticket.subject || '').trim() || '(untitled)'
+  const title = (ticket.subject || '').trim() || '(untitled)';
   const subtitle = `UPDATED ${relativeUpdated}, #${ticket.external_id || '—'}${
     ticket.pipeline_stage_label ? `, ${ticket.pipeline_stage_label}` : ''
-  }`
-  const description = ticket.preview ?? ticket.body ?? ''
+  }`;
+  const description = ticket.preview ?? ticket.body ?? '';
 
   // Optimistic placeholders show as a row but aren't expandable — the
   // real external_id hasn't landed so the drawer's `useTicketEngagements`
   // would have nothing to fetch, and action targets would be undefined.
-  const isExpandable = !optimistic
-  const isExpanded = expanded && isExpandable
+  const isExpandable = !optimistic;
+  const isExpanded = expanded && isExpandable;
 
-  const rowRef = useRef<HTMLDivElement | null>(null)
+  const rowRef = useRef<HTMLDivElement | null>(null);
   // Click only toggles — the scroll-to-top is deferred to the effect below.
   const handleClick = useCallback(() => {
-    onToggle(ticket.id)
-  }, [onToggle, ticket.id])
+    onToggle(ticket.id);
+  }, [onToggle, ticket.id]);
 
   // Smooth-scroll the row to the top once the drawer has expanded — in an
   // effect keyed on `isExpanded` (NOT the click handler, which runs before
@@ -110,21 +105,20 @@ export function HelpCenterCard({
   // before the first measurement; the tween then tracks the row to its resting
   // position as the page finishes growing. Cleanup cancels on collapse/unmount.
   useEffect(() => {
-    if (!isExpanded) return
+    if (!isExpanded) return undefined;
     const raf = requestAnimationFrame(() => {
       scrollElementIntoView(rowRef.current, {
         headerOffset: STICKY_HEADER_OFFSET_PX,
-      })
-    })
-    return () => cancelAnimationFrame(raf)
-  }, [isExpanded])
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isExpanded]);
 
   // Unread replies for this row — read from the provider's single summary
   // map (missing key / no provider = 0). The provider masks the open
   // ticket to 0 and zeroes on markRead, so no local state here.
-  const live = useOptionalTicketLive()
-  const unreadCount =
-    (!optimistic && ticket.external_id && live?.unreadByTicket[ticket.external_id]) || 0
+  const live = useOptionalTicketLive();
+  const unreadCount = (!optimistic && ticket.external_id && live?.unreadByTicket[ticket.external_id]) || 0;
 
   const rightBadges = (
     <>
@@ -151,7 +145,7 @@ export function HelpCenterCard({
         />
       )}
     </>
-  )
+  );
 
   return (
     <div
@@ -167,7 +161,7 @@ export function HelpCenterCard({
         disabled={!isExpandable}
         aria-expanded={isExpandable ? isExpanded : undefined}
         aria-controls={isExpanded ? `help-center-drawer-${ticket.id}` : undefined}
-        className="w-full text-left p-[12px] md:p-[16px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-inset disabled:cursor-default"
+        className="w-full p-[12px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent disabled:cursor-default md:p-[16px]"
       >
         <DevCardRowContent
           title={title}
@@ -194,7 +188,7 @@ export function HelpCenterCard({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 /** Ticket priority → StatusBadge colorScheme. HIGH / URGENT → red,
@@ -203,7 +197,7 @@ export function HelpCenterCard({
  *  severity, and conflating them would mis-render an "OPEN" status as
  *  a low-priority badge or vice-versa. */
 function mapPriorityScheme(priority: string): NonNullable<StatusBadgeProps['colorScheme']> {
-  if (priority === 'HIGH' || priority === 'URGENT') return 'error'
-  if (priority === 'MEDIUM') return 'warning'
-  return 'default'
+  if (priority === 'HIGH' || priority === 'URGENT') return 'error';
+  if (priority === 'MEDIUM') return 'warning';
+  return 'default';
 }

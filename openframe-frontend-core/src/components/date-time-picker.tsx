@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { Label } from "./ui/label";
 import DatePicker from 'react-datepicker';
 import { cn } from '../utils/cn';
+import { Label } from './ui/label';
 
 interface DateTimePickerProps {
   value?: Date;
@@ -19,14 +19,14 @@ interface DateTimePickerProps {
 
 // Shared input styling that matches Input component pattern
 const inputClassName = cn(
-  "flex h-10 w-full rounded-md border px-3 py-2 text-sm ring-offset-background",
-  "file:border-0 file:bg-transparent file:text-sm file:font-medium",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-  "disabled:cursor-not-allowed disabled:opacity-50 touch-manipulation",
+  'flex h-10 w-full rounded-md border px-3 py-2 text-sm ring-offset-background',
+  'file:border-0 file:bg-transparent file:text-sm file:font-medium',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+  'touch-manipulation disabled:cursor-not-allowed disabled:opacity-50',
   // Admin theme colors
-  "bg-ods-card border-ods-border text-ods-text-primary",
-  "placeholder:text-ods-text-muted focus-visible:ring-ods-accent",
-  "md:text-sm text-base" // Mobile zoom prevention
+  'border-ods-border bg-ods-card text-ods-text-primary',
+  'placeholder:text-ods-text-muted focus-visible:ring-ods-accent',
+  'text-base md:text-sm', // Mobile zoom prevention
 );
 
 export function DateTimePicker({
@@ -34,20 +34,16 @@ export function DateTimePicker({
   onChange,
   disabled = false,
   label,
-  placeholder = "Select date and time",
+  placeholder = 'Select date and time',
   className,
   showTimeSelect = true,
-  timeFormat = "HH:mm",
+  timeFormat = 'HH:mm',
   timeIntervals = 15,
-  dateFormat = "MMMM d, yyyy h:mm aa"
+  dateFormat = 'MMMM d, yyyy h:mm aa',
 }: DateTimePickerProps) {
   return (
-    <div className={cn("space-y-2", className)}>
-      {label && (
-        <Label className="text-h5 font-semibold text-ods-text-secondary">
-          {label}
-        </Label>
-      )}
+    <div className={cn('space-y-2', className)}>
+      {label && <Label className="font-semibold text-ods-text-secondary text-h5">{label}</Label>}
 
       <div className="w-full">
         <DatePicker
@@ -63,8 +59,10 @@ export function DateTimePicker({
           className={inputClassName}
         />
       </div>
-      
-      <style dangerouslySetInnerHTML={{ __html: `
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         .react-datepicker-wrapper {
           width: 100% !important;
           display: block !important;
@@ -163,7 +161,9 @@ export function DateTimePicker({
         .react-datepicker__navigation--next {
           border-left-color: #888888 !important;
         }
-      ` }} />
+      `,
+        }}
+      />
     </div>
   );
-} 
+}

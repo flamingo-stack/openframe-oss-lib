@@ -2,7 +2,7 @@ package com.openframe.management.migration;
 
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.result.UpdateResult;
-import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.service.TenantIdProvider;
 import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;

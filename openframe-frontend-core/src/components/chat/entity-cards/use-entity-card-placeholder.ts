@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Entity-card OG-placeholder resolver.
@@ -10,19 +10,19 @@
  * so this surface shares one memo + one code path with every other consumer.
  */
 
-import { useOgPlaceholderUrl } from '../../../hooks/use-og-placeholder-url'
+import { useOgPlaceholderUrl } from '../../../hooks/use-og-placeholder-url';
 
 export interface UseEntityCardPlaceholderArgs {
   /** Entity title — used as the placeholder label. */
-  title: string | undefined | null
+  title: string | undefined | null;
   /** Explicit override. When set (including `null`), the runtime default is
    *  skipped. */
-  placeholderUrl?: string | null
+  placeholderUrl?: string | null;
   /** Site name shown under the title. Optional. */
-  siteName?: string
+  siteName?: string;
   /** Output aspect ratio. `'wide'` (default) for catalog cards, `'square'`
    *  for compact chat-inline cards. */
-  aspect?: 'wide' | 'square'
+  aspect?: 'wide' | 'square';
 }
 
 export function useEntityCardPlaceholder({
@@ -31,7 +31,7 @@ export function useEntityCardPlaceholder({
   siteName = '',
   aspect = 'wide',
 }: UseEntityCardPlaceholderArgs): string | null {
-  const derived = useOgPlaceholderUrl({ title, siteName, aspect })
+  const derived = useOgPlaceholderUrl({ title, siteName, aspect });
   // Explicit prop (including explicit null) wins; `undefined` → derived default.
-  return placeholderUrl !== undefined ? placeholderUrl : derived
+  return placeholderUrl !== undefined ? placeholderUrl : derived;
 }

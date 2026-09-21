@@ -1,3 +1,4 @@
+import type { TagAssoc } from '../../../../types/blog';
 import type { EntityAuthor } from '../../../../types/entity-author';
 
 /**
@@ -59,6 +60,10 @@ export interface OnboardingGuide {
   custom_instructions: string | null;
   config: Record<string, unknown> | null;
   ai_effort_score: number | null;
+
+  /** Flat `entity_tags` hydration, same junction shape as `blog_post_tags`.
+   *  Rendered by `<EntityTagBadges>` on the detail view. */
+  onboarding_guide_tags?: TagAssoc[] | null;
 
   // Junction (multi-platform)
   onboarding_guide_platforms?: Array<{

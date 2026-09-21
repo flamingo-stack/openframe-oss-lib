@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Single ticket row + expanded details drawer.
@@ -18,41 +18,32 @@
  *      rendered only when this row is the expanded one.
  */
 
-import { useCallback, useRef } from 'react'
-import {
-  Collapsible,
-  CollapsibleContent,
-} from '../collapsible'
-import {
-  ChatTicketItem,
-  type ChatTicketItemData,
-} from '../chat/entity-cards/chat-ticket-item'
-import { formatRelativeTime } from '../../utils/date-utils'
-import { scrollElementIntoView } from '../../utils/scroll-into-view'
-import {
-  TicketDetailDrawer,
-  type TicketDetailDrawerProps,
-} from './ticket-detail-drawer'
-import type { AnyTicket } from './types'
-import { isOptimistic } from './types'
+import { useCallback, useRef } from 'react';
+import { formatRelativeTime } from '../../utils/date-utils';
+import { scrollElementIntoView } from '../../utils/scroll-into-view';
+import { ChatTicketItem, type ChatTicketItemData } from '../chat/entity-cards/chat-ticket-item';
+import { Collapsible, CollapsibleContent } from '../collapsible';
+import { TicketDetailDrawer, type TicketDetailDrawerProps } from './ticket-detail-drawer';
+import type { AnyTicket } from './types';
+import { isOptimistic } from './types';
 
 export interface TicketRowProps {
-  ticket: AnyTicket
-  expanded: boolean
-  onToggle: (ticketId: string) => void
-  busy: boolean
-  supportSystemDown: boolean
-  onSendMessage: TicketDetailDrawerProps['onSendMessage']
-  onClose: TicketDetailDrawerProps['onClose']
-  onReopen: TicketDetailDrawerProps['onReopen']
+  ticket: AnyTicket;
+  expanded: boolean;
+  onToggle: (ticketId: string) => void;
+  busy: boolean;
+  supportSystemDown: boolean;
+  onSendMessage: TicketDetailDrawerProps['onSendMessage'];
+  onClose: TicketDetailDrawerProps['onClose'];
+  onReopen: TicketDetailDrawerProps['onReopen'];
   /** Called after a successful close/reopen so the parent can collapse
    *  the drawer (status flipped — current action set is now stale). */
-  onActionCollapsed: TicketDetailDrawerProps['onActionCollapsed']
+  onActionCollapsed: TicketDetailDrawerProps['onActionCollapsed'];
   /** DOM `id` applied to the row's outer element. Parents that surface
    *  a deep-link target set `ticket-<external_id>` so `useScrollToHash`
    *  resolves it. `scroll-mt-24` is already baked into the outer
    *  element regardless. */
-  id?: string
+  id?: string;
 }
 
 export function TicketRow({
@@ -69,7 +60,7 @@ export function TicketRow({
 }: TicketRowProps) {
   // Optimistic placeholders have no drawer — the real id hasn't
   // arrived yet, so action targets would be undefined.
-  const optimistic = isOptimistic(ticket)
+  const optimistic = isOptimistic(ticket);
 
   // Scroll the clicked card to the top of the viewport. Every click
   // scrolls — first-click expansion, same-row re-click, cross-row
@@ -81,25 +72,23 @@ export function TicketRow({
   // smooth-scroll lands at the FINAL post-collapse position cleanly.
   // Same pattern as `<HelpCenterCard>` — the only diff is the drawer
   // id prefix (`ticket-drawer-` vs `help-center-drawer-`).
-  const rowRef = useRef<HTMLDivElement | null>(null)
+  const rowRef = useRef<HTMLDivElement | null>(null);
   const handleClick = useCallback(() => {
-    onToggle(ticket.id)
+    onToggle(ticket.id);
     scrollElementIntoView(rowRef.current, {
-      adjustTargetY: (raw) => {
-        if (!rowRef.current) return raw
-        const expandedDrawer = document.querySelector(
-          'div[id^="ticket-drawer-"]',
-        )
-        if (!(expandedDrawer instanceof HTMLElement)) return raw
-        const drawerRect = expandedDrawer.getBoundingClientRect()
-        const myRect = rowRef.current.getBoundingClientRect()
+      adjustTargetY: raw => {
+        if (!rowRef.current) return raw;
+        const expandedDrawer = document.querySelector('div[id^="ticket-drawer-"]');
+        if (!(expandedDrawer instanceof HTMLElement)) return raw;
+        const drawerRect = expandedDrawer.getBoundingClientRect();
+        const myRect = rowRef.current.getBoundingClientRect();
         // Only adjust when the drawer is ABOVE us. Drawers below
         // don't shift our position when they collapse.
-        if (drawerRect.bottom > myRect.top) return raw
-        return raw - drawerRect.height
+        if (drawerRect.bottom > myRect.top) return raw;
+        return raw - drawerRect.height;
       },
-    })
-  }, [onToggle, ticket.id])
+    });
+  }, [onToggle, ticket.id]);
 
   const tileData: ChatTicketItemData = {
     id: ticket.id,
@@ -113,9 +102,7 @@ export function TicketRow({
     // so the badge accurately reflects "Closed" with a checkmark.
     statusLabel: ticket.pipeline_stage_label ?? undefined,
     category: ticket.customer_company ?? undefined,
-    timeAgo: ticket.hubspot_updated_at
-      ? formatRelativeTime(ticket.hubspot_updated_at)
-      : undefined,
+    timeAgo: ticket.hubspot_updated_at ? formatRelativeTime(ticket.hubspot_updated_at) : undefined,
     // Linked-work chip: surfaced whenever the ticket has a linked
     // ClickUp task. Uses the linked task's own status so the chip text
     // reads "Working" / "Waiting on version release" / etc. — useful
@@ -123,38 +110,35 @@ export function TicketRow({
     // when the task exists but its status hasn't synced yet.
     linkedTaskLabel: ticket.clickup
       ? ticket.clickup.status
-        ? ticket.clickup.status.replace(/\b\w/g, (c) => c.toUpperCase())
+        ? ticket.clickup.status.replace(/\b\w/g, c => c.toUpperCase())
         : 'Linked work'
       : undefined,
-  }
+  };
 
   return (
     <div ref={rowRef} id={id} className="scroll-mt-24">
-      <Collapsible
-        open={expanded && !optimistic}
-        className="border-b border-ods-border last:border-b-0"
-      >
-      <ChatTicketItem
-        ticket={tileData}
-        onClick={optimistic ? undefined : handleClick}
-        aria-expanded={expanded && !optimistic}
-        aria-controls={`ticket-drawer-${ticket.id}`}
-      />
-      <CollapsibleContent
-        id={`ticket-drawer-${ticket.id}`}
-        className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
-      >
-        <TicketDetailDrawer
-          ticket={ticket}
-          busy={busy}
-          supportSystemDown={supportSystemDown}
-          onSendMessage={onSendMessage}
-          onClose={onClose}
-          onReopen={onReopen}
-          onActionCollapsed={onActionCollapsed}
+      <Collapsible open={expanded && !optimistic} className="border-b border-ods-border last:border-b-0">
+        <ChatTicketItem
+          ticket={tileData}
+          onClick={optimistic ? undefined : handleClick}
+          aria-expanded={expanded && !optimistic}
+          aria-controls={`ticket-drawer-${ticket.id}`}
         />
-      </CollapsibleContent>
+        <CollapsibleContent
+          id={`ticket-drawer-${ticket.id}`}
+          className="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden"
+        >
+          <TicketDetailDrawer
+            ticket={ticket}
+            busy={busy}
+            supportSystemDown={supportSystemDown}
+            onSendMessage={onSendMessage}
+            onClose={onClose}
+            onReopen={onReopen}
+            onActionCollapsed={onActionCollapsed}
+          />
+        </CollapsibleContent>
       </Collapsible>
     </div>
-  )
+  );
 }

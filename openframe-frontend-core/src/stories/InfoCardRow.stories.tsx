@@ -1,13 +1,11 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { InfoCardRow } from '../components/ui/info-card-row'
-import { CheckCircleIcon } from '../components/icons-v2-generated/signs-and-symbols/check-circle-icon'
-import { TagIcon } from '../components/icons-v2-generated/shopping/tag-icon'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { TagIcon } from '../components/icons-v2-generated/shopping/tag-icon';
+import { CheckCircleIcon } from '../components/icons-v2-generated/signs-and-symbols/check-circle-icon';
+import { InfoCardRow } from '../components/ui/info-card-row';
 
 // Stand-in company logo — the lead `icon` fills the 40px bordered avatar box.
 // In real usage this is typically an `<img>` logo (rendered with object-cover).
-const companyLogo = (
-  <div className="size-full" style={{ background: 'linear-gradient(135deg, #5EFAF0, #F357BB)' }} />
-)
+const companyLogo = <div className="size-full" style={{ background: 'linear-gradient(135deg, #5EFAF0, #F357BB)' }} />;
 
 const meta = {
   title: 'UI/InfoCardRow',
@@ -30,16 +28,16 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div className="w-full max-w-[1024px]">
         <Story />
       </div>
     ),
   ],
-} satisfies Meta<typeof InfoCardRow>
+} satisfies Meta<typeof InfoCardRow>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /** Full row — lead logo + name/devices, and two stats with icons. Matches Figma. */
 export const Default: Story = {
@@ -54,7 +52,7 @@ export const Default: Story = {
       { title: 'Open tickets', caption: '2', icon: <TagIcon className="text-ods-text-secondary" /> },
     ],
   },
-}
+};
 
 /** Icons omitted — text-only sections. */
 export const WithoutIcons: Story = {
@@ -65,4 +63,4 @@ export const WithoutIcons: Story = {
       { title: 'Open tickets', caption: '2' },
     ],
   },
-}
+};

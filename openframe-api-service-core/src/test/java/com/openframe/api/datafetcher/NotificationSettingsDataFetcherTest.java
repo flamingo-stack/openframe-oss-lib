@@ -1,7 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.openframe.api.dto.NotificationSettingsView;
-import com.openframe.api.dto.NotificationTypeSetting;
+import com.openframe.api.dto.NotificationTypeSettingInput;
 import com.openframe.api.service.NotificationSettingsService;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.data.document.notification.NotificationSettingGroup;
@@ -44,8 +44,8 @@ class NotificationSettingsDataFetcherTest {
     @Test
     @DisplayName("updateNotificationSettings hands the full argument set to the service for the authenticated user")
     void update_delegates_with_the_principal_id() {
-        List<NotificationTypeSetting> typeSettings =
-                List.of(new NotificationTypeSetting(NotificationSettingGroup.MINGO_MESSAGES, false));
+        List<NotificationTypeSettingInput> typeSettings =
+                List.of(new NotificationTypeSettingInput(NotificationSettingGroup.MINGO_MESSAGES, false));
         when(service.update("user-1", false, typeSettings)).thenReturn(view(false));
 
         assertThat(fetcher.updateNotificationSettings(false, typeSettings, principal("user-1")).isEnabled())

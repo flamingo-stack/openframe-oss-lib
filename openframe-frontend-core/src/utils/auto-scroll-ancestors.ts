@@ -1,10 +1,10 @@
-import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine'
 import {
   autoScrollForElements,
   autoScrollWindowForElements,
-} from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element'
-import { unsafeOverflowAutoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/unsafe-overflow/element'
-import { scrollableAncestorsOf } from './scroll-parent'
+} from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
+import { unsafeOverflowAutoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/unsafe-overflow/element';
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { scrollableAncestorsOf } from './scroll-parent';
 
 /**
  * How far past a scroller's edge a drag still counts as "scroll this".
@@ -13,20 +13,20 @@ import { scrollableAncestorsOf } from './scroll-parent'
  * question is whether the intent is obvious, and dragging beyond a container is
  * about as obvious as intent gets.
  */
-const OVERFLOW_REACH = 5000
+const OVERFLOW_REACH = 5000;
 
 const overflow = () => ({
   forTopEdge: { top: OVERFLOW_REACH, left: OVERFLOW_REACH, right: OVERFLOW_REACH },
   forBottomEdge: { bottom: OVERFLOW_REACH, left: OVERFLOW_REACH, right: OVERFLOW_REACH },
   forLeftEdge: { left: OVERFLOW_REACH, top: OVERFLOW_REACH, bottom: OVERFLOW_REACH },
   forRightEdge: { right: OVERFLOW_REACH, top: OVERFLOW_REACH, bottom: OVERFLOW_REACH },
-})
+});
 
 /** Straight up and straight down only — no sideways reach at all. */
 const verticalOverflow = () => ({
   forTopEdge: { top: OVERFLOW_REACH },
   forBottomEdge: { bottom: OVERFLOW_REACH },
-})
+});
 
 /**
  * Registers drag auto-scroll for one scroller, both **inside** its edges and
@@ -43,7 +43,7 @@ export function autoScrollBothWays(element: HTMLElement): () => void {
   return combine(
     autoScrollForElements({ element }),
     unsafeOverflowAutoScrollForElements({ element, getOverflow: overflow }),
-  )
+  );
 }
 
 /**
@@ -60,7 +60,7 @@ export function autoScrollColumn(element: HTMLElement): () => void {
   return combine(
     autoScrollForElements({ element }),
     unsafeOverflowAutoScrollForElements({ element, getOverflow: verticalOverflow }),
-  )
+  );
 }
 
 /**
@@ -82,9 +82,9 @@ export function autoScrollColumn(element: HTMLElement): () => void {
  * fast.
  */
 export function autoScrollAncestors(element: HTMLElement): () => void {
-  const cleanups = scrollableAncestorsOf(element).map(autoScrollBothWays)
+  const cleanups = scrollableAncestorsOf(element).map(autoScrollBothWays);
   // Cheap and harmless when the document itself does not scroll, and the only
   // thing that works when it does.
-  cleanups.push(autoScrollWindowForElements())
-  return combine(...cleanups)
+  cleanups.push(autoScrollWindowForElements());
+  return combine(...cleanups);
 }

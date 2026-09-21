@@ -36,7 +36,7 @@
  * by a code comment — which is exactly how the `~~~`-blind extractor drifted
  * in the first place. Both consumers now instantiate `createFenceTracker()`.
  */
-const FENCE_RE = /^ {0,3}(`{3,}|~{3,})([^\n]*?)\r?$/
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})([^\n]*?)\r?$/;
 
 /**
  * CommonMark's BLANK LINE — spaces and tabs only. The single definition, shared
@@ -48,7 +48,7 @@ const FENCE_RE = /^ {0,3}(`{3,}|~{3,})([^\n]*?)\r?$/
  * none of which CommonMark (or remark) treats as blank. Every place that meant
  * "is this a CommonMark blank line?" and asked `trim() === ''` therefore
  * TERMINATED a construct one line early while remark kept it open. Verified
- * end-to-end: `<div>\n \n\`<textarea>\`\n\nrest\n` left a LIVE `<textarea>`
+ * end-to-end: `<div>\n\u00A0\n\`<textarea>\`\n\nrest\n` left a LIVE `<textarea>`
  * in the DOM (`escapeUnknownHtmlTags` returned the input byte-identical),
  * because the tracked HTML-block range ended at the NBSP filler line and the
  * inline-code shelter below it stopped being inside a tracked block. Same for
@@ -59,11 +59,11 @@ const FENCE_RE = /^ {0,3}(`{3,}|~{3,})([^\n]*?)\r?$/
  * `"\r"`, and the mask is length-preserving so stripping `\r` from the source
  * is not an option (see `FENCE_RE`'s `\r?$`).
  */
-const BLANK_LINE_RE = /^[ \t\r]*$/
+const BLANK_LINE_RE = /^[ \t\r]*$/;
 
 /** True when `line` is a CommonMark blank line (spaces/tabs only, `\r`-tolerant). */
 export function isBlankLine(line: string): boolean {
-  return BLANK_LINE_RE.test(line)
+  return BLANK_LINE_RE.test(line);
 }
 
 /**
@@ -82,30 +82,30 @@ export function isBlankLine(line: string): boolean {
  * distinction for free and a future consumer (e.g. fence-aware syntax
  * post-processing) would otherwise have to re-derive it.
  */
-export type FenceLineRole = 'open' | 'close' | 'inside' | 'text'
+export type FenceLineRole = 'open' | 'close' | 'inside' | 'text';
 
 export interface FenceTracker {
   /** Advance across one raw source line (mutates) and classify it. */
-  push(line: string): FenceLineRole
+  push(line: string): FenceLineRole;
   /** Marker CHARACTER of the currently open fence (`` ` `` / `~`), or null. */
-  openChar(): string | null
+  openChar(): string | null;
   /** Run length of the currently open fence (a closer must be ≥ this). */
-  openLength(): number
+  openLength(): number;
 }
 
 /** A fresh fenced-code state machine. Server-safe: no React, no DOM. */
 export function createFenceTracker(): FenceTracker {
-  let fenceChar: string | null = null
-  let fenceLength = 0
+  let fenceChar: string | null = null;
+  let fenceLength = 0;
   return {
     push(line: string): FenceLineRole {
-      const fence = FENCE_RE.exec(line)
+      const fence = FENCE_RE.exec(line);
       if (fence) {
-        const run = fence[1]
+        const run = fence[1];
         if (fenceChar === null) {
-          fenceChar = run[0]
-          fenceLength = run.length
-          return 'open'
+          fenceChar = run[0];
+          fenceLength = run.length;
+          return 'open';
         }
         // A closer must use the SAME marker char, be at least as long as the
         // opener, and (per CommonMark) carry no info string. "No info string"
@@ -113,15 +113,15 @@ export function createFenceTracker(): FenceTracker {
         // a fence CommonMark keeps open, i.e. blank LESS of the haystack
         // (fail-OPEN). Hence `isBlankLine`, not `trim()`.
         if (run[0] === fenceChar && run.length >= fenceLength && isBlankLine(fence[2])) {
-          fenceChar = null
-          fenceLength = 0
-          return 'close'
+          fenceChar = null;
+          fenceLength = 0;
+          return 'close';
         }
-        return 'inside'
+        return 'inside';
       }
-      return fenceChar === null ? 'text' : 'inside'
+      return fenceChar === null ? 'text' : 'inside';
     },
     openChar: () => fenceChar,
     openLength: () => fenceLength,
-  }
+  };
 }

@@ -11,6 +11,7 @@ import com.openframe.api.service.processor.UserProcessor;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserStatus;
+import com.openframe.data.repository.auth.SsoIdentityRepository;
 import com.openframe.data.repository.user.UserRepository;
 import com.openframe.notification.mail.service.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ import static com.openframe.data.document.user.UserStatus.SELF_DELETED;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final SsoIdentityRepository ssoIdentityRepository;
     private final UserMapper userMapper;
     private final UserProcessor userProcessor;
     private final EmailService emailService;
@@ -122,6 +124,14 @@ public class UserService {
             user.setStatus(DELETED);
         }
         User savedUser = userRepository.save(user);
+
+        // A deleted user's federated identity links must not keep resolving future SSO logins
+        // to this account. Best-effort — the deletion itself is already committed.
+        try {
+            ssoIdentityRepository.deleteByUserId(savedUser.getId());
+        } catch (Exception e) {
+            log.warn("Failed to remove sso identity links for deleted user {}: {}", savedUser.getId(), e.getMessage());
+        }
 
         userProcessor.postProcessUserDeleted(savedUser);
 

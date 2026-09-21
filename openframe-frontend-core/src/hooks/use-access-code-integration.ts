@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Access Code Integration Hook
@@ -15,14 +15,10 @@
  * `EndpointsRuntimeContext` so React callers don't have to plumb URLs.
  */
 
-import React from 'react'
+import React from 'react';
 
-import { useRequiredEndpointsRuntime } from '../contexts/endpoints-runtime-context'
-import {
-  validateAccessCode,
-  consumeAccessCode,
-  validateAndConsumeAccessCode,
-} from '../utils/access-code-client'
+import { useRequiredEndpointsRuntime } from '../contexts/endpoints-runtime-context';
+import { validateAccessCode, consumeAccessCode, validateAndConsumeAccessCode } from '../utils/access-code-client';
 
 /**
  * Resolves access-code endpoints from `EndpointsRuntimeContext` (throws
@@ -62,39 +58,39 @@ import {
  * };
  */
 export function useAccessCodeIntegration() {
-  const runtime = useRequiredEndpointsRuntime()
-  const endpoints = runtime.accessCode
-  const [isValidating, setIsValidating] = React.useState(false)
-  const [isConsuming, setIsConsuming] = React.useState(false)
+  const runtime = useRequiredEndpointsRuntime();
+  const endpoints = runtime.accessCode;
+  const [isValidating, setIsValidating] = React.useState(false);
+  const [isConsuming, setIsConsuming] = React.useState(false);
 
   const validate = async (email: string, code: string) => {
-    setIsValidating(true)
+    setIsValidating(true);
     try {
-      return await validateAccessCode(email, code, endpoints)
+      return await validateAccessCode(email, code, endpoints);
     } finally {
-      setIsValidating(false)
+      setIsValidating(false);
     }
-  }
+  };
 
   const consume = async (email: string, code: string) => {
-    setIsConsuming(true)
+    setIsConsuming(true);
     try {
-      return await consumeAccessCode(email, code, endpoints)
+      return await consumeAccessCode(email, code, endpoints);
     } finally {
-      setIsConsuming(false)
+      setIsConsuming(false);
     }
-  }
+  };
 
   const validateAndConsume = async (email: string, code: string) => {
-    setIsValidating(true)
-    setIsConsuming(true)
+    setIsValidating(true);
+    setIsConsuming(true);
     try {
-      return await validateAndConsumeAccessCode(email, code, endpoints)
+      return await validateAndConsumeAccessCode(email, code, endpoints);
     } finally {
-      setIsValidating(false)
-      setIsConsuming(false)
+      setIsValidating(false);
+      setIsConsuming(false);
     }
-  }
+  };
 
   return {
     validate,
@@ -103,5 +99,5 @@ export function useAccessCodeIntegration() {
     isValidating,
     isConsuming,
     isProcessing: isValidating || isConsuming,
-  }
+  };
 }

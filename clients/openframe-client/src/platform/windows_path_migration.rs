@@ -28,8 +28,10 @@ pub fn run() {
         let path_str = String::from_utf16_lossy(
             &raw_value
                 .bytes
-                .chunks_exact(2)
-                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| u16::from_le_bytes(*c))
                 .collect::<Vec<u16>>(),
         )
         .trim_end_matches('\0')

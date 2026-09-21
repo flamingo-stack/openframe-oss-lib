@@ -1,6 +1,6 @@
 package com.openframe.data.document.device;
 import com.openframe.data.document.TenantScoped;
-import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.rmm.script.OsType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import org.springframework.data.annotation.CreatedDate;

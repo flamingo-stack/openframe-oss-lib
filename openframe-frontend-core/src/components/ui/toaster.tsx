@@ -1,15 +1,15 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { Toaster as SonnerToaster, toast as sonnerToast } from 'sonner'
-import type { ExternalToast } from 'sonner'
-import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon'
-import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
-import { ToolIcon } from '../tool-icon'
-import type { ToolType } from '../../types/tool.types'
-import { cn } from '../../utils/cn'
+import { type ComponentProps, type ReactNode, useState } from 'react';
+import { Toaster as SonnerToaster, toast as sonnerToast } from 'sonner';
+import type { ExternalToast } from 'sonner';
+import type { ToolType } from '../../types/tool.types';
+import { cn } from '../../utils/cn';
+import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
+import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { ToolIcon } from '../tool-icon';
 
-export type ToastVariant = 'default' | 'success' | 'warning' | 'error' | 'info'
+export type ToastVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
 
 export const dotColorByVariant: Record<ToastVariant, string> = {
   default: 'bg-ods-text-secondary',
@@ -17,7 +17,7 @@ export const dotColorByVariant: Record<ToastVariant, string> = {
   warning: 'bg-ods-warning',
   error: 'bg-ods-error',
   info: 'bg-ods-text-secondary',
-}
+};
 
 export const progressColorByVariant: Record<ToastVariant, string> = {
   default: 'bg-ods-text-secondary',
@@ -25,17 +25,17 @@ export const progressColorByVariant: Record<ToastVariant, string> = {
   warning: 'bg-ods-warning',
   error: 'bg-ods-error',
   info: 'bg-ods-text-secondary',
-}
+};
 
 interface ToastHeaderProps {
-  id: string | number
-  variant: ToastVariant
-  title?: React.ReactNode
-  description?: React.ReactNode
-  duration?: number
-  dismissible?: boolean
-  className?: string
-  showProgress?: boolean
+  id: string | number;
+  variant: ToastVariant;
+  title?: ReactNode;
+  description?: ReactNode;
+  duration?: number;
+  dismissible?: boolean;
+  className?: string;
+  showProgress?: boolean;
 }
 
 function ToastHeader({
@@ -49,22 +49,27 @@ function ToastHeader({
   showProgress = true,
 }: ToastHeaderProps) {
   return (
-    <div
-      className={cn(
-        'relative flex w-full items-start gap-2 overflow-hidden bg-ods-card p-3',
-        className,
-      )}
-    >
+    <div className={cn('relative flex w-full items-start gap-2 overflow-hidden bg-ods-card p-3', className)}>
       <div className="flex size-6 shrink-0 items-center justify-center">
         <span className={cn('size-[9px] rounded-full', dotColorByVariant[variant])} />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         {title ? (
-          <p className="truncate pr-5 text-h4 text-ods-text-primary" title={typeof title === 'string' ? title : undefined}>{title}</p>
+          <p
+            className="truncate pr-5 text-ods-text-primary text-h4"
+            title={typeof title === 'string' ? title : undefined}
+          >
+            {title}
+          </p>
         ) : null}
         {description ? (
-          <p className="text-h6 text-ods-text-secondary line-clamp-3" title={typeof description === 'string' ? description : undefined}>{description}</p>
+          <p
+            className="line-clamp-3 text-ods-text-secondary text-h6"
+            title={typeof description === 'string' ? description : undefined}
+          >
+            {description}
+          </p>
         ) : null}
       </div>
 
@@ -81,27 +86,24 @@ function ToastHeader({
 
       {showProgress && duration !== Infinity && duration > 0 ? (
         <div
-          className={cn(
-            'absolute inset-x-0 bottom-0 h-1 origin-left',
-            progressColorByVariant[variant],
-          )}
+          className={cn('absolute inset-x-0 bottom-0 h-1 origin-left', progressColorByVariant[variant])}
           style={{
             animation: `toast-progress ${duration}ms linear forwards`,
           }}
         />
       ) : null}
     </div>
-  )
+  );
 }
 
 export interface ToastCardProps {
-  id: string | number
-  variant?: ToastVariant
-  title?: React.ReactNode
-  description?: React.ReactNode
-  duration?: number
-  dismissible?: boolean
-  className?: string
+  id: string | number;
+  variant?: ToastVariant;
+  title?: ReactNode;
+  description?: ReactNode;
+  duration?: number;
+  dismissible?: boolean;
+  className?: string;
 }
 
 export function ToastCard({
@@ -130,25 +132,25 @@ export function ToastCard({
         dismissible={dismissible}
       />
     </div>
-  )
+  );
 }
 
 export interface CommandApprovalToastProps {
-  id: string | number
-  variant?: ToastVariant
-  title?: React.ReactNode
-  description?: React.ReactNode
-  command: string
-  toolType?: ToolType
-  approvalDescription?: React.ReactNode
-  approveLabel?: string
-  rejectLabel?: string
-  onApprove?: () => void
-  onReject?: () => void
-  duration?: number
-  dismissible?: boolean
-  defaultExpanded?: boolean
-  className?: string
+  id: string | number;
+  variant?: ToastVariant;
+  title?: ReactNode;
+  description?: ReactNode;
+  command: string;
+  toolType?: ToolType;
+  approvalDescription?: ReactNode;
+  approveLabel?: string;
+  rejectLabel?: string;
+  onApprove?: () => void;
+  onReject?: () => void;
+  duration?: number;
+  dismissible?: boolean;
+  defaultExpanded?: boolean;
+  className?: string;
 }
 
 export function CommandApprovalToast({
@@ -168,17 +170,17 @@ export function CommandApprovalToast({
   defaultExpanded = false,
   className,
 }: CommandApprovalToastProps) {
-  const [expanded, setExpanded] = React.useState(defaultExpanded)
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   const handleApprove = () => {
-    onApprove?.()
-    sonnerToast.dismiss(id)
-  }
+    onApprove?.();
+    sonnerToast.dismiss(id);
+  };
 
   const handleReject = () => {
-    onReject?.()
-    sonnerToast.dismiss(id)
-  }
+    onReject?.();
+    sonnerToast.dismiss(id);
+  };
 
   return (
     <div
@@ -206,24 +208,20 @@ export function CommandApprovalToast({
       >
         <div className="overflow-hidden">
           <div className="flex h-11 w-full items-center gap-2 border-b border-ods-border bg-ods-card px-3 py-2">
-            <p className="min-w-0 flex-1 truncate text-h6 text-ods-text-primary" title={command}>
+            <p className="min-w-0 flex-1 truncate text-ods-text-primary text-h6" title={command}>
               {command}
             </p>
             {toolType ? <ToolIcon toolType={toolType} size={16} /> : null}
           </div>
 
           <div className="flex flex-col gap-2 bg-ods-bg p-3">
-            {approvalDescription ? (
-              <p className="text-h6 text-ods-text-secondary">
-                {approvalDescription}
-              </p>
-            ) : null}
+            {approvalDescription ? <p className="text-ods-text-secondary text-h6">{approvalDescription}</p> : null}
             <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={handleApprove}
                 tabIndex={expanded ? 0 : -1}
-                className="flex flex-1 items-center justify-center rounded-md bg-ods-accent px-2 py-2 text-h5 text-ods-text-on-accent transition-colors hover:bg-ods-accent-hover active:bg-ods-accent-active"
+                className="flex flex-1 items-center justify-center rounded-md bg-ods-accent px-2 py-2 text-ods-text-on-accent transition-colors text-h5 hover:bg-ods-accent-hover active:bg-ods-accent-active"
               >
                 {approveLabel}
               </button>
@@ -231,7 +229,7 @@ export function CommandApprovalToast({
                 type="button"
                 onClick={handleReject}
                 tabIndex={expanded ? 0 : -1}
-                className="flex flex-1 items-center justify-center rounded-md border border-ods-border bg-ods-card px-2 py-2 text-h5 text-ods-text-primary transition-colors hover:bg-ods-bg-hover"
+                className="flex flex-1 items-center justify-center rounded-md border border-ods-border bg-ods-card px-2 py-2 text-ods-text-primary transition-colors text-h5 hover:bg-ods-bg-hover"
               >
                 {rejectLabel}
               </button>
@@ -244,7 +242,7 @@ export function CommandApprovalToast({
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="flex w-full items-center gap-2 bg-ods-card px-3 py-2 text-left text-h6 text-ods-text-primary transition-colors hover:bg-ods-bg-hover"
+          className="flex w-full items-center gap-2 bg-ods-card px-3 py-2 text-left text-ods-text-primary transition-colors text-h6 hover:bg-ods-bg-hover"
           aria-expanded={false}
         >
           <span className="flex-1">Show Command</span>
@@ -252,19 +250,13 @@ export function CommandApprovalToast({
         </button>
       )}
     </div>
-  )
+  );
 }
 
-export type ToasterProps = React.ComponentProps<typeof SonnerToaster>
+export type ToasterProps = ComponentProps<typeof SonnerToaster>;
 
-export function Toaster({
-  position = 'bottom-right',
-  offset = 24,
-  gap = 8,
-  toastOptions,
-  ...rest
-}: ToasterProps = {}) {
-  const { classNames: userClassNames, ...restToastOptions } = toastOptions ?? {}
+export function Toaster({ position = 'bottom-right', offset = 24, gap = 8, toastOptions, ...rest }: ToasterProps = {}) {
+  const { classNames: userClassNames, ...restToastOptions } = toastOptions ?? {};
 
   return (
     <>
@@ -289,30 +281,22 @@ export function Toaster({
         {...rest}
       />
     </>
-  )
+  );
 }
 
 export interface ShowToastOptions extends Omit<ExternalToast, 'description'> {
-  title?: React.ReactNode
-  description?: React.ReactNode
-  variant?: ToastVariant
+  title?: ReactNode;
+  description?: ReactNode;
+  variant?: ToastVariant;
 }
 
 export function showToast(options: ShowToastOptions | string) {
-  const opts: ShowToastOptions =
-    typeof options === 'string' ? { title: options } : options
+  const opts: ShowToastOptions = typeof options === 'string' ? { title: options } : options;
 
-  const {
-    title,
-    description,
-    variant = 'default',
-    duration = 4000,
-    dismissible = true,
-    ...rest
-  } = opts
+  const { title, description, variant = 'default', duration = 4000, dismissible = true, ...rest } = opts;
 
   return sonnerToast.custom(
-    (id) => (
+    id => (
       <ToastCard
         id={id}
         variant={variant}
@@ -323,12 +307,11 @@ export function showToast(options: ShowToastOptions | string) {
       />
     ),
     { duration, dismissible, ...rest },
-  )
+  );
 }
 
 export interface ShowCommandApprovalToastOptions
-  extends Omit<ExternalToast, 'description'>,
-    Omit<CommandApprovalToastProps, 'id'> {}
+  extends Omit<ExternalToast, 'description'>, Omit<CommandApprovalToastProps, 'id'> {}
 
 export function showCommandApprovalToast(options: ShowCommandApprovalToastOptions) {
   const {
@@ -346,10 +329,10 @@ export function showCommandApprovalToast(options: ShowCommandApprovalToastOption
     duration = Infinity,
     dismissible = true,
     ...rest
-  } = options
+  } = options;
 
   return sonnerToast.custom(
-    (id) => (
+    id => (
       <CommandApprovalToast
         id={id}
         variant={variant}
@@ -368,5 +351,5 @@ export function showCommandApprovalToast(options: ShowCommandApprovalToastOption
       />
     ),
     { duration, dismissible, ...rest },
-  )
+  );
 }

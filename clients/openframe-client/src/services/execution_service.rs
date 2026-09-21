@@ -2,6 +2,11 @@ use std::time::Instant;
 
 use crate::models::{ExecutionRequest, RmmResult};
 
+#[cfg(windows)]
+use crate::models::PrivilegePolicy;
+#[cfg(any(unix, windows))]
+use crate::{executor::Privilege, models::PrivilegeLevel};
+
 #[derive(Clone, Default)]
 pub struct ExecutionService;
 
@@ -15,17 +20,20 @@ impl ExecutionService {
 
         #[cfg(any(unix, windows))]
         {
-            use crate::executor::{execute_script, Privilege, ScriptParams};
-            use crate::models::PrivilegeLevel;
+            use crate::executor::{execute_script, ScriptParams};
+            use tracing::{info, warn};
 
             let timeout_secs = match req.timeout_secs {
                 0 => 900,
                 t => t.min(u32::MAX as u64) as u32,
             };
-            let privilege = match req.privilege {
-                PrivilegeLevel::Admin => Privilege::Agent,
-                PrivilegeLevel::User => Privilege::User,
-            };
+            let privilege = resolve_privilege(req);
+
+            info!(
+                execution_id = req.execution_id,
+                privilege = ?privilege,
+                "Executing script"
+            );
 
             let result = execute_script(ScriptParams {
                 code: req.code,
@@ -38,6 +46,12 @@ impl ExecutionService {
             .await;
 
             let error = if result.retcode == 85 {
+                warn!(
+                    execution_id = req.execution_id,
+                    privilege = ?privilege,
+                    detail = %result.stderr,
+                    "Script did not start"
+                );
                 Some(result.stderr.clone())
             } else {
                 None
@@ -73,6 +87,27 @@ impl ExecutionService {
             }
         }
     }
+}
+
+#[cfg(any(unix, windows))]
+fn base_privilege(level: PrivilegeLevel) -> Privilege {
+    match level {
+        PrivilegeLevel::Admin => Privilege::Agent,
+        PrivilegeLevel::User => Privilege::User,
+    }
+}
+
+#[cfg(windows)]
+fn resolve_privilege(req: &ExecutionRequest<'_>) -> Privilege {
+    match req.privilege_policy {
+        PrivilegePolicy::InteractiveElevated => Privilege::ElevatedUser,
+        PrivilegePolicy::AsRequested => base_privilege(req.privilege),
+    }
+}
+
+#[cfg(unix)]
+fn resolve_privilege(req: &ExecutionRequest<'_>) -> Privilege {
+    base_privilege(req.privilege)
 }
 
 #[cfg(all(test, unix))]

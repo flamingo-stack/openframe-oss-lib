@@ -1,4 +1,5 @@
-import { ToolType } from "./tool.types";
+import type { ReactNode } from 'react';
+import type { ToolType } from './tool.types';
 
 export type ApprovalLevel = 'ALLOW' | 'ASK_USER' | 'ASK_TECHNICIAN' | 'DENY';
 
@@ -19,7 +20,7 @@ export interface PermissionCategory {
   id: string;
   name: string;
   /** Optional leading icon; the panel falls back to a shield. */
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   policies: PermissionPolicy[];
 }
 

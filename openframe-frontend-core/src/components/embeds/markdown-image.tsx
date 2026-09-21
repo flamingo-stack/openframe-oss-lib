@@ -31,13 +31,16 @@ const DISPLAY_W = 768; // logical width hint; the optimizer handles srcset + ret
 
 export function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
   const { transformImageSrc } = useRichMarkdownRuntime();
-  const [ratio, setRatio] = useState<number | null>(null); // width / height
+  // Tagged with the src it was measured from. That tag IS the reset: a reused
+  // instance handed a new `src` stops matching immediately, so it can never
+  // size the new image with the previous image's ratio — where the old explicit
+  // `setRatio(null)` in the effect did the same thing one commit late (and cost
+  // a second render pass every time).
+  const [probed, setProbed] = useState<{ src: string; ratio: number } | null>(null);
+  const ratio = probed?.src === src ? probed.ratio : null; // width / height
 
   useEffect(() => {
     let cancelled = false;
-    // Reset on src change so a reused instance doesn't briefly size the new image with
-    // the previous image's ratio.
-    setRatio(null);
     // Probe a tiny aspect-preserving variant so we learn the real ratio without
     // downloading the full image; the display copy is then fetched once, at the right size.
     // When no transformer is wired (embedders), fall back to the raw src.
@@ -45,11 +48,11 @@ export function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
     const probe = new window.Image();
     probe.onload = () => {
       if (!cancelled && probe.naturalWidth && probe.naturalHeight) {
-        setRatio(probe.naturalWidth / probe.naturalHeight);
+        setProbed({ src, ratio: probe.naturalWidth / probe.naturalHeight });
       }
     };
     probe.onerror = () => {
-      if (!cancelled) setRatio(1.5); // neutral fallback so we still render something
+      if (!cancelled) setProbed({ src, ratio: 1.5 }); // neutral fallback so we still render something
     };
     probe.src = probeSrc;
     return () => {

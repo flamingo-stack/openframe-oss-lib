@@ -9,7 +9,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Compact, reusable menu triggered by an ellipsis icon button. Built on top of Radix DropdownMenu used in the UI Kit.',
+        component:
+          'Compact, reusable menu triggered by an ellipsis icon button. Built on top of Radix DropdownMenu used in the UI Kit.',
       },
     },
   },
@@ -42,8 +43,10 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
-      <div style={{ padding: '4rem', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+    Story => (
+      <div
+        style={{ padding: '4rem', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}
+      >
         <Story />
       </div>
     ),

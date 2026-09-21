@@ -1,11 +1,12 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
 import { Sparkles, Upload } from 'lucide-react';
+import type React from 'react';
+import { useState } from 'react';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
-import { Label } from '../ui/label';
-import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { AIEnrichSection } from './ai-enrich/AIEnrichSection';
 import type { AIRequiredField } from './ai-enrich/AIEnrichSection';
@@ -125,16 +126,16 @@ export function HighlightVideoSection({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Highlight Video Configuration */}
-      <div className="space-y-3 p-4 bg-ods-card rounded-lg border border-ods-border">
+      <div className="space-y-3 rounded-lg border border-ods-border bg-ods-card p-4">
         <div className="flex items-center gap-4">
           <div className="flex-1">
             <Label>Target Duration</Label>
             <Select
               value={targetDurationSeconds.toString()}
-              onValueChange={(value) => onTargetDurationChange(parseInt(value))}
+              onValueChange={value => onTargetDurationChange(parseInt(value))}
               disabled={disabled}
             >
-              <SelectTrigger className="bg-ods-bg-surface mt-1">
+              <SelectTrigger className="mt-1 bg-ods-bg-surface">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-ods-card">
@@ -154,7 +155,7 @@ export function HighlightVideoSection({
         title="Highlight Video"
         description={`Generate a ${Math.floor(targetDurationSeconds / 60)}-minute summary video using Claude AI + Shotstack`}
         icon={<Sparkles className="h-5 w-5" />}
-        buttonLabel={hasExistingHighlight ? "Regenerate Highlight" : "Generate Highlight"}
+        buttonLabel={hasExistingHighlight ? 'Regenerate Highlight' : 'Generate Highlight'}
         loadingLabel="Generating highlight..."
         onEnrich={onGenerateHighlight}
         loading={isGenerating}
@@ -162,9 +163,11 @@ export function HighlightVideoSection({
         requiredFields={requiredFields}
         status={generationStatus}
         statusMessage={
-          generationStatusMessage ?
-            (generationProgress && generationProgress > 0 ? `${generationStatusMessage} (${generationProgress}%)` : generationStatusMessage) :
-          undefined
+          generationStatusMessage
+            ? generationProgress && generationProgress > 0
+              ? `${generationStatusMessage} (${generationProgress}%)`
+              : generationStatusMessage
+            : undefined
         }
         disabledMessage={disabled ? "Switch to 'Upload Video' to enable AI processing" : disabledMessage}
         showCancel={!!onCancelGeneration}
@@ -174,12 +177,10 @@ export function HighlightVideoSection({
 
       {/* Highlight Video Preview + Manual Upload */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Label>Highlight Video</Label>
-            {highlightVideoSource === 'ai_generated' && (
-              <AIGeneratedBadge />
-            )}
+            {highlightVideoSource === 'ai_generated' && <AIGeneratedBadge />}
             {highlightVideoDurationMs && (
               <Badge variant="outline" className="text-h6">
                 {formatDuration(highlightVideoDurationMs)}
@@ -198,9 +199,7 @@ export function HighlightVideoSection({
           </Button>
         </div>
 
-        {uploadError && (
-          <p className="text-h6 text-ods-error">{uploadError}</p>
-        )}
+        {uploadError && <p className="text-ods-error text-h6">{uploadError}</p>}
 
         {highlightVideoUrl ? (
           VideoPreviewComponent ? (
@@ -212,19 +211,15 @@ export function HighlightVideoSection({
           ) : (
             // Default simple preview — the <Video> SSOT (MuxPlayer) plays
             // MP4 and Mux HLS alike; aspect-video box reserves the height.
-            <div className="relative rounded-lg border border-ods-border overflow-hidden bg-black">
-              <div className="w-full aspect-video max-h-[300px]">
-                <Video
-                  kind="file"
-                  url={highlightVideoUrl}
-                  poster={highlightVideoThumbnail || undefined}
-                />
+            <div className="relative overflow-hidden rounded-lg border border-ods-border bg-black">
+              <div className="aspect-video max-h-[300px] w-full">
+                <Video kind="file" url={highlightVideoUrl} poster={highlightVideoThumbnail || undefined} />
               </div>
               {onDeleteHighlight && (
                 <button
                   type="button"
                   onClick={onDeleteHighlight}
-                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
+                  className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 transition-colors hover:bg-black/80"
                 >
                   <span className="sr-only">Delete</span>
                   <svg className="h-4 w-4 text-ods-text-on-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -235,7 +230,7 @@ export function HighlightVideoSection({
             </div>
           )
         ) : (
-          <p className="text-h6 text-ods-text-secondary italic">
+          <p className="italic text-ods-text-secondary text-h6">
             No highlight video yet. Use AI generation above or upload manually.
           </p>
         )}

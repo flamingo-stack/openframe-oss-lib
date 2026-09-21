@@ -177,7 +177,11 @@ public class MingoDeviceTest extends MingoBaseTest {
     public void testHostnameQuery() {
         String actualHostname = ssh.hostname();
 
-        RunResult result = prompt("What is the hostname of the machine " + host + "?");
+        // "the online machine": the tenant can hold several device records for this hostname, one
+        // per enroll/uninstall cycle, and the assistant is entitled to stop and ask which is meant.
+        // Both these cases assert against values read over SSH from the live box, so the online
+        // record is the only one whose answer can match. See MingoMdmTest.testPolicyAssignHost.
+        RunResult result = prompt("What is the hostname of the online machine " + host + "?");
 
         assertThat(result.finalText())
                 .as("Reply should contain the real hostname %s.\n%s", actualHostname, result)
@@ -208,7 +212,7 @@ public class MingoDeviceTest extends MingoBaseTest {
     public void testOsVersion() {
         String build = ssh.osBuild();
 
-        RunResult result = prompt("What Windows version and build number is the machine " + host + " running?");
+        RunResult result = prompt("What Windows version and build number is the online machine " + host + " running?");
 
         assertThat(result.finalText())
                 .as("Reply should include the real OS build %s.\n%s", build, result)
@@ -285,11 +289,18 @@ public class MingoDeviceTest extends MingoBaseTest {
         String name = "E2E-" + runId + "-run";
 
         // Seed a script (setup) whose body writes the token to a known path on the box.
+        //
+        // ADMIN rather than USER: a USER-privilege execution is dispatched as run_as_user, which the agent
+        // refuses with "run_as_user requested but no active interactive session" unless somebody is logged
+        // into the box — so as USER this case failed on the target having no console/RDP session rather
+        // than on anything Mingo did. Nothing here is about the run-as-user path (the case is that Mingo
+        // can run a *saved* script), so it should not depend on that session existing. PrivilegeLevel is
+        // {USER, ADMIN}; there is no SYSTEM level to ask for.
         Script script = ScriptApi.createScript(CreateScriptInput.builder()
                 .name(name)
                 .description("e2e run target")
                 .shell("POWERSHELL")
-                .privilegeLevel("USER")
+                .privilegeLevel("ADMIN")
                 .scriptBody("Set-Content -LiteralPath '" + path + "' -Value '" + token + "' -NoNewline -Encoding utf8")
                 .supportedPlatforms(List.of("WINDOWS"))
                 .defaultTimeoutSeconds(90)

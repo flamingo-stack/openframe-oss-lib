@@ -1,9 +1,25 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import {
+  Home,
+  Settings,
+  Users,
+  Bell,
+  Shield,
+  Mail,
+  Star,
+  Heart,
+  Zap,
+  Globe,
+  Lock,
+  Database,
+  Cloud,
+  Cpu,
+  Wifi,
+} from 'lucide-react';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
-import { Home, Settings, Users, Bell, Shield, Mail, Star, Heart, Zap, Globe, Lock, Database, Cloud, Cpu, Wifi } from 'lucide-react';
 
-import { TabNavigation, TabItem } from '../components/ui/tab-navigation';
+import { TabNavigation, type TabItem } from '../components/ui/tab-navigation';
 
 const defaultTabs: TabItem[] = [
   { id: 'overview', label: 'Overview', icon: Home },
@@ -80,13 +96,7 @@ type Story = StoryObj<typeof meta>;
 export const Controlled: Story = {
   render: () => {
     const [active, setActive] = useState('overview');
-    return (
-      <TabNavigation
-        tabs={defaultTabs}
-        activeTab={active}
-        onTabChange={setActive}
-      />
-    );
+    return <TabNavigation tabs={defaultTabs} activeTab={active} onTabChange={setActive} />;
   },
   args: { tabs: defaultTabs },
 };
@@ -98,12 +108,8 @@ export const WithContent: Story = {
   render: () => {
     const [active, setActive] = useState('overview');
     return (
-      <TabNavigation
-        tabs={defaultTabs}
-        activeTab={active}
-        onTabChange={setActive}
-      >
-        {(activeTab) => (
+      <TabNavigation tabs={defaultTabs} activeTab={active} onTabChange={setActive}>
+        {activeTab => (
           <div style={{ padding: '1.5rem' }}>
             Active tab: <strong>{activeTab}</strong>
           </div>
@@ -120,13 +126,7 @@ export const WithContent: Story = {
 export const WithIndicators: Story = {
   render: () => {
     const [active, setActive] = useState('overview');
-    return (
-      <TabNavigation
-        tabs={tabsWithIndicators}
-        activeTab={active}
-        onTabChange={setActive}
-      />
-    );
+    return <TabNavigation tabs={tabsWithIndicators} activeTab={active} onTabChange={setActive} />;
   },
   args: { tabs: tabsWithIndicators },
 };
@@ -184,9 +184,7 @@ export const TwoTabs: Story = {
       { id: 'settings', label: 'Settings', icon: Settings },
     ];
     const [active, setActive] = useState('overview');
-    return (
-      <TabNavigation tabs={tabs} activeTab={active} onTabChange={setActive} />
-    );
+    return <TabNavigation tabs={tabs} activeTab={active} onTabChange={setActive} />;
   },
   args: { tabs: defaultTabs },
 };
@@ -197,13 +195,7 @@ export const TwoTabs: Story = {
 export const DefaultTabOverride: Story = {
   render: () => {
     const [active, setActive] = useState('settings');
-    return (
-      <TabNavigation
-        tabs={defaultTabs}
-        activeTab={active}
-        onTabChange={setActive}
-      />
-    );
+    return <TabNavigation tabs={defaultTabs} activeTab={active} onTabChange={setActive} />;
   },
   args: { tabs: defaultTabs },
 };
@@ -219,7 +211,7 @@ export const CustomClassName: Story = {
         tabs={defaultTabs}
         activeTab={active}
         onTabChange={setActive}
-        className="bg-ods-card rounded-t-lg"
+        className="rounded-t-lg bg-ods-card"
       />
     );
   },
@@ -234,11 +226,7 @@ export const ScrollShadows: Story = {
     const [active, setActive] = useState('overview');
     return (
       <div style={{ maxWidth: 500 }}>
-        <TabNavigation
-          tabs={manyTabs}
-          activeTab={active}
-          onTabChange={setActive}
-        />
+        <TabNavigation tabs={manyTabs} activeTab={active} onTabChange={setActive} />
       </div>
     );
   },
@@ -253,12 +241,7 @@ export const CustomShadowColor: Story = {
     const [active, setActive] = useState('overview');
     return (
       <div style={{ maxWidth: 500 }}>
-        <TabNavigation
-          tabs={manyTabs}
-          activeTab={active}
-          onTabChange={setActive}
-          shadowClassName="from-red-500"
-        />
+        <TabNavigation tabs={manyTabs} activeTab={active} onTabChange={setActive} shadowClassName="from-red-500" />
       </div>
     );
   },
@@ -272,12 +255,12 @@ export const ShadowOnCustomBackground: Story = {
   render: () => {
     const [active, setActive] = useState('overview');
     return (
-      <div style={{ maxWidth: 500 }} className="bg-ods-card rounded-lg">
+      <div style={{ maxWidth: 500 }} className="rounded-lg bg-ods-card">
         <TabNavigation
           tabs={manyTabs}
           activeTab={active}
           onTabChange={setActive}
-          className="bg-ods-card rounded-t-lg"
+          className="rounded-t-lg bg-ods-card"
           shadowClassName="from-ods-card"
         />
       </div>
@@ -296,9 +279,7 @@ export const NoShadows: Story = {
       { id: 'settings', label: 'Settings', icon: Settings },
     ];
     const [active, setActive] = useState('overview');
-    return (
-      <TabNavigation tabs={tabs} activeTab={active} onTabChange={setActive} />
-    );
+    return <TabNavigation tabs={tabs} activeTab={active} onTabChange={setActive} />;
   },
   args: { tabs: defaultTabs },
 };

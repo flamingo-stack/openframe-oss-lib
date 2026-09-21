@@ -10,13 +10,13 @@ import {
   TRAILER_SENTINEL,
   type SseLeadingFrame,
   type SseTrailingUsageFrame,
-} from './frames'
+} from './frames';
 
-const encoder = new TextEncoder()
+const encoder = new TextEncoder();
 
 /** Matches every framing sentinel byte: `\0`, `\x1E`, `\x1F`. THE one
  *  regex — `stripSentinelBytes` is its only consumer. */
-const SENTINEL_BYTES_RE = /[\u0000\u001E\u001F]/g
+const SENTINEL_BYTES_RE = /[\u0000\u001E\u001F]/g;
 
 /**
  * Remove the SSE framing sentinel bytes (`\0`, `\x1E`, `\x1F`) from model
@@ -36,17 +36,17 @@ const SENTINEL_BYTES_RE = /[\u0000\u001E\u001F]/g
  * accumulated string interchangeably.
  */
 export function stripSentinelBytes(text: string): string {
-  return text.replace(SENTINEL_BYTES_RE, '')
+  return text.replace(SENTINEL_BYTES_RE, '');
 }
 
 /** Encode one leading frame: JSON + `\0` terminator. */
 export function encodeLeadingFrame(frame: SseLeadingFrame): Uint8Array {
-  return encoder.encode(JSON.stringify(frame) + FRAME_TERMINATOR)
+  return encoder.encode(JSON.stringify(frame) + FRAME_TERMINATOR);
 }
 
 /** Encode the single `\x1E` end-of-leading-frames sentinel. */
 export function encodeEndOfLeading(): Uint8Array {
-  return encoder.encode(END_OF_LEADING)
+  return encoder.encode(END_OF_LEADING);
 }
 
 /**
@@ -61,11 +61,11 @@ export function encodeEndOfLeading(): Uint8Array {
  * must call `stripSentinelBytes` on their own copy — see its docblock.
  */
 export function encodeTextDelta(text: string): Uint8Array {
-  return encoder.encode(stripSentinelBytes(text))
+  return encoder.encode(stripSentinelBytes(text));
 }
 
 /** Encode the trailing usage frame: `\x1F` + JSON, no terminator
  *  (runs to stream end). */
 export function encodeTrailingUsageFrame(frame: SseTrailingUsageFrame): Uint8Array {
-  return encoder.encode(TRAILER_SENTINEL + JSON.stringify(frame))
+  return encoder.encode(TRAILER_SENTINEL + JSON.stringify(frame));
 }

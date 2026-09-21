@@ -1,6 +1,6 @@
 package com.openframe.api.dto.rmm.schedulerun;
 
-import com.openframe.data.document.rmm.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

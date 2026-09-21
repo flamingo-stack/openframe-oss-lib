@@ -1,18 +1,22 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../../utils/cn'
-import { SparklesIcon } from '../../icons/sparkles-icon'
-import { getConfidenceBorderClass, getConfidenceTextClass, getConfidenceLabel } from '../../../utils/confidence-helpers'
+import type React from 'react';
+import { cn } from '../../../utils/cn';
+import {
+  getConfidenceBorderClass,
+  getConfidenceTextClass,
+  getConfidenceLabel,
+} from '../../../utils/confidence-helpers';
+import { SparklesIcon } from '../../icons/sparkles-icon';
 
-export type AIStatus = 'idle' | 'loading' | 'success' | 'error'
+export type AIStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export interface AIStatusIndicatorProps {
-  status: AIStatus
-  confidence?: number
-  message?: string
-  showConfidence?: boolean
-  className?: string
+  status: AIStatus;
+  confidence?: number;
+  message?: string;
+  showConfidence?: boolean;
+  className?: string;
 }
 
 const statusConfig = {
@@ -36,7 +40,7 @@ const statusConfig = {
     bgColor: 'bg-ods-error/10',
     label: 'Failed',
   },
-}
+};
 
 export const AIStatusIndicator: React.FC<AIStatusIndicatorProps> = ({
   status,
@@ -45,36 +49,25 @@ export const AIStatusIndicator: React.FC<AIStatusIndicatorProps> = ({
   showConfidence = true,
   className,
 }) => {
-  const config = statusConfig[status]
+  const config = statusConfig[status];
 
-  const displayText = message || config.label
-  const confidenceLabel = showConfidence && confidence !== undefined
-    ? `${getConfidenceLabel(confidence)} (${confidence}%)`
-    : null
+  const displayText = message || config.label;
+  const confidenceLabel =
+    showConfidence && confidence !== undefined ? `${getConfidenceLabel(confidence)} (${confidence}%)` : null;
 
   return (
-    <div
-      className={cn(
-        'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg',
-        config.bgColor,
-        className
-      )}
-    >
+    <div className={cn('inline-flex items-center gap-2 rounded-lg px-3 py-1.5', config.bgColor, className)}>
       <SparklesIcon
         size={16}
         className={cn(
           status === 'loading' && 'animate-pulse',
-          confidence !== undefined && status === 'success'
-            ? getConfidenceTextClass(confidence)
-            : config.color
+          confidence !== undefined && status === 'success' ? getConfidenceTextClass(confidence) : config.color,
         )}
       />
       <span
         className={cn(
           'text-h6',
-          confidence !== undefined && status === 'success'
-            ? getConfidenceTextClass(confidence)
-            : config.color
+          confidence !== undefined && status === 'success' ? getConfidenceTextClass(confidence) : config.color,
         )}
       >
         {displayText}
@@ -82,14 +75,14 @@ export const AIStatusIndicator: React.FC<AIStatusIndicatorProps> = ({
       {confidenceLabel && status === 'success' && (
         <span
           className={cn(
-            'text-h6 px-2 py-0.5 rounded-full border',
+            'rounded-full border px-2 py-0.5 text-h6',
             getConfidenceBorderClass(confidence),
-            getConfidenceTextClass(confidence)
+            getConfidenceTextClass(confidence),
           )}
         >
           {confidenceLabel}
         </span>
       )}
     </div>
-  )
-}
+  );
+};
