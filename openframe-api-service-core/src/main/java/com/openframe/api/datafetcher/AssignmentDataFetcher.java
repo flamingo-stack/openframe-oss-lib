@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
+import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -106,12 +107,21 @@ public class AssignmentDataFetcher {
         return RELAY.toGlobalId("ItemAssignment", assignment.getId());
     }
 
+    // Ticket declares Node here like Organization and Machine do, and the assignment mutations take
+    // global ids — without this the raw id a client reads back cannot be passed to unassignItem.
+    @DgsData(parentType = "Ticket", field = "id")
+    public String ticketNodeId(DgsDataFetchingEnvironment dfe) {
+        Ticket ticket = dfe.getSource();
+        String ticketId = ticket.getId();
+        return RELAY.toGlobalId("Ticket", ticketId);
+    }
+
     @DgsData(parentType = "ItemAssignment", field = "target")
     public CompletableFuture<?> resolveTarget(DgsDataFetchingEnvironment dfe) {
         ItemAssignment assignment = dfe.getSource();
         String targetId = assignment.getTargetId();
         return switch (assignment.getTargetType()) {
-            case ORGANIZATION -> dfe.<String, Organization>getDataLoader("organizationDataLoader").load(targetId);
+            case ORGANIZATION -> dfe.<String, Organization>getDataLoader(OrganizationDataLoader.NAME).load(targetId);
             case DEVICE -> dfe.<String, Machine>getDataLoader("machineDataLoader").load(targetId);
             case TICKET -> dfe.<String, Ticket>getDataLoader("ticketDataLoader").load(targetId);
             case KNOWLEDGE_ARTICLE -> dfe.<String, KnowledgeBaseItem>getDataLoader("knowledgeBaseItemDataLoader").load(targetId);
