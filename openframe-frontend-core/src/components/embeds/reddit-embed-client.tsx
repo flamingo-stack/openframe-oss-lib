@@ -310,6 +310,13 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
     if (video && video.fallback_url) {
       console.log('📹 Found Reddit video:', video);
 
+      // DASH_\d+\.mp4 is the shape Reddit's CDN uses for this fallback URL,
+      // but it's not guaranteed. Both the poster and video URL rewrites below
+      // check the pattern actually matched before using the "rewritten"
+      // string, so a URL of a different shape simply falls back to the
+      // original fallback_url/no poster instead of producing a mangled URL.
+      const dashPattern = /DASH_\d+\.mp4.*$/;
+
       // Generate poster URL from video URL and preview data
       let posterUrl = '';
 
@@ -320,9 +327,13 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       } else {
         // Fallback: try to generate from video URL
         try {
-          const baseUrl = video.fallback_url.replace(/DASH_\d+\.mp4.*$/, '');
-          posterUrl = `${baseUrl}DASH_720.jpg`;
-          console.log('🎯 Generated poster URL:', posterUrl);
+          if (dashPattern.test(video.fallback_url)) {
+            const baseUrl = video.fallback_url.replace(dashPattern, '');
+            posterUrl = `${baseUrl}DASH_720.jpg`;
+            console.log('🎯 Generated poster URL:', posterUrl);
+          } else {
+            console.log('Fallback URL does not match DASH pattern - skipping poster generation');
+          }
         } catch {
           console.log('Could not generate poster URL');
         }
@@ -332,9 +343,9 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
       let videoUrl = video.fallback_url;
 
       // If it's a DASH URL, try to get a direct MP4 format
-      if (videoUrl.includes('DASH_')) {
+      if (videoUrl.includes('DASH_') && dashPattern.test(videoUrl)) {
         // Try different quality levels for Reddit videos
-        const baseUrl = videoUrl.replace(/DASH_\d+\.mp4.*$/, '');
+        const baseUrl = videoUrl.replace(dashPattern, '');
 
         // 480p as default: the widest-compatibility rung of Reddit's DASH
         // ladder (the others are 240/360/720).
