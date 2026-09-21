@@ -42,7 +42,7 @@ public class MachineIdCacheService {
 
     /**
      * Get cached machine info from cache or database by agent ID
-`     * Returns only essential fields (machineId, hostname, nickname, organizationId)
+     * Returns only essential fields (machineId, hostname, nickname, organizationId)
      *
      * @param agentId the agent ID
      * @return the CachedMachineInfo object, or null if not found

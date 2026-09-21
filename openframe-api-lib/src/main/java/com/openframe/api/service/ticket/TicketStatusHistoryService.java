@@ -26,7 +26,7 @@ public class TicketStatusHistoryService {
                        AuthPrincipal principal, String reason) {
         try {
             historyRepository.save(historyMapper.toHistory(ticket, from, to, principal, reason));
-            log.debug("Status transition recorded - ticketId: {}, {} → {}",
+            log.debug("Status transition recorded - ticketId: {}, {} -> {}",
                     ticket.getId(), from.getName(), to.getName());
         } catch (Exception e) {
             log.error("Status transition record failed — swallowed, transition unaffected - ticketId: {}",

@@ -30,12 +30,12 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
         // Debug logging for PKCE parameters before save
         OAuth2AuthorizationRequest request = authorization.getAttribute(OAuth2AuthorizationRequest.class.getName());
         if (request != null) {
-            log.debug("PKCE in request before save: {}", request.getAdditionalParameters());
+            log.debug("PKCE in request before save: keys={}", request.getAdditionalParameters().keySet());
         }
 
         OAuth2Authorization.Token<OAuth2AuthorizationCode> code = authorization.getToken(OAuth2AuthorizationCode.class);
         if (code != null) {
-            log.debug("PKCE in code metadata before save: {}", code.getMetadata());
+            log.debug("PKCE in code metadata before save: keys={}", code.getMetadata().keySet());
         }
 
         MongoOAuth2Authorization entity = MongoAuthorizationMapper.toEntity(authorization);
@@ -43,10 +43,10 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
 
         // Verify PKCE parameters after mapping
         if (entity.getArAdditional() != null) {
-            log.debug("PKCE in entity additional params: {}", entity.getArAdditional());
+            log.debug("PKCE in entity additional params: keys={}", entity.getArAdditional().keySet());
         }
         if (entity.getAuthorizationCodeMetadata() != null) {
-            log.debug("PKCE in entity code metadata: {}", entity.getAuthorizationCodeMetadata());
+            log.debug("PKCE in entity code metadata: keys={}", entity.getAuthorizationCodeMetadata().keySet());
         }
     }
 
@@ -88,12 +88,12 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
             // Debug logging for PKCE parameters
             OAuth2AuthorizationRequest request = auth.getAttribute(OAuth2AuthorizationRequest.class.getName());
             if (request != null) {
-                log.debug("PKCE in request: {}", request.getAdditionalParameters());
+                log.debug("PKCE in request: keys={}", request.getAdditionalParameters().keySet());
             }
 
             OAuth2Authorization.Token<OAuth2AuthorizationCode> code = auth.getToken(OAuth2AuthorizationCode.class);
             if (code != null) {
-                log.debug("PKCE in code metadata: {}", code.getMetadata());
+                log.debug("PKCE in code metadata: keys={}", code.getMetadata().keySet());
             }
 
             return auth;
