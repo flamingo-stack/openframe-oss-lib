@@ -13,7 +13,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
-import java.util.EnumSet;
 import java.util.Set;
 
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
@@ -25,68 +24,66 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_ATTEMPTS = "attempts";
     private static final String FIELD_LAST_ATTEMPT_AT = "lastAttemptAt";
-    private static final String FIELD_NEXT_ATTEMPT_AT = "nextAttemptAt";
+    private static final String FIELD_DUE_AT = "dueAt";
     private static final String FIELD_ACKED_AT = "ackedAt";
     private static final String FIELD_FINISHED_AT = "finishedAt";
     private static final String FIELD_EXPIRES_AT = "expiresAt";
     private static final String FIELD_FAILURE = "failure";
-
-    private static final Set<DeliveryStatus> PENDING_ONLY = EnumSet.of(DeliveryStatus.PENDING);
-    private static final Set<DeliveryStatus> OPEN = EnumSet.of(DeliveryStatus.PENDING, DeliveryStatus.ACKED);
 
     public CustomMachineDeliveryRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
         super(mongoTemplate);
     }
 
     @Override
-    public boolean markRepublished(String id, Instant attemptAt, Instant nextAttemptAt) {
+    public boolean markRepublished(String id, Set<DeliveryStatus> from, Instant attemptAt, Instant dueAt) {
         Update update = new Update()
                 .inc(FIELD_ATTEMPTS, 1)
                 .set(FIELD_LAST_ATTEMPT_AT, attemptAt)
-                .set(FIELD_NEXT_ATTEMPT_AT, nextAttemptAt);
-        return transition(id, PENDING_ONLY, update);
+                .set(FIELD_DUE_AT, dueAt);
+        return transition(id, from, update);
     }
 
     @Override
-    public boolean postpone(String id, Instant nextAttemptAt) {
-        Update update = new Update().set(FIELD_NEXT_ATTEMPT_AT, nextAttemptAt);
-        return transition(id, PENDING_ONLY, update);
+    public boolean postpone(String id, Set<DeliveryStatus> from, Instant dueAt) {
+        Update update = new Update().set(FIELD_DUE_AT, dueAt);
+        return transition(id, from, update);
     }
 
     @Override
-    public boolean markAcked(String id, Instant ackedAt) {
+    public boolean markAcked(String id, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt) {
         Update update = new Update()
                 .set(FIELD_STATUS, DeliveryStatus.ACKED)
-                .set(FIELD_ACKED_AT, ackedAt);
-        return transition(id, PENDING_ONLY, update);
+                .set(FIELD_ACKED_AT, ackedAt)
+                .set(FIELD_DUE_AT, dueAt);
+        return transition(id, from, update);
     }
 
     @Override
-    public boolean markDone(String id, Instant finishedAt, Instant expiresAt) {
+    public boolean markDone(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.DONE, finishedAt, expiresAt);
-        return transition(id, OPEN, update);
+        return transition(id, from, update);
     }
 
     @Override
-    public boolean markCancelled(String id, Instant finishedAt, Instant expiresAt) {
+    public boolean markCancelled(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.CANCELLED, finishedAt, expiresAt);
-        return transition(id, OPEN, update);
+        return transition(id, from, update);
     }
 
     @Override
-    public boolean markFailed(String id, DeliveryFailure failure, Instant finishedAt, Instant expiresAt) {
+    public boolean markFailed(String id, Set<DeliveryStatus> from, DeliveryFailure failure, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.FAILED, finishedAt, expiresAt)
                 .set(FIELD_FAILURE, failure);
-        return transition(id, OPEN, update);
+        return transition(id, from, update);
     }
 
     @Override
-    public long wake(String machineId, Instant nextAttemptAt) {
-        Criteria parkedForMachine = Criteria.where(FIELD_MACHINE_ID).is(machineId)
-                .and(FIELD_STATUS).is(DeliveryStatus.PENDING)
-                .and(FIELD_NEXT_ATTEMPT_AT).gt(nextAttemptAt);
-        Query query = new Query(parkedForMachine);
-        Update update = new Update().set(FIELD_NEXT_ATTEMPT_AT, nextAttemptAt);
+    public long wake(String machineId, Set<DeliveryStatus> from, Instant dueAt) {
+        Criteria laterRowsOfMachine = Criteria.where(FIELD_MACHINE_ID).is(machineId)
+                .and(FIELD_STATUS).in(from)
+                .and(FIELD_DUE_AT).gt(dueAt);
+        Query query = new Query(laterRowsOfMachine);
+        Update update = new Update().set(FIELD_DUE_AT, dueAt);
         UpdateResult result = mongoTemplate.updateMulti(query, update, MachineDelivery.class);
         return result.getModifiedCount();
     }

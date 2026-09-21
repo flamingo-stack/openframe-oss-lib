@@ -2,6 +2,7 @@ package com.openframe.data.repository.delivery.impl;
 
 import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +49,7 @@ class CustomMachineDeliveryRepositoryImplTest {
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
 
         // execution
-        boolean republished = repository.markRepublished(ID, now, now);
+        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, now);
 
         // verifications
         assertThat(republished).isTrue();
@@ -58,7 +59,7 @@ class CustomMachineDeliveryRepositoryImplTest {
                 .doesNotContain("ACKED");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("$inc")
-                .contains("nextAttemptAt");
+                .contains("dueAt");
     }
 
     @Test
@@ -68,7 +69,7 @@ class CustomMachineDeliveryRepositoryImplTest {
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(noRow);
 
         // execution
-        boolean republished = repository.markRepublished(ID, now, now);
+        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, now);
 
         // verifications
         assertThat(republished).isFalse();
@@ -81,7 +82,7 @@ class CustomMachineDeliveryRepositoryImplTest {
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
 
         // execution
-        boolean failed = repository.markFailed(ID, DeliveryFailure.TIMEOUT, now, now);
+        boolean failed = repository.markFailed(ID, DeliveryStatus.OPEN, DeliveryFailure.TIMEOUT, now, now);
 
         // verifications
         assertThat(failed).isTrue();
@@ -101,7 +102,7 @@ class CustomMachineDeliveryRepositoryImplTest {
         when(mongoTemplate.updateMulti(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(twoRows);
 
         // execution
-        long woken = repository.wake(MACHINE_ID, now);
+        long woken = repository.wake(MACHINE_ID, DeliveryStatus.UNACKED, now);
 
         // verifications
         assertThat(woken).isEqualTo(2);

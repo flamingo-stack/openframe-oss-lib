@@ -1,7 +1,6 @@
 package com.openframe.data.document.delivery;
 
 import com.openframe.data.document.TenantScoped;
-import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,8 +17,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "machine_delivery")
-@CompoundIndex(name = "machine_delivery_sweep", def = "{'tenantId': 1, 'type': 1, 'status': 1, 'nextAttemptAt': 1}")
-@CompoundIndex(name = "machine_delivery_watchdog", def = "{'tenantId': 1, 'type': 1, 'status': 1, 'ackedAt': 1}")
+@CompoundIndex(name = "machine_delivery_due", def = "{'tenantId': 1, 'status': 1, 'dueAt': 1}")
 public class MachineDelivery implements TenantScoped {
 
     @Id
@@ -36,14 +34,13 @@ public class MachineDelivery implements TenantScoped {
 
     private Instant dispatchedAt;
     private Instant lastAttemptAt;
-    private Instant nextAttemptAt;
+    private Instant dueAt;
     private Instant ackedAt;
     private Instant finishedAt;
 
     private DeliveryFailure failure;
-    private String error;
 
-    private ScheduleOfflineBehavior offlineBehavior;
+    private DeliveryOfflineBehavior offlineBehavior;
     private Long reconnectWindowSeconds;
 
     @Indexed(name = "machine_delivery_ttl", expireAfterSeconds = 0)
