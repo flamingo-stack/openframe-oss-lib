@@ -172,21 +172,21 @@ public class ScriptExecutionHistoryTest extends BaseTest {
         if (ownSchedule != null) {
             try {
                 ScriptScheduleApi.deleteSchedule(ownSchedule.getId());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 log.warn("Failed to delete schedule {} — it is left in the tenant: {}", ownSchedule.getId(), e.getMessage());
             }
         }
         if (ownDispatched != null) {
             try {
                 ScriptApi.deleteScript(ownDispatched.getId());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 log.warn("Failed to delete script {} — it is left in the tenant: {}", ownDispatched.getId(), e.getMessage());
             }
         }
         if (ownScript != null) {
             try {
                 ScriptApi.deleteScript(ownScript.getId());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 log.warn("Failed to delete script {} — it is left in the tenant: {}", ownScript.getId(), e.getMessage());
             }
         }

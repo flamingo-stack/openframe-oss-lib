@@ -191,12 +191,12 @@ public class ScriptScheduleDevicesTest extends BaseTest {
             }
             try {
                 ScriptScheduleApi.removeAllDevices(s.getId(), null, null);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 log.warn("Failed to clear the devices of schedule {}: {}", s.getId(), e.getMessage());
             }
             try {
                 ScriptScheduleApi.deleteSchedule(s.getId());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 log.warn("Failed to delete schedule {} — it is left in the tenant: {}", s.getId(), e.getMessage());
             }
         }
@@ -206,7 +206,7 @@ public class ScriptScheduleDevicesTest extends BaseTest {
             }
             try {
                 ScriptApi.deleteScript(s.getId());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 log.warn("Failed to delete script {} — it is left in the tenant: {}", s.getId(), e.getMessage());
             }
         }
