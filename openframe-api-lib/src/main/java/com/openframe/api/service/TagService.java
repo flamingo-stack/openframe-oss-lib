@@ -77,8 +77,16 @@ public class TagService {
         log.debug("Searching device tag values (tenant-wide): key: {}, search: {}, limit: {}",
                 tagKey, search, limit);
 
+        boolean tagKeyExists = tagRepository.existsByKeyIgnoreCaseAndEntityType(tagKey, TagEntityType.DEVICE);
         Tag tag = tagRepository.findValuesByKeyAndEntityType(tagKey, TagEntityType.DEVICE);
-        if (tag == null || tag.getValues() == null || tag.getValues().isEmpty()) {
+        if (tag == null) {
+            if (tagKeyExists) {
+                throw new IllegalStateException(
+                        "Tag key '" + tagKey + "' exists but repository returned null values for it");
+            }
+            return List.of();
+        }
+        if (tag.getValues() == null || tag.getValues().isEmpty()) {
             return List.of();
         }
 
