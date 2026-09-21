@@ -223,11 +223,15 @@ export function interpolateColors(startToken: string, endToken: string, progress
   // Was a pair of local `hexToRgb`/`rgbToHex` copies that shadowed the exported
   // ones below. They were not just duplicates — the local `rgbToHex` used the
   // `(1 << 24)` trick, which produces garbage for a channel outside 0-255, while
-  // the exported one clamps and pads. Black-on-unparseable is kept because that
-  // is what the local `hexToRgb` did; the exported one returns null.
-  const BLACK = { r: 0, g: 0, b: 0 };
-  const start = hexToRgb(startColor) ?? BLACK;
-  const end = hexToRgb(endColor) ?? BLACK;
+  // the exported one clamps and pads. If either token fails to parse as hex,
+  // fall back to whichever of the two colors DID parse rather than silently
+  // substituting black, which would produce a jarring, wrong interpolation.
+  const start = hexToRgb(startColor);
+  const end = hexToRgb(endColor);
+
+  if (!start || !end) {
+    return (start ? startColor : end ? endColor : startColor) as string;
+  }
 
   const interpolated = {
     r: start.r + (end.r - start.r) * progress,
