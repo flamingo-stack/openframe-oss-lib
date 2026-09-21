@@ -26,6 +26,16 @@ export const ROW_HEIGHT_MOBILE = 'h-[66px]';
  */
 export const ROW_SHELL_CLASSES = 'items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]';
 
+/**
+ * The column every row slot stacks in, and the gap between two of them.
+ *
+ * One constant for the same reason as `ROW_SHELL_CLASSES`: the body's rows, its
+ * loading skeleton and the infinite footer's fallback skeleton all stack here,
+ * and the footer used to stack in nothing at all — its placeholder rows were
+ * bare children of the table root, touching each other.
+ */
+export const ROW_STACK_CLASSES = 'flex w-full flex-col gap-[var(--spacing-system-xsf)]';
+
 export interface DataTableSkeletonProps {
   rows?: number;
   className?: string;
