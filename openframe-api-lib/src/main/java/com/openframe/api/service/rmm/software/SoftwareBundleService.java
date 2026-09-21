@@ -1,6 +1,5 @@
 package com.openframe.api.service.rmm.software;
 
-import com.openframe.api.dto.rmm.software.CreateSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
 import com.openframe.api.dto.rmm.software.SoftwareBundleScheduleInput;
@@ -8,7 +7,6 @@ import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
-import com.openframe.api.dto.rmm.software.UpdateSoftwareBundleInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -66,44 +64,6 @@ public class SoftwareBundleService {
     @Value("${openframe.rmm.software.bundle.schedule.reconnect-window-seconds}")
     private long scheduleReconnectWindowSeconds;
 
-    public SoftwareBundleResponse create(CreateSoftwareBundleInput input, String createdBy) {
-        String tenantId = tenantIdProvider.getTenantId();
-        Instant now = Instant.now();
-        SoftwareBundle entity = SoftwareBundle.builder()
-                .tenantId(tenantId)
-                .action(input.getAction())
-                .mode(input.getMode())
-                .status(SoftwareBundleStatus.PENDING)
-                .machineIds(List.copyOf(input.getMachineIds()))
-                .packages(toDomainPackages(input.getPackages()))
-                .startAt(input.getStartAt())
-                .createdBy(createdBy)
-                .createdAt(now)
-                .updatedAt(now)
-                .expireAt(now.plus(pendingTtl))
-                .build();
-        SoftwareBundle saved = bundleRepository.save(entity);
-        log.info("Created software bundle id={} action={} devices={} packages={} tenantId={}",
-                saved.getId(), saved.getAction(), saved.getMachineIds().size(),
-                saved.getPackages().size(), tenantId);
-        return toResponse(saved);
-    }
-
-    public SoftwareBundleResponse update(UpdateSoftwareBundleInput input, String actor) {
-        SoftwareBundle entity = loadPendingOrThrow(input.getId());
-        entity.setMode(input.getMode());
-        entity.setMachineIds(List.copyOf(input.getMachineIds()));
-        entity.setPackages(toDomainPackages(input.getPackages()));
-        entity.setStartAt(input.getStartAt());
-        Instant now = Instant.now();
-        entity.setUpdatedAt(now);
-        entity.setExpireAt(now.plus(pendingTtl));
-        SoftwareBundle saved = bundleRepository.save(entity);
-        log.debug("Updated software bundle id={} devices={} packages={} actor={}",
-                saved.getId(), saved.getMachineIds().size(), saved.getPackages().size(), actor);
-        return toResponse(saved);
-    }
-
     public boolean delete(String id, String actor) {
         Optional<SoftwareBundle> found = bundleRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id);
         if (found.isEmpty()) {
@@ -120,41 +80,6 @@ public class SoftwareBundleService {
 
     public Optional<SoftwareBundleResponse> findById(String id) {
         return bundleRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id).map(SoftwareBundleService::toResponse);
-    }
-
-    public List<SoftwareBundleResponse> list(SoftwareBundleStatus status) {
-        String tenantId = tenantIdProvider.getTenantId();
-        List<SoftwareBundle> bundles = status == null
-                ? bundleRepository.findByTenantIdOrderByIdDesc(tenantId)
-                : bundleRepository.findByTenantIdAndStatusOrderByIdDesc(tenantId, status);
-        return bundles.stream().map(SoftwareBundleService::toResponse).toList();
-    }
-
-    public SoftwareBundleResponse run(String id, String actor) {
-        SoftwareBundle entity = loadPendingOrThrow(id);
-        if (entity.getPackages() == null || entity.getPackages().isEmpty()) {
-            throw new BadRequestException("Cannot run software bundle " + id + ": no packages selected");
-        }
-        if (entity.getMachineIds() == null || entity.getMachineIds().isEmpty()) {
-            throw new BadRequestException("Cannot run software bundle " + id + ": no devices selected");
-        }
-
-        Instant now = Instant.now();
-        if (entity.getMode() == SoftwareBundleMode.SCHEDULED) {
-            runScheduled(entity, actor);
-        } else {
-            armOnlineDispatch(entity, now);
-        }
-
-        entity.setStatus(SoftwareBundleStatus.COMPLETED);
-        entity.setCompletedAt(now);
-        entity.setUpdatedAt(now);
-        entity.setExpireAt(null); // completed bundles are history — never reaped
-        bundleRepository.save(entity);
-
-        log.info("Ran software bundle id={} mode={} action={} devices={} actor={}",
-                id, entity.getMode(), entity.getAction(), entity.getMachineIds().size(), actor);
-        return toResponse(entity);
     }
 
     public SoftwareBundleResponse createBundleStub(String createdBy) {
@@ -217,7 +142,7 @@ public class SoftwareBundleService {
         } else {
             entity.setMode(SoftwareBundleMode.NOW);
             armOnlineDispatch(entity, now);
-            entity.setExecutionIds(executionIds(entity)); // one deterministic executionId per package
+            entity.setExecutionIds(executionIds(entity));
         }
 
         entity.setStatus(SoftwareBundleStatus.COMPLETED);
@@ -296,7 +221,7 @@ public class SoftwareBundleService {
         List<String> incompatible = machineIds.stream()
                 .filter(machineId -> {
                     OsType os = deviceOsTypes.get(machineId);
-                    return os != null && !packageOsTypes.contains(os); // unknown OS is left to dispatch-time routing
+                    return os != null && !packageOsTypes.contains(os);
                 })
                 .toList();
         if (!incompatible.isEmpty()) {
@@ -347,27 +272,6 @@ public class SoftwareBundleService {
         log.debug("Touched software bundle id={} devices={} actor={}",
                 saved.getId(), currentMachineIds(saved).size(), actor);
         return toResponse(saved);
-    }
-
-    private void runScheduled(SoftwareBundle bundle, String actor) {
-        if (bundle.getStartAt() == null) {
-            throw new BadRequestException("Cannot run SCHEDULED software bundle " + bundle.getId()
-                    + ": startAt is required");
-        }
-        CreateSoftwareScheduleInput input = new CreateSoftwareScheduleInput();
-        input.setName(scheduleName(bundle));
-        input.setAction(bundle.getAction());
-        input.setPackages(toSchedulePackages(bundle.getPackages()));
-        input.setTimeReference(ScheduleTimeReference.SERVER);
-        input.setOfflineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT);
-        input.setReconnectWindowSeconds(scheduleReconnectWindowSeconds);
-        input.setStartAt(bundle.getStartAt());
-        input.setMachineIds(bundle.getMachineIds());
-
-        SoftwareScheduleResponse schedule = softwareScheduleService.create(input, actor);
-        bundle.setScheduleId(schedule.getId());
-        log.info("SCHEDULED software bundle id={} → created schedule id={} startAt={} reconnectWindowSeconds={}",
-                bundle.getId(), schedule.getId(), bundle.getStartAt(), scheduleReconnectWindowSeconds);
     }
 
     private static String scheduleName(SoftwareBundle bundle) {

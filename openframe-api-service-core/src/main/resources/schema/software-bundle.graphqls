@@ -13,9 +13,6 @@
 extend type Query {
     """One bundle by id. Null when it does not exist (or was already reaped)."""
     softwareBundle(id: ID!): SoftwareBundle
-
-    """Bundles for the tenant, newest first. Optionally filtered by status."""
-    softwareBundles(status: SoftwareBundleStatus): [SoftwareBundle!]!
 }
 
 extend type Mutation {
