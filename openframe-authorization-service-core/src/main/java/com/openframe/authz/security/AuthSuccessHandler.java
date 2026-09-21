@@ -67,8 +67,7 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         }
 
         // Best practice: only mark verified if the IdP asserts it (when claim is present).
-        // Google typically provides email_verified. Microsoft may omit it; we treat omission as verified only for
-        // providers explicitly allowlisted in ssoProviderRegistry as trusted to omit this claim.
+        // Google typically provides email_verified. Microsoft may omit it; we treat omission as verified for trusted providers.
         if (authentication.getPrincipal() instanceof OidcUser oidcUser
                 && !OidcUserUtils.emailVerifiedClaimAllows(oidcUser)) {
             return;
