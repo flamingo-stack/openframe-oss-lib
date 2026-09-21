@@ -6,7 +6,10 @@ import com.openframe.data.document.tag.Tag;
 import lombok.RequiredArgsConstructor;
 import org.dataloader.BatchLoader;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -22,6 +25,15 @@ public class ScriptTagDataLoader implements BatchLoader<String, List<Tag>> {
 
     @Override
     public CompletionStage<List<List<Tag>>> load(List<String> scriptIds) {
-        return CompletableFuture.supplyAsync(() -> scriptTagService.getTagsByScriptIds(scriptIds));
+        return CompletableFuture.supplyAsync(() -> {
+            Map<String, List<Tag>> tagsByScriptId = scriptTagService.getTagsByScriptIds(scriptIds);
+            List<List<Tag>> result = new ArrayList<>(scriptIds.size());
+            for (String scriptId : scriptIds) {
+                List<Tag> tags = tagsByScriptId.get(scriptId);
+                result.add(tags != null ? tags : Collections.emptyList());
+            }
+            return result;
+        });
     }
 }
+
