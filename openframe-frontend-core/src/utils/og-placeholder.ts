@@ -64,6 +64,17 @@ function resolveOgPlaceholderBase(endpoints?: OgPlaceholderEndpoints | null): st
     // name, never an incidental substring.
     const derived = imageProxy.replace(/\/image-proxy(?=$|[?/])/, '/og-placeholder');
     if (derived !== imageProxy) return derived;
+    // `imageProxyUrlPrefix` was set but doesn't contain the `/image-proxy`
+    // path segment we anchor on — the derive is a silent no-op. Surface a
+    // diagnostic instead of falling through quietly, since the same-origin
+    // default below may 404 for cross-origin embedders.
+    if (typeof console !== 'undefined') {
+      console.warn(
+        `[og-placeholder] endpoints.imageProxyUrlPrefix ("${imageProxy}") does not contain ` +
+          `the expected "/image-proxy" path segment; falling back to same-origin ` +
+          `"${DEFAULT_OG_PLACEHOLDER_PATH}". Set endpoints.ogPlaceholderUrl explicitly to fix.`,
+      );
+    }
   }
   return DEFAULT_OG_PLACEHOLDER_PATH;
 }
