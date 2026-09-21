@@ -1,12 +1,16 @@
 package com.openframe.test.data.redis;
 
 import com.openframe.test.config.RedisConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
 public class Redis {
+
+    private static final Logger log = LoggerFactory.getLogger(Redis.class);
 
     /**
      * Find the password-reset token for {@code email}. The auth-server stores it under the tenant-scoped,
@@ -33,7 +37,7 @@ public class Redis {
                     cursor = scanResult.getCursor();
                 } while (!cursor.equals(ScanParams.SCAN_POINTER_START));
             } catch (Exception e) {
-                // Node unreachable or does not own the slot — try the next seed.
+                log.debug("Node {} unreachable or does not own the slot: {}", node, e.getMessage(), e);
             }
         }
         return null;
