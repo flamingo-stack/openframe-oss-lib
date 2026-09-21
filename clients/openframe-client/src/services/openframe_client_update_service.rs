@@ -77,6 +77,7 @@ impl OpenFrameClientUpdateService {
 
         if self.tool_run_manager.any_tool_op_in_progress().await {
             warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
+            self.tool_run_manager.clear_client_update_pending().await;
             return Err(anyhow!(
                 "Tool operation in progress, deferring client update"
             ));
@@ -88,6 +89,7 @@ impl OpenFrameClientUpdateService {
                 "Update already in progress, ignoring duplicate request for version: {}",
                 requested_version
             );
+            self.tool_run_manager.clear_client_update_pending().await;
             return Err(anyhow!("Update already in progress"));
         };
         info!("Acquired update lock for version: {}", requested_version);
@@ -106,6 +108,7 @@ impl OpenFrameClientUpdateService {
         // 2. Validate version format
         if !Self::is_valid_version(requested_version) {
             error!("Invalid version format: {}", requested_version);
+            self.tool_run_manager.clear_client_update_pending().await;
             return Err(anyhow!("Invalid version format: {}", requested_version));
         }
 
@@ -346,6 +349,7 @@ impl OpenFrameClientUpdateService {
     }
 
     /// The script's first real action stops this service, so an exit seen while we are alive means it failed before the swap.
+    /// Bounded by a timeout so a hung updater process cannot hold the update lock forever.
     fn watch_updater_exit(
         &self,
         launched: LaunchedUpdater,
@@ -359,9 +363,21 @@ impl OpenFrameClientUpdateService {
         let this = self.clone();
         tokio::spawn(async move {
             let _guard = guard;
-            if let Ok(Some(status)) = exit_watch.await {
-                this.handle_updater_early_exit(status, &staged_path, &target_version)
-                    .await;
+            const UPDATER_EXIT_WATCH_TIMEOUT: std::time::Duration =
+                std::time::Duration::from_secs(600);
+            match tokio::time::timeout(UPDATER_EXIT_WATCH_TIMEOUT, exit_watch).await {
+                Ok(Ok(Some(status))) => {
+                    this.handle_updater_early_exit(status, &staged_path, &target_version)
+                        .await;
+                }
+                Ok(Ok(None)) => {}
+                Ok(Err(_)) => {}
+                Err(_) => {
+                    warn!(
+                        "Timed out after {:?} waiting for updater exit for version {}; releasing update lock",
+                        UPDATER_EXIT_WATCH_TIMEOUT, target_version
+                    );
+                }
             }
         });
     }
