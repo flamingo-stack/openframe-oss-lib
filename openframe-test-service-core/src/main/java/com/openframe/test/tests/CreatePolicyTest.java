@@ -48,9 +48,11 @@ public class CreatePolicyTest extends BaseTest {
 
         List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
         assertThat(devices).as("Expect Windows device online").isNotEmpty();
-        Machine device = DeviceApi.getDevice(devices.getFirst().getMachineId());
+        String machineId = devices.getFirst().getMachineId();
+        Machine device = DeviceApi.getDevice(machineId);
         assertThat(device.getToolConnections()).as("Device should have agents").isNotEmpty();
-        Integer fleetId = Integer.valueOf(getFleetId(device));
+        String fleetIdString = getFleetId(device);
+        Integer fleetId = Integer.valueOf(fleetIdString);
         assertThat(fleetId).as("Device should have Fleet").isNotNull();
 
         MonitoringApi.selectPolicyDevices(policy.getId(), fleetId);
