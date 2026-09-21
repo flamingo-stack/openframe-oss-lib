@@ -108,12 +108,9 @@ public class AuthApi {
         return given(getAuthFlowRequestSpec())
                 .baseUri(getAuthUrl())
                 .cookie("refresh_token", cookies.get("refresh_token"))
-//                .queryParam("tenantId", user.getTenantId())
+                .queryParam("tenantId", user.getTenantId())
                 .when()
                 .post(OAUTH_REFRESH);
-//                .then()
-//                .statusCode(204)
-//                .extract().response().getCookies();
     }
 
     public static Map<String, String> logout(String tenantId, Map<String, String> cookies) {
