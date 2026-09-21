@@ -10,6 +10,7 @@ use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
+use crate::utils::version_comparator;
 use anyhow::{anyhow, Context, Result};
 use semver::Version;
 use std::path::{Path, PathBuf};
@@ -452,10 +453,8 @@ impl OpenFrameClientUpdateService {
     /// Parse version string into semver Version
     /// Supports formats like: "1.2.3", "v1.2.3", "1.2.3-beta", "1.2.3+build"
     fn parse_version(version: &str) -> Result<Version> {
-        // Remove 'v' prefix if present
-        let version = version.trim().trim_start_matches('v');
-
-        Version::parse(version).with_context(|| format!("Failed to parse version: {}", version))
+        version_comparator::parse_version(version)
+            .with_context(|| format!("Failed to parse version: {}", version))
     }
 
     /// Validate version format (basic semver check)
