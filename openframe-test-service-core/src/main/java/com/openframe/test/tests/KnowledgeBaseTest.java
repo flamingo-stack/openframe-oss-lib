@@ -495,7 +495,7 @@ public class KnowledgeBaseTest extends BaseTest {
         for (String id : createdArticleIds) {
             try {
                 KnowledgeBaseApi.archiveArticle(id);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException | AssertionError ignored) {
                 // best effort: a failed cleanup must not mask the case that failed
             }
         }
