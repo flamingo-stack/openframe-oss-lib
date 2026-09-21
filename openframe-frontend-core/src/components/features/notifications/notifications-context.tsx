@@ -88,6 +88,10 @@ type Action =
   | { type: 'remove'; id: string }
   | { type: 'clear' };
 
+// `read`/`settled` are sticky-OR only when the incoming notification omits
+// the field (i.e. the caller isn't expressing an opinion). If the caller
+// explicitly passes `read`/`settled` (even `false`), that explicit value wins
+// so a notification can be intentionally reset/recycled by id.
 function mergeNotification(base: Notification, incoming: Notification): Notification {
   const out: Notification = { ...base };
   for (const key of Object.keys(incoming) as (keyof Notification)[]) {
@@ -95,8 +99,8 @@ function mergeNotification(base: Notification, incoming: Notification): Notifica
     if (value !== undefined) (out as unknown as Record<string, unknown>)[key] = value;
   }
 
-  out.read = (incoming.read ?? false) || (base.read ?? false) || false;
-  out.settled = (incoming.settled ?? false) || (base.settled ?? false) || false;
+  out.read = incoming.read !== undefined ? incoming.read : (base.read ?? false) || false;
+  out.settled = incoming.settled !== undefined ? incoming.settled : (base.settled ?? false) || false;
   return out;
 }
 
