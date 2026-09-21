@@ -37,4 +37,5 @@ public class TicketQueryFilter {
     private List<TicketCreationSource> creationSources;
     private Instant createdAtFrom;
     private Instant createdAtTo;
+    private TicketActivityCriteria activity;
 }

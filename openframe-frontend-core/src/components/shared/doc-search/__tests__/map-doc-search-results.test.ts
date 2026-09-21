@@ -19,17 +19,16 @@ const FOLDED_TABLES = [
   'financial-cash-flow',
 ];
 
-const row = (sourceRepo: string, n: number): DocSearchResult =>
-  ({
-    path: `${sourceRepo}/${n}`,
-    name: `Row ${n}`,
-    snippet: '',
-    type: 'file',
-    matchType: 'content',
-    documentType: 'cap_table',
-    sourceRepo,
-    entityId: `${n}`,
-  }) as DocSearchResult;
+const row = (sourceRepo: string, n: number): DocSearchResult => ({
+  path: `${sourceRepo}/${n}`,
+  name: `Row ${n}`,
+  snippet: '',
+  type: 'file',
+  matchType: 'content',
+  documentType: 'cap_table',
+  sourceRepo,
+  entityId: `${n}`,
+});
 
 describe('mapDocSearchResults', () => {
   it.each(FOLDED_TABLES)('titles the folded %s row with its shared label and count', table => {
