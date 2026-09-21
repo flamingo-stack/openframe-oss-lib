@@ -40,16 +40,14 @@ impl ToolCommandParamsResolver {
         );
         let token_path = self.build_token_path();
         let machine_id = self.agent_configuration_service.get_machine_id()?;
+        let openframe_secret = self.agent_configuration_service.get_openframe_secret()?;
 
         Ok(command_args
             .into_iter()
             // Resolve standard placeholders
             .map(|arg| {
                 arg.replace(Self::SERVER_URL_PLACEHOLDER, &server_url)
-                    .replace(
-                        Self::OPENFRAME_SECRET_PLACEHOLDER,
-                        "12345678901234567890123456789012",
-                    )
+                    .replace(Self::OPENFRAME_SECRET_PLACEHOLDER, &openframe_secret)
                     .replace(Self::OPENFRAME_TOKEN_PATH_PLACEHOLDER, &token_path)
                     .replace(Self::MACHINE_ID_PLACEHOLDER, &machine_id)
             })
