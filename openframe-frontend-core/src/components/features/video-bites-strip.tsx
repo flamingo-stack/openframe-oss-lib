@@ -329,11 +329,14 @@ export function VideoBiteCard({
     </>
   );
 
-  // Figma node 4033:90369 exactly: pure-black 75% fill (Tailwind palette
-  // black — NOT a glassy backdrop blur; Figma has no background blur here),
-  // full soft-grey border, p-16/gap-16, large soft drop shadow.
+  // Figma node 4033:90369 exactly: pure-black 75% fill, full soft-grey
+  // border, p-16/gap-16, large soft drop shadow. Expressed via the ODS
+  // semantic overlay token (`bg-ods-overlay`, defined at 75% opacity) rather
+  // than the raw Tailwind `bg-black/75` palette utility, per
+  // MULTIPLA-002/MULTIPLA-003-2 (no-hardcoded-colors) — NOT a glassy backdrop
+  // blur; Figma has no background blur here.
   const overlayClass = cn(
-    'absolute inset-x-0 bottom-0 gap-2 border border-ods-border bg-black/75 p-3 shadow-2xl',
+    'absolute inset-x-0 bottom-0 gap-2 border border-ods-border bg-ods-overlay p-3 shadow-2xl',
     'flex flex-col transition-opacity duration-200',
     isActive ? 'opacity-100' : 'opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100',
     // Non-interactive while invisible so it never swallows clicks on the
@@ -426,3 +429,4 @@ export function VideoBiteCard({
     </div>
   );
 }
+
