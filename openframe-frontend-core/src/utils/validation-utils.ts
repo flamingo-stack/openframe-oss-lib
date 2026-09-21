@@ -23,6 +23,13 @@ export function isValidEmailDomain(domain: string): boolean {
     return false;
   }
 
+  // Reject oversized input before running the regex below. The maximum valid
+  // DNS domain name length is 253 characters; anything longer is either
+  // malformed or an adversarial input crafted to maximize regex backtracking.
+  if (trimmed.length > 253) {
+    return false;
+  }
+
   // Domain regex: must have at least one dot, valid characters, and proper TLD
   // Allows subdomains, hyphens (not at start/end of labels), alphanumeric characters
   const domainRegex = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,}$/;
@@ -167,3 +174,4 @@ export function cleanEmailDomain(domain: string): string {
 
   return cleaned;
 }
+
