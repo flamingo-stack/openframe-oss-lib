@@ -392,8 +392,8 @@ public class SoftwareInventoryService {
             case "severity", "cvssScore" -> Comparator.comparing(
                     SoftwareVulnerabilityResponse::getCvssScore,
                     Comparator.nullsLast(Comparator.naturalOrder()));
-            case "publishedAt", "published" -> Comparator.comparing(
-                    SoftwareVulnerabilityResponse::getPublishedAt,
+            case "discoveredAt", "discovered" -> Comparator.comparing(
+                    SoftwareVulnerabilityResponse::getDiscoveredAt,
                     Comparator.nullsLast(Comparator.naturalOrder()));
             default -> Comparator.comparing(
                     SoftwareVulnerabilityResponse::getCveId,
