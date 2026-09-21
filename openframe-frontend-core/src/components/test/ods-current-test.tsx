@@ -5,7 +5,7 @@
  * to different platform types (OpenFrame, Flamingo, TMCG).
  *
  * Expected behavior:
- * - OpenFrame: Cyan (#5efaf0)
+ * - OpenFrame: Yellow (#ffc008)
  * - Flamingo: Pink (#f357bb)
  * - TMCG: Pink (#f357bb)
  * - Default: Primary text color (#fafafa)
@@ -91,14 +91,17 @@ export function OdsCurrentTest() {
           <div className="mt-4 space-y-2 text-sm">
             <div className="flex gap-2">
               <span className="text-ods-text-secondary">OpenFrame:</span>
+              {/* eslint-disable-next-line -- intentional exception: demonstrating the literal hex value ods-current resolves to for this platform */}
               <span className="text-[#ffc008]">Yellow (#ffc008)</span>
             </div>
             <div className="flex gap-2">
               <span className="text-ods-text-secondary">Flamingo:</span>
+              {/* eslint-disable-next-line -- intentional exception: demonstrating the literal hex value ods-current resolves to for this platform */}
               <span className="text-[#f357bb]">Pink (#f357bb)</span>
             </div>
             <div className="flex gap-2">
               <span className="text-ods-text-secondary">TMCG:</span>
+              {/* eslint-disable-next-line -- intentional exception: demonstrating the literal hex value ods-current resolves to for this platform */}
               <span className="text-[#f357bb]">Pink (#f357bb)</span>
             </div>
             <div className="flex gap-2">
