@@ -208,8 +208,6 @@ public class NavigationSidebar {
     public DevicesPage goToDevices() {
         clickNavItem(devicesNavItem(), URL_DEVICES);
         DevicesPage devicesPage = new DevicesPage(this.page);
-        page.waitForCondition(devicesPage::isLoaded,
-                new Page.WaitForConditionOptions().setTimeout(120_000));
         return devicesPage;
     }
 
@@ -226,8 +224,6 @@ public class NavigationSidebar {
     public MonitoringPage goToMonitoring() {
         clickNavItem(monitoringNavItem(), URL_MONITORING);
         MonitoringPage monitoringPage = new MonitoringPage(this.page);
-        page.waitForCondition(monitoringPage::isTotalPoliciesCardVisible,
-                new Page.WaitForConditionOptions().setTimeout(120_000));
         return monitoringPage;
     }
 
