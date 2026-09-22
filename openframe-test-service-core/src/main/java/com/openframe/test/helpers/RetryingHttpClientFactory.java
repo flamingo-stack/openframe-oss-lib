@@ -16,13 +16,22 @@ import java.time.Duration;
  */
 class RetryingHttpClientFactory {
 
-    // Connect fails fast so a dropped SYN (hairpin blip) is retried promptly instead of hanging;
-    // socket timeout stays generous because the server itself can be slow to respond.
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    // Measured from the saas-test pod on qa, 2026-09-22: connects to the gateway VIP that succeed do so
+    // in 0.9ms median (p95 5ms), but roughly one in ten is lost on the egress path. A lost SYN is then
+    // retransmitted by the kernel at 1s, 3s, 7s, 15s — so a stalled connect is never "slow", it is
+    // waiting on a retransmit, and the only question is how long we wait before giving up and dialling
+    // again. At 10s that cost 42 connect timeouts 210 of the 333 seconds in one run.
+    //
+    // 2s keeps the connects that survive one retransmit (~1s) and abandons the rest to the retry below,
+    // which reconnects in under a millisecond when the next SYN gets through. Worst case per request
+    // falls from ~57s (5 attempts x 10s + backoff) to ~17s, and the common single-drop case from ~10.5s
+    // to ~2.5s.
+    //
+    // Socket timeout stays generous: that one covers the server thinking, which is a different problem.
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration SOCKET_TIMEOUT = Duration.ofSeconds(32);
-    // The test runner reaches the gateway by hairpinning out to the cluster's own external LB VIP,
-    // which drops SYNs in intermittent bursts. 5 attempts (initial + 4 retries) plus backoff spans
-    // ~50s+ of wall-clock so a single blip is ridden out instead of failing the test.
+    // 5 attempts (initial + 4 retries) plus backoff. At a ~10% drop rate, five independent attempts put
+    // the odds of exhausting them at about one in a hundred thousand.
     private static final int CONNECT_RETRIES = 4;
     private static final Duration RETRY_BACKOFF_BASE = Duration.ofMillis(500);
     private static final Duration RETRY_BACKOFF_MAX = Duration.ofSeconds(5);
