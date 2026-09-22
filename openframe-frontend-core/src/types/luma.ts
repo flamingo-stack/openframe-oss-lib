@@ -1,7 +1,7 @@
 // Luma Events Types
 // Used for Luma event management and display across admin interfaces
 
-import { PlatformName } from './platform';
+import type { PlatformName } from './platform';
 
 // Database Luma Event Model (from luma_events table)
 export interface LumaEvent {
@@ -16,17 +16,21 @@ export interface LumaEvent {
   end_at: string;
   duration_interval?: string;
   timezone: string;
-  geo_address?: any;
+  /** Luma's `geo_address_json` blob — `address` / `full_address` plus
+   *  whatever else the venue record carries. */
+  geo_address?: { address?: string; full_address?: string; [key: string]: unknown } | null;
   geo_latitude?: number;
   geo_longitude?: number;
   location_name?: string;
   location_full_address?: string;
   visibility: string;
   meeting_url?: string;
-  registration_questions?: any[];
+  /** Luma's registration form schema, passed through verbatim — this lib
+   *  never reads inside it. */
+  registration_questions?: Array<Record<string, unknown>>;
   tags: string[];
   platform: PlatformName;
-  hosts?: any[];
+  hosts?: LumaEventHost[];
   guest_count?: number;
   created_at: string;
   updated_at: string;

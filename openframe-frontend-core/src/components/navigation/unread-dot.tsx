@@ -1,7 +1,6 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils/cn'
+import { cn } from '../../utils/cn';
 
 /**
  * The ONE unread-indicator dot (`bg-ods-warning`, top-right of an icon
@@ -15,20 +14,20 @@ import { cn } from '../../utils/cn'
  *   - `fixed`      — sidebar collapsed icon: `w-2 h-2`
  */
 export interface UnreadDotProps {
-  size?: 'responsive' | 'fixed'
-  className?: string
+  size?: 'responsive' | 'fixed';
+  className?: string;
 }
 
 export function UnreadDot({ size = 'responsive', className }: UnreadDotProps) {
   return (
     <span
       className={cn(
-        'absolute top-0 right-0 bg-ods-warning rounded-full',
-        size === 'responsive' ? 'w-1.5 h-1.5 md:w-2 md:h-2' : 'w-2 h-2',
+        'absolute right-0 top-0 rounded-full bg-ods-warning',
+        size === 'responsive' ? 'h-1.5 w-1.5 md:h-2 md:w-2' : 'h-2 w-2',
         className,
       )}
     />
-  )
+  );
 }
 
 /**
@@ -38,24 +37,24 @@ export function UnreadDot({ size = 'responsive', className }: UnreadDotProps) {
  * the sidebar's expanded-row pill stays its own larger treatment.
  */
 export interface UnreadCountBadgeProps {
-  count: number
-  className?: string
+  count: number;
+  className?: string;
 }
 
 export function UnreadCountBadge({ count, className }: UnreadCountBadgeProps) {
-  if (count <= 0) return null
+  if (count <= 0) return null;
   return (
     <span
       className={cn(
-        'absolute -top-1.5 -right-1.5 flex items-center justify-center',
-        'min-w-4 h-4 px-1 rounded-full bg-ods-accent',
-        'text-badge text-ods-text-on-accent leading-none',
+        'absolute -right-1.5 -top-1.5 flex items-center justify-center',
+        'h-4 min-w-4 rounded-full bg-ods-accent px-1',
+        'leading-none text-ods-text-on-accent text-badge',
         className,
       )}
     >
       {count > 9 ? '9+' : count}
     </span>
-  )
+  );
 }
 
-export default UnreadDot
+export default UnreadDot;

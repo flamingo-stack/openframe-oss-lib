@@ -1,13 +1,7 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { cn } from '../../../utils/cn'
-import { Autocomplete, type AutocompleteOption } from '../../ui/autocomplete'
-import { Button } from '../../ui/button/button'
-import { SplitButton } from '../../ui/button/split-button'
-import { SquareAvatar } from '../../ui/square-avatar'
-import { Tag } from '../../ui/tag'
-import { Textarea } from '../../ui/textarea'
+import { useState } from 'react';
+import { cn } from '../../../utils/cn';
 import {
   ArrowRightUpIcon,
   CheckCircleIcon,
@@ -19,16 +13,22 @@ import {
   PlayIcon,
   PlusCircleIcon,
   XmarkIcon,
-} from '../../icons-v2-generated'
-import { useTrackerClock } from './use-tracker-clock'
-import type { TimeTrackerData, TimeTrackerEntry, TimeTrackerStatus } from './types'
+} from '../../icons-v2-generated';
+import { Autocomplete, type AutocompleteOption } from '../../ui/autocomplete';
+import { Button } from '../../ui/button/button';
+import { SplitButton } from '../../ui/button/split-button';
+import { SquareAvatar } from '../../ui/square-avatar';
+import { Tag } from '../../ui/tag';
+import { Textarea } from '../../ui/textarea';
+import type { TimeTrackerData, TimeTrackerEntry, TimeTrackerStatus } from './types';
+import { useTrackerClock } from './use-tracker-clock';
 
 interface CustomerAutocompleteOption extends AutocompleteOption {
-  imageUrl?: string
+  imageUrl?: string;
 }
 
 function renderCustomerOption(option: AutocompleteOption, isSelected: boolean) {
-  const { label, imageUrl } = option as CustomerAutocompleteOption
+  const { label, imageUrl } = option as CustomerAutocompleteOption;
   return (
     <div className="flex w-full min-w-0 items-center justify-between gap-[var(--spacing-system-xs)]">
       <div className="flex min-w-0 items-center gap-[var(--spacing-system-xs)]">
@@ -39,12 +39,12 @@ function renderCustomerOption(option: AutocompleteOption, isSelected: boolean) {
       </div>
       {isSelected && <CheckIcon className="text-ods-accent" size={20} />}
     </div>
-  )
+  );
 }
 
 export interface TimeTrackerPanelProps extends TimeTrackerData {
-  onClose: () => void
-  className?: string
+  onClose: () => void;
+  className?: string;
 }
 
 export function TimeTrackerPanel({
@@ -79,63 +79,68 @@ export function TimeTrackerPanel({
   onClose,
   className,
 }: TimeTrackerPanelProps) {
-  const elapsedLabel = useTrackerClock({ status, runningSince, accumulatedMs })
+  const elapsedLabel = useTrackerClock({ status, runningSince, accumulatedMs });
 
-  const [showValidationError, setShowValidationError] = useState(false)
+  const [showValidationError, setShowValidationError] = useState(false);
 
-  const isRunning = status === 'tracking'
-  const isActive = status !== 'ready'
-  const hasContent = selectedTicketId != null || notes.trim() !== ''
-  const showFieldError = isActive && showValidationError && !hasContent
+  const isRunning = status === 'tracking';
+  const isActive = status !== 'ready';
+  const hasContent = selectedTicketId != null || notes.trim() !== '';
+  const showFieldError = isActive && showValidationError && !hasContent;
 
   // Reset the validation flag once a session ends so the next one starts clean.
-  useEffect(() => {
-    if (status === 'ready') setShowValidationError(false)
-  }, [status])
+  // Adjusted while rendering, not from an effect: the flag is only ever READ
+  // through `showFieldError` above, so publishing the reset a commit later
+  // bought nothing and cost a render pass on every session end.
+  const [wasReady, setWasReady] = useState(!isActive);
+  if (wasReady !== !isActive) {
+    setWasReady(!isActive);
+    if (!isActive) setShowValidationError(false);
+  }
 
   const handleSubmit = () => {
     if (!hasContent) {
-      setShowValidationError(true)
-      return
+      setShowValidationError(true);
+      return;
     }
-    onSubmit()
-  }
+    onSubmit();
+  };
 
   const handleManualEntry = onManualEntry
     ? () => {
-        onClose()
-        onManualEntry()
+        onClose();
+        onManualEntry();
       }
-    : undefined
+    : undefined;
   const handleEntryClick = onEntryClick
     ? (entry: TimeTrackerEntry) => {
-        onClose()
-        onEntryClick(entry)
+        onClose();
+        onEntryClick(entry);
       }
-    : undefined
+    : undefined;
   const handleOpenMyTime = onOpenMyTime
     ? () => {
-        onClose()
-        onOpenMyTime()
+        onClose();
+        onOpenMyTime();
       }
-    : undefined
+    : undefined;
   const handleCancel = () => {
-    onClose()
-    onCancel()
-  }
+    onClose();
+    onCancel();
+  };
 
-  const ticketAutocompleteOptions: AutocompleteOption[] = ticketOptions.map((t) => ({
+  const ticketAutocompleteOptions: AutocompleteOption[] = ticketOptions.map(t => ({
     label: t.label,
     value: t.id,
-  }))
+  }));
 
-  const showCustomer = !!onSelectedCustomerChange
-  const customerAutocompleteOptions: CustomerAutocompleteOption[] = (customerOptions ?? []).map((c) => ({
+  const showCustomer = !!onSelectedCustomerChange;
+  const customerAutocompleteOptions: CustomerAutocompleteOption[] = (customerOptions ?? []).map(c => ({
     label: c.label,
     value: c.id,
     imageUrl: c.imageUrl,
-  }))
-  const selectedCustomer = customerAutocompleteOptions.find((o) => o.value === selectedCustomerId)
+  }));
+  const selectedCustomer = customerAutocompleteOptions.find(o => o.value === selectedCustomerId);
   const customerStartAdornment = selectedCustomer ? (
     <SquareAvatar
       src={selectedCustomer.imageUrl}
@@ -144,9 +149,9 @@ export function TimeTrackerPanel({
       size="sm"
       variant="square"
     />
-  ) : undefined
+  ) : undefined;
 
-  const visibleEntries = lastEntries.slice(0, 3)
+  const visibleEntries = lastEntries.slice(0, 3);
 
   return (
     <div
@@ -173,7 +178,7 @@ export function TimeTrackerPanel({
             <Button
               variant="transparent"
               onClick={handleCancel}
-              className="h-auto p-0 text-h6 font-medium text-ods-text-secondary underline hover:bg-transparent hover:text-ods-text-primary md:h-auto"
+              className="h-auto p-0 font-medium text-ods-text-secondary underline text-h6 hover:bg-transparent hover:text-ods-text-primary md:h-auto"
             >
               Cancel Entry
             </Button>
@@ -184,7 +189,7 @@ export function TimeTrackerPanel({
           <div className="flex flex-1 items-center border-r border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-s)]">
             <span
               className={cn(
-                'text-h3 !font-mono font-bold tabular-nums',
+                '!font-mono font-bold tabular-nums text-h3',
                 isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary',
               )}
             >
@@ -228,7 +233,7 @@ export function TimeTrackerPanel({
             error={showFieldError ? 'Required if no notes added' : undefined}
             disableClientFilter={!!onTicketSearch}
             onInputChange={(value, reason) => {
-              if (reason === 'input') onTicketSearch?.(value)
+              if (reason === 'input') onTicketSearch?.(value);
             }}
           />
           {showCustomer && (
@@ -241,7 +246,7 @@ export function TimeTrackerPanel({
               disabled={customerLocked}
               disableClientFilter={!!onCustomerSearch}
               onInputChange={(value, reason) => {
-                if (reason === 'input') onCustomerSearch?.(value)
+                if (reason === 'input') onCustomerSearch?.(value);
               }}
               startAdornment={customerStartAdornment}
               renderOption={renderCustomerOption}
@@ -252,7 +257,7 @@ export function TimeTrackerPanel({
 
       <Textarea
         value={notes}
-        onChange={(e) => onNotesChange(e.target.value)}
+        onChange={e => onNotesChange(e.target.value)}
         invalid={showFieldError}
         error={showFieldError ? 'Required if no ticket assigned' : undefined}
         placeholder="Additional Notes (optional if ticket selected)"
@@ -265,15 +270,15 @@ export function TimeTrackerPanel({
           <div className="flex min-h-[268px] flex-col items-center justify-center gap-[var(--spacing-system-l)] p-[var(--spacing-system-l)] text-center text-ods-text-secondary">
             <ClockHistoryIcon className="size-6" />
             <div className="flex flex-col">
-              <p className="text-h4 font-medium">No time logged</p>
+              <p className="font-medium text-h4">No time logged</p>
               <p className="text-h6">Last entries will appear here</p>
             </div>
           </div>
         ) : (
           <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-            <p className="font-mono text-h6 uppercase tracking-wide text-ods-text-secondary">Last Entries</p>
+            <p className="font-mono uppercase tracking-wide text-ods-text-secondary text-h6">Last Entries</p>
             <div className="overflow-hidden rounded-md border border-ods-border bg-ods-card">
-              {visibleEntries.map((entry) => (
+              {visibleEntries.map(entry => (
                 <LastEntryRow key={entry.id} entry={entry} onClick={handleEntryClick} />
               ))}
             </div>
@@ -315,41 +320,46 @@ export function TimeTrackerPanel({
         Close
       </Button>
     </div>
-  )
+  );
 }
 
-const STATUS_TAG_SKIN = 'gap-[var(--spacing-system-xs)] font-mono font-medium uppercase tracking-tight'
+const STATUS_TAG_SKIN = 'gap-[var(--spacing-system-xs)] font-mono font-medium uppercase tracking-tight';
 
 function StatusTag({ status }: { status: TimeTrackerStatus }) {
   if (status === 'tracking') {
     return (
-      <Tag variant="success" className={STATUS_TAG_SKIN} icon={<DotsLoaderIcon className="h-4 w-4" />} label="Tracking" />
-    )
+      <Tag
+        variant="success"
+        className={STATUS_TAG_SKIN}
+        icon={<DotsLoaderIcon className="h-4 w-4" />}
+        label="Tracking"
+      />
+    );
   }
   if (status === 'paused') {
-    return <Tag variant="warning" className={STATUS_TAG_SKIN} icon={<PauseIcon className="h-4 w-4" />} label="Paused" />
+    return (
+      <Tag variant="warning" className={STATUS_TAG_SKIN} icon={<PauseIcon className="h-4 w-4" />} label="Paused" />
+    );
   }
-  return <Tag variant="grey" className={STATUS_TAG_SKIN} label="Ready to Track" />
+  return <Tag variant="grey" className={STATUS_TAG_SKIN} label="Ready to Track" />;
 }
 
 interface LastEntryRowProps {
-  entry: TimeTrackerEntry
-  onClick?: (entry: TimeTrackerEntry) => void
+  entry: TimeTrackerEntry;
+  onClick?: (entry: TimeTrackerEntry) => void;
 }
 
 function LastEntryRow({ entry, onClick }: LastEntryRowProps) {
   return (
     <div className="flex items-center gap-[var(--spacing-system-m)] border-b border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] last:border-b-0">
       <div className="flex w-[88px] shrink-0 flex-col justify-center">
-        <span className="truncate text-h4 font-medium text-ods-text-primary">{entry.durationLabel}</span>
-        <span className="truncate text-h6 text-ods-text-secondary">{entry.dateLabel}</span>
+        <span className="truncate font-medium text-ods-text-primary text-h4">{entry.durationLabel}</span>
+        <span className="truncate text-ods-text-secondary text-h6">{entry.dateLabel}</span>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col justify-center">
-        <span className="truncate text-h4 font-medium text-ods-text-primary">{entry.title}</span>
-        {entry.description && (
-          <span className="truncate text-h6 text-ods-text-secondary">{entry.description}</span>
-        )}
+        <span className="truncate font-medium text-ods-text-primary text-h4">{entry.title}</span>
+        {entry.description && <span className="truncate text-ods-text-secondary text-h6">{entry.description}</span>}
       </div>
 
       <Button
@@ -363,5 +373,5 @@ function LastEntryRow({ entry, onClick }: LastEntryRowProps) {
         <Chevron02RightIcon />
       </Button>
     </div>
-  )
+  );
 }

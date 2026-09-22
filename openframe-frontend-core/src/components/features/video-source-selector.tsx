@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import React, { useState, useCallback } from 'react';
 import { Upload, X, Video as VideoIcon } from 'lucide-react';
+import type React from 'react';
+import { useState, useCallback } from 'react';
+import { YouTubeIcon } from '../icons/youtube-icon';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Badge } from '../ui/badge';
-import { YouTubeIcon } from '../icons/youtube-icon';
 import { Video } from './video';
 
 export type VideoSourceType = 'youtube' | 'uploaded';
@@ -118,7 +118,7 @@ export function VideoSourceSelector({
       setUploadError(null);
 
       try {
-        const url = await onUploadVideo(file, (progress) => {
+        const url = await onUploadVideo(file, progress => {
           setUploadProgress(progress);
         });
         setUploadProgress(100);
@@ -142,14 +142,22 @@ export function VideoSourceSelector({
   }, [onUploadVideo, onMainVideoUrlChange]);
 
   const handleDeleteVideo = useCallback(() => {
-    onMainVideoUrlChange('');
+    setUploadError(null);
+    // `onMainVideoUrlChange` is declared `void | Promise<void>` and the host's
+    // implementation persists the change. A rejected detach was previously
+    // unhandled, so the card cleared and the user believed the video was
+    // removed when the server still had it — surface it in the same error slot
+    // the upload path uses.
+    void Promise.resolve(onMainVideoUrlChange('')).catch((err: unknown) => {
+      setUploadError(err instanceof Error ? err.message : 'Failed to remove video');
+    });
   }, [onMainVideoUrlChange]);
 
   return (
-    <div className={`space-y-4 p-6 bg-ods-card border border-ods-border rounded-lg ${className}`}>
+    <div className={`space-y-4 rounded-lg border border-ods-border bg-ods-card p-6 ${className}`}>
       {/* Section Title */}
       {showTitle && (
-        <h3 className="text-h5 text-ods-text-primary flex items-center gap-2">
+        <h3 className="flex items-center gap-2 text-ods-text-primary text-h5">
           <VideoIcon className="h-5 w-5" />
           {title}
         </h3>
@@ -183,28 +191,22 @@ export function VideoSourceSelector({
           <Label>{youtubeLabel}</Label>
           <Input
             value={youtubeUrl}
-            onChange={(e) => onYoutubeUrlChange(e.target.value)}
+            onChange={e => onYoutubeUrlChange(e.target.value)}
             placeholder={youtubePlaceholder}
             className="bg-ods-bg"
             disabled={disabled}
           />
-          {youtubeHelperText && (
-            <p className="text-h6 text-ods-text-secondary">
-              {youtubeHelperText}
-            </p>
-          )}
+          {youtubeHelperText && <p className="text-ods-text-secondary text-h6">{youtubeHelperText}</p>}
         </div>
       )}
 
       {/* Uploaded Video Section */}
       {videoSourceType === 'uploaded' && (
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Label>{uploadLabel}</Label>
-              {showAIBadge && isAIGenerated && (
-                <AIGeneratedBadge />
-              )}
+              {showAIBadge && isAIGenerated && <AIGeneratedBadge />}
             </div>
             <Button
               type="button"
@@ -220,33 +222,27 @@ export function VideoSourceSelector({
 
           {/* Upload Progress */}
           {isUploading && UploadProgressComponent && (
-            <UploadProgressComponent
-              progress={uploadProgress}
-              message={uploadMessage}
-              className="mb-3"
-            />
+            <UploadProgressComponent progress={uploadProgress} message={uploadMessage} className="mb-3" />
           )}
 
           {/* Simple progress bar fallback if no custom component */}
           {isUploading && !UploadProgressComponent && (
             <div className="mb-3">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="flex-1 h-2 bg-ods-border rounded-full overflow-hidden">
+              <div className="mb-1 flex items-center gap-2">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-ods-border">
                   <div
                     className="h-full bg-ods-accent transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
-                <span className="text-h6 text-ods-text-secondary">{uploadProgress}%</span>
+                <span className="text-ods-text-secondary text-h6">{uploadProgress}%</span>
               </div>
-              <p className="text-h6 text-ods-text-secondary">{uploadMessage}</p>
+              <p className="text-ods-text-secondary text-h6">{uploadMessage}</p>
             </div>
           )}
 
           {/* Upload Error */}
-          {uploadError && (
-            <p className="text-h6 text-ods-error mb-3">{uploadError}</p>
-          )}
+          {uploadError && <p className="mb-3 text-ods-error text-h6">{uploadError}</p>}
 
           {/* Video Preview */}
           {mainVideoUrl ? (
@@ -257,16 +253,10 @@ export function VideoSourceSelector({
                 isAIGenerated={isAIGenerated}
               />
             ) : (
-              <DefaultVideoPreview
-                videoUrl={mainVideoUrl}
-                onDelete={handleDeleteVideo}
-                disabled={disabled}
-              />
+              <DefaultVideoPreview videoUrl={mainVideoUrl} onDelete={handleDeleteVideo} disabled={disabled} />
             )
           ) : (
-            <p className="text-h6 text-ods-text-secondary italic">
-              {uploadEmptyText}
-            </p>
+            <p className="italic text-ods-text-secondary text-h6">{uploadEmptyText}</p>
           )}
         </div>
       )}
@@ -289,18 +279,18 @@ interface DefaultVideoPreviewProps {
  */
 function DefaultVideoPreview({ videoUrl, onDelete, disabled }: DefaultVideoPreviewProps) {
   return (
-    <div className="relative rounded-lg border border-ods-border overflow-hidden">
+    <div className="relative overflow-hidden rounded-lg border border-ods-border">
       {/* aspect-video box: MuxPlayer fills its container (width/height 100%),
           so the wrapper must reserve the height the intrinsic-sized native
           <video> used to provide. */}
-      <div className="w-full aspect-video max-h-[300px]">
+      <div className="aspect-video max-h-[300px] w-full">
         <Video kind="file" url={videoUrl} />
       </div>
       <button
         type="button"
         onClick={onDelete}
         aria-label="Delete video"
-        className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
+        className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 transition-colors hover:bg-black/80"
         disabled={disabled}
       >
         <X className="h-4 w-4 text-ods-text-on-dark" />

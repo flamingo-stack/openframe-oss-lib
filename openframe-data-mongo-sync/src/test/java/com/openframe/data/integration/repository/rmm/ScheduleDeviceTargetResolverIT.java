@@ -3,11 +3,11 @@ package com.openframe.data.integration.repository.rmm;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
-import com.openframe.data.document.rmm.ScheduleDeviceSelectionMode;
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleMachineAssigned;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptMachineAssigned;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.ScheduleDeviceResolverIntegrationTestApplication;
 import com.openframe.data.repository.device.MachineRepository;
@@ -25,7 +25,7 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
 
-import static com.openframe.data.document.rmm.OsType.WINDOWS;
+import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -59,7 +59,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     @BeforeEach
     void reset() {
         mongoTemplate.remove(new Query(), Machine.class);
-        mongoTemplate.remove(new Query(), ScriptScheduleMachineAssigned.class);
+        mongoTemplate.remove(new Query(), ScheduleScriptMachineAssigned.class);
     }
 
     @Test
@@ -68,7 +68,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
 
-        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScheduleScript schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-win");
     }
@@ -79,7 +79,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("m-lap", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-desk", TENANT_A, "org-1", DeviceType.DESKTOP, WINDOWS);
 
-        ScriptSchedule schedule = criteria(List.of(WINDOWS),
+        ScheduleScript schedule = criteria(List.of(WINDOWS),
                 ScheduleDeviceCriteria.builder().deviceTypes(List.of(DeviceType.LAPTOP)).build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-lap");
@@ -91,7 +91,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("m1", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m2", TENANT_A, "org-2", DeviceType.LAPTOP, WINDOWS);
 
-        ScriptSchedule schedule = criteria(List.of(WINDOWS),
+        ScheduleScript schedule = criteria(List.of(WINDOWS),
                 ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m1");
@@ -103,7 +103,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("m-a", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-b", TENANT_B, "org-1", DeviceType.LAPTOP, WINDOWS);
 
-        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScheduleScript schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-a");
     }
@@ -114,7 +114,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
 
-        ScriptSchedule schedule = criteria(List.of(WINDOWS, OsType.MAC_OS),
+        ScheduleScript schedule = criteria(List.of(WINDOWS, OsType.MAC_OS),
                 ScheduleDeviceCriteria.builder().osTypes(List.of(WINDOWS)).build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-win");
@@ -126,7 +126,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("m-win", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
 
-        ScriptSchedule schedule = criteria(List.of(OsType.MAC_OS),
+        ScheduleScript schedule = criteria(List.of(OsType.MAC_OS),
                 ScheduleDeviceCriteria.builder().osTypes(List.of(WINDOWS)).build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).isEmpty();
@@ -138,7 +138,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("m-known", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-null", TENANT_A, "org-1", DeviceType.LAPTOP, null);
 
-        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScheduleScript schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-known");
     }
@@ -151,7 +151,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("wrong-type", TENANT_A, "org-1", DeviceType.SERVER, WINDOWS);
         machine("wrong-os", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);
 
-        ScriptSchedule schedule = criteria(List.of(WINDOWS, OsType.MAC_OS),
+        ScheduleScript schedule = criteria(List.of(WINDOWS, OsType.MAC_OS),
                 ScheduleDeviceCriteria.builder()
                         .organizationIds(List.of("org-1"))
                         .deviceTypes(List.of(DeviceType.LAPTOP))
@@ -168,7 +168,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("m-lin", TENANT_A, "org-2", DeviceType.SERVER, null);
         machine("m-other-tenant", TENANT_B, "org-1", DeviceType.LAPTOP, WINDOWS);
 
-        ScriptSchedule schedule = criteria(null, ScheduleDeviceCriteria.builder().build());
+        ScheduleScript schedule = criteria(null, ScheduleDeviceCriteria.builder().build());
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactlyInAnyOrder("m-win", "m-lin");
     }
@@ -180,7 +180,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machine("m-win2", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
         machine("m-mac", TENANT_A, "org-1", DeviceType.LAPTOP, OsType.MAC_OS);   // excluded by platform scope
 
-        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScheduleScript schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         assertThat(resolver.countCriteriaMachines(schedule)).isEqualTo(2L);
         assertThat(resolver.resolveTargetMachineIds(schedule)).hasSize(2);   // count agrees with the id set
@@ -192,12 +192,12 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         assignedRepository.save(pair("m-1"));
         assignedRepository.save(pair("m-2"));
         // a join row for a different schedule / tenant must not leak in
-        assignedRepository.save(ScriptScheduleMachineAssigned.builder()
+        assignedRepository.save(ScheduleScriptMachineAssigned.builder()
                 .tenantId(TENANT_A).scriptScheduleId("other-sch").machineId("m-9").build());
-        assignedRepository.save(ScriptScheduleMachineAssigned.builder()
+        assignedRepository.save(ScheduleScriptMachineAssigned.builder()
                 .tenantId(TENANT_B).scriptScheduleId("sch-1").machineId("m-3").build());
 
-        ScriptSchedule schedule = ScriptSchedule.builder()
+        ScheduleScript schedule = ScheduleScript.builder()
                 .id("sch-1").tenantId(TENANT_A)
                 .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).build();
 
@@ -209,7 +209,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
     void criteria_returnsMachineIdNotObjectId() {
         machine("device-serial-123", TENANT_A, "org-1", DeviceType.LAPTOP, WINDOWS);
 
-        ScriptSchedule schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
+        ScheduleScript schedule = criteria(List.of(WINDOWS), ScheduleDeviceCriteria.builder().build());
 
         List<String> ids = resolver.resolveTargetMachineIds(schedule);
         assertThat(ids).containsExactly("device-serial-123");
@@ -229,8 +229,8 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         machineRepository.save(m);
     }
 
-    private static ScriptSchedule criteria(List<OsType> supportedPlatforms, ScheduleDeviceCriteria criteria) {
-        return ScriptSchedule.builder()
+    private static ScheduleScript criteria(List<OsType> supportedPlatforms, ScheduleDeviceCriteria criteria) {
+        return ScheduleScript.builder()
                 .id("sch-1").tenantId(TENANT_A)
                 .supportedPlatforms(supportedPlatforms)
                 .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
@@ -238,8 +238,8 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
                 .build();
     }
 
-    private static ScriptScheduleMachineAssigned pair(String machineId) {
-        return ScriptScheduleMachineAssigned.builder()
+    private static ScheduleScriptMachineAssigned pair(String machineId) {
+        return ScheduleScriptMachineAssigned.builder()
                 .tenantId(TENANT_A).scriptScheduleId("sch-1").machineId(machineId).build();
     }
 }

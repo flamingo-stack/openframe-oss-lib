@@ -11,9 +11,4 @@ export {
   type LegalDocumentPageProps,
   type LegalDocumentMarkdownRendererProps,
 } from './legal-document-page';
-export {
-  useLegalDocs,
-  type LegalDocument,
-  type UseLegalDocsOptions,
-  type UseLegalDocsReturn,
-} from './use-legal-docs';
+export { useLegalDocs, type LegalDocument, type UseLegalDocsOptions, type UseLegalDocsReturn } from './use-legal-docs';

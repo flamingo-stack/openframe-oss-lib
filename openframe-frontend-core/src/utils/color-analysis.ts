@@ -21,17 +21,15 @@ export function hexToRgb(hex: string): [number, number, number] {
   // by their real color instead of falling through to black.
   const normalized = hex.replace(/^#?([a-f\d])([a-f\d])([a-f\d])$/i, (_, r, g, b) => `${r}${r}${g}${g}${b}${b}`);
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(normalized);
-  return result
-    ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
-    : [0, 0, 0];
+  return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0, 0, 0];
 }
 
 /**
  * Calculate relative luminance for contrast calculations
  */
 function getLuminance(rgb: [number, number, number]): number {
-  const [r, g, b] = rgb.map(c => {
-    c = c / 255;
+  const [r, g, b] = rgb.map(channel => {
+    const c = channel / 255;
     return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -175,49 +173,73 @@ export function analyzeImageColor(imageSrc: string): Promise<ColorPalette> {
  * Client-side only (uses canvas). Returns hex color string.
  */
 export async function extractImageEdgeColorAsync(imageUrl: string): Promise<string> {
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined') { resolve('#000000'); return }
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
+  return new Promise(resolve => {
+    if (typeof window === 'undefined') {
+      resolve('#000000');
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
-        const canvas = document.createElement('canvas')
-        const ctx = canvas.getContext('2d')
-        if (!ctx) { resolve('#000000'); return }
-        const maxSize = 50
-        const scale = Math.min(maxSize / img.naturalWidth, maxSize / img.naturalHeight)
-        const w = Math.round(img.naturalWidth * scale)
-        const h = Math.round(img.naturalHeight * scale)
-        canvas.width = w; canvas.height = h
-        ctx.drawImage(img, 0, 0, w, h)
-        const data = ctx.getImageData(0, 0, w, h).data
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve('#000000');
+          return;
+        }
+        const maxSize = 50;
+        const scale = Math.min(maxSize / img.naturalWidth, maxSize / img.naturalHeight);
+        const w = Math.round(img.naturalWidth * scale);
+        const h = Math.round(img.naturalHeight * scale);
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h).data;
         // Sample edge pixels (15% band on all sides) with color bucketing
-        const edgeW = Math.max(2, Math.round(w * 0.15))
-        const edgeH = Math.max(2, Math.round(h * 0.15))
-        const bucketSize = 32
-        const buckets = new Map<string, { r: number; g: number; b: number; count: number }>()
+        const edgeW = Math.max(2, Math.round(w * 0.15));
+        const edgeH = Math.max(2, Math.round(h * 0.15));
+        const bucketSize = 32;
+        const buckets = new Map<string, { r: number; g: number; b: number; count: number }>();
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
-            if (!(x < edgeW || x >= w - edgeW || y < edgeH || y >= h - edgeH)) continue
-            const i = (y * w + x) * 4
-            if (data[i + 3] < 128) continue
-            const br = Math.floor(data[i] / bucketSize) * bucketSize
-            const bg = Math.floor(data[i + 1] / bucketSize) * bucketSize
-            const bb = Math.floor(data[i + 2] / bucketSize) * bucketSize
-            const key = `${br},${bg},${bb}`
-            const existing = buckets.get(key)
-            if (existing) { existing.r += data[i]; existing.g += data[i + 1]; existing.b += data[i + 2]; existing.count++ }
-            else { buckets.set(key, { r: data[i], g: data[i + 1], b: data[i + 2], count: 1 }) }
+            if (!(x < edgeW || x >= w - edgeW || y < edgeH || y >= h - edgeH)) continue;
+            const i = (y * w + x) * 4;
+            if (data[i + 3] < 128) continue;
+            const br = Math.floor(data[i] / bucketSize) * bucketSize;
+            const bg = Math.floor(data[i + 1] / bucketSize) * bucketSize;
+            const bb = Math.floor(data[i + 2] / bucketSize) * bucketSize;
+            const key = `${br},${bg},${bb}`;
+            const existing = buckets.get(key);
+            if (existing) {
+              existing.r += data[i];
+              existing.g += data[i + 1];
+              existing.b += data[i + 2];
+              existing.count++;
+            } else {
+              buckets.set(key, { r: data[i], g: data[i + 1], b: data[i + 2], count: 1 });
+            }
           }
         }
-        let best = { r: 0, g: 0, b: 0, count: 0 }
-        for (const b of buckets.values()) { if (b.count > best.count) best = b }
-        if (best.count === 0) { resolve('#000000'); return }
-        const r = Math.round(best.r / best.count), g = Math.round(best.g / best.count), b = Math.round(best.b / best.count)
-        resolve(`#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`)
-      } catch { resolve('#000000') }
-    }
-    img.onerror = () => resolve('#000000')
-    img.src = imageUrl
-  })
+        let best = { r: 0, g: 0, b: 0, count: 0 };
+        for (const b of buckets.values()) {
+          if (b.count > best.count) best = b;
+        }
+        if (best.count === 0) {
+          resolve('#000000');
+          return;
+        }
+        const r = Math.round(best.r / best.count),
+          g = Math.round(best.g / best.count),
+          b = Math.round(best.b / best.count);
+        resolve(
+          `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`,
+        );
+      } catch {
+        resolve('#000000');
+      }
+    };
+    img.onerror = () => resolve('#000000');
+    img.src = imageUrl;
+  });
 }

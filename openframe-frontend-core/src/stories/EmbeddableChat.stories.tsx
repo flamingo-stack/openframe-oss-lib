@@ -1,43 +1,34 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { within, userEvent } from 'storybook/test'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import * as DialogPrimitive from '@radix-ui/react-dialog'
-import React, { useMemo } from 'react'
-import {
-  ChatRuntimeContext,
-  type ChatRuntime,
-} from '../contexts/chat-runtime-context'
-import { EmbeddableChat } from '../components/chat/embeddable-chat'
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type React from 'react';
+import { useMemo } from 'react';
+import { within, userEvent } from 'storybook/test';
+import { EmbeddableChat } from '../components/chat/embeddable-chat';
 import type {
   UseNatsChatAdapterConfig,
   FetchDialogsResult,
   FetchDialogMessagesResult,
-} from '../components/chat/hooks/use-nats-chat-adapter'
-import type { SlashCommandSummary } from '../components/chat/hooks/use-slash-commands'
-import type { DialogItem } from '../components/chat/types/component.types'
-import type {
-  UnifiedChatState,
-  UnifiedChatMessage,
-} from '../components/chat/types/unified-chat-state.types'
-import type { MingoQuickAction } from '../components/chat/mingo-welcome'
-import {
-  BracketCurlyIcon,
-  Rocket01Icon,
-  SearchIcon,
-} from '../components/icons-v2-generated'
+} from '../components/chat/hooks/use-nats-chat-adapter';
+import type { SlashCommandSummary } from '../components/chat/hooks/use-slash-commands';
+import type { MingoQuickAction } from '../components/chat/mingo-welcome';
+import type { DialogItem } from '../components/chat/types/component.types';
+import type { UnifiedChatState, UnifiedChatMessage } from '../components/chat/types/unified-chat-state.types';
+import { BracketCurlyIcon, Rocket01Icon, SearchIcon } from '../components/icons-v2-generated';
+import { ChatRuntimeContext, type ChatRuntime } from '../contexts/chat-runtime-context';
 
 // =============================================================================
 // Stub commands endpoint — module-level constant referenced both by the
 // runtime mock (commandsUrl) and by the `fetch` shim installed below.
 // =============================================================================
 
-const COMMANDS_URL = '/__story__/commands'
+const COMMANDS_URL = '/__story__/commands';
 
 // Agent-config endpoint. EmbeddableChat's `DEFAULT_AI_AGENT_CONFIG_URL` resolves
 // `activeAgentSlug` → `/api/ai-agents/<slug>`; the fetch shim below answers any
 // href containing this prefix with a mocked `EmptyStateConfig` so agent-mode
 // quick-action chips render from the fetch (not the host prop).
-const AI_AGENT_CONFIG_PREFIX = '/api/ai-agents/'
+const AI_AGENT_CONFIG_PREFIX = '/api/ai-agents/';
 
 // Mocked `/api/ai-agents/fae` response — the `EmptyStateConfig` shape
 // (see use-empty-state-config.ts). `icon: { name: 'fae' }` is the agent
@@ -48,13 +39,23 @@ const FAE_AGENT_CONFIG = {
   icon: { name: 'fae' },
   greeting: "Hi, I'm Fae — ask me about incidents, scripts, or device health.",
   quickActions: [
-    { id: 'fae-triage', label: 'Triage an alert', prompt: 'Help me triage the latest critical alert.', iconName: 'search' },
-    { id: 'fae-script', label: 'Write a script', prompt: 'Write a PowerShell script to audit local admins.', iconName: 'bracket-curly' },
+    {
+      id: 'fae-triage',
+      label: 'Triage an alert',
+      prompt: 'Help me triage the latest critical alert.',
+      iconName: 'search',
+    },
+    {
+      id: 'fae-script',
+      label: 'Write a script',
+      prompt: 'Write a PowerShell script to audit local admins.',
+      iconName: 'bracket-curly',
+    },
     { id: 'fae-health', label: 'Device health', prompt: 'Which devices are unhealthy right now?', iconName: 'rocket' },
     { id: 'fae-logs', label: 'Summarize logs', prompt: 'Summarize the last 24h of error logs.', iconName: 'newspaper' },
   ],
   suggestedQueries: [],
-}
+};
 
 // =============================================================================
 // Shared mocks
@@ -82,7 +83,7 @@ function createMockRuntime(): ChatRuntime {
       defaultContentOrigin: 'https://example.com',
     },
     source: 'storybook',
-  }
+  };
 }
 
 /**
@@ -96,8 +97,7 @@ function createMockMingoConfig(): UseNatsChatAdapterConfig {
     dialogId: 'story-dialog-id',
     getNatsWsUrl: () => null,
     publishUserMessage: (text, options) => {
-      // eslint-disable-next-line no-console
-      console.log('[story] mingo publish', { text, options })
+      console.log('[story] mingo publish', { text, options });
     },
     // Selecting a dialog loads its history via this callback — without it
     // `hasMessages` stays false and the panel never switches to the
@@ -126,7 +126,7 @@ function createMockMingoConfig(): UseNatsChatAdapterConfig {
         ],
         nextCursor: null,
       }),
-  }
+  };
 }
 
 // Sample dialog history (Figma node 7532:223950) — supplied via `fetchDialogs`
@@ -141,7 +141,7 @@ const SAMPLE_DIALOGS: ReadonlyArray<DialogItem> = [
   { id: 'd6', title: 'Office 365 license assignment automation' },
   { id: 'd7', title: 'Firewall rule configuration for new application' },
   { id: 'd8', title: 'SQL Server maintenance plan troubleshooting' },
-]
+];
 
 // Caller-provided Mingo quick-action chips — rendered after the built-in
 // "Start Guide Chat" chip in the welcome/returning-user view. `onClick` just
@@ -177,7 +177,7 @@ const SAMPLE_QUICK_ACTIONS: ReadonlyArray<MingoQuickAction> = [
     icon: <BracketCurlyIcon size={16} />,
     onClick: () => console.log('[story] quick action: patch status report'),
   },
-]
+];
 
 /** Mingo config whose `fetchDialogs` resolves a single page of history (with
  *  timestamps so the list splits into Today / Yesterday) plus working
@@ -186,42 +186,39 @@ function createMockMingoConfigWithDialogs(): UseNatsChatAdapterConfig {
   return {
     ...createMockMingoConfig(),
     fetchDialogs: () => {
-      const now = Date.now()
-      const day = 24 * 60 * 60 * 1000
+      const now = Date.now();
+      const day = 24 * 60 * 60 * 1000;
       // First six → Today, the rest → Yesterday.
       const dialogs = SAMPLE_DIALOGS.map((d, i) => ({
         ...d,
         timestamp: new Date(now - (i < 6 ? 0 : day)),
-      }))
-      return Promise.resolve({ dialogs, nextCursor: null })
+      }));
+      return Promise.resolve({ dialogs, nextCursor: null });
     },
     renameDialog: (id, title) => {
-      // eslint-disable-next-line no-console
-      console.log('[story] mingo rename', { id, title })
-      return Promise.resolve()
+      console.log('[story] mingo rename', { id, title });
+      return Promise.resolve();
     },
-    archiveDialog: (id) => {
-      // eslint-disable-next-line no-console
-      console.log('[story] mingo archive', { id })
-      return Promise.resolve()
+    archiveDialog: id => {
+      console.log('[story] mingo archive', { id });
+      return Promise.resolve();
     },
     fetchArchivedDialogs: () => {
-      const now = Date.now()
-      const day = 24 * 60 * 60 * 1000
+      const now = Date.now();
+      const day = 24 * 60 * 60 * 1000;
       const dialogs: DialogItem[] = [
         { id: 'a1', title: 'Exchange hybrid migration planning', timestamp: new Date(now) },
         { id: 'a2', title: 'VPN split-tunnel configuration review', timestamp: new Date(now) },
         { id: 'a3', title: 'Decommissioning legacy file server', timestamp: new Date(now - day) },
         { id: 'a4', title: 'Intune compliance policy rollout', timestamp: new Date(now - day) },
-      ]
-      return Promise.resolve({ dialogs, nextCursor: null })
+      ];
+      return Promise.resolve({ dialogs, nextCursor: null });
     },
-    unarchiveDialog: (id) => {
-      // eslint-disable-next-line no-console
-      console.log('[story] mingo unarchive', { id })
-      return Promise.resolve()
+    unarchiveDialog: id => {
+      console.log('[story] mingo unarchive', { id });
+      return Promise.resolve();
     },
-  }
+  };
 }
 
 /**
@@ -229,7 +226,7 @@ function createMockMingoConfigWithDialogs(): UseNatsChatAdapterConfig {
  * backs pinned `true`, so the loading UI stays on screen for the story
  * (no fake timers, no flicker to a resolved state).
  */
-const pending = <T,>(): Promise<T> => new Promise<T>(() => {})
+const pending = <T,>(): Promise<T> => new Promise<T>(() => {});
 
 /**
  * Chats-loading config — `fetchDialogs` never resolves, so the adapter keeps
@@ -241,7 +238,7 @@ function createMockMingoConfigChatsLoading(): UseNatsChatAdapterConfig {
   return {
     ...createMockMingoConfig(),
     fetchDialogs: () => pending<FetchDialogsResult>(),
-  }
+  };
 }
 
 /**
@@ -254,7 +251,7 @@ function createMockMingoConfigChatLoading(): UseNatsChatAdapterConfig {
   return {
     ...createMockMingoConfigWithDialogs(),
     fetchDialogMessages: () => pending<FetchDialogMessagesResult>(),
-  }
+  };
 }
 
 /**
@@ -268,9 +265,8 @@ function createMockMingoConfigChatLoading(): UseNatsChatAdapterConfig {
 function createMockMingoConfigChatsError(): UseNatsChatAdapterConfig {
   return {
     ...createMockMingoConfig(),
-    fetchDialogs: () =>
-      Promise.reject(new Error('Story: dialog list backend unavailable')),
-  }
+    fetchDialogs: () => Promise.reject(new Error('Story: dialog list backend unavailable')),
+  };
 }
 
 /**
@@ -282,9 +278,8 @@ function createMockMingoConfigChatsError(): UseNatsChatAdapterConfig {
 function createMockMingoConfigArchiveEmpty(): UseNatsChatAdapterConfig {
   return {
     ...createMockMingoConfigWithDialogs(),
-    fetchArchivedDialogs: () =>
-      Promise.resolve({ dialogs: [], nextCursor: null }),
-  }
+    fetchArchivedDialogs: () => Promise.resolve({ dialogs: [], nextCursor: null }),
+  };
 }
 
 // =============================================================================
@@ -411,7 +406,7 @@ const SAMPLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSummary> = [
     actions: [{ id: 'browse', label: 'Browse' }],
     displayOrder: 13,
   },
-]
+];
 
 // =============================================================================
 // `fetch` shim — installed at MODULE level (not inside an effect) so the
@@ -422,28 +417,20 @@ const SAMPLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSummary> = [
 // safe — `/__story__/commands` is reserved for storybook.
 // =============================================================================
 
-const FETCH_FLAG = '__embeddableChatStoriesMockInstalled__'
+const FETCH_FLAG = '__embeddableChatStoriesMockInstalled__';
 
-if (
-  typeof window !== 'undefined' &&
-  !(window as unknown as Record<string, unknown>)[FETCH_FLAG]
-) {
-  ;(window as unknown as Record<string, unknown>)[FETCH_FLAG] = true
-  const originalFetch = window.fetch.bind(window)
+if (typeof window !== 'undefined' && !(window as unknown as Record<string, unknown>)[FETCH_FLAG]) {
+  (window as unknown as Record<string, unknown>)[FETCH_FLAG] = true;
+  const originalFetch = window.fetch.bind(window);
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-    const href =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url
+    const href = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (href.includes(COMMANDS_URL)) {
       return Promise.resolve(
         new Response(JSON.stringify({ commands: SAMPLE_SLASH_COMMANDS }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
-      )
+      );
     }
     if (href.includes(AI_AGENT_CONFIG_PREFIX)) {
       return Promise.resolve(
@@ -451,10 +438,10 @@ if (
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
-      )
+      );
     }
-    return originalFetch(input as RequestInfo, init)
-  }) as typeof window.fetch
+    return originalFetch(input as RequestInfo, init);
+  }) as typeof window.fetch;
 }
 
 // =============================================================================
@@ -462,22 +449,20 @@ if (
 // =============================================================================
 
 function StoryShell({ children }: { children: React.ReactNode }) {
-  const runtime = useMemo(() => createMockRuntime(), [])
-  const queryClient = useMemo(() => new QueryClient(), [])
+  const runtime = useMemo(() => createMockRuntime(), []);
+  const queryClient = useMemo(() => new QueryClient(), []);
   return (
     <QueryClientProvider client={queryClient}>
       <ChatRuntimeContext.Provider value={runtime}>
         {/* Filler content under the drawer so the floating overlay
             has visual context to slide over. */}
         <div className="min-h-[100dvh] bg-ods-bg p-8">
-          <div className="text-ods-text-secondary text-sm">
-            Storybook canvas — drawer opens on the right →
-          </div>
+          <div className="text-sm text-ods-text-secondary">Storybook canvas — drawer opens on the right →</div>
         </div>
         {children}
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>
-  )
+  );
 }
 
 // =============================================================================
@@ -491,16 +476,16 @@ const meta = {
     layout: 'fullscreen',
   },
   decorators: [
-    (Story) => (
+    Story => (
       <StoryShell>
         <Story />
       </StoryShell>
     ),
   ],
-} satisfies Meta<typeof EmbeddableChat>
+} satisfies Meta<typeof EmbeddableChat>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 // =============================================================================
 // 1. Guide-only (legacy / multi-platform-hub)
@@ -518,13 +503,9 @@ export const GuideOnly: Story = {
     defaultOpen: true,
     showInternalTrigger: false,
     emptyStateGreeting: 'Ask me anything about the OpenFrame docs.',
-    suggestedQueries: [
-      'How do I install the agent?',
-      'What integrations are supported?',
-      'Where do I configure SSO?',
-    ],
+    suggestedQueries: ['How do I install the agent?', 'What integrations are supported?', 'Where do I configure SSO?'],
   },
-}
+};
 
 // =============================================================================
 // 2. Mingo-only (NATS agent surface)
@@ -539,7 +520,7 @@ export const GuideOnly: Story = {
  * handshake is attempted — the story renders the empty Mingo panel.
  */
 export const MingoOnly: Story = {
-  render: (args) => (
+  render: args => (
     <EmbeddableChat
       {...args}
       modes={{
@@ -552,7 +533,7 @@ export const MingoOnly: Story = {
     />
   ),
   args: {},
-}
+};
 
 // =============================================================================
 // 3. Both modes (toggle visible — openframe-frontend target)
@@ -568,7 +549,7 @@ export const MingoOnly: Story = {
  * idle (no real backend) — toggle and layout are the visible deliverable.
  */
 export const BothModes: Story = {
-  render: (args) => (
+  render: args => (
     <EmbeddableChat
       {...args}
       modes={{
@@ -579,14 +560,11 @@ export const BothModes: Story = {
       defaultOpen
       showInternalTrigger={false}
       emptyStateGreeting="Switch between Mingo (agent) and Guide (docs) via the header toggle."
-      suggestedQueries={[
-        'How do I onboard a new device?',
-        'Show me the audit log',
-      ]}
+      suggestedQueries={['How do I onboard a new device?', 'Show me the audit log']}
     />
   ),
   args: {},
-}
+};
 
 // =============================================================================
 // 4. Returning user — Mingo with existing chats (Figma node 7532:223950)
@@ -603,7 +581,7 @@ export const BothModes: Story = {
  * "Start Guide Chat" — the first is `primary` (accent), the rest `outline`.
  */
 export const ReturningUser: Story = {
-  render: (args) => (
+  render: args => (
     <EmbeddableChat
       {...args}
       modes={{
@@ -617,7 +595,7 @@ export const ReturningUser: Story = {
     />
   ),
   args: {},
-}
+};
 
 // =============================================================================
 // 5. Chats loading — dialog list fetch in flight
@@ -631,7 +609,7 @@ export const ReturningUser: Story = {
  * lands.
  */
 export const ChatsLoading: Story = {
-  render: (args) => (
+  render: args => (
     <EmbeddableChat
       {...args}
       modes={{
@@ -643,7 +621,7 @@ export const ChatsLoading: Story = {
     />
   ),
   args: {},
-}
+};
 
 // =============================================================================
 // 6. Chat loading — opening a dialog whose history is in flight
@@ -657,7 +635,7 @@ export const ChatsLoading: Story = {
  * "opening a chat" loading frame before bubbles stream in.
  */
 export const ChatLoading: Story = {
-  render: (args) => (
+  render: args => (
     <EmbeddableChat
       {...args}
       modes={{
@@ -671,11 +649,11 @@ export const ChatLoading: Story = {
   args: {},
   play: async () => {
     // The drawer portals to <body>, so query the document, not the canvas.
-    const body = within(document.body)
-    const row = await body.findByText(SAMPLE_DIALOGS[0].title)
-    await userEvent.click(row)
+    const body = within(document.body);
+    const row = await body.findByText(SAMPLE_DIALOGS[0].title);
+    await userEvent.click(row);
   },
-}
+};
 
 // =============================================================================
 // 7. Chats error — dialog list fetch failed
@@ -689,7 +667,7 @@ export const ChatLoading: Story = {
  * is unreachable. Clicking retry re-runs the (still-failing) fetch.
  */
 export const ChatsError: Story = {
-  render: (args) => (
+  render: args => (
     <EmbeddableChat
       {...args}
       modes={{
@@ -701,7 +679,7 @@ export const ChatsError: Story = {
     />
   ),
   args: {},
-}
+};
 
 // =============================================================================
 // 8. Archive empty — archive page with no archived chats
@@ -715,7 +693,7 @@ export const ChatsError: Story = {
  * hint) rather than the dialog list or skeleton.
  */
 export const ArchiveEmpty: Story = {
-  render: (args) => (
+  render: args => (
     <EmbeddableChat
       {...args}
       modes={{
@@ -729,13 +707,13 @@ export const ArchiveEmpty: Story = {
   args: {},
   play: async () => {
     // The drawer portals to <body>, so query the document, not the canvas.
-    const body = within(document.body)
+    const body = within(document.body);
     const archiveButton = await body.findByRole('button', {
       name: 'Chat archive',
-    })
-    await userEvent.click(archiveButton)
+    });
+    await userEvent.click(archiveButton);
   },
-}
+};
 
 // =============================================================================
 // 9. Agent-mode quick actions (fetched chips — PR #1342)
@@ -756,7 +734,7 @@ export const AgentModeQuickActions: Story = {
     showInternalTrigger: false,
     activeAgentSlug: 'fae',
   },
-}
+};
 
 /**
  * The PR #1342 precedence fix. BOTH sources are configured: the host passes its
@@ -779,7 +757,7 @@ export const AgentChipsWinOverHost: Story = {
       ],
     },
   },
-}
+};
 
 // =============================================================================
 // 10. Scripted Mingo conversation — Figma "Flamingo Website" node 4050:23837
@@ -788,18 +766,18 @@ export const AgentChipsWinOverHost: Story = {
 // Simple gradient user-avatar as a self-contained data URI — no external asset
 // dependency in the story. Roman's `user` bubble shows it via `message.avatar`.
 const ROMAN_AVATAR =
-  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MCcgaGVpZ2h0PSc0MCc+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSdnJyB4MT0nMCcgeTE9JzAnIHgyPScxJyB5Mj0nMSc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPScjNWVmYWYwJy8+PHN0b3Agb2Zmc2V0PScxJyBzdG9wLWNvbG9yPScjZmY2YjlkJy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0nMjAnIGN5PScyMCcgcj0nMjAnIGZpbGw9J3VybCgjZyknLz48Y2lyY2xlIGN4PScyMCcgY3k9JzE2JyByPSc2LjUnIGZpbGw9JyMxNjE2MTYnIG9wYWNpdHk9JzAuODUnLz48cGF0aCBkPSdNOCAzNGMxLjUtNiA2LTkgMTItOXMxMC41IDMgMTIgOXonIGZpbGw9JyMxNjE2MTYnIG9wYWNpdHk9JzAuODUnLz48L3N2Zz4='
+  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MCcgaGVpZ2h0PSc0MCc+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSdnJyB4MT0nMCcgeTE9JzAnIHgyPScxJyB5Mj0nMSc+PHN0b3Agb2Zmc2V0PScwJyBzdG9wLWNvbG9yPScjNWVmYWYwJy8+PHN0b3Agb2Zmc2V0PScxJyBzdG9wLWNvbG9yPScjZmY2YjlkJy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0nMjAnIGN5PScyMCcgcj0nMjAnIGZpbGw9J3VybCgjZyknLz48Y2lyY2xlIGN4PScyMCcgY3k9JzE2JyByPSc2LjUnIGZpbGw9JyMxNjE2MTYnIG9wYWNpdHk9JzAuODUnLz48cGF0aCBkPSdNOCAzNGMxLjUtNiA2LTkgMTItOXMxMC41IDMgMTIgOXonIGZpbGw9JyMxNjE2MTYnIG9wYWNpdHk9JzAuODUnLz48L3N2Zz4=';
 
 // Fixed timestamp so the bubbles render a stable "2:47 PM" (matches the Figma
 // mock) instead of the current clock — 14:47 local → 2:47 PM.
-const TS_247 = new Date(2024, 0, 1, 14, 47, 0)
+const TS_247 = new Date(2024, 0, 1, 14, 47, 0);
 
 // The exact PowerShell command from the Figma command block. Passed as
 // `toolTitle` (not a `command`/`script` parameter) so `getToolCallTitle`
 // renders this whole string verbatim — including the backticks — as the
 // collapsed command-block preview line.
 const RUN_SCRIPT_TITLE =
-  '`run_script` -- PowerShell: `Get-LocalUser | Where-Object { $_.PasswordRequired -eq $false -or $_.PasswordLastSet -lt (Get-Date).AddDays(-90) }`'
+  '`run_script` -- PowerShell: `Get-LocalUser | Where-Object { $_.PasswordRequired -eq $false -or $_.PasswordLastSet -lt (Get-Date).AddDays(-90) }`';
 
 const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
   {
@@ -839,7 +817,7 @@ const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
       },
     ],
   },
-]
+];
 
 /**
  * Fully-stubbed `UnifiedChatState` factory. This is the "inject a static Mingo
@@ -849,8 +827,8 @@ const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
  * drives the trailing "Mingo is working" dots loader under the command block.
  */
 function createScriptedMingoState(): UnifiedChatState {
-  const noop = () => {}
-  const asyncNoop = async () => {}
+  const noop = () => {};
+  const asyncNoop = async () => {};
   return {
     messages: SCRIPTED_MESSAGES,
     isLoading: true,
@@ -889,7 +867,7 @@ function createScriptedMingoState(): UnifiedChatState {
     rejectRequest: asyncNoop,
     dialogTokenUsage: null,
     connectionState: 'connected',
-  }
+  };
 }
 
 /**
@@ -918,7 +896,7 @@ export const ScriptedConversation: Story = {
     // the inline layout.
     <DialogPrimitive.Root open>
       <div className="fixed inset-0 z-[10] flex items-center justify-center bg-ods-bg p-6">
-        <div className="w-[440px] h-[560px] overflow-hidden rounded-[6px] border border-ods-border shadow-2xl">
+        <div className="h-[560px] w-[440px] overflow-hidden rounded-[6px] border border-ods-border shadow-2xl">
           <EmbeddableChat
             shell="none"
             defaultOpen
@@ -933,4 +911,4 @@ export const ScriptedConversation: Story = {
     </DialogPrimitive.Root>
   ),
   args: {},
-}
+};

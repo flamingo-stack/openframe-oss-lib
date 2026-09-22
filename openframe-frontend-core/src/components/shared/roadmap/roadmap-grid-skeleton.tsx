@@ -15,31 +15,31 @@
 
 function RoadmapCardSkeleton() {
   return (
-    <div className="bg-ods-card border border-ods-border rounded-[6px] p-[24px] flex flex-col gap-[16px] min-h-[340px] relative">
+    <div className="relative flex min-h-[340px] flex-col gap-[16px] rounded-[6px] border border-ods-border bg-ods-card p-[24px]">
       {/* Status Badge Skeleton - Top Right */}
-      <div className="absolute top-[24px] right-[24px]">
-        <div className="h-[20px] w-[80px] bg-ods-border rounded animate-pulse"></div>
+      <div className="absolute right-[24px] top-[24px]">
+        <div className="h-[20px] w-[80px] animate-pulse rounded bg-ods-border"></div>
       </div>
 
       {/* Icon and title skeleton */}
       <div className="flex items-center gap-[16px] pr-[120px]">
-        <div className="w-[80px] h-[80px] bg-ods-border rounded-lg flex-shrink-0 animate-pulse"></div>
-        <div className="flex-1 min-w-0 flex flex-col gap-1">
-          <div className="min-h-[48px] flex items-center">
-            <div className="h-[24px] w-full bg-ods-border rounded animate-pulse"></div>
+        <div className="h-[80px] w-[80px] flex-shrink-0 animate-pulse rounded-lg bg-ods-border"></div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex min-h-[48px] items-center">
+            <div className="h-[24px] w-full animate-pulse rounded bg-ods-border"></div>
           </div>
-          <div className="min-h-[20px] flex items-center">
-            <div className="h-[14px] w-1/2 bg-ods-border rounded animate-pulse"></div>
+          <div className="flex min-h-[20px] items-center">
+            <div className="h-[14px] w-1/2 animate-pulse rounded bg-ods-border"></div>
           </div>
         </div>
       </div>
 
       {/* Description skeleton - exactly 3 lines */}
-      <div className="min-h-[72px] flex items-center">
+      <div className="flex min-h-[72px] items-center">
         <div className="w-full space-y-2">
-          <div className="h-[24px] bg-ods-border rounded animate-pulse"></div>
-          <div className="h-[24px] bg-ods-border rounded animate-pulse"></div>
-          <div className="h-[24px] w-4/5 bg-ods-border rounded animate-pulse"></div>
+          <div className="h-[24px] animate-pulse rounded bg-ods-border"></div>
+          <div className="h-[24px] animate-pulse rounded bg-ods-border"></div>
+          <div className="h-[24px] w-4/5 animate-pulse rounded bg-ods-border"></div>
         </div>
       </div>
 
@@ -47,8 +47,8 @@ function RoadmapCardSkeleton() {
 
       {/* Bottom skeleton */}
       <div className="flex items-center justify-between">
-        <div className="h-[48px] w-[120px] bg-ods-border rounded animate-pulse"></div>
-        <div className="h-[32px] w-[100px] bg-ods-border rounded animate-pulse"></div>
+        <div className="h-[48px] w-[120px] animate-pulse rounded bg-ods-border"></div>
+        <div className="h-[32px] w-[100px] animate-pulse rounded bg-ods-border"></div>
       </div>
     </div>
   );
@@ -65,7 +65,7 @@ export interface RoadmapGridSkeletonProps {
 
 export function RoadmapGridSkeleton({ count = 4, showLeftMargin = true }: RoadmapGridSkeletonProps) {
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${showLeftMargin ? 'md:ml-[120px]' : ''}`}>
+    <div className={`grid grid-cols-1 gap-6 md:grid-cols-2 ${showLeftMargin ? 'md:ml-[120px]' : ''}`}>
       {Array.from({ length: count }).map((_, i) => (
         <RoadmapCardSkeleton key={i} />
       ))}

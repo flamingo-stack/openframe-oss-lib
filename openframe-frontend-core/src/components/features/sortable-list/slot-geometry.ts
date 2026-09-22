@@ -20,21 +20,21 @@
  * boundary just crossed cannot be re-crossed by jitter, or by the hand simply
  * stopping.
  */
-export const SLOT_STICKINESS = 0.25
+export const SLOT_STICKINESS = 0.25;
 
 export interface DragSlots {
   /** Every item's top edge, before anything moved, measured from the list's own
    *  top rather than the viewport or the document — so a scroll during the drag
    *  (the page, the layout's `<main>`, any ancestor) leaves them all valid. */
-  tops: number[]
+  tops: number[];
   /** Every item's bottom edge, same frame of reference. */
-  bottoms: number[]
+  bottoms: number[];
   /** The dragged item's own height. */
-  height: number
+  height: number;
   /** The index the drag started from. */
-  from: number
+  from: number;
   /** How far a displaced item travels: the dragged item's height + the row gap. */
-  step: number
+  step: number;
 }
 
 /**
@@ -45,14 +45,14 @@ export interface DragSlots {
  * and the pointer together and none of this goes stale.
  */
 export function measureSlots(items: readonly HTMLElement[], from: number, gap: number, origin: number): DragSlots {
-  const rects = items.map(item => item.getBoundingClientRect())
+  const rects = items.map(item => item.getBoundingClientRect());
   return {
     tops: rects.map(rect => rect.top - origin),
     bottoms: rects.map(rect => rect.bottom - origin),
     height: rects[from].height,
     from,
     step: rects[from].height + gap,
-  }
+  };
 }
 
 /**
@@ -64,7 +64,7 @@ export function measureSlots(items: readonly HTMLElement[], from: number, gap: n
  * the user is aiming at — not the neighbour's centre.
  */
 function restingCentre(slots: DragSlots, index: number): number {
-  return index <= slots.from ? slots.tops[index] + slots.height / 2 : slots.bottoms[index] - slots.height / 2
+  return index <= slots.from ? slots.tops[index] + slots.height / 2 : slots.bottoms[index] - slots.height / 2;
 }
 
 /**
@@ -77,24 +77,24 @@ function restingCentre(slots: DragSlots, index: number): number {
  * neighbour outright takes twice as long and reads as late.
  */
 export function resolveSlot(slots: DragSlots, held: number, offset: number): number {
-  const centre = slots.tops[slots.from] + slots.height / 2 + offset
-  let best = Math.abs(centre - restingCentre(slots, held)) - slots.step * SLOT_STICKINESS
-  let next = held
+  const centre = slots.tops[slots.from] + slots.height / 2 + offset;
+  let best = Math.abs(centre - restingCentre(slots, held)) - slots.step * SLOT_STICKINESS;
+  let next = held;
   for (let index = 0; index < slots.tops.length; index++) {
-    if (index === held) continue
-    const distance = Math.abs(centre - restingCentre(slots, index))
+    if (index === held) continue;
+    const distance = Math.abs(centre - restingCentre(slots, index));
     if (distance < best) {
-      best = distance
-      next = index
+      best = distance;
+      next = index;
     }
   }
-  return next
+  return next;
 }
 
 /** How far the item at `index` has to stand aside while the drop is aimed at `to`. */
 export function shiftFor(slots: DragSlots, index: number, to: number): number {
-  if (index === slots.from) return 0
-  if (index > slots.from && index <= to) return -slots.step
-  if (index < slots.from && index >= to) return slots.step
-  return 0
+  if (index === slots.from) return 0;
+  if (index > slots.from && index <= to) return -slots.step;
+  if (index < slots.from && index >= to) return slots.step;
+  return 0;
 }

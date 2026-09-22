@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface AboutIconProps {
   width?: number;
   height?: number;
@@ -8,12 +6,7 @@ interface AboutIconProps {
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function AboutIcon({
-  width = 24,
-  height = 24,
-  className = "",
-  color = 'white'
-}: AboutIconProps) {
+export function AboutIcon({ width = 24, height = 24, className = '', color = 'white' }: AboutIconProps) {
   return (
     <svg
       width={width}
@@ -29,4 +22,4 @@ export function AboutIcon({
       />
     </svg>
   );
-} 
+}

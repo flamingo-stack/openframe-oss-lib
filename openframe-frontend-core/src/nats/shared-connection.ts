@@ -1,4 +1,4 @@
-import { createNatsClient, type NatsClient, type NatsStatus, type NatsStatusEvent } from './nats'
+import { createNatsClient, type NatsClient, type NatsStatus, type NatsStatusEvent } from './nats';
 
 export const NATS_DEFAULTS = {
   SHARED_CLOSE_DELAY_MS: 3000,
@@ -8,34 +8,34 @@ export const NATS_DEFAULTS = {
   RETRY_INITIAL_DELAY_MS: 1000,
   RETRY_MAX_DELAY_MS: 30_000,
   RETRY_MULTIPLIER: 2,
-} as const
+} as const;
 
 export interface NatsReconnectionBackoff {
   /** Number of fast retries before exponential phase kicks in. Default: 0. */
-  fastRetries?: number
+  fastRetries?: number;
   /** Delay used during the fast-retry phase. Default: RETRY_INITIAL_DELAY_MS. */
-  fastRetryDelayMs?: number
+  fastRetryDelayMs?: number;
   /** Base delay for the exponential phase. Default: RETRY_INITIAL_DELAY_MS. */
-  initialDelayMs?: number
+  initialDelayMs?: number;
   /** Upper cap on any single retry delay. Default: RETRY_MAX_DELAY_MS. */
-  maxDelayMs?: number
+  maxDelayMs?: number;
   /** Per-attempt multiplier during exponential phase. Default: RETRY_MULTIPLIER. */
-  multiplier?: number
+  multiplier?: number;
 }
 
 export interface SharedConnection {
-  wsUrl: string
-  client: NatsClient
-  refCount: number
-  closeTimer: ReturnType<typeof setTimeout> | null
-  retryTimer: ReturnType<typeof setTimeout> | null
+  wsUrl: string;
+  client: NatsClient;
+  refCount: number;
+  closeTimer: ReturnType<typeof setTimeout> | null;
+  retryTimer: ReturnType<typeof setTimeout> | null;
   /**
    * The lifecycle driving reconnect, held as its own `scheduleRetry`. When set,
    * other consumers observe status only and skip their own scheduleRetry —
    * otherwise every disconnect starts one backoff schedule per attached
    * consumer, all dialling the same connection on their own clocks.
    */
-  retryOwner: (() => void) | null
+  retryOwner: (() => void) | null;
   /**
    * The `scheduleRetry` of every lifecycle currently observing this connection,
    * in attach order — the same value that goes into `retryOwner`, so a
@@ -43,20 +43,20 @@ export interface SharedConnection {
    * reconnect, so when it gives the loop up the roster is what a successor is
    * found in; see {@link handOffRetry}.
    */
-  retrySchedulers: Set<() => void>
+  retrySchedulers: Set<() => void>;
 }
 
 export interface AcquireClientOptions {
-  name?: string
-  user?: string
-  pass?: string
-  connectTimeoutMs?: number
-  pingIntervalMs?: number
-  maxPingOut?: number
+  name?: string;
+  user?: string;
+  pass?: string;
+  connectTimeoutMs?: number;
+  pingIntervalMs?: number;
+  maxPingOut?: number;
 }
 
 export interface ReleaseClientOptions {
-  delayMs?: number
+  delayMs?: number;
 }
 
 // One shared connection PER URL. The previous single-slot implementation
@@ -66,7 +66,7 @@ export interface ReleaseClientOptions {
 // mounted at once, each acquire killed the other's socket, and the loser's
 // retry loop self-cancelled (connection identity mismatch) leaving a dead
 // subscription that silently received nothing.
-const connections = new Map<string, SharedConnection>()
+const connections = new Map<string, SharedConnection>();
 
 /** Legacy accessor from the single-slot era: returns the first live shared
  *  connection, or null. With MULTIPLE URLs connected (e.g. `/ws/nats` client
@@ -75,12 +75,12 @@ const connections = new Map<string, SharedConnection>()
  *  Prefer `getSharedConnectionFor(url)`; this stays only for external
  *  registry-pinned consumers of the old single-connection API. */
 export function getSharedConnection(): SharedConnection | null {
-  const first = connections.values().next()
-  return first.done ? null : first.value
+  const first = connections.values().next();
+  return first.done ? null : first.value;
 }
 
 export function acquireClient(url: string, opts?: AcquireClientOptions): SharedConnection {
-  let conn = connections.get(url)
+  let conn = connections.get(url);
 
   if (!conn) {
     const {
@@ -90,7 +90,7 @@ export function acquireClient(url: string, opts?: AcquireClientOptions): SharedC
       connectTimeoutMs = NATS_DEFAULTS.CONNECT_TIMEOUT_MS,
       pingIntervalMs = NATS_DEFAULTS.PING_INTERVAL_MS,
       maxPingOut = NATS_DEFAULTS.MAX_PING_OUT,
-    } = opts ?? {}
+    } = opts ?? {};
 
     const client = createNatsClient({
       servers: url,
@@ -101,7 +101,7 @@ export function acquireClient(url: string, opts?: AcquireClientOptions): SharedC
       reconnect: false,
       pingIntervalMs,
       maxPingOut,
-    })
+    });
 
     conn = {
       wsUrl: url,
@@ -111,44 +111,44 @@ export function acquireClient(url: string, opts?: AcquireClientOptions): SharedC
       retryTimer: null,
       retryOwner: null,
       retrySchedulers: new Set(),
-    }
-    connections.set(url, conn)
+    };
+    connections.set(url, conn);
   }
 
-  conn.refCount += 1
+  conn.refCount += 1;
   if (conn.closeTimer) {
-    clearTimeout(conn.closeTimer)
-    conn.closeTimer = null
+    clearTimeout(conn.closeTimer);
+    conn.closeTimer = null;
   }
-  return conn
+  return conn;
 }
 
 export function releaseClient(url: string, opts?: ReleaseClientOptions): void {
-  const conn = connections.get(url)
-  if (!conn) return
+  const conn = connections.get(url);
+  if (!conn) return;
 
-  conn.refCount = Math.max(0, conn.refCount - 1)
-  if (conn.refCount > 0) return
+  conn.refCount = Math.max(0, conn.refCount - 1);
+  if (conn.refCount > 0) return;
 
-  const delay = opts?.delayMs ?? NATS_DEFAULTS.SHARED_CLOSE_DELAY_MS
+  const delay = opts?.delayMs ?? NATS_DEFAULTS.SHARED_CLOSE_DELAY_MS;
   conn.closeTimer = setTimeout(() => {
-    conn.closeTimer = null
+    conn.closeTimer = null;
     // A new acquire may have raced in during the grace period.
-    if (conn.refCount > 0) return
+    if (conn.refCount > 0) return;
     if (connections.get(url) === conn) {
-      connections.delete(url)
+      connections.delete(url);
     }
     if (conn.retryTimer) {
-      clearTimeout(conn.retryTimer)
-      conn.retryTimer = null
+      clearTimeout(conn.retryTimer);
+      conn.retryTimer = null;
     }
-    void conn.client.close().catch(() => {})
-  }, delay)
+    void conn.client.close().catch(() => {});
+  }, delay);
 }
 
 export function getSharedConnectionFor(url: string | null | undefined): SharedConnection | null {
-  if (!url) return null
-  return connections.get(url) ?? null
+  if (!url) return null;
+  return connections.get(url) ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,27 +163,27 @@ export function getSharedConnectionFor(url: string | null | undefined): SharedCo
 // ---------------------------------------------------------------------------
 
 export interface ConnectionLifecycleOptions {
-  conn: SharedConnection
-  wsUrl: string
-  onBeforeReconnect?: () => Promise<void> | void
-  backoff?: NatsReconnectionBackoff
-  getFreshUrl: () => string | null
+  conn: SharedConnection;
+  wsUrl: string;
+  onBeforeReconnect?: () => Promise<void> | void;
+  backoff?: NatsReconnectionBackoff;
+  getFreshUrl: () => string | null;
   /** Called on every status change (after closed-guard). */
-  onStatusChange?: (status: NatsStatus, evt: NatsStatusEvent) => void
+  onStatusChange?: (status: NatsStatus, evt: NatsStatusEvent) => void;
   /**
    * Decide which statuses should trigger a retry attempt. Defaults to closed +
    * disconnected. Override to skip 'error' (JetStream protocol errors that
    * don't close the WS) or include it.
    */
-  shouldRetryOn?: (status: NatsStatus) => boolean
+  shouldRetryOn?: (status: NatsStatus) => boolean;
 }
 
 export interface ConnectionLifecycleHandle {
   /** Stop observing status, clear any pending retry, release ownership if held. */
-  stop(): void
+  stop(): void;
 }
 
-const defaultShouldRetryOn = (status: NatsStatus) => status === 'closed' || status === 'disconnected'
+const defaultShouldRetryOn = (status: NatsStatus) => status === 'closed' || status === 'disconnected';
 
 /**
  * Offer the retry loop to another lifecycle on this connection.
@@ -202,33 +202,33 @@ const defaultShouldRetryOn = (status: NatsStatus) => status === 'closed' || stat
  */
 function handOffRetry(conn: SharedConnection): void {
   for (const takeOver of conn.retrySchedulers) {
-    takeOver()
-    if (conn.retryOwner) return
+    takeOver();
+    if (conn.retryOwner) return;
   }
 }
 
 export function startConnectionLifecycle(options: ConnectionLifecycleOptions): ConnectionLifecycleHandle {
-  const { conn, wsUrl } = options
-  let closed = false
-  let retryAttempt = 0
+  const { conn, wsUrl } = options;
+  let closed = false;
+  let retryAttempt = 0;
 
   function emitSynthetic(status: NatsStatus) {
-    if (closed) return
-    options.onStatusChange?.(status, { status })
+    if (closed) return;
+    options.onStatusChange?.(status, { status });
     if (status === 'connected') {
-      retryAttempt = 0
+      retryAttempt = 0;
     }
   }
 
   // A lifecycle's identity IS its `scheduleRetry`: that function goes on the
   // connection's roster and, for whichever lifecycle holds the loop, into
   // `retryOwner` — one identity, not two.
-  conn.retrySchedulers.add(scheduleRetry)
-  if (!conn.retryOwner) conn.retryOwner = scheduleRetry
+  conn.retrySchedulers.add(scheduleRetry);
+  if (!conn.retryOwner) conn.retryOwner = scheduleRetry;
 
   function scheduleRetry() {
-    if (closed) return
-    if (getSharedConnectionFor(wsUrl) !== conn) return
+    if (closed) return;
+    if (getSharedConnectionFor(wsUrl) !== conn) return;
     // This lifecycle now wants a different URL, so it must not drive this
     // connection — not from its own status events, and not as a handoff
     // successor. Without the guard, two consumers that had both moved on
@@ -236,9 +236,9 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     // — a token refresh in the real callers — on every pass and dialling
     // nothing. The armed callback re-checks, because the URL can move between
     // arming and firing.
-    if (options.getFreshUrl() !== wsUrl) return
-    if (!conn.retryOwner) conn.retryOwner = scheduleRetry
-    if (conn.retryOwner !== scheduleRetry) return
+    if (options.getFreshUrl() !== wsUrl) return;
+    if (!conn.retryOwner) conn.retryOwner = scheduleRetry;
+    if (conn.retryOwner !== scheduleRetry) return;
 
     // One outage can raise more than one status: nats.ws reports
     // `staleConnection` and then, once the transport is down, `disconnect`.
@@ -246,26 +246,32 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     // on the defaults, waiting 2000ms where the caller asked for 1000. The
     // armed timer re-validates everything when it fires, so the first one
     // scheduled for an outage is always the right one to keep.
-    if (conn.retryTimer) return
+    if (conn.retryTimer) return;
 
-    const cfg = options.backoff ?? {}
-    const fastRetries = cfg.fastRetries ?? 0
-    const fastDelay = cfg.fastRetryDelayMs ?? NATS_DEFAULTS.RETRY_INITIAL_DELAY_MS
-    const baseDelay = cfg.initialDelayMs ?? NATS_DEFAULTS.RETRY_INITIAL_DELAY_MS
-    const maxDelay = cfg.maxDelayMs ?? NATS_DEFAULTS.RETRY_MAX_DELAY_MS
-    const multiplier = cfg.multiplier ?? NATS_DEFAULTS.RETRY_MULTIPLIER
+    const cfg = options.backoff ?? {};
+    const fastRetries = cfg.fastRetries ?? 0;
+    const fastDelay = cfg.fastRetryDelayMs ?? NATS_DEFAULTS.RETRY_INITIAL_DELAY_MS;
+    const baseDelay = cfg.initialDelayMs ?? NATS_DEFAULTS.RETRY_INITIAL_DELAY_MS;
+    const maxDelay = cfg.maxDelayMs ?? NATS_DEFAULTS.RETRY_MAX_DELAY_MS;
+    const multiplier = cfg.multiplier ?? NATS_DEFAULTS.RETRY_MULTIPLIER;
 
     const delay =
       retryAttempt < fastRetries
         ? fastDelay
-        : Math.min(baseDelay * multiplier ** (retryAttempt - fastRetries), maxDelay)
-    const jitteredDelay = delay * (0.5 + Math.random() * 0.5)
-    retryAttempt++
+        : Math.min(baseDelay * multiplier ** (retryAttempt - fastRetries), maxDelay);
+    const jitteredDelay = delay * (0.5 + Math.random() * 0.5);
+    retryAttempt++;
 
-    conn.retryTimer = setTimeout(async () => {
-      conn.retryTimer = null
-      if (closed) return
-      if (getSharedConnectionFor(wsUrl) !== conn) return
+    // The retry body is a named async function rather than the timer callback
+    // itself: `setTimeout` discards whatever its callback returns, so an async
+    // callback's rejection has nowhere to go. Everything that can realistically
+    // throw in here is already caught below, so this is the last-resort net —
+    // but the retry loop is what brings the connection back, and a silent
+    // unhandled rejection in it strands every consumer offline.
+    const runRetry = async () => {
+      conn.retryTimer = null;
+      if (closed) return;
+      if (getSharedConnectionFor(wsUrl) !== conn) return;
 
       // Nothing to reconnect. Reached when the dial that was already in flight
       // succeeded while this retry sat in its backoff — a handoff during a
@@ -273,68 +279,74 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
       // is a token refresh in the real callers, so it must not run on a
       // connection that came back on its own.
       if (conn.client.isConnected()) {
-        retryAttempt = 0
-        return
+        retryAttempt = 0;
+        return;
       }
 
       try {
-        await options.onBeforeReconnect?.()
+        await options.onBeforeReconnect?.();
       } catch {
         // continue regardless of token-refresh outcome
       }
-      if (closed) return
-      if (getSharedConnectionFor(wsUrl) !== conn) return
+      if (closed) return;
+      if (getSharedConnectionFor(wsUrl) !== conn) return;
 
-      const freshUrl = options.getFreshUrl()
+      const freshUrl = options.getFreshUrl();
       if (freshUrl !== wsUrl) {
         // This lifecycle has moved to a different URL, so it must not dial this
         // connection again while holding the loop — that is the dead end the
         // rest of this module exists to avoid. Give the loop up and push it to
         // someone still on this URL.
         if (conn.retryOwner === scheduleRetry) {
-          conn.retryOwner = null
+          conn.retryOwner = null;
           // A status that landed while the refresh above was awaited can have
           // armed a new timer under this ownership. It belongs to a lifecycle
           // that is leaving, and a successor claiming while it is armed would
           // return early believing the loop is covered — then this timer fires,
           // finds someone else owns the loop, and bails without handing on.
           if (conn.retryTimer) {
-            clearTimeout(conn.retryTimer)
-            conn.retryTimer = null
+            clearTimeout(conn.retryTimer);
+            conn.retryTimer = null;
           }
-          handOffRetry(conn)
+          handOffRetry(conn);
         }
-        return
+        return;
       }
 
       try {
-        await conn.client.connect()
+        await conn.client.connect();
         if (!closed && getSharedConnectionFor(wsUrl) === conn) {
-          retryAttempt = 0
+          retryAttempt = 0;
         }
       } catch {
         if (!closed && getSharedConnectionFor(wsUrl) === conn) {
-          scheduleRetry()
+          scheduleRetry();
         }
       }
-    }, jitteredDelay)
+    };
+
+    conn.retryTimer = setTimeout(() => {
+      runRetry().catch((err: unknown) => {
+        console.warn('[nats] retry attempt threw:', err);
+      });
+    }, jitteredDelay);
   }
 
-  const shouldRetryOn = options.shouldRetryOn ?? defaultShouldRetryOn
+  const shouldRetryOn = options.shouldRetryOn ?? defaultShouldRetryOn;
 
-  const unsubStatus = conn.client.onStatus((evt) => {
-    if (closed) return
-    options.onStatusChange?.(evt.status, evt)
+  const unsubStatus = conn.client.onStatus(evt => {
+    if (closed) return;
+    options.onStatusChange?.(evt.status, evt);
     if (evt.status === 'connected') {
-      retryAttempt = 0
+      retryAttempt = 0;
     }
     if (shouldRetryOn(evt.status)) {
-      scheduleRetry()
+      scheduleRetry();
     }
-  })
+  });
 
   if (conn.client.isConnected()) {
-    emitSynthetic('connected')
+    emitSynthetic('connected');
   }
 
   // Dial through the client rather than caching a promise on the connection.
@@ -349,20 +361,20 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
   // dial, so the second copy of that bookkeeping bought nothing.
   void (async () => {
     try {
-      await conn.client.connect()
+      await conn.client.connect();
     } catch {
-      if (closed) return
+      if (closed) return;
 
-      emitSynthetic('disconnected')
-      scheduleRetry()
+      emitSynthetic('disconnected');
+      scheduleRetry();
     }
-  })()
+  })();
 
   return {
     stop() {
-      closed = true
-      unsubStatus()
-      conn.retrySchedulers.delete(scheduleRetry)
+      closed = true;
+      unsubStatus();
+      conn.retrySchedulers.delete(scheduleRetry);
 
       if (conn.retryOwner !== scheduleRetry) {
         // Not ours to cancel. `retryTimer` lives on the CONNECTION, and
@@ -371,14 +383,14 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
         // dialog closing, a route change) during a backoff killed reconnect
         // for everyone. Nothing rescheduled it either, for the reason
         // handOffRetry exists. The connection stayed down for good.
-        return
+        return;
       }
 
-      conn.retryOwner = null
-      const wasRetrying = conn.retryTimer !== null
+      conn.retryOwner = null;
+      const wasRetrying = conn.retryTimer !== null;
       if (conn.retryTimer) {
-        clearTimeout(conn.retryTimer)
-        conn.retryTimer = null
+        clearTimeout(conn.retryTimer);
+        conn.retryTimer = null;
       }
 
       // A healthy connection with nothing armed needs no successor: the next
@@ -387,8 +399,8 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
       // already fired and its callback is mid-dial — is caught by the
       // connection not being connected. The successor backs off on its OWN
       // attempt counter, which is zero unless it has driven the loop before.
-      if (!wasRetrying && conn.client.isConnected()) return
-      handOffRetry(conn)
+      if (!wasRetrying && conn.client.isConnected()) return;
+      handOffRetry(conn);
     },
-  }
+  };
 }

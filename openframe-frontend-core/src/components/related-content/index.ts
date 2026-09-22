@@ -7,4 +7,4 @@ export {
   type CardLinkProviderProps,
   type CardLinkAnchorProps,
   type AdminCampaignCardSlot,
-} from './related-content-section'
+} from './related-content-section';

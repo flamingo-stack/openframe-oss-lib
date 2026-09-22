@@ -1,8 +1,10 @@
 package com.openframe.notification.service;
 
-import com.openframe.data.document.notification.NotificationContext;
+import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.spec.Audience;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.notification.spec.NotificationType;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,38 +20,45 @@ public final class NotificationCommand {
     private final String title;
     private final String description;
     private final NotificationSeverity severity;
-    private final NotificationContext context;
     private final String correlationId;
     private final Audience audience;
-    // Null until the caller is the spec-driven emitter; legacy dispatchers don't set them.
     private final NotificationType type;
     private final Map<String, String> attributes;
+    private final String applePushCategory;
+    private final NotificationCategory category;
+    private final NotificationSettingGroup settingsGroup;
+    private final NotificationEntityRef entity;
 
     @Builder
     NotificationCommand(String title,
                         String description,
                         NotificationSeverity severity,
-                        NotificationContext context,
                         String correlationId,
                         Audience audience,
                         NotificationType type,
-                        Map<String, String> attributes) {
+                        Map<String, String> attributes,
+                        String applePushCategory,
+                        NotificationCategory category,
+                        NotificationSettingGroup settingsGroup,
+                        NotificationEntityRef entity) {
         if (isBlank(title)) {
             throw new IllegalArgumentException("title must not be blank");
         }
         Objects.requireNonNull(severity, "severity must not be null");
-        Objects.requireNonNull(context, "context must not be null");
         Objects.requireNonNull(audience, "audience must not be null");
-        if (isBlank(context.getType())) {
-            throw new IllegalArgumentException("context.type must not be blank");
-        }
+        Objects.requireNonNull(type, "type must not be null");
+        Objects.requireNonNull(attributes, "attributes must not be null");
+        Objects.requireNonNull(category, "category must not be null");
         this.title = title;
         this.description = description;
         this.severity = severity;
-        this.context = context;
         this.correlationId = correlationId;
         this.audience = audience;
         this.type = type;
-        this.attributes = attributes == null ? null : Map.copyOf(attributes);
+        this.attributes = Map.copyOf(attributes);
+        this.applePushCategory = applePushCategory;
+        this.category = category;
+        this.settingsGroup = settingsGroup;
+        this.entity = entity;
     }
 }

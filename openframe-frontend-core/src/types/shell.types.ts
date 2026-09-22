@@ -1,21 +1,14 @@
+import type { ComponentType } from 'react';
+import { BashIcon, CmdIcon, DenoIcon, NushellIcon, ShellIcon } from '../components/icons';
 /**
  * Centralized Shell Types
  *
  * Single source of truth for all shell/script type information across the platform.
  * Based on the RMM-supported shell types.
  */
-import { PowershellLogoIcon } from '../components/icons-v2-generated/brand-logos/powershell-logo-icon'
-import { PythonLogoIcon } from '../components/icons-v2-generated/brand-logos/python-logo-icon'
-import {
-  BashIcon,
-  CmdIcon,
-  DenoIcon,
-  NushellIcon,
-  ShellIcon
-} from '../components/icons'
-import type { IconProps } from './icons'
-
-
+import { PowershellLogoIcon } from '../components/icons-v2-generated/brand-logos/powershell-logo-icon';
+import { PythonLogoIcon } from '../components/icons-v2-generated/brand-logos/python-logo-icon';
+import type { IconProps } from './icons';
 
 export const ShellTypeValues = {
   POWERSHELL: 'POWERSHELL',
@@ -24,19 +17,19 @@ export const ShellTypeValues = {
   PYTHON: 'PYTHON',
   NUSHELL: 'NUSHELL',
   DENO: 'DENO',
-  SHELL: 'SHELL'
-} as const
+  SHELL: 'SHELL',
+} as const;
 
-export type ShellType = (typeof ShellTypeValues)[keyof typeof ShellTypeValues]
+export type ShellType = (typeof ShellTypeValues)[keyof typeof ShellTypeValues];
 
 /**
  * Shell type definition with all metadata
  */
 export interface ShellTypeDefinition {
-  id: ShellType
-  label: string
-  value: string
-  icon: React.ComponentType<IconProps>
+  id: ShellType;
+  label: string;
+  value: string;
+  icon: ComponentType<IconProps>;
 }
 
 /**
@@ -51,7 +44,7 @@ export const SHELL_TYPES: ShellTypeDefinition[] = [
   { id: ShellTypeValues.NUSHELL, label: 'Nu', value: 'nushell', icon: NushellIcon },
   { id: ShellTypeValues.DENO, label: 'Deno', value: 'deno', icon: DenoIcon },
   { id: ShellTypeValues.SHELL, label: 'Shell', value: 'shell', icon: ShellIcon },
-]
+];
 
 /**
  * Maps shell types to display labels
@@ -63,5 +56,5 @@ export const shellLabels: Record<ShellType, string> = {
   [ShellTypeValues.PYTHON]: 'Python',
   [ShellTypeValues.NUSHELL]: 'Nu',
   [ShellTypeValues.DENO]: 'Deno',
-  [ShellTypeValues.SHELL]: 'Shell'
-}
+  [ShellTypeValues.SHELL]: 'Shell',
+};

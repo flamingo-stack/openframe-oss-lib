@@ -1,6 +1,6 @@
-"use client"
+'use client';
 
-import React from 'react';
+import type React from 'react';
 import { SECTION_HEADING_CLASS } from './layout/page-heading';
 
 interface WhyItMattersItemProps {
@@ -13,59 +13,46 @@ interface WhyItMattersItemProps {
 const WhyItMattersItem: React.FC<WhyItMattersItemProps> = ({ number, title, description, isLast }) => {
   return (
     <li
-      className={`
-        flex flex-col md:flex-row items-start gap-6 p-10 w-full
-        transition-colors duration-200 hover:bg-ods-bg-hover
-        ${!isLast ? 'border-b border-ods-border' : ''}
-      `}
+      className={`flex w-full flex-col items-start gap-6 p-10 transition-colors duration-200 hover:bg-ods-bg-hover md:flex-row ${!isLast ? 'border-b border-ods-border' : ''} `}
     >
-      <span className="text-h2 tracking-[-0.02em] text-ods-accent">
-        {number}
-      </span>
+      <span className="tracking-[-0.02em] text-ods-accent text-h2">{number}</span>
       <div className="flex-1">
-        <h3 className="text-h2 tracking-[-0.02em] text-ods-text-primary">
-          {title}
-        </h3>
-        <p className="text-h4 text-ods-text-primary mt-4">
-          {description}
-        </p>
+        <h3 className="tracking-[-0.02em] text-ods-text-primary text-h2">{title}</h3>
+        <p className="mt-4 text-ods-text-primary text-h4">{description}</p>
       </div>
     </li>
   );
 };
 
-
 const WhyItMatters = () => {
   const items = [
     {
-      number: "1.",
-      title: "Cut Costs",
-      description: "Eliminate vendor fees with proven open-source alternatives",
+      number: '1.',
+      title: 'Cut Costs',
+      description: 'Eliminate vendor fees with proven open-source alternatives',
     },
     {
-      number: "2.",
-      title: "Stay in Control",
-      description: "Full visibility and data ownership",
+      number: '2.',
+      title: 'Stay in Control',
+      description: 'Full visibility and data ownership',
     },
     {
-      number: "3.",
-      title: "Build What You Need",
-      description: "Customize without vendor limitations",
+      number: '3.',
+      title: 'Build What You Need',
+      description: 'Customize without vendor limitations',
     },
     {
-      number: "4.",
-      title: "Scale Freely",
-      description: "Designed for multi-tenant MSP environments",
+      number: '4.',
+      title: 'Scale Freely',
+      description: 'Designed for multi-tenant MSP environments',
     },
   ];
 
   return (
     <section className="bg-ods-bg">
-      <div className="w-full max-w-[1920px] mx-auto px-6 md:px-20">
-        <h2 className={`${SECTION_HEADING_CLASS} text-center mb-6`}>
-          Why It Matters
-        </h2>
-        <div className="bg-ods-card border border-ods-border rounded-3xl overflow-hidden w-full">
+      <div className="mx-auto w-full max-w-[1920px] px-6 md:px-20">
+        <h2 className={`${SECTION_HEADING_CLASS} mb-6 text-center`}>Why It Matters</h2>
+        <div className="w-full overflow-hidden rounded-3xl border border-ods-border bg-ods-card">
           <ol>
             {items.map((item, index) => (
               <WhyItMattersItem
@@ -83,4 +70,4 @@ const WhyItMatters = () => {
   );
 };
 
-export default WhyItMatters; 
+export default WhyItMatters;

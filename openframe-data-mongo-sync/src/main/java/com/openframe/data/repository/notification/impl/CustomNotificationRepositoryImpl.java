@@ -118,7 +118,7 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
         if (readFilter == null) {
             criteria.and(FIELD_STATUS).ne(ReadStatus.DELETED);
         } else if (readFilter) {
-            criteria.and(FIELD_STATUS).is(ReadStatus.READ);
+            criteria.and(FIELD_STATUS).in(ReadStatus.READ, ReadStatus.ARCHIVED);
         } else {
             criteria.and(FIELD_STATUS).is(ReadStatus.UNREAD);
         }

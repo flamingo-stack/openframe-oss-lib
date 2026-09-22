@@ -23,7 +23,7 @@
  * type via `opts.extras.programConfigs.X` — the dispatch reads
  * `extras.programConfigs.X ?? DEFAULT_PROGRAM_CONFIGS.X`.
  */
-import type { ProgramConfig, BaseProgramItem } from '../types/entities/program-types'
+import type { ProgramConfig, BaseProgramItem } from '../types/entities/program-types';
 
 /** Minimal config — fields the compact card actually reads + safe
  *  placeholders for the others so type-checking passes. */
@@ -46,17 +46,17 @@ function makeDefault<T extends BaseProgramItem>(
     // externalLinkLabel are NOT read by the compact chat card — set to
     // empty / null so the embedder doesn't have to think about catalog
     // page concerns when all they want is the inline chat card.
-    dateField: 'date' as keyof T,
+    dateField: 'date',
     table: '',
     apiEndpoint: '',
     icon: null,
     externalLinkLabel: '',
     detailRoute: '',
-  }
+  };
 }
 
 export const DEFAULT_PROGRAM_CONFIGS = {
   podcast: makeDefault<BaseProgramItem>('podcast', 'Episode', 'Episodes'),
   webinar: makeDefault<BaseProgramItem>('webinar', 'Webinar', 'Webinars'),
   event: makeDefault<BaseProgramItem>('event', 'Event', 'Events'),
-} as const
+} as const;

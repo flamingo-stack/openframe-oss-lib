@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 
-interface InteractiveState {
+export interface InteractiveState {
   isHovered: boolean;
   isFocused: boolean;
   isPressed: boolean;
@@ -61,8 +61,11 @@ export function useInteractiveState() {
     getStateStyles: () => ({}),
     getStateClasses: () => '',
     ripplePosition: { x: 0, y: 0 },
-    setLoading: (loading: boolean) => {},
-    setDisabled: (disabled: boolean) => {},
+    // No-ops: this hook tracks hover/focus/press only. The setters exist so
+    // callers can keep the full API shape; the arguments are deliberately
+    // unread until loading/disabled styling is actually implemented.
+    setLoading: (_loading: boolean) => {},
+    setDisabled: (_disabled: boolean) => {},
     ref: ref,
   };
 }

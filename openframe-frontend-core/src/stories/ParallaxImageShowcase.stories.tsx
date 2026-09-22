@@ -1,28 +1,28 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { ParallaxImageShowcase } from '../components/features/parallax-image-showcase'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { ParallaxImageShowcase } from '../components/features/parallax-image-showcase';
 
 /** Generate a placeholder screenshot SVG as a data URI */
 const makePlaceholder = (label: string, bg = '#1e1e2e', fg = '#a6adc8') =>
   `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">` +
-    `<rect width="800" height="500" rx="12" fill="${bg}"/>` +
-    `<rect x="16" y="16" width="768" height="40" rx="8" fill="${fg}" opacity="0.15"/>` +
-    `<circle cx="36" cy="36" r="6" fill="#f38ba8"/>` +
-    `<circle cx="56" cy="36" r="6" fill="#f9e2af"/>` +
-    `<circle cx="76" cy="36" r="6" fill="#a6e3a1"/>` +
-    `<rect x="16" y="72" width="200" height="412" rx="8" fill="${fg}" opacity="0.08"/>` +
-    `<rect x="232" y="72" width="552" height="200" rx="8" fill="${fg}" opacity="0.08"/>` +
-    `<rect x="232" y="288" width="268" height="196" rx="8" fill="${fg}" opacity="0.08"/>` +
-    `<rect x="516" y="288" width="268" height="196" rx="8" fill="${fg}" opacity="0.08"/>` +
-    `<text x="400" y="260" text-anchor="middle" fill="${fg}" font-size="20" font-family="sans-serif" opacity="0.5">${label}</text>` +
-    `</svg>`
-  )}`
+      `<rect width="800" height="500" rx="12" fill="${bg}"/>` +
+      `<rect x="16" y="16" width="768" height="40" rx="8" fill="${fg}" opacity="0.15"/>` +
+      `<circle cx="36" cy="36" r="6" fill="#f38ba8"/>` +
+      `<circle cx="56" cy="36" r="6" fill="#f9e2af"/>` +
+      `<circle cx="76" cy="36" r="6" fill="#a6e3a1"/>` +
+      `<rect x="16" y="72" width="200" height="412" rx="8" fill="${fg}" opacity="0.08"/>` +
+      `<rect x="232" y="72" width="552" height="200" rx="8" fill="${fg}" opacity="0.08"/>` +
+      `<rect x="232" y="288" width="268" height="196" rx="8" fill="${fg}" opacity="0.08"/>` +
+      `<rect x="516" y="288" width="268" height="196" rx="8" fill="${fg}" opacity="0.08"/>` +
+      `<text x="400" y="260" text-anchor="middle" fill="${fg}" font-size="20" font-family="sans-serif" opacity="0.5">${label}</text>` +
+      `</svg>`,
+  )}`;
 
 const images = [
   { src: makePlaceholder('Dashboard', '#1e1e2e'), alt: 'Dashboard', position: 'left' as const },
   { src: makePlaceholder('Analytics', '#1a1b26'), alt: 'Analytics', position: 'center' as const },
   { src: makePlaceholder('Settings', '#191724'), alt: 'Settings', position: 'right' as const },
-]
+];
 
 const meta = {
   title: 'Features/ParallaxImageShowcase',
@@ -42,7 +42,7 @@ const meta = {
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ height: '200vh', paddingTop: '10vh' }}>
         <div style={{ height: '600px', maxWidth: '1200px', margin: '0 auto', position: 'relative' }}>
           <Story />
@@ -50,10 +50,10 @@ const meta = {
       </div>
     ),
   ],
-} satisfies Meta<typeof ParallaxImageShowcase>
+} satisfies Meta<typeof ParallaxImageShowcase>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 // === Layout Variants ===
 
@@ -65,7 +65,7 @@ export const NonBoxed: Story = {
     images,
     layout: 'non-boxed',
   },
-}
+};
 
 /**
  * Boxed layout with two-row structure — logo on top, images below.
@@ -75,12 +75,22 @@ export const Boxed: Story = {
     images,
     layout: 'boxed',
     logoElement: (
-      <div style={{ padding: '12px 24px', background: '#313244', borderRadius: 8, color: '#cdd6f4', fontFamily: 'monospace', fontSize: 18, fontWeight: 600 }}>
+      <div
+        style={{
+          padding: '12px 24px',
+          background: '#313244',
+          borderRadius: 8,
+          color: '#cdd6f4',
+          fontFamily: 'monospace',
+          fontSize: 18,
+          fontWeight: 600,
+        }}
+      >
         Logo
       </div>
     ),
   },
-}
+};
 
 /**
  * Grid layout — simple 3-column grid with gentle parallax.
@@ -90,7 +100,7 @@ export const Grid: Story = {
     images,
     layout: 'grid',
   },
-}
+};
 
 // === Intensity Variants ===
 
@@ -103,7 +113,7 @@ export const SubtleIntensity: Story = {
     layout: 'non-boxed',
     intensity: 0.3,
   },
-}
+};
 
 /**
  * Aggressive animation — exaggerated movement.
@@ -114,7 +124,7 @@ export const HighIntensity: Story = {
     layout: 'non-boxed',
     intensity: 5,
   },
-}
+};
 
 // === Grid Options ===
 
@@ -127,7 +137,7 @@ export const GridWithShadow: Story = {
     layout: 'grid',
     shadow: true,
   },
-}
+};
 
 /**
  * Grid with higher intensity for more dramatic parallax.
@@ -139,7 +149,7 @@ export const GridHighIntensity: Story = {
     intensity: 3,
     shadow: true,
   },
-}
+};
 
 // === Partial Images ===
 
@@ -151,7 +161,7 @@ export const TwoImages: Story = {
     images: images.slice(0, 2),
     layout: 'non-boxed',
   },
-}
+};
 
 /**
  * Single image only.
@@ -161,4 +171,4 @@ export const SingleImage: Story = {
     images: [images[0]],
     layout: 'grid',
   },
-}
+};

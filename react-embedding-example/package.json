@@ -15,6 +15,7 @@
   "dependencies": {
     "@flamingo-stack/openframe-frontend-core": "file:.yalc/@flamingo-stack/openframe-frontend-core",
     "@hookform/resolvers": "~5.2.2",
+    "@modelcontextprotocol/client": "2.0.0",
     "@tanstack/react-query": "^5",
     "react": "^19",
     "react-dom": "^19",

@@ -1,52 +1,51 @@
-"use client";
+'use client';
 
 import React from 'react';
-import { cn } from "../utils/cn";
-import { useDynamicTheming } from '../hooks/use-dynamic-theming';
 import { useThemeAware } from '../hooks/use-theme-aware';
+import { cn } from '../utils/cn';
 
 interface DynamicSkeletonProps {
   /**
    * Type of skeleton animation
    */
   animation?: 'pulse' | 'shimmer' | 'wave' | 'static';
-  
+
   /**
    * Skeleton variant based on content type
    */
   variant?: 'text' | 'avatar' | 'card' | 'button' | 'image' | 'custom';
-  
+
   /**
    * Size preset for common elements
    */
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  
+
   /**
    * Custom dimensions
    */
   width?: string | number;
   height?: string | number;
-  
+
   /**
    * Number of lines for text skeleton
    */
   lines?: number;
-  
+
   /**
    * Platform-aware styling
    */
   platformAware?: boolean;
-  
+
   /**
    * Accessibility enhancements
    */
   includeAriaLabel?: boolean;
-  
+
   /**
    * Custom CSS classes
    */
   className?: string;
-  
+
   /**
    * Child elements (for container skeletons)
    */
@@ -57,7 +56,7 @@ const sizePresets = {
   sm: { width: '4rem', height: '1rem' },
   md: { width: '8rem', height: '1.5rem' },
   lg: { width: '12rem', height: '2rem' },
-  xl: { width: '16rem', height: '2.5rem' }
+  xl: { width: '16rem', height: '2.5rem' },
 };
 
 const variantStyles = {
@@ -66,7 +65,7 @@ const variantStyles = {
   card: 'rounded-lg',
   button: 'rounded-md',
   image: 'rounded-lg aspect-video',
-  custom: ''
+  custom: '',
 };
 
 export function DynamicSkeleton({
@@ -79,7 +78,7 @@ export function DynamicSkeleton({
   platformAware = true,
   includeAriaLabel = true,
   className,
-  children
+  children,
 }: DynamicSkeletonProps) {
   const { platform, isDark, accentColor } = useThemeAware();
 
@@ -88,15 +87,15 @@ export function DynamicSkeleton({
     if (width || height) {
       return {
         width: typeof width === 'number' ? `${width}px` : width,
-        height: typeof height === 'number' ? `${height}px` : height
+        height: typeof height === 'number' ? `${height}px` : height,
       };
     }
-    
+
     if (variant === 'avatar') {
       const avatarSize = sizePresets[size].height;
       return { width: avatarSize, height: avatarSize };
     }
-    
+
     return sizePresets[size];
   }, [width, height, size, variant]);
 
@@ -110,7 +109,7 @@ export function DynamicSkeleton({
     return {
       '--skeleton-base': `color-mix(in srgb, var(--color-bg-skeleton) ${baseOpacity * 100}%, transparent)`,
       '--skeleton-highlight': `color-mix(in srgb, ${accentColor} ${accentOpacity * 100}%, var(--color-bg-skeleton))`,
-      '--skeleton-accent': `color-mix(in srgb, ${accentColor} 10%, transparent)`
+      '--skeleton-accent': `color-mix(in srgb, ${accentColor} 10%, transparent)`,
     } as React.CSSProperties;
   }, [platformAware, isDark, accentColor]);
 
@@ -119,7 +118,7 @@ export function DynamicSkeleton({
     pulse: 'animate-pulse',
     shimmer: 'ods-loading-dynamic',
     wave: 'skeleton-wave',
-    static: ''
+    static: '',
   };
 
   // Base skeleton classes
@@ -128,28 +127,28 @@ export function DynamicSkeleton({
     variantStyles[variant],
     animationClasses[animation],
     platformAware && `skeleton-platform-${platform}`,
-    className
+    className,
   );
 
   // For text skeletons with multiple lines
   if (variant === 'text' && lines > 1) {
     return (
-      <div 
+      <div
         className="space-y-2"
         style={platformStyles}
         role="status"
-        aria-label={includeAriaLabel ? "Loading content..." : undefined}
+        aria-label={includeAriaLabel ? 'Loading content...' : undefined}
       >
         {Array.from({ length: lines }, (_, index) => (
           <div
             key={index}
             className={cn(
               baseClasses,
-              index === lines - 1 && 'w-3/4' // Last line shorter
+              index === lines - 1 && 'w-3/4', // Last line shorter
             )}
             style={{
               ...dimensions,
-              width: index === lines - 1 ? '75%' : dimensions.width
+              width: index === lines - 1 ? '75%' : dimensions.width,
             }}
           />
         ))}
@@ -163,7 +162,7 @@ export function DynamicSkeleton({
       className={baseClasses}
       style={{ ...dimensions, ...platformStyles }}
       role="status"
-      aria-label={includeAriaLabel ? "Loading content..." : undefined}
+      aria-label={includeAriaLabel ? 'Loading content...' : undefined}
     >
       {children}
     </div>
@@ -178,10 +177,8 @@ export const SkeletonPresets = {
    * Card skeleton with header, content, and actions
    */
   Card: ({ showActions = true, showImage = false }: { showActions?: boolean; showImage?: boolean }) => (
-    <div className="bg-ods-card border border-ods-border rounded-lg p-6 space-y-4">
-      {showImage && (
-        <DynamicSkeleton variant="image" className="w-full h-40" />
-      )}
+    <div className="space-y-4 rounded-lg border border-ods-border bg-ods-card p-6">
+      {showImage && <DynamicSkeleton variant="image" className="h-40 w-full" />}
       <div className="space-y-2">
         <DynamicSkeleton variant="text" size="lg" />
         <DynamicSkeleton variant="text" lines={2} size="md" />
@@ -237,7 +234,7 @@ export const SkeletonPresets = {
       {/* Rows */}
       {Array.from({ length: rows }, (_, rowIndex) => (
         <div key={`row-${rowIndex}`} className="grid gap-4" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
-          {Array.from({ length: columns }, (_, colIndex) => (
+          {Array.from({ length: columns }, (_cell, colIndex) => (
             <DynamicSkeleton key={`cell-${rowIndex}-${colIndex}`} variant="text" size="sm" />
           ))}
         </div>
@@ -249,9 +246,9 @@ export const SkeletonPresets = {
    * Vendor grid skeleton (specific to the app)
    */
   VendorGrid: ({ items = 6 }: { items?: number }) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: items }, (_, index) => (
-        <div key={index} className="bg-ods-card border border-ods-border rounded-lg p-4 space-y-3">
+        <div key={index} className="space-y-3 rounded-lg border border-ods-border bg-ods-card p-4">
           <div className="flex items-center gap-3">
             <DynamicSkeleton variant="avatar" size="md" />
             <div className="flex-1">
@@ -281,29 +278,40 @@ export const SkeletonPresets = {
           <DynamicSkeleton variant="text" size="sm" width="6rem" />
         </div>
       </div>
-      <DynamicSkeleton variant="image" className="w-full h-64" />
+      <DynamicSkeleton variant="image" className="h-64 w-full" />
       <div className="space-y-3">
         {Array.from({ length: 4 }, (_, index) => (
           <DynamicSkeleton key={index} variant="text" lines={3} size="md" />
         ))}
       </div>
     </article>
-  )
+  ),
 };
+
+/** Every preset's props merged into one all-optional bag. */
+export interface SkeletonPresetProps {
+  showActions?: boolean;
+  showImage?: boolean;
+  items?: number;
+  rows?: number;
+  columns?: number;
+}
 
 /**
  * Platform-aware loading container that shows different skeletons based on platform
  */
-export function PlatformSkeletonContainer({ 
-  children, 
-  isLoading, 
+export function PlatformSkeletonContainer({
+  children,
+  isLoading,
   skeletonType = 'Card',
-  skeletonProps = {}
+  skeletonProps = {},
 }: {
   children: React.ReactNode;
   isLoading: boolean;
   skeletonType?: keyof typeof SkeletonPresets;
-  skeletonProps?: any;
+  /** Props for the chosen preset. Every preset takes an all-optional bag, so
+   *  the union of them is what any one of them accepts. */
+  skeletonProps?: SkeletonPresetProps;
 }) {
   const { platform } = useThemeAware();
 
@@ -324,7 +332,9 @@ export function PlatformSkeletonContainer({
  * Enhanced skeleton with progressive enhancement
  */
 export function ProgressiveSkeleton({
-  stages = ['basic', 'detailed', 'interactive'],
+  // Named only to keep it out of the `...props` spread: the stage NAMES are
+  // unused, `currentStage` alone selects the skeleton shape below.
+  stages: _stages = ['basic', 'detailed', 'interactive'],
   currentStage = 0,
   children,
   ...props
@@ -338,7 +348,7 @@ export function ProgressiveSkeleton({
   const stageConfig = {
     0: { animation: 'pulse' as const, variant: 'text' as const },
     1: { animation: 'shimmer' as const, variant: 'card' as const },
-    2: { animation: 'wave' as const, variant: 'custom' as const }
+    2: { animation: 'wave' as const, variant: 'custom' as const },
   };
 
   const config = stageConfig[currentStage as keyof typeof stageConfig] || stageConfig[0];
@@ -347,11 +357,7 @@ export function ProgressiveSkeleton({
     <DynamicSkeleton
       {...props}
       {...config}
-      className={cn(
-        props.className,
-        `skeleton-stage-${currentStage}`,
-        `skeleton-platform-${platform}`
-      )}
+      className={cn(props.className, `skeleton-stage-${currentStage}`, `skeleton-platform-${platform}`)}
     >
       {children}
     </DynamicSkeleton>

@@ -13,12 +13,7 @@
 
 export type GitHubActivityKind = 'commit' | 'pull_request' | 'pr_review';
 
-export type PrReviewState =
-  | 'APPROVED'
-  | 'CHANGES_REQUESTED'
-  | 'COMMENTED'
-  | 'DISMISSED'
-  | 'PENDING';
+export type PrReviewState = 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'DISMISSED' | 'PENDING';
 
 export interface GitHubActivityItem {
   /** Commit SHA (full or short) / PR-# / review id */

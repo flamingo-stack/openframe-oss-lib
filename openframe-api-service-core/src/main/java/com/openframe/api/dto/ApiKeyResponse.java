@@ -17,6 +17,10 @@ public class ApiKeyResponse {
     private boolean enabled;
     private Instant createdAt;
     private Instant updatedAt;
+    /** User ID that created the key */
+    private String createdBy;
+    /** User ID that last modified the key */
+    private String updatedBy;
     private Instant lastUsed;
     private Instant expiresAt;
     private Long totalRequests;

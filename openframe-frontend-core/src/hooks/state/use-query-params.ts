@@ -16,73 +16,80 @@
  * // variables: { search: 'error', filter: { severity: ['critical'] } }
  */
 
-'use client'
+'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useRouter, useSearchParams } from '../../embed-shims/next-navigation'
-import { DocumentNode } from 'graphql'
+import type { DocumentNode } from 'graphql';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from '../../embed-shims/next-navigation';
 
-import { extractVariablesFromQuery } from './graphql-parser'
-import { flattenQueryVariables, mergeDefaults, validateSchema, FlattenedParam } from './flatten-schema'
-import { urlParamsToVariables, variablesToUrlParams, mergeVariables, clearParams } from './url-converter'
-import { introspector } from './introspection'
+import { flattenQueryVariables, mergeDefaults, validateSchema, type FlattenedParam } from './flatten-schema';
+import { extractVariablesFromQuery } from './graphql-parser';
+import { introspector } from './introspection';
+import {
+  urlParamsToVariables,
+  variablesToUrlParams,
+  mergeVariables,
+  clearParams,
+  type GraphQLVariables,
+} from './url-converter';
 
 /**
  * Options for useQueryParams hook
  */
 export interface UseQueryParamsOptions {
   /** Default values for parameters */
-  defaultValues?: Record<string, any>
+  defaultValues?: GraphQLVariables;
 
   /** GraphQL endpoint for introspection (defaults to process.env.NEXT_PUBLIC_API_URL/graphql) */
-  introspectionEndpoint?: string
+  introspectionEndpoint?: string;
 
   /** HTTP headers for introspection (e.g., authentication) */
-  introspectionHeaders?: Record<string, string>
+  introspectionHeaders?: Record<string, string>;
 
   /** Skip introspection (use only AST parsing, no nested type flattening) */
-  skipIntrospection?: boolean
+  skipIntrospection?: boolean;
 
   /** Custom parameter name mapping (override auto-generated names) */
-  paramMapping?: Record<string, string>
+  paramMapping?: Record<string, string>;
 
   /** Enable debug logging */
-  debug?: boolean
+  debug?: boolean;
 }
 
 /**
  * Return type for useQueryParams hook
  */
-export interface UseQueryParamsReturn<TVariables = Record<string, any>> {
+export interface UseQueryParamsReturn<TVariables = GraphQLVariables> {
   /** GraphQL variables ready for Apollo Client */
-  variables: TVariables
+  variables: TVariables;
 
-  /** Raw URL parameters (before conversion to variables) */
-  params: Record<string, any>
+  /** Raw URL parameters (before conversion to variables). Repeated keys
+   *  collapse into an array, in URL order. */
+  params: Record<string, string | string[]>;
 
   /** Flattened parameter schema */
-  schema: Record<string, FlattenedParam>
+  schema: Record<string, FlattenedParam>;
 
   /** Set a single parameter */
-  setParam: (key: string, value: any) => void
+  setParam: (key: string, value: unknown) => void;
 
   /** Set multiple parameters at once */
-  setParams: (params: Record<string, any>) => void
+  setParams: (params: GraphQLVariables) => void;
 
   /** Clear specific parameters */
-  clearParams: (keys: string[]) => void
+  clearParams: (keys: string[]) => void;
 
   /** Reset all parameters (clear URL) */
-  resetParams: () => void
+  resetParams: () => void;
 
   /** Whether schema is ready (introspection complete) */
-  isReady: boolean
+  isReady: boolean;
 
   /** Loading state during initialization */
-  isLoading: boolean
+  isLoading: boolean;
 
   /** Error during initialization */
-  error: Error | null
+  error: Error | null;
 }
 
 /**
@@ -99,198 +106,245 @@ export interface UseQueryParamsReturn<TVariables = Record<string, any>> {
  * @param options - Configuration options
  * @returns Hook API for managing URL state
  */
-export function useQueryParams<TVariables = Record<string, any>>(
+export function useQueryParams<TVariables = GraphQLVariables>(
   query: DocumentNode,
-  options: UseQueryParamsOptions = {}
+  options: UseQueryParamsOptions = {},
 ): UseQueryParamsReturn<TVariables> {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [isLoading, setIsLoading] = useState(true)
-  const [isReady, setIsReady] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-  const [schema, setSchema] = useState<Record<string, FlattenedParam>>({})
+  const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [schema, setSchema] = useState<Record<string, FlattenedParam>>({});
 
-  // Extract default values
-  const defaultValues = options.defaultValues || {}
-  const skipIntrospection = options.skipIntrospection || false
-  const debug = options.debug || false
+  // Extract default values. Memoised: `|| {}` minted a new object on every
+  // render, so every memo and effect keyed on it re-ran every time.
+  const defaultValues = useMemo(() => options.defaultValues || {}, [options.defaultValues]);
+  const skipIntrospection = options.skipIntrospection || false;
+  const debug = options.debug || false;
+
+  // Latest option bag for the one-time initialiser below. These cannot be
+  // dependencies: `introspectionHeaders`, `paramMapping` and `defaultValues`
+  // are almost always object literals, so as deps they would re-run schema
+  // introspection on every render of the calling component.
+  const initSourceRef = useRef({
+    introspectionHeaders: options.introspectionHeaders,
+    paramMapping: options.paramMapping,
+    defaultValues,
+  });
+  useEffect(() => {
+    initSourceRef.current = {
+      introspectionHeaders: options.introspectionHeaders,
+      paramMapping: options.paramMapping,
+      defaultValues,
+    };
+  });
 
   // Initialize: Parse query + fetch schema (once)
   useEffect(() => {
+    // `initialize` awaits introspection and schema flattening, so a `query`
+    // change can start a second run while the first is still in flight. Without
+    // this guard the SUPERSEDED run's `setSchema`/`setIsReady` could land last
+    // and leave the hook parsing the URL against the PREVIOUS query's schema —
+    // params for the new query then silently drop or coerce to the wrong type.
+    let cancelled = false;
     async function initialize() {
       try {
-        if (debug) console.log('[useQueryParams] Initializing...')
+        if (debug) console.log('[useQueryParams] Initializing...');
 
         // 1. Extract variables from query AST
-        const queryVariables = extractVariablesFromQuery(query)
+        const queryVariables = extractVariablesFromQuery(query);
 
         if (debug) {
-          console.log('[useQueryParams] Extracted variables:', queryVariables)
+          console.log('[useQueryParams] Extracted variables:', queryVariables);
         }
 
         // 2. Fetch GraphQL schema via introspection (if needed and not skipped)
         if (!skipIntrospection && !introspector.isLoaded()) {
-          const endpoint = options.introspectionEndpoint ||
+          const endpoint =
+            options.introspectionEndpoint ||
             (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
               ? `${process.env.NEXT_PUBLIC_API_URL}/graphql`
-              : '')
+              : '');
 
           if (endpoint) {
             try {
-              await introspector.fetchSchema(endpoint, options.introspectionHeaders)
-              if (debug) console.log('[useQueryParams] Introspection complete')
+              await introspector.fetchSchema(endpoint, initSourceRef.current.introspectionHeaders);
+              if (debug) console.log('[useQueryParams] Introspection complete');
             } catch (err) {
-              console.warn('[useQueryParams] Introspection failed, continuing without it:', err)
+              console.warn('[useQueryParams] Introspection failed, continuing without it:', err);
               // Continue without introspection - nested types won't be flattened
             }
           }
         }
 
-        // 3. Flatten schema (with or without introspection)
-        let flattenedSchema = await flattenQueryVariables(queryVariables, introspector)
+        // 3. Flatten schema (with or without introspection). Synchronous — the
+        // schema fetch it depends on was already awaited in step 2 above.
+        let flattenedSchema = flattenQueryVariables(queryVariables, introspector);
 
         // Apply custom param mapping if provided
-        if (options.paramMapping) {
-          flattenedSchema = applyParamMapping(flattenedSchema, options.paramMapping)
+        const { paramMapping, defaultValues: initialDefaults } = initSourceRef.current;
+        if (paramMapping) {
+          flattenedSchema = applyParamMapping(flattenedSchema, paramMapping);
         }
 
         // Merge default values
-        flattenedSchema = mergeDefaults(flattenedSchema, defaultValues)
+        flattenedSchema = mergeDefaults(flattenedSchema, initialDefaults);
 
         // Validate schema
-        validateSchema(flattenedSchema)
+        validateSchema(flattenedSchema);
 
         if (debug) {
-          console.log('[useQueryParams] Flattened schema:', flattenedSchema)
+          console.log('[useQueryParams] Flattened schema:', flattenedSchema);
         }
 
-        setSchema(flattenedSchema)
-        setIsReady(true)
+        if (cancelled) return;
+        setSchema(flattenedSchema);
+        setIsReady(true);
       } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err))
-        console.error('[useQueryParams] Initialization failed:', error)
-        setError(error)
+        if (cancelled) return;
+        const initError = err instanceof Error ? err : new Error(String(err));
+        console.error('[useQueryParams] Initialization failed:', initError);
+        setError(initError);
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false);
       }
     }
 
-    initialize()
-  }, [query, options.introspectionEndpoint, skipIntrospection, debug])
+    // Never rejects — settles every failure into `error` state.
+    void initialize();
+    return () => {
+      cancelled = true;
+    };
+  }, [query, options.introspectionEndpoint, skipIntrospection, debug]);
 
-  // Convert URL params to GraphQL variables
-  const variables = useMemo(() => {
+  // Convert URL params to GraphQL variables. Kept as the plain record shape
+  // internally (that is what the converters take); the caller-chosen
+  // `TVariables` view is applied once, at the returned value.
+  const variables = useMemo<GraphQLVariables>(() => {
     if (!isReady) {
-      return defaultValues as TVariables
+      return defaultValues;
     }
 
     try {
-      const varsFromUrl = urlParamsToVariables(searchParams, schema)
-      const merged = { ...defaultValues, ...varsFromUrl }
+      const varsFromUrl = urlParamsToVariables(searchParams, schema);
+      const merged = { ...defaultValues, ...varsFromUrl };
 
       if (debug) {
-        console.log('[useQueryParams] Variables from URL:', merged)
+        console.log('[useQueryParams] Variables from URL:', merged);
       }
 
-      return merged as TVariables
+      return merged;
     } catch (err) {
-      console.error('[useQueryParams] Failed to convert URL to variables:', err)
-      return defaultValues as TVariables
+      console.error('[useQueryParams] Failed to convert URL to variables:', err);
+      return defaultValues;
     }
-  }, [searchParams, schema, isReady, defaultValues, debug])
+  }, [searchParams, schema, isReady, defaultValues, debug]);
 
   // Raw URL params (before conversion)
   const params = useMemo(() => {
-    const result: Record<string, any> = {}
+    const result: Record<string, string | string[]> = {};
     searchParams.forEach((value, key) => {
-      if (result[key]) {
-        // Multiple values - convert to array
-        if (!Array.isArray(result[key])) {
-          result[key] = [result[key]]
-        }
-        result[key].push(value)
+      const existing = result[key];
+      if (existing === undefined) {
+        result[key] = value;
+      } else if (Array.isArray(existing)) {
+        // Multiple values - append to the array
+        existing.push(value);
       } else {
-        result[key] = value
+        result[key] = [existing, value];
       }
-    })
-    return result
-  }, [searchParams])
+    });
+    return result;
+  }, [searchParams]);
 
   // Update URL with new parameters
-  const updateUrl = useCallback((newParams: URLSearchParams) => {
-    const url = newParams.toString() ? `?${newParams.toString()}` : window.location.pathname
+  const updateUrl = useCallback(
+    (newParams: URLSearchParams) => {
+      const url = newParams.toString() ? `?${newParams.toString()}` : window.location.pathname;
 
-    if (debug) {
-      console.log('[useQueryParams] Updating URL:', url)
-    }
+      if (debug) {
+        console.log('[useQueryParams] Updating URL:', url);
+      }
 
-    // Use replace for shallow routing (no page reload, no history spam)
-    router.replace(url, { scroll: false })
-  }, [router, debug])
+      // Use replace for shallow routing (no page reload, no history spam)
+      router.replace(url, { scroll: false });
+    },
+    [router, debug],
+  );
 
   // Set a single parameter
-  const setParam = useCallback((key: string, value: any) => {
-    if (!isReady) {
-      console.warn('[useQueryParams] Schema not ready, cannot set param')
-      return
-    }
+  const setParam = useCallback(
+    (key: string, value: unknown) => {
+      if (!isReady) {
+        console.warn('[useQueryParams] Schema not ready, cannot set param');
+        return;
+      }
 
-    try {
-      const currentVars = variables
-      const updated = mergeVariables(currentVars as Record<string, any>, { [key]: value }, schema)
-      const newParams = variablesToUrlParams(updated, schema)
-      updateUrl(newParams)
-    } catch (err) {
-      console.error('[useQueryParams] Failed to set param:', err)
-    }
-  }, [variables, schema, isReady, updateUrl])
+      try {
+        const updated = mergeVariables(variables, { [key]: value }, schema);
+        const newParams = variablesToUrlParams(updated, schema);
+        updateUrl(newParams);
+      } catch (err) {
+        console.error('[useQueryParams] Failed to set param:', err);
+      }
+    },
+    [variables, schema, isReady, updateUrl],
+  );
 
   // Set multiple parameters
-  const setParams = useCallback((updates: Record<string, any>) => {
-    if (!isReady) {
-      console.warn('[useQueryParams] Schema not ready, cannot set params')
-      return
-    }
+  const setParams = useCallback(
+    (updates: GraphQLVariables) => {
+      if (!isReady) {
+        console.warn('[useQueryParams] Schema not ready, cannot set params');
+        return;
+      }
 
-    try {
-      const currentVars = variables
-      const updated = mergeVariables(currentVars as Record<string, any>, updates, schema)
-      const newParams = variablesToUrlParams(updated, schema)
-      updateUrl(newParams)
-    } catch (err) {
-      console.error('[useQueryParams] Failed to set params:', err)
-    }
-  }, [variables, schema, isReady, updateUrl])
+      try {
+        const updated = mergeVariables(variables, updates, schema);
+        const newParams = variablesToUrlParams(updated, schema);
+        updateUrl(newParams);
+      } catch (err) {
+        console.error('[useQueryParams] Failed to set params:', err);
+      }
+    },
+    [variables, schema, isReady, updateUrl],
+  );
 
   // Clear specific parameters
-  const clearParamsHandler = useCallback((keys: string[]) => {
-    if (!isReady) {
-      console.warn('[useQueryParams] Schema not ready, cannot clear params')
-      return
-    }
+  const clearParamsHandler = useCallback(
+    (keys: string[]) => {
+      if (!isReady) {
+        console.warn('[useQueryParams] Schema not ready, cannot clear params');
+        return;
+      }
 
-    try {
-      const currentVars = variables
-      const updated = clearParams(currentVars as Record<string, any>, keys, schema)
-      const newParams = variablesToUrlParams(updated, schema)
-      updateUrl(newParams)
-    } catch (err) {
-      console.error('[useQueryParams] Failed to clear params:', err)
-    }
-  }, [variables, schema, isReady, updateUrl])
+      try {
+        const updated = clearParams(variables, keys, schema);
+        const newParams = variablesToUrlParams(updated, schema);
+        updateUrl(newParams);
+      } catch (err) {
+        console.error('[useQueryParams] Failed to clear params:', err);
+      }
+    },
+    [variables, schema, isReady, updateUrl],
+  );
 
   // Reset all parameters
   const resetParams = useCallback(() => {
     if (debug) {
-      console.log('[useQueryParams] Resetting params')
+      console.log('[useQueryParams] Resetting params');
     }
 
-    router.replace(window.location.pathname, { scroll: false })
-  }, [router, debug])
+    router.replace(window.location.pathname, { scroll: false });
+  }, [router, debug]);
 
   return {
-    variables,
+    // The only place the caller's `TVariables` view is applied — this hook
+    // builds the object from the URL, so its exact shape is the caller's
+    // claim about their own query, not something we can verify here.
+    variables: variables as TVariables,
     params,
     schema,
     setParam,
@@ -299,8 +353,8 @@ export function useQueryParams<TVariables = Record<string, any>>(
     resetParams,
     isReady,
     isLoading,
-    error
-  }
+    error,
+  };
 }
 
 /**
@@ -308,17 +362,17 @@ export function useQueryParams<TVariables = Record<string, any>>(
  */
 function applyParamMapping(
   schema: Record<string, FlattenedParam>,
-  mapping: Record<string, string>
+  mapping: Record<string, string>,
 ): Record<string, FlattenedParam> {
-  const mapped: Record<string, FlattenedParam> = {}
+  const mapped: Record<string, FlattenedParam> = {};
 
   for (const [key, param] of Object.entries(schema)) {
-    const newKey = mapping[key] || key
+    const newKey = mapping[key] || key;
     mapped[newKey] = {
       ...param,
-      urlParamName: mapping[key] || param.urlParamName
-    }
+      urlParamName: mapping[key] || param.urlParamName,
+    };
   }
 
-  return mapped
+  return mapped;
 }

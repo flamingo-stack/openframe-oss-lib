@@ -11,7 +11,7 @@ const meta = {
     backgrounds: { default: 'dark' },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div>
         <Story />
         <Toaster />
@@ -20,7 +20,7 @@ const meta = {
   ],
   args: {
     onRegister: async () => {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 1500));
     },
     geoApiUrl: null,
     privacyPolicyUrl: 'https://flamingo.ai/privacy',
@@ -95,7 +95,7 @@ export const CustomLabels: Story = {
  */
 export const NarrowContainer: Story = {
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ maxWidth: 360 }}>
         <Story />
         <Toaster />
@@ -110,7 +110,7 @@ export const NarrowContainer: Story = {
 export const FailingRegistration: Story = {
   args: {
     onRegister: async () => {
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 1000));
       throw new Error('Registration failed');
     },
   },
@@ -125,11 +125,11 @@ export const FlamingoWithCheckboxError: Story = {
     defaultEmail: 'user@msp-company.com',
     defaultPhone: '5551234567',
     onRegister: async () => {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 1500));
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div data-app-type="flamingo">
         <Story />
         <Toaster />

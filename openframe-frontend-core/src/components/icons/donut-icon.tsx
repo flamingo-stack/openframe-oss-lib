@@ -19,4 +19,4 @@ export function DonutIcon({ className = '', color = 'white' }: { className?: str
       />
     </svg>
   );
-} 
+}

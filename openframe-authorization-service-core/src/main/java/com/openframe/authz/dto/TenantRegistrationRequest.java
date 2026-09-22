@@ -42,8 +42,6 @@ public class TenantRegistrationRequest extends CoreUserRequest {
     @TenantDomain
     private String tenantDomain;
 
-    private String accessCode;
-
     /**
      * Optional PR number identifying a preview environment. When PR-number registration is enabled,
      * the tenant is bound to the pre-provisioned {@code tenant-<prNumber>} namespace instead of

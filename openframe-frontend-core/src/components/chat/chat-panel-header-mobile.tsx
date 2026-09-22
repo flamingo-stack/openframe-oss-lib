@@ -1,13 +1,13 @@
-'use client'
+'use client';
 
-import { Chevron02LeftIcon, ClockHistoryIcon, XmarkIcon } from '../icons-v2-generated'
-import { Button } from '../ui/button'
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu'
-import { cn } from '../../utils/cn'
-import type { ChatPanelHeaderProps } from './chat-panel-header'
+import { cn } from '../../utils/cn';
+import { Chevron02LeftIcon, ClockHistoryIcon, XmarkIcon } from '../icons-v2-generated';
+import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
+import { Button } from '../ui/button';
+import type { ChatPanelHeaderProps } from './chat-panel-header';
 
 export interface ChatPanelHeaderMobileProps extends ChatPanelHeaderProps {
-  className?: string
+  className?: string;
 }
 
 /**
@@ -38,6 +38,7 @@ export function ChatPanelHeaderMobile({
   onRestore,
   onRename,
   onArchive,
+  onCopyLink,
   onOpenArchive,
   className,
 }: ChatPanelHeaderMobileProps) {
@@ -45,38 +46,39 @@ export function ChatPanelHeaderMobile({
   // listed (the panel is dismissed elsewhere); the trigger is hidden entirely
   // when no action applies (e.g. the archive list view).
   const menuItems = [
-    !showBack && onOpenArchive && { id: 'open-archive', label: 'Chat archive', icon: <ClockHistoryIcon className="w-full h-full" />, onClick: onOpenArchive },
+    !showBack &&
+      onOpenArchive && {
+        id: 'open-archive',
+        label: 'Chat archive',
+        icon: <ClockHistoryIcon className="h-full w-full" />,
+        onClick: onOpenArchive,
+      },
     isArchivedView && onRestore && { id: 'unarchive', label: 'Unarchive chat', onClick: onRestore },
+    !isArchivedView && onCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: onCopyLink },
     !isArchivedView && onRename && { id: 'rename', label: 'Rename chat', onClick: onRename },
     !isArchivedView && onArchive && { id: 'archive', label: 'Archive chat', onClick: onArchive },
-  ].filter(Boolean) as ActionsMenuItem[]
+  ].filter(Boolean) as ActionsMenuItem[];
 
   return (
     <div
       className={cn(
-        'flex-shrink-0 flex flex-col border-b border-ods-border bg-ods-card',
+        'flex flex-shrink-0 flex-col border-b border-ods-border bg-ods-card',
         'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
         className,
       )}
     >
       <div className="flex w-full items-end gap-[var(--spacing-system-sf)]">
         {showBack && (
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={backAriaLabel}
-            onClick={onBack}
-            className="shrink-0"
-          >
+          <Button variant="outline" size="icon" aria-label={backAriaLabel} onClick={onBack} className="shrink-0">
             <Chevron02LeftIcon />
           </Button>
         )}
 
         {/* Title block — `xl` top padding pushes the title down so the row
             bottom-aligns the title, back chevron, and ⋯ menu. */}
-        <div className="flex flex-1 min-w-0 items-end gap-[var(--spacing-system-m)] pt-[var(--spacing-system-xl)]">
-          <div className="flex flex-1 min-w-0 flex-col gap-[var(--spacing-system-xs)]">
-            <p className="min-w-0 truncate text-h2 text-ods-text-primary" title={title}>
+        <div className="flex min-w-0 flex-1 items-end gap-[var(--spacing-system-m)] pt-[var(--spacing-system-xl)]">
+          <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xs)]">
+            <p className="min-w-0 truncate text-ods-text-primary text-h2" title={title}>
               {title}
             </p>
           </div>
@@ -85,23 +87,17 @@ export function ChatPanelHeaderMobile({
             <ActionsMenuDropdown
               groups={[{ items: menuItems }]}
               triggerAriaLabel="Chat actions"
-              triggerClassName="shrink-0 bg-ods-card border-ods-border hover:bg-ods-bg-hover flex items-center justify-center focus-visible:ring-0"
+              triggerClassName="flex shrink-0 items-center justify-center border-ods-border bg-ods-card hover:bg-ods-bg-hover focus-visible:ring-0"
             />
           )}
 
           {onClose && (
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Close chat"
-              onClick={onClose}
-              className="shrink-0"
-            >
+            <Button variant="outline" size="icon" aria-label="Close chat" onClick={onClose} className="shrink-0">
               <XmarkIcon />
             </Button>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }

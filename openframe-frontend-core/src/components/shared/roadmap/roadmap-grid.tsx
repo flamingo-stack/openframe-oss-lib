@@ -23,22 +23,22 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { RoadmapCard } from '../../chat/entity-cards/roadmap-card';
-import { useRoadmapVoting, type UseRoadmapVotingOptions } from './use-roadmap-voting';
-import { EmptyState } from '../../empty-state';
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from '../../ui';
 import { cn } from '../../../utils/cn';
 import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
 import { contentFetch } from '../../../utils/embed-content-fetch';
+import { RoadmapCard } from '../../chat/entity-cards/roadmap-card';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
+import { EmptyState } from '../../empty-state';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../../ui';
+import { useRoadmapVoting, type UseRoadmapVotingOptions } from './use-roadmap-voting';
 
 const DEFAULT_BUILD_REFRESH_URL = (taskId: string) => `/api/roadmap/${taskId}`;
 const BACKLOG = 'Backlog';
+
+/** Wire shape of the post-vote single-task refresh — `{ item }`. */
+interface RoadmapItemResponse {
+  item?: RoadmapItem;
+}
 
 // ── Quarter helpers (pure; lifted from the hub roadmap section) ──────────────
 
@@ -59,10 +59,7 @@ function parseQuarterString(q: string): { quarter: number; year: number } | null
   return { quarter: parseInt(match[1], 10), year: parseInt(match[2], 10) };
 }
 
-function compareQuarters(
-  a: { quarter: number; year: number },
-  b: { quarter: number; year: number },
-): number {
+function compareQuarters(a: { quarter: number; year: number }, b: { quarter: number; year: number }): number {
   if (a.year !== b.year) return a.year - b.year;
   return a.quarter - b.quarter;
 }
@@ -100,6 +97,15 @@ export interface RoadmapGridProps {
   /** Show the desktop left margin (~120px) that aligns the grid with the page
    *  hero. Default `true`. Related-content rails pass `false`. */
   showLeftMargin?: boolean;
+  /**
+   * Columns at `md` and up. Default `2` (the roadmap page).
+   *
+   * A card in this grid needs real width — its title, status badge, target
+   * version and vote row sit on one line each. Two columns inside a NARROW
+   * host (a modal rail, a sidebar) halve an already-small container and crush
+   * every one of them, so such hosts pass `1`.
+   */
+  columns?: 1 | 2;
   /** URL builder for the per-task refresh call after a successful vote. */
   buildRefreshUrl?: (taskId: string) => string;
   /** Voting hook options (vote endpoint + storage key). */
@@ -122,19 +128,27 @@ export interface RoadmapGridProps {
 function RoadmapGridSingle({
   items,
   showLeftMargin,
+  columns = 2,
   getVote,
   onVote,
   votingTasks,
 }: {
   items: RoadmapItem[];
   showLeftMargin: boolean;
+  columns?: 1 | 2;
   getVote: (taskId: string) => 'up' | 'down' | null;
   onVote: (taskId: string, voteType: 'up' | 'down') => void;
   votingTasks: Set<string>;
 }) {
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${showLeftMargin ? 'md:ml-[120px]' : ''}`}>
-      {items.map((item) => (
+    // LITERAL class strings: an interpolated `md:grid-cols-${n}` is invisible
+    // to Tailwind's scanner and is never generated.
+    <div
+      className={`grid grid-cols-1 gap-6 ${columns === 2 ? 'md:grid-cols-2' : ''} ${
+        showLeftMargin ? 'md:ml-[120px]' : ''
+      }`}
+    >
+      {items.map(item => (
         // DOM id + sticky-header scroll offset live ON RoadmapCard's own
         // outer element (no wrapper div). Anchor mirrors
         // `buildDevSectionUrl('roadmap', <id>)` → `#roadmap-<external_id>`;
@@ -145,7 +159,7 @@ function RoadmapGridSingle({
           item={item}
           id={devSectionAnchorId('roadmap', item.id)}
           userVote={getVote(item.id)}
-          onVote={(voteType) => onVote(item.id, voteType)}
+          onVote={voteType => onVote(item.id, voteType)}
           isVoting={votingTasks.has(item.id)}
         />
       ))}
@@ -157,6 +171,7 @@ export function RoadmapGrid({
   items,
   onItemUpdate,
   showLeftMargin = true,
+  columns = 2,
   buildRefreshUrl = DEFAULT_BUILD_REFRESH_URL,
   votingOptions,
   groupByQuarter = false,
@@ -169,18 +184,20 @@ export function RoadmapGrid({
 
   const handleVote = async (taskId: string, voteType: 'up' | 'down') => {
     if (votingTasks.has(taskId)) return;
-    setVotingTasks((prev) => new Set(prev).add(taskId));
+    setVotingTasks(prev => new Set(prev).add(taskId));
     try {
       const result = await toggleVote(taskId, voteType);
       if (result.success) {
         const response = await contentFetch(buildRefreshUrl(taskId));
         if (response.ok) {
-          const data = await response.json();
+          // `buildRefreshUrl` points at the single-task read, which answers
+          // `{ item }` (404 → `{ error }`, already excluded by `response.ok`).
+          const data = (await response.json()) as RoadmapItemResponse;
           if (data.item && onItemUpdate) onItemUpdate(data.item);
         }
       }
     } finally {
-      setVotingTasks((prev) => {
+      setVotingTasks(prev => {
         const next = new Set(prev);
         next.delete(taskId);
         return next;
@@ -189,11 +206,11 @@ export function RoadmapGrid({
   };
 
   // ── Quarter bucketing + chronological sort (recomputed each render; cheap) ──
-  const itemsByQuarter = items.reduce<Record<string, RoadmapItem[]>>((acc, item) => {
+  const itemsByQuarter: Record<string, RoadmapItem[]> = {};
+  for (const item of items) {
     const q = item.quarter || BACKLOG;
-    (acc[q] ||= []).push(item);
-    return acc;
-  }, {});
+    (itemsByQuarter[q] ||= []).push(item);
+  }
   for (const q of Object.keys(itemsByQuarter)) {
     itemsByQuarter[q].sort((a, b) => getStatusPriority(a.status) - getStatusPriority(b.status));
   }
@@ -212,31 +229,42 @@ export function RoadmapGrid({
   const hasSetInitialState = useRef(false);
   const prevItemsLength = useRef(0);
 
+  // Latest values for the two effects below. Neither can take `sortedQuarters`
+  // as a dependency: it is rebuilt on every render, and the effects are keyed
+  // on its LENGTH / content key on purpose. Declared before them so the sync
+  // has already run by the time either fires in the same commit.
+  const sortedQuartersRef = useRef(sortedQuarters);
+  const hasActiveFiltersRef = useRef(hasActiveFilters);
+  const quartersToKeepClosedRef = useRef(quartersToKeepClosed);
+  useEffect(() => {
+    sortedQuartersRef.current = sortedQuarters;
+    hasActiveFiltersRef.current = hasActiveFilters;
+    quartersToKeepClosedRef.current = quartersToKeepClosed;
+  });
+
   // Initial expand state once data loads (runs once, or when data first arrives).
   useEffect(() => {
     const itemsJustLoaded = prevItemsLength.current === 0 && items.length > 0;
     prevItemsLength.current = items.length;
-    if (sortedQuarters.length > 0 && (!hasSetInitialState.current || itemsJustLoaded)) {
+    const quarters = sortedQuartersRef.current;
+    if (quarters.length > 0 && (!hasSetInitialState.current || itemsJustLoaded)) {
       hasSetInitialState.current = true;
       setExpandedQuarters(
-        hasActiveFilters
-          ? [...sortedQuarters]
-          : computeDefaultExpandedQuarters(sortedQuarters, quartersToKeepClosed),
+        hasActiveFiltersRef.current
+          ? [...quarters]
+          : computeDefaultExpandedQuarters(quarters, quartersToKeepClosedRef.current),
       );
       setIsInitialized(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortedQuarters.length, items.length]);
 
   // React to filter toggles AFTER init: filters on → expand all; off → defaults.
   useEffect(() => {
-    if (!isInitialized || sortedQuarters.length === 0) return;
+    const quarters = sortedQuartersRef.current;
+    if (!isInitialized || quarters.length === 0) return;
     setExpandedQuarters(
-      hasActiveFilters
-        ? [...sortedQuarters]
-        : computeDefaultExpandedQuarters(sortedQuarters, quartersToKeepClosed),
+      hasActiveFilters ? [...quarters] : computeDefaultExpandedQuarters(quarters, quartersToKeepClosed),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasActiveFilters, sortedQuartersKey, isInitialized, quartersToKeepClosed]);
 
   if (items.length === 0) {
@@ -255,6 +283,7 @@ export function RoadmapGrid({
       <RoadmapGridSingle
         items={items}
         showLeftMargin={showLeftMargin}
+        columns={columns}
         getVote={getVote}
         onVote={handleVote}
         votingTasks={votingTasks}
@@ -269,7 +298,7 @@ export function RoadmapGrid({
       onValueChange={setExpandedQuarters}
       className="flex flex-col gap-10"
     >
-      {sortedQuarters.map((quarter) => {
+      {sortedQuarters.map(quarter => {
         const itemCount = itemsByQuarter[quarter]?.length || 0;
         const isExpanded = expandedQuarters.includes(quarter);
         return (
@@ -279,11 +308,11 @@ export function RoadmapGrid({
             id={`quarter-${quarter.replace(/\s+/g, '-').toLowerCase()}`}
             className="border-0"
           >
-            <AccordionTrigger className="w-full p-0 hover:no-underline [&>svg]:h-5 [&>svg]:w-5 [&>svg]:text-ods-text-secondary [&>svg]:ml-auto [&>svg]:shrink-0">
+            <AccordionTrigger className="w-full p-0 hover:no-underline [&>svg]:ml-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:shrink-0 [&>svg]:text-ods-text-secondary">
               <div className="flex items-center gap-3">
                 <h3
                   className={cn(
-                    'text-h2 text-ods-text-primary transition-opacity',
+                    'text-ods-text-primary transition-opacity text-h2',
                     isExpanded ? 'opacity-100' : 'opacity-60',
                   )}
                 >
@@ -292,7 +321,7 @@ export function RoadmapGrid({
                 </h3>
                 <span
                   className={cn(
-                    'text-h6 transition-opacity',
+                    'transition-opacity text-h6',
                     isExpanded ? 'text-ods-text-secondary opacity-100' : 'text-ods-text-tertiary opacity-60',
                   )}
                 >
@@ -301,10 +330,11 @@ export function RoadmapGrid({
                 </span>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="pt-4 pb-0 overflow-hidden data-[state=closed]:animate-none data-[state=open]:animate-none">
+            <AccordionContent className="overflow-hidden pb-0 pt-4 data-[state=closed]:animate-none data-[state=open]:animate-none">
               <RoadmapGridSingle
                 items={itemsByQuarter[quarter]}
                 showLeftMargin={showLeftMargin}
+                columns={columns}
                 getVote={getVote}
                 onVote={handleVote}
                 votingTasks={votingTasks}

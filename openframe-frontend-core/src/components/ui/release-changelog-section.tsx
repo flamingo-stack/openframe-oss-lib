@@ -1,11 +1,12 @@
-"use client"
+'use client';
 
-import React, { useState } from 'react';
-import { Badge } from './badge';
 import { ChevronDown } from 'lucide-react';
+import type React from 'react';
+import { useState } from 'react';
+import type { ChangelogEntry } from '../../types/product-release';
+import { Badge } from './badge';
 import { FadePreview } from './fade-preview';
 import { RichMarkdownRenderer } from './markdown';
-import type { ChangelogEntry } from '../../types/product-release';
 
 interface ReleaseChangelogSectionProps {
   title: string;
@@ -65,20 +66,24 @@ export function ReleaseChangelogSection({
 
   return (
     <div className="space-y-4">
-      {!hideTitle && (
-        collapsible ? (
+      {!hideTitle &&
+        (collapsible ? (
           <button
             type="button"
             onClick={() => setCollapsed(!collapsed)}
-            className="flex items-center justify-between w-full cursor-pointer"
+            className="flex w-full cursor-pointer items-center justify-between"
           >
-            <h2 className={`flex items-center gap-2 text-h2 ${isBreaking ? 'text-ods-error' : 'text-ods-text-primary'}`}>
+            <h2
+              className={`flex items-center gap-2 text-h2 ${isBreaking ? 'text-ods-error' : 'text-ods-text-primary'}`}
+            >
               {icon}
               {title}
-              <Badge variant="secondary" className="ml-2">{entries.length}</Badge>
+              <Badge variant="secondary" className="ml-2">
+                {entries.length}
+              </Badge>
             </h2>
             <ChevronDown
-              className={`h-4 w-4 text-ods-text-secondary shrink-0 transition-transform duration-200 ${
+              className={`h-4 w-4 shrink-0 text-ods-text-secondary transition-transform duration-200 ${
                 !collapsed ? 'rotate-180' : ''
               }`}
             />
@@ -87,12 +92,13 @@ export function ReleaseChangelogSection({
           <h2 className={`flex items-center gap-2 text-h2 ${isBreaking ? 'text-ods-error' : 'text-ods-text-primary'}`}>
             {icon}
             {title}
-            <Badge variant="secondary" className="ml-2">{entries.length}</Badge>
+            <Badge variant="secondary" className="ml-2">
+              {entries.length}
+            </Badge>
           </h2>
-        )
-      )}
-      {showEntries && (
-        inPreviewMode ? (
+        ))}
+      {showEntries &&
+        (inPreviewMode ? (
           /* Preview-first mode: the shared `FadePreview` primitive clamps
              the list to ~one full entry, fade-masks the rest, and renders
              the "Show N more / Show less" toggle. */
@@ -105,8 +111,7 @@ export function ReleaseChangelogSection({
           </FadePreview>
         ) : (
           <ChangelogEntryList entries={entries} MarkdownRenderer={MarkdownRenderer} />
-        )
-      )}
+        ))}
     </div>
   );
 }
@@ -126,7 +131,7 @@ function ChangelogEntryList({
   return (
     <ul className="space-y-6">
       {entries.map((entry, index) => (
-        <li key={index} className="border-l-2 border-ods-border pl-4 ml-0">
+        <li key={index} className="ml-0 border-l-2 border-ods-border pl-4">
           {/* Entry title — run through the SAME markdown renderer as the
               description so inline markdown (links like `[label](url)`,
               emphasis) renders instead of showing as raw text, then pinned
@@ -135,7 +140,7 @@ function ChangelogEntryList({
               so plain-text titles look exactly as before. `[&_p]:!my-0`
               strips the renderer's paragraph margins; `mb-2` keeps the gap to
               the description. */}
-          <div className="text-h3 text-ods-text-primary mb-2 [&_p]:!text-[length:var(--font-size-h3-body)] [&_p]:!leading-[var(--font-line-space-h3-body)] [&_p]:!font-bold [&_p]:!my-0 [&_p+p]:!mt-2">
+          <div className="mb-2 text-ods-text-primary text-h3 [&_p+p]:!mt-2 [&_p]:!my-0 [&_p]:!text-[length:var(--font-size-h3-body)] [&_p]:!font-bold [&_p]:!leading-[var(--font-line-space-h3-body)]">
             <MarkdownRenderer content={entry.title} />
           </div>
           {entry.description && (
@@ -146,7 +151,7 @@ function ChangelogEntryList({
                inflate the changelog body to 20px. The `[&_p]:!` overrides
                pin every descendant `<p>` back to the h4 responsive tokens
                so the breakpoints stay aligned with the rest of the page. */
-            <div className="text-h4 text-ods-text-primary [&_p]:!text-[length:var(--font-size-h4-body)] [&_p]:!leading-[var(--font-line-space-h4-body)] [&_p]:!font-medium">
+            <div className="text-ods-text-primary text-h4 [&_p]:!text-[length:var(--font-size-h4-body)] [&_p]:!font-medium [&_p]:!leading-[var(--font-line-space-h4-body)]">
               <MarkdownRenderer content={entry.description} />
             </div>
           )}

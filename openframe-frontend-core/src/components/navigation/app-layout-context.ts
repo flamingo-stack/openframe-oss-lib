@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { createContext, useContext } from 'react'
+import { createContext, useContext } from 'react';
 
 /**
  * Container element that wraps `<main>` and serves as the portal target for
@@ -13,10 +13,10 @@ import { createContext, useContext } from 'react'
  * these contexts without importing AppLayout itself — AppLayout renders those
  * panels, so importing it back would create a module cycle.
  */
-export const AppLayoutDrawerContainerContext = createContext<HTMLElement | null>(null)
+export const AppLayoutDrawerContainerContext = createContext<HTMLElement | null>(null);
 
 export function useAppLayoutDrawerContainer(): HTMLElement | null {
-  return useContext(AppLayoutDrawerContainerContext)
+  return useContext(AppLayoutDrawerContainerContext);
 }
 
 /**
@@ -29,18 +29,18 @@ export function useAppLayoutDrawerContainer(): HTMLElement | null {
  *     button (or another panel) closes it. Null outside of AppLayout.
  */
 export interface AppLayoutDrawerHandle {
-  close: () => void
+  close: () => void;
 }
 
 export interface AppLayoutDrawerCoordination {
   /** `self` is skipped when closing the other registered panels. */
-  notifyDrawerDidOpen: (self?: AppLayoutDrawerHandle) => void
+  notifyDrawerDidOpen: (self?: AppLayoutDrawerHandle) => void;
   /** Returns an unregister cleanup. */
-  registerDrawer: (handle: AppLayoutDrawerHandle) => () => void
+  registerDrawer: (handle: AppLayoutDrawerHandle) => () => void;
 }
 
-export const AppLayoutDrawerCoordinationContext = createContext<AppLayoutDrawerCoordination | null>(null)
+export const AppLayoutDrawerCoordinationContext = createContext<AppLayoutDrawerCoordination | null>(null);
 
 export function useAppLayoutDrawerCoordination(): AppLayoutDrawerCoordination | null {
-  return useContext(AppLayoutDrawerCoordinationContext)
+  return useContext(AppLayoutDrawerCoordinationContext);
 }

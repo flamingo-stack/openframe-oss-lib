@@ -47,4 +47,31 @@ public class ToolResponse {
     
     @Schema(description = "Tool credentials")
     private ToolCredentialsResponse credentials;
+
+    @Schema(description = "Architecture layer the tool belongs to", example = "Integrated Tools")
+    private String layer;
+
+    @Schema(description = "Ordering of the tool within its layer", example = "1")
+    private Integer layerOrder;
+
+    @Schema(description = "Display color of the layer", example = "#4F46E5")
+    private String layerColor;
+
+    @Schema(description = "Metrics endpoint path", example = "/metrics")
+    private String metricsPath;
+
+    @Schema(description = "Health check endpoint", example = "/health")
+    private String healthCheckEndpoint;
+
+    @Schema(description = "Health check interval in seconds", example = "30")
+    private Integer healthCheckInterval;
+
+    @Schema(description = "Connection timeout in milliseconds", example = "5000")
+    private Integer connectionTimeout;
+
+    @Schema(description = "Read timeout in milliseconds", example = "30000")
+    private Integer readTimeout;
+
+    @Schema(description = "Endpoints allowed to be proxied through the integration API")
+    private List<String> allowedEndpoints;
 } 

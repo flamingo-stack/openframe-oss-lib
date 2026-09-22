@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Deleted Data Card — generic TOMBSTONE placeholder for an entity a chat
@@ -17,8 +17,7 @@
  *     ("Recoverable from the ClickUp Trash for 30 days")
  */
 
-import React from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react';
 import {
   COMPACT_CARD_ICON_SLOT,
   COMPACT_CARD_META_ROW,
@@ -26,19 +25,19 @@ import {
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
-} from '../utils/compact-card-classes'
+} from '../utils/compact-card-classes';
 
 export interface DeletedDataCardProps {
-  title?: string | null
+  title?: string | null;
   /** What kind of entity was deleted ("ClickUp task", "HubSpot ticket"). */
-  entityLabel?: string | null
+  entityLabel?: string | null;
   /** Recoverability copy ("Recoverable from the ClickUp Trash for 30 days"). */
-  recoveryNote?: string | null
-  className?: string
+  recoveryNote?: string | null;
+  className?: string;
 }
 
 export function DeletedDataCard({ title, entityLabel, recoveryNote, className }: DeletedDataCardProps) {
-  const label = entityLabel || 'Item'
+  const label = entityLabel || 'Item';
   return (
     <div className={`${COMPACT_CARD_OUTER_STATIC} opacity-70 ${className ?? ''}`}>
       <div className={COMPACT_CARD_ICON_SLOT}>
@@ -46,7 +45,7 @@ export function DeletedDataCard({ title, entityLabel, recoveryNote, className }:
       </div>
       <div className={COMPACT_CARD_TEXT_COL}>
         <div className={COMPACT_CARD_TITLE_ROW}>
-          <span className={`${COMPACT_CARD_TITLE} line-through text-ods-text-secondary`}>
+          <span className={`${COMPACT_CARD_TITLE} text-ods-text-secondary line-through`}>
             {title || `Deleted ${label.toLowerCase()}`}
           </span>
         </div>
@@ -57,5 +56,5 @@ export function DeletedDataCard({ title, entityLabel, recoveryNote, className }:
         </div>
       </div>
     </div>
-  )
+  );
 }

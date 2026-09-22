@@ -1,7 +1,6 @@
 package com.openframe.data.nats.publisher;
 
 import com.openframe.core.exception.NatsException;
-import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationSeverity;
@@ -96,7 +95,7 @@ class NotificationNatsPublisherTest {
         Notification unpersisted = Notification.builder()
                 .title("Test")
                 .createdAt(Instant.now())
-                .context(GenericContext.builder().type("welcome").build())
+                .type("welcome")
                 .build();
 
         assertThatThrownBy(() -> publisher.publishToUser("user-1", unpersisted, NotificationCategory.GENERIC))
@@ -141,7 +140,8 @@ class NotificationNatsPublisherTest {
                 .title("Ticket #1234 — Printer offline at front desk")
                 .description("Escalated by the user - waiting for a technician")
                 .createdAt(Instant.parse("2026-08-11T09:15:30Z"))
-                .context(GenericContext.builder().type("TICKET_ESCALATED_BY_USER").payload("{}").build())
+                .type("TICKET_ESCALATED_BY_USER")
+                .attributes(java.util.Map.of("ticketId", "t-1"))
                 .build();
 
         publisher.publishToUser("user-42", stored, NotificationCategory.TICKETS);
@@ -154,7 +154,8 @@ class NotificationNatsPublisherTest {
         assertThat(published.getDescription()).isEqualTo(stored.getDescription());
         assertThat(published.getCreatedAt()).isEqualTo(stored.getCreatedAt());
         assertThat(published.getSeverity()).isEqualTo(stored.getSeverity());
-        assertThat(published.getContext()).isSameAs(stored.getContext());
+        assertThat(published.getType()).isEqualTo(stored.getType());
+        assertThat(published.getAttributes()).isSameAs(stored.getAttributes());
         assertThat(published.getCategory()).isEqualTo(NotificationCategory.TICKETS);
         assertThat(published.getEventType()).isEqualTo(NotificationEventType.CREATED);
     }
@@ -164,7 +165,7 @@ class NotificationNatsPublisherTest {
                 .id("notif-" + System.nanoTime())
                 .title("Hello")
                 .createdAt(Instant.now())
-                .context(GenericContext.builder().type("welcome").build())
+                .type("welcome")
                 .build();
     }
 }

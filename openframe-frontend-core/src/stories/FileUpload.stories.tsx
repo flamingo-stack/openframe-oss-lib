@@ -15,7 +15,7 @@ const meta = {
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '500px' }}>
         <Story />
       </div>
@@ -65,15 +65,8 @@ export const Interactive: Story = {
     const [files, setFiles] = useState<File[]>([]);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <FileUpload
-          value={files}
-          onChange={(f) => setFiles(f as File[] || [])}
-          multiple
-          fieldLabel="Upload Files"
-        />
-        <p style={{ color: '#888', fontSize: '14px' }}>
-          {files.length} file(s) selected
-        </p>
+        <FileUpload value={files} onChange={f => setFiles((f as File[]) || [])} multiple fieldLabel="Upload Files" />
+        <p style={{ color: '#888', fontSize: '14px' }}>{files.length} file(s) selected</p>
       </div>
     );
   },

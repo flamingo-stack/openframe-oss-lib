@@ -4,23 +4,30 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.service.organization.OrganizationQueryService;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -84,6 +91,69 @@ class OrganizationQueryServiceTest {
         assertThat(result.getPageInfo().isHasNextPage()).isTrue();
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "3, 2, 2, true",
+            "2, 2, 2, false",
+            "1, 2, 1, false",
+            "0, 2, 0, false"
+    })
+    void queryOrganizations_rowsReturnedAgainstLimit_pageTrimmedAndNextPageFlagged(
+            int returned, int limit, int expectedItems, boolean expectedHasNextPage) {
+        Query query = new Query();
+        when(repository.buildOrganizationQuery(any(), any())).thenReturn(query);
+        when(repository.findOrganizationsWithCursor(query, null, limit + 1, "updatedAt", "DESC"))
+                .thenReturn(orgs(returned));
+
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(), page(limit), null, lastActivity(SortDirection.DESC));
+
+        assertThat(result.getItems()).hasSize(expectedItems);
+        assertThat(result.getPageInfo().isHasNextPage()).isEqualTo(expectedHasNextPage);
+    }
+
+    @Test
+    void queryOrganizations_moreRowsThanLimit_endCursorIsLastShownRowNotProbeRow() {
+        when(repository.findOrganizationsWithCursor(any(), any(), anyInt(), any(), any())).thenReturn(orgs(3));
+
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(), page(2), null,
+                SortInput.builder().field("_id").direction(SortDirection.DESC).build());
+
+        assertThat(result.getItems()).extracting(Organization::getId).containsExactly("id-1", "id-2");
+        assertThat(CursorCodec.decode(result.getPageInfo().getEndCursor())).isEqualTo("id-2");
+    }
+
+    @Test
+    void queryOrganizations_noRows_noCursorsAndNoNextPage() {
+        when(repository.findOrganizationsWithCursor(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
+
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(), page(2), null, lastActivity(SortDirection.DESC));
+
+        assertThat(result.getItems()).isEmpty();
+        assertThat(result.getPageInfo())
+                .returns(false, PageInfo::isHasNextPage)
+                .returns(null, PageInfo::getStartCursor)
+                .returns(null, PageInfo::getEndCursor);
+    }
+
+    @Test
+    void queryOrganizations_cursorGiven_hasPreviousPage() {
+        when(repository.findOrganizationsWithCursor(any(), eq("id-0"), anyInt(), any(), any())).thenReturn(orgs(1));
+
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(),
+                CursorPaginationCriteria.builder().limit(2).cursor("id-0").build(), null,
+                SortInput.builder().field("_id").direction(SortDirection.DESC).build());
+
+        assertThat(result.getPageInfo().isHasPreviousPage()).isTrue();
+    }
+
+    private static List<Organization> orgs(int count) {
+        return IntStream.rangeClosed(1, count).mapToObj(i -> org("id-" + i, i)).toList();
+    }
+
     @Test
     @DisplayName("last-activity sort emits compound <millis>_<id> page cursors")
     void compoundCursorForLastActivitySort() {
@@ -122,6 +192,26 @@ class OrganizationQueryServiceTest {
         OrganizationQueryFilter forwarded = captor.getValue();
         assertThat(forwarded.getLastActivityFrom()).isEqualTo(from);
         assertThat(forwarded.getLastActivityTo()).isEqualTo(to);
+    }
+
+    @Test
+    @DisplayName("excludeOrganizationIds on the FilterOptions must reach the repository — the directory connection picker relies on it to hide customers that already have a connection")
+    void excludeOrganizationIdsIsForwardedToRepository() {
+        when(repository.countOrganizations(any())).thenReturn(0L);
+        when(repository.findOrganizationsWithCursor(any(), any(), anyInt(), any(), any()))
+                .thenReturn(List.of());
+
+        Set<String> excluded = Set.of("org-a", "org-b");
+        OrganizationFilterOptions options = OrganizationFilterOptions.builder()
+                .excludeOrganizationIds(excluded)
+                .build();
+
+        service.queryOrganizations(options, page(20), null, lastActivity(SortDirection.DESC));
+
+        ArgumentCaptor<OrganizationQueryFilter> captor = ArgumentCaptor.forClass(OrganizationQueryFilter.class);
+        verify(repository).buildOrganizationQuery(captor.capture(), any());
+        OrganizationQueryFilter forwarded = captor.getValue();
+        assertThat(forwarded.getExcludeOrganizationIds()).containsExactlyInAnyOrderElementsOf(excluded);
     }
 
     @Test

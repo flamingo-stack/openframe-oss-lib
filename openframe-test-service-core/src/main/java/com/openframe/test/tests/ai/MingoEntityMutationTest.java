@@ -1,5 +1,6 @@
 package com.openframe.test.tests.ai;
 
+import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.api.KnowledgeBaseApi;
 import com.openframe.test.api.ScriptApi;
 import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseItem;
@@ -19,11 +20,13 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * AI assistant entity-creation/mutation E2E (no machine required): the assistant creates/updates/deletes
+ * AI assistant entity-creation/mutation E2E: the assistant creates/updates/deletes
  * scripts and creates a KB article via its tools (each a mutation requiring an ADMIN approval, auto-approved
  * by the runner), verified through the product's own Script / Knowledge Base APIs (channel B).
  *
- * <p>Immune to the searchMachines online-flap — no machine is involved.
+ * <p>The update case names the online box: the assistant tests a script body on a real machine before
+ * saving it, and asked without one it replies "which Windows machine should I use to test this?" and
+ * stops, leaving the script unchanged.
  */
 @Tag("ai")
 @Tag("mingo")
@@ -62,8 +65,10 @@ public class MingoEntityMutationTest extends MingoBaseTest {
         scriptIds.add(seed.getId());
         String token = "UPDATED-" + runId;
 
+        Machine target = onlineWindowsDevice();
         RunResult result = prompt("Update the script named \"" + name + "\" so that its body prints exactly "
-                + token + ". Keep the same script.");
+                + token + ". Keep the same script."
+                + " Test the new body on the online machine " + target.getHostname() + " before saving.");
 
         // Same id must now carry the new body — if the assistant recreated instead of updating, the seed's
         // body is unchanged and this fails.

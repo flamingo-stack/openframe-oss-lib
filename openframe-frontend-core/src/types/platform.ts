@@ -1,7 +1,27 @@
 // Unified Platform Types
 // Used across announcements, blog posts, and platform configuration
 
-export type PlatformName = 'openmsp' | 'tmcg' | 'flamingo' | 'flamingo-teaser' | 'universal' | 'marketing-hub' | 'product-hub' | 'revenue-hub' | 'people-hub' | 'openframe' | 'company-hub';
+export type PlatformName =
+  | 'openmsp'
+  | 'tmcg'
+  | 'flamingo'
+  | 'flamingo-teaser'
+  | 'universal'
+  | 'marketing-hub'
+  | 'product-hub'
+  | 'revenue-hub'
+  | 'people-hub'
+  | 'openframe'
+  | 'company-hub'
+  | 'mlg';
+
+/**
+ * Every platform that is a deployable app type (i.e. a `NEXT_PUBLIC_APP_TYPE` value).
+ * `universal` is a content scope, never a deployment, so it is excluded.
+ * THE owner of this alias: the hub's `AppConfig` map and the platform-access seed
+ * script both key on it, so a new platform fails their builds until it is wired.
+ */
+export type PlatformAppType = Exclude<PlatformName, 'universal'>;
 
 // Database Platform Model (from platforms table)
 export interface PlatformRecord {
@@ -32,10 +52,10 @@ export interface PlatformRecord {
 
 // Platform Configuration for API
 export interface PlatformConfig {
-  id: string;  // UUID from database (required)
-  value: string;  // same as name
-  label: string;  // same as display_name
-  name: string;   // same as name
+  id: string; // UUID from database (required)
+  value: string; // same as name
+  label: string; // same as display_name
+  name: string; // same as name
   display_name: string;
   default_color: string;
   default_icon: string;
@@ -61,4 +81,4 @@ export interface PlatformStats {
   announcement_count: number;
   blog_post_count: number;
   is_active: boolean;
-} 
+}

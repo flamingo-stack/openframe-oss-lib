@@ -1,16 +1,16 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
 
 import {
   BracketCurlyIcon,
   ChartDonutIcon,
   IdCardIcon,
   MonitorIcon,
-  Settings02Icon
-} from '../components/icons-v2-generated'
-import { AppLayout } from '../components/navigation/app-layout'
-import { NavigationSidebarConfig } from '../types/navigation'
+  Settings02Icon,
+} from '../components/icons-v2-generated';
+import { AppLayout } from '../components/navigation/app-layout';
+import type { NavigationSidebarConfig } from '../types/navigation';
 
 const defaultNavigationItems: NavigationSidebarConfig['items'] = [
   {
@@ -38,7 +38,7 @@ const defaultNavigationItems: NavigationSidebarConfig['items'] = [
     icon: <BracketCurlyIcon size={24} />,
     path: '/scripts',
   },
-]
+];
 
 const secondaryNavigationItems: NavigationSidebarConfig['items'] = [
   {
@@ -48,12 +48,9 @@ const secondaryNavigationItems: NavigationSidebarConfig['items'] = [
     path: '/settings',
     section: 'secondary',
   },
-]
+];
 
-const allNavigationItems: NavigationSidebarConfig['items'] = [
-  ...defaultNavigationItems,
-  ...secondaryNavigationItems,
-]
+const allNavigationItems: NavigationSidebarConfig['items'] = [...defaultNavigationItems, ...secondaryNavigationItems];
 
 const meta = {
   title: 'Navigation/AppLayout',
@@ -84,9 +81,9 @@ A unified application layout component that combines the NavigationSidebar, AppH
 - **Configurable Header**: Optional header with user menu, notifications, search
 - **Suspense Integration**: Built-in loading state support for main content
 - **Flexible Styling**: Customizable via className props
-        `
-      }
-    }
+        `,
+      },
+    },
   },
   tags: ['autodocs'],
   args: {
@@ -105,15 +102,15 @@ A unified application layout component that combines the NavigationSidebar, AppH
     },
     children: (
       <div className="p-4">
-        <h1 className="text-2xl font-semibold text-ods-text-primary mb-4">Main Content</h1>
+        <h1 className="mb-4 text-2xl font-semibold text-ods-text-primary">Main Content</h1>
         <p className="text-ods-text-secondary">This is where your page content goes.</p>
       </div>
     ),
   },
-} satisfies Meta<typeof AppLayout>
+} satisfies Meta<typeof AppLayout>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default layout with sidebar, header, and main content area.
@@ -129,18 +126,18 @@ export const Default: Story = {
       },
     },
   },
-  render: (args) => {
-    const [items, setItems] = useState(args.sidebarConfig.items)
+  render: args => {
+    const [items, setItems] = useState(args.sidebarConfig.items);
 
     const handleNavigate = (path: string) => {
-      fn()(path)
+      fn()(path);
       setItems(prevItems =>
         prevItems.map(item => ({
           ...item,
           isActive: item.path === path,
-        }))
-      )
-    }
+        })),
+      );
+    };
 
     return (
       <AppLayout
@@ -151,9 +148,9 @@ export const Default: Story = {
           onNavigate: handleNavigate,
         }}
       />
-    )
+    );
   },
-}
+};
 
 /**
  * Layout without custom user info - using only headerProps user data.
@@ -170,12 +167,12 @@ export const WithHeaderUserOnly: Story = {
     },
     children: (
       <div className="p-4">
-        <h1 className="text-2xl font-semibold text-ods-text-primary mb-4">Header User Only</h1>
+        <h1 className="mb-4 text-2xl font-semibold text-ods-text-primary">Header User Only</h1>
         <p className="text-ods-text-secondary">This layout uses user info from headerProps for the sidebar.</p>
       </div>
     ),
   },
-}
+};
 
 /**
  * Layout with header showing search and organization selector.
@@ -210,12 +207,12 @@ export const WithSearchAndOrganizations: Story = {
     },
     children: (
       <div className="p-4">
-        <h1 className="text-2xl font-semibold text-ods-text-primary mb-4">Dashboard</h1>
+        <h1 className="mb-4 text-2xl font-semibold text-ods-text-primary">Dashboard</h1>
         <p className="text-ods-text-secondary">Welcome back! Here&apos;s your overview.</p>
       </div>
     ),
   },
-}
+};
 
 /**
  * Layout with custom main content styling.
@@ -233,12 +230,12 @@ export const WithCustomMainClassName: Story = {
     },
     children: (
       <div className="p-4">
-        <h1 className="text-2xl font-semibold text-ods-text-primary mb-4">Custom Background</h1>
+        <h1 className="mb-4 text-2xl font-semibold text-ods-text-primary">Custom Background</h1>
         <p className="text-ods-text-secondary">The main content area has a custom background color.</p>
       </div>
     ),
   },
-}
+};
 
 /**
  * Layout with minimized sidebar by default.
@@ -261,12 +258,12 @@ export const MinimizedSidebar: Story = {
     },
     children: (
       <div className="p-4">
-        <h1 className="text-2xl font-semibold text-ods-text-primary mb-4">Wider Content Area</h1>
+        <h1 className="mb-4 text-2xl font-semibold text-ods-text-primary">Wider Content Area</h1>
         <p className="text-ods-text-secondary">The sidebar starts minimized, giving more horizontal space.</p>
       </div>
     ),
   },
-}
+};
 
 /**
  * Interactive example with working navigation.
@@ -283,20 +280,20 @@ export const Interactive: Story = {
     },
   },
   render: function InteractiveStory() {
-    const [items, setItems] = useState(allNavigationItems)
-    const [currentPage, setCurrentPage] = useState('Dashboard')
+    const [items, setItems] = useState(allNavigationItems);
+    const [currentPage, setCurrentPage] = useState('Dashboard');
 
     const handleNavigate = (path: string) => {
-      const pageName = path.replace('/', '').replace(/-/g, ' ')
-      const formattedName = pageName.charAt(0).toUpperCase() + pageName.slice(1) || 'Dashboard'
-      setCurrentPage(formattedName)
+      const pageName = path.replace('/', '').replace(/-/g, ' ');
+      const formattedName = pageName.charAt(0).toUpperCase() + pageName.slice(1) || 'Dashboard';
+      setCurrentPage(formattedName);
       setItems(prevItems =>
         prevItems.map(item => ({
           ...item,
           isActive: item.path === path,
-        }))
-      )
-    }
+        })),
+      );
+    };
 
     return (
       <AppLayout
@@ -323,21 +320,19 @@ export const Interactive: Story = {
         }}
       >
         <div className="p-4">
-          <h1 className="text-2xl font-semibold text-ods-text-primary mb-4">{currentPage}</h1>
+          <h1 className="mb-4 text-2xl font-semibold text-ods-text-primary">{currentPage}</h1>
           <p className="text-ods-text-secondary">
             Click on sidebar items to navigate. The sidebar can be collapsed using the toggle at the bottom.
           </p>
-          <div className="mt-6 p-4 bg-ods-bg-card rounded-lg border border-ods-border">
-            <h2 className="text-lg font-medium text-ods-text-primary mb-2">Current Route</h2>
-            <code className="text-sm text-ods-accent">
-              /{currentPage.toLowerCase().replace(/ /g, '-')}
-            </code>
+          <div className="bg-ods-bg-card mt-6 rounded-lg border border-ods-border p-4">
+            <h2 className="mb-2 text-lg font-medium text-ods-text-primary">Current Route</h2>
+            <code className="text-sm text-ods-accent">/{currentPage.toLowerCase().replace(/ /g, '-')}</code>
           </div>
         </div>
       </AppLayout>
-    )
+    );
   },
-}
+};
 
 /**
  * Disabled state - only the mobile burger menu toggle and the sidebar collapse/expand
@@ -378,21 +373,18 @@ export const Disabled: Story = {
     },
     children: (
       <div className="p-4">
-        <h1 className="text-2xl font-semibold text-ods-text-primary mb-4">
-          Disabled Layout
-        </h1>
-        <p className="text-ods-text-secondary mb-2">
-          Try clicking nav items, search, organizations, the user menu, or any
-          content here — they are all inert.
+        <h1 className="mb-4 text-2xl font-semibold text-ods-text-primary">Disabled Layout</h1>
+        <p className="mb-2 text-ods-text-secondary">
+          Try clicking nav items, search, organizations, the user menu, or any content here — they are all inert.
         </p>
         <p className="text-ods-text-secondary">
-          Only the burger menu (mobile) and the sidebar collapse/expand toggle at
-          the bottom of the sidebar remain interactive.
+          Only the burger menu (mobile) and the sidebar collapse/expand toggle at the bottom of the sidebar remain
+          interactive.
         </p>
       </div>
     ),
   },
-}
+};
 
 /**
  * Example mimicking a typical dashboard page.
@@ -426,31 +418,34 @@ export const DashboardExample: Story = {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-semibold text-ods-text-primary">Dashboard</h1>
-          <p className="text-ods-text-secondary mt-1">Welcome back! Here&apos;s what&apos;s happening.</p>
+          <p className="mt-1 text-ods-text-secondary">Welcome back! Here&apos;s what&apos;s happening.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {[
             { label: 'Total Devices', value: '1,234' },
             { label: 'Active Users', value: '567' },
             { label: 'Scripts Run', value: '89' },
-          ].map((stat) => (
-            <div key={stat.label} className="p-4 bg-ods-bg-card rounded-lg border border-ods-border">
+          ].map(stat => (
+            <div key={stat.label} className="bg-ods-bg-card rounded-lg border border-ods-border p-4">
               <p className="text-sm text-ods-text-secondary">{stat.label}</p>
-              <p className="text-2xl font-semibold text-ods-text-primary mt-1">{stat.value}</p>
+              <p className="mt-1 text-2xl font-semibold text-ods-text-primary">{stat.value}</p>
             </div>
           ))}
         </div>
 
-        <div className="p-4 bg-ods-bg-card rounded-lg border border-ods-border">
-          <h2 className="text-lg font-medium text-ods-text-primary mb-4">Recent Activity</h2>
+        <div className="bg-ods-bg-card rounded-lg border border-ods-border p-4">
+          <h2 className="mb-4 text-lg font-medium text-ods-text-primary">Recent Activity</h2>
           <div className="space-y-3">
             {[
               { action: 'Script executed', target: 'backup-daily.sh', time: '2 min ago' },
               { action: 'Device added', target: 'MacBook-Pro-15', time: '15 min ago' },
               { action: 'User invited', target: 'sarah@company.com', time: '1 hour ago' },
             ].map((activity, index) => (
-              <div key={index} className="flex justify-between items-center py-2 border-b border-ods-border last:border-0">
+              <div
+                key={index}
+                className="flex items-center justify-between border-b border-ods-border py-2 last:border-0"
+              >
                 <div>
                   <p className="text-sm text-ods-text-primary">{activity.action}</p>
                   <p className="text-xs text-ods-text-secondary">{activity.target}</p>
@@ -463,4 +458,4 @@ export const DashboardExample: Story = {
       </div>
     ),
   },
-}
+};

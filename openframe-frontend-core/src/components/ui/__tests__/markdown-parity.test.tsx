@@ -1,3 +1,4 @@
+import { render, act } from '@testing-library/react';
 /**
  * Phase-0 GOLDEN CHARACTERIZATION TESTS for the markdown renderer unification.
  *
@@ -17,9 +18,8 @@
  * sanitization), not the leaves. The same mocks apply pre- and
  * post-refactor, so snapshots stay comparable.
  */
-import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
-import { render, act } from '@testing-library/react'
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Leaf mocks (stable across the refactor)
@@ -27,56 +27,65 @@ import { render, act } from '@testing-library/react'
 vi.mock('mermaid', () => ({
   default: {
     initialize: vi.fn(),
-    render: vi.fn(async () => ({ svg: '<svg data-mock-mermaid="true" width="100" height="50"></svg>' })),
+    // Promise-returning without `async`: the real `mermaid.render` is async and
+    // the component awaits it, so the mock must keep that contract.
+    render: vi.fn(() => Promise.resolve({ svg: '<svg data-mock-mermaid="true" width="100" height="50"></svg>' })),
   },
-}))
+}));
+
+/** Props every embed stub below reads — a URL and nothing else. */
+interface MockUrlProps {
+  url?: string;
+}
 
 vi.mock('@/components/features/video', () => ({
-  Video: ({ kind, url, poster }: any) => (
+  Video: ({ kind, url, poster }: { kind?: string; url?: string; poster?: string | null }) => (
     <div data-mock="video" data-kind={kind} data-url={url} data-poster={poster ?? ''} />
   ),
-}))
+}));
 
 vi.mock('@/components/embeds/reddit-embed-client', () => ({
-  RedditEmbedClient: ({ url }: any) => <div data-mock="reddit" data-url={url} />,
-}))
+  RedditEmbedClient: ({ url }: MockUrlProps) => <div data-mock="reddit" data-url={url} />,
+}));
 
 vi.mock('@/components/embeds/twitter-embed-client', () => ({
-  TwitterEmbedClient: ({ url }: any) => <div data-mock="twitter" data-url={url} />,
-}))
+  TwitterEmbedClient: ({ url }: MockUrlProps) => <div data-mock="twitter" data-url={url} />,
+}));
 
 vi.mock('@/components/embeds/linkedin-embed-client', () => ({
-  LinkedInEmbedClient: ({ url }: any) => <div data-mock="linkedin" data-url={url} />,
-}))
+  LinkedInEmbedClient: ({ url }: MockUrlProps) => <div data-mock="linkedin" data-url={url} />,
+}));
 
 vi.mock('@/components/embeds/og-link-preview', () => ({
-  OGLinkPreview: ({ url }: any) => <div data-mock="og-preview" data-url={url} />,
-  OGLinkErrorBoundary: ({ children }: any) => <>{children}</>,
-}))
+  OGLinkPreview: ({ url }: MockUrlProps) => <div data-mock="og-preview" data-url={url} />,
+  OGLinkErrorBoundary: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+}));
 
 vi.mock('@/components/embeds/figma-embed', () => ({
-  FigmaEmbed: ({ url }: any) => <div data-mock="figma" data-url={url} />,
-}))
+  FigmaEmbed: ({ url }: MockUrlProps) => <div data-mock="figma" data-url={url} />,
+}));
 
 vi.mock('@/components/embeds/markdown-image', () => ({
-  MarkdownImage: ({ src, alt }: any) => <img data-mock="markdown-image" src={src} alt={alt ?? ''} />,
-}))
+  MarkdownImage: ({ src, alt }: { src?: string; alt?: string }) => (
+    <img data-mock="markdown-image" src={src} alt={alt ?? ''} />
+  ),
+}));
 
-import { SimpleMarkdownRenderer } from '../markdown'
-import { RichMarkdownRenderer } from '../markdown'
-import { remarkCardLinks } from '../../chat/remark-card-links'
-import { remarkMentionChips } from '../../chat/remark-mention-chips'
-import { extractSections } from '../../../utils/markdown-section-extractor'
-import { scanHeadings } from '../../../utils/markdown-heading-id'
+import type { Root, RootContent } from 'mdast';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
+import { isBlankLine } from '../../../utils/markdown-fences';
+import { scanHeadings } from '../../../utils/markdown-heading-id';
+import { extractSections } from '../../../utils/markdown-section-extractor';
+import { remarkCardLinks } from '../../chat/remark-card-links';
+import { remarkMentionChips } from '../../chat/remark-mention-chips';
+import { SimpleMarkdownRenderer, RichMarkdownRenderer } from '../markdown';
 import {
   __buildCloserHaystackForTest,
   __findInlineCodeRangesForTest,
   escapeUnknownHtmlTags,
-} from '../markdown/sanitize'
-import { splitStreamingBlocks } from '../markdown/streaming'
-import { isBlankLine } from '../../../utils/markdown-fences'
-import { unified } from 'unified'
-import remarkParse from 'remark-parse'
+} from '../markdown/sanitize';
+import { splitStreamingBlocks } from '../markdown/streaming';
 
 // ---------------------------------------------------------------------------
 // Fixture corpus (per migration plan §D1 parity verification)
@@ -193,14 +202,10 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // spans + attribute regions blanked), built from the SAME regex that drives
   // the escaping carve. In all three the opener must escape and the heading
   // after it must survive as a real <h1>.
-  'rawtext-closer-in-fence-does-not-unescape':
-    '<textarea>\n\n# Heading\n\npara2\n\n```html\n</textarea>\n```',
-  'rawtext-closer-in-inline-code-does-not-unescape':
-    '<textarea>\n\n# Heading\n\npara2 with `</textarea>` inline',
-  'rawtext-closer-in-attribute-does-not-unescape':
-    '<textarea>\n\n# Heading\n\n<div title="</textarea>">x</div>',
-  'rawtext-title-closer-in-fence-does-not-unescape':
-    '<title>\n\n# Heading\n\n```html\n</title>\n```',
+  'rawtext-closer-in-fence-does-not-unescape': '<textarea>\n\n# Heading\n\npara2\n\n```html\n</textarea>\n```',
+  'rawtext-closer-in-inline-code-does-not-unescape': '<textarea>\n\n# Heading\n\npara2 with `</textarea>` inline',
+  'rawtext-closer-in-attribute-does-not-unescape': '<textarea>\n\n# Heading\n\n<div title="</textarea>">x</div>',
+  'rawtext-title-closer-in-fence-does-not-unescape': '<title>\n\n# Heading\n\n```html\n</title>\n```',
   // Round-5 SECURITY: the round-4 mask claimed every index matched the
   // original string, but it started with `text.toLowerCase()` — and
   // `toLowerCase()` EXPANDS U+0130 (Turkish dotted capital `İ`, ordinary
@@ -212,8 +217,7 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // escaped correctly; at n≥25 the heading and list below became the editable
   // value of a live textarea. The mask now folds ASCII only (tag names are
   // ASCII by definition); the length invariant below is the real guard.
-  'rawtext-mask-survives-turkish-dotted-i':
-    `${'İ'.repeat(25)} <textarea>a</textarea>\n\n<textarea>\n\n## Later heading\n\n- item one\n`,
+  'rawtext-mask-survives-turkish-dotted-i': `${'İ'.repeat(25)} <textarea>a</textarea>\n\n<textarea>\n\n## Later heading\n\n- item one\n`,
   // Round-5 LOGIC: the escape pre-pass used to run BEFORE the streaming tail
   // was completed. Mid-stream every partially-emitted fence is unclosed, and
   // both fence notions in the pre-pass only recognize CLOSED fences — so a
@@ -444,24 +448,20 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // runs past remark's real closer and shelters the `<textarea>`. parse5 then
   // swallowed `hello`, `~~~` and `after`. The carve is now the INTERSECTION of
   // carve and mask, so over-detection by EITHER engine can only cause escaping.
-  'mismatched-fence-carve-does-not-shelter-opener':
-    '```\n```js\n~~~\n```\n<textarea>\nhello\n~~~\nafter\n',
+  'mismatched-fence-carve-does-not-shelter-opener': '```\n```js\n~~~\n```\n<textarea>\nhello\n~~~\nafter\n',
   // Round-7 REGRESSION: `blankComments` scanned the UNMASKED copy, so a `<!--`
   // written INSIDE code blanked everything after it to EOF. Every other pass
   // scans the unmasked copy on purpose (`INLINE_CODE_RE` would corrupt a fence
   // scan), but for comments that reasoning inverts: a `<!--` inside a code
   // region is not a comment start. Both shapes rendered a REAL `<textarea>`
   // before the round-6 mask work, and must keep doing so.
-  'comment-marker-in-inline-code-does-not-blank-to-eof':
-    'Use `<!--` to start a comment.\n\n<textarea>hi</textarea>\n',
-  'truncated-comment-in-fence-does-not-blank-to-eof':
-    '```html\n<!-- todo\n```\n\n<textarea>a</textarea>\n',
+  'comment-marker-in-inline-code-does-not-blank-to-eof': 'Use `<!--` to start a comment.\n\n<textarea>hi</textarea>\n',
+  'truncated-comment-in-fence-does-not-blank-to-eof': '```html\n<!-- todo\n```\n\n<textarea>a</textarea>\n',
   // Round-7: `blankIndentedCode` applied a flat 4-space threshold, so a LIST
   // ITEM's continuation paragraph (content indent 4 under `1.  `, 2 under `- `)
   // was blanked as code — the closer vanished from the haystack and the opener
   // escaped. Under CommonMark these are paragraph lines and the element is real.
-  'list-continuation-textarea-stays-live-ordered':
-    '1.  Here is a form:\n\n    <textarea>\n    </textarea>\n',
+  'list-continuation-textarea-stays-live-ordered': '1.  Here is a form:\n\n    <textarea>\n    </textarea>\n',
   'list-continuation-textarea-stays-live-bullet': '- item\n\n    <textarea>x</textarea>\n',
   // Round-9 SECURITY (the residual fail-open of the round-7 intersection
   // guard): the guard only reconciles DISAGREEMENT between carve and mask.
@@ -513,8 +513,7 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // DIMENSION is swept over the whole corpus below (`EXOTIC_BLANK_WRAPPERS`).
   'rawtext-opener-in-nbsp-filler-html-block-not-sheltered':
     '<div>\n \n`<textarea>`\n\nrest of the answer\n\n## After heading\n\nsecret tail\n',
-  'rawtext-iframe-in-nbsp-filler-html-block-not-sheltered':
-    '<div>\n \n`<iframe>`\n\nrest of the answer\n',
+  'rawtext-iframe-in-nbsp-filler-html-block-not-sheltered': '<div>\n \n`<iframe>`\n\nrest of the answer\n',
   // Round-13 SECURITY (the same hole, third spelling): `computeHtmlBlockRanges`
   // matched every start/end condition against the RAW line, anchored `^ {0,3}<`.
   // Inside a CONTAINER (blockquote / list item) the line begins with the
@@ -597,14 +596,11 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // non-self-closing spelling. `RAWTEXT_TAGS` has no void members, so nothing
   // legitimate self-closes — both guards now count the self-closed form as an
   // opener.
-  'rawtext-self-closing-textarea-escaped':
-    'Hello\n\n<textarea/>\n\n## After heading\n\n- item\n',
-  'rawtext-self-closing-spaced-textarea-escaped':
-    'Hello\n\n<textarea />\n\n## After heading\n\n- item\n',
+  'rawtext-self-closing-textarea-escaped': 'Hello\n\n<textarea/>\n\n## After heading\n\n- item\n',
+  'rawtext-self-closing-spaced-textarea-escaped': 'Hello\n\n<textarea />\n\n## After heading\n\n- item\n',
   'rawtext-self-closing-iframe-escaped': 'Hello\n\n<iframe/>\n\n## After heading\n\n- item\n',
   'rawtext-self-closing-title-escaped': 'Hello\n\n<title/>\n\n## After heading\n\n- item\n',
-  'rawtext-self-closing-textarea-inline-escaped':
-    'Hello <textarea/> world\n\n## After heading\n',
+  'rawtext-self-closing-textarea-inline-escaped': 'Hello <textarea/> world\n\n## After heading\n',
   'rawtext-self-closing-opener-in-html-block-div-not-sheltered':
     'intro\n\n<div>\n```\n<textarea/>\n```\n</div>\n\n## After heading\n\nsecret tail\n',
   // Round-11 REGRESSION (user-visible, introduced by round-9): the CARVE
@@ -624,8 +620,7 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   // blanked, and its code-sample `</textarea>` satisfied `hasLaterCloser` —
   // leaving the prose opener LIVE. The walk now re-derives its lines from the
   // CURRENT mask, so fence-blanked lines are all-spaces and push nothing.
-  'list-marker-inside-fence-does-not-shift-indent-columns':
-    'A <textarea>\n\n```\n- x\n  ```\n\n    </textarea>\n',
+  'list-marker-inside-fence-does-not-shift-indent-columns': 'A <textarea>\n\n```\n- x\n  ```\n\n    </textarea>\n',
   'list-marker-inside-fence-html-block-combo':
     '<div>\n<textarea>\n</div>\n\n```\n- x\n  ```\n\n    </textarea>\n\n# Heading after\n\nBody after.\n',
   // Round-9 CORRECTNESS: CommonMark clamps a list item's content column to
@@ -664,14 +659,16 @@ Line<br>break and <kbd>Ctrl</kbd>+<mark>C</mark>.
   'authored-text-input': '<form><input type="text" placeholder="email"><button>go</button></form>',
   // Inline SVG renders in published posts; the pre-unification Rich renderer
   // had no pre-pass and no sanitizer, so it always survived.
-  'inline-svg': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 12l3 3 5-6"/></svg>',
+  'inline-svg':
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 12l3 3 5-6"/></svg>',
   'hostile-script': 'before\n\n<script>alert(1)</script>\n\nafter',
   'hostile-onerror': '<img src="https://example.com/x.png" onerror="alert(1)">',
   'hostile-js-href': '<a href="javascript:alert(1)">click</a>',
-  'hostile-srcset': '<img src="https://safe.example/a.png" srcset="https://safe.example/a.png 1x, javascript:alert(1) 2x">',
+  'hostile-srcset':
+    '<img src="https://safe.example/a.png" srcset="https://safe.example/a.png 1x, javascript:alert(1) 2x">',
   'hostile-iframe-srcdoc': '<iframe srcdoc="<script>alert(1)</script>" src="https://example.com/frame"></iframe>',
   'hostile-style-block': 'text\n\n<style>body{display:none}</style>\n\nmore',
-}
+};
 
 const RICH_ONLY_FIXTURES: Record<string, string> = {
   'shortcode-youtube': 'Intro\n\n{{youtube:abc123XYZ_-}}\n\nOutro',
@@ -689,7 +686,8 @@ const RICH_ONLY_FIXTURES: Record<string, string> = {
   'auto-url-figma': 'design https://www.figma.com/proto/xyz/Proto-File end',
   'auto-url-generic-link-preview': 'read https://blog.example.com/post-1 tonight',
   'auto-url-inside-md-link-not-embedded': 'already [a link](https://blog.example.com/post-2) inline',
-  'auto-url-inside-code-not-embedded': 'code `https://blog.example.com/post-3` inline\n\n```\nhttps://blog.example.com/post-4\n```',
+  'auto-url-inside-code-not-embedded':
+    'code `https://blog.example.com/post-3` inline\n\n```\nhttps://blog.example.com/post-4\n```',
   'auto-url-inside-table-not-embedded': `
 | Site |
 |------|
@@ -701,36 +699,36 @@ const RICH_ONLY_FIXTURES: Record<string, string> = {
   'fence-link-preview': '```link-preview\nhttps://example.com/fenced\n```',
   'fence-figma-embed': '```figma-embed\nhttps://www.figma.com/deck/q/Deck\n```',
   'fence-linkedin-embed': '```linkedin-embed\nhttps://www.linkedin.com/posts/p_activity-2\n```',
-  'raw-video-tag': '<video src="https://stream.example.com/v.mp4" poster="https://example.com/p.jpg" controls class="w-full my-8 rounded-lg"></video>',
+  'raw-video-tag':
+    '<video src="https://stream.example.com/v.mp4" poster="https://example.com/p.jpg" controls class="w-full my-8 rounded-lg"></video>',
   // 2026-07 content-store audit: real blog posts carry inline style attrs
   // (div.takeaway, table styling) — must survive the sanitize schema.
-  'audit-style-attrs': '<div class="takeaway" style="padding:8px">Key point</div>\n\n<p style="color:red">styled para</p>',
+  'audit-style-attrs':
+    '<div class="takeaway" style="padding:8px">Key point</div>\n\n<p style="color:red">styled para</p>',
   // 2026-07 content-store audit: 58 posts use Reddit's own embed markup
   // (script stripped by sanitize; blockquote rehydrated to RedditEmbedClient).
   'audit-reddit-embed-bq':
     '<blockquote class="reddit-embed-bq" data-embed-height="500"><p>Post title</p><a href="https://www.reddit.com/r/msp/comments/abc/post/">view</a></blockquote>\n<script async src="https://embed.reddit.com/widgets.js" charset="UTF-8"></script>',
-}
+};
 
 const CHAT_FIXTURES: Record<string, string> = {
   'card-marker': 'Here is the record: [card://blog:hello-world] inline.',
   'mention-chip': 'Check @device:router-9 status.',
   'card-and-mention-mixed': 'See [card://vendor:acme] and @ticket:T-100 together.',
-}
+};
 
 const SECTION_IDS = [
   { id: 'getting-started', title: '🚀 Getting Started', level: 1 },
   { id: 'setup', title: 'Setup', level: 2 },
-]
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 async function renderStable(ui: React.ReactElement): Promise<HTMLElement> {
-  let container: HTMLElement
-  await act(async () => {
-    const result = render(ui)
-    container = result.container
-  })
+  // `render` already commits inside its own `act`; the settle loop below is
+  // what flushes everything the commit queued.
+  const { container } = render(ui);
   // Settle the mermaid mount → dynamic-import → setSvg chain by polling for a
   // STABLE DOM rather than spending a fixed number of ticks. How many turns
   // `await import('mermaid')` needs is Node/vitest-version dependent, so the
@@ -738,21 +736,27 @@ async function renderStable(ui: React.ReactElement): Promise<HTMLElement> {
   // rendered diagram on newer Node (the `mermaid` fixture's golden mismatched
   // on Node 25 while passing on 22). Two consecutive identical reads mean no
   // further state update is queued.
-  let previous = ''
-  for (let i = 0; i < 20; i++) {
+  // 60, not 20: the budget is a backstop, not the mechanism — the loop exits
+  // as soon as two consecutive reads match. 20 macrotasks was enough for
+  // mermaid's dynamic import when this file runs alone and NOT enough under a
+  // full-suite run on a loaded machine (observed 2026-08-25: the `mermaid`
+  // golden snapshotted the loading skeleton once in ~10 runs). Raising the cap
+  // costs nothing when the DOM settles early.
+  let previous = '';
+  for (let i = 0; i < 60; i++) {
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 0))
-    })
-    const html = container!.innerHTML
-    if (html === previous) break
-    previous = html
+      await new Promise(r => setTimeout(r, 0));
+    });
+    const html = container.innerHTML;
+    if (html === previous) break;
+    previous = html;
   }
-  return container!
+  return container;
 }
 
 function normalize(html: string): string {
   // The mermaid <style> block is a constant — collapse whitespace only.
-  return html.replace(/\s+\n/g, '\n')
+  return html.replace(/\s+\n/g, '\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -761,9 +765,9 @@ function normalize(html: string): string {
 describe('SimpleMarkdownRenderer golden parity', () => {
   for (const [name, md] of Object.entries(SHARED_FIXTURES)) {
     it(`renders fixture: ${name}`, async () => {
-      const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-      expect(normalize(container.innerHTML)).toMatchSnapshot()
-    })
+      const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+      expect(normalize(container.innerHTML)).toMatchSnapshot();
+    });
   }
 
   it('renders headings with backend sectionIds + demoteMarkdownH1ToH2', async () => {
@@ -773,9 +777,9 @@ describe('SimpleMarkdownRenderer golden parity', () => {
         sectionIds={SECTION_IDS}
         demoteMarkdownH1ToH2
       />,
-    )
-    expect(normalize(container.innerHTML)).toMatchSnapshot()
-  })
+    );
+    expect(normalize(container.innerHTML)).toMatchSnapshot();
+  });
 
   it('renders broken links with badge', async () => {
     const container = await renderStable(
@@ -785,18 +789,18 @@ describe('SimpleMarkdownRenderer golden parity', () => {
         currentPath="docs/index.md"
         onInternalLinkClick={() => {}}
       />,
-    )
-    expect(normalize(container.innerHTML)).toMatchSnapshot()
-  })
+    );
+    expect(normalize(container.innerHTML)).toMatchSnapshot();
+  });
 
   it('renders each text-size preset', async () => {
     for (const preset of ['default', 'compact', 'large'] as const) {
       const container = await renderStable(
         <SimpleMarkdownRenderer content={'# H\n\npara\n\n- li'} textSize={preset} />,
-      )
-      expect(normalize(container.innerHTML)).toMatchSnapshot(`textSize-${preset}`)
+      );
+      expect(normalize(container.innerHTML)).toMatchSnapshot(`textSize-${preset}`);
     }
-  })
+  });
 
   for (const [name, md] of Object.entries(CHAT_FIXTURES)) {
     it(`renders chat fixture with card/mention plugins: ${name}`, async () => {
@@ -806,11 +810,11 @@ describe('SimpleMarkdownRenderer golden parity', () => {
           textSize="compact"
           additionalRemarkPlugins={[remarkCardLinks, remarkMentionChips]}
         />,
-      )
-      expect(normalize(container.innerHTML)).toMatchSnapshot()
-    })
+      );
+      expect(normalize(container.innerHTML)).toMatchSnapshot();
+    });
   }
-})
+});
 
 // ---------------------------------------------------------------------------
 // RAWTEXT mask invariants (round-5)
@@ -826,22 +830,22 @@ describe('closer-search mask', () => {
       ...RICH_ONLY_FIXTURES,
       ...CHAT_FIXTURES,
     })) {
-      expect(__buildCloserHaystackForTest(md).length, name).toBe(md.length)
+      expect(__buildCloserHaystackForTest(md).length, name).toBe(md.length);
     }
-  })
+  });
 
   it('is LENGTH-PRESERVING for U+0130 (the one BMP char toLowerCase expands)', () => {
     // `'İ'.toLowerCase()` is 'i' + U+0307 — 1 code unit becomes 2. This is the
     // only such BMP character, and it is ordinary Turkish prose.
-    expect('İ'.toLowerCase().length).toBe(2)
+    expect('İ'.toLowerCase().length).toBe(2);
     for (const src of ['İ', 'İstanbul', `${'İ'.repeat(25)} <textarea>`, 'İ<TEXTAREA>İ</TEXTAREA>']) {
-      expect(__buildCloserHaystackForTest(src).length, JSON.stringify(src)).toBe(src.length)
+      expect(__buildCloserHaystackForTest(src).length, JSON.stringify(src)).toBe(src.length);
     }
-  })
+  });
 
   it('still folds ASCII case, so an UPPERCASE closer is found', () => {
-    expect(__buildCloserHaystackForTest('<TEXTAREA>x</TEXTAREA>')).toContain('</textarea>')
-  })
+    expect(__buildCloserHaystackForTest('<TEXTAREA>x</TEXTAREA>')).toContain('</textarea>');
+  });
 
   // Round-6: every ordinary form of CODE must hide a `</textarea>` from the
   // closer search. Each of these rendered a LIVE editable textarea containing
@@ -854,25 +858,25 @@ describe('closer-search mask', () => {
     'rawtext-closer-in-quoted-list-indented-fence-does-not-unescape',
     'rawtext-closer-in-html-comment-does-not-unescape',
     'rawtext-closer-after-info-string-closer-does-not-unescape',
-  ])('escapes the prose opener when the only closer is code: %s', async (name) => {
-    const md = SHARED_FIXTURES[name]
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('textarea').length, name).toBe(0)
+  ])('escapes the prose opener when the only closer is code: %s', async name => {
+    const md = SHARED_FIXTURES[name];
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('textarea').length, name).toBe(0);
     // …and the document after the opener is still structured markdown.
-    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
-  })
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
+  });
 
   // Round-7: the carve must never shelter an opener the mask blanked. The
   // protected set is the INTERSECTION of carve and mask, so a span the mask
   // disagrees with is routed through `escapeOutsideFences` instead of being
   // pushed verbatim.
   it('does not shelter a live opener inside a mismatched carve span', async () => {
-    const md = SHARED_FIXTURES['mismatched-fence-carve-does-not-shelter-opener']
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('textarea').length).toBe(0)
+    const md = SHARED_FIXTURES['mismatched-fence-carve-does-not-shelter-opener'];
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('textarea').length).toBe(0);
     // The text after the opener survives instead of becoming a textarea value.
-    expect(container.textContent).toContain('after')
-  })
+    expect(container.textContent).toContain('after');
+  });
 
   // Round-9: BOTH engines over-detect a fence inside an HTML block, so the
   // intersection guard is a no-op there. A protected span is self-contained
@@ -882,12 +886,12 @@ describe('closer-search mask', () => {
     'rawtext-opener-in-html-block-div-not-sheltered',
     'rawtext-opener-in-html-block-pre-not-sheltered',
     'rawtext-opener-in-html-block-details-not-sheltered',
-  ])('does not shelter an opener inside an HTML block: %s', async (name) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
-    expect(container.querySelectorAll('textarea').length, name).toBe(0)
-    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
-    expect(container.textContent, name).toContain('secret tail')
-  })
+  ])('does not shelter an opener inside an HTML block: %s', async name => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+    expect(container.querySelectorAll('textarea').length, name).toBe(0);
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
+    expect(container.textContent, name).toContain('secret tail');
+  });
 
   // Round-12: the SAME hole, sheltered by INLINE CODE instead of a fence. Round
   // 11 scoped the balance guard to fences because an inline span "cannot shelter
@@ -899,35 +903,33 @@ describe('closer-search mask', () => {
     'rawtext-opener-in-inline-code-in-html-block-pre-not-sheltered',
     'rawtext-opener-in-inline-code-in-html-block-details-not-sheltered',
     'rawtext-opener-in-inline-code-in-html-block-span-not-sheltered',
-  ])('does not shelter an opener in INLINE CODE inside an HTML block: %s', async (name) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
-    expect(container.querySelectorAll('textarea').length, name).toBe(0)
-    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
-    expect(container.textContent, name).toContain('secret tail')
-  })
+  ])('does not shelter an opener in INLINE CODE inside an HTML block: %s', async name => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+    expect(container.querySelectorAll('textarea').length, name).toBe(0);
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
+    expect(container.textContent, name).toContain('secret tail');
+  });
 
   // Round-12: `/` not IMMEDIATELY followed by `>` is not a valid open tag under
   // CommonMark, so remark emits no `html` node and neither sanitizer regex needs
   // to match. Pinned because that safety is a coupling, not a local property.
   it('is inert for a slash not immediately before the closing bracket', async () => {
     const container = await renderStable(
-      <SimpleMarkdownRenderer
-        content={SHARED_FIXTURES['rawtext-slash-not-immediately-before-gt-is-inert']}
-      />,
-    )
-    expect(container.querySelectorAll('textarea').length).toBe(0)
-    expect(container.querySelector('h2')?.textContent).toBe('After heading')
-    expect(container.querySelectorAll('li').length).toBe(1)
-  })
+      <SimpleMarkdownRenderer content={SHARED_FIXTURES['rawtext-slash-not-immediately-before-gt-is-inert']} />,
+    );
+    expect(container.querySelectorAll('textarea').length).toBe(0);
+    expect(container.querySelector('h2')?.textContent).toBe('After heading');
+    expect(container.querySelectorAll('li').length).toBe(1);
+  });
 
   // Round-12 REGRESSION: the cap-overflow fallback must not escape inside code.
   // Entity refs are not decoded there, so the reader sees a literal `&lt;`.
   it('does not escape a bare `<` inside an indented code block', async () => {
-    const md = SHARED_FIXTURES['indented-code-angle-bracket-not-escaped']
-    expect(escapeUnknownHtmlTags(md)).toBe(md)
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelector('code')?.textContent).toBe('if a <b then\ndone\n')
-  })
+    const md = SHARED_FIXTURES['indented-code-angle-bracket-not-escaped'];
+    expect(escapeUnknownHtmlTags(md)).toBe(md);
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelector('code')?.textContent).toBe('if a <b then\ndone\n');
+  });
 
   // …including an over-long tag, which is what the fallback was written for: in
   // a region the MASK calls code it is a code sample, not a live opener. (Kept
@@ -937,14 +939,14 @@ describe('closer-search mask', () => {
     ['fenced', 'Para\n\n```\n<div ' + 'b'.repeat(5000) + '>\n```\n'],
     ['inline', 'Hi `<div ' + 'b'.repeat(3000) + '>` there'],
   ])('leaves an over-long tag inside code unescaped: %s', (_name, md) => {
-    expect(escapeUnknownHtmlTags(md)).not.toContain('&lt;div')
-  })
+    expect(escapeUnknownHtmlTags(md)).not.toContain('&lt;div');
+  });
 
   // …while the SAME shape in PROSE still fails closed (the round-11 fix).
   it('still escapes an over-long tag written in prose', () => {
-    const md = 'Hello\n\n<iframe src="' + 'b'.repeat(5000) + '">\n\n## After heading\n'
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;iframe')
-  })
+    const md = 'Hello\n\n<iframe src="' + 'b'.repeat(5000) + '">\n\n## After heading\n';
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;iframe');
+  });
 
   // Round-11: HTML ignores the self-closing flag on non-void, non-foreign
   // elements, so `<textarea/>` is a START tag and enters RAWTEXT exactly like
@@ -954,33 +956,33 @@ describe('closer-search mask', () => {
     'rawtext-self-closing-spaced-textarea-escaped',
     'rawtext-self-closing-iframe-escaped',
     'rawtext-self-closing-title-escaped',
-  ])('escapes a SELF-CLOSING rawtext opener: %s', async (name) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
-    expect(container.querySelectorAll('textarea').length, name).toBe(0)
-    expect(container.querySelectorAll('iframe').length, name).toBe(0)
-    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
-    expect(container.querySelectorAll('li').length, name).toBe(1)
-  })
+  ])('escapes a SELF-CLOSING rawtext opener: %s', async name => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+    expect(container.querySelectorAll('textarea').length, name).toBe(0);
+    expect(container.querySelectorAll('iframe').length, name).toBe(0);
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
+    expect(container.querySelectorAll('li').length, name).toBe(1);
+  });
 
   it('escapes a self-closing rawtext opener written INLINE in prose', async () => {
     const container = await renderStable(
       <SimpleMarkdownRenderer content={SHARED_FIXTURES['rawtext-self-closing-textarea-inline-escaped']} />,
-    )
-    expect(container.querySelectorAll('textarea').length).toBe(0)
-    expect(container.textContent).toContain('<textarea/>')
-    expect(container.querySelector('h2')?.textContent).toBe('After heading')
-  })
+    );
+    expect(container.querySelectorAll('textarea').length).toBe(0);
+    expect(container.textContent).toContain('<textarea/>');
+    expect(container.querySelector('h2')?.textContent).toBe('After heading');
+  });
 
   it('does not shelter a SELF-CLOSING opener inside an HTML block', async () => {
     const container = await renderStable(
       <SimpleMarkdownRenderer
         content={SHARED_FIXTURES['rawtext-self-closing-opener-in-html-block-div-not-sheltered']}
       />,
-    )
-    expect(container.querySelectorAll('textarea').length).toBe(0)
-    expect(container.querySelector('h2')?.textContent).toBe('After heading')
-    expect(container.textContent).toContain('secret tail')
-  })
+    );
+    expect(container.querySelectorAll('textarea').length).toBe(0);
+    expect(container.querySelector('h2')?.textContent).toBe('After heading');
+    expect(container.textContent).toContain('secret tail');
+  });
 
   // Round-13: an HTML block opened INSIDE a container (blockquote / list item).
   // `computeHtmlBlockRanges` matched `^ {0,3}<…` against the RAW line, so the
@@ -993,14 +995,14 @@ describe('closer-search mask', () => {
     ['rawtext-opener-in-inline-code-in-ordered-item-html-block-not-sheltered', 'textarea'],
     ['rawtext-iframe-in-inline-code-in-blockquoted-html-block-not-sheltered', 'iframe'],
   ])('does not shelter an opener inside a CONTAINER-nested HTML block: %s', async (name, tag) => {
-    const md = SHARED_FIXTURES[name]
+    const md = SHARED_FIXTURES[name];
     // The sanitizer must actually act on it (the round-13 symptom was a no-op).
-    expect(escapeUnknownHtmlTags(md), name).not.toBe(md)
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll(tag).length, name).toBe(0)
-    expect(container.querySelector('h2')?.textContent, name).toBe('After heading')
-    expect(container.textContent, name).toContain('secret tail')
-  })
+    expect(escapeUnknownHtmlTags(md), name).not.toBe(md);
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll(tag).length, name).toBe(0);
+    expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
+    expect(container.textContent, name).toContain('secret tail');
+  });
 
   // Round-14: the container walk measured the list content column in CHARACTERS
   // where CommonMark measures COLUMNS, so a TAB-spelled list prefix
@@ -1018,28 +1020,28 @@ describe('closer-search mask', () => {
     ['rawtext-opener-after-foreign-filler-in-list-item-html-block-not-sheltered', 'textarea'],
     ['rawtext-opener-after-foreign-filler-in-blockquoted-html-block-not-sheltered', 'textarea'],
   ])('does not shelter an opener behind a column-miscounted container: %s', async (name, tag) => {
-    const md = SHARED_FIXTURES[name]
+    const md = SHARED_FIXTURES[name];
     // The sanitizer must actually act on it (the symptom was a byte-identical no-op).
-    expect(escapeUnknownHtmlTags(md), name).not.toBe(md)
+    expect(escapeUnknownHtmlTags(md), name).not.toBe(md);
     for (const [label, Renderer] of [
       ['simple', SimpleMarkdownRenderer],
       ['rich', RichMarkdownRenderer],
     ] as const) {
-      const container = await renderStable(<Renderer content={md} />)
-      expect(container.querySelectorAll(tag).length, `${name} / ${label}`).toBe(0)
-      expect(container.textContent, `${name} / ${label}`).toContain('secret tail')
+      const container = await renderStable(<Renderer content={md} />);
+      expect(container.querySelectorAll(tag).length, `${name} / ${label}`).toBe(0);
+      expect(container.textContent, `${name} / ${label}`).toContain('secret tail');
     }
-  })
+  });
 
   // Round-14 CONTROL: the foreign-filler fixtures must differ from their
   // filler-less twins ONLY by that line — otherwise they would prove nothing.
   it.each([
     ['- <div>\n  `<textarea>`\n\n## After heading\n\nsecret tail\n'],
     ['> <div>\n> `<textarea>`\n\n## After heading\n\nsecret tail\n'],
-  ])('the filler-less control was already safe: %#', async (md) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('textarea').length).toBe(0)
-  })
+  ])('the filler-less control was already safe: %#', async md => {
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('textarea').length).toBe(0);
+  });
 
   // Round-14: a GENUINE filler (the opening container's own) must still
   // TERMINATE the block — the fix scopes termination, it must not disable it.
@@ -1050,9 +1052,9 @@ describe('closer-search mask', () => {
   ])('still terminates an HTML block at its OWN container filler: %s', (_n, md) => {
     // The line after the filler is outside the block, so a protected span there
     // is ordinary inline code and is left verbatim.
-    const withSpan = md.replace('after', '`<textarea>`')
-    expect(escapeUnknownHtmlTags(withSpan)).toBe(withSpan)
-  })
+    const withSpan = md.replace('after', '`<textarea>`');
+    expect(escapeUnknownHtmlTags(withSpan)).toBe(withSpan);
+  });
 
   // Round-11: the WHOLE swallow corpus, re-run in the SELF-CLOSING spelling.
   // Every fixture below is one whose defense is "the prose opener must escape";
@@ -1138,20 +1140,17 @@ describe('closer-search mask', () => {
     'rawtext-closer-in-quoted-multiline-definition-label-does-not-unescape',
     'rawtext-closer-in-multiline-definition-title-does-not-unescape',
     'rawtext-iframe-closer-in-multiline-definition-label-does-not-unescape',
-  ]
+  ];
   // Bare opener → self-closed opener. Closers (`</tag>`), openers that already
   // carry attributes, and openers whose closer sits on the SAME line (a paired
   // inline element, as in the Turkish-`İ` fixture) are left alone — rewriting
   // those would change what the fixture is about rather than its spelling.
   const selfClose = (md: string) =>
-    md.replace(
-      /<(title|textarea|iframe|xmp|noembed|noframes|plaintext)>(?![^\n]*<\/\1>)/gi,
-      '<$1/>',
-    )
+    md.replace(/<(title|textarea|iframe|xmp|noembed|noframes|plaintext)>(?![^\n]*<\/\1>)/gi, '<$1/>');
 
-  const RAWTEXT_SELECTORS = ['textarea', 'iframe', 'title', 'xmp', 'noembed', 'noframes', 'plaintext']
+  const RAWTEXT_SELECTORS = ['textarea', 'iframe', 'title', 'xmp', 'noembed', 'noframes', 'plaintext'];
   const rawtextCounts = (el: HTMLElement) =>
-    RAWTEXT_SELECTORS.map((t) => `${t}:${el.querySelectorAll(t).length}`).join(' ')
+    RAWTEXT_SELECTORS.map(t => `${t}:${el.querySelectorAll(t).length}`).join(' ');
 
   // Round-12: the sweep's invariant used to be purely DIFFERENTIAL (`selfEl`
   // counts === `bareEl` counts), so a common-mode regression that broke BOTH
@@ -1162,7 +1161,7 @@ describe('closer-search mask', () => {
   // before its bare opener, and that one must keep rendering.
   const LIVE_RAWTEXT_EXPECTED: Record<string, number> = {
     'rawtext-mask-survives-turkish-dotted-i': 1,
-  }
+  };
 
   // -------------------------------------------------------------------------
   // Round-15: LINE ENDINGS as a first-class corpus DIMENSION.
@@ -1178,41 +1177,33 @@ describe('closer-search mask', () => {
   const LINE_ENDINGS = {
     lf: (md: string) => md,
     crlf: (md: string) => md.replace(/\n/g, '\r\n'),
-  } as const
-  const LINE_ENDING_NAMES = Object.keys(LINE_ENDINGS) as (keyof typeof LINE_ENDINGS)[]
+  } as const;
+  const LINE_ENDING_NAMES = Object.keys(LINE_ENDINGS) as (keyof typeof LINE_ENDINGS)[];
 
-  const SELF_CLOSING_CASES: [string, keyof typeof LINE_ENDINGS][] = []
-  for (const name of SWALLOW_CORPUS)
-    for (const eol of LINE_ENDING_NAMES) SELF_CLOSING_CASES.push([name, eol])
+  const SELF_CLOSING_CASES: [string, keyof typeof LINE_ENDINGS][] = [];
+  for (const name of SWALLOW_CORPUS) for (const eol of LINE_ENDING_NAMES) SELF_CLOSING_CASES.push([name, eol]);
 
-  it.each(SELF_CLOSING_CASES)(
-    'swallow corpus holds in the self-closing spelling: %s / %s',
-    async (name, eol) => {
-    const eolize = LINE_ENDINGS[eol]
-    const bare = eolize(SHARED_FIXTURES[name])
-    const md = eolize(selfClose(SHARED_FIXTURES[name]))
-    expect(md, name).not.toBe(bare) // the rewrite actually applied
-    const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />)
-    const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />)
+  it.each(SELF_CLOSING_CASES)('swallow corpus holds in the self-closing spelling: %s / %s', async (name, eol) => {
+    const eolize = LINE_ENDINGS[eol];
+    const bare = eolize(SHARED_FIXTURES[name]);
+    const md = eolize(selfClose(SHARED_FIXTURES[name]));
+    expect(md, name).not.toBe(bare); // the rewrite actually applied
+    const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />);
+    const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />);
     // ABSOLUTE: no swallow in EITHER spelling, independent of the comparison.
-    const expected = LIVE_RAWTEXT_EXPECTED[name] ?? 0
+    const expected = LIVE_RAWTEXT_EXPECTED[name] ?? 0;
     for (const [label, el] of [
       ['bare', bareEl],
       ['self-closing', selfEl],
     ] as const) {
-      expect(el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length, `${name} ${label}`).toBe(
-        expected,
-      )
+      expect(el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length, `${name} ${label}`).toBe(expected);
     }
     // Spelling-independence: parse5 treats `<tag/>` as a start tag, so the two
     // spellings must yield the same live RAWTEXT elements…
-    expect(rawtextCounts(selfEl), name).toBe(rawtextCounts(bareEl))
+    expect(rawtextCounts(selfEl), name).toBe(rawtextCounts(bareEl));
     // …and the same document structure below the opener (no swallow).
-    expect(selfEl.querySelectorAll('h1,h2,h3,li,p').length, name).toBe(
-      bareEl.querySelectorAll('h1,h2,h3,li,p').length,
-    )
-    },
-  )
+    expect(selfEl.querySelectorAll('h1,h2,h3,li,p').length, name).toBe(bareEl.querySelectorAll('h1,h2,h3,li,p').length);
+  });
 
   // -------------------------------------------------------------------------
   // Round-13: CONTAINER NESTING as a first-class corpus DIMENSION.
@@ -1225,33 +1216,32 @@ describe('closer-search mask', () => {
   // invariant (zero live RAWTEXT elements, per-entry `LIVE_RAWTEXT_EXPECTED`)
   // plus the spelling-differential one. Any future shelter shape is therefore
   // caught in every container spelling automatically.
-  const perLine = (f: (line: string) => string) => (md: string) =>
-    md.split('\n').map(f).join('\n')
+  const perLine = (f: (line: string) => string) => (md: string) => md.split('\n').map(f).join('\n');
 
   /** Tabs to 4-column stops \u2014 mirrors the sanitizer's `expandTabs`, so a
    *  TAB-spelled marker's continuation pad lands on the real content column. */
   const expandTabs = (str: string) => {
-    let out = ''
-    for (const ch of str) out += ch === '\t' ? ' '.repeat(4 - (out.length % 4)) : ch
-    return out
-  }
+    let out = '';
+    for (const ch of str) out += ch === '\t' ? ' '.repeat(4 - (out.length % 4)) : ch;
+    return out;
+  };
 
   /** A list item: the marker on the first line, the content column on the rest. */
   const listWrap = (marker: string) => (md: string) => {
-    const pad = ' '.repeat(expandTabs(marker).length)
-    let seen = false
+    const pad = ' '.repeat(expandTabs(marker).length);
+    let seen = false;
     return md
       .split('\n')
-      .map((l) => {
-        if (l === '') return ''
+      .map(l => {
+        if (l === '') return '';
         if (!seen) {
-          seen = true
-          return marker + l
+          seen = true;
+          return marker + l;
         }
-        return pad + l
+        return pad + l;
       })
-      .join('\n')
-  }
+      .join('\n');
+  };
 
   /**
    * ROUND-18 — THE MARKER-LINE VARIANT, the dimension 1032 container cases
@@ -1281,42 +1271,40 @@ describe('closer-search mask', () => {
    * unchanged. `wrapper marks a block-opening line` below pins the targeting.
    */
   /** A line that OPENS A BLOCK: a code fence or a link reference definition. */
-  const BLOCK_OPENER_RE = /^[ \t]{0,3}(?:```|~~~|\[[^\]\n]{0,99}\]:)/
+  const BLOCK_OPENER_RE = /^[ \t]{0,3}(?:```|~~~|\[[^\]\n]{0,99}\]:)/;
   /** Index of the line `markerLineListWrap` puts the marker on, or -1. */
   const markerLineTarget = (lines: string[]) => {
-    const opener = lines.findIndex((l, i) => i > 0 && l !== '' && BLOCK_OPENER_RE.test(l))
-    if (opener > 0) return opener
-    const first = lines.findIndex((l) => l !== '')
-    return first === -1 ? -1 : lines.findIndex((l, i) => i > first && l !== '')
-  }
+    const opener = lines.findIndex((l, i) => i > 0 && l !== '' && BLOCK_OPENER_RE.test(l));
+    if (opener > 0) return opener;
+    const first = lines.findIndex(l => l !== '');
+    return first === -1 ? -1 : lines.findIndex((l, i) => i > first && l !== '');
+  };
   const markerLineListWrap = (marker: string) => (md: string) => {
-    const pad = ' '.repeat(expandTabs(marker).length)
-    const lines = md.split('\n')
-    const target = markerLineTarget(lines)
-    if (target <= 0) return md
-    return lines
-      .map((l, i) => (l === '' ? '' : i < target ? l : i === target ? marker + l : pad + l))
-      .join('\n')
-  }
+    const pad = ' '.repeat(expandTabs(marker).length);
+    const lines = md.split('\n');
+    const target = markerLineTarget(lines);
+    if (target <= 0) return md;
+    return lines.map((l, i) => (l === '' ? '' : i < target ? l : i === target ? marker + l : pad + l)).join('\n');
+  };
 
   /** A list item whose BLANK separators carry a FOREIGN container's opener at
    *  the content column. Those lines look blank to a greedy container strip but
    *  are HTML content under CommonMark \u2014 the round-14 early-termination shape. */
   const foreignFillerListWrap = (marker: string, filler: string) => (md: string) => {
-    const pad = ' '.repeat(expandTabs(marker).length)
-    let seen = false
+    const pad = ' '.repeat(expandTabs(marker).length);
+    let seen = false;
     return md
       .split('\n')
-      .map((l) => {
-        if (l === '') return pad + filler
+      .map(l => {
+        if (l === '') return pad + filler;
         if (!seen) {
-          seen = true
-          return marker + l
+          seen = true;
+          return marker + l;
         }
-        return pad + l
+        return pad + l;
       })
-      .join('\n')
-  }
+      .join('\n');
+  };
 
   /**
    * `preservesColumns` says whether the wrapper keeps each line's indentation
@@ -1353,18 +1341,18 @@ describe('closer-search mask', () => {
   ) => ({
     wrap: (md: string) => outer.wrap(inner.wrap(md)),
     preservesColumns: outer.preservesColumns && inner.preservesColumns,
-  })
+  });
   const BQ1 = {
     wrap: perLine((l: string) => (l === '' ? '>' : `> ${l}`)),
     preservesColumns: true,
-  }
+  };
   const BQ2 = {
     wrap: perLine((l: string) => (l === '' ? '> >' : `> > ${l}`)),
     preservesColumns: true,
-  }
+  };
   /** List markers whose CONTENT COLUMN is 4 — past `FENCE_RE`'s absolute
    *  3-column indent cap, which is what makes the nested fence invisible. */
-  const WIDE_LIST_MARKERS = { ordered: '1.  ', bullet: '-   ', tab: '-\t' } as const
+  const WIDE_LIST_MARKERS = { ordered: '1.  ', bullet: '-   ', tab: '-\t' } as const;
   const CONTAINER_WRAPPERS = {
     'blockquote-depth-1': {
       wrap: perLine((l: string) => (l === '' ? '>' : `> ${l}`)),
@@ -1424,32 +1412,32 @@ describe('closer-search mask', () => {
     // item) so neither leg of the mutual recursion is swept alone.
     ...(Object.fromEntries(
       Object.entries(WIDE_LIST_MARKERS).flatMap(([label, marker]) => {
-        const item = { wrap: listWrap(marker), preservesColumns: false }
+        const item = { wrap: listWrap(marker), preservesColumns: false };
         return [
           [`quote-x-${label}-item`, nest(BQ1, item)],
           [`nested-quote-x-${label}-item`, nest(BQ2, item)],
           [`${label}-item-x-quote`, nest(item, BQ1)],
-        ]
+        ];
       }),
     ) as Record<string, { wrap: (md: string) => string; preservesColumns: boolean }>),
     // Round-18: the MARKER-LINE variant of every list-bearing wrapper above —
     // the block opened ON the marker line rather than on a continuation line.
     ...(Object.fromEntries(
       Object.entries(WIDE_LIST_MARKERS).flatMap(([label, marker]) => {
-        const item = { wrap: markerLineListWrap(marker), preservesColumns: false }
+        const item = { wrap: markerLineListWrap(marker), preservesColumns: false };
         return [
           [`marker-line-${label}-item`, item],
           [`quote-x-marker-line-${label}-item`, nest(BQ1, item)],
           [`nested-quote-x-marker-line-${label}-item`, nest(BQ2, item)],
           [`marker-line-${label}-item-x-quote`, nest(item, BQ1)],
-        ]
+        ];
       }),
     ) as Record<string, { wrap: (md: string) => string; preservesColumns: boolean }>),
     // …and the NARROW markers too (content column 2/3, under the `FENCE_RE`
     // cap), so the marker-line position is swept independently of the column.
     'marker-line-bullet-item': { wrap: markerLineListWrap('- '), preservesColumns: false },
     'marker-line-ordered-item': { wrap: markerLineListWrap('1. '), preservesColumns: false },
-  } as const
+  } as const;
 
   // Entries whose MEANING is a column: an indented-code block at exactly 4, a
   // fence indented into a list content column, a marker-gap clamp. A list
@@ -1485,42 +1473,37 @@ describe('closer-search mask', () => {
     'rawtext-closer-in-nested-marker-line-fence-does-not-unescape',
     'rawtext-closer-in-nested-marker-line-link-definition-does-not-unescape',
     'rawtext-closer-in-listed-inline-link-title-does-not-unescape',
-  ])
+  ]);
 
-  const CONTAINER_CASES: [string, string, keyof typeof LINE_ENDINGS][] = []
+  const CONTAINER_CASES: [string, string, keyof typeof LINE_ENDINGS][] = [];
   for (const name of SWALLOW_CORPUS)
     for (const [wrapper, spec] of Object.entries(CONTAINER_WRAPPERS))
       if (!COLUMN_SENSITIVE_ENTRIES.has(name) || spec.preservesColumns)
         // …and every (entry × wrapper) pair in BOTH line-ending spellings, so
         // the CRLF dimension composes with the container one for free.
-        for (const eol of LINE_ENDING_NAMES) CONTAINER_CASES.push([name, wrapper, eol])
+        for (const eol of LINE_ENDING_NAMES) CONTAINER_CASES.push([name, wrapper, eol]);
 
-  it.each(CONTAINER_CASES)(
-    'swallow corpus holds inside a container: %s / %s / %s',
-    async (name, wrapper, eol) => {
-      const { wrap } = CONTAINER_WRAPPERS[wrapper as keyof typeof CONTAINER_WRAPPERS]
-      const eolize = LINE_ENDINGS[eol]
-      const bare = eolize(wrap(SHARED_FIXTURES[name]))
-      const md = eolize(selfClose(wrap(SHARED_FIXTURES[name])))
-      const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />)
-      const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />)
-      const expected = LIVE_RAWTEXT_EXPECTED[name] ?? 0
-      for (const [label, el] of [
-        ['bare', bareEl],
-        ['self-closing', selfEl],
-      ] as const) {
-        expect(
-          el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length,
-          `${name} / ${wrapper} / ${eol} / ${label}`,
-        ).toBe(expected)
-      }
-      expect(rawtextCounts(selfEl), `${name} / ${wrapper} / ${eol}`).toBe(rawtextCounts(bareEl))
-      expect(
-        selfEl.querySelectorAll('h1,h2,h3,li,p').length,
-        `${name} / ${wrapper} / ${eol}`,
-      ).toBe(bareEl.querySelectorAll('h1,h2,h3,li,p').length)
-    },
-  )
+  it.each(CONTAINER_CASES)('swallow corpus holds inside a container: %s / %s / %s', async (name, wrapper, eol) => {
+    const { wrap } = CONTAINER_WRAPPERS[wrapper as keyof typeof CONTAINER_WRAPPERS];
+    const eolize = LINE_ENDINGS[eol];
+    const bare = eolize(wrap(SHARED_FIXTURES[name]));
+    const md = eolize(selfClose(wrap(SHARED_FIXTURES[name])));
+    const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />);
+    const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const expected = LIVE_RAWTEXT_EXPECTED[name] ?? 0;
+    for (const [label, el] of [
+      ['bare', bareEl],
+      ['self-closing', selfEl],
+    ] as const) {
+      expect(el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length, `${name} / ${wrapper} / ${eol} / ${label}`).toBe(
+        expected,
+      );
+    }
+    expect(rawtextCounts(selfEl), `${name} / ${wrapper} / ${eol}`).toBe(rawtextCounts(bareEl));
+    expect(selfEl.querySelectorAll('h1,h2,h3,li,p').length, `${name} / ${wrapper} / ${eol}`).toBe(
+      bareEl.querySelectorAll('h1,h2,h3,li,p').length,
+    );
+  });
 
   // Round-19 META-TEST: `markerLineListWrap` must actually put the marker on a
   // line that OPENS A BLOCK. Its predecessor could not, and that is the whole
@@ -1529,26 +1512,28 @@ describe('closer-search mask', () => {
   // checked; a wrapper that regresses to "first non-blank after the prose"
   // fails here rather than passing silently for the wrong reason.
   it('markerLineListWrap marks a block-opening line', () => {
-    const blockBearing = SWALLOW_CORPUS.filter((name) =>
-      SHARED_FIXTURES[name]
-        .split('\n')
-        .some((l, i) => i > 0 && l !== '' && BLOCK_OPENER_RE.test(l)),
-    )
+    const blockBearing = SWALLOW_CORPUS.filter(name =>
+      SHARED_FIXTURES[name].split('\n').some((l, i) => i > 0 && l !== '' && BLOCK_OPENER_RE.test(l)),
+    );
     // The corpus must actually contain such entries, or the assertion is vacuous.
-    expect(blockBearing.length).toBeGreaterThan(10)
+    expect(blockBearing.length).toBeGreaterThan(10);
     for (const name of blockBearing)
       for (const marker of ['- ', '1. ', '-   ', '1.  ', '-\t']) {
-        const wrapped = markerLineListWrap(marker)(SHARED_FIXTURES[name])
-        const markerLine = wrapped.split('\n').find((l) => l.startsWith(marker))
-        expect(markerLine, `${name} / ${JSON.stringify(marker)}`).toBeDefined()
+        const wrapped = markerLineListWrap(marker)(SHARED_FIXTURES[name]);
+        const markerLine = wrapped.split('\n').find(l => l.startsWith(marker));
+        // Throw rather than `expect(...).toBeDefined()`: same failure message,
+        // but it also narrows `markerLine` for the slice below.
+        if (markerLine === undefined) {
+          throw new Error(`${name} / ${JSON.stringify(marker)}: no line starts with the marker`);
+        }
         // The marker is IMMEDIATELY followed by the block opener — the construct
         // is ON the marker line, not on a padded continuation line below it.
         expect(
-          BLOCK_OPENER_RE.test(markerLine!.slice(marker.length)),
+          BLOCK_OPENER_RE.test(markerLine.slice(marker.length)),
           `${name} / ${JSON.stringify(marker)} / ${JSON.stringify(markerLine)}`,
-        ).toBe(true)
+        ).toBe(true);
       }
-  })
+  });
 
   // Round-19: CONTAINER NESTING DEPTH. The round-17 termination note claimed
   // `> -   ` alternation at 8000 levels ran with "no throw, ≤4 ms"; it did not —
@@ -1565,13 +1550,13 @@ describe('closer-search mask', () => {
     ['list-markers', (d: number) => '- '.repeat(d) + '```html\n' + ' '.repeat(2 * d) + '</textarea>\n'],
   ])('masks arbitrarily deep container nesting without throwing: %s', (_label, mk) => {
     for (const depth of [1, 63, 64, 65, 2000, 8000, 40000]) {
-      const doc = mk(depth)
-      const masked = __buildCloserHaystackForTest(doc)
-      expect(masked.length, `depth ${depth}`).toBe(doc.length)
+      const doc = mk(depth);
+      const masked = __buildCloserHaystackForTest(doc);
+      expect(masked.length, `depth ${depth}`).toBe(doc.length);
       // Fail-CLOSED: the sheltered closer is gone from the haystack.
-      expect(masked.includes('</textarea>'), `depth ${depth}`).toBe(false)
+      expect(masked.includes('</textarea>'), `depth ${depth}`).toBe(false);
     }
-  })
+  });
 
   // Round-19 ESCALATION: the inline-title shelter with an ATTRIBUTE-BEARING
   // opener. Not privilege escalation (`iframe`/`src` are allowlisted) but
@@ -1580,12 +1565,12 @@ describe('closer-search mask', () => {
   it('does not shelter an attribute-bearing opener behind an inline link title', async () => {
     const md =
       'Embedding <iframe src="https://evil.example/x" width="600"> explained.\n\n' +
-      '[a](/x "</iframe>")\n\n## After heading\n\nsecret tail\n'
-    expect(escapeUnknownHtmlTags(md)).not.toBe(md)
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(el.querySelectorAll('iframe').length).toBe(0)
-    expect(el.textContent).toContain('secret tail')
-  })
+      '[a](/x "</iframe>")\n\n## After heading\n\nsecret tail\n';
+    expect(escapeUnknownHtmlTags(md)).not.toBe(md);
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(el.querySelectorAll('iframe').length).toBe(0);
+    expect(el.textContent).toContain('secret tail');
+  });
 
   // -------------------------------------------------------------------------
   // Round-20: the BRACKET half of the attribute-shelter class.
@@ -1596,12 +1581,12 @@ describe('closer-search mask', () => {
   it('does not shelter an attribute-bearing opener behind an image alt', async () => {
     const md =
       'Embed: <iframe src="https://evil.example/x" width="600" height="400">\n\n' +
-      '![</iframe>](/x)\n\n## After heading\n\nsecret tail\n'
-    expect(escapeUnknownHtmlTags(md)).not.toBe(md)
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(el.querySelectorAll('iframe').length).toBe(0)
-    expect(el.textContent).toContain('secret tail')
-  })
+      '![</iframe>](/x)\n\n## After heading\n\nsecret tail\n';
+    expect(escapeUnknownHtmlTags(md)).not.toBe(md);
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(el.querySelectorAll('iframe').length).toBe(0);
+    expect(el.textContent).toContain('secret tail');
+  });
 
   // The COMPLEMENT of the same rule, and the reason the pass may not simply
   // blank every `[…]`: remark EMITS an inline link's text and a bare SHORTCUT
@@ -1612,8 +1597,8 @@ describe('closer-search mask', () => {
     ['inline link text', 'The <textarea> element.\n\n[<textarea>hi</textarea>](/x)\n'],
     ['shortcut reference', 'The <textarea> element.\n\n[</textarea>]\n\n[</textarea>]: /x\n'],
   ])('leaves REMARK-EMITTED bracket text visible: %s', (_label, md) => {
-    expect(escapeUnknownHtmlTags(md)).toBe(md)
-  })
+    expect(escapeUnknownHtmlTags(md)).toBe(md);
+  });
 
   // -------------------------------------------------------------------------
   // Round-20: the length caps must BLANK, not SKIP.
@@ -1625,8 +1610,8 @@ describe('closer-search mask', () => {
   // so these are ordinary documents. Every row was a byte-identical no-op with a
   // live RAWTEXT element before the fix; the 900-char controls below already
   // escaped correctly, which is what makes the cap (not the shape) the cause.
-  const capFiller = 'y'.repeat(1100)
-  const okFiller = 'y'.repeat(900)
+  const capFiller = 'y'.repeat(1100);
+  const okFiller = 'y'.repeat(900);
   it.each([
     ['inline title', `[a](/x "${capFiller}</textarea>")`],
     ['inline destination', `[a](/${capFiller}</textarea>)`],
@@ -1635,46 +1620,40 @@ describe('closer-search mask', () => {
     ['definition destination', `[a]: /${capFiller}</textarea>`],
     ['definition label', `[${capFiller}]: /x "</textarea>"`],
   ])('an OVER-CAP shelter still blanks: %s', async (_label, shelter) => {
-    const md =
-      'The <textarea> element explained.\n\n' +
-      shelter +
-      '\n\n## After heading\n\nsecret tail\n'
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;')
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(el.querySelectorAll('textarea').length).toBe(0)
-    expect(el.textContent).toContain('secret tail')
-  })
+    const md = 'The <textarea> element explained.\n\n' + shelter + '\n\n## After heading\n\nsecret tail\n';
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;');
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(el.querySelectorAll('textarea').length).toBe(0);
+    expect(el.textContent).toContain('secret tail');
+  });
 
   it.each([
     ['inline title', `[a](/x "${okFiller}</textarea>")`],
     ['definition title', `[a]: /x "${okFiller}</textarea>"`],
   ])('…and the UNDER-cap control behaves identically: %s', (_label, shelter) => {
-    const md =
-      'The <textarea> element explained.\n\n' +
-      shelter +
-      '\n\n## After heading\n\nsecret tail\n'
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;')
-  })
+    const md = 'The <textarea> element explained.\n\n' + shelter + '\n\n## After heading\n\nsecret tail\n';
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;');
+  });
 
   // The over-cap escalation, with attributes.
   it('does not shelter an attribute-bearing opener behind an over-cap title', async () => {
     const md =
       'Embed: <iframe src="https://evil.example/x" width="600">\n\n' +
-      `[a](/x "${capFiller}</iframe>")\n\n## After heading\n\nsecret tail\n`
-    expect(escapeUnknownHtmlTags(md)).not.toBe(md)
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(el.querySelectorAll('iframe').length).toBe(0)
-  })
+      `[a](/x "${capFiller}</iframe>")\n\n## After heading\n\nsecret tail\n`;
+    expect(escapeUnknownHtmlTags(md)).not.toBe(md);
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(el.querySelectorAll('iframe').length).toBe(0);
+  });
 
   // …and a stray `](` still blanks NOTHING: the cap decides when to stop
   // parsing, never how little to blank, so an unparseable shape declines and
   // ordinary prose containing `](` is untouched.
   it('a stray `](` in prose blanks nothing', () => {
-    const md = 'The <textarea> element.\n\nsee foo](bar baz and then </textarea> later\n'
-    const masked = __buildCloserHaystackForTest(md)
-    expect(masked.length).toBe(md.length)
-    expect(masked).toContain('</textarea>')
-  })
+    const md = 'The <textarea> element.\n\nsee foo](bar baz and then </textarea> later\n';
+    const masked = __buildCloserHaystackForTest(md);
+    expect(masked.length).toBe(md.length);
+    expect(masked).toContain('</textarea>');
+  });
 
   // -------------------------------------------------------------------------
   // Round-21: the definition parser is ESCAPE-AWARE, and its exits are
@@ -1685,12 +1664,12 @@ describe('closer-search mask', () => {
   it('does not shelter an attribute-bearing opener behind a multi-line label', async () => {
     const md =
       'See <iframe src="https://evil.example/x" width="600" height="400">.\n\n' +
-      '[foo\n</iframe>]: /x\n\n## After heading\n\nsecret tail\n'
-    expect(escapeUnknownHtmlTags(md)).not.toBe(md)
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(el.querySelectorAll('iframe').length).toBe(0)
-    expect(el.textContent).toContain('secret tail')
-  })
+      '[foo\n</iframe>]: /x\n\n## After heading\n\nsecret tail\n';
+    expect(escapeUnknownHtmlTags(md)).not.toBe(md);
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(el.querySelectorAll('iframe').length).toBe(0);
+    expect(el.textContent).toContain('secret tail');
+  });
 
   // THE RECOGNITION BOUNDARY — the controls that keep the multi-line label from
   // swallowing ordinary prose. In each of these remark EMITS the text (no `]:`
@@ -1707,23 +1686,23 @@ describe('closer-search mask', () => {
     ['trailing content after a destination', 'The <textarea> element.\n\n[a]: /x </textarea>\n'],
     ['continuation line that is not a title', 'The <textarea> element.\n\n[a]: /x\n</textarea> is real\n'],
   ])('leaves a NON-definition visible: %s', (_label, md) => {
-    const masked = __buildCloserHaystackForTest(md)
-    expect(masked.length).toBe(md.length)
-    expect(masked).toContain('</textarea>')
-    expect(escapeUnknownHtmlTags(md)).toBe(md)
-  })
+    const masked = __buildCloserHaystackForTest(md);
+    expect(masked.length).toBe(md.length);
+    expect(masked).toContain('</textarea>');
+    expect(escapeUnknownHtmlTags(md)).toBe(md);
+  });
 
   // …and the consumption side of the same boundary: a title that OPENS and
   // never closes is blanked TO THE PARAGRAPH BOUND rather than declined, and the
   // blanking stops there (the heading below it stays visible in the haystack).
   it('blanks an unterminated definition title to the paragraph bound', () => {
     const md =
-      'The <textarea> element explained.\n\n[a]: /x "never closes\n</textarea>\nstill inside\n\n## After heading\n'
-    const masked = __buildCloserHaystackForTest(md)
-    expect(masked.length).toBe(md.length)
-    expect(masked).not.toContain('</textarea>')
-    expect(masked).toContain('## after heading') // the haystack is case-folded
-  })
+      'The <textarea> element explained.\n\n[a]: /x "never closes\n</textarea>\nstill inside\n\n## After heading\n';
+    const masked = __buildCloserHaystackForTest(md);
+    expect(masked.length).toBe(md.length);
+    expect(masked).not.toContain('</textarea>');
+    expect(masked).toContain('## after heading'); // the haystack is case-folded
+  });
 
   // Round-19 (LOW, cosmetic): `blankLinkDefinitions`' label pattern also matched
   // a GFM FOOTNOTE definition, whose content is BLOCK-parsed and may hold REAL
@@ -1731,26 +1710,22 @@ describe('closer-search mask', () => {
   // byte-identical pair in plain prose rendered correctly. Fail-closed, so not a
   // security defect — but the two must now agree.
   it('does not blank a GFM footnote definition', async () => {
-    const md = 'Body[^a].\n\n[^a]: <textarea>hi</textarea>\n'
-    expect(escapeUnknownHtmlTags(md)).toBe(md)
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    const plain = await renderStable(
-      <SimpleMarkdownRenderer content={'Body.\n\nSee <textarea>hi</textarea>\n'} />,
-    )
-    expect(el.querySelectorAll('textarea').length).toBe(
-      plain.querySelectorAll('textarea').length,
-    )
-    expect(el.textContent).not.toContain('<textarea>')
-  })
+    const md = 'Body[^a].\n\n[^a]: <textarea>hi</textarea>\n';
+    expect(escapeUnknownHtmlTags(md)).toBe(md);
+    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const plain = await renderStable(<SimpleMarkdownRenderer content={'Body.\n\nSee <textarea>hi</textarea>\n'} />);
+    expect(el.querySelectorAll('textarea').length).toBe(plain.querySelectorAll('textarea').length);
+    expect(el.textContent).not.toContain('<textarea>');
+  });
 
   // …while a real link reference definition next to it is STILL blanked — the
   // footnote carve-out must not reopen the round-18 shelter.
   it('still blanks a link definition sharing the document with a footnote', () => {
     const md =
       'The <textarea> element[^a] explained.\n\n[^a]: note\n\n[a]: /x "</textarea>"\n\n' +
-      '## After heading\n\nsecret tail\n'
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;')
-  })
+      '## After heading\n\nsecret tail\n';
+    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;');
+  });
 
   // -------------------------------------------------------------------------
   // Round-16: INLINE-SPAN LENGTH as a first-class corpus DIMENSION.
@@ -1765,7 +1740,7 @@ describe('closer-search mask', () => {
   // 0 live textareas; ≥4099: 1. The mask no longer uses a capped regex
   // (`findInlineCodeRanges`), and this axis pins the dimension: every shelter
   // spelling is now swept at cap−k AND cap+k.
-  const INLINE_SPAN_PADS = { 'under-cap': 4080, 'over-cap': 4085 } as const
+  const INLINE_SPAN_PADS = { 'under-cap': 4080, 'over-cap': 4085 } as const;
 
   /** Shelter spellings, parameterized by RAWTEXT tag and inline-span padding. */
   const SPAN_LENGTH_SHAPES: Record<string, (tag: string, pad: number) => string> = {
@@ -1783,39 +1758,33 @@ describe('closer-search mask', () => {
       `intro\n\n<details>\n\`${'x'.repeat(pad)} <${tag}> \`\n</details>\n\n## After heading\n\nsecret tail\n`,
     'opener-in-inline-code-in-blockquoted-html-block': (tag, pad) =>
       `> intro\n>\n> <div>\n> \`${'x'.repeat(pad)} <${tag}> \`\n> </div>\n>\n> ## After heading\n>\n> secret tail\n`,
-  }
+  };
 
-  const SPAN_LENGTH_CASES: [string, string, keyof typeof INLINE_SPAN_PADS][] = []
+  const SPAN_LENGTH_CASES: [string, string, keyof typeof INLINE_SPAN_PADS][] = [];
   for (const shape of Object.keys(SPAN_LENGTH_SHAPES))
     for (const tag of ['textarea', 'iframe'])
       for (const len of Object.keys(INLINE_SPAN_PADS) as (keyof typeof INLINE_SPAN_PADS)[])
-        SPAN_LENGTH_CASES.push([shape, tag, len])
+        SPAN_LENGTH_CASES.push([shape, tag, len]);
 
-  it.each(SPAN_LENGTH_CASES)(
-    'shelter holds at every inline-span length: %s / %s / %s',
-    async (shape, tag, len) => {
-      const build = SPAN_LENGTH_SHAPES[shape]
-      const bare = build(tag, INLINE_SPAN_PADS[len])
-      const md = selfClose(bare)
-      const label = `${shape} / ${tag} / ${len}`
-      for (const [spelling, src] of [
-        ['bare', bare],
-        ['self-closing', md],
-      ] as const) {
-        const el = await renderStable(<SimpleMarkdownRenderer content={src} />)
-        // Nothing RAWTEXT may be live, in EITHER tag spelling and at EITHER
-        // side of the retired cap.
-        expect(
-          el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length,
-          `${label} / ${spelling}`,
-        ).toBe(0)
-        // …and the document below the shelter must survive intact: a swallow
-        // leaves the tail alive only as a textarea VALUE, invisible to the
-        // element count above.
-        expect(el.textContent, `${label} / ${spelling}`).toContain('secret tail')
-      }
-    },
-  )
+  it.each(SPAN_LENGTH_CASES)('shelter holds at every inline-span length: %s / %s / %s', async (shape, tag, len) => {
+    const build = SPAN_LENGTH_SHAPES[shape];
+    const bare = build(tag, INLINE_SPAN_PADS[len]);
+    const md = selfClose(bare);
+    const label = `${shape} / ${tag} / ${len}`;
+    for (const [spelling, src] of [
+      ['bare', bare],
+      ['self-closing', md],
+    ] as const) {
+      const el = await renderStable(<SimpleMarkdownRenderer content={src} />);
+      // Nothing RAWTEXT may be live, in EITHER tag spelling and at EITHER
+      // side of the retired cap.
+      expect(el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length, `${label} / ${spelling}`).toBe(0);
+      // …and the document below the shelter must survive intact: a swallow
+      // leaves the tail alive only as a textarea VALUE, invisible to the
+      // element count above.
+      expect(el.textContent, `${label} / ${spelling}`).toContain('secret tail');
+    }
+  });
 
   // Round-16: the mask's inline-code pass stopped being a regex, so the claim
   // "same match semantics, minus the cap and the backtracking" needs a proof.
@@ -1844,45 +1813,44 @@ describe('closer-search mask', () => {
   // already contains `\n` and ' ', so blank lines, one-line segments and
   // multi-line segments are all generated.
   it('the inline-code scan matches the retired regex, per paragraph segment', () => {
-    const TICK = String.fromCharCode(96)
-    const RE = new RegExp('(' + TICK + '+)[\\s\\S]*?\\1', 'g')
-    const alphabet = [TICK, TICK, TICK, 'a', 'b', '\n', ' ', '<', '>']
-    let seed = 12345
-    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+    const TICK = String.fromCharCode(96);
+    const RE = new RegExp('(' + TICK + '+)[\\s\\S]*?\\1', 'g');
+    const alphabet = [TICK, TICK, TICK, 'a', 'b', '\n', ' ', '<', '>'];
+    let seed = 12345;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
     /** Maximal runs of non-blank lines, as `[start, end)` offsets. */
     const segments = (src: string): [number, number][] => {
-      const out: [number, number][] = []
-      let offset = 0
-      let start = -1
-      let end = -1
+      const out: [number, number][] = [];
+      let offset = 0;
+      let start = -1;
+      let end = -1;
       for (const line of src.split('\n')) {
         if (isBlankLine(line)) {
-          if (start !== -1) out.push([start, end])
-          start = -1
+          if (start !== -1) out.push([start, end]);
+          start = -1;
         } else {
-          if (start === -1) start = offset
-          end = offset + line.length
+          if (start === -1) start = offset;
+          end = offset + line.length;
         }
-        offset += line.length + 1
+        offset += line.length + 1;
       }
-      if (start !== -1) out.push([start, end])
-      return out
-    }
+      if (start !== -1) out.push([start, end]);
+      return out;
+    };
     for (let iter = 0; iter < 20000; iter++) {
-      let src = ''
-      const n = 1 + Math.floor(rnd() * 24)
-      for (let i = 0; i < n; i++) src += alphabet[Math.floor(rnd() * alphabet.length)]
-      const want: [number, number][] = []
+      let src = '';
+      const n = 1 + Math.floor(rnd() * 24);
+      for (let i = 0; i < n; i++) src += alphabet[Math.floor(rnd() * alphabet.length)];
+      const want: [number, number][] = [];
       for (const [from, to] of segments(src)) {
-        const seg = src.slice(from, to)
-        RE.lastIndex = 0
-        let m: RegExpExecArray | null
-        while ((m = RE.exec(seg)) !== null)
-          want.push([from + m.index, from + m.index + m[0].length])
+        const seg = src.slice(from, to);
+        RE.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = RE.exec(seg)) !== null) want.push([from + m.index, from + m.index + m[0].length]);
       }
-      expect(__findInlineCodeRangesForTest(src), JSON.stringify(src)).toEqual(want)
+      expect(__findInlineCodeRangesForTest(src), JSON.stringify(src)).toEqual(want);
     }
-  })
+  });
 
   // -------------------------------------------------------------------------
   // Round-16: the sweep also drives `splitStreamingBlocks`.
@@ -1898,57 +1866,57 @@ describe('closer-search mask', () => {
   // replaced by an ordinary non-blank character: both are non-blank under
   // CommonMark, so both must split identically.
   it('the splitter is swept across the corpus x containers x line endings', () => {
-    const EXOTIC_FILLERS: Record<string, string> = {
-      'exotic-blank-nbsp': '\u00a0',
-      'exotic-blank-vertical-tab': '\u000b',
-      'exotic-blank-form-feed': '\u000c',
-      'exotic-blank-bom': '\ufeff',
-    }
-    let checked = 0
-    let controls = 0
+    // The four wrappers whose filler line is an exotic blank (NBSP, VT, FF,
+    // BOM). Only the NAMES matter here — the filler characters themselves live
+    // in CONTAINER_WRAPPERS, which is what actually builds the document.
+    const EXOTIC_BLANK_WRAPPERS = new Set([
+      'exotic-blank-nbsp',
+      'exotic-blank-vertical-tab',
+      'exotic-blank-form-feed',
+      'exotic-blank-bom',
+    ]);
+    let checked = 0;
+    let controls = 0;
     for (const name of SWALLOW_CORPUS) {
       for (const [wrapper, spec] of Object.entries(CONTAINER_WRAPPERS)) {
-        if (COLUMN_SENSITIVE_ENTRIES.has(name) && !spec.preservesColumns) continue
-        const wrapped = spec.wrap(SHARED_FIXTURES[name])
-        const lfBlocks = splitStreamingBlocks(wrapped)
+        if (COLUMN_SENSITIVE_ENTRIES.has(name) && !spec.preservesColumns) continue;
+        const wrapped = spec.wrap(SHARED_FIXTURES[name]);
+        const lfBlocks = splitStreamingBlocks(wrapped);
         for (const eol of LINE_ENDING_NAMES) {
-          const md = LINE_ENDINGS[eol](wrapped)
-          const blocks = splitStreamingBlocks(md)
-          const label = `${name} / ${wrapper} / ${eol}`
+          const md = LINE_ENDINGS[eol](wrapped);
+          const blocks = splitStreamingBlocks(md);
+          const label = `${name} / ${wrapper} / ${eol}`;
           // LOSSLESS: the units are a partition of the source, so the engine's
           // per-unit parses cover the document exactly once.
-          expect(blocks.map((b) => b.text).join('\n'), label).toBe(md)
+          expect(blocks.map(b => b.text).join('\n'), label).toBe(md);
           // …and `startLine` stays a running line count over that partition.
-          let line = 1
+          let line = 1;
           for (const b of blocks) {
-            expect(b.startLine, `${label} #${b.index}`).toBe(line)
-            line += b.text.split('\n').length
+            expect(b.startLine, `${label} #${b.index}`).toBe(line);
+            line += b.text.split('\n').length;
           }
           // The line ending is not a block boundary: CRLF must split exactly
           // like its LF twin.
-          expect(blocks.length, label).toBe(lfBlocks.length)
-          checked++
+          expect(blocks.length, label).toBe(lfBlocks.length);
+          checked++;
         }
         // EXOTIC BLANKS ARE NOT BLANK. Compare against the non-blank control.
-        const filler = EXOTIC_FILLERS[wrapper]
-        if (filler !== undefined) {
-          const control = SHARED_FIXTURES[name]
-            .split('\n')
-            .map((l) => (l === '' ? 'x' : l))
-            .join('\n')
-          expect(
-            splitStreamingBlocks(wrapped).length,
-            `${name} / ${wrapper} vs non-blank control`,
-          ).toBe(splitStreamingBlocks(control).length)
-          controls++
-        }
+        if (!EXOTIC_BLANK_WRAPPERS.has(wrapper)) continue;
+        const control = SHARED_FIXTURES[name]
+          .split('\n')
+          .map(l => (l === '' ? 'x' : l))
+          .join('\n');
+        expect(splitStreamingBlocks(wrapped).length, `${name} / ${wrapper} vs non-blank control`).toBe(
+          splitStreamingBlocks(control).length,
+        );
+        controls++;
       }
     }
     // Pinned, not "greater than": the splitter arm must stay in lockstep with
     // the renderer arm's (entry x wrapper x line-ending) matrix above.
-    expect(checked).toBe(CONTAINER_CASES.length)
-    expect(controls).toBe(SWALLOW_CORPUS.length * 4)
-  })
+    expect(checked).toBe(CONTAINER_CASES.length);
+    expect(controls).toBe(SWALLOW_CORPUS.length * 4);
+  });
 
   // Round-11: the balance guard must NOT touch inline code. An inline span can
   // shelter nothing (remark emits it as an `inlineCode` text node), and entity
@@ -1958,13 +1926,13 @@ describe('closer-search mask', () => {
     ['inline-code-rawtext-title-not-escaped', '<title>'],
     ['inline-code-rawtext-textarea-not-escaped', '<textarea>'],
   ])('keeps a rawtext tag named in inline code verbatim: %s', async (name, tag) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
-    const code = container.querySelector('code')
-    expect(code?.textContent, name).toBe(tag)
-    expect(container.textContent, name).not.toContain('&lt;')
+    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+    const code = container.querySelector('code');
+    expect(code?.textContent, name).toBe(tag);
+    expect(container.textContent, name).not.toContain('&lt;');
     // …and the inline span still shelters nothing live.
-    expect(container.querySelectorAll('textarea').length, name).toBe(0)
-  })
+    expect(container.querySelectorAll('textarea').length, name).toBe(0);
+  });
 
   // Round-11 SECURITY: `TAG_LIKE_REGEX` hard-bounds its attribute run at 4096
   // chars (ReDoS hardening). An attribute run LONGER than that made the tag
@@ -1976,11 +1944,11 @@ describe('closer-search mask', () => {
     ['textarea', `Hello\n\n<textarea ${'a'.repeat(5000)}>\n\n## After heading\n\n- item\n`],
     ['unknown', `Hello\n\n<their ${'a'.repeat(5000)}>\n\n## After heading\n\n- item\n`],
   ])('escapes a tag whose attribute run exceeds the regex cap: %s', async (tag, md) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll(tag).length, tag).toBe(0)
-    expect(container.querySelector('h2')?.textContent, tag).toBe('After heading')
-    expect(container.querySelectorAll('li').length, tag).toBe(1)
-  })
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll(tag).length, tag).toBe(0);
+    expect(container.querySelector('h2')?.textContent, tag).toBe('After heading');
+    expect(container.querySelectorAll('li').length, tag).toBe(1);
+  });
 
   // …and the fallback must not double-escape what the main pass already handled.
   it('the over-long-tag fallback does not double-escape ordinary tags', () => {
@@ -1992,81 +1960,79 @@ describe('closer-search mask', () => {
       'plain text with no tags at all',
       '`<title>` in code',
     ]) {
-      expect(escapeUnknownHtmlTags(src), src).not.toContain('&amp;lt;')
+      expect(escapeUnknownHtmlTags(src), src).not.toContain('&amp;lt;');
     }
-  })
+  });
 
   // Round-9: the indented-code walk must see the CURRENT mask, so a list marker
   // written inside a fence cannot shift the content-column stack.
   it('a list marker inside a fence does not unblank later indented code', async () => {
     const container = await renderStable(
-      <SimpleMarkdownRenderer
-        content={SHARED_FIXTURES['list-marker-inside-fence-does-not-shift-indent-columns']}
-      />,
-    )
-    expect(container.querySelectorAll('textarea').length).toBe(0)
-  })
+      <SimpleMarkdownRenderer content={SHARED_FIXTURES['list-marker-inside-fence-does-not-shift-indent-columns']} />,
+    );
+    expect(container.querySelectorAll('textarea').length).toBe(0);
+  });
 
   it('survives the HTML-block + in-fence-list-marker combination', async () => {
     const container = await renderStable(
       <SimpleMarkdownRenderer content={SHARED_FIXTURES['list-marker-inside-fence-html-block-combo']} />,
-    )
-    expect(container.querySelectorAll('textarea').length).toBe(0)
-    expect(container.querySelector('h1')?.textContent).toBe('Heading after')
-    expect(container.textContent).toContain('Body after.')
-  })
+    );
+    expect(container.querySelectorAll('textarea').length).toBe(0);
+    expect(container.querySelector('h1')?.textContent).toBe('Heading after');
+    expect(container.textContent).toContain('Body after.');
+  });
 
   // Round-9: CommonMark clamps the item content column when the marker is
   // followed by more than 4 spaces.
   it('clamps a list content column when the marker gap exceeds 4 spaces', async () => {
     const container = await renderStable(
       <SimpleMarkdownRenderer content={SHARED_FIXTURES['wide-list-marker-gap-clamps-content-column']} />,
-    )
-    expect(container.querySelectorAll('textarea').length).toBe(0)
-    expect(container.querySelector('h2')?.textContent).toBe('After heading')
-  })
+    );
+    expect(container.querySelectorAll('textarea').length).toBe(0);
+    expect(container.querySelector('h2')?.textContent).toBe('After heading');
+  });
 
   // Round-7: a `<!--` inside code is not a comment start. Both of these blanked
   // the rest of the document (and escaped a perfectly valid element) when
   // `blankComments` scanned the unmasked copy.
-  it.each([
-    'comment-marker-in-inline-code-does-not-blank-to-eof',
-    'truncated-comment-in-fence-does-not-blank-to-eof',
-  ])('a `<!--` inside code does not disable later closers: %s', async (name) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
-    expect(container.querySelectorAll('textarea').length, name).toBe(1)
-  })
+  it.each(['comment-marker-in-inline-code-does-not-blank-to-eof', 'truncated-comment-in-fence-does-not-blank-to-eof'])(
+    'a `<!--` inside code does not disable later closers: %s',
+    async name => {
+      const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+      expect(container.querySelectorAll('textarea').length, name).toBe(1);
+    },
+  );
 
   // Round-7: list-item continuation lines are paragraphs, not indented code.
-  it.each([
-    'list-continuation-textarea-stays-live-ordered',
-    'list-continuation-textarea-stays-live-bullet',
-  ])('keeps a list-continuation <textarea> live: %s', async (name) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />)
-    expect(container.querySelectorAll('textarea').length, name).toBe(1)
-  })
+  it.each(['list-continuation-textarea-stays-live-ordered', 'list-continuation-textarea-stays-live-bullet'])(
+    'keeps a list-continuation <textarea> live: %s',
+    async name => {
+      const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+      expect(container.querySelectorAll('textarea').length, name).toBe(1);
+    },
+  );
 
   // The blockquote pass strips the `>` prefix and runs a NESTED tracker rather
   // than blanking every quoted line, precisely so a legitimately PAIRED
   // `<textarea>` inside a blockquote keeps rendering as a real element.
   it('keeps a properly paired <textarea> inside a blockquote live', async () => {
-    const md = '> quoted intro\n>\n> <textarea>edit me</textarea>\n\n## After heading\n'
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('textarea').length).toBe(1)
-    expect(container.querySelector('h2')?.textContent).toBe('After heading')
-  })
+    const md = '> quoted intro\n>\n> <textarea>edit me</textarea>\n\n## After heading\n';
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('textarea').length).toBe(1);
+    expect(container.querySelector('h2')?.textContent).toBe('After heading');
+  });
 
   it('leaves the opener live when a REAL closer follows, regardless of İ count', async () => {
     for (const n of [0, 20, 25, 60]) {
-      const md = `${'İ'.repeat(n)} <textarea>a</textarea>\n\n<textarea>\n\n## Later heading\n\n- item one\n`
-      const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
+      const md = `${'İ'.repeat(n)} <textarea>a</textarea>\n\n<textarea>\n\n## Later heading\n\n- item one\n`;
+      const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
       // Exactly ONE textarea: the properly closed one. The bare opener must be
       // escaped, so the heading and the list below survive as real elements.
-      expect(container.querySelectorAll('textarea').length, `n=${n}`).toBe(1)
-      expect(container.querySelectorAll('h2').length, `n=${n}`).toBe(1)
-      expect(container.querySelectorAll('li').length, `n=${n}`).toBe(1)
+      expect(container.querySelectorAll('textarea').length, `n=${n}`).toBe(1);
+      expect(container.querySelectorAll('h2').length, `n=${n}`).toBe(1);
+      expect(container.querySelectorAll('li').length, `n=${n}`).toBe(1);
     }
-  })
+  });
 
   // Round-22 (SECURITY): the GFM-footnote RECOGNITION decline was fail-OPEN for
   // an UNREFERENCED definition. The decline's justification — "a footnote body
@@ -2077,29 +2043,38 @@ describe('closer-search mask', () => {
   // Reproduced end-to-end: a LIVE `<iframe>` keeping `src` and `width`,
   // swallowing the prose above it.
   it.each([
-    ['plain', 'Secret prose.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text\n\n[^f]: note body </iframe>\n'],
+    [
+      'plain',
+      'Secret prose.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text\n\n[^f]: note body </iframe>\n',
+    ],
     ['textarea', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n[^f]: note body </textarea>\n'],
     ['blockquoted', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n> [^f]: note body </textarea>\n'],
     ['list-marker', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n- [^f]: note body </textarea>\n'],
-    ['lazy-continuation', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n[^f]: note body\nstill the note </textarea>\n'],
-    ['second-paragraph', 'Secret prose.\n\n<textarea>\n\nvisible text\n\n[^f]: note body\n\n    second para </textarea>\n'],
+    [
+      'lazy-continuation',
+      'Secret prose.\n\n<textarea>\n\nvisible text\n\n[^f]: note body\nstill the note </textarea>\n',
+    ],
+    [
+      'second-paragraph',
+      'Secret prose.\n\n<textarea>\n\nvisible text\n\n[^f]: note body\n\n    second para </textarea>\n',
+    ],
     ['other-label-referenced', 'Secret prose.\n\n<textarea>\n\nvisible text [^Other]\n\n[^f]: note body </textarea>\n'],
   ])('escapes the opener when the only closer is an UNREFERENCED footnote body: %s', async (name, md) => {
-    expect(escapeUnknownHtmlTags(md), name).toContain('&lt;')
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('iframe').length, name).toBe(0)
-    expect(container.querySelectorAll('textarea').length, name).toBe(0)
-    expect(container.textContent, name).toContain('visible text')
-  })
+    expect(escapeUnknownHtmlTags(md), name).toContain('&lt;');
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('iframe').length, name).toBe(0);
+    expect(container.querySelectorAll('textarea').length, name).toBe(0);
+    expect(container.textContent, name).toContain('visible text');
+  });
 
   // …and the decline is KEPT where its justification actually holds: a
   // REFERENCED footnote's body IS block-parsed and reaches the document, so a
   // closer written there is REAL and blanking it would over-escape.
   it('keeps a REFERENCED footnote body live (the round-19 decline, narrowed not dropped)', async () => {
-    const md = 'See [^f] here.\n\n[^f]: note <textarea>edit me</textarea>\n'
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('textarea').length).toBe(1)
-  })
+    const md = 'See [^f] here.\n\n[^f]: note <textarea>edit me</textarea>\n';
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('textarea').length).toBe(1);
+  });
 
   // Label matching follows micromark's `normalizeIdentifier`: whitespace runs
   // collapse to one space, the label is trimmed, and case is folded. A
@@ -2109,9 +2084,9 @@ describe('closer-search mask', () => {
     ['case', 'See [^Foo] here.\n\n[^foo]: note <textarea>edit me</textarea>\n'],
     ['whitespace', 'See [^a  b] here.\n\n[^a b]: note <textarea>edit me</textarea>\n'],
   ])('normalizes footnote labels when matching reference to definition: %s', async (name, md) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('textarea').length, name).toBe(1)
-  })
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('textarea').length, name).toBe(1);
+  });
 
   // Round-23 (SECURITY): the round-22 pass above counted PHANTOM references.
   // Its reference collection ran over the current mask, which at that point in
@@ -2136,21 +2111,21 @@ describe('closer-search mask', () => {
     ['angle autolink', 'S.\n\n<textarea>\n\nvisible text <https://e.example/[^f]>\n\n[^f]: b </textarea>\n'],
     ['literal autolink', 'S.\n\n<textarea>\n\nvisible text https://e.example/x[^f]y\n\n[^f]: b </textarea>\n'],
   ])('escapes the opener when the only "reference" is a PHANTOM: %s', async (name, md) => {
-    expect(escapeUnknownHtmlTags(md), name).toContain('&lt;')
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('textarea').length, name).toBe(0)
-    expect(container.textContent, name).toContain('visible text')
-  })
+    expect(escapeUnknownHtmlTags(md), name).toContain('&lt;');
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('textarea').length, name).toBe(0);
+    expect(container.textContent, name).toContain('visible text');
+  });
 
   // …and the same escalation, with an ATTRIBUTE-BEARING opener: the phantom used
   // to leave a live third-party iframe keeping `src` and `width`.
   it('escapes an attribute-bearing iframe opener behind a phantom reference', async () => {
     const md =
-      'S.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text ![[^f]](/i.png)\n\n[^f]: b </iframe>\n'
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('iframe').length).toBe(0)
-    expect(container.textContent).toContain('visible text')
-  })
+      'S.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text ![[^f]](/i.png)\n\n[^f]: b </iframe>\n';
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('iframe').length).toBe(0);
+    expect(container.textContent).toContain('visible text');
+  });
 
   // THE OVER-BLANK DIRECTION, which the narrowing must NOT cross: where remark
   // really does resolve the reference, the definition body is document text and
@@ -2166,10 +2141,10 @@ describe('closer-search mask', () => {
     ['after an autolink', 'v https://e.example/x [^f] t'],
     ['email autolink (the `[` voids it)', 'v <a[^f]b@e.example> t'],
   ])('keeps the element live for a GENUINE reference: %s', async (name, body) => {
-    const md = `S.\n\n<iframe src="https://evil.example/x" width="600">\n\n${body}\n\n[^f]: b </iframe>\n`
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('iframe').length, name).toBe(1)
-  })
+    const md = `S.\n\n<iframe src="https://evil.example/x" width="600">\n\n${body}\n\n[^f]: b </iframe>\n`;
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('iframe').length, name).toBe(1);
+  });
 
   // THE ONE NAMED RESIDUAL, pinned so it stays visible rather than becoming the
   // next round's surprise: a reference living ONLY inside another, itself
@@ -2178,10 +2153,10 @@ describe('closer-search mask', () => {
   // rather than one pass. Deliberately not built — see the pass docblock.
   it('KNOWN RESIDUAL: a reference inside another dead definition still counts', async () => {
     const md =
-      'S.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text\n\n[^a]: see [^f]\n\n[^f]: b </iframe>\n'
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelectorAll('iframe').length).toBe(1)
-  })
+      'S.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text\n\n[^a]: see [^f]\n\n[^f]: b </iframe>\n';
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelectorAll('iframe').length).toBe(1);
+  });
 
   // Round-22: a payload that RUNS OUT OF INPUT is a SHAPE decline, not a cap
   // exit — the common streaming shape (`see [a](/x` as the last token). It used
@@ -2189,16 +2164,16 @@ describe('closer-search mask', () => {
   // paragraph tail and escaping an earlier opener mid-stream that unescaped
   // again on completion (a visible flicker).
   it('does not blank the paragraph tail for a link payload cut off at end of input', () => {
-    expect(__buildCloserHaystackForTest('see [a](/x')).toBe('see [a](/x')
-    expect(__buildCloserHaystackForTest('see [a](/x "t')).toBe('see [a](/x "t')
-  })
+    expect(__buildCloserHaystackForTest('see [a](/x')).toBe('see [a](/x');
+    expect(__buildCloserHaystackForTest('see [a](/x "t')).toBe('see [a](/x "t');
+  });
 
   // …while the CAP path must still BLANK THROUGH (the round-20 fix).
   it('still blanks through the cap for an over-long payload', () => {
-    const md = `[a](/x "<${'y'.repeat(1100)}></textarea>")\n\ntail\n`
-    expect(__buildCloserHaystackForTest(md)).not.toContain('</textarea>')
-  })
-})
+    const md = `[a](/x "<${'y'.repeat(1100)}></textarea>")\n\ntail\n`;
+    expect(__buildCloserHaystackForTest(md)).not.toContain('</textarea>');
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Streaming pre-pass ordering (round-5)
@@ -2208,41 +2183,39 @@ describe('streaming completes the tail BEFORE escaping', () => {
     // The canonical shape: an LLM explains `<textarea>`, then streams a fenced
     // HTML sample. Mid-emission the fence is unclosed, so escaping first left
     // the prose opener live and parse5 swallowed the rest of the message.
-    const md = 'Explaining <textarea> in HTML.\n\n## Heading\n\n```html\n</textarea>\n'
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} streaming />)
-    expect(container.querySelectorAll('textarea').length).toBe(0)
-    expect(container.querySelector('h2')?.textContent).toBe('Heading')
-    expect(container.textContent).toContain('Explaining <textarea> in HTML.')
-  })
+    const md = 'Explaining <textarea> in HTML.\n\n## Heading\n\n```html\n</textarea>\n';
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} streaming />);
+    expect(container.querySelectorAll('textarea').length).toBe(0);
+    expect(container.querySelector('h2')?.textContent).toBe('Heading');
+    expect(container.textContent).toContain('Explaining <textarea> in HTML.');
+  });
 
   it('does NOT escape an unknown tag inside a mid-emission fence', async () => {
     // The carve's "unclosed fence body is unprotected" tradeoff used to fire on
     // EVERY streaming frame: a `<their>` mid-fence rendered as literal
     // `&lt;their&gt;` until the closer arrived, then snapped back.
-    const md = 'intro\n\n```html\n<their>x</their>\n'
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} streaming />)
-    expect(container.textContent).toContain('<their>x</their>')
-    expect(container.textContent).not.toContain('&lt;their&gt;')
-  })
+    const md = 'intro\n\n```html\n<their>x</their>\n';
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} streaming />);
+    expect(container.textContent).toContain('<their>x</their>');
+    expect(container.textContent).not.toContain('&lt;their&gt;');
+  });
 
   it('token-by-token growth through an open fence never swallows the document', async () => {
-    const full = 'Explaining <textarea> in HTML.\n\n## Heading\n\n```html\n<textarea>v</textarea>\n```\n'
+    const full = 'Explaining <textarea> in HTML.\n\n## Heading\n\n```html\n<textarea>v</textarea>\n```\n';
     // Start once `## Heading\n` has fully arrived (earlier cuts legitimately
     // show a partial title) and walk the rest of the fence in small steps.
-    const from = full.indexOf('## Heading') + '## Heading\n'.length
+    const from = full.indexOf('## Heading') + '## Heading\n'.length;
     for (let cut = from; cut <= full.length; cut += 3) {
-      const container = await renderStable(
-        <SimpleMarkdownRenderer content={full.slice(0, cut)} streaming />,
-      )
-      expect(container.querySelector('h2')?.textContent, `cut=${cut}`).toBe('Heading')
+      const container = await renderStable(<SimpleMarkdownRenderer content={full.slice(0, cut)} streaming />);
+      expect(container.querySelector('h2')?.textContent, `cut=${cut}`).toBe('Heading');
       // The h2 assertion alone is NOT enough: a swallow that starts after the
       // heading leaves the <h2> intact while the rest of the message becomes a
       // live textarea value. Pin the absence of the swallow itself.
-      const textareas = Array.from(container.querySelectorAll('textarea'))
-      expect(textareas.length, `cut=${cut}`).toBe(0)
+      const textareas = Array.from(container.querySelectorAll('textarea'));
+      expect(textareas.length, `cut=${cut}`).toBe(0);
     }
-  })
-})
+  });
+});
 
 // ---------------------------------------------------------------------------
 // RichMarkdownRenderer parity
@@ -2250,9 +2223,9 @@ describe('streaming completes the tail BEFORE escaping', () => {
 describe('RichMarkdownRenderer golden parity', () => {
   for (const [name, md] of Object.entries({ ...SHARED_FIXTURES, ...RICH_ONLY_FIXTURES })) {
     it(`renders fixture: ${name}`, async () => {
-      const container = await renderStable(<RichMarkdownRenderer content={md} />)
-      expect(normalize(container.innerHTML)).toMatchSnapshot()
-    })
+      const container = await renderStable(<RichMarkdownRenderer content={md} />);
+      expect(normalize(container.innerHTML)).toMatchSnapshot();
+    });
   }
 
   it('renders headings with backend sectionIds + demoteMarkdownH1ToH2', async () => {
@@ -2262,10 +2235,10 @@ describe('RichMarkdownRenderer golden parity', () => {
         sectionIds={SECTION_IDS}
         demoteMarkdownH1ToH2
       />,
-    )
-    expect(normalize(container.innerHTML)).toMatchSnapshot()
-  })
-})
+    );
+    expect(normalize(container.innerHTML)).toMatchSnapshot();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Heading-id ↔ section-extractor agreement (three slug copies today —
@@ -2277,16 +2250,15 @@ describe('heading-id and section-extractor slug agreement', () => {
   // counting, not reset per pair) and a SYMBOL-ONLY heading (`## !!!`, whose
   // slug collapses to '' and hits the `section-N` fallback, where the two
   // implementations previously used different counters).
-  const AGREEMENT_MD =
-    `# 🚀 Getting Started\n\n## Setup\n\n## Setup\n\n## Setup\n\n## !!!\n\n## Weird — punct!, chars?\n`
+  const AGREEMENT_MD = `# 🚀 Getting Started\n\n## Setup\n\n## Setup\n\n## Setup\n\n## !!!\n\n## Weird — punct!, chars?\n`;
 
   it('renderer-generated heading ids equal extractSections ids for the same markdown', async () => {
-    const sections = extractSections(AGREEMENT_MD, { maxLevel: 2 })
-    const container = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
-    const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map((el) => el.id)
-    expect(renderedIds).toEqual(sections.map((s) => s.id))
-    expect(sections).toMatchSnapshot('extracted-sections')
-  })
+    const sections = extractSections(AGREEMENT_MD, { maxLevel: 2 });
+    const container = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />);
+    const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map(el => el.id);
+    expect(renderedIds).toEqual(sections.map(s => s.id));
+    expect(sections).toMatchSnapshot('extracted-sections');
+  });
 
   // --- round-15 REGRESSION vs `main`: CRLF documents ------------------------
   // `main`'s extractor pattern was `^(#{1,N})\\s+(.+)` — no end anchor at all,
@@ -2296,64 +2268,53 @@ describe('heading-id and section-extractor slug agreement', () => {
   // where `main` produced them: every CRLF-stored doc / blog / release body
   // silently lost its TOC, its in-page anchors and its doc-SEO heading links.
   // (Direct A/B over this fixture: `main` → ["Real","Second"], branch → [].)
-  const CRLF_HEADINGS_MD =
-    '# Real\r\n\r\nbody\r\n\r\n## Second\r\n\r\n```\r\n# In fence\r\n```\r\n'
+  const CRLF_HEADINGS_MD = '# Real\r\n\r\nbody\r\n\r\n## Second\r\n\r\n```\r\n# In fence\r\n```\r\n';
 
   it('CRLF documents scan the same headings as their LF twin', () => {
-    const lf = CRLF_HEADINGS_MD.replace(/\r/g, '')
-    expect(scanHeadings(CRLF_HEADINGS_MD)).toEqual(scanHeadings(lf))
-    expect(extractSections(CRLF_HEADINGS_MD, { maxLevel: 2 }).map((sec) => sec.title)).toEqual([
-      'Real',
-      'Second',
-    ])
+    const lf = CRLF_HEADINGS_MD.replace(/\r/g, '');
+    expect(scanHeadings(CRLF_HEADINGS_MD)).toEqual(scanHeadings(lf));
+    expect(extractSections(CRLF_HEADINGS_MD, { maxLevel: 2 }).map(sec => sec.title)).toEqual(['Real', 'Second']);
     // …and the `# In fence` line is still fence content in BOTH spellings —
     // the fence tracker used to match no CRLF line at all.
-    expect(extractSections(CRLF_HEADINGS_MD, { maxLevel: 2 })).toEqual(
-      extractSections(lf, { maxLevel: 2 }),
-    )
-  })
+    expect(extractSections(CRLF_HEADINGS_MD, { maxLevel: 2 })).toEqual(extractSections(lf, { maxLevel: 2 }));
+  });
 
   it('CRLF renderer heading ids equal extractSections ids', async () => {
-    const sections = extractSections(CRLF_HEADINGS_MD, { maxLevel: 2 })
-    const container = await renderStable(<SimpleMarkdownRenderer content={CRLF_HEADINGS_MD} />)
-    const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map((el) => el.id)
-    expect(renderedIds).toEqual(sections.map((sec) => sec.id))
-    expect(renderedIds).toEqual(['real', 'second'])
-  })
+    const sections = extractSections(CRLF_HEADINGS_MD, { maxLevel: 2 });
+    const container = await renderStable(<SimpleMarkdownRenderer content={CRLF_HEADINGS_MD} />);
+    const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map(el => el.id);
+    expect(renderedIds).toEqual(sections.map(sec => sec.id));
+    expect(renderedIds).toEqual(['real', 'second']);
+  });
 
   it('heading ids are STABLE across re-renders of the same content', async () => {
-    const idsOf = (c: HTMLElement) =>
-      Array.from(c.querySelectorAll('h1, h2')).map((el) => el.id)
+    const idsOf = (c: HTMLElement) => Array.from(c.querySelectorAll('h1, h2')).map(el => el.id);
 
     // Two independent mounts must agree…
-    const first = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
-    const firstIds = idsOf(first)
-    const second = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
-    expect(idsOf(second)).toEqual(firstIds)
+    const first = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />);
+    const firstIds = idsOf(first);
+    const second = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />);
+    expect(idsOf(second)).toEqual(firstIds);
 
     // …and so must repeated render passes of the SAME instance. Before the
     // per-pass counter reset this produced `setup-4`, `setup-5`, … on every
     // re-render, silently breaking every `#anchor` deep link.
-    let container!: HTMLElement
-    let rerender!: (ui: React.ReactElement) => void
+    const { container, rerender } = render(<SimpleMarkdownRenderer content={AGREEMENT_MD} />);
     await act(async () => {
-      const result = render(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
-      container = result.container
-      rerender = result.rerender
-      await new Promise((r) => setTimeout(r, 0))
-    })
-    expect(idsOf(container)).toEqual(firstIds)
+      await new Promise(r => setTimeout(r, 0));
+    });
+    expect(idsOf(container)).toEqual(firstIds);
 
     for (let pass = 0; pass < 3; pass++) {
       await act(async () => {
         // A fresh `brokenLinks` array each time is exactly what a parent
         // re-render looks like — it must not renumber anything.
-        rerender(<SimpleMarkdownRenderer content={AGREEMENT_MD} brokenLinks={[]} />)
-        await new Promise((r) => setTimeout(r, 0))
-      })
-      expect(idsOf(container), `pass ${pass}`).toEqual(firstIds)
+        rerender(<SimpleMarkdownRenderer content={AGREEMENT_MD} brokenLinks={[]} />);
+        await new Promise(r => setTimeout(r, 0));
+      });
+      expect(idsOf(container), `pass ${pass}`).toEqual(firstIds);
     }
-  })
+  });
 
   // --- round-2: the ids must be PURE ---------------------------------------
   it('ids are identical under a StrictMode double render', async () => {
@@ -2361,17 +2322,17 @@ describe('heading-id and section-extractor slug agreement', () => {
     // parent that used to `reset()` the counter — so StrictMode's second
     // invocation suffixed every id with `-2` in dev and broke
     // extractor↔renderer parity. The pure line-keyed map is immune.
-    const plain = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />)
-    const plainIds = Array.from(plain.querySelectorAll('h1, h2')).map((el) => el.id)
+    const plain = await renderStable(<SimpleMarkdownRenderer content={AGREEMENT_MD} />);
+    const plainIds = Array.from(plain.querySelectorAll('h1, h2')).map(el => el.id);
 
     const strict = await renderStable(
       <React.StrictMode>
         <SimpleMarkdownRenderer content={AGREEMENT_MD} />
       </React.StrictMode>,
-    )
-    const strictIds = Array.from(strict.querySelectorAll('h1, h2')).map((el) => el.id)
-    expect(strictIds).toEqual(plainIds)
-  })
+    );
+    const strictIds = Array.from(strict.querySelectorAll('h1, h2')).map(el => el.id);
+    expect(strictIds).toEqual(plainIds);
+  });
 
   it('emits NO duplicate ids mid-stream, where completed blocks are memoized', async () => {
     // A memoized completed block does NOT re-render on the pass that used to
@@ -2379,37 +2340,33 @@ describe('heading-id and section-extractor slug agreement', () => {
     // tail re-derived `setup` from an empty counter — two live `id="setup"`
     // in the DOM, and `#setup` resolving to the wrong node for the whole
     // stream.
-    const STREAM_MD = '## Setup\n\nfirst body\n\n## Setup\n\nsecond body\n\ntail text'
+    const STREAM_MD = '## Setup\n\nfirst body\n\n## Setup\n\nsecond body\n\ntail text';
 
-    let container!: HTMLElement
-    let rerender!: (ui: React.ReactElement) => void
+    const { container, rerender } = render(<SimpleMarkdownRenderer content={STREAM_MD} streaming />);
     await act(async () => {
-      const result = render(<SimpleMarkdownRenderer content={STREAM_MD} streaming />)
-      container = result.container
-      rerender = result.rerender
-      await new Promise((r) => setTimeout(r, 0))
-    })
+      await new Promise(r => setTimeout(r, 0));
+    });
 
-    const idsOf = () => Array.from(container.querySelectorAll('h1, h2, h3')).map((el) => el.id)
-    expect(idsOf()).toEqual(['setup', 'setup-2'])
+    const idsOf = () => Array.from(container.querySelectorAll('h1, h2, h3')).map(el => el.id);
+    expect(idsOf()).toEqual(['setup', 'setup-2']);
 
     // Grow the tail token-by-token; the completed blocks stay memoized.
     for (const suffix of [' and', ' and more', ' and more words']) {
       await act(async () => {
-        rerender(<SimpleMarkdownRenderer content={`${STREAM_MD}${suffix}`} streaming />)
-        await new Promise((r) => setTimeout(r, 0))
-      })
-      const ids = idsOf()
-      expect(ids, `after "${suffix}"`).toEqual(['setup', 'setup-2'])
-      expect(new Set(ids).size, 'no duplicate DOM ids').toBe(ids.length)
+        rerender(<SimpleMarkdownRenderer content={`${STREAM_MD}${suffix}`} streaming />);
+        await new Promise(r => setTimeout(r, 0));
+      });
+      const ids = idsOf();
+      expect(ids, `after "${suffix}"`).toEqual(['setup', 'setup-2']);
+      expect(new Set(ids).size, 'no duplicate DOM ids').toBe(ids.length);
     }
 
     // …and the settled whole-document parse agrees with the extractor.
-    const done = await renderStable(<SimpleMarkdownRenderer content={STREAM_MD} />)
-    expect(Array.from(done.querySelectorAll('h1, h2')).map((el) => el.id)).toEqual(
-      extractSections(STREAM_MD, { maxLevel: 2 }).map((s) => s.id),
-    )
-  })
+    const done = await renderStable(<SimpleMarkdownRenderer content={STREAM_MD} />);
+    expect(Array.from(done.querySelectorAll('h1, h2')).map(el => el.id)).toEqual(
+      extractSections(STREAM_MD, { maxLevel: 2 }).map(s => s.id),
+    );
+  });
 
   // --- round-3: producer/consumer scanner parity -------------------------
   it('agrees with the extractor across fence, container and setext shapes', async () => {
@@ -2446,17 +2403,17 @@ describe('heading-id and section-extractor slug agreement', () => {
       '',
       '## Tail',
       '',
-    ].join('\n')
+    ].join('\n');
 
-    const sections = extractSections(DRIFT_MD, { maxLevel: 2 })
-    const container = await renderStable(<SimpleMarkdownRenderer content={DRIFT_MD} />)
-    const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map((el) => el.id)
+    const sections = extractSections(DRIFT_MD, { maxLevel: 2 });
+    const container = await renderStable(<SimpleMarkdownRenderer content={DRIFT_MD} />);
+    const renderedIds = Array.from(container.querySelectorAll('h1, h2')).map(el => el.id);
 
-    expect(renderedIds).toEqual(sections.map((s) => s.id))
-    expect(new Set(renderedIds).size, 'no duplicate DOM ids').toBe(renderedIds.length)
-    expect(renderedIds, 'fenced headings contribute NO id').not.toContain('fenced-not-a-heading')
-    expect(sections).toMatchSnapshot('drift-sections')
-  })
+    expect(renderedIds).toEqual(sections.map(s => s.id));
+    expect(new Set(renderedIds).size, 'no duplicate DOM ids').toBe(renderedIds.length);
+    expect(renderedIds, 'fenced headings contribute NO id').not.toContain('fenced-not-a-heading');
+    expect(sections).toMatchSnapshot('drift-sections');
+  });
 
   // --- round-4: the setext scan must match mdast EXACTLY ------------------
   // The scanner is a line-based approximation of what remark will parse. Where
@@ -2466,75 +2423,74 @@ describe('heading-id and section-extractor slug agreement', () => {
   // expectation.
   describe('setext scanning matches mdast', () => {
     const mdastHeadings = (md: string) => {
-      const tree = unified().use(remarkParse).parse(md) as any
-      const out: Array<{ line: number; level: number }> = []
-      const walk = (n: any) => {
-        if (n.type === 'heading') out.push({ line: n.position.start.line, level: n.depth })
-        for (const child of n.children ?? []) walk(child)
-      }
-      walk(tree)
-      return out
-    }
-    const scanned = (md: string) =>
-      scanHeadings(md).map((h) => ({ line: h.line, level: h.level }))
+      const tree = unified().use(remarkParse).parse(md);
+      const out: Array<{ line: number; level: number }> = [];
+      const walk = (n: Root | RootContent) => {
+        if (n.type === 'heading') out.push({ line: n.position?.start.line ?? 0, level: n.depth });
+        if ('children' in n) for (const child of n.children) walk(child);
+      };
+      walk(tree);
+      return out;
+    };
+    const scanned = (md: string) => scanHeadings(md).map(h => ({ line: h.line, level: h.level }));
 
-    it('multi-line setext is ONE heading at the run\'s FIRST line', () => {
-      const md = 'Foo\nbar\n===\n'
+    it("multi-line setext is ONE heading at the run's FIRST line", () => {
+      const md = 'Foo\nbar\n===\n';
       // mdast: {line:1, depth:1, text:"Foo\nbar"}. The scanner used to record
       // only the LAST paragraph line ({line:2, text:"bar"}), so the renderer's
       // lookup missed and fell back to a slug of the rendered children
       // (`foo-bar`) while the extractor published `bar`.
-      expect(scanned(md)).toEqual(mdastHeadings(md))
-      expect(scanHeadings(md)[0].text).toBe('Foo\nbar')
-      expect(extractSections(md).map((s) => s.id)).toEqual(['foo-bar'])
-    })
+      expect(scanned(md)).toEqual(mdastHeadings(md));
+      expect(scanHeadings(md)[0].text).toBe('Foo\nbar');
+      expect(extractSections(md).map(s => s.id)).toEqual(['foo-bar']);
+    });
 
     it('container-nested setext IS a heading', () => {
-      const md = '> Quote title\n> ---\n'
+      const md = '> Quote title\n> ---\n';
       // A real h2 in mdast; the container-prefix guard used to kill the
       // candidate, so it was invisible to the TOC.
-      expect(scanned(md)).toEqual(mdastHeadings(md))
-      expect(extractSections(md).map((s) => s.id)).toEqual(['quote-title'])
-    })
+      expect(scanned(md)).toEqual(mdastHeadings(md));
+      expect(extractSections(md).map(s => s.id)).toEqual(['quote-title']);
+    });
 
     it('a `---` inside a raw HTML block is NOT a setext underline', () => {
-      const md = '<div>\nText\n---\n</div>\n'
+      const md = '<div>\nText\n---\n</div>\n';
       // mdast emits nothing (the whole thing is one HTML block); the scanner
       // used to publish a phantom `Text` h2.
-      expect(mdastHeadings(md)).toEqual([])
-      expect(scanned(md)).toEqual([])
-      expect(extractSections(md)).toEqual([])
-    })
+      expect(mdastHeadings(md)).toEqual([]);
+      expect(scanned(md)).toEqual([]);
+      expect(extractSections(md)).toEqual([]);
+    });
 
     it('an underline with a DIFFERENT container prefix is a thematic break', () => {
-      const md = '> Quote\n\n---\n'
-      expect(scanned(md)).toEqual(mdastHeadings(md))
-      expect(scanned(md)).toEqual([])
-    })
+      const md = '> Quote\n\n---\n';
+      expect(scanned(md)).toEqual(mdastHeadings(md));
+      expect(scanned(md)).toEqual([]);
+    });
 
     it('renderer ids agree with the extractor for multi-line setext', async () => {
-      const md = 'Foo\nbar\n===\n\nbody\n'
-      const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-      expect(Array.from(container.querySelectorAll('h1, h2')).map((el) => el.id)).toEqual(
-        extractSections(md, { maxLevel: 2 }).map((s) => s.id),
-      )
-    })
-  })
+      const md = 'Foo\nbar\n===\n\nbody\n';
+      const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+      expect(Array.from(container.querySelectorAll('h1, h2')).map(el => el.id)).toEqual(
+        extractSections(md, { maxLevel: 2 }).map(s => s.id),
+      );
+    });
+  });
 
   it('honors an AUTHORED anchor on a raw-HTML heading', async () => {
     // The sanitize schema allows `id` and disables clobbering precisely so
     // hand-picked anchors survive; the renderer then overwrote them with the
     // slug of the heading text, silently breaking every deep link to them.
-    const md = '<h2 id="pricing-faq">Pricing</h2>\n\nbody'
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(container.querySelector('h2')?.id).toBe('pricing-faq')
-  })
+    const md = '<h2 id="pricing-faq">Pricing</h2>\n\nbody';
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(container.querySelector('h2')?.id).toBe('pricing-faq');
+  });
 
   it('strips inline markdown from heading text before slugifying (extractor parity)', async () => {
-    const md = '## **Bold** Setup\n\n## `code` Heading\n'
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />)
-    expect(Array.from(container.querySelectorAll('h2')).map((el) => el.id)).toEqual(
-      extractSections(md, { maxLevel: 2 }).map((s) => s.id),
-    )
-  })
-})
+    const md = '## **Bold** Setup\n\n## `code` Heading\n';
+    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(Array.from(container.querySelectorAll('h2')).map(el => el.id)).toEqual(
+      extractSections(md, { maxLevel: 2 }).map(s => s.id),
+    );
+  });
+});

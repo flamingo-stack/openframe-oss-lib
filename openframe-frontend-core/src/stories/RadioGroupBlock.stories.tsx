@@ -1,15 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import { Tag } from '../components/ui/tag';
 import { TagPercentIcon } from '../components/icons-v2-generated/shopping/tag-percent-icon';
 import { RadioGroupBlock } from '../components/ui/radio-group';
+import { Tag } from '../components/ui/tag';
 
 const DiscountTag = ({ value }: { value: string }) => (
-  <Tag
-    variant="success"
-    icon={<TagPercentIcon className="size-4" />}
-    label={value}
-  />
+  <Tag variant="success" icon={<TagPercentIcon className="size-4" />} label={value} />
 );
 
 const meta = {
@@ -34,7 +30,7 @@ const meta = {
     onValueChange: { action: 'valueChange' },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '400px' }}>
         <Story />
       </div>
@@ -147,11 +143,7 @@ export const AllStates: Story = {
           { value: 'option-2', label: 'Disabled unselected' },
         ]}
       />
-      <RadioGroupBlock
-        name="state-error"
-        options={baseOptions}
-        error="Please select an option."
-      />
+      <RadioGroupBlock name="state-error" options={baseOptions} error="Please select an option." />
       <RadioGroupBlock
         name="state-descriptions"
         defaultValue="option-1"
@@ -260,7 +252,7 @@ export const FlamingoTheme: Story = {
     options: baseOptions,
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div data-app-type="flamingo" style={{ width: '320px' }}>
         <Story />
       </div>

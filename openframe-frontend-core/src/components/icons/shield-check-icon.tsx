@@ -1,10 +1,8 @@
-import React from 'react'
-
 interface ShieldCheckIconProps {
-  className?: string
-  size?: number
-  color?: string
-  strokeWidth?: number
+  className?: string;
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
@@ -12,7 +10,7 @@ export function ShieldCheckIcon({
   className = '',
   size = 24,
   color = 'white',
-  strokeWidth = 1.5
+  strokeWidth = 1.5,
 }: ShieldCheckIconProps) {
   return (
     <svg
@@ -41,5 +39,5 @@ export function ShieldCheckIcon({
         fill="none"
       />
     </svg>
-  )
+  );
 }

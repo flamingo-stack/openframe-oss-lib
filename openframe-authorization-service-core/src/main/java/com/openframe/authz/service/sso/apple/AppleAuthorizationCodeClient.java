@@ -50,11 +50,13 @@ public class AppleAuthorizationCodeClient {
 
     /**
      * Redeems the code for the given bundle id and asserts it belongs to {@code expectedSubject}.
+     * Returns Apple's refresh token — kept per user so the account-deletion flow can revoke it
+     * (App Store guideline 5.1.1(v)); may be {@code null} if Apple returned none.
      *
      * @throws OAuth2AuthenticationException with {@code invalid_grant} when Apple rejects the code
      *                                       (wrong, expired, or already used) or the subjects differ
      */
-    public void redeemAndVerify(String bundleId, String authorizationCode, String expectedSubject, String tenantId) {
+    public String redeemAndVerify(String bundleId, String authorizationCode, String expectedSubject, String tenantId) {
         SSOConfig cfg = ssoConfigService.getEffectiveSSOConfig(tenantId, APPLE)
                 .orElseThrow(() -> invalidGrant("Apple SSO is not configured for this tenant."));
         String privateKeyPem = ssoConfigService.getDecryptedClientSecret(cfg);
@@ -95,6 +97,7 @@ public class AppleAuthorizationCodeClient {
             log.warn("Apple code-exchange subject mismatch: identityToken sub != code sub");
             throw invalidGrant("Authorization code does not belong to the presented identity token.");
         }
+        return (String) response.get("refresh_token");
     }
 
     private String tokenUrl() {

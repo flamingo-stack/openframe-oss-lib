@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<DocSearchBar>` — the canonical RAG-search dropdown surface.
@@ -20,18 +20,18 @@
  * this component as plain props. Both consumers shrink to ~5 lines.
  */
 
-import type { ReactNode } from 'react'
-import { SearchInput, type SearchResult } from '../../ui/search-input'
-import { DocSearchResultRow } from './doc-search-result-row'
+import type { ReactNode } from 'react';
+import { SearchInput, type SearchResult } from '../../ui/search-input';
+import { DocSearchResultRow } from './doc-search-result-row';
 
 export interface DocSearchBarProps {
-  placeholder: string
-  query: string
-  onQueryChange: (value: string) => void
+  placeholder: string;
+  query: string;
+  onQueryChange: (value: string) => void;
   /** Hook-fetched results. Reuses the lib's `<SearchInput>` `SearchResult`
    *  shape directly so callers don't translate. */
-  results: SearchResult[]
-  isLoading: boolean
+  results: SearchResult[];
+  isLoading: boolean;
   /** Result selection handler. Mirrors `<SearchInput>` — the second
    *  `modifiers` argument is preserved so cmd-click / shift-click on
    *  a result row still forces new-tab behavior. Hub `useDocSearch`
@@ -39,29 +39,29 @@ export interface DocSearchBarProps {
   onResultSelect: (
     result: SearchResult,
     modifiers?: {
-      metaKey?: boolean
-      ctrlKey?: boolean
-      shiftKey?: boolean
-      altKey?: boolean
-      button?: number
+      metaKey?: boolean;
+      ctrlKey?: boolean;
+      shiftKey?: boolean;
+      altKey?: boolean;
+      button?: number;
     },
-  ) => void
+  ) => void;
   /** Lets the caller's hook force the dropdown open after a recent
    *  internal action (e.g. result navigation). `undefined` falls back
    *  to `<SearchInput>`'s built-in focus/hover heuristics. */
-  showDropdown?: boolean
+  showDropdown?: boolean;
   /** Defaults to 2 — matches the existing data-room and onboarding-
    *  guide consumers. Override only if a surface needs different
    *  typeahead semantics. */
-  minQueryLength?: number
+  minQueryLength?: number;
   /** Defaults to 0 — both existing consumers debounce inside the
    *  hook, not the input. */
-  debounceMs?: number
-  className?: string
+  debounceMs?: number;
+  className?: string;
   /** Optional row-renderer override. Defaults to the lib's standard
    *  `<DocSearchResultRow>` (source icon + title + path breadcrumb).
    *  Override only when a surface needs custom row chrome. */
-  renderResult?: (result: SearchResult, isHighlighted: boolean) => ReactNode
+  renderResult?: (result: SearchResult, isHighlighted: boolean) => ReactNode;
 }
 
 export function DocSearchBar({
@@ -91,10 +91,8 @@ export function DocSearchBar({
       className={className}
       renderResult={
         renderResult ??
-        ((result, isHighlighted) => (
-          <DocSearchResultRow result={result} isHighlighted={isHighlighted} />
-        ))
+        ((result, isHighlighted) => <DocSearchResultRow result={result} isHighlighted={isHighlighted} />)
       }
     />
-  )
+  );
 }

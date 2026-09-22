@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Backward-compatibility shim.
@@ -22,4 +22,4 @@ export {
   type DocSource,
   type ChatTurnMeta,
   type StreamingPhase,
-} from './use-sse-chat-adapter'
+} from './use-sse-chat-adapter';

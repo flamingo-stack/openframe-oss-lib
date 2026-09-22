@@ -36,6 +36,15 @@ where
         .await
 }
 
+/// Display for `Error::Winapi` hides the io::Error ("IO error in winapi call"); surface it so logs carry the OS error code.
+#[cfg(target_os = "windows")]
+fn scm_error_detail(e: &windows_service::Error) -> String {
+    match e {
+        windows_service::Error::Winapi(io) => io.to_string(),
+        other => other.to_string(),
+    }
+}
+
 /// `query_service_status_windows` off-runtime with a timeout; the outer Err is an unresponsive SCM.
 #[cfg(target_os = "windows")]
 async fn query_service_status_timed(
@@ -163,13 +172,13 @@ fn try_start_service_windows(service_name: &str) -> std::result::Result<(), Stri
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
-        .map_err(|e| format!("connect to SCM: {}", e))?;
+        .map_err(|e| format!("connect to SCM: {}", scm_error_detail(&e)))?;
     let service = manager
         .open_service(
             service_name,
             ServiceAccess::START | ServiceAccess::QUERY_STATUS,
         )
-        .map_err(|e| format!("open service: {}", e))?;
+        .map_err(|e| format!("open service: {}", scm_error_detail(&e)))?;
 
     match service.start::<&std::ffi::OsStr>(&[]) {
         Ok(()) => Ok(()),
@@ -178,7 +187,7 @@ fn try_start_service_windows(service_name: &str) -> std::result::Result<(), Stri
         {
             Ok(())
         }
-        Err(e) => Err(format!("{}", e)),
+        Err(e) => Err(format!("start call: {}", scm_error_detail(&e))),
     }
 }
 
@@ -354,7 +363,8 @@ async fn stop_service_windows(service_name: &str, allow_delete: bool) -> Result<
         Err(e) => {
             error!(
                 "Failed to stop service {} via SCM: {}; force-killing service process",
-                service_name, e
+                service_name,
+                scm_error_detail(&e)
             );
             force_stop_service_windows(service_name, allow_delete).await
         }
@@ -692,6 +702,16 @@ pub fn service_not_stopped(service_name: &str) -> bool {
     match query_service_status_windows(service_name) {
         Ok(status) => status.current_state != ServiceState::Stopped,
         Err(_) => false,
+    }
+}
+
+/// Pooled, timeboxed running check; None = SCM busy/unresponsive or errored (e.g. service missing).
+#[cfg(target_os = "windows")]
+pub async fn service_running_state(service_name: &str) -> Option<bool> {
+    use windows_service::service::ServiceState;
+    match query_service_status_timed(service_name).await {
+        Ok(Ok(status)) => Some(status.current_state != ServiceState::Stopped),
+        _ => None,
     }
 }
 

@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * useChatCardItem — fetches the full mapped item for an inline chat
@@ -19,53 +19,52 @@
  * proxy; the hub wires the registry-driven builder directly.
  */
 
-import { useQuery } from '@tanstack/react-query'
-import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context'
-import { embedAuthedFetch } from '../../../utils/embed-authed-fetch'
-import { extractItems, extractItemId } from '../../../utils/extract-items'
+import { useQuery } from '@tanstack/react-query';
+import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { extractItems, extractItemId } from '../../../utils/extract-items';
 
 export interface UseChatCardItemResult<T = unknown> {
-  item: T | undefined
-  isLoading: boolean
-  isError: boolean
+  item: T | undefined;
+  isLoading: boolean;
+  isError: boolean;
   /** True only after a fetch actually completed — false for disabled
    *  queries (no list URL for the type / empty id). */
-  isFetched: boolean
+  isFetched: boolean;
 }
 
 // `extractItems` / `extractItemId` hoisted to `src/utils/extract-items.ts`
 // (shared with the related-content rail — react-query-free home).
 
-export function useChatCardItem<T = unknown>(
-  type: string,
-  id: string,
-): UseChatCardItemResult<T> {
+export function useChatCardItem<T = unknown>(type: string, id: string): UseChatCardItemResult<T> {
   // Read the list-URL builder from the chat runtime — hub uses the
   // rag-table-config registry directly; embedded apps supply a per-type
   // URL builder against the reverse proxy.
-  const runtime = useRequiredChatRuntime()
-  const url = runtime.endpoints.buildListUrl(type, [id])
+  const runtime = useRequiredChatRuntime();
+  const url = runtime.endpoints.buildListUrl(type, [id]);
   const query = useQuery({
     queryKey: ['chat-card-item', type, id],
     queryFn: async (): Promise<T | null> => {
-      if (!url) return null
+      if (!url) return null;
       // Go through `embedAuthedFetch` (NOT bare `fetch`) so the request
       // rides the same auth path as the chat stream/commands: it consults
       // the host-registered `EmbedAuthAdapter` (cookie `credentials:'include'`
       // cross-origin, dev-ticket Bearer, 401 refresh-and-retry). Bare `fetch`
       // sent no credentials, so list endpoints behind the gateway returned
       // 401 and the card rendered blank.
-      const res = await embedAuthedFetch(url)
+      const res = await embedAuthedFetch(url);
       // THROW on non-OK (was `return null`): callers must be able to
       // tell "fetched fine, entity absent" (→ deleted tombstone) from
       // "fetch failed" (401 refresh miss, 5xx, 429 → transient; render
       // nothing, never a false 'deleted' claim). TanStack surfaces the
       // throw as `isError`.
-      if (!res.ok) throw new Error(`chat card fetch failed: ${res.status}`)
-      const data = await res.json()
-      const items = extractItems(data)
-      const match = items.find((it) => extractItemId(type, it) === id)
-      return (match ?? null) as T | null
+      if (!res.ok) throw new Error(`chat card fetch failed: ${res.status}`);
+      // `.json()` is `any`; `extractItems` already takes `unknown` and does the
+      // shape normalization, so keep the boundary honest and let it do its job.
+      const data: unknown = await res.json();
+      const items = extractItems(data);
+      const match = items.find(it => extractItemId(type, it) === id);
+      return (match ?? null) as T | null;
     },
     enabled: !!url && id.length > 0,
     // ALWAYS FRESH — no freshness window. Card entities are mutable
@@ -78,9 +77,9 @@ export function useChatCardItem<T = unknown>(
     // the refetch is in flight — no skeleton flash, never stale-forever.
     staleTime: 0,
     gcTime: 30 * 60 * 1000,
-  })
+  });
   return {
-    item: (query.data ?? undefined) as T | undefined,
+    item: query.data ?? undefined,
     isLoading: query.isLoading,
     isError: query.isError,
     // True only after the query actually completed a fetch. DISABLED
@@ -89,5 +88,5 @@ export function useChatCardItem<T = unknown>(
     // read that as "fetched fine, entity absent" (tombstone gate in
     // entity-cards/dispatch.tsx).
     isFetched: query.isFetched,
-  }
+  };
 }

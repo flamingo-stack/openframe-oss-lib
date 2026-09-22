@@ -1,7 +1,7 @@
 package com.openframe.data.document.rmm.filter;
 
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

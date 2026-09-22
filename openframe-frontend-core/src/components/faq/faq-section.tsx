@@ -1,17 +1,18 @@
-"use client"
+'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Faq } from '../../types/faq'
-import { FaqAccordion, type FaqItem } from '../faq-accordion'
-import { useSelfFetch } from '../../hooks/use-self-fetch'
-import { buildSuggestionUrl } from '../../utils/suggestion-url'
-import { serializeJsonLd } from '../../utils/common'
-import { useScrollToHash } from '../../hooks/use-scroll-to-hash'
-import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav'
-import { faqSectionSlug, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor'
-import { cn } from '../../utils/cn'
-import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld'
-import { SECTION_HEADING_CLASS } from '../layout/page-heading'
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
+import { useSelfFetch } from '../../hooks/use-self-fetch';
+import type { Faq } from '../../types/faq';
+import { cn } from '../../utils/cn';
+import { serializeJsonLd } from '../../utils/common';
+import { faqSectionSlug, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor';
+import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
+import { buildSuggestionUrl } from '../../utils/suggestion-url';
+import { FaqAccordion, type FaqItem } from '../faq-accordion';
+import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld';
 
 export interface FaqSectionProps {
   /**
@@ -19,10 +20,10 @@ export interface FaqSectionProps {
    * useSelfFetch contract). The consuming server page resolves FAQs then drills
    * them into this prop — the lib never re-fetches what the host already gated on.
    */
-  initialFaqs?: Faq[]
+  initialFaqs?: Faq[];
   /** Both required together for entity-attached FAQs; partial → bare /api/faqs. */
-  entityType?: string
-  entityId?: number | string
+  entityType?: string;
+  entityId?: number | string;
   /**
    * Heading node above the grouped list. `undefined` → default
    * `<h2>`"Frequently Asked Questions". `null` → no heading (the host page
@@ -32,40 +33,35 @@ export interface FaqSectionProps {
    * `null` → categories render `<h2>` (directly under the page `<h1>`);
    * otherwise categories render `<h3>` beneath this heading.
    */
-  heading?: React.ReactNode | null
+  heading?: React.ReactNode | null;
   /** Inject FAQPage schema.org JSON-LD as a <script>. Off by default so embeds
    *  don't emit duplicate schema. */
-  emitJsonLd?: boolean
+  emitJsonLd?: boolean;
   /** Overrides for the JSON-LD's name/description/url. */
-  jsonLd?: FaqSchemaOptions
-  className?: string
+  jsonLd?: FaqSchemaOptions;
+  className?: string;
   /** Maps to /api/faqs `?count=` (the 5-tier fill target). Absent → param
    *  not sent (server default applies). */
-  minResults?: number
+  minResults?: number;
   /** Fetch-URL prefix for third-party embeds / reverse proxies
    *  ('' = same-origin relative). */
-  apiBaseUrl?: string
+  apiBaseUrl?: string;
 }
 
-const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions'
+const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
 
 /** URL composition shared with RelatedContentSection (`buildSuggestionUrl`)
  *  — byte-identical to the historical `buildFaqsUrl` output when
  *  `minResults`/`apiBaseUrl` are absent. */
-function buildFaqsUrl(
-  entityType?: string,
-  entityId?: number | string,
-  minResults?: number,
-  apiBaseUrl = '',
-): string {
-  return buildSuggestionUrl('/api/faqs', { apiBaseUrl, entityType, entityId, count: minResults })
+function buildFaqsUrl(entityType?: string, entityId?: number | string, minResults?: number, apiBaseUrl = ''): string {
+  return buildSuggestionUrl('/api/faqs', { apiBaseUrl, entityType, entityId, count: minResults });
 }
 
 interface FaqGroup {
   /** null → the uncategorized bucket: no heading, no jump pill, rendered last. */
-  section: string | null
-  slug: string | null
-  items: FaqItem[]
+  section: string | null;
+  slug: string | null;
+  items: FaqItem[];
 }
 
 /** Group FAQs by `faq.section`, preserving the server's first-seen
@@ -74,36 +70,36 @@ interface FaqGroup {
  *  since it renders without a heading. Items carry NO badge here — the `<h2>`
  *  IS the category, so a per-row chip would be redundant. */
 function groupFaqsBySection(faqs: Faq[]): FaqGroup[] {
-  const order: string[] = []
-  const byName = new Map<string, FaqGroup>()
-  let uncategorized: FaqGroup | null = null
+  // A Map iterates in insertion order, which is exactly the first-seen section
+  // order this function promises — so the Map IS the ordering, and no parallel
+  // array of names (plus a lookup that has to assert the key back) is needed.
+  const byName = new Map<string, FaqGroup>();
+  let uncategorized: FaqGroup | null = null;
   for (const faq of faqs) {
-    const item: FaqItem = { id: faq.id, question: faq.question, answer: faq.answer }
-    const name = faq.section?.trim()
+    const item: FaqItem = { id: faq.id, question: faq.question, answer: faq.answer };
+    const name = faq.section?.trim();
     if (!name) {
-      if (!uncategorized) uncategorized = { section: null, slug: null, items: [] }
-      uncategorized.items.push(item)
-      continue
+      if (!uncategorized) uncategorized = { section: null, slug: null, items: [] };
+      uncategorized.items.push(item);
+      continue;
     }
-    let group = byName.get(name)
+    let group = byName.get(name);
     if (!group) {
-      group = { section: name, slug: faqSectionSlug(name), items: [] }
-      byName.set(name, group)
-      order.push(name)
+      group = { section: name, slug: faqSectionSlug(name), items: [] };
+      byName.set(name, group);
     }
-    group.items.push(item)
+    group.items.push(item);
   }
-  const groups = order.map((name) => byName.get(name)!)
-  if (uncategorized) groups.push(uncategorized)
-  return groups
+  const groups = [...byName.values()];
+  if (uncategorized) groups.push(uncategorized);
+  return groups;
 }
-
 
 /** Map key for the uncategorized bucket — `group.slug` is null for it, so
  *  every per-group map (default-open ids, accordion keys) uses this sentinel
  *  to keep the lookup typed. */
-const UNCATEGORIZED_KEY = '__uncategorized__'
-const groupKey = (g: FaqGroup): string => g.slug ?? UNCATEGORIZED_KEY
+const UNCATEGORIZED_KEY = '__uncategorized__';
+const groupKey = (g: FaqGroup): string => g.slug ?? UNCATEGORIZED_KEY;
 
 /**
  * Grouped FAQ layout: a category jump-nav above stacked `<h2>` category
@@ -119,55 +115,61 @@ function GroupedFaqList({
   groups,
   categoryHeadingAs,
 }: {
-  groups: FaqGroup[]
+  groups: FaqGroup[];
   /** Heading tag for each category, so the document outline nests correctly
    *  under whatever owns the heading above this block: `h2` on the standalone
    *  page (the page owns the `<h1>`), `h3` beneath an embed's `<h2>` title.
    *  The VISUAL is `SECTION_HEADING_CLASS` either way, so categories look
    *  identical on every surface. */
-  categoryHeadingAs: 'h2' | 'h3'
+  categoryHeadingAs: 'h2' | 'h3';
 }) {
-  const CategoryHeading = categoryHeadingAs
-  const navGroups = useMemo(() => groups.filter((g) => g.slug), [groups])
-  const [activeSlug, setActiveSlug] = useState<string | null>(navGroups[0]?.slug ?? null)
+  const CategoryHeading = categoryHeadingAs;
+  const navGroups = useMemo(() => groups.filter(g => g.slug), [groups]);
+  const [activeSlug, setActiveSlug] = useState<string | null>(navGroups[0]?.slug ?? null);
   // Identity-stable key for the section set so the observer re-binds only when
   // the categories actually change (not on every parent re-render).
-  const slugKey = navGroups.map((g) => g.slug).join('|')
+  const slugKey = navGroups.map(g => g.slug).join('|');
+  // Latest `navGroups` for the scroll-spy observer below, which re-observes on
+  // `slugKey` (the section SET) and must not re-run when the array is merely
+  // rebuilt with the same slugs.
+  const navGroupsRef = useRef(navGroups);
+  useEffect(() => {
+    navGroupsRef.current = navGroups;
+  });
 
   // Scroll-spy: mark the pill for the category currently at the top of the
   // viewport. rootMargin drops the trigger line just below the sticky header
   // and ignores the bottom ~55% so "active" is the section being read, not the
   // next one peeking in.
   useEffect(() => {
-    if (navGroups.length < 2) return
-    const tops = new Map<string, number>()
+    if (navGroupsRef.current.length < 2) return undefined;
+    const tops = new Map<string, number>();
     const observer = new IntersectionObserver(
-      (entries) => {
+      entries => {
         for (const entry of entries) {
-          const id = (entry.target as HTMLElement).id
-          if (entry.isIntersecting) tops.set(id, entry.boundingClientRect.top)
-          else tops.delete(id)
+          const id = (entry.target as HTMLElement).id;
+          if (entry.isIntersecting) tops.set(id, entry.boundingClientRect.top);
+          else tops.delete(id);
         }
-        let bestId: string | null = null
-        let bestTop = Number.POSITIVE_INFINITY
+        let bestId: string | null = null;
+        let bestTop = Number.POSITIVE_INFINITY;
         for (const [id, top] of tops) {
           if (top < bestTop) {
-            bestTop = top
-            bestId = id
+            bestTop = top;
+            bestId = id;
           }
         }
-        if (bestId) setActiveSlug(bestId)
+        if (bestId) setActiveSlug(bestId);
       },
       { rootMargin: `-${STICKY_HEADER_OFFSET_PX}px 0px -55% 0px`, threshold: 0 },
-    )
-    for (const group of navGroups) {
-      const el = group.slug ? document.getElementById(group.slug) : null
-      if (el) observer.observe(el)
+    );
+    for (const group of navGroupsRef.current) {
+      const el = group.slug ? document.getElementById(group.slug) : null;
+      if (el) observer.observe(el);
     }
-    return () => observer.disconnect()
+    return () => observer.disconnect();
     // slugKey encodes the section set; re-observe only when it changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slugKey])
+  }, [slugKey]);
 
   // ─── Hash dispatch — `/faqs#faq-item-<id>` or `/faqs#faq-<section-slug>` ──
   // Tracks the current hash so:
@@ -179,34 +181,33 @@ function GroupedFaqList({
   // Listens to `hashchange` so back/forward replays the same behavior. SSR-
   // safe: initial null state matches the server render; the first effect
   // tick on the client updates it.
-  const [hashTarget, setHashTarget] = useState<FaqHashTarget | null>(null)
+  const [hashTarget, setHashTarget] = useState<FaqHashTarget | null>(null);
   useEffect(() => {
-    const refresh = () => setHashTarget(parseFaqHash(window.location.hash))
-    refresh()
-    window.addEventListener('hashchange', refresh)
-    return () => window.removeEventListener('hashchange', refresh)
-  }, [])
+    const refresh = () => setHashTarget(parseFaqHash(window.location.hash));
+    refresh();
+    window.addEventListener('hashchange', refresh);
+    return () => window.removeEventListener('hashchange', refresh);
+  }, []);
 
   // Per-group default-open set when the hash points at an item. The map key
   // matches `groupKey(group)` so the render-time lookup is O(1) per group.
   const defaultOpenByGroupKey = useMemo(() => {
-    if (hashTarget?.kind !== 'item') return null
-    const targetId = hashTarget.rawId
-    const result = new Map<string, (string | number)[]>()
+    if (hashTarget?.kind !== 'item') return null;
+    const targetId = hashTarget.rawId;
+    const result = new Map<string, (string | number)[]>();
     for (const group of groups) {
-      const hit = group.items.find((i) => String(i.id) === targetId)
-      if (hit) result.set(groupKey(group), [hit.id])
+      const hit = group.items.find(i => String(i.id) === targetId);
+      if (hit) result.set(groupKey(group), [hit.id]);
     }
-    return result.size > 0 ? result : null
-  }, [groups, hashTarget])
+    return result.size > 0 ? result : null;
+  }, [groups, hashTarget]);
 
   // Accordion is uncontrolled — `defaultOpenIds` is only consumed at mount,
   // so a new item hash needs a remount to honor it. Keying off the item-id
   // suffix triggers exactly the remount we need (and stays stable when the
   // hash points at a section, so category navigation never disturbs the
   // accordion's open state).
-  const accordionKeySuffix =
-    hashTarget?.kind === 'item' ? `item:${hashTarget.rawId}` : 'default'
+  const accordionKeySuffix = hashTarget?.kind === 'item' ? `item:${hashTarget.rawId}` : 'default';
 
   // Unified scroll-to-hash: rAF-polls for the target row (outlasts the SWR self-fetch
   // + Radix accordion expand) and re-fires on `hashchange` — including the synthetic
@@ -223,14 +224,22 @@ function GroupedFaqList({
       ? `item:${hashTarget.rawId}`
       : hashTarget?.kind === 'section'
         ? `section:${hashTarget.slug}`
-        : 'none')
-  useScrollToHash(scrollDep, { headerOffset: STICKY_HEADER_OFFSET_PX })
+        : 'none');
+  useScrollToHash(scrollDep, { headerOffset: STICKY_HEADER_OFFSET_PX });
 
   // A section hash also lights up its category pill; item hashes leave the pills
   // untouched so deep-linking a question never disturbs scroll-spy state.
-  useEffect(() => {
-    if (hashTarget?.kind === 'section') setActiveSlug(hashTarget.slug)
-  }, [hashTarget])
+  //
+  // Adjusted while rendering (React's prop-sync pattern) rather than from an
+  // effect: the pills below read `activeSlug` in THIS render, so an effect
+  // painted the OLD pill lit and then re-rendered to move the highlight. The
+  // initial value matches `hashTarget`'s own initial `null`, so a mount is a
+  // no-op here exactly as the effect's first run was.
+  const [pillSyncedHash, setPillSyncedHash] = useState(hashTarget);
+  if (pillSyncedHash !== hashTarget) {
+    setPillSyncedHash(hashTarget);
+    if (hashTarget?.kind === 'section') setActiveSlug(hashTarget.slug);
+  }
 
   // Category pill click. `navigateSamePageHash` owns the entire transition:
   // replaceState → synthetic `hashchange` → `scrollElementIntoView` tween
@@ -248,31 +257,28 @@ function GroupedFaqList({
   // are a TOC, not a navigation step, so the Back button leaves the
   // FAQ page in one step regardless of how many categories the user
   // clicked through.
-  const handleJump = useCallback(
-    (e: React.MouseEvent<HTMLAnchorElement>, slug: string) => {
-      e.preventDefault()
-      navigateSamePageHash('#' + slug, {
-        headerOffset: STICKY_HEADER_OFFSET_PX,
-        history: 'replace',
-      })
-    },
-    [],
-  )
+  const handleJump = useCallback((e: React.MouseEvent<HTMLAnchorElement>, slug: string) => {
+    e.preventDefault();
+    navigateSamePageHash('#' + slug, {
+      headerOffset: STICKY_HEADER_OFFSET_PX,
+      history: 'replace',
+    });
+  }, []);
 
   return (
     <div className="space-y-8">
       {navGroups.length > 1 && (
         <nav aria-label="FAQ categories" className="flex flex-wrap gap-2">
-          {navGroups.map((group) => {
-            const isActive = group.slug === activeSlug
+          {navGroups.map(group => {
+            const isActive = group.slug === activeSlug;
             return (
               <a
                 key={group.slug}
                 href={`#${group.slug}`}
                 aria-current={isActive ? 'true' : undefined}
-                onClick={(e) => handleJump(e, group.slug as string)}
+                onClick={e => handleJump(e, group.slug as string)}
                 className={cn(
-                  "rounded-full border px-4 py-2 text-h6 transition-colors",
+                  'rounded-full border px-4 py-2 transition-colors text-h6',
                   isActive
                     ? 'border-ods-text-primary bg-ods-card text-ods-text-primary'
                     : 'border-ods-border bg-ods-card text-ods-text-secondary hover:border-ods-text-secondary hover:text-ods-text-primary',
@@ -280,22 +286,16 @@ function GroupedFaqList({
               >
                 {group.section}
               </a>
-            )
+            );
           })}
         </nav>
       )}
       <div className="space-y-10">
-        {groups.map((group) => {
-          const key = groupKey(group)
+        {groups.map(group => {
+          const key = groupKey(group);
           return (
-            <section
-              key={key}
-              id={group.slug ?? undefined}
-              className="scroll-mt-24 space-y-4"
-            >
-              {group.section && (
-                <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>
-              )}
+            <section key={key} id={group.slug ?? undefined} className="scroll-mt-24 space-y-4">
+              {group.section && <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>}
               <FaqAccordion
                 // Re-key on item-hash changes so the remount picks up the new
                 // `defaultOpenIds` (the accordion is uncontrolled). Stable for
@@ -305,31 +305,31 @@ function GroupedFaqList({
                 defaultOpenIds={defaultOpenByGroupKey?.get(key)}
               />
             </section>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 function FaqSkeleton() {
   return (
-    <div className="space-y-8 animate-pulse">
-      <div className="h-12 md:h-14 w-2/3 rounded bg-ods-border" />
-      <div className="rounded-md border border-ods-border overflow-hidden bg-transparent divide-y divide-ods-border w-full">
+    <div className="animate-pulse space-y-8">
+      <div className="h-12 w-2/3 rounded bg-ods-border md:h-14" />
+      <div className="w-full divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent">
         {Array.from({ length: 8 }).map((_, idx) => (
-          <div key={idx} className="flex items-center justify-between gap-6 md:gap-10 px-6 py-4">
+          <div key={idx} className="flex items-center justify-between gap-6 px-6 py-4 md:gap-10">
             <div className="h-6 w-5/6 rounded bg-ods-border" />
             <div className="size-6 rounded bg-ods-border" />
           </div>
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 interface FaqsResponse {
-  faqs: Faq[]
+  faqs: Faq[];
 }
 
 /**
@@ -360,38 +360,40 @@ export function FaqSection({
   minResults,
   apiBaseUrl = '',
 }: FaqSectionProps) {
-  const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl)
+  const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl);
   // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
   // wrapper object would setState-loop under re-rendering parents.
   const initialData = useMemo<FaqsResponse | undefined>(
     () => (initialFaqs ? { faqs: initialFaqs } : undefined),
     [initialFaqs],
-  )
-  const { data, isLoading, error } = useSelfFetch<FaqsResponse>(url, { initialData })
+  );
+  const { data, isLoading, error } = useSelfFetch<FaqsResponse>(url, { initialData });
 
-  const faqs = data?.faqs ?? []
+  // Memoised because the `??` fallback minted a NEW array on every
+  // render, which made the memo below re-run every time — i.e. do nothing.
+  const faqs = useMemo(() => data?.faqs ?? [], [data?.faqs]);
   // Grouped before the early returns so the hook order stays stable.
-  const groups = useMemo(() => (faqs.length > 0 ? groupFaqsBySection(faqs) : []), [faqs])
+  const groups = useMemo(() => (faqs.length > 0 ? groupFaqsBySection(faqs) : []), [faqs]);
 
   // `undefined` → default <h2> title; `null` → the host page owns the <h1>, so
   // no title renders here. `heading === null` also makes the category headings
   // <h2> (directly under the page <h1>); otherwise they nest as <h3>.
   const headingNode =
-    heading === undefined ? <h2 className={SECTION_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h2> : heading
+    heading === undefined ? <h2 className={SECTION_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h2> : heading;
 
   // Degrade silently — never show an error banner or an empty section shell
   // where FAQs would be (host pages and the standalone surface both rely on it).
-  if (error) return null
-  if (!isLoading && faqs.length === 0) return null
+  if (error) return null;
+  if (!isLoading && faqs.length === 0) return null;
   if (isLoading && faqs.length === 0) {
     return (
       <div className={className}>
         <FaqSkeleton />
       </div>
-    )
+    );
   }
 
-  const schema = emitJsonLd ? buildFaqJsonLdFromFaqs(faqs, jsonLd) : null
+  const schema = emitJsonLd ? buildFaqJsonLdFromFaqs(faqs, jsonLd) : null;
 
   return (
     <>
@@ -402,12 +404,11 @@ export function FaqSection({
       {schema && (
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           // serializeJsonLd, NOT raw JSON.stringify — FAQ answers are
           // admin-entered; an embedded "</script>" must not break the tag.
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(schema) }}
         />
       )}
     </>
-  )
+  );
 }

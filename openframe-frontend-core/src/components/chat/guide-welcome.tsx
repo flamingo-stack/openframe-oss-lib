@@ -1,13 +1,13 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { MingoIcon } from '../icons'
-import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
-import { Skeleton } from '../ui/skeleton'
-import { QuickActionWall } from './quick-action-wall'
-import { EntityIcon } from '../icon-display'
-import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip'
+import { type ReactNode, useMemo } from 'react';
+import { cn } from '../../utils/cn';
+import { EntityIcon } from '../icon-display';
+import { MingoIcon } from '../icons';
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
+import { Skeleton } from '../ui/skeleton';
+import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip';
+import { QuickActionWall } from './quick-action-wall';
 
 // =============================================================================
 // Types
@@ -16,64 +16,64 @@ import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-c
 /** A guide quick-action chip (e.g. "How to start"). */
 export interface GuideQuickAction {
   /** Stable React key. */
-  id: string
+  id: string;
   /** Chip label. */
-  label: string
+  label: string;
   /** Prompt text seeded into the composer on click. Defaults to `label`. */
-  prompt?: string
+  prompt?: string;
   /** Optional library-glyph name (resolved via the onboarding-icon registry). */
-  iconName?: string | null
+  iconName?: string | null;
   /** Optional uploaded image URL (wins over `iconName`). */
-  iconUrl?: string | null
+  iconUrl?: string | null;
   /** Optional props spread onto the resolved glyph. */
-  iconProps?: Record<string, unknown> | null
+  iconProps?: Record<string, unknown> | null;
   /** Optional agent accent tint for the icon (fae→pink, mingo→cyan). */
-  accent?: QuickActionAccent
+  accent?: QuickActionAccent;
 }
 
 export interface GuideWelcomeProps {
   /** Greeting heading. Defaults to "Guide Mode Chat". */
-  title?: React.ReactNode
+  title?: ReactNode;
   /** Optional identity icon (agent mode) — replaces the built-in Mingo mark as
    *  the empty-state glyph. `{ name | url | props }` resolved via <EntityIcon>.
    *  Omitted/empty → the default Mingo mark renders. */
-  icon?: { name?: string | null; url?: string | null; props?: Record<string, unknown> | null } | null
+  icon?: { name?: string | null; url?: string | null; props?: Record<string, unknown> | null } | null;
   /** Greeting sub-line. No built-in default — when omitted/empty the sub-line
    *  is not rendered, so the empty state shows only the title. Set via the
    *  admin `emptyStateGreeting` (or a host override). */
-  subtitle?: React.ReactNode
+  subtitle?: ReactNode;
   /** While the admin greeting is still being fetched, render a one-line
    *  subtitle skeleton instead of flashing empty → text. Ignored once a
    *  `subtitle` is present. */
-  subtitleLoading?: boolean
+  subtitleLoading?: boolean;
   /** Quick-action chips — caller-provided; there are no built-in defaults, so
    *  the chip row is omitted entirely unless the host supplies actions. ALL
    *  chips render in a wrapping row (no "⋯" overflow collapse) so every action
    *  is directly hoverable — hover/focus previews the action's full `prompt` in
    *  the composer; click sends it. */
-  quickActions?: ReadonlyArray<GuideQuickAction>
+  quickActions?: ReadonlyArray<GuideQuickAction>;
   /** Fired when a quick-action chip is activated (click). */
-  onQuickAction?: (action: GuideQuickAction) => void
+  onQuickAction?: (action: GuideQuickAction) => void;
   /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
    *  action's full `prompt` in the composer input. */
-  onQuickActionHover?: (action: GuideQuickAction) => void
+  onQuickActionHover?: (action: GuideQuickAction) => void;
   /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
-  onQuickActionHoverEnd?: () => void
+  onQuickActionHoverEnd?: () => void;
   /** Agent this empty state belongs to — forwarded to the quick-action
    *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
    *  brick stack at 2 rows. Unset (host/guide mode) keeps the full `rows` cap. */
-  agentSlug?: string
+  agentSlug?: string;
   /** Slash-command onboarding list — rendered inside the shared scroll region
    *  below the greeting (so greeting + list scroll together, with edge fades). */
-  children?: React.ReactNode
-  className?: string
+  children?: ReactNode;
+  className?: string;
 }
 
 // =============================================================================
 // Defaults (OpenFrame copy — overridable; the kit stays platform-agnostic)
 // =============================================================================
 
-const DEFAULT_TITLE = 'Guide Mode Chat'
+const DEFAULT_TITLE = 'Guide Mode Chat';
 
 // =============================================================================
 // Component
@@ -106,16 +106,16 @@ export function GuideWelcome({
   // Scroll-fade affordances: a 48px gradient at the top/bottom edge of the
   // scroll region, shown only while content is actually hidden in that
   // direction. (Same behaviour as MingoWelcome.)
-  const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>()
+  const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>();
 
   // Map to the shared {@link QuickActionChip} shape consumed by the unified
   // `QuickActionWall` — the SAME chip wall the website hero + deck render, so
   // the chat's quick actions read as "the work the agent does". Every chip
   // stays interactive (clone copies included); `onHoverStart`/`onHoverEnd` drive
   // the composer prompt preview and `onSelect` sends.
-  const chipItems = React.useMemo(
+  const chipItems = useMemo(
     () =>
-      quickActions.map((action) => ({
+      quickActions.map(action => ({
         id: action.id,
         label: action.label,
         // Declarative spec — the unified chip resolves it via <EntityIcon>.
@@ -134,22 +134,17 @@ export function GuideWelcome({
         onHoverEnd: () => onQuickActionHoverEnd?.(),
       })),
     [quickActions, icon, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
-  )
+  );
 
   return (
-    <div
-      className={cn(
-        'flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)]',
-        className,
-      )}
-    >
+    <div className={cn('flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)]', className)}>
       {/* Greeting + slash-command list share one scroll region; `relative` so
           the edge fades can overlay it. */}
-      <div className="relative flex flex-1 min-h-0 flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={scrollRef}
           onScroll={updateScrollFade}
-          className="flex flex-1 min-h-0 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
+          className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] overflow-y-auto overscroll-contain"
         >
           {/* Greeting grows to fill (`flex-1`) so the slash-command list stays
               anchored below it — but its content is anchored at the TOP of the
@@ -176,13 +171,13 @@ export function GuideWelcome({
               />
             )}
             <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
-              <p className="text-h2 text-ods-text-primary">{title}</p>
+              <p className="text-ods-text-primary text-h2">{title}</p>
               {/* Sub-line: while the greeting is still being fetched show a
                   one-line skeleton; once settled, render the greeting (admin
                   copy / host override) or nothing — no built-in default, so by
                   default the empty state shows the title alone. */}
               {subtitle ? (
-                <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
+                <p className="text-ods-text-secondary text-h4">{subtitle}</p>
               ) : subtitleLoading ? (
                 <div className="flex w-full justify-center">
                   <Skeleton className="h-5 w-3/4 max-w-80 rounded-sm" />
@@ -222,5 +217,5 @@ export function GuideWelcome({
         />
       )}
     </div>
-  )
+  );
 }

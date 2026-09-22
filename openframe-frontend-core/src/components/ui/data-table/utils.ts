@@ -1,8 +1,8 @@
-import type { FilterFn } from '@tanstack/react-table'
-import type { TailwindBreakpoint } from './types'
+import type { FilterFn } from '@tanstack/react-table';
+import type { TailwindBreakpoint } from './types';
 
 /** Ascending breakpoint scale `hideAt` is expressed in. */
-export const BREAKPOINT_ORDER: TailwindBreakpoint[] = ['md', 'lg', 'xl', '2xl']
+export const BREAKPOINT_ORDER: TailwindBreakpoint[] = ['md', 'lg', 'xl', '2xl'];
 
 /**
  * Generates Tailwind hide classes based on breakpoint configuration.
@@ -11,21 +11,19 @@ export const BREAKPOINT_ORDER: TailwindBreakpoint[] = ['md', 'lg', 'xl', '2xl']
  * getHideClasses('md')           // 'hidden md:flex'
  * getHideClasses(['md', 'lg'])   // 'md:hidden lg:hidden xl:flex'
  */
-export function getHideClasses(
-  hideAt?: TailwindBreakpoint | TailwindBreakpoint[],
-): string {
-  if (!hideAt) return ''
+export function getHideClasses(hideAt?: TailwindBreakpoint | TailwindBreakpoint[]): string {
+  if (!hideAt) return '';
 
-  const breakpoints = Array.isArray(hideAt) ? hideAt : [hideAt]
+  const breakpoints = Array.isArray(hideAt) ? hideAt : [hideAt];
 
   if (breakpoints.length === 1) {
-    return `hidden ${breakpoints[0]}:flex`
+    return `hidden ${breakpoints[0]}:flex`;
   }
 
-  const maxIdx = Math.max(...breakpoints.map(bp => BREAKPOINT_ORDER.indexOf(bp)))
-  const hideClasses = breakpoints.map(bp => `${bp}:hidden`).join(' ')
-  const showBreakpoint = BREAKPOINT_ORDER[maxIdx + 1]
-  return showBreakpoint ? `${hideClasses} ${showBreakpoint}:flex` : hideClasses
+  const maxIdx = Math.max(...breakpoints.map(bp => BREAKPOINT_ORDER.indexOf(bp)));
+  const hideClasses = breakpoints.map(bp => `${bp}:hidden`).join(' ');
+  const showBreakpoint = BREAKPOINT_ORDER[maxIdx + 1];
+  return showBreakpoint ? `${hideClasses} ${showBreakpoint}:flex` : hideClasses;
 }
 
 /**
@@ -43,44 +41,42 @@ export function getHideClasses(
  * those classes directly, and a disagreement is a header that shows a different
  * set of columns than the rows beneath it.
  */
-export function getHideAtVisibility(
-  hideAt?: TailwindBreakpoint | TailwindBreakpoint[],
-): boolean[] {
-  const steps = BREAKPOINT_ORDER.length + 1
-  if (!hideAt) return Array.from({ length: steps }, () => true)
+export function getHideAtVisibility(hideAt?: TailwindBreakpoint | TailwindBreakpoint[]): boolean[] {
+  const steps = BREAKPOINT_ORDER.length + 1;
+  if (!hideAt) return Array.from({ length: steps }, () => true);
 
-  const breakpoints = Array.isArray(hideAt) ? hideAt : [hideAt]
+  const breakpoints = Array.isArray(hideAt) ? hideAt : [hideAt];
 
   // Single breakpoint → `hidden <bp>:flex`: hidden below it, visible from it.
   if (breakpoints.length === 1) {
-    const showFrom = BREAKPOINT_ORDER.indexOf(breakpoints[0]) + 1
-    return Array.from({ length: steps }, (_, step) => step >= showFrom)
+    const showFrom = BREAKPOINT_ORDER.indexOf(breakpoints[0]) + 1;
+    return Array.from({ length: steps }, (_, step) => step >= showFrom);
   }
 
   // Array → one `<bp>:hidden` per entry plus a single `<next>:flex`, and no bare
   // `hidden`, so the base step stays visible. Walk the scale upwards: later
   // classes win, and the show breakpoint always sits past every hide one.
-  const maxIdx = Math.max(...breakpoints.map(bp => BREAKPOINT_ORDER.indexOf(bp)))
-  const showBreakpoint = BREAKPOINT_ORDER[maxIdx + 1]
-  const visible = [true]
+  const maxIdx = Math.max(...breakpoints.map(bp => BREAKPOINT_ORDER.indexOf(bp)));
+  const showBreakpoint = BREAKPOINT_ORDER[maxIdx + 1];
+  const visible = [true];
   for (const bp of BREAKPOINT_ORDER) {
-    let state = visible[visible.length - 1]
-    if (breakpoints.includes(bp)) state = false
-    if (bp === showBreakpoint) state = true
-    visible.push(state)
+    let state = visible[visible.length - 1];
+    if (breakpoints.includes(bp)) state = false;
+    if (bp === showBreakpoint) state = true;
+    visible.push(state);
   }
-  return visible
+  return visible;
 }
 
 /** Maps `meta.align` to flex justify classes. */
 export function alignJustify(align?: 'left' | 'center' | 'right'): string {
   switch (align) {
     case 'center':
-      return 'justify-center text-center'
+      return 'justify-center text-center';
     case 'right':
-      return 'justify-end text-right'
+      return 'justify-end text-right';
     default:
-      return 'justify-start text-left'
+      return 'justify-start text-left';
   }
 }
 
@@ -102,9 +98,12 @@ export function alignJustify(align?: 'left' | 'center' | 'right'): string {
  *   },
  * ]
  */
-export const multiSelectFilterFn: FilterFn<any> = (row, columnId, filterValue) => {
-  const values = filterValue as Array<string | number | boolean> | undefined
-  if (!values || values.length === 0) return true
-  const cellValue = row.getValue(columnId)
-  return values.some(v => v === cellValue || String(v) === String(cellValue))
-}
+// Row-type-agnostic: only `row.getValue(columnId)` is touched, never a row
+// field, so the filter is declared at the erased row type and works for any
+// `ColumnDef<T>` it is attached to.
+export const multiSelectFilterFn: FilterFn<unknown> = (row, columnId, filterValue) => {
+  const values = filterValue as Array<string | number | boolean> | undefined;
+  if (!values || values.length === 0) return true;
+  const cellValue = row.getValue(columnId);
+  return values.some(v => v === cellValue || String(v) === String(cellValue));
+};

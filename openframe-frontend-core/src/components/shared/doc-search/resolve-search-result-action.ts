@@ -15,16 +15,16 @@
  * Pure — no React, no telemetry.
  */
 
-import type { SearchResult } from '../../ui/search-input'
-import type { ChatRef } from '../../chat/chat-ref.types'
-import type { ComposeContentUrl } from '../../../utils/content-href'
-import { decideNewTab } from '../../chat/utils/decide-new-tab'
+import type { ComposeContentUrl } from '../../../utils/content-href';
+import type { ChatRef } from '../../chat/chat-ref.types';
+import { decideNewTab } from '../../chat/utils/decide-new-tab';
+import type { SearchResult } from '../../ui/search-input';
 
 /** True for `https://…` and protocol-relative `//…`. A composed href that is
  *  NOT absolute is an in-app route the host claimed via `hostedTypes` /
  *  `overrides`. */
 function isAbsoluteHref(href: string): boolean {
-  return /^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(href)
+  return /^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(href);
 }
 
 export type SearchResultAction =
@@ -32,7 +32,7 @@ export type SearchResultAction =
   | { kind: 'navigate-new-tab'; href: string }
   | { kind: 'ask-ai'; detail: { source: string; ref: ChatRef } }
   | { kind: 'route'; path: string }
-  | { kind: 'noop' }
+  | { kind: 'noop' };
 
 export function resolveSearchResultAction(
   result: SearchResult,
@@ -45,13 +45,13 @@ export function resolveSearchResultAction(
    *  use. Omitted → the legacy verbatim-`externalUrl` behavior. */
   composeContentUrl?: ComposeContentUrl,
 ): SearchResultAction {
-  const meta = result.metadata ?? {}
-  const externalUrl = meta.externalUrl as string | undefined
-  const rowId = meta.id as string | undefined
-  const sourceRepo = meta.sourceRepo as string | undefined
-  const documentType = meta.documentType as string | undefined
+  const meta = result.metadata ?? {};
+  const externalUrl = meta.externalUrl as string | undefined;
+  const rowId = meta.id as string | undefined;
+  const sourceRepo = meta.sourceRepo as string | undefined;
+  const documentType = meta.documentType as string | undefined;
   if (externalUrl) {
-    const targetPlatform = meta.targetPlatform as string | null | undefined
+    const targetPlatform = meta.targetPlatform as string | null | undefined;
     // Unified content-href seam — the same call `resolveSourceRowCTA` makes
     // for chat rows. Hosted types relativize the slug out of `externalUrl`;
     // everything else comes back verbatim, so an unwired host (or a row with
@@ -64,14 +64,14 @@ export function resolveSearchResultAction(
             externalUrl,
             targetPlatform: targetPlatform ?? null,
           })
-        : null
-    const href = composed?.href || externalUrl
+        : null;
+    const href = composed?.href || externalUrl;
     // A RELATIVE composed href means the host claimed this row as in-app.
     // Short-circuit BEFORE `decideNewTab`: in embed mode that helper forces
     // new-tab unconditionally, which would fire `window.open()` on a path
     // that only resolves inside this app.
     if (composed && !isAbsoluteHref(href)) {
-      return { kind: 'navigate-same-tab', href }
+      return { kind: 'navigate-same-tab', href };
     }
     // Same pure helper `useNavLink` and `useUnifiedNav` call — single
     // decision rule across cards, chips, and autocomplete rows. Thread
@@ -83,10 +83,8 @@ export function resolveSearchResultAction(
       surface: 'useUnifiedNav',
       runtimeMode,
       currentSource: source,
-    })
-    return isNewTab
-      ? { kind: 'navigate-new-tab', href }
-      : { kind: 'navigate-same-tab', href }
+    });
+    return isNewTab ? { kind: 'navigate-new-tab', href } : { kind: 'navigate-same-tab', href };
   }
   if (rowId && sourceRepo && documentType) {
     return {
@@ -95,10 +93,10 @@ export function resolveSearchResultAction(
         source,
         ref: { type: documentType, id: rowId, title: result.title, url: null },
       },
-    }
+    };
   }
   if (result.path) {
-    return { kind: 'route', path: result.path }
+    return { kind: 'route', path: result.path };
   }
-  return { kind: 'noop' }
+  return { kind: 'noop' };
 }

@@ -109,7 +109,7 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
     }),
     // Per-documentType doc-viewer targets. Doc chips with NO public externalUrl
     // resolve here when their documentType has an entry — the lib emits
-    // `getBaseUrl(platform)/<basePath>/<path>` and opens it in a NEW TAB.
+    // `getPlatformUrl(platform)/<basePath>/<path>` and opens it in a NEW TAB.
     //
     // `markdown` is intentionally OMITTED — this embedder now mounts its OWN
     // `<DocsHubPage>` at /knowledge-base (see app-routes.tsx + pages/knowledge-base.tsx),
@@ -132,5 +132,6 @@ export function buildEndpointsRuntime(): EndpointsRuntime {
     announcementsUrl: EP.announcements,
     accessCode: { validateUrl: EP.accessValidate, consumeUrl: EP.accessConsume },
     contactUrl: EP.contact,
+    storageViewBaseUrl: EP.storageView,
   }
 }

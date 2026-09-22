@@ -27,7 +27,7 @@ export const CUSTOM_ITEM_ID = {
   EPIC: 1012,
   COMPONENT: 1013,
   INITIATIVE: 1014,
-} as const
+} as const;
 
 /**
  * Display name for a ClickUp task type — used in chat-inline cards and
@@ -36,24 +36,37 @@ export const CUSTOM_ITEM_ID = {
  * Returning `null` for unknown IDs lets callers fall back to a generic
  * "Task" affordance rather than printing `task-1100` or similar.
  */
-export function getTaskTypeLabel(
-  customItemId: number | null | undefined,
-): string | null {
+export function getTaskTypeLabel(customItemId: number | null | undefined): string | null {
   switch (customItemId) {
-    case CUSTOM_ITEM_ID.TASK:       return 'Task'
-    case CUSTOM_ITEM_ID.MILESTONE:  return 'Milestone'
-    case CUSTOM_ITEM_ID.RECURRING:  return 'Recurring'
-    case CUSTOM_ITEM_ID.SUBTASK:    return 'Subtask'
-    case CUSTOM_ITEM_ID.FORM:       return 'Form'
-    case CUSTOM_ITEM_ID.PLAN:       return 'Plan'
-    case CUSTOM_ITEM_ID.STRATEGY:   return 'Strategy'
-    case CUSTOM_ITEM_ID.BUG:        return 'Bug'
-    case CUSTOM_ITEM_ID.REQUEST:    return 'Request'
-    case CUSTOM_ITEM_ID.FEATURE:    return 'Feature'
-    case CUSTOM_ITEM_ID.STORY:      return 'Story'
-    case CUSTOM_ITEM_ID.EPIC:       return 'Epic'
-    case CUSTOM_ITEM_ID.COMPONENT:  return 'Component'
-    case CUSTOM_ITEM_ID.INITIATIVE: return 'Initiative'
-    default:                         return null
+    case CUSTOM_ITEM_ID.TASK:
+      return 'Task';
+    case CUSTOM_ITEM_ID.MILESTONE:
+      return 'Milestone';
+    case CUSTOM_ITEM_ID.RECURRING:
+      return 'Recurring';
+    case CUSTOM_ITEM_ID.SUBTASK:
+      return 'Subtask';
+    case CUSTOM_ITEM_ID.FORM:
+      return 'Form';
+    case CUSTOM_ITEM_ID.PLAN:
+      return 'Plan';
+    case CUSTOM_ITEM_ID.STRATEGY:
+      return 'Strategy';
+    case CUSTOM_ITEM_ID.BUG:
+      return 'Bug';
+    case CUSTOM_ITEM_ID.REQUEST:
+      return 'Request';
+    case CUSTOM_ITEM_ID.FEATURE:
+      return 'Feature';
+    case CUSTOM_ITEM_ID.STORY:
+      return 'Story';
+    case CUSTOM_ITEM_ID.EPIC:
+      return 'Epic';
+    case CUSTOM_ITEM_ID.COMPONENT:
+      return 'Component';
+    case CUSTOM_ITEM_ID.INITIATIVE:
+      return 'Initiative';
+    default:
+      return null;
   }
 }

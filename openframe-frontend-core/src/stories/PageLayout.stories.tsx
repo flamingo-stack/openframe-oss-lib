@@ -1,43 +1,43 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
-import { PageLayout } from '../components/layout/page-layout'
-import { TabSelector } from '../components/ui/tab-selector'
-import { Table, type TableColumn } from '../components/ui/table'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
 import {
   BoxArchiveIcon,
   GridLayoutIcon,
   PenEditIcon,
   PlusCircleIcon,
   TableCellIcon,
-} from '../components/icons-v2-generated'
+} from '../components/icons-v2-generated';
+import { PageLayout } from '../components/layout/page-layout';
+import { TabSelector } from '../components/ui/tab-selector';
+import { Table, type TableColumn } from '../components/ui/table';
 
 interface Device {
-  id: string
-  name: string
-  status: 'Active' | 'Inactive'
-  os: string
-  lastOnline: string
+  id: string;
+  name: string;
+  status: 'Active' | 'Inactive';
+  os: string;
+  lastOnline: string;
 }
 
 const sampleDevices: Device[] = [
   { id: '1', name: "John's Device", status: 'Active', os: 'macOS', lastOnline: '26/03/2026 15:42:27' },
   { id: '2', name: "Jane's Device", status: 'Active', os: 'macOS', lastOnline: '26/03/2026 15:40:10' },
   { id: '3', name: 'Reception PC', status: 'Inactive', os: 'Windows', lastOnline: '24/03/2026 09:11:02' },
-]
+];
 
 const deviceColumns: TableColumn<Device>[] = [
   { key: 'name', label: 'Device' },
   { key: 'status', label: 'Status' },
   { key: 'os', label: 'OS' },
   { key: 'lastOnline', label: 'Last Online' },
-]
+];
 
 const ORG_LOGO_DATA_URI =
   'data:image/svg+xml;utf8,' +
   encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="%23212121"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="Azeret Mono, monospace" font-size="22" font-weight="700" fill="%23FFC008">TF</text></svg>`,
-  )
+  );
 
 const meta = {
   title: 'Layout/PageLayout',
@@ -58,14 +58,12 @@ The \`subtitle\` and \`image\` props are optional — when set, the title block 
   argTypes: {
     actionsVariant: { control: 'select', options: ['icon-buttons', 'primary-buttons', 'menu-primary'] },
   },
-} satisfies Meta<typeof PageLayout>
+} satisfies Meta<typeof PageLayout>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
-const sampleContent = (
-  <Table data={sampleDevices} columns={deviceColumns} rowKey="id" />
-)
+const sampleContent = <Table data={sampleDevices} columns={deviceColumns} rowKey="id" />;
 
 /**
  * Title only — baseline header.
@@ -75,7 +73,7 @@ export const TitleOnly: Story = {
     title: 'Devices',
     children: sampleContent,
   },
-}
+};
 
 /**
  * Organization detail page with subtitle, thumbnail image, back button, and header actions —
@@ -108,7 +106,7 @@ export const WithSubtitleAndImage: Story = {
     ],
     children: sampleContent,
   },
-}
+};
 
 /**
  * Same content as `WithSubtitleAndImage`, viewed in a mobile viewport — actions collapse
@@ -119,7 +117,7 @@ export const MobileActionsMenu: Story = {
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
   },
-}
+};
 
 /**
  * Subtitle without image — useful for pages where the title needs a one-line context note.
@@ -139,7 +137,7 @@ export const WithSubtitleOnly: Story = {
     ],
     children: sampleContent,
   },
-}
+};
 
 /**
  * Image without subtitle — branded entity header without a metadata line.
@@ -151,7 +149,7 @@ export const WithImageOnly: Story = {
     backButton: { label: 'Back to Organizations', onClick: fn() },
     children: sampleContent,
   },
-}
+};
 
 /**
  * Page actions with a desktop-only `selector` (here a `TabSelector` for table/grid view
@@ -174,14 +172,14 @@ export const WithSelector: Story = {
     children: sampleContent,
   },
   render: function WithSelectorStory(args) {
-    const [view, setView] = useState<'table' | 'grid'>('table')
+    const [view, setView] = useState<'table' | 'grid'>('table');
     return (
       <PageLayout
         {...args}
         selector={
           <TabSelector
             value={view}
-            onValueChange={(v) => setView(v as 'table' | 'grid')}
+            onValueChange={v => setView(v as 'table' | 'grid')}
             items={[
               { id: 'table', label: '', icon: <TableCellIcon size={24} /> },
               { id: 'grid', label: '', icon: <GridLayoutIcon size={24} /> },
@@ -189,9 +187,9 @@ export const WithSelector: Story = {
           />
         }
       />
-    )
+    );
   },
-}
+};
 
 /**
  * Same args as `WithSelector` viewed in a mobile viewport — the selector is hidden
@@ -202,7 +200,7 @@ export const WithSelectorMobile: Story = {
   parameters: {
     viewport: { defaultViewport: 'mobile1' },
   },
-}
+};
 
 /**
  * Long title and subtitle truncate with ellipsis when the image is present, so the header
@@ -211,9 +209,8 @@ export const WithSelectorMobile: Story = {
 export const LongTitleTruncates: Story = {
   args: {
     title: 'A Very Long Organization Name That Will Not Fit On A Single Line Without Truncation',
-    subtitle:
-      'verylongdomainname.example.com • An Equally Long Industry Description That Should Truncate',
+    subtitle: 'verylongdomainname.example.com • An Equally Long Industry Description That Should Truncate',
     image: { src: ORG_LOGO_DATA_URI, alt: '' },
     children: sampleContent,
   },
-}
+};

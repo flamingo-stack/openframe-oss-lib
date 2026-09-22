@@ -1,17 +1,16 @@
 package com.openframe.notification;
 
-import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.NotificationCategory;
-import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSettingGroup;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.notification.service.NotificationCommand;
 import com.openframe.notification.spec.AttrKey;
 import com.openframe.notification.spec.Attrs;
 import com.openframe.notification.spec.Audience;
+import com.openframe.notification.spec.NotificationEntityRef;
 import com.openframe.notification.spec.NotificationSeed;
-import com.openframe.notification.spec.NotificationText;
 import com.openframe.notification.spec.NotificationType;
 import com.openframe.notification.spec.NotificationTypeRegistry;
 import com.openframe.notification.spec.NotificationTypeSpec;
@@ -66,7 +65,7 @@ class NotificationEmitterTest {
     }
 
     @Test
-    @DisplayName("The pipeline in one pass: typed seed → attrs mapping → compose/audience → command with type, attributes and legacy context")
+    @DisplayName("The pipeline in one pass: typed seed → attrs mapping → compose/audience → command with type and attributes")
     void happy_path_builds_the_full_command() {
         NotificationRequest request = NotificationRequest.of(new TestSeed("t-1", "u-9"));
 
@@ -85,7 +84,7 @@ class NotificationEmitterTest {
         assertThat(sent.getSeverity()).isEqualTo(NotificationSeverity.INFO);
         assertThat(sent.getAudience()).isSameAs(spec.audience);
         assertThat(sent.getCorrelationId()).isEqualTo("corr-1");
-        assertThat(sent.getContext().getType()).isEqualTo("TEST_TYPE");
+        assertThat(sent.getApplePushCategory()).isEqualTo("TEST_CATEGORY");
     }
 
     @Test
@@ -116,18 +115,26 @@ class NotificationEmitterTest {
         @Override public Optional<NotificationSettingGroup> getSettingsGroup() { return Optional.empty(); }
         @Override public NotificationCategory getCategory() { return NotificationCategory.TICKETS; }
         @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
-        @Override public Audience audience(Attrs attrs) { return audience; }
+        @Override public Audience audience(TestSeed seed) { return audience; }
+
+        @Override public Optional<NotificationEntityRef> entity(TestSeed seed) {
+            return NotificationEntityRef.of(NotificationEntityType.TICKET, seed.ticketId());
+        }
 
         @Override public Attrs attrs(TestSeed seed) {
             return Attrs.of(Map.of("ticketId", seed.ticketId())).with(ASSIGNEE, seed.assigneeUserId());
         }
 
-        @Override public NotificationText compose(Attrs attrs) {
-            return new NotificationText("Ticket " + attrs.get(TICKET_ID), "Assigned to " + attrs.get(ASSIGNEE));
+        @Override public String composeTitle(TestSeed seed) {
+            return "Ticket " + seed.ticketId();
         }
 
-        @Override public NotificationContext buildLegacyContext(Attrs attrs) {
-            return GenericContext.builder().type(getType().name()).payload("{}").build();
+        @Override public String composeDescription(TestSeed seed) {
+            return "Assigned to " + seed.assigneeUserId();
+        }
+
+        @Override public Optional<String> getApplePushCategory() {
+            return Optional.of("TEST_CATEGORY");
         }
     }
 }

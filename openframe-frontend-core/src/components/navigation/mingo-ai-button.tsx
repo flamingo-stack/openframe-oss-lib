@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import type React from 'react';
 import { cn } from '../../utils';
 import { MingoIcon } from '../icons';
 
@@ -96,7 +96,7 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
             (Figma 2936-6825). */}
         {/* Bare `text-h3` — the exact composite the default-size Button label
             uses (bold 700 and -0.02em tracking are built into the utility). */}
-        <span className="relative hidden whitespace-nowrap text-h3 text-ods-text-primary md:inline">{label}</span>
+        <span className="relative hidden whitespace-nowrap text-ods-text-primary text-h3 md:inline">{label}</span>
       </span>
     </button>
   );

@@ -1,5 +1,6 @@
 package com.openframe.api.service;
 
+import com.openframe.api.service.rmm.script.ScriptTagService;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;

@@ -1,6 +1,6 @@
 package com.openframe.client.metrics;
 
-import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
+import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;

@@ -1,6 +1,6 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.filter.ScheduleRunQueryFilter;
 import org.springframework.data.domain.Sort;
 

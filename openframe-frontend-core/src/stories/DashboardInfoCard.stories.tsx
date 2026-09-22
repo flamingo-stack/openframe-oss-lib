@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { DashboardInfoCard } from '../components/ui/dashboard-info-card'
-import { Tag } from '../components/ui/tag'
-import { MonitorIcon } from '../components/icons-v2-generated/devices/monitor-icon'
-import { FaceSmile01Icon } from '../components/icons-v2-generated/users/face-smile-01-icon'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { MonitorIcon } from '../components/icons-v2-generated/devices/monitor-icon';
+import { FaceSmile01Icon } from '../components/icons-v2-generated/users/face-smile-01-icon';
+import { DashboardInfoCard } from '../components/ui/dashboard-info-card';
+import { Tag } from '../components/ui/tag';
 
 const meta = {
   title: 'UI/DashboardInfoCard',
@@ -33,7 +33,8 @@ const meta = {
     },
     progressSize: {
       control: { type: 'number' },
-      description: 'Tablet/desktop ring diameter in px (mobile always shrinks to 24px), or `{ base, md?, lg? }` for full control. Default `{ base: 24, md: 56 }` (Figma spec).',
+      description:
+        'Tablet/desktop ring diameter in px (mobile always shrinks to 24px), or `{ base, md?, lg? }` for full control. Default `{ base: 24, md: 56 }` (Figma spec).',
     },
     href: { control: 'text', description: 'Navigation URL — renders as a Next.js Link with pointer cursor' },
     tooltip: { control: 'text', description: 'Tooltip content for the question-mark icon' },
@@ -41,10 +42,10 @@ const meta = {
     titleTag: { control: false, description: 'Tag rendered in the title row after the title (Figma "status" variant)' },
     icon: { control: false, description: 'Icon or image in a bordered square slot on the left (Figma "icon" variant)' },
   },
-} satisfies Meta<typeof DashboardInfoCard>
+} satisfies Meta<typeof DashboardInfoCard>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default card with a title and numeric value.
@@ -54,7 +55,7 @@ export const Default: Story = {
     title: 'Total Devices',
     value: 1284,
   },
-}
+};
 
 /**
  * Card with a string value.
@@ -64,7 +65,7 @@ export const StringValue: Story = {
     title: 'Status',
     value: 'Healthy',
   },
-}
+};
 
 /**
  * Card displaying a percentage alongside the value.
@@ -75,7 +76,7 @@ export const WithPercentage: Story = {
     value: 342,
     percentage: 97,
   },
-}
+};
 
 /**
  * Card with circular progress indicator.
@@ -87,7 +88,7 @@ export const WithProgress: Story = {
     percentage: 64,
     showProgress: true,
   },
-}
+};
 
 /**
  * Card with a custom progress variant.
@@ -100,7 +101,7 @@ export const CustomProgressVariant: Story = {
     showProgress: true,
     progressVariant: 'error',
   },
-}
+};
 
 /**
  * Card with a tooltip on the value.
@@ -111,7 +112,7 @@ export const WithTooltip: Story = {
     value: 56,
     tooltip: 'Users who logged in within the last 30 days',
   },
-}
+};
 
 /**
  * Clickable card with href — renders as a Link with pointer cursor and hover accent.
@@ -122,7 +123,7 @@ export const WithHref: Story = {
     value: 23,
     href: '/tickets',
   },
-}
+};
 
 /**
  * Card without href — no pointer cursor, no hover accent.
@@ -132,7 +133,7 @@ export const NonClickable: Story = {
     title: 'Total Revenue',
     value: '$12,400',
   },
-}
+};
 
 /**
  * Card with all features enabled.
@@ -147,7 +148,7 @@ export const FullyLoaded: Story = {
     tooltip: 'Based on the latest audit results',
     href: '/compliance',
   },
-}
+};
 
 /**
  * Warning variant — the percentage renders as a yellow-tinted Tag next to
@@ -170,7 +171,7 @@ export const WarningWithTag: Story = {
       },
     },
   },
-}
+};
 
 /**
  * Error variant — the percentage renders as a red-tinted Tag next to the
@@ -193,7 +194,7 @@ export const ErrorWithTag: Story = {
       },
     },
   },
-}
+};
 
 /**
  * `progressOverflow="wrap"` with the default `success` variant — at 130 the
@@ -209,7 +210,7 @@ export const OverflowWrap: Story = {
     progressVariant: 'success',
     progressOverflow: 'wrap',
   },
-}
+};
 
 /**
  * Side-by-side comparison of `overflow="clamp"` (default) vs `overflow="wrap"`
@@ -242,7 +243,7 @@ export const OverflowComparison: Story = {
       </div>
     ),
   ],
-}
+};
 
 /**
  * `percentageDisplay="plain"` keeps a colored progress ring while rendering the
@@ -265,7 +266,7 @@ export const PlainPercentageWithColoredRing: Story = {
       },
     },
   },
-}
+};
 
 /**
  * Four counters with
@@ -316,7 +317,7 @@ export const DeviceStatusesOverview: Story = {
       },
     },
   },
-}
+};
 
 /**
  * `progressSize` controls the tablet/desktop ring diameter (stroke scales with
@@ -347,7 +348,7 @@ export const ProgressSizeComparison: Story = {
       />
     </div>
   ),
-}
+};
 
 /**
  * Tag in the title row instead of a plain title — matches the Figma
@@ -366,7 +367,7 @@ export const WithTitleTag: Story = {
       },
     },
   },
-}
+};
 
 /**
  * Title and tag together in the title row.
@@ -377,7 +378,7 @@ export const WithTitleAndTag: Story = {
     value: 75,
     titleTag: <Tag variant="outline" label="Resolved" />,
   },
-}
+};
 
 /**
  * Icon in a bordered square slot on the left — matches the Figma
@@ -389,7 +390,7 @@ export const WithIcon: Story = {
     value: 4046,
     icon: <MonitorIcon />,
   },
-}
+};
 
 /**
  * An `<img>` in the icon slot — the node is stretched to fill the slot's
@@ -401,7 +402,7 @@ export const WithImage: Story = {
     value: 'Flamingo',
     icon: <img src="https://github.com/flamingo-stack.png" alt="Flamingo" className="rounded-[2px] object-cover" />,
   },
-}
+};
 
 /**
  * Every prop at once: icon slot, title + tag, sub-value, percentage,
@@ -430,7 +431,7 @@ export const KitchenSink: Story = {
       },
     },
   },
-}
+};
 
 /**
  * Multiple cards in a dashboard grid layout.
@@ -452,4 +453,4 @@ export const CardGrid: Story = {
       </div>
     ),
   ],
-}
+};

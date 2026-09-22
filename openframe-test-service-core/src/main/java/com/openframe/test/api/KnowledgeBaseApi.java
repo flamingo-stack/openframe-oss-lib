@@ -15,6 +15,7 @@ import com.openframe.test.data.dto.knowledgebase.KnowledgeBaseTempAttachmentPayl
 import com.openframe.test.data.dto.knowledgebase.LinkKnowledgeBaseTempAttachmentsInput;
 import com.openframe.test.data.dto.knowledgebase.UpdateArticleInput;
 import com.openframe.test.data.dto.shared.MutationDeleteInput;
+import com.openframe.test.data.dto.shared.GraphqlError;
 import com.openframe.test.data.dto.shared.MutationDeletePayload;
 
 import java.util.HashMap;
@@ -22,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ADD_TAG_TO_ITEM;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.REMOVE_TAG_FROM_ITEM;
+import static com.openframe.test.api.graphql.KnowledgeBaseQueries.UNPUBLISH_ARTICLE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ARCHIVED_ARTICLES;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ARCHIVE_ARTICLE;
 import static com.openframe.test.api.graphql.KnowledgeBaseQueries.ATTACHMENT_DOWNLOAD_URL;
@@ -317,6 +320,42 @@ public class KnowledgeBaseApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.addTagToKnowledgeBaseItem", KnowledgeBaseItem.class);
+    }
+
+    public static KnowledgeBaseItem removeTagFromItem(String itemId, String tagId) {
+        Map<String, Object> body = Map.of(
+                "query", REMOVE_TAG_FROM_ITEM,
+                "variables", Map.of("itemId", itemId, "tagId", tagId)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.removeTagFromKnowledgeBaseItem", KnowledgeBaseItem.class);
+    }
+
+    /** A tag attach expected to be refused (unknown tag); returns the top-level GraphQL errors. */
+    public static List<GraphqlError> attemptAddTagToItemErrors(String itemId, String tagId) {
+        Map<String, Object> body = Map.of(
+                "query", ADD_TAG_TO_ITEM,
+                "variables", Map.of("itemId", itemId, "tagId", tagId)
+        );
+        List<GraphqlError> errors = given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().statusCode(200)
+                .extract().jsonPath().getList("errors", GraphqlError.class);
+        return errors == null ? List.of() : errors;
+    }
+
+    /** Sends a PUBLISHED article back to DRAFT. */
+    public static KnowledgeBaseItem unpublishArticle(String articleId) {
+        Map<String, Object> body = Map.of(
+                "query", UNPUBLISH_ARTICLE,
+                "variables", Map.of("id", articleId)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.unpublishArticle", KnowledgeBaseItem.class);
     }
 
     // ---- Discovery helpers: locate existing data to operate on, failing fast when the env lacks it ----

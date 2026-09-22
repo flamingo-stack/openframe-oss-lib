@@ -148,3 +148,59 @@ fn shell_maps_to_param() {
     assert_eq!(ScriptShell::Cmd.as_param(), "cmd");
     assert_eq!(ScriptShell::Shell.as_param(), "sh");
 }
+
+#[test]
+fn execution_ack_serializes_camel_case() {
+    let ack = ExecutionAck {
+        execution_id: "ex".into(),
+        machine_id: "m".into(),
+        schedule_id: Some("sch".into()),
+        script_ids: vec!["s1".into(), "s2".into()],
+    };
+    let v = serde_json::to_value(&ack).unwrap();
+    assert_eq!(v["executionId"], "ex");
+    assert_eq!(v["machineId"], "m");
+    assert_eq!(v["scheduleId"], "sch");
+    assert_eq!(v["scriptIds"], serde_json::json!(["s1", "s2"]));
+}
+
+#[test]
+fn execution_ack_command_shape() {
+    // ad-hoc command: no schedule, no scripts.
+    let ack = ExecutionAck {
+        execution_id: "ex".into(),
+        machine_id: "m".into(),
+        schedule_id: None,
+        script_ids: vec![],
+    };
+    let v = serde_json::to_value(&ack).unwrap();
+    assert!(v["scheduleId"].is_null(), "scheduleId serializes as null");
+    assert_eq!(v["scriptIds"], serde_json::json!([]));
+}
+
+#[test]
+fn routed_script_messages_share_the_script_payload_but_not_the_policy() {
+    let payload = r#"{"executionId":"e","code":"winget install x","shell":"POWERSHELL"}"#;
+
+    let software = SoftwareScriptMessage::from_payload(payload).unwrap();
+    let requests = software.to_requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].code, "winget install x");
+    assert_eq!(software.execution_id(), "e");
+
+    assert_eq!(
+        SoftwareScriptMessage::PRIVILEGE_POLICY,
+        PrivilegePolicy::InteractiveElevated
+    );
+    assert_eq!(
+        BootstrapScriptMessage::PRIVILEGE_POLICY,
+        PrivilegePolicy::AsRequested
+    );
+    assert_eq!(
+        ScriptMessage::PRIVILEGE_POLICY,
+        PrivilegePolicy::AsRequested
+    );
+
+    assert_eq!(SoftwareScriptMessage::KIND, "software-execution");
+    assert_eq!(BootstrapScriptMessage::KIND, "script-bootstrap-execution");
+}

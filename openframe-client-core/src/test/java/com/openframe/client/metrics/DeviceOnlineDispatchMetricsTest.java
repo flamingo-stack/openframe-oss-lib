@@ -1,6 +1,6 @@
 package com.openframe.client.metrics;
 
-import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
+import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;

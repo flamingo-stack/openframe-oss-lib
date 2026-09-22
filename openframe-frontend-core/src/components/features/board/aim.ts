@@ -1,5 +1,5 @@
-import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge'
-import type { BoardChange, BoardColumnDef } from './types'
+import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import type { BoardChange, BoardColumnDef } from './types';
 
 /**
  * Where a card being moved currently points: a lane, and a slot among the cards
@@ -13,32 +13,32 @@ import type { BoardChange, BoardColumnDef } from './types'
  * it jump between two positions as the pointer crosses the boundary.
  */
 export interface BoardAim {
-  columnId: string
+  columnId: string;
   /** Insertion index among the other cards, so `0..others.length`. */
-  index: number
+  index: number;
 }
 
-export type ArrowKey = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight'
+export type ArrowKey = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight';
 
 /** Whether a lane will take this card — the board's own rules, passed in so this
  *  module stays arithmetic. */
-type LaneFilter = (column: BoardColumnDef) => boolean
+type LaneFilter = (column: BoardColumnDef) => boolean;
 
 const othersIn = (columns: readonly BoardColumnDef[], columnId: string, ticketId: string) =>
-  (columns.find(c => c.id === columnId)?.tickets ?? []).filter(t => t.id !== ticketId)
+  (columns.find(c => c.id === columnId)?.tickets ?? []).filter(t => t.id !== ticketId);
 
 /** The lane a card is in right now, or `null` if it is in none of them. */
 export function laneOf(columns: readonly BoardColumnDef[], ticketId: string): BoardColumnDef | null {
-  return columns.find(c => c.tickets.some(t => t.id === ticketId)) ?? null
+  return columns.find(c => c.tickets.some(t => t.id === ticketId)) ?? null;
 }
 
 /** Where a card starts: exactly where it already sits. */
 export function initialAim(columns: readonly BoardColumnDef[], ticketId: string): BoardAim | null {
-  const lane = laneOf(columns, ticketId)
-  if (!lane) return null
+  const lane = laneOf(columns, ticketId);
+  if (!lane) return null;
   // Its index among the others is its own index: dropping it back at that slot
   // puts it exactly where it came from.
-  return { columnId: lane.id, index: lane.tickets.findIndex(t => t.id === ticketId) }
+  return { columnId: lane.id, index: lane.tickets.findIndex(t => t.id === ticketId) };
 }
 
 /**
@@ -61,13 +61,13 @@ export function aimFromTarget(
   ticketId: string,
   target: Record<string | symbol, unknown>,
 ): BoardAim | null {
-  const columnId = String(target.columnId)
-  if (!columns.some(c => c.id === columnId)) return null
-  const others = othersIn(columns, columnId, ticketId)
-  if (target.type !== 'ticket') return { columnId, index: others.length }
-  const over = others.findIndex(t => t.id === String(target.ticketId))
-  if (over < 0) return { columnId, index: others.length }
-  return { columnId, index: over + (extractClosestEdge(target) === 'bottom' ? 1 : 0) }
+  const columnId = String(target.columnId);
+  if (!columns.some(c => c.id === columnId)) return null;
+  const others = othersIn(columns, columnId, ticketId);
+  if (target.type !== 'ticket') return { columnId, index: others.length };
+  const over = others.findIndex(t => t.id === String(target.ticketId));
+  if (over < 0) return { columnId, index: others.length };
+  return { columnId, index: over + (extractClosestEdge(target) === 'bottom' ? 1 : 0) };
 }
 
 export function moveAim(
@@ -78,21 +78,21 @@ export function moveAim(
   accepts: LaneFilter,
 ): BoardAim {
   if (key === 'ArrowUp' || key === 'ArrowDown') {
-    const limit = othersIn(columns, aim.columnId, ticketId).length
-    const index = Math.min(Math.max(aim.index + (key === 'ArrowUp' ? -1 : 1), 0), limit)
-    return index === aim.index ? aim : { ...aim, index }
+    const limit = othersIn(columns, aim.columnId, ticketId).length;
+    const index = Math.min(Math.max(aim.index + (key === 'ArrowUp' ? -1 : 1), 0), limit);
+    return index === aim.index ? aim : { ...aim, index };
   }
 
-  const step = key === 'ArrowLeft' ? -1 : 1
-  const from = columns.findIndex(c => c.id === aim.columnId)
+  const step = key === 'ArrowLeft' ? -1 : 1;
+  const from = columns.findIndex(c => c.id === aim.columnId);
   for (let i = from + step; i >= 0 && i < columns.length; i += step) {
-    const column = columns[i]
-    if (!accepts(column)) continue
+    const column = columns[i];
+    if (!accepts(column)) continue;
     // Keep the slot the card had, as far as the new lane allows.
-    const limit = othersIn(columns, column.id, ticketId).length
-    return { columnId: column.id, index: Math.min(aim.index, limit) }
+    const limit = othersIn(columns, column.id, ticketId).length;
+    return { columnId: column.id, index: Math.min(aim.index, limit) };
   }
-  return aim
+  return aim;
 }
 
 /** The card the preview hangs off, and which side of it — `null` for a lane with
@@ -102,10 +102,10 @@ export function aimAnchor(
   ticketId: string,
   aim: BoardAim,
 ): { ticketId: string | null; edge: 'top' | 'bottom' | null } {
-  const others = othersIn(columns, aim.columnId, ticketId)
-  if (others.length === 0) return { ticketId: null, edge: null }
-  if (aim.index < others.length) return { ticketId: others[aim.index].id, edge: 'top' }
-  return { ticketId: others[others.length - 1].id, edge: 'bottom' }
+  const others = othersIn(columns, aim.columnId, ticketId);
+  if (others.length === 0) return { ticketId: null, edge: null };
+  if (aim.index < others.length) return { ticketId: others[aim.index].id, edge: 'top' };
+  return { ticketId: others[others.length - 1].id, edge: 'bottom' };
 }
 
 /**
@@ -115,17 +115,17 @@ export function aimAnchor(
  * where it began must be as silent as a card picked up and put down again.
  */
 export function aimToChange(columns: readonly BoardColumnDef[], ticketId: string, aim: BoardAim): BoardChange | null {
-  const lane = laneOf(columns, ticketId)
-  if (!lane) return null
+  const lane = laneOf(columns, ticketId);
+  if (!lane) return null;
 
-  const others = othersIn(columns, aim.columnId, ticketId)
-  const afterTicketId = others[aim.index - 1]?.id ?? null
-  const beforeTicketId = others[aim.index]?.id ?? null
+  const others = othersIn(columns, aim.columnId, ticketId);
+  const afterTicketId = others[aim.index - 1]?.id ?? null;
+  const beforeTicketId = others[aim.index]?.id ?? null;
 
   if (lane.id === aim.columnId) {
-    const currentIndex = lane.tickets.findIndex(t => t.id === ticketId)
-    if ((lane.tickets[currentIndex - 1]?.id ?? null) === afterTicketId) return null
+    const currentIndex = lane.tickets.findIndex(t => t.id === ticketId);
+    if ((lane.tickets[currentIndex - 1]?.id ?? null) === afterTicketId) return null;
   }
 
-  return { ticketId, fromColumnId: lane.id, toColumnId: aim.columnId, afterTicketId, beforeTicketId }
+  return { ticketId, fromColumnId: lane.id, toColumnId: aim.columnId, afterTicketId, beforeTicketId };
 }

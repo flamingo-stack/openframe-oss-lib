@@ -1,11 +1,11 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
-import { Autocomplete, type AutocompleteOption } from '../components/ui/autocomplete'
-import { Button } from '../components/ui/button'
-import { Modal, ModalContent, ModalFooter, ModalHeader, ModalTitle } from '../components/ui/modal'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
+import { Autocomplete, type AutocompleteOption } from '../components/ui/autocomplete';
+import { Button } from '../components/ui/button';
+import { Modal, ModalContent, ModalFooter, ModalHeader, ModalTitle } from '../components/ui/modal';
 
-type ModalStoryMeta = Meta<typeof Modal>
+type ModalStoryMeta = Meta<typeof Modal>;
 
 const meta: ModalStoryMeta = {
   title: 'UI/Modal',
@@ -29,10 +29,10 @@ const meta: ModalStoryMeta = {
       description: 'Custom className for the modal container',
     },
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default modal with header, content and footer.
@@ -44,7 +44,7 @@ export const Default: Story = {
     children: null,
   },
   render: function Render(args) {
-    const [isOpen, setIsOpen] = useState(args.isOpen)
+    const [isOpen, setIsOpen] = useState(args.isOpen);
 
     return (
       <>
@@ -56,9 +56,7 @@ export const Default: Story = {
             <ModalTitle>Modal Title</ModalTitle>
           </ModalHeader>
           <ModalContent className="px-6 py-4">
-            <p className="text-ods-text-secondary">
-              This is a basic modal with header, content and footer sections.
-            </p>
+            <p className="text-ods-text-secondary">This is a basic modal with header, content and footer sections.</p>
           </ModalContent>
           <ModalFooter>
             <Button variant="outline" onClick={() => setIsOpen(false)}>
@@ -70,9 +68,9 @@ export const Default: Story = {
           </ModalFooter>
         </Modal>
       </>
-    )
+    );
   },
-}
+};
 
 const autocompleteOptions: AutocompleteOption<string>[] = [
   { label: 'Enterprise', value: 'enterprise' },
@@ -85,7 +83,7 @@ const autocompleteOptions: AutocompleteOption<string>[] = [
   { label: 'Finance', value: 'finance' },
   { label: 'Retail', value: 'retail' },
   { label: 'Technology', value: 'technology' },
-]
+];
 
 /**
  * Modal with Autocomplete inside. The Autocomplete dropdown renders inline in
@@ -99,19 +97,15 @@ export const WithAutocomplete: Story = {
     children: null,
   },
   render: function Render(args) {
-    const [isOpen, setIsOpen] = useState(args.isOpen)
-    const [selected, setSelected] = useState<string[]>(['enterprise'])
+    const [isOpen, setIsOpen] = useState(args.isOpen);
+    const [selected, setSelected] = useState<string[]>(['enterprise']);
 
     return (
       <>
         <Button onClick={() => setIsOpen(true)} variant="outline">
           Open Modal with Autocomplete
         </Button>
-        <Modal
-          isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
-          className="max-w-lg overflow-visible"
-        >
+        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} className="max-w-lg overflow-visible">
           <ModalHeader>
             <ModalTitle>Select Industries</ModalTitle>
           </ModalHeader>
@@ -135,6 +129,6 @@ export const WithAutocomplete: Story = {
           </ModalFooter>
         </Modal>
       </>
-    )
+    );
   },
-}
+};

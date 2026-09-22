@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { EmployeeEntryCard, EmployeeEntryBadge } from '../components/chat/entity-cards/employee-entry-card'
-import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator'
-import { howIWorkEntry, whatIShippedEntry } from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { EmployeeEntryCard, EmployeeEntryBadge } from '../components/chat/entity-cards/employee-entry-card';
+import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator';
+import { howIWorkEntry, whatIShippedEntry } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof EmployeeEntryCard> = {
   title: 'Chat/EntityCards/EmployeeEntryCard',
@@ -15,32 +15,38 @@ const meta: Meta<typeof EmployeeEntryCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Published: Story = {
   args: {
     entry: whatIShippedEntry,
     dateLabel: 'Jul 2026',
   },
-}
+};
 
 export const Draft: Story = {
   args: {
     entry: { ...whatIShippedEntry, status: 'draft' },
     dateLabel: 'Jul 2026',
   },
-}
+};
 
 export const Archived: Story = {
   args: {
     entry: { ...whatIShippedEntry, status: 'archived' },
     dateLabel: 'Jul 2026',
   },
-}
+};
 
 export const WithExtraBadges: Story = {
   args: {
@@ -53,7 +59,7 @@ export const WithExtraBadges: Story = {
       </>
     ),
   },
-}
+};
 
 /** Cover falls back to the video frame when there is no featured image. */
 export const VideoThumbnailFallback: Story = {
@@ -61,12 +67,11 @@ export const VideoThumbnailFallback: Story = {
     entry: {
       ...whatIShippedEntry,
       featured_image: null,
-      main_video_thumbnail:
-        'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=1200&h=675&fit=crop',
+      main_video_thumbnail: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=1200&h=675&fit=crop',
     },
     dateLabel: 'Jul 2026',
   },
-}
+};
 
 /** The auto-created-draft state: no title yet, no summary, no cover — the card
  *  must still read as a specific entity, not an error. */
@@ -83,7 +88,7 @@ export const EmptyDraft: Story = {
     dateLabel: null,
     untitledLabel: 'Untitled session',
   },
-}
+};
 
 /** Related-rail mode: the whole card is a link (never combined with actions). */
 export const AsAnchor: Story = {
@@ -92,4 +97,4 @@ export const AsAnchor: Story = {
     dateLabel: 'Jul 2026',
     anchorProps: makeAnchorProps('/what-i-shipped/billing-flow'),
   },
-}
+};

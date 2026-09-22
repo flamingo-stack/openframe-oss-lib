@@ -1,7 +1,12 @@
-import React from 'react';
+import type React from 'react';
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export const OpenFrameLogo = ({ className, lowerPathColor, upperPathColor,  ...props }: { className?: string, lowerPathColor?: string, upperPathColor?: string } & React.SVGProps<SVGSVGElement>) => {
+export const OpenFrameLogo = ({
+  className,
+  lowerPathColor,
+  upperPathColor,
+  ...props
+}: { className?: string; lowerPathColor?: string; upperPathColor?: string } & React.SVGProps<SVGSVGElement>) => {
   return (
     <svg
       {...props}
@@ -11,10 +16,12 @@ export const OpenFrameLogo = ({ className, lowerPathColor, upperPathColor,  ...p
       viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      style={{
-        '--fill-0': 'currentColor',
-        ...props.style
-      } as React.CSSProperties}
+      style={
+        {
+          '--fill-0': 'currentColor',
+          ...props.style,
+        } as React.CSSProperties
+      }
     >
       <g>
         <g>
@@ -44,4 +51,4 @@ export const OpenFrameLogo = ({ className, lowerPathColor, upperPathColor,  ...p
       </g>
     </svg>
   );
-}; 
+};

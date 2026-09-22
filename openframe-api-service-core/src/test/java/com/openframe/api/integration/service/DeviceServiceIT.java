@@ -6,11 +6,11 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.integration.BaseMongoIntegrationTest;
 import com.openframe.api.integration.support.DeviceServiceIntegrationTestApplication;
-import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,8 +28,8 @@ import org.springframework.data.mongodb.core.query.Update;
 import java.util.List;
 import java.util.Set;
 
-import static com.openframe.data.document.rmm.OsType.MAC_OS;
-import static com.openframe.data.document.rmm.OsType.WINDOWS;
+import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
+import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

@@ -34,30 +34,30 @@
  *     any) is captured as `lead` and re-emitted as text, so it is preserved.
  */
 
-import type { Plugin } from 'unified'
-import type { Root, Text, Link } from 'mdast'
-import { visit, SKIP } from 'unist-util-visit'
+import type { Root, Text, Link } from 'mdast';
+import type { Plugin } from 'unified';
+import { visit, SKIP } from 'unist-util-visit';
 
-const MENTION_REGEX = /(^|[^\w@])@([a-zA-Z]+):([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g
+const MENTION_REGEX = /(^|[^\w@])@([a-zA-Z]+):([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g;
 
 export const remarkMentionChips: Plugin<[], Root> = () => {
   return (tree: Root) => {
     visit(tree, 'text', (node: Text, index, parent) => {
-      if (!parent || typeof index !== 'number') return
-      const text = node.value
-      if (!text || !text.includes('@')) return
+      if (!parent || typeof index !== 'number') return undefined;
+      const text = node.value;
+      if (!text || !text.includes('@')) return undefined;
 
-      const parts: Array<Text | Link> = []
-      let lastIndex = 0
-      MENTION_REGEX.lastIndex = 0
-      let match: RegExpExecArray | null
+      const parts: Array<Text | Link> = [];
+      let lastIndex = 0;
+      MENTION_REGEX.lastIndex = 0;
+      let match: RegExpExecArray | null;
       while ((match = MENTION_REGEX.exec(text)) !== null) {
-        const lead = match[1] // '' or the boundary char before '@' (space, '(', etc.)
-        const marker = match[2]
-        const id = match[3]
-        const tokenStart = match.index + lead.length // position of '@'
+        const lead = match[1]; // '' or the boundary char before '@' (space, '(', etc.)
+        const marker = match[2];
+        const id = match[3];
+        const tokenStart = match.index + lead.length; // position of '@'
         if (tokenStart > lastIndex) {
-          parts.push({ type: 'text', value: text.slice(lastIndex, tokenStart) })
+          parts.push({ type: 'text', value: text.slice(lastIndex, tokenStart) });
         }
         parts.push({
           type: 'link',
@@ -65,17 +65,17 @@ export const remarkMentionChips: Plugin<[], Root> = () => {
           // Keep the raw token as the visible children so an unresolved mention
           // (no matching context item) falls back to the literal text.
           children: [{ type: 'text', value: `@${marker}:${id}` }],
-        })
-        lastIndex = match.index + match[0].length
+        });
+        lastIndex = match.index + match[0].length;
       }
-      if (lastIndex === 0) return // no matches
+      if (lastIndex === 0) return undefined; // no matches
 
       if (lastIndex < text.length) {
-        parts.push({ type: 'text', value: text.slice(lastIndex) })
+        parts.push({ type: 'text', value: text.slice(lastIndex) });
       }
 
-      parent.children.splice(index, 1, ...parts)
-      return [SKIP, index + parts.length]
-    })
-  }
-}
+      parent.children.splice(index, 1, ...parts);
+      return [SKIP, index + parts.length];
+    });
+  };
+};
