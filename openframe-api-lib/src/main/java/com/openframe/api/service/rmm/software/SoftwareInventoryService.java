@@ -30,7 +30,6 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -79,18 +78,22 @@ public class SoftwareInventoryService {
 
     private FleetMdmClient fleet;
 
-    @PostConstruct
-    void wireFleetClient() {
-        FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantIdEnv);
-        String key = IntegratedToolId.FLEET_SERVER_ID.getValue();
-        IntegratedTool tool = integratedToolRepository.findByKey(key)
-                .orElseThrow(() -> new IllegalStateException("Fleet MDM tool not configured: " + key));
-        this.fleet = new FleetMdmClient(tool.apiUrl(), tool.apiToken(), tenantIdEnv);
+    private FleetMdmClient fleet() {
+        FleetMdmClient client = fleet;
+        if (client == null) {
+            FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantIdEnv);
+            String key = IntegratedToolId.FLEET_SERVER_ID.getValue();
+            IntegratedTool tool = integratedToolRepository.findByKey(key)
+                    .orElseThrow(() -> new IllegalStateException("Fleet MDM tool not configured: " + key));
+            client = new FleetMdmClient(tool.apiUrl(), tool.apiToken(), tenantIdEnv);
+            fleet = client;
+        }
+        return client;
     }
 
     public Optional<SoftwareResponse> findById(String softwareId) {
         return parseNumericId(softwareId)
-                .map(fleet::getSoftwareTitle)
+                .map(fleet()::getSoftwareTitle)
                 .map(FleetSoftwareMapper::toResponse)
                 .map(row -> {
                     enrichRealDevicesCount(List.of(row));
@@ -137,7 +140,7 @@ public class SoftwareInventoryService {
                     HostSearchRequest request = new HostSearchRequest();
                     request.setSoftwareTitleId(titleId);
                     request.setPerPage(HOSTS_PER_TITLE_LIMIT);
-                    return fleet.searchHosts(request);
+                    return fleet().searchHosts(request);
                 })
                 .orElseGet(List::of);
     }
@@ -149,7 +152,7 @@ public class SoftwareInventoryService {
                 .orderKey(orderKey).orderDirection(orderDirection)
                 .vulnerable(vulnerable)
                 .build();
-        SoftwareTitlesResponse response = fleet.listSoftwareTitles(request);
+        SoftwareTitlesResponse response = fleet().listSoftwareTitles(request);
         List<SoftwareResponse> items = mapTitles(response);
         boolean hasNext = response.getMeta() != null
                 && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
@@ -167,7 +170,7 @@ public class SoftwareInventoryService {
                     .page(page).perPage(TITLES_FETCH_PAGE).query(search)
                     .vulnerable(vulnerable)
                     .build();
-            SoftwareTitlesResponse response = fleet.listSoftwareTitles(request);
+            SoftwareTitlesResponse response = fleet().listSoftwareTitles(request);
             all.addAll(mapTitles(response));
             boolean hasNext = response.getMeta() != null
                     && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
@@ -223,7 +226,7 @@ public class SoftwareInventoryService {
         if (parsed.isEmpty()) {
             return PageResult.empty(page);
         }
-        SoftwareTitle title = fleet.getSoftwareTitle(parsed.get());
+        SoftwareTitle title = fleet().getSoftwareTitle(parsed.get());
         if (title == null || title.getVersions() == null || title.getVersions().isEmpty()) {
             return PageResult.empty(page);
         }
@@ -282,7 +285,7 @@ public class SoftwareInventoryService {
         if (titleId.isEmpty()) {
             return List.of();
         }
-        SoftwareTitle title = fleet.getSoftwareTitle(titleId.get());
+        SoftwareTitle title = fleet().getSoftwareTitle(titleId.get());
         if (title == null || title.getVersions() == null || title.getVersions().isEmpty()) {
             return List.of();
         }
@@ -296,7 +299,7 @@ public class SoftwareInventoryService {
             HostSearchRequest request = new HostSearchRequest();
             request.setSoftwareVersionId(version.getId());
             request.setPerPage(DEVICES_PER_VERSION_LIMIT);
-            List<Host> hosts = fleet.searchHosts(request);
+            List<Host> hosts = fleet().searchHosts(request);
             hosts.forEach(host -> hostVersions.add(new HostVersion(host, version.getVersion())));
         }
 
@@ -439,7 +442,7 @@ public class SoftwareInventoryService {
         // (404) — collect only the resolved ones; callers null-coalesce a missing key.
         Map<String, Vulnerability> enrichment = new java.util.concurrent.ConcurrentHashMap<>();
         cves.parallelStream().forEach(cve -> {
-            Vulnerability detail = fleet.getVulnerability(cve);
+            Vulnerability detail = fleet().getVulnerability(cve);
             if (detail != null) {
                 enrichment.put(cve, detail);
             }
