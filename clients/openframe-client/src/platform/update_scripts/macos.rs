@@ -269,6 +269,7 @@ if [ $MARKER_OK -ne 1 ]; then
 fi
 
 log "Boot marker matched target version '$TARGET_VERSION'"
+rm -f "$PREV_PATH" 2>/dev/null
 
 set_update_phase "verifying"
 

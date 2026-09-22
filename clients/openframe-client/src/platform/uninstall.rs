@@ -83,6 +83,44 @@ fn spawn_detached_uninstall_windows(install_path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn remove_binary_siblings(install_path: &Path) {
+    let Some(dir) = install_path.parent() else {
+        return;
+    };
+    let Some(exe_name) = install_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+    else {
+        return;
+    };
+    let stem = install_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| exe_name.clone());
+    let prefixes = [format!("{exe_name}."), format!(".{stem}-update-")];
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !prefixes.iter().any(|p| name.starts_with(p)) {
+            continue;
+        }
+        let path = entry.path();
+        match std::fs::remove_file(&path) {
+            Ok(()) => info!("Removed update leftover: {}", path.display()),
+            Err(e) => warn!("Failed to remove update leftover {}: {}", path.display(), e),
+        }
+    }
+}
+
+async fn remove_update_temp_files() {
+    match crate::services::UpdateCleanupService::new() {
+        Ok(cleanup) => cleanup.cleanup_all().await,
+        Err(e) => warn!("Failed to initialize update cleanup: {:#}", e),
+    }
+}
+
 pub fn orbit_dir() -> std::path::PathBuf {
     #[cfg(target_os = "windows")]
     {
@@ -416,6 +454,9 @@ pub async fn uninstall_windows(
         deregistration_service.retry_if_unreported().await;
     }
 
+    remove_binary_siblings(install_path);
+    remove_update_temp_files().await;
+
     // Launch cleanup script to remove binary after process exit
     if install_path.exists() {
         info!("Launching binary cleanup script...");
@@ -530,6 +571,9 @@ pub async fn uninstall_macos(
             warn!("Binary could not be removed, may require manual cleanup");
         }
     }
+
+    remove_binary_siblings(install_path);
+    remove_update_temp_files().await;
 
     // Final chance to report the uninstall now that the wipe is done.
     if let Some(deregistration_service) = &deregistration_service {
