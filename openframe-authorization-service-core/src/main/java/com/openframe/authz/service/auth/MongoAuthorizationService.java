@@ -4,6 +4,8 @@ import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
@@ -12,6 +14,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -34,6 +37,35 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
     @Override
     public void remove(OAuth2Authorization authorization) {
         repository.deleteById(authorization.getId());
+    }
+
+    /**
+     * Revokes every refresh token issued to the principal, the same way /oauth2/revoke does on logout:
+     * the refresh token (and its access token) is marked invalidated, so it can no longer be exchanged.
+     * Principal names are the user's email; matched case-insensitively because SSO logins carry the
+     * provider's email claim as-is.
+     */
+    public int revokeAllForPrincipal(String principalName) {
+        List<MongoOAuth2Authorization> entities =
+                repository.findAllByPrincipalNameIgnoreCaseAndRefreshTokenValueNotNull(principalName);
+        for (MongoOAuth2Authorization entity : entities) {
+            OAuth2Authorization authorization = MongoAuthorizationMapper.toDomain(entity, registeredClientRepository);
+            save(invalidate(authorization));
+        }
+        return entities.size();
+    }
+
+    private static OAuth2Authorization invalidate(OAuth2Authorization authorization) {
+        OAuth2Authorization.Builder builder = OAuth2Authorization.from(authorization);
+        OAuth2Authorization.Token<OAuth2RefreshToken> refresh = authorization.getRefreshToken();
+        if (refresh != null) {
+            builder.token(refresh.getToken(), md -> md.put(OAuth2Authorization.Token.INVALIDATED_METADATA_NAME, true));
+        }
+        OAuth2Authorization.Token<OAuth2AccessToken> access = authorization.getAccessToken();
+        if (access != null) {
+            builder.token(access.getToken(), md -> md.put(OAuth2Authorization.Token.INVALIDATED_METADATA_NAME, true));
+        }
+        return builder.build();
     }
 
     @Override
