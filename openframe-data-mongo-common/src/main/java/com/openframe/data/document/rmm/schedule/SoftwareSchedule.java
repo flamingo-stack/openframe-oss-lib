@@ -42,6 +42,8 @@ public class SoftwareSchedule implements TenantScoped {
     @Builder.Default
     private ScheduleDeviceSelectionMode selectionMode = ScheduleDeviceSelectionMode.SPECIFIC;
 
+    private ScheduleDeviceCriteria deviceCriteria;
+
     @Builder.Default
     private ScheduleScriptTrigger trigger = ScheduleScriptTrigger.DATE_TIME;
 
