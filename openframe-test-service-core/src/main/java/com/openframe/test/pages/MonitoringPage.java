@@ -6,11 +6,7 @@ import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.AriaRole;
 import com.microsoft.playwright.options.WaitForSelectorState;
 
-/**
- * Page Object for the OpenFrame Monitoring page.
- * URL: /monitoring/
- * Contains two tabs: Policies and Queries.
- */
+// Page Object for the OpenFrame Monitoring page (/monitoring/). Contains two tabs: Policies and Queries.
 public class MonitoringPage {
 
     private final Page page;
@@ -20,21 +16,12 @@ public class MonitoringPage {
     private static final String POLICIES_URL = "/monitoring";
     private static final String QUERIES_URL = "/monitoring?tab=queries";
 
-    /**
-     * How long a row read waits for the list to render. The list arrives from its own query, later than
-     * the summary cards {@code goToMonitoring()} waits on, so a read straight after navigation has to
-     * wait for the row itself.
-     */
+    // The list arrives from its own query, later than the summary cards goToMonitoring() waits on, so a
+    // read straight after navigation has to wait for the row itself.
     private static final double ROW_WAIT_TIMEOUT_MS = 15_000;
 
     // ── Tab navigation ────────────────────────────────────────────────────────
-    /**
-     * "Policies" tab button in the tab bar
-     */
     private final Locator tabPolicies;
-    /**
-     * "Queries" tab button in the tab bar
-     */
     private final Locator tabQueries;
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -42,95 +29,35 @@ public class MonitoringPage {
     // ══════════════════════════════════════════════════════════════════════════
 
     // ── Page header ──────────────────────────────────────────────────────────
-    /**
-     * <h1>Policies</h1>
-     */
     private final Locator policiesHeading;
-    /**
-     * Primary "Add Policy" button (text label, visible on larger screens)
-     */
     private final Locator addPolicyButtonText;
-    /**
-     * Icon-only "Add Policy" button (aria-label, visible on smaller screens)
-     */
     private final Locator addPolicyButtonIcon;
-    /**
-     * Search input field
-     */
     private final Locator searchPoliciesInput;
 
     // ── Summary / metric cards ────────────────────────────────────────────────
-    /**
-     * Card containing "Total Policies" label and count value
-     */
     private final Locator totalPoliciesCard;
-    /**
-     * Numeric value inside the Total Policies card
-     */
     private final Locator totalPoliciesValue;
-    /**
-     * Card containing "Compliance Rate" label and ratio/percentage
-     */
     private final Locator complianceRateCard;
-    /**
-     * Compliance ratio text, e.g. "1/1"
-     */
     private final Locator complianceRateRatio;
-    /**
-     * Compliance percentage text, e.g. "(100%)"
-     */
     private final Locator complianceRatePercent;
-    /**
-     * Card containing "Failed Policies" label, count, and percentage
-     */
     private final Locator failedPoliciesCard;
-    /**
-     * Numeric value inside the Failed Policies card
-     */
     private final Locator failedPoliciesValue;
-    /**
-     * "Updated" card showing last refresh timestamp
-     */
     private final Locator updatedCard;
-    /**
-     * Timestamp text inside the Updated card, e.g. "3 minutes ago"
-     */
     private final Locator updatedTimestamp;
 
     // ── Policies list table ───────────────────────────────────────────────────
-    /**
-     * Result count label, e.g. "1 result" or "2 results"
-     */
     private final Locator resultsCountLabel;
-    /**
-     * All policy row containers (the inner flex row inside each card).
-     * Each row has direct-child divs: [0] Name | [1] Severity | [2] Status | [3] Actions | [4] Link
-     */
+    // Each row has direct-child divs: [0] Name | [1] Severity | [2] Status | [3] Actions | [4] Link
     private final Locator policyRows;
 
     // ══════════════════════════════════════════════════════════════════════════
     // QUERIES TAB
     // ══════════════════════════════════════════════════════════════════════════
 
-    /**
-     * <h1>Queries</h1>
-     */
     private final Locator queriesHeading;
-    /**
-     * Primary "Add Query" button (text label)
-     */
     private final Locator addQueryButtonText;
-    /**
-     * Icon-only "Add Query" button (aria-label)
-     */
     private final Locator addQueryButtonIcon;
-    /**
-     * Search input field on the Queries tab
-     */
     private final Locator searchQueriesInput;
-    /**
-     * Empty-state message when no queries exist
-     */
     private final Locator queriesEmptyState;
 
 
@@ -250,9 +177,6 @@ public class MonitoringPage {
         return this;
     }
 
-    /**
-     * Click the "More actions" (…) button for the policy row at the given 0-based index.
-     */
     public MonitoringPage clickMoreActionsForPolicy(int rowIndex) {
         policyRows.nth(rowIndex)
                 .locator("button[aria-label='More actions']")
@@ -260,23 +184,11 @@ public class MonitoringPage {
         return this;
     }
 
-    /**
-     * Click the row itself to open a policy detail view.
-     */
     public MonitoringPage clickPolicyRow(int rowIndex) {
         policyRows.nth(rowIndex).click();
         return this;
     }
 
-    /**
-     * Returns the status badge text ("Compliant", "Non-Compliant", …)
-     * for the policy row matching the given name, waiting up to {@link #ROW_WAIT_TIMEOUT_MS} for the row
-     * to render.
-     *
-     * @param policyName exact visible name of the policy, e.g. "test policy"
-     * @return status text of the matched row
-     * @throws RuntimeException if no row with that name renders within the timeout
-     */
     public String getPolicyStatusByName(String policyName) {
         Locator matchedRow = policyRows.filter(
                 new Locator.FilterOptions().setHasText(policyName));
@@ -346,26 +258,18 @@ public class MonitoringPage {
         return updatedTimestamp.textContent().trim();          // e.g. "10 minutes ago"
     }
 
-    /**
-     * Returns the result count label text, e.g. "1 result" or "3 results".
-     * FIX: was filtering on "Showing" — the actual label never contains that word.
-     */
+    // FIX: was filtering on "Showing" — the actual label never contains that word.
     public String getResultsCountText() {
         return resultsCountLabel.textContent().trim();
     }
 
-    /**
-     * Number of policy rows currently rendered. Deliberately an instantaneous sample: 0 is a legitimate
-     * answer (empty state), so this cannot wait for a row without breaking absence checks. A caller that
-     * expects rows should pair it with {@code page.waitForCondition(...)} rather than read it once.
-     */
+    // Deliberately an instantaneous sample: 0 is a legitimate answer (empty state), so this cannot wait
+    // for a row without breaking absence checks. A caller that expects rows should pair it with
+    // page.waitForCondition(...) rather than read it once.
     public int getPolicyRowCount() {
         return policyRows.count();
     }
 
-    /**
-     * Returns the policy name from the row at the given 0-based index.
-     */
     public String getPolicyName(int rowIndex) {
         // Direct child [0] is the name column; descend into its nested <p> or <div>.
         return policyRows.nth(rowIndex)
@@ -374,30 +278,21 @@ public class MonitoringPage {
                 .textContent().trim();
     }
 
-    /**
-     * Returns the severity text ("Low", "Medium", "High") for a given row.
-     * Direct child [1] = Severity column.
-     */
     public String getPolicySeverity(int rowIndex) {
+        // Direct child [1] = Severity column.
         return policyRows.nth(rowIndex)
                 .locator(":scope > div").nth(1)
                 .textContent().trim();
     }
 
-    /**
-     * Returns the status badge text ("Compliant", "Non-Compliant", …) for a given row.
-     * Direct child [2] = Status column (Platform column was removed from the UI).
-     */
     public String getPolicyStatus(int rowIndex) {
+        // Direct child [2] = Status column (Platform column was removed from the UI).
         return policyRows.nth(rowIndex)
                 .locator(":scope > div").nth(2)
                 .textContent().trim();
     }
 
-    /**
-     * Returns the Locator for the status badge div (for color / CSS class assertions).
-     * Scoped to the correct row to avoid matching the Failed Policies metric card badge.
-     */
+    // Scoped to the correct row to avoid matching the Failed Policies metric card badge.
     public Locator getPolicyStatusBadge(int rowIndex) {
         return policyRows.nth(rowIndex)
                 .locator("div[class*='bg-[var(--ods-attention']");
@@ -461,11 +356,8 @@ public class MonitoringPage {
         return updatedCard.isVisible();
     }
 
-    /**
-     * Whether row {@code i} is rendered right now. Like the other {@code is*Visible()} predicates here it
-     * does not wait — false is a legitimate answer, and these are meant to be fed to
-     * {@code page.waitForCondition(...)} (see {@code NavigationSidebar.goToMonitoring}).
-     */
+    // Like the other is*Visible() predicates here it does not wait — false is a legitimate answer, and
+    // these are meant to be fed to page.waitForCondition(...) (see NavigationSidebar.goToMonitoring).
     public boolean isPolicyRowVisible(int i) {
         return policyRows.nth(i).isVisible();
     }

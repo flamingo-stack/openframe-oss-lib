@@ -12,14 +12,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/**
- * One row of a ticket's status history: who moved the ticket, from which status to which, when,
- * and the reason they gave. Written on every status transition and never updated or deleted — the
- * ticket itself only knows its current status, this collection remembers the path.
- * <p>
- * Status kinds and names are stored as plain snapshots: history must survive statuses being
- * renamed or deleted and new kinds appearing, so nothing here references live definitions.
- */
+// Snapshots statuses by id/kind/name rather than referencing live definitions, since history must survive status renames/deletions.
 @Document(collection = "ticket_status_history")
 @Data
 @Builder
