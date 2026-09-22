@@ -12,7 +12,6 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -44,18 +43,33 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
     /**
      * Revokes every refresh token issued to the principal, the same way /oauth2/revoke does on logout:
      * the refresh token (and its access token) is marked invalidated, so it can no longer be exchanged.
-     * Already revoked or expired tokens are left alone; returns how many were revoked.
+     * Already revoked or expired tokens are left alone, and a record that fails to revoke is logged and
+     * skipped so it can't keep the rest alive; returns how many were revoked.
      * Principal names are the user's email; matched case-insensitively because SSO logins carry the
      * provider's email claim as-is.
      */
     public int revokeAllForPrincipal(String principalName) {
-        List<OAuth2Authorization> active = repository
-                .findAllByPrincipalNameIgnoreCaseAndRefreshTokenValueNotNull(principalName).stream()
-                .map(e -> MongoAuthorizationMapper.toDomain(e, registeredClientRepository))
-                .filter(auth -> auth.getRefreshToken().isActive())
-                .toList();
-        active.forEach(auth -> save(invalidate(auth)));
-        return active.size();
+        int revoked = 0;
+        for (MongoOAuth2Authorization entity : repository.findAllByPrincipalNameIgnoreCaseAndRefreshTokenValueNotNull(principalName)) {
+            if (revoke(entity)) {
+                revoked++;
+            }
+        }
+        return revoked;
+    }
+
+    private boolean revoke(MongoOAuth2Authorization entity) {
+        try {
+            OAuth2Authorization authorization = MongoAuthorizationMapper.toDomain(entity, registeredClientRepository);
+            if (!authorization.getRefreshToken().isActive()) {
+                return false;
+            }
+            save(invalidate(authorization));
+            return true;
+        } catch (RuntimeException e) {
+            log.error("Failed to revoke authorization {}", entity.getId(), e);
+            return false;
+        }
     }
 
     private static OAuth2Authorization invalidate(OAuth2Authorization authorization) {
