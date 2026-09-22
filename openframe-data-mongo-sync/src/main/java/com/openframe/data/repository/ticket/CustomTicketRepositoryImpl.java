@@ -1,7 +1,6 @@
 package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketActivityCriteria;
 import com.openframe.data.document.ticket.filter.TicketActivityFilter;
@@ -95,7 +94,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
 
         if (filter != null) {
             addCriteriaIfNotEmpty(query, FIELD_TICKET_NUMBER, filter.getTicketNumbers());
-            addCriteriaIfNotEmpty(query, FIELD_STATUS, filter.getStatuses());
             addCriteriaIfNotEmpty(query, FIELD_STATUS_ID, filter.getStatusIds());
             addCriteriaIfNotEmpty(query, FIELD_STATUS_KIND, filter.getStatusKinds());
             addCriteriaIfNotEmpty(query, FIELD_ORGANIZATION_ID, filter.getOrganizationIds());
@@ -341,33 +339,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     }
 
     @Override
-    public Map<TicketStatus, Long> countTicketsByStatus() {
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(tenantCriteria()),
-                Aggregation.group(FIELD_STATUS).count().as(AGG_COUNT),
-                Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS)
-        );
-
-        AggregationResults<Document> results = mongoTemplate.aggregate(
-                aggregation, Ticket.class, Document.class);
-
-        Map<TicketStatus, Long> statusCounts = new EnumMap<>(TicketStatus.class);
-        for (Document doc : results.getMappedResults()) {
-            String statusStr = doc.getString(FIELD_STATUS);
-            if (statusStr != null) {
-                try {
-                    TicketStatus status = TicketStatus.valueOf(statusStr);
-                    statusCounts.put(status, doc.getInteger(AGG_COUNT).longValue());
-                } catch (IllegalArgumentException e) {
-                    log.warn("Unknown ticket status: {}", statusStr);
-                }
-            }
-        }
-
-        return statusCounts;
-    }
-
-    @Override
     public Map<TicketStatusKind, Long> countTicketsByStatusKind() {
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(tenantCriteria()),
@@ -442,19 +413,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         }
 
         return Optional.empty();
-    }
-
-    @Override
-    public int updateStatusBulk(TicketStatus fromStatus, TicketStatus toStatus) {
-        Query query = new Query(Criteria.where(FIELD_STATUS).is(fromStatus));
-        Update update = new Update()
-                .set(FIELD_STATUS, toStatus)
-                .set(FIELD_UPDATED_AT, Instant.now());
-
-        long modifiedCount = mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
-        log.debug("Bulk status update: {} -> {}, modified: {}", fromStatus, toStatus, modifiedCount);
-
-        return (int) modifiedCount;
     }
 
     @Override

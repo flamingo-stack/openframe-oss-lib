@@ -44,7 +44,6 @@ class TicketServiceGetTicketsTest {
     @Mock private OrganizationRepository organizationRepository;
     @Mock private UserRepository userRepository;
     @Mock private AssignmentService assignmentService;
-    @Mock private TicketOrderCalculationService ticketOrderCalculationService;
     @Mock private TicketLifecycleService ticketLifecycleService;
     @Mock private TicketResolverStamp ticketResolverStamp;
 
@@ -56,7 +55,7 @@ class TicketServiceGetTicketsTest {
     void setUp() {
         ticketService = new TicketService(ticketRepository, ticketNumberService, ticketTagService, ticketIdsForFilter,
                 ticketStalenessResolver, machineRepository, organizationRepository, userRepository, assignmentService,
-                ticketOrderCalculationService, ticketLifecycleService, ticketResolverStamp, List.of());
+                ticketLifecycleService, ticketResolverStamp, List.of());
     }
 
     @ParameterizedTest

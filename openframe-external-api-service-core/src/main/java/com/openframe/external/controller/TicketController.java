@@ -10,7 +10,6 @@ import com.openframe.api.dto.ticket.UpdateTicketInput;
 import com.openframe.api.service.ticket.*;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.ticket.*;
 import com.openframe.external.mapper.TicketMapper;
@@ -67,9 +66,7 @@ public class TicketController {
     @GetMapping
     @ResponseStatus(OK)
     public TicketsResponse getTickets(
-            @Parameter(description = "Legacy statuses to filter by (tenants without the custom-status lifecycle)")
-            @RequestParam(required = false) List<TicketStatus> statuses,
-            @Parameter(description = "Lifecycle status ids to filter by (see /statuses)")
+            @Parameter(description = "Status ids to filter by (see /statuses)")
             @RequestParam(required = false) List<String> statusIds,
             @Parameter(description = "Customer ids to filter by")
             @RequestParam(required = false) List<String> customerIds,
@@ -95,7 +92,7 @@ public class TicketController {
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
         CountedGenericQueryResult<Ticket> result = ticketService.getTickets(
                 principal,
-                filter(statuses, statusIds, customerIds, assigneeIds, tagIds),
+                filter(statusIds, customerIds, assigneeIds, tagIds),
                 CursorPaginationCriteria.builder().cursor(ExternalCursors.requireTicketCursor(cursor)).limit(limit).build(),
                 search,
                 SortInput.from("customerName".equals(sortField) ? "organizationName" : sortField, sortDirection));
@@ -107,7 +104,6 @@ public class TicketController {
     @GetMapping("/filters")
     @ResponseStatus(OK)
     public TicketFiltersResponse getTicketFilters(
-            @RequestParam(required = false) List<TicketStatus> statuses,
             @RequestParam(required = false) List<String> statusIds,
             @RequestParam(required = false) List<String> customerIds,
             @RequestParam(required = false) List<String> assigneeIds,
@@ -117,7 +113,7 @@ public class TicketController {
         log.debug("Getting ticket filters - userId: {}, apiKeyId: {}", caller.userId(), caller.apiKeyId());
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketMapper.toFiltersResponse(ticketFilterService.getFilters(
-                principal, filter(statuses, statusIds, customerIds, assigneeIds, tagIds)).join());
+                principal, filter(statusIds, customerIds, assigneeIds, tagIds)).join());
     }
 
     @Operation(summary = "Get ticket statuses",
@@ -392,10 +388,9 @@ public class TicketController {
         ticketNoteService.deleteNote(principal, noteId);
     }
 
-    private static TicketFilterInput filter(List<TicketStatus> statuses, List<String> statusIds,
-                                            List<String> customerIds, List<String> assigneeIds, List<String> tagIds) {
+    private static TicketFilterInput filter(List<String> statusIds, List<String> customerIds,
+                                            List<String> assigneeIds, List<String> tagIds) {
         return TicketFilterInput.builder()
-                .statuses(statuses)
                 .statusIds(statusIds)
                 .organizationIds(customerIds)
                 .assigneeIds(assigneeIds)
