@@ -14,7 +14,6 @@ import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
-import com.openframe.delivery.sweep.MachineOnlineStatus.Lookup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -48,13 +47,14 @@ public class DeliverySweepService {
             return;
         }
         Set<String> machineIds = due.stream().map(MachineDelivery::getMachineId).collect(toSet());
-        Lookup machines = machineOnlineStatus.lookup(machineIds);
-        due.forEach(delivery -> retryOne(delivery, machines, now));
+        Set<String> gone = machineOnlineStatus.gone(machineIds);
+        Set<String> online = machineOnlineStatus.online(machineIds);
+        due.forEach(delivery -> retryOne(delivery, gone, online, now));
     }
 
-    private void retryOne(MachineDelivery delivery, Lookup machines, Instant now) {
+    private void retryOne(MachineDelivery delivery, Set<String> gone, Set<String> online, Instant now) {
         try {
-            retryOrClose(delivery, machines, now);
+            retryOrClose(delivery, gone, online, now);
         } catch (Exception e) {
             metrics.recordRowError();
             countErrorAndBackOff(delivery, now);
@@ -62,15 +62,15 @@ public class DeliverySweepService {
         }
     }
 
-    private void retryOrClose(MachineDelivery delivery, Lookup machines, Instant now) {
+    private void retryOrClose(MachineDelivery delivery, Set<String> gone, Set<String> online, Instant now) {
         String machineId = delivery.getMachineId();
-        if (machines.isGone(machineId)) {
+        if (gone.contains(machineId)) {
             closer.cancel(delivery, DeliveryStatus.UNACKED, "machine gone", now);
             return;
         }
         DeliveryType type = delivery.getType();
         Policy policy = properties.resolve(type);
-        if (machines.isOffline(machineId)) {
+        if (!online.contains(machineId)) {
             parkSkipOrFailOffline(delivery, policy, now);
             return;
         }

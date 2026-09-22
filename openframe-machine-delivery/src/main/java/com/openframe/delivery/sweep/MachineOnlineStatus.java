@@ -8,10 +8,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+
+import static java.util.stream.Collectors.toSet;
 
 @Component
 @RequiredArgsConstructor
@@ -23,25 +23,17 @@ public class MachineOnlineStatus {
 
     private final MachineRepository machineRepository;
 
-    public Lookup lookup(Set<String> machineIds) {
-        List<Machine> machines = machineRepository.findByMachineIdIn(machineIds);
-        Map<String, DeviceStatus> statusById = new HashMap<>();
-        machines.forEach(machine -> statusById.put(machine.getMachineId(), machine.getStatus()));
-        return new Lookup(statusById);
+    public Set<String> online(Set<String> machineIds) {
+        List<Machine> online = machineRepository.findByMachineIdInAndStatus(machineIds, DeviceStatus.ONLINE);
+        return ids(online);
     }
 
-    @RequiredArgsConstructor
-    public static class Lookup {
+    public Set<String> gone(Set<String> machineIds) {
+        List<Machine> gone = machineRepository.findByMachineIdInAndStatusIn(machineIds, GONE);
+        return ids(gone);
+    }
 
-        private final Map<String, DeviceStatus> statusById;
-
-        public boolean isGone(String machineId) {
-            DeviceStatus status = statusById.get(machineId);
-            return GONE.contains(status);
-        }
-
-        public boolean isOffline(String machineId) {
-            return statusById.get(machineId) != DeviceStatus.ONLINE;
-        }
+    private static Set<String> ids(List<Machine> machines) {
+        return machines.stream().map(Machine::getMachineId).collect(toSet());
     }
 }

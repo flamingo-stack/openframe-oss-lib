@@ -6,7 +6,6 @@ import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
-import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryTestPolicies;
@@ -15,7 +14,6 @@ import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
 import com.openframe.delivery.spec.TestPayload;
 import com.openframe.delivery.spec.TestSeed;
-import com.openframe.delivery.sweep.MachineOnlineStatus.Lookup;
 import com.openframe.delivery.track.DeliveryId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +25,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
@@ -91,7 +88,7 @@ class DeliverySweepServiceTest {
         // setup
         Instant before = Instant.now();
         stubDue(delivery);
-        stubMachine(DeviceStatus.ONLINE);
+        stubMachineOnline();
         stubSpec();
         when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), dueAtCaptor.capture())).thenReturn(true);
 
@@ -115,7 +112,7 @@ class DeliverySweepServiceTest {
         properties.getDefaults().setMaxAttempts(MANY_ATTEMPTS_ALLOWED);
         delivery.setAttempts(ATTEMPTS_PAST_CAP);
         stubDue(delivery);
-        stubMachine(DeviceStatus.ONLINE);
+        stubMachineOnline();
         stubSpec();
         when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(ATTEMPTS_PAST_CAP), dueAtCaptor.capture())).thenReturn(true);
 
@@ -133,7 +130,7 @@ class DeliverySweepServiceTest {
         // setup
         Instant before = Instant.now();
         stubDue(delivery);
-        stubMachine(DeviceStatus.ONLINE);
+        stubMachineOnline();
         stubSpec();
         doThrow(new IllegalStateException("nats down")).when(spec).publish(eq(MACHINE_ID), any(TestPayload.class));
 
@@ -156,7 +153,7 @@ class DeliverySweepServiceTest {
     void retryPending_typeWithoutSpec_errorCountedAndRowPostponed() {
         // setup
         stubDue(delivery);
-        stubMachine(DeviceStatus.ONLINE);
+        stubMachineOnline();
         when(registry.require(DeliveryType.TOOL_INSTALLATION))
                 .thenThrow(new IllegalArgumentException("No spec registered for delivery type: TOOL_INSTALLATION"));
 
@@ -174,7 +171,7 @@ class DeliverySweepServiceTest {
         // setup
         delivery.setErrors(MAX_ATTEMPTS - 1);
         stubDue(delivery);
-        stubMachine(DeviceStatus.ONLINE);
+        stubMachineOnline();
         when(registry.require(DeliveryType.TOOL_INSTALLATION))
                 .thenThrow(new IllegalArgumentException("No spec registered for delivery type: TOOL_INSTALLATION"));
 
@@ -190,7 +187,7 @@ class DeliverySweepServiceTest {
     void retryPending_rowMovedOnWhilePublishing_publishedButNotCounted() {
         // setup
         stubDue(delivery);
-        stubMachine(DeviceStatus.ONLINE);
+        stubMachineOnline();
         stubSpec();
         when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(false);
 
@@ -208,7 +205,7 @@ class DeliverySweepServiceTest {
         // setup
         delivery.setAttempts(MAX_ATTEMPTS);
         stubDue(delivery);
-        stubMachine(DeviceStatus.ONLINE);
+        stubMachineOnline();
 
         // execution
         service.retryPending();
@@ -223,7 +220,7 @@ class DeliverySweepServiceTest {
         // setup
         Instant before = Instant.now();
         stubDue(delivery);
-        stubMachine(DeviceStatus.OFFLINE);
+        stubMachineNotOnline();
 
         // execution
         service.retryPending();
@@ -242,7 +239,7 @@ class DeliverySweepServiceTest {
         Instant recently = Instant.now().minusSeconds(RECONNECT_WINDOW - ONE_MINUTE_SECONDS);
         delivery.setDispatchedAt(recently);
         stubDue(delivery);
-        stubMachine(DeviceStatus.OFFLINE);
+        stubMachineNotOnline();
 
         // execution
         service.retryPending();
@@ -252,40 +249,12 @@ class DeliverySweepServiceTest {
     }
 
     @Test
-    void retryPending_machineStillPendingFirstHeartbeat_parkedLikeOffline() {
-        // setup
-        stubDue(delivery);
-        stubMachine(DeviceStatus.PENDING);
-
-        // execution
-        service.retryPending();
-
-        // verifications
-        verify(repository).park(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class));
-        verifyNoInteractions(registry, closer, metrics);
-    }
-
-    @Test
-    void retryPending_machineDocumentMissing_parkedNotCancelled() {
-        // setup
-        stubDue(delivery);
-        when(machineOnlineStatus.lookup(Set.of(MACHINE_ID))).thenReturn(new Lookup(Map.of()));
-
-        // execution
-        service.retryPending();
-
-        // verifications
-        verify(repository).park(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class));
-        verifyNoInteractions(registry, closer, metrics);
-    }
-
-    @Test
     void retryPending_offlineReconnectWindowOver_failedOffline() {
         // setup
         Instant twoDaysAgo = Instant.now().minusSeconds(TWO_DAYS_SECONDS);
         delivery.setDispatchedAt(twoDaysAgo);
         stubDue(delivery);
-        stubMachine(DeviceStatus.OFFLINE);
+        stubMachineNotOnline();
 
         // execution
         service.retryPending();
@@ -300,7 +269,7 @@ class DeliverySweepServiceTest {
         // setup
         properties.getDefaults().setOfflineBehavior(DeliveryOfflineBehavior.SKIP);
         stubDue(delivery);
-        stubMachine(DeviceStatus.OFFLINE);
+        stubMachineNotOnline();
 
         // execution
         service.retryPending();
@@ -315,7 +284,7 @@ class DeliverySweepServiceTest {
     void retryPending_machineDeleted_cancelled() {
         // setup
         stubDue(delivery);
-        stubMachine(DeviceStatus.DELETED);
+        stubMachineGone();
 
         // execution
         service.retryPending();
@@ -331,8 +300,8 @@ class DeliverySweepServiceTest {
         MachineDelivery corrupt = row(OTHER_MACHINE_ID, CORRUPT_JSON);
         stubDue(corrupt, delivery);
         Set<String> both = Set.of(OTHER_MACHINE_ID, MACHINE_ID);
-        Map<String, DeviceStatus> bothOnline = Map.of(OTHER_MACHINE_ID, DeviceStatus.ONLINE, MACHINE_ID, DeviceStatus.ONLINE);
-        when(machineOnlineStatus.lookup(both)).thenReturn(new Lookup(bothOnline));
+        when(machineOnlineStatus.gone(both)).thenReturn(Set.of());
+        when(machineOnlineStatus.online(both)).thenReturn(both);
         stubSpec();
         when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
 
@@ -379,9 +348,19 @@ class DeliverySweepServiceTest {
         when(repository.findDue(eq(DeliveryStatus.PENDING), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
     }
 
-    private void stubMachine(DeviceStatus status) {
-        Lookup lookup = new Lookup(Map.of(MACHINE_ID, status));
-        when(machineOnlineStatus.lookup(Set.of(MACHINE_ID))).thenReturn(lookup);
+    private void stubMachineOnline() {
+        when(machineOnlineStatus.gone(Set.of(MACHINE_ID))).thenReturn(Set.of());
+        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(Set.of(MACHINE_ID));
+    }
+
+    private void stubMachineNotOnline() {
+        when(machineOnlineStatus.gone(Set.of(MACHINE_ID))).thenReturn(Set.of());
+        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(Set.of());
+    }
+
+    private void stubMachineGone() {
+        when(machineOnlineStatus.gone(Set.of(MACHINE_ID))).thenReturn(Set.of(MACHINE_ID));
+        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(Set.of());
     }
 
     private void stubSpec() {
