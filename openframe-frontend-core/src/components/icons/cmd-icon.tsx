@@ -23,7 +23,7 @@ export const CmdIcon: React.FC<CmdIconProps> = ({ size = 16, className = '', col
         stroke={color}
       />
       <text x="12" y="16" textAnchor="middle" fill={color} fontSize="10" fontFamily="monospace" fontWeight="bold">
-        \&gt;
+        &gt;
       </text>
     </svg>
   );
