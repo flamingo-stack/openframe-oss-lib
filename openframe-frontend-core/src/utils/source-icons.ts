@@ -81,7 +81,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'prospect-calls': 'phone',
 
   // Code intelligence
-  'code-review-rules': 'check-square',
+  'code-rules': 'check-square',
   'code-graph-repos': 'github',
   'code-graph-deployments': 'package',
 };
@@ -168,7 +168,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   'prospect-calls': 'Prospect calls',
 
   // Code intelligence
-  'code-review-rules': 'Code Review Rules',
+  'code-rules': 'Code Rules',
   'code-graph-repos': 'Repositories',
   'code-graph-deployments': 'Deployments',
 };
@@ -257,7 +257,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   prospect_call: 'prospect-calls',
 
   // Code intelligence
-  code_rule: 'code-review-rules',
+  code_rule: 'code-rules',
   code_repo: 'code-graph-repos',
   code_deployment: 'code-graph-deployments',
 };

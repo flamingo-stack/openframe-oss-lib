@@ -2,7 +2,6 @@ package com.openframe.external.dto.ticket;
 
 import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketResolver;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -32,13 +31,10 @@ public class TicketResponse {
     @Schema(description = "Ticket description")
     private String description;
 
-    @Schema(description = "Legacy status (populated only on tenants without the custom-status lifecycle)")
-    private TicketStatus status;
-
-    @Schema(description = "Kind of the current lifecycle status (AI_ASSISTANCE, TECH_REQUIRED, RESOLVED, ARCHIVED or CUSTOM)")
+    @Schema(description = "Kind of the current status (AI_ASSISTANCE, TECH_REQUIRED, RESOLVED, ARCHIVED or CUSTOM)")
     private TicketStatusKind statusKind;
 
-    @Schema(description = "Current lifecycle status definition")
+    @Schema(description = "Current status definition")
     private TicketStatusResponse statusDefinition;
 
     @Schema(description = "Statuses this ticket may be transitioned to right now (single-ticket reads only; null in list responses). Use their ids with the transition endpoint.")

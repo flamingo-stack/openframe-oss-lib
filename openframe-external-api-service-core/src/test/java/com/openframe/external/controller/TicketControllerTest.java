@@ -162,7 +162,6 @@ class TicketControllerTest {
         stubEmptyPage(principal);
 
         mockMvc.perform(get(BASE)
-                        .param("statuses", "ACTIVE", "RESOLVED")
                         .param("statusIds", "st-1", "st-2")
                         .param("customerIds", "org-1", "org-2")
                         .param("assigneeIds", "user-2")
@@ -180,7 +179,6 @@ class TicketControllerTest {
         ArgumentCaptor<CursorPaginationCriteria> pagination = ArgumentCaptor.forClass(CursorPaginationCriteria.class);
         ArgumentCaptor<SortInput> sort = ArgumentCaptor.forClass(SortInput.class);
         verify(ticketService).getTickets(same(principal), filter.capture(), pagination.capture(), eq("printer"), sort.capture());
-        assertEquals(List.of(TicketStatus.ACTIVE, TicketStatus.RESOLVED), filter.getValue().getStatuses());
         assertEquals(List.of("st-1", "st-2"), filter.getValue().getStatusIds());
         assertEquals(List.of("org-1", "org-2"), filter.getValue().getOrganizationIds());
         assertEquals(List.of("user-2"), filter.getValue().getAssigneeIds());
@@ -257,15 +255,6 @@ class TicketControllerTest {
     }
 
     @Test
-    void listWithUnknownLegacyStatusIs400TypeMismatch() throws Exception {
-        mockMvc.perform(get(BASE).param("statuses", "BOGUS"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
-
-        verifyNoInteractions(ticketService, ticketReadService);
-    }
-
-    @Test
     void listWithMalformedCursorIs400AndNeverReachesTheDomain() throws Exception {
         resolvedPrincipal();
 
@@ -289,7 +278,6 @@ class TicketControllerTest {
         when(ticketFilterService.getFilters(same(principal), any())).thenReturn(CompletableFuture.completedFuture(filters));
 
         mockMvc.perform(get(BASE + "/filters")
-                        .param("statuses", "ON_HOLD")
                         .param("statusIds", "st-1")
                         .param("customerIds", "org-1")
                         .param("assigneeIds", "user-2")
@@ -305,21 +293,11 @@ class TicketControllerTest {
         ArgumentCaptor<TicketFilterInput> filter = ArgumentCaptor.forClass(TicketFilterInput.class);
         verify(ticketFilterService).getFilters(same(principal), filter.capture());
         assertEquals(TicketFilterInput.builder()
-                .statuses(List.of(TicketStatus.ON_HOLD))
                 .statusIds(List.of("st-1"))
                 .organizationIds(List.of("org-1"))
                 .assigneeIds(List.of("user-2"))
                 .tagIds(List.of("tag-1"))
                 .build(), filter.getValue());
-    }
-
-    @Test
-    void filtersWithUnknownLegacyStatusIs400TypeMismatch() throws Exception {
-        mockMvc.perform(get(BASE + "/filters").param("statuses", "BOGUS"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
-
-        verifyNoInteractions(ticketFilterService);
     }
 
     @Test
@@ -369,7 +347,6 @@ class TicketControllerTest {
         AuthPrincipal principal = resolvedPrincipal();
         when(ticketStatisticsService.getStatistics(same(principal))).thenReturn(TicketStatistics.builder()
                 .totalCount(12)
-                .statusCounts(List.of(new TicketStatusCount(TicketStatus.ACTIVE, 7)))
                 .statusDefinitionCounts(List.of(new TicketStatusDefinitionCount(
                         TicketStatusDefinition.builder().id("st-1").kind(TicketStatusKind.CUSTOM).name("Open").build(), 5)))
                 .averageResolutionTimeFormatted("2h 15m")
@@ -379,8 +356,6 @@ class TicketControllerTest {
         mockMvc.perform(get(BASE + "/statistics"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalCount").value(12))
-                .andExpect(jsonPath("$.statusCounts[0].status").value("ACTIVE"))
-                .andExpect(jsonPath("$.statusCounts[0].count").value(7))
                 .andExpect(jsonPath("$.statusDefinitionCounts[0].status.id").value("st-1"))
                 .andExpect(jsonPath("$.statusDefinitionCounts[0].status.name").value("Open"))
                 .andExpect(jsonPath("$.statusDefinitionCounts[0].count").value(5))
