@@ -48,7 +48,7 @@ class CommandExecutionServiceTest {
         when(commandExecutionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         service.createBatch(EXECUTION_ID, "uptime", ScriptShell.BASH, List.of("m-1", "m-2"),
-                PrivilegeLevel.ADMIN, 30, "alice");
+                PrivilegeLevel.ADMIN, 30, "alice", false);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<CommandExecution>> captor = ArgumentCaptor.forClass(List.class);

@@ -11,6 +11,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -22,6 +23,9 @@ import java.util.List;
  */
 @Component
 public class ScriptScheduleMapper {
+
+    @Value("${openframe.rmm.test-mode.enabled}")
+    private boolean testModeEnabled;
 
     public ScheduleScript toEntity(String tenantId, CreateScriptScheduleInput input) {
         return ScheduleScript.builder()
@@ -37,6 +41,7 @@ public class ScriptScheduleMapper {
                 .reconnectWindowSeconds(input.getReconnectWindowSeconds())
                 .startAt(input.getStartAt())
                 .repeat(input.getRepeat())
+                .testScript(testModeEnabled)
                 .build();
     }
 
@@ -94,6 +99,7 @@ public class ScriptScheduleMapper {
                 .statusChangedAt(entity.getStatusChangedAt())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .testScript(entity.isTestScript())
                 .build();
     }
 

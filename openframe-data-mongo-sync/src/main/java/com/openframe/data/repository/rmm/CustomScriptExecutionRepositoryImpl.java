@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -54,6 +55,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_FINISHED_AT = "finishedAt";
     private static final String FIELD_STATUS_CHANGED_AT = "statusChangedAt";
     private static final String FIELD_COUNT = "count";
+    private static final String FIELD_TEST_SCRIPT = "testScript";
 
     /** Sort-field allowlist. Anything not in here falls back to {@link #getDefaultSortField()}. */
     private static final Set<String> SORTABLE_FIELDS = Set.of(
@@ -71,6 +73,9 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
             ExecutionFacetField.MACHINE, FIELD_MACHINE_ID));
 
     private final MongoTemplate mongoTemplate;
+
+    @Value("${openframe.rmm.test-mode.enabled}")
+    private boolean testModeEnabled;
 
     @Override
     public List<ScriptExecution> saveRunning(RunningExecutionRows request) {
@@ -98,6 +103,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                         .packageManager(request.getPackageManager())
                         .packageName(request.getPackageName())
                         .softwareAction(request.getSoftwareAction())
+                        .testScript(request.isTestScript())
                         .status(initialStatus)
                         .dispatchedAt(now)
                         .statusChangedAt(now)
@@ -204,10 +210,13 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         }
     }
 
-    private static Criteria baseCriteria(String tenantId, ExecutionOwnerScope owner,
-                                         ScriptExecutionQueryFilter filter, String excludedField) {
+    private Criteria baseCriteria(String tenantId, ExecutionOwnerScope owner,
+                                  ScriptExecutionQueryFilter filter, String excludedField) {
         Criteria criteria = Criteria.where(FIELD_TENANT_ID).is(tenantId);
         applyOwner(criteria, owner);
+        if (testModeEnabled) {
+            criteria.and(FIELD_TEST_SCRIPT).ne(true);
+        }
         if (filter == null) {
             return criteria;
         }

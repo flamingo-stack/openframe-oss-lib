@@ -38,11 +38,12 @@ public class CommandExecutionService {
                                               List<String> machineIds,
                                               PrivilegeLevel privilegeLevel,
                                               Integer timeoutSeconds,
-                                              String initiatedBy) {
+                                              String initiatedBy,
+                                              boolean testCommand) {
         Instant now = Instant.now();
         List<CommandExecution> rows = machineIds.stream()
                 .map(machineId -> buildRunningRow(executionId, command, shell, machineId,
-                        privilegeLevel, timeoutSeconds, initiatedBy, now))
+                        privilegeLevel, timeoutSeconds, initiatedBy, now, testCommand))
                 .toList();
         List<CommandExecution> saved = commandExecutionRepository.saveAll(rows);
         log.info("Persisted batch command execution rows: executionId={} machineCount={} initiatedBy={} status=RUNNING",
@@ -72,7 +73,8 @@ public class CommandExecutionService {
                                              PrivilegeLevel privilegeLevel,
                                              Integer timeoutSeconds,
                                              String initiatedBy,
-                                             Instant now) {
+                                             Instant now,
+                                             boolean testCommand) {
         return CommandExecution.builder()
                 .tenantId(tenantIdProvider.getTenantId())
                 .executionId(executionId)
@@ -85,6 +87,7 @@ public class CommandExecutionService {
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(now)
                 .statusChangedAt(now)
+                .testCommand(testCommand)
                 .build();
     }
 }

@@ -110,6 +110,10 @@ type Script implements Node {
     updatedAt: Instant
     """The creating user (resolved from the internal createdBy id via the user DataLoader). The raw createdBy id is not exposed — filter by author via authorIds."""
     author: User
+    """When true, this is a monitoring / QA fixture created by the monitoring pipeline. Immutable at
+    create-time. Set by the pipeline via createScript; hidden from user-facing list/facets/getById
+    reads (query-builder shield) — visible only on direct id lookup performed by the pipeline itself."""
+    testScript: Boolean!
 }
 
 type ScriptEnvVar {

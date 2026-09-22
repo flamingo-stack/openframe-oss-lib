@@ -36,4 +36,5 @@ public class ScriptResponse {
     private Instant statusChangedAt;
     private Instant createdAt;
     private Instant updatedAt;
+    private boolean testScript;
 }

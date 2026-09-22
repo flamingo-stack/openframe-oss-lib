@@ -111,4 +111,5 @@ public class Script implements TenantScoped {
      */
     private Instant statusChangedAt;
     private String contentHash;
+    private boolean testScript;
 }

@@ -152,6 +152,9 @@ type ScriptSchedule implements Node {
     updatedAt: Instant
     """The creating user (resolved from the internal createdBy id via the user DataLoader)."""
     author: User
+    """When true, this is a monitoring / QA fixture. Dispatch still runs, user-facing reads hide it.
+    Immutable at create-time."""
+    testScript: Boolean!
 }
 
 enum ScriptScheduleTrigger {
