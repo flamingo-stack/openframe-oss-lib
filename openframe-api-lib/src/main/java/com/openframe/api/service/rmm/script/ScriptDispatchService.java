@@ -300,13 +300,17 @@ public class ScriptDispatchService {
             return;
         }
         for (ScriptEnvVarInput e : envVars) {
-            if (e.getName() != null) {
-                target.put(e.getName(), ScriptEnvVar.builder()
-                        .name(e.getName())
-                        .value(e.getValue() == null ? "" : e.getValue())
-                        .secret(e.isSecret())
-                        .build());
+            if (e.getName() == null) {
+                continue;
             }
+            if (e.getValue() == null && e.isSecret()) {
+                continue;
+            }
+            target.put(e.getName(), ScriptEnvVar.builder()
+                    .name(e.getName())
+                    .value(e.getValue() == null ? "" : e.getValue())
+                    .secret(e.isSecret())
+                    .build());
         }
     }
 }

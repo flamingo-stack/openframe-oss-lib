@@ -6,8 +6,6 @@ import com.openframe.data.document.rmm.script.ScriptEnvVar;
 
 import java.util.List;
 
-import static org.springframework.util.StringUtils.hasText;
-
 public final class ScriptEnvVarMapper {
 
     private ScriptEnvVarMapper() {
@@ -18,20 +16,18 @@ public final class ScriptEnvVarMapper {
             return;
         }
         for (ScriptEnvVarInput e : input) {
-            if (!hasText(e.getValue())) {
+            if (e.getValue() == null && !e.isSecret()) {
                 throw new BadRequestException("Env var '" + e.getName() + "' must have a value");
             }
         }
     }
 
     public static List<ScriptEnvVar> toEntity(List<ScriptEnvVarInput> input) {
-        if (input == null) {
-            return null;
-        }
-        validate(input);
-        return input.stream()
-                .map(ScriptEnvVarMapper::toEntitySingle)
-                .toList();
+        return toEntity(input, (List<ScriptEnvVar>) null);
+    }
+
+    public static List<ScriptEnvVar> toEntity(List<ScriptEnvVarInput> input, List<ScriptEnvVar> existing) {
+        return toEntityResolvingSecrets(input, existing == null ? List.of() : existing);
     }
 
     @SafeVarargs
@@ -45,22 +41,12 @@ public final class ScriptEnvVarMapper {
                 .toList();
     }
 
-    private static ScriptEnvVar toEntitySingle(ScriptEnvVarInput e) {
-        String name = e.getName();
-        String value = e.getValue();
-        boolean secret = e.isSecret();
-        return ScriptEnvVar.builder()
-                .name(name)
-                .value(value)
-                .secret(secret)
-                .build();
-    }
-
     private static ScriptEnvVar resolveSingle(ScriptEnvVarInput e, List<ScriptEnvVar>[] fallbacks) {
+        // Named locals — PMD's NoMethodCallAsArgument (OFJAVA-002) rejects inline builder args.
         String name = e.getName();
         boolean secret = e.isSecret();
         String value = e.getValue();
-        if (hasText(value)) {
+        if (value != null) {
             return build(name, value, secret);
         }
         if (!secret) {
@@ -68,7 +54,7 @@ public final class ScriptEnvVarMapper {
         }
         for (List<ScriptEnvVar> source : fallbacks) {
             String resolved = lookup(source, name);
-            if (hasText(resolved)) {
+            if (resolved != null) {
                 return build(name, resolved, true);
             }
         }
@@ -106,8 +92,7 @@ public final class ScriptEnvVarMapper {
     }
 
     private static ScriptEnvVarInput maskSingle(ScriptEnvVarInput v) {
-        // Extract into named locals so PMD's NoMethodCallAsArgument (OFJAVA-002) does not fire on
-        // the inline builder chain.
+        // Named locals — PMD's NoMethodCallAsArgument (OFJAVA-002) rejects inline builder args.
         String name = v.getName();
         boolean secret = v.isSecret();
         String value = secret ? null : v.getValue();

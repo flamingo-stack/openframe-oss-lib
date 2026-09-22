@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Pure entity &harr; DTO mapping for script schedules. Mirrors {@link ScriptMapper};
@@ -50,7 +51,7 @@ public class ScriptScheduleMapper {
         existing.setDescription(input.getDescription());
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setScriptIds(input.getScriptIds());
-        // update: prior stored override wins over script defaults so a customized secret is kept.
+        // update: the prior stored override wins over script defaults so a customized secret is kept.
         Map<String, List<ScriptEnvVar>> storedByScriptId = storedOverridesByScriptId(existing);
         existing.setScriptCustomParams(toCustomParams(input.getScriptCustomParams(),
                 storedByScriptId, scriptDefaultsByScriptId));
@@ -121,6 +122,7 @@ public class ScriptScheduleMapper {
             ScheduledScriptCustomParamsInput p,
             Map<String, List<ScriptEnvVar>> storedOverridesByScriptId,
             Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId) {
+        // Named locals — PMD's NoMethodCallAsArgument (OFJAVA-002) rejects inline builder args.
         String scriptId = p.getScriptId();
         List<ScriptEnvVar> stored = storedOverridesByScriptId.getOrDefault(scriptId, List.of());
         List<ScriptEnvVar> defaults = scriptDefaultsByScriptId.getOrDefault(scriptId, List.of());
@@ -141,7 +143,7 @@ public class ScriptScheduleMapper {
         }
         return current.stream()
                 .filter(p -> p.getScriptId() != null && p.getEnvVars() != null)
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         ScheduledScriptCustomParams::getScriptId,
                         ScheduledScriptCustomParams::getEnvVars,
                         (a, b) -> a));
