@@ -174,6 +174,13 @@ public class AuthHelper {
     /**
      * What a session belongs to. The password is held as a hash so the key can be compared and logged
      * about without carrying a credential around.
+     *
+     * <p><b>The password is load-bearing, not decoration.</b> The tenant report rotates its account's
+     * password on every run and then calls {@code getCookies()} immediately to prove the new one
+     * authenticates — {@code ReportCredentialRotator.confirmAndInstall}, which treats a successful login
+     * there as evidence that a reset landed even when the confirm call reported failure. Tokens minted
+     * with the old password stay valid, so a key without the password would hand that check a cached
+     * session, make it vacuous, and let a half-applied rotation report success. Keep it in the key.
      */
     private record SessionKey(String email, String domain, String baseUrl, int passwordHash) {
 
