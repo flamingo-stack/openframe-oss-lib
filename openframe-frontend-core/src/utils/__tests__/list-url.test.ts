@@ -58,7 +58,7 @@ const BASELINE: Record<string, string> = {
   prospect_call: '/api/prospect-calls?ids=a,b',
   // 2026-09: code intelligence — the review rules and the code graph as chat
   // sources on product-hub.
-  code_rule: '/api/code-review/rules/cards?ids=a,b',
+  code_rule: '/api/code-rules/cards?ids=a,b',
   code_repo: '/api/code-graph/repos?ids=a,b',
   code_deployment: '/api/code-graph/deployments?ids=a,b',
 };
