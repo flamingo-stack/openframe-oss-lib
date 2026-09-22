@@ -287,12 +287,19 @@ public class ScriptScheduleDataFetcher {
             return null;
         }
         return envVars.stream()
-                .map(v -> com.openframe.data.document.rmm.script.ScriptEnvVar.builder()
-                        .name(v.getName())
-                        .value(v.isSecret() ? null : v.getValue())
-                        .secret(v.isSecret())
-                        .build())
+                .map(ScriptScheduleDataFetcher::maskSingleEnvVar)
                 .toList();
+    }
+
+    private static ScriptEnvVar maskSingleEnvVar(ScriptEnvVar v) {
+        String name = v.getName();
+        boolean secret = v.isSecret();
+        String value = secret ? null : v.getValue();
+        return ScriptEnvVar.builder()
+                .name(name)
+                .value(value)
+                .secret(secret)
+                .build();
     }
 
     /**

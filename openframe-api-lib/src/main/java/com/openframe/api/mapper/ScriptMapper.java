@@ -47,7 +47,8 @@ public class ScriptMapper {
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
         existing.setDefaultArgs(input.getDefaultArgs());
-        existing.setEnvVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()));
+        existing.setEnvVars(ScriptEnvVarMapper.toEntityResolvingSecrets(
+                input.getEnvVars(), existing.getEnvVars()));
     }
 
     public ScriptResponse toResponse(Script entity) {
