@@ -24,4 +24,7 @@ public class RunningExecutionRows {
     PackageManagerType packageManager;
     String packageName;
     SoftwareAction softwareAction;
+
+    String softwareBundleId;
+    String softwareScheduleId;
 }
