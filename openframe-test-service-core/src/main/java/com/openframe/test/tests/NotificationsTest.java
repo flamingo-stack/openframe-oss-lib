@@ -91,6 +91,12 @@ public class NotificationsTest extends BaseTest {
     }
 
     @Tag("feature")
+    // The only case here that needs the inbox to hold something. The other three read counts or run
+    // bulk operations, which are meaningful on an empty inbox; this one aborts. `needs-notification`
+    // is what the `tenant` env excludes, so the dev suite — a shared tenant whose inbox is usually
+    // empty — stops reporting that abort as a red x. Tagged on the method, not the class: no phase
+    // selects this tag, so the class is never split across two phases.
+    @Tag("needs-notification")
     @Test
     @DisplayName("Mark a notification read, then delete it")
     @Order(2)
