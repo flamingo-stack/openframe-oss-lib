@@ -57,10 +57,7 @@ public class SoftwareInventoryService {
 
     private static final int DEVICES_PER_VERSION_LIMIT = 500;
     private static final int HOSTS_PER_TITLE_LIMIT = 500;
-    private static final Map<String, String> FLEET_SORT = Map.of(
-            "name", "name",
-            "devicesCount", "hosts_count");
-    private static final Set<String> CLIENT_SORT = Set.of("cveCount", "highestSeverity", "severity");
+    private static final Set<String> SORTABLE = Set.of("name", "devicesCount", "cveCount", "highestSeverity", "severity");
     private static final String SORTABLE_FIELDS = "name, devicesCount, cveCount, highestSeverity";
     private static final int TITLES_FETCH_PAGE = 500;
     private static final int TITLES_FETCH_CAP = 5000;
@@ -105,26 +102,23 @@ public class SoftwareInventoryService {
                                                      SortInput sort, Boolean vulnerable) {
         String field = sort == null ? null : sort.getField();
         boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
-
-        if (field == null || FLEET_SORT.containsKey(field)) {
-            String orderKey = field == null ? null : FLEET_SORT.get(field);
-            // Fleet rejects order_direction without order_key — send it only when there is a key.
-            String orderDirection = orderKey == null ? null : (desc ? "desc" : "asc");
-            PageResult<SoftwareResponse> pageResult = fleetPage(search, page, perPage, orderKey, orderDirection, vulnerable);
-            // Enrich ONLY the visible page (bounded by perPage) to keep Fleet fan-out predictable.
-            enrichRealDevicesCount(pageResult.items());
-            return pageResult;
-        }
-        if (!CLIENT_SORT.contains(field)) {
+        if (field != null && !SORTABLE.contains(field)) {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
-        // fetchAllTitles is bounded by TITLES_FETCH_CAP; we sort in memory then enrich only the returned slice.
-        List<SoftwareResponse> all = fetchAllTitles(search, vulnerable).stream()
-                .sorted(clientComparator(field, desc))
+
+        List<SoftwareResponse> all = fetchAllTitles(search, vulnerable);
+        enrichRealDevicesCount(all);
+        List<SoftwareResponse> withDevices = all.stream()
+                .filter(row -> deviceCount(row) > 0)
                 .toList();
-        PageResult<SoftwareResponse> pageResult = paginateList(all, page, perPage);
-        enrichRealDevicesCount(pageResult.items());
-        return pageResult;
+        List<SoftwareResponse> ordered = field == null
+                ? withDevices
+                : withDevices.stream().sorted(comparatorFor(field, desc)).toList();
+        return paginateList(ordered, page, perPage);
+    }
+
+    private static int deviceCount(SoftwareResponse row) {
+        return row.getDevicesCount() == null ? 0 : row.getDevicesCount();
     }
 
     // Replace Fleet's raw hosts_count with the count of correlated OpenFrame Machines.
@@ -145,22 +139,6 @@ public class SoftwareInventoryService {
                 .orElseGet(List::of);
     }
 
-    private PageResult<SoftwareResponse> fleetPage(String search, int page, Integer perPage, String orderKey,
-                                                   String orderDirection, Boolean vulnerable) {
-        SoftwareTitleRequest request = SoftwareTitleRequest.builder()
-                .page(page).perPage(perPage).query(search)
-                .orderKey(orderKey).orderDirection(orderDirection)
-                .vulnerable(vulnerable)
-                .build();
-        SoftwareTitlesResponse response = fleet().listSoftwareTitles(request);
-        List<SoftwareResponse> items = mapTitles(response);
-        boolean hasNext = response.getMeta() != null
-                && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
-        boolean hasPrev = response.getMeta() != null
-                && Boolean.TRUE.equals(response.getMeta().getHasPreviousResults());
-        int total = response.getCount() == null ? items.size() : response.getCount();
-        return new PageResult<>(items, hasNext, hasPrev, total, page);
-    }
 
     private List<SoftwareResponse> fetchAllTitles(String search, Boolean vulnerable) {
         List<SoftwareResponse> all = new ArrayList<>();
@@ -190,8 +168,11 @@ public class SoftwareInventoryService {
                         .toList();
     }
 
-    private static Comparator<SoftwareResponse> clientComparator(String field, boolean desc) {
+    private static Comparator<SoftwareResponse> comparatorFor(String field, boolean desc) {
         Comparator<SoftwareResponse> base = switch (field) {
+            case "name" -> Comparator.comparing(row -> row.getName() == null ? "" : row.getName(),
+                    String.CASE_INSENSITIVE_ORDER);
+            case "devicesCount" -> Comparator.comparingInt(SoftwareInventoryService::deviceCount);
             case "cveCount" -> Comparator.comparingInt(SoftwareInventoryService::cveCount);
             case "highestSeverity", "severity" -> Comparator.comparingInt(SoftwareInventoryService::severityRank);
             default -> throw new BadRequestException(

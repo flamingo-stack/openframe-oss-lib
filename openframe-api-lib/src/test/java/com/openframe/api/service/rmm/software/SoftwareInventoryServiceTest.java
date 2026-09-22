@@ -121,6 +121,7 @@ class SoftwareInventoryServiceTest {
                 titleWithCves("Alpha", 5),
                 titleWithCves("Chrome", 40)));
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response); // meta null -> single page in the scan
+        simulateEnricherSetsCount(1);
 
         PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, sort("cveCount", SortDirection.DESC), null);
 
@@ -265,6 +266,26 @@ class SoftwareInventoryServiceTest {
         assertThat(filters.getStatuses()).isNotEmpty();
         int total = filters.getStatuses().stream().mapToInt(SoftwareFilterOption::getCount).sum();
         assertThat(total).isEqualTo(1); // one correlated device → one status bucket, count 1
+    }
+
+    @Test
+    @DisplayName("listSoftware: titles the enricher correlates to zero live devices are hidden from the list")
+    void listSoftware_dropsZeroDeviceTitles() {
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of(
+                titleWithSource("Keep", "homebrew_packages"),
+                titleWithSource("Drop", "homebrew_packages")));
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(2);
+            rows.forEach(row -> setter.accept(row, "Keep".equals(row.getName()) ? 1 : 0));
+            return null;
+        }).when(deviceCountEnricher).enrich(anyList(), any(), any());
+
+        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, null, null);
+
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Keep");
     }
 
     private static SoftwareTitle titleWithSource(String name, String fleetSource) {
