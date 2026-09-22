@@ -24,16 +24,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * The unit runs on every boot, so it has to be safe to repeat: a tenant that already has its board
- * must come out unchanged. Above all the admin-owned "On Hold" column is seeded by name — renaming
- * or deleting it is the admin's decision, and the next boot must not undo it.
+ * Seeding has to be safe to repeat even as a one-shot unit — a tenant may reach it with part of the
+ * board already in place. Above all the admin-owned "On Hold" column is seeded by name: renaming or
+ * deleting it is the admin's decision, and seeding must not undo it.
  */
 @ExtendWith(MockitoExtension.class)
-class MigrateTicketStatusesChangeUnitTest {
+class SeedTicketStatusesChangeUnitTest {
 
     @Mock private MongoTemplate mongoTemplate;
 
-    @InjectMocks private MigrateTicketStatusesChangeUnit changeUnit;
+    @InjectMocks private SeedTicketStatusesChangeUnit changeUnit;
 
     @Test
     void seedsTheFourSystemStatusesAndTheOnHoldColumn() {
