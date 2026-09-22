@@ -24,18 +24,23 @@ public class ProviderAwareAuthenticationEntryPoint implements AuthenticationEntr
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException {
         String provider = request.getParameter("provider");
+        boolean providerSupported = ssoProviderRegistry.isSupported(provider);
 
         // Preserve tenant in session for dynamic ClientRegistration resolution
         String tenantId = TenantContext.getTenantId();
         if (tenantId != null && !tenantId.isBlank()) {
             HttpSession session = request.getSession(true);
             session.setAttribute(TENANT_ID, tenantId);
-            log.debug("Stored tenantId in session for SSO redirect: tenantId={}, provider={}", tenantId, provider);
-        } else if (ssoProviderRegistry.isSupported(provider)) {
+            if (providerSupported) {
+                log.debug("Stored tenantId in session for SSO redirect: tenantId={}, provider={}", tenantId, provider);
+            } else {
+                log.debug("Stored tenantId in session for SSO redirect: tenantId={}", tenantId);
+            }
+        } else if (providerSupported) {
             log.warn("Redirecting to SSO provider without tenantId in context; callback may fail. provider={}, requestUri={}", provider, request.getRequestURI());
         }
 
-        String target = ssoProviderRegistry.isSupported(provider)
+        String target = providerSupported
                 ? "/oauth2/authorization/" + provider.toLowerCase(ROOT)
                 : "/login";
 

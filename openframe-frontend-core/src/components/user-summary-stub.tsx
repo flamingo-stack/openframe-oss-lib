@@ -86,10 +86,34 @@ export function UserSummary({
   avatarUrl,
   authProviders,
   showEditButton = false,
+  // The following props are intentionally accepted but NOT IMPLEMENTED in
+  // this stub (see the docstring above). They are destructured here — even
+  // though unused — so that any caller passing them is not silently ignored:
+  // TypeScript/lint "unused variable" tooling and `console.warn` below make
+  // the no-op explicit instead of a documentation-only trap.
+  editHref,
+  userId,
+  profileData,
+  editablePhoto,
+  onPhotoChange,
   mspPreview,
   compact = false,
   avatarSize = 40,
 }: Props) {
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    (editHref !== undefined ||
+      userId !== undefined ||
+      profileData !== undefined ||
+      editablePhoto !== undefined ||
+      onPhotoChange !== undefined)
+  ) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[UserSummary stub] One or more of editHref/userId/profileData/editablePhoto/onPhotoChange were passed ' +
+        'but are NOT IMPLEMENTED in this stub component and will have no effect.'
+    );
+  }
   // Compact variant: minimal horizontal row
   if (compact) {
     return (

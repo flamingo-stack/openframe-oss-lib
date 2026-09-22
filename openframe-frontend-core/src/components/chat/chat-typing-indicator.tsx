@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useId } from 'react';
 import { cn } from '../../utils/cn';
 import type { ChatTypingIndicatorProps } from './types';
 
@@ -16,8 +16,11 @@ const ChatTypingIndicator = forwardRef<HTMLDivElement, ChatTypingIndicatorProps>
       lg: 'h-8',
     };
 
+    const animationId = useId();
+    const keyframeName = `dotPulse-${animationId.replace(/[^a-zA-Z0-9-]/g, '')}`;
+
     const dotAnimation = `
-      @keyframes dotPulse {
+      @keyframes ${keyframeName} {
         0%, 80%, 100% {
           transform: scale(1);
           opacity: 0.7;
@@ -37,21 +40,21 @@ const ChatTypingIndicator = forwardRef<HTMLDivElement, ChatTypingIndicatorProps>
           <div
             className={cn(dotSizeClasses[size], 'rounded-full', dotClassName || 'bg-ods-text-primary')}
             style={{
-              animation: 'dotPulse 1.4s ease-in-out infinite',
+              animation: `${keyframeName} 1.4s ease-in-out infinite`,
               animationDelay: '0ms',
             }}
           />
           <div
             className={cn(dotSizeClasses[size], 'rounded-full', dotClassName || 'bg-ods-text-primary')}
             style={{
-              animation: 'dotPulse 1.4s ease-in-out infinite',
+              animation: `${keyframeName} 1.4s ease-in-out infinite`,
               animationDelay: '200ms',
             }}
           />
           <div
             className={cn(dotSizeClasses[size], 'rounded-full', dotClassName || 'bg-ods-text-primary')}
             style={{
-              animation: 'dotPulse 1.4s ease-in-out infinite',
+              animation: `${keyframeName} 1.4s ease-in-out infinite`,
               animationDelay: '400ms',
             }}
           />

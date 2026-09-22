@@ -52,7 +52,7 @@ export function exportToCSV(data: QueryResultRow[], columns: string[], filename:
   document.body.appendChild(link);
   link.click();
 
-  // Cleanup
+  // Cleanup (deferred so the download has a chance to start before the URL is revoked)
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }

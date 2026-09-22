@@ -30,7 +30,9 @@ public class TicketFilterInput {
     private Boolean hasUnreadNotifications;
     @Size(max = 3)
     private List<TicketActivityFilter> activity;
-    //TODO Backward compatibility alias. Remove after FE alignment
+    // TODO(OF-TBD): Backward compatibility alias for FE clients still sending labelIds instead of tagIds.
+    // Consumers: frontend, openframe-saas-lib. Do not remove until FE alignment ticket is resolved
+    // and all downstream consumers are confirmed migrated off this field.
     @Deprecated
     private List<String> labelIds;
 }

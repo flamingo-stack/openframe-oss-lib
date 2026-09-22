@@ -40,5 +40,6 @@ public class IntegratedTool implements TenantScoped {
     private Integer connectionTimeout;
     private Integer readTimeout;
     private String[] allowedEndpoints;
-    private Object[] debeziumConnectors;
+    private List<DebeziumConnector> debeziumConnectors;
 }
+

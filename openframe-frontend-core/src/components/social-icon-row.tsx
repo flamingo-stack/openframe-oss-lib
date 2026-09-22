@@ -40,11 +40,12 @@ interface SocialIconRowProps {
   groupByVisibility?: boolean;
 }
 
-const defaultLinks: SocialIconLink[] = [
-  { platform: 'github', href: 'https://github.com/flamingo-stack', label: 'GitHub' },
-  { platform: 'linkedin', href: 'https://linkedin.com/company/flamingo.run', label: 'LinkedIn' },
-  { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' },
-];
+// This is a generic, shared UI-kit component: it must not hardcode any
+// organization-specific social URLs. `links` is data-driven (sourced from the
+// `social_platforms` table by the consumer) and is REQUIRED — there is no
+// fallback here. Consumers that forget to pass `links` simply render nothing,
+// rather than leaking flamingo-stack URLs into unrelated apps.
+const defaultLinks: SocialIconLink[] = [];
 
 type SocialIconComponent = (props: { className?: string }) => React.ReactElement;
 

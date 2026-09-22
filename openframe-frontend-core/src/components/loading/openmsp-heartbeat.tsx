@@ -19,30 +19,8 @@ export function OpenmspHeartbeatLoader({
       role="status"
       aria-label="Generating report"
     >
-      {/* Inline keyframes to bypass Tailwind build issues */}
-      <style>{`
-        /* Lub-dub double-beat: quick pulse, quick pulse, rest */
-        @keyframes heartbeatInline {
-          0%   { transform: scale(1);      opacity: 0.96; }
-          8%   { transform: scale(1.07);   opacity: 1;    }
-          16%  { transform: scale(1);      opacity: 0.98; }
-          24%  { transform: scale(1.07);   opacity: 1;    }
-          32%  { transform: scale(1);      opacity: 0.96; }
-          /* small rebound */
-          40%  { transform: scale(0.97);   opacity: 0.94; }
-          /* rest */
-          70%  { transform: scale(1);      opacity: 0.96; }
-          100% { transform: scale(1);      opacity: 0.96; }
-        }
-      `}</style>
       <div className="justify-top flex flex-col items-center">
-        <div
-          style={{
-            animation: 'heartbeatInline 3.6s ease-in-out infinite',
-            transformOrigin: 'center center',
-            display: 'inline-flex',
-          }}
-        >
+        <div className="inline-flex origin-center animate-pulse">
           <OpenmspLogo
             className="mb-10 h-16 w-16 text-ods-accent opacity-90 md:h-24 md:w-24"
             frontBubbleColor="#f1f1f1"

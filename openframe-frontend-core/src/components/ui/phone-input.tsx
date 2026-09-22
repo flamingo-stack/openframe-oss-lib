@@ -67,6 +67,13 @@ export function PhoneInput({
     };
   }, []);
 
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, [countryCode]);
+
   return (
     <div className="flex w-full min-w-0 gap-2">
       <Select
