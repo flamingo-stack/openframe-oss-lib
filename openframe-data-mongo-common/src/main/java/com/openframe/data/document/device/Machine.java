@@ -19,6 +19,7 @@ public class Machine implements TenantScoped {
     @Indexed
     private String tenantId;
     @NotBlank
+    @Indexed
     private String machineId;   // Same as in OAuthClient, used for authentication and as primary ID
     private String ip;
     private String macAddress;

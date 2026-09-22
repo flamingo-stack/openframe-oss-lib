@@ -79,4 +79,4 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
                 ))
                 .build();
     }
-} 
+}
