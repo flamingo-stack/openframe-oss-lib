@@ -4,8 +4,6 @@ import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.config.DeliveryProperties.Sweep;
 
-import java.time.Duration;
-
 public final class DeliveryTestPolicies {
 
     public static final long ACK_THRESHOLD = 30L;
@@ -13,9 +11,6 @@ public final class DeliveryTestPolicies {
     public static final int BACKOFF_MULTIPLIER = 2;
     public static final long MAX_RETRY_INTERVAL = 300L;
     public static final int BATCH_SIZE = 500;
-    public static final long SWEEP_INTERVAL_MS = 30_000L;
-    public static final Duration LOCK_AT_MOST_FOR = Duration.ofMinutes(2);
-    public static final Duration LOCK_AT_LEAST_FOR = Duration.ofSeconds(10);
     public static final long RECONNECT_WINDOW = 86_400L;
     public static final long RESULT_TIMEOUT = 600L;
     public static final long TTL = 604_800L;
@@ -35,9 +30,6 @@ public final class DeliveryTestPolicies {
         defaults.setTtlSeconds(TTL);
         Sweep sweep = new Sweep();
         sweep.setBatchSize(BATCH_SIZE);
-        sweep.setInterval(SWEEP_INTERVAL_MS);
-        sweep.setLockAtMostFor(LOCK_AT_MOST_FOR);
-        sweep.setLockAtLeastFor(LOCK_AT_LEAST_FOR);
         DeliveryProperties properties = new DeliveryProperties();
         properties.setEnabled(true);
         properties.setDefaults(defaults);

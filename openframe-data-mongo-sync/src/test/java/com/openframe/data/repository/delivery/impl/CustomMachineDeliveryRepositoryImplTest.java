@@ -91,7 +91,7 @@ class CustomMachineDeliveryRepositoryImplTest {
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
 
         // execution
-        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, ATTEMPTS, now, now);
+        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, ATTEMPTS, now);
 
         // verifications
         assertThat(republished).isTrue();
@@ -113,7 +113,7 @@ class CustomMachineDeliveryRepositoryImplTest {
         when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(noRow);
 
         // execution
-        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, ATTEMPTS, now, now);
+        boolean republished = repository.markRepublished(ID, DeliveryStatus.UNACKED, now, ATTEMPTS, now);
 
         // verifications
         assertThat(republished).isFalse();

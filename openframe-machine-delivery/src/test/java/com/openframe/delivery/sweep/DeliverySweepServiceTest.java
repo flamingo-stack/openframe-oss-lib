@@ -87,13 +87,13 @@ class DeliverySweepServiceTest {
     }
 
     @Test
-    void retryPending_onlineWithAttemptsLeft_publishedThenCountedAgainstSameDispatchAndAttemptWithBackoff() {
+    void retryPending_onlineWithAttemptsLeft_publishedThenCountedWithBackoff() {
         // setup
         Instant before = Instant.now();
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class), dueAtCaptor.capture())).thenReturn(true);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), dueAtCaptor.capture())).thenReturn(true);
 
         // execution
         service.retryPending();
@@ -117,7 +117,7 @@ class DeliverySweepServiceTest {
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(ATTEMPTS_PAST_CAP), any(Instant.class), dueAtCaptor.capture())).thenReturn(true);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(ATTEMPTS_PAST_CAP), dueAtCaptor.capture())).thenReturn(true);
 
         // execution
         service.retryPending();
@@ -141,13 +141,13 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(repository, never()).markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class), any(Instant.class));
+        verify(repository, never()).markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class));
         verify(repository).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), dueAtCaptor.capture());
         assertThat(dueAtCaptor.getValue())
                 .isAfterOrEqualTo(before.plusSeconds(MAX_RETRY_INTERVAL))
                 .isBefore(before.plusSeconds(MAX_RETRY_INTERVAL + CLOCK_SLACK_SECONDS));
         verify(metrics).recordPublishFailed(DeliveryType.TOOL_INSTALLATION);
-        verify(metrics).recordRowError();
+        verify(metrics, never()).recordRowError();
         verify(metrics, never()).recordRetried(DeliveryType.TOOL_INSTALLATION);
         verifyNoInteractions(closer);
     }
@@ -192,7 +192,7 @@ class DeliverySweepServiceTest {
         stubDue(delivery);
         stubMachine(DeviceStatus.ONLINE);
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class), any(Instant.class))).thenReturn(false);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(false);
 
         // execution
         service.retryPending();
@@ -298,7 +298,7 @@ class DeliverySweepServiceTest {
     @Test
     void retryPending_offlineWithSkipBehavior_cancelledNotFailed() {
         // setup
-        delivery.setOfflineBehavior(DeliveryOfflineBehavior.SKIP);
+        properties.getDefaults().setOfflineBehavior(DeliveryOfflineBehavior.SKIP);
         stubDue(delivery);
         stubMachine(DeviceStatus.OFFLINE);
 
@@ -334,7 +334,7 @@ class DeliverySweepServiceTest {
         Map<String, DeviceStatus> bothOnline = Map.of(OTHER_MACHINE_ID, DeviceStatus.ONLINE, MACHINE_ID, DeviceStatus.ONLINE);
         when(machineOnlineStatus.lookup(both)).thenReturn(new Lookup(bothOnline));
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class), any(Instant.class))).thenReturn(true);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
 
         // execution
         service.retryPending();
@@ -371,7 +371,6 @@ class DeliverySweepServiceTest {
                 .errors(0)
                 .payloadJson(payloadJson)
                 .dispatchedAt(dispatchedAt)
-                .lastAttemptAt(dispatchedAt)
                 .dueAt(dispatchedAt.plusSeconds(ACK_THRESHOLD))
                 .build();
     }

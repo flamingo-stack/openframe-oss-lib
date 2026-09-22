@@ -3,6 +3,7 @@ package com.openframe.delivery.dispatch;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.delivery.DeliveryStatus;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
@@ -36,25 +37,26 @@ public class DeliveryRecorder {
 
     private MachineDelivery pendingRow(DeliveryRequest<?> request) {
         Instant now = Instant.now();
-        String id = DeliveryId.of(request.getType(), request.getTargetId(), request.getMachineId());
-        String payloadJson = toJson(request.getPayload());
-        Policy policy = properties.resolve(request.getType());
+        DeliveryType type = request.getType();
+        String targetId = request.getTargetId();
+        String machineId = request.getMachineId();
+        String id = DeliveryId.of(type, targetId, machineId);
+        Object payload = request.getPayload();
+        String payloadJson = toJson(payload);
+        Policy policy = properties.resolve(type);
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
         long ttlSeconds = policy.getTtlSeconds();
         return MachineDelivery.builder()
                 .id(id)
-                .type(request.getType())
-                .targetId(request.getTargetId())
-                .machineId(request.getMachineId())
+                .type(type)
+                .targetId(targetId)
+                .machineId(machineId)
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
                 .errors(0)
                 .payloadJson(payloadJson)
                 .dispatchedAt(now)
-                .lastAttemptAt(now)
                 .dueAt(now.plusSeconds(ackThresholdSeconds))
-                .offlineBehavior(request.getOfflineBehavior())
-                .reconnectWindowSeconds(request.getReconnectWindowSeconds())
                 .expiresAt(now.plusSeconds(ttlSeconds))
                 .build();
     }

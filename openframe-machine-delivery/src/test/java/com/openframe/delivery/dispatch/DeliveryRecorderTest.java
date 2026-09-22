@@ -1,7 +1,6 @@
 package com.openframe.delivery.dispatch;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
@@ -48,7 +47,6 @@ class DeliveryRecorderTest {
                 .targetId(MACHINE_ID)
                 .machineId(MACHINE_ID)
                 .payload(payload)
-                .offlineBehavior(DeliveryOfflineBehavior.RETRY_ON_RECONNECT)
                 .build();
         properties = DeliveryTestPolicies.properties();
         recorder = new DeliveryRecorder(repository, properties, new ObjectMapper());
@@ -69,8 +67,6 @@ class DeliveryRecorderTest {
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(saved.getAttempts()).isZero();
         assertThat(saved.getPayloadJson()).contains(VALUE);
-        assertThat(saved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
-        assertThat(saved.getDispatchedAt()).isEqualTo(saved.getLastAttemptAt());
         assertThat(saved.getDueAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(ACK_THRESHOLD));
         assertThat(saved.getExpiresAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(TTL));
         assertThat(saved.getErrors()).isZero();

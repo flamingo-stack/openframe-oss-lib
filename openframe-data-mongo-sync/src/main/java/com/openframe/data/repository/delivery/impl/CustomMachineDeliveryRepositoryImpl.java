@@ -31,7 +31,6 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_ERRORS = "errors";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
-    private static final String FIELD_LAST_ATTEMPT_AT = "lastAttemptAt";
     private static final String FIELD_DUE_AT = "dueAt";
     private static final String FIELD_PARKED = "parked";
     private static final String FIELD_ACKED_AT = "ackedAt";
@@ -45,7 +44,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         super(mongoTemplate);
     }
 
-    // primary read: a lagging secondary would show a row the sweep has already re-sent as still due
+    // primary on purpose: a lagging secondary shows a row the sweep already re-sent as still due
     @Override
     public List<MachineDelivery> findDue(DeliveryStatus status, Instant before, int limit) {
         Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_DUE_AT).lt(before);
@@ -56,24 +55,23 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         return mongoTemplate.find(query, MachineDelivery.class);
     }
 
-    // $set of every field (a replacement document would be inserted without the tenant of the scoped filter):
-    // restarts our own open row, refuses a foreign one with the same _id (duplicate key)
+    // $set per field, not a replacement document: a replacement is inserted without the tenant of the scoped filter
     @Override
     public void upsertPending(MachineDelivery delivery) {
         Document document = new Document();
         mongoTemplate.getConverter().write(delivery, document);
         Update update = new Update().set(FIELD_TENANT_ID, tenantId());
         document.forEach((field, value) -> setField(update, field, value));
-        Query byId = new Query(Criteria.where(FIELD_ID).is(delivery.getId()));
+        String id = delivery.getId();
+        Query byId = new Query(Criteria.where(FIELD_ID).is(id));
         mongoTemplate.upsert(byId, update, MachineDelivery.class);
     }
 
     @Override
-    public boolean markRepublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, int attempts, Instant attemptAt, Instant dueAt) {
+    public boolean markRepublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, int attempts, Instant dueAt) {
         Criteria sameAttempt = sameDispatch(id, from, dispatchedAt).and(FIELD_ATTEMPTS).is(attempts);
         Update update = new Update()
                 .inc(FIELD_ATTEMPTS, 1)
-                .set(FIELD_LAST_ATTEMPT_AT, attemptAt)
                 .set(FIELD_DUE_AT, dueAt);
         return updateOne(sameAttempt, update);
     }

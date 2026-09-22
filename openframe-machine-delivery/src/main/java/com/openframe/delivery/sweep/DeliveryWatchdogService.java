@@ -2,6 +2,7 @@ package com.openframe.delivery.sweep;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
@@ -43,13 +44,15 @@ public class DeliveryWatchdogService {
         }
     }
 
-    // a row whose close keeps failing must not stay at the head of every batch
     private void backOff(MachineDelivery delivery, Instant now) {
         try {
-            Policy policy = properties.resolve(delivery);
+            DeliveryType type = delivery.getType();
+            Policy policy = properties.resolve(type);
             long delaySeconds = policy.getMaxRetryIntervalSeconds();
             Instant dueAt = now.plusSeconds(delaySeconds);
-            repository.postpone(delivery.getId(), DeliveryStatus.AWAITING_RESULT, delivery.getDispatchedAt(), dueAt);
+            String id = delivery.getId();
+            Instant dispatchedAt = delivery.getDispatchedAt();
+            repository.postpone(id, DeliveryStatus.AWAITING_RESULT, dispatchedAt, dueAt);
         } catch (Exception e) {
             log.error("Delivery watchdog could not postpone row: id={}", delivery.getId(), e);
         }

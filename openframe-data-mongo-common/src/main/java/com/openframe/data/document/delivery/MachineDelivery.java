@@ -35,16 +35,12 @@ public class MachineDelivery implements TenantScoped {
     private String payloadJson;
 
     private Instant dispatchedAt;
-    private Instant lastAttemptAt;
     private Instant dueAt;
     private boolean parked;
     private Instant ackedAt;
     private Instant finishedAt;
 
     private DeliveryFailure failure;
-
-    private DeliveryOfflineBehavior offlineBehavior;
-    private Long reconnectWindowSeconds;
 
     @Indexed(name = "machine_delivery_ttl", expireAfterSeconds = 0)
     private Instant expiresAt;

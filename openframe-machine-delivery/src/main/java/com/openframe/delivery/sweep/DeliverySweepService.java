@@ -55,11 +55,6 @@ public class DeliverySweepService {
     private void retryOne(MachineDelivery delivery, Lookup machines, Instant now) {
         try {
             retryOrClose(delivery, machines, now);
-        } catch (DeliveryPublishException e) {
-            metrics.recordPublishFailed(delivery.getType());
-            metrics.recordRowError();
-            backOff(delivery, now);
-            log.error("Delivery publish failed, row postponed: id={}", delivery.getId(), e);
         } catch (Exception e) {
             metrics.recordRowError();
             countErrorAndBackOff(delivery, now);
@@ -73,7 +68,8 @@ public class DeliverySweepService {
             closer.cancel(delivery, DeliveryStatus.UNACKED, "machine gone", now);
             return;
         }
-        Policy policy = properties.resolve(delivery);
+        DeliveryType type = delivery.getType();
+        Policy policy = properties.resolve(type);
         if (machines.isOffline(machineId)) {
             parkSkipOrFailOffline(delivery, policy, now);
             return;
@@ -85,7 +81,6 @@ public class DeliverySweepService {
         closer.fail(delivery, DeliveryFailure.EXHAUSTED, DeliveryStatus.UNACKED, now);
     }
 
-    // parked rows are re-checked every max-retry-interval: a wake that raced the snapshot is not the only way back
     private void parkSkipOrFailOffline(MachineDelivery delivery, Policy policy, Instant now) {
         if (shouldSkipOffline(policy)) {
             closer.cancel(delivery, DeliveryStatus.UNACKED, "machine not online, type skips offline machines", now);
@@ -99,8 +94,10 @@ public class DeliverySweepService {
         long recheckSeconds = policy.getMaxRetryIntervalSeconds();
         Instant recheckAt = now.plusSeconds(recheckSeconds);
         Instant dueAt = earliest(windowEnd, recheckAt);
-        repository.park(delivery.getId(), DeliveryStatus.UNACKED, delivery.getDispatchedAt(), dueAt);
-        log.debug("Delivery parked, machine not online: id={} dueAt={} windowEnd={}", delivery.getId(), dueAt, windowEnd);
+        String id = delivery.getId();
+        Instant dispatchedAt = delivery.getDispatchedAt();
+        repository.park(id, DeliveryStatus.UNACKED, dispatchedAt, dueAt);
+        log.debug("Delivery parked, machine not online: id={} dueAt={} windowEnd={}", id, dueAt, windowEnd);
     }
 
     private void republish(MachineDelivery delivery, Policy policy, Instant now) {
@@ -109,16 +106,21 @@ public class DeliverySweepService {
         Class<Object> payloadClass = spec.getPayloadClass();
         Object payload = readPayload(delivery, payloadClass);
         String machineId = delivery.getMachineId();
-        publish(spec, delivery, machineId, payload);
-
+        boolean published = publish(spec, machineId, payload);
+        if (!published) {
+            metrics.recordPublishFailed(type);
+            backOff(delivery, now);
+            return;
+        }
         int attempts = delivery.getAttempts();
         int attempt = attempts + 1;
         long delaySeconds = retryDelaySeconds(attempt, policy);
         Instant dueAt = now.plusSeconds(delaySeconds);
+        String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
-        boolean counted = repository.markRepublished(delivery.getId(), DeliveryStatus.UNACKED, dispatchedAt, attempts, now, dueAt);
+        boolean counted = repository.markRepublished(id, DeliveryStatus.UNACKED, dispatchedAt, attempts, dueAt);
         if (!counted) {
-            log.debug("Delivery moved on while being re-published: id={}", delivery.getId());
+            log.debug("Delivery moved on while being re-published: id={}", id);
             return;
         }
         metrics.recordRetried(type);
@@ -126,42 +128,48 @@ public class DeliverySweepService {
                 type, delivery.getTargetId(), machineId, attempt, dueAt);
     }
 
-    private static void publish(DeliverySpec<DeliverySeed, Object> spec, MachineDelivery delivery, String machineId, Object payload) {
+    private static boolean publish(DeliverySpec<DeliverySeed, Object> spec, String machineId, Object payload) {
         try {
             spec.publish(machineId, payload);
+            return true;
         } catch (RuntimeException e) {
-            throw new DeliveryPublishException(delivery.getId(), e);
+            log.error("Delivery publish failed: machineId={}", machineId, e);
+            return false;
         }
     }
 
-    // infrastructure trouble: no attempt counted, the row simply comes back after max-retry-interval
     private void backOff(MachineDelivery delivery, Instant now) {
         try {
             Instant dueAt = recheckAt(delivery, now);
-            repository.postpone(delivery.getId(), DeliveryStatus.UNACKED, delivery.getDispatchedAt(), dueAt);
+            String id = delivery.getId();
+            Instant dispatchedAt = delivery.getDispatchedAt();
+            repository.postpone(id, DeliveryStatus.UNACKED, dispatchedAt, dueAt);
         } catch (Exception e) {
             log.error("Delivery sweep could not postpone row: id={}", delivery.getId(), e);
         }
     }
 
-    // a row that keeps failing for its own reasons (no spec, corrupt payload) is bounded like attempts are
     private void countErrorAndBackOff(MachineDelivery delivery, Instant now) {
         try {
-            Policy policy = properties.resolve(delivery);
+            DeliveryType type = delivery.getType();
+            Policy policy = properties.resolve(type);
             int errors = delivery.getErrors() + 1;
             if (errors >= policy.getMaxAttempts()) {
                 closer.fail(delivery, DeliveryFailure.ERROR, DeliveryStatus.UNACKED, now);
                 return;
             }
             Instant dueAt = recheckAt(delivery, now);
-            repository.postponeAfterError(delivery.getId(), DeliveryStatus.UNACKED, delivery.getDispatchedAt(), dueAt);
+            String id = delivery.getId();
+            Instant dispatchedAt = delivery.getDispatchedAt();
+            repository.postponeAfterError(id, DeliveryStatus.UNACKED, dispatchedAt, dueAt);
         } catch (Exception e) {
             log.error("Delivery sweep could not postpone row: id={}", delivery.getId(), e);
         }
     }
 
     private Instant recheckAt(MachineDelivery delivery, Instant now) {
-        Policy policy = properties.resolve(delivery);
+        DeliveryType type = delivery.getType();
+        Policy policy = properties.resolve(type);
         long delaySeconds = policy.getMaxRetryIntervalSeconds();
         return now.plusSeconds(delaySeconds);
     }

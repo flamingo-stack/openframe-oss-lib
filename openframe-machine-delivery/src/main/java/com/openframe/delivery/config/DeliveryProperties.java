@@ -2,7 +2,6 @@ package com.openframe.delivery.config;
 
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.document.delivery.MachineDelivery;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -12,7 +11,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.Duration;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -51,25 +49,10 @@ public class DeliveryProperties {
         return override.mergeOver(defaults);
     }
 
-    public Policy resolve(MachineDelivery delivery) {
-        Policy typePolicy = resolve(delivery.getType());
-        Policy rowOverride = new Policy();
-        rowOverride.setOfflineBehavior(delivery.getOfflineBehavior());
-        rowOverride.setReconnectWindowSeconds(delivery.getReconnectWindowSeconds());
-        return rowOverride.mergeOver(typePolicy);
-    }
-
     @Getter
     @Setter
     public static class Sweep {
 
-        @NotNull
-        @Positive
-        private Long interval;
-        @NotNull
-        private Duration lockAtMostFor;
-        @NotNull
-        private Duration lockAtLeastFor;
         @NotNull
         @Positive
         private Integer batchSize;

@@ -14,7 +14,7 @@ public interface CustomMachineDeliveryRepository {
 
     void upsertPending(MachineDelivery delivery);
 
-    boolean markRepublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, int attempts, Instant attemptAt, Instant dueAt);
+    boolean markRepublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, int attempts, Instant dueAt);
 
     boolean postpone(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt);
 
