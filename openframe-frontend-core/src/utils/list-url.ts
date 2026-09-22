@@ -114,6 +114,11 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
   openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
   prospect_call: (ids, b) => `${b}/api/prospect-calls?ids=${ids.join(',')}`,
+  // Code intelligence — per-object card hydration, same `handleEntityCardList`
+  // shape as the internal objects above.
+  code_rule: (ids, b) => `${b}/api/code-rules/cards?ids=${ids.join(',')}`,
+  code_repo: (ids, b) => `${b}/api/code-graph/repos?ids=${ids.join(',')}`,
+  code_deployment: (ids, b) => `${b}/api/code-graph/deployments?ids=${ids.join(',')}`,
 };
 
 /**

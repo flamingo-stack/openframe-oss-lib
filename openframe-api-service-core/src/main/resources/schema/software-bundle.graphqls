@@ -1,0 +1,134 @@
+# Software bundle — the staging layer for Install / Update Software.
+#
+# The frontend creates an empty draft bundle (createSoftwareBundle) the moment the user opens the
+# Install/Update screen, assigns devices to it (add/remove, individually or by filter+search), then submits
+# it (submitSoftwareBundle) with the action + packages, choosing run-now vs a schedule. A PENDING bundle left
+# unsubmitted is disposable and reaped by a Mongo TTL index.
+#
+# Gated behind openframe.rmm.software.enabled=true (+ spring.cloud.stream.enabled for the run dispatch).
+# Reuses SoftwareAction, SoftwarePackageInput from software.graphqls; Node, SortInput from shared.graphqls;
+# DeviceFilterInput, DeviceConnection, DeviceFilters from device.graphqls; AvailableDeviceConnection,
+# ScheduleTimeReference, ScheduleOfflineBehavior from script-schedule.graphqls.
+
+extend type Query {
+    """One bundle by id. Null when it does not exist (or was already reaped)."""
+    softwareBundle(id: ID!): SoftwareBundle
+}
+
+extend type Mutation {
+    """
+    Start an empty draft: status PENDING, no devices, no packages, no action.
+    Scoped to the tenant and the calling user. The frontend calls it right before the
+    first device is assigned.
+    """
+    createSoftwareBundle: SoftwareBundle!
+
+    """
+    Assign the given devices. Idempotent: ids that are already assigned are skipped.
+    machineIds are Machine global ids. Fails if the bundle is COMPLETED.
+    """
+    addDevicesToSoftwareBundle(bundleId: ID!, machineIds: [ID!]!): SoftwareBundle!
+
+    """
+    Unassign the given devices. Ids that are not assigned are no-ops.
+    Fails if the bundle is COMPLETED.
+    """
+    removeDevicesFromSoftwareBundle(bundleId: ID!, machineIds: [ID!]!): SoftwareBundle!
+
+    """
+    Assign every device matching filter + search, resolved on the server ("Add N Devices").
+    Takes the same filter/search as availableDevices. Already-assigned devices are skipped.
+    """
+    addAllDevicesToSoftwareBundle(bundleId: ID!, filter: DeviceFilterInput, search: String): SoftwareBundle!
+
+    """
+    Unassign every assigned device matching filter + search ("Remove N Devices").
+    With no filter and no search it clears the whole assignment.
+    """
+    removeAllDevicesFromSoftwareBundle(bundleId: ID!, filter: DeviceFilterInput, search: String): SoftwareBundle!
+
+    """
+    Validate the bundle, then run it now (schedule: null) or create a software schedule from it,
+    and mark it COMPLETED.
+    """
+    submitSoftwareBundle(input: SubmitSoftwareBundleInput!): SoftwareBundle!
+
+    """
+    Discard a PENDING bundle. Idempotent: an unknown or already reaped id returns true. A COMPLETED
+    bundle returns false and is left untouched. It never throws.
+    """
+    deleteSoftwareBundle(id: ID!): Boolean!
+}
+
+input SubmitSoftwareBundleInput {
+    id: ID!
+    action: SoftwareAction!
+    """1..50, as in SoftwareManagementInput."""
+    packages: [SoftwarePackageInput!]!
+    """Null: run now (Device-Online). Set: create a software schedule."""
+    schedule: SoftwareBundleScheduleInput
+}
+
+"""Same fields and rules as CreateSoftwareScheduleInput, minus action / packages / machineIds."""
+input SoftwareBundleScheduleInput {
+    """Null: the server names it, e.g. "Install jq, wget"."""
+    name: String
+    description: String
+    timeReference: ScheduleTimeReference
+    offlineBehavior: ScheduleOfflineBehavior
+    reconnectWindowSeconds: Long
+    startAt: Instant!
+    repeat: Long
+}
+
+"""A staged install/update operation: assigned devices + packages, plus lifecycle state."""
+type SoftwareBundle implements Node {
+    id: ID!
+    "PENDING while drafting, COMPLETED once submitted. Server-controlled; never settable."
+    status: SoftwareBundleStatus!
+    "Null while PENDING; set by submit."
+    action: SoftwareAction
+    "Null while PENDING; set by submit."
+    mode: SoftwareBundleMode
+    "Empty while PENDING; set by submit."
+    packages: [SoftwareBundlePackage!]!
+
+    "Number of assigned devices."
+    deviceCount: Int!
+    "Assigned devices. Same filter/search/sort/pagination as the top-level devices query."
+    assignedDevices(filter: DeviceFilterInput, first: Int, after: String, last: Int, before: String, search: String, sort: SortInput): DeviceConnection!
+    "The picker's \"Available Devices\". Each edge carries assigned."
+    availableDevices(filter: DeviceFilterInput, first: Int, after: String, last: Int, before: String, search: String, sort: SortInput): AvailableDeviceConnection!
+    assignedDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
+    availableDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
+
+    "For SCHEDULED bundles: when the run fires (absolute instant, SERVER time). Null for NOW."
+    startAt: Instant
+    "For SCHEDULED bundles: the schedule created on submit. Null for NOW / while PENDING."
+    scheduleId: String
+    "Execution ids from the run (one per dispatched package). Null/empty while PENDING."
+    executionIds: [String!]
+    createdBy: String
+    createdAt: Instant
+    updatedAt: Instant
+    "When the bundle was submitted. Null while PENDING."
+    completedAt: Instant
+}
+
+enum SoftwareBundleMode {
+    NOW
+    SCHEDULED
+}
+
+"""One catalog package staged in a bundle."""
+type SoftwareBundlePackage {
+    packageManager: PackageManagerType!
+    packageName: String!
+    brewPackageType: BrewPackageType
+    version: String
+}
+
+enum SoftwareBundleStatus {
+    PENDING
+    COMPLETED
+}

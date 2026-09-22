@@ -1,5 +1,7 @@
 package com.openframe.data.service.rmm;
 
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,9 +17,13 @@ import java.util.Objects;
 public class SoftwareScheduleTargetResolver {
 
     private final SoftwareScheduleMachineAssignedRepository assignedRepository;
+    private final ScheduleCriteriaDeviceResolver criteriaResolver;
 
-    public List<String> resolveMachineIds(String tenantId, String softwareScheduleId) {
-        return assignedRepository.findByTenantIdAndSoftwareScheduleId(tenantId, softwareScheduleId).stream()
+    public List<String> resolveMachineIds(SoftwareSchedule schedule) {
+        if (schedule.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA) {
+            return criteriaResolver.resolveMachineIds(schedule.getTenantId(), schedule.getDeviceCriteria(), null);
+        }
+        return assignedRepository.findByTenantIdAndSoftwareScheduleId(schedule.getTenantId(), schedule.getId()).stream()
                 .map(SoftwareScheduleMachineAssigned::getMachineId)
                 .filter(Objects::nonNull)
                 .distinct()
