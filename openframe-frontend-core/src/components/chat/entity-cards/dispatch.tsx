@@ -1355,7 +1355,7 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   // held to, the repositories themselves, and one row per deployment
   // environment. Glyph cards like their siblings — none of the three has a
   // cover image, and a rule is read in the admin screen it links to.
-  code_rule: { label: 'Review rule', icon: () => <BracketCurlyCheckIcon size={24} /> },
+  code_rule: { label: 'Code rule', icon: () => <BracketCurlyCheckIcon size={24} /> },
   code_repo: { label: 'Repository', icon: () => <CodingBranchIcon size={24} /> },
   code_deployment: { label: 'Deployment', icon: () => <PackageIcon size={24} /> },
 };
