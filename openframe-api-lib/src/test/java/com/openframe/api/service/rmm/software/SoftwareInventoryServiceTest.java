@@ -2,9 +2,13 @@ package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
+import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
@@ -60,7 +64,7 @@ class SoftwareInventoryServiceTest {
     @Test
     @DisplayName("listDevicesForSoftware: a non-numeric id short-circuits to empty without touching Fleet")
     void listDevices_nonNumericId_emptyNoFleet() {
-        assertThat(service.listDevicesForSoftware("not-a-number", null, 0, 50).items()).isEmpty();
+        assertThat(service.listDevicesForSoftware("not-a-number", null, null, 0, 50).items()).isEmpty();
         verifyNoInteractions(fleet, hostMachineResolver);
     }
 
@@ -85,7 +89,7 @@ class SoftwareInventoryServiceTest {
         machine.setHostname("host-1");
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(1L, machine));
 
-        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, 0, 50);
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 50);
 
         assertThat(result.items()).hasSize(1);
         SoftwareOnDeviceResponse row = result.items().get(0);
@@ -211,6 +215,58 @@ class SoftwareInventoryServiceTest {
         return s;
     }
 
+    @Test
+    @DisplayName("listDevicesForSoftware: the status filter keeps only devices whose status is selected")
+    void listDevices_statusFilter() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setName("Google Chrome");
+        SoftwareTitleVersion version = new SoftwareTitleVersion();
+        version.setId(10L);
+        version.setVersion("1.2.3");
+        title.setVersions(List.of(version));
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+        when(fleet.searchHosts(any(HostSearchRequest.class))).thenReturn(List.of(host(1L, "u1", "host-1")));
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        Machine machine = new Machine();
+        machine.setMachineId("m-1");
+        machine.setHostname("host-1");
+        when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(1L, machine));
+
+        // The device is UP_TO_DATE or OUTDATED; a lifecycle status it cannot have filters it out.
+        SoftwareOnDeviceFilterInput drop = new SoftwareOnDeviceFilterInput();
+        drop.setStatuses(List.of(SoftwareOnDeviceStatus.SCHEDULED_UNINSTALL));
+        assertThat(service.listDevicesForSoftware("42", drop, null, 0, 50).items()).isEmpty();
+
+        // Selecting both possible static statuses keeps it.
+        SoftwareOnDeviceFilterInput keep = new SoftwareOnDeviceFilterInput();
+        keep.setStatuses(List.of(SoftwareOnDeviceStatus.UP_TO_DATE, SoftwareOnDeviceStatus.OUTDATED));
+        assertThat(service.listDevicesForSoftware("42", keep, null, 0, 50).items()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("softwareDeviceFilters: facets the devices-on-software list by status")
+    void softwareDeviceFilters_facetsByStatus() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setName("Google Chrome");
+        SoftwareTitleVersion version = new SoftwareTitleVersion();
+        version.setId(10L);
+        version.setVersion("1.2.3");
+        title.setVersions(List.of(version));
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+        when(fleet.searchHosts(any(HostSearchRequest.class))).thenReturn(List.of(host(1L, "u1", "host-1")));
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        Machine machine = new Machine();
+        machine.setMachineId("m-1");
+        machine.setHostname("host-1");
+        when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(1L, machine));
+
+        SoftwareOnDeviceFilters filters = service.getSoftwareDeviceFilters("42", null);
+
+        assertThat(filters.getStatuses()).isNotEmpty();
+        int total = filters.getStatuses().stream().mapToInt(SoftwareFilterOption::getCount).sum();
+        assertThat(total).isEqualTo(1); // one correlated device → one status bucket, count 1
+    }
+
     private static SoftwareTitle titleWithSource(String name, String fleetSource) {
         SoftwareTitle t = new SoftwareTitle();
         t.setName(name);
@@ -219,6 +275,55 @@ class SoftwareInventoryServiceTest {
         v.setVersion("1.0");
         t.setVersions(List.of(v));
         return t;
+    }
+
+    @Test
+    @DisplayName("listVulnerabilitiesForSoftware: one CVE affecting many versions is a single row, versions aggregated")
+    void listVulnerabilitiesForSoftware_dedupsByCve() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(42L);
+        title.setName("setuptools");
+        title.setVersions(List.of(
+                versionWithCve("10.0", "CVE-2026-59890"),
+                versionWithCve("9.0", "CVE-2026-59890"),
+                versionWithCve("58.0.4", "CVE-2026-59890")));
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+        when(fleet.getVulnerability(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(new com.openframe.sdk.fleetmdm.model.Vulnerability());
+
+        PageResult<SoftwareVulnerabilityResponse> result =
+                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
+
+        assertThat(result.items()).hasSize(1);
+        SoftwareVulnerabilityResponse row = result.items().get(0);
+        assertThat(row.getCveId()).isEqualTo("CVE-2026-59890");
+        // one row, versions aggregated in numeric (not lexicographic) order
+        assertThat(row.getAffectedVersion()).isEqualTo("9.0, 10.0, 58.0.4");
+    }
+
+    @Test
+    @DisplayName("listVulnerabilitiesForSoftware: a CVE Fleet has no record for (null enrichment) does not NPE")
+    void listVulnerabilitiesForSoftware_nullEnrichment_noNpe() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(42L);
+        title.setName("setuptools");
+        title.setVersions(List.of(versionWithCve("58.0.4", "CVE-2026-00000")));
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+        when(fleet.getVulnerability(org.mockito.ArgumentMatchers.anyString())).thenReturn(null); // 404 from Fleet
+
+        PageResult<SoftwareVulnerabilityResponse> result =
+                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
+
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().get(0).getCveId()).isEqualTo("CVE-2026-00000");
+        assertThat(result.items().get(0).getSeverity()).isNull(); // no enrichment → no severity
+    }
+
+    private static SoftwareTitleVersion versionWithCve(String version, String cve) {
+        SoftwareTitleVersion v = new SoftwareTitleVersion();
+        v.setVersion(version);
+        v.setVulnerabilities(List.of(cve));
+        return v;
     }
 
     private static SoftwareTitle titleWithCves(String name, int cveCount) {

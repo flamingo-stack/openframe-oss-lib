@@ -3,6 +3,8 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
@@ -230,8 +232,12 @@ public class SoftwareInventoryService {
             return PageResult.empty(page);
         }
         Map<String, Vulnerability> enrichment = enrichCves(uniqueCves(pairs));
-        List<SoftwareVulnerabilityResponse> all = pairs.stream()
-                .map(p -> FleetVulnerabilityMapper.toResponse(p.cve(), enrichment.get(p.cve()), p.version()))
+        Map<String, List<String>> versionsByCve = pairs.stream()
+                .collect(Collectors.groupingBy(VersionCve::cve, java.util.LinkedHashMap::new,
+                        Collectors.mapping(VersionCve::version, Collectors.toList())));
+        List<SoftwareVulnerabilityResponse> all = versionsByCve.entrySet().stream()
+                .map(e -> FleetVulnerabilityMapper.toResponse(e.getKey(), enrichment.get(e.getKey()),
+                        joinVersions(e.getValue())))
                 .filter(Objects::nonNull)
                 .filter(v -> matchesSearch(v, search))
                 .sorted(comparator(sortField, sortAsc))
@@ -239,15 +245,46 @@ public class SoftwareInventoryService {
         return paginate(all, page, perPage);
     }
 
-    public PageResult<SoftwareOnDeviceResponse> listDevicesForSoftware(String softwareId, String search,
-                                                                       int page, Integer perPage) {
+    public PageResult<SoftwareOnDeviceResponse> listDevicesForSoftware(String softwareId,
+                                                                       SoftwareOnDeviceFilterInput filter,
+                                                                       String search, int page, Integer perPage) {
+        List<SoftwareOnDeviceResponse> all = allDevicesForSoftware(softwareId, search).stream()
+                .filter(row -> matchesStatusFilter(row, filter))
+                .toList();
+        return paginateList(all, page, perPage);
+    }
+
+    private static boolean matchesStatusFilter(SoftwareOnDeviceResponse row, SoftwareOnDeviceFilterInput filter) {
+        if (filter == null || filter.getStatuses() == null || filter.getStatuses().isEmpty()) {
+            return true;
+        }
+        return row.getStatus() != null && filter.getStatuses().contains(row.getStatus());
+    }
+
+    public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, String search) {
+        Map<SoftwareOnDeviceStatus, Long> counts = allDevicesForSoftware(softwareId, search).stream()
+                .map(SoftwareOnDeviceResponse::getStatus)
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+        List<SoftwareFilterOption> statuses = counts.entrySet().stream()
+                .sorted(Comparator.comparingInt(e -> e.getKey().ordinal()))
+                .map(e -> SoftwareFilterOption.builder()
+                        .value(e.getKey().name())
+                        .label(humanize(e.getKey().name()))
+                        .count(e.getValue().intValue())
+                        .build())
+                .toList();
+        return SoftwareOnDeviceFilters.builder().statuses(statuses).build();
+    }
+
+    private List<SoftwareOnDeviceResponse> allDevicesForSoftware(String softwareId, String search) {
         Optional<Long> titleId = parseNumericId(softwareId);
         if (titleId.isEmpty()) {
-            return PageResult.empty(page);
+            return List.of();
         }
         SoftwareTitle title = fleet.getSoftwareTitle(titleId.get());
         if (title == null || title.getVersions() == null || title.getVersions().isEmpty()) {
-            return PageResult.empty(page);
+            return List.of();
         }
         String latestVersion = FleetSoftwareMapper.toResponse(title).getLatestVersion();
 
@@ -266,12 +303,11 @@ public class SoftwareInventoryService {
         Map<Long, Machine> machinesByHostId = hostMachineResolver.resolve(
                 tenantIdProvider.getTenantId(), hostVersions.stream().map(HostVersion::host).toList());
 
-        List<SoftwareOnDeviceResponse> all = hostVersions.stream()
+        return hostVersions.stream()
                 .map(hv -> toDeviceResponse(hv, machinesByHostId, latestVersion))
                 .filter(Objects::nonNull)
                 .filter(row -> matchesDeviceSearch(row, search))
                 .toList();
-        return paginateList(all, page, perPage);
     }
 
     private static SoftwareOnDeviceResponse toDeviceResponse(HostVersion hv, Map<Long, Machine> machinesByHostId,
@@ -368,10 +404,47 @@ public class SoftwareInventoryService {
         return pairs.stream().map(VersionCve::cve).collect(Collectors.toSet());
     }
 
+    private static String joinVersions(List<String> versions) {
+        return versions.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted(SoftwareInventoryService::compareVersions)
+                .collect(Collectors.joining(", "));
+    }
+
+    // Numeric, segment-wise version order so "9.0" precedes "10.0" (plain String sort would not).
+    private static int compareVersions(String a, String b) {
+        String[] pa = a.split("\\.");
+        String[] pb = b.split("\\.");
+        for (int i = 0; i < Math.max(pa.length, pb.length); i++) {
+            int va = i < pa.length ? parseSegment(pa[i]) : 0;
+            int vb = i < pb.length ? parseSegment(pb[i]) : 0;
+            if (va != vb) {
+                return Integer.compare(va, vb);
+            }
+        }
+        return a.compareTo(b);
+    }
+
+    private static int parseSegment(String segment) {
+        try {
+            return Integer.parseInt(segment.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     private Map<String, Vulnerability> enrichCves(Set<String> cves) {
-        return cves.parallelStream().collect(Collectors.toConcurrentMap(
-                cve -> cve,
-                cve -> Optional.ofNullable(fleet.getVulnerability(cve)).orElse(null)));
+        // ConcurrentHashMap rejects null values, and Fleet returns null for a CVE it has no record of
+        // (404) — collect only the resolved ones; callers null-coalesce a missing key.
+        Map<String, Vulnerability> enrichment = new java.util.concurrent.ConcurrentHashMap<>();
+        cves.parallelStream().forEach(cve -> {
+            Vulnerability detail = fleet.getVulnerability(cve);
+            if (detail != null) {
+                enrichment.put(cve, detail);
+            }
+        });
+        return enrichment;
     }
 
     private static boolean matchesSearch(SoftwareVulnerabilityResponse row, String search) {
