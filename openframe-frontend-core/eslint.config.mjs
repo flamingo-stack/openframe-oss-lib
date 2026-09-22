@@ -167,6 +167,11 @@ export default defineConfig([
       // reaches it; the attributes ARE the contract under test (an artifact is
       // user-authored HTML, so losing the sandbox is a security regression).
       'src/components/embeds/__tests__/claude-embed.test.tsx',
+      // The filters panel has no role and no name of its own — it is a plain
+      // box of checkboxes with Reset/Apply — and what is under test is WHERE
+      // it hangs: the `left-0` / `right-0` class on that box. No `screen`
+      // query reaches a role-less element, so the test walks up from Apply.
+      'src/components/features/__tests__/filters-dropdown-placement.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',
