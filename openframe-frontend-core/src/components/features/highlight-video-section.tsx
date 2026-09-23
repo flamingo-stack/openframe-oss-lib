@@ -216,16 +216,18 @@ export function HighlightVideoSection({
                 <Video kind="file" url={highlightVideoUrl} poster={highlightVideoThumbnail || undefined} />
               </div>
               {onDeleteHighlight && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={onDeleteHighlight}
-                  className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 transition-colors hover:bg-black/80"
+                  className="absolute right-2 top-2 rounded-full bg-ods-overlay p-1.5 transition-colors hover:bg-ods-overlay-hover"
                 >
                   <span className="sr-only">Delete</span>
                   <svg className="h-4 w-4 text-ods-text-on-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                </button>
+                </Button>
               )}
             </div>
           )
