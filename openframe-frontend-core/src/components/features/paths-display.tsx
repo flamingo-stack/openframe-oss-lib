@@ -3,6 +3,7 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
+import { Button } from '../ui/button';
 
 export interface PathsDisplayProps {
   /**
@@ -101,14 +102,16 @@ export function PathsDisplay({
             {leadingIcon && <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>}
             <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h4">{path}</span>
             {showCopyButtons && onCopyPath && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => onCopyPath(path)}
                 aria-label={`Copy ${path}`}
                 className="shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
               >
                 <Copy02Icon className={copyIconSize} />
-              </button>
+              </Button>
             )}
           </div>
         ))}
