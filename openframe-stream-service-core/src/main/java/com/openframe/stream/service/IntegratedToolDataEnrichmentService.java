@@ -9,27 +9,25 @@ import com.openframe.data.repository.redis.MachineIdCacheService;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Optional;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class IntegratedToolDataEnrichmentService implements DataEnrichmentService<DeserializedDebeziumMessage> {
 
     private final MachineIdCacheService machineIdCacheService;
-    private final ClusterTenantIdResolver clusterTenantIdResolver;
+    // ClusterTenantIdResolver is only registered as a bean on shared clusters; tenant clusters
+    // have no such bean, so it is injected as Optional (consistent with NotificationBroadcaster's
+    // Optional<NotificationNatsPublisher>) rather than via @Autowired(required = false).
+    private final Optional<ClusterTenantIdResolver> clusterTenantIdResolver;
     private final TenantIdProvider tenantIdProvider;
-
-    public IntegratedToolDataEnrichmentService(MachineIdCacheService machineIdCacheService,
-                                               @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver,
-                                               TenantIdProvider tenantIdProvider) {
-        this.machineIdCacheService = machineIdCacheService;
-        this.clusterTenantIdResolver = clusterTenantIdResolver;
-        this.tenantIdProvider = tenantIdProvider;
-    }
 
     @Override
     public IntegratedToolEnrichedData getExtraParams(DeserializedDebeziumMessage message) {
@@ -80,7 +78,7 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
     }
 
     private boolean canScopeLookupToTenant(String tenantId, ToolType toolType) {
-        return clusterTenantIdResolver != null && !isBlank(tenantId) && toolType != null;
+        return clusterTenantIdResolver.isPresent() && !isBlank(tenantId) && toolType != null;
     }
 
     private ToolType toolTypeOf(IntegratedToolType integratedToolType) {
@@ -105,12 +103,12 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
      * dispatched with the event's tool type.
      */
     private void enrichFromTenant(DeserializedDebeziumMessage message, IntegratedToolEnrichedData enriched) {
-        if (clusterTenantIdResolver == null) {
+        if (clusterTenantIdResolver.isEmpty()) {
             enriched.setTenantId(tenantIdProvider.getTenantId());
             message.setTenantId(enriched.getTenantId());
             return;
         }
-        String tenantId = clusterTenantIdResolver.resolveTenantId(message.getIntegratedToolType(), message.getTenantId());
+        String tenantId = clusterTenantIdResolver.get().resolveTenantId(message.getIntegratedToolType(), message.getTenantId());
         enriched.setTenantId(tenantId);
         message.setTenantId(enriched.getTenantId());
     }
