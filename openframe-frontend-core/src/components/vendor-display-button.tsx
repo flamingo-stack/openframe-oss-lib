@@ -32,6 +32,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
   if (variant === 'compact') {
     return (
       <button
+        type="button"
         onClick={handleClick}
         className="inline-flex items-center gap-2 rounded-full border border-ods-border bg-ods-card px-3 py-1.5 transition-colors hover:border-ods-accent/50"
       >
@@ -60,6 +61,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
   // Default variant
   return (
     <button
+      type="button"
       onClick={handleClick}
       className="flex max-w-full items-center gap-2 overflow-hidden rounded-lg border border-ods-border bg-ods-card px-3 py-2 transition-colors hover:border-ods-accent"
     >
