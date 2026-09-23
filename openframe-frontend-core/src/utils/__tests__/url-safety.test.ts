@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { safeHref } from '../../components/chat/utils/compact-card-classes';
-import { UNSAFE_URL_CHARS, isSameOriginPath } from '../url-safety';
+import { UNSAFE_URL_CHARS, isSameOriginPath, safeHref } from '../url-safety';
 
 /**
  * The shared URL-safety predicate, tested once for BOTH callers — the wire
@@ -42,3 +41,4 @@ describe('safeHref uses the same rule', () => {
     expect(UNSAFE_URL_CHARS.test('/ordinary/path')).toBe(false);
   });
 });
+
