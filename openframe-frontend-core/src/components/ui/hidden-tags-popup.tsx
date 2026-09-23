@@ -3,6 +3,7 @@
 import { type CSSProperties, type ForwardedRef, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { Button } from './button';
 
 export interface HiddenTagItem {
   label: ReactNode;
@@ -49,17 +50,18 @@ export const HiddenTagsPopup = forwardRef(function HiddenTagsPopupImpl(
             {item.label}
           </span>
           {!disabled && onRemove && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={e => {
                 e.stopPropagation();
                 onRemove(item.value);
               }}
-              className="shrink-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary"
+              className="h-auto w-auto shrink-0 p-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary"
               aria-label={`Remove ${String(item.label)}`}
             >
               <XmarkCircleIcon size={20} />
-            </button>
+            </Button>
           )}
         </div>
       ))}
