@@ -23,6 +23,7 @@ import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.FleetTenantHeader;
+import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
@@ -38,7 +39,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -49,6 +49,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
@@ -111,9 +112,7 @@ public class SoftwareInventoryService {
         List<SoftwareTitle> titles = fetchAllTitles(search, vulnerable);
         Map<Long, String> titleIdByVersionId = titleIdByVersionId(titles);
         List<SoftwareResponse> all = mapTitles(titles);
-        deviceCountEnricher.enrichFromHostSoftware(all, fleet()::searchHosts,
-                software -> Stream.ofNullable(titleIdByVersionId.get(software.getId())),
-                SoftwareResponse::getId, SoftwareResponse::setDevicesCount);
+        enrichDevicesCountFromHosts(all, titleIdByVersionId);
         List<SoftwareResponse> withDevices = all.stream()
                 .filter(row -> deviceCount(row) > 0)
                 .toList();
@@ -121,6 +120,19 @@ public class SoftwareInventoryService {
                 ? withDevices
                 : withDevices.stream().sorted(comparatorFor(field, desc)).toList();
         return paginateList(ordered, page, perPage);
+    }
+
+    private void enrichDevicesCountFromHosts(List<SoftwareResponse> rows, Map<Long, String> titleIdByVersionId) {
+        FleetMdmClient client = fleet();
+        deviceCountEnricher.enrichFromHostSoftware(rows, client::searchHosts,
+                software -> titleIdOf(software, titleIdByVersionId),
+                SoftwareResponse::getId, SoftwareResponse::setDevicesCount);
+    }
+
+    private static Stream<String> titleIdOf(FleetSoftware software, Map<Long, String> titleIdByVersionId) {
+        Long versionId = software.getId();
+        String titleId = titleIdByVersionId.get(versionId);
+        return Stream.ofNullable(titleId);
     }
 
     private static int deviceCount(SoftwareResponse row) {
@@ -155,12 +167,11 @@ public class SoftwareInventoryService {
                     .vulnerable(vulnerable)
                     .build();
             SoftwareTitlesResponse response = fleet().listSoftwareTitles(request);
-            if (response.getSoftwareTitles() != null) {
-                all.addAll(response.getSoftwareTitles());
-            }
+            List<SoftwareTitle> batch = titlesOf(response);
+            all.addAll(batch);
             boolean hasNext = response.getMeta() != null
                     && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
-            if (!hasNext || response.getSoftwareTitles() == null || response.getSoftwareTitles().isEmpty()) {
+            if (!hasNext || batch.isEmpty()) {
                 break;
             }
             page++;
@@ -175,18 +186,28 @@ public class SoftwareInventoryService {
                 .toList();
     }
 
+    private static List<SoftwareTitle> titlesOf(SoftwareTitlesResponse response) {
+        List<SoftwareTitle> titles = response.getSoftwareTitles();
+        return isEmpty(titles) ? List.of() : titles;
+    }
+
     private static Map<Long, String> titleIdByVersionId(List<SoftwareTitle> titles) {
-        Map<Long, String> byVersionId = new HashMap<>();
-        for (SoftwareTitle title : titles) {
-            if (title.getId() == null || title.getVersions() == null) {
-                continue;
-            }
-            title.getVersions().stream()
-                    .map(SoftwareTitleVersion::getId)
-                    .filter(Objects::nonNull)
-                    .forEach(versionId -> byVersionId.put(versionId, title.getId().toString()));
-        }
-        return byVersionId;
+        return titles.stream()
+                .filter(SoftwareInventoryService::hasIdAndVersions)
+                .flatMap(SoftwareInventoryService::versionIdToTitleId)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first));
+    }
+
+    private static boolean hasIdAndVersions(SoftwareTitle title) {
+        return title.getId() != null && !isEmpty(title.getVersions());
+    }
+
+    private static Stream<Map.Entry<Long, String>> versionIdToTitleId(SoftwareTitle title) {
+        String titleId = title.getId().toString();
+        return title.getVersions().stream()
+                .map(SoftwareTitleVersion::getId)
+                .filter(Objects::nonNull)
+                .map(versionId -> Map.entry(versionId, titleId));
     }
 
     private static Comparator<SoftwareResponse> comparatorFor(String field, boolean desc) {

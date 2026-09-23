@@ -4,7 +4,6 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
-import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -31,12 +31,13 @@ class FleetDeviceCountEnricherTest {
 
     @Mock private FleetHostMachineResolver hostMachineResolver;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private CorrelatedHostSoftwareCache hostSoftwareCache;
 
     private FleetDeviceCountEnricher enricher;
 
     @BeforeEach
     void setUp() {
-        enricher = new FleetDeviceCountEnricher(hostMachineResolver, tenantIdProvider);
+        enricher = new FleetDeviceCountEnricher(hostMachineResolver, tenantIdProvider, hostSoftwareCache);
     }
 
     @Test
@@ -138,20 +139,17 @@ class FleetDeviceCountEnricherTest {
     }
 
     @Test
-    void enrichFromHostSoftware_countsCorrelatedHostsPerKey_onceEvenWithSeveralVersions() {
+    void enrichFromHostSoftware_countsHostsPerKey_onceEvenWithSeveralVersionsOnOneHost() {
         Row chrome = new Row("chrome");
         Row slack = new Row("slack");
         Row unused = new Row("unused");
-        Host h1 = hostWith(1L, "chrome", "chrome", "slack");   // two chrome versions on one host
-        Host h2 = hostWith(2L, "chrome");
-        Host orphan = hostWith(3L, "chrome", "slack");         // no matching Machine
-        when(tenantIdProvider.getTenantId()).thenReturn("t1");
-        when(hostMachineResolver.resolve(eq("t1"), anyList()))
-                .thenReturn(Map.of(1L, new Machine(), 2L, new Machine()));
+        when(hostSoftwareCache.softwareByHostId(any())).thenReturn(Map.of(
+                1L, software("chrome", "chrome", "slack"),
+                2L, software("chrome")));
 
         enricher.enrichFromHostSoftware(List.of(chrome, slack, unused),
-                request -> List.of(h1, h2, orphan),
-                software -> Stream.of(software.getName()),
+                request -> List.of(),
+                item -> Stream.of(item.getName()),
                 row -> row.name, Row::setCount);
 
         assertThat(chrome.count).isEqualTo(2);
@@ -160,66 +158,23 @@ class FleetDeviceCountEnricherTest {
     }
 
     @Test
-    void enrichFromHostSoftware_pagesHostsWithSoftwareUntilAShortPage_oneResolverCall() {
-        List<HostSearchRequest> requests = new ArrayList<>();
-        List<Host> fullPage = java.util.stream.LongStream.range(0, 100).mapToObj(id -> hostWith(id, "a")).toList();
-        when(tenantIdProvider.getTenantId()).thenReturn("t1");
-        when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of());
-
-        enricher.enrichFromHostSoftware(List.of(new Row("a")),
-                request -> {
-                    requests.add(request);
-                    return request.getPage() == 0 ? fullPage : List.of(hostWith(100L, "a"));
-                },
-                software -> Stream.of(software.getName()),
-                row -> row.name, Row::setCount);
-
-        assertThat(requests).extracting(HostSearchRequest::getPage).containsExactly(0, 1);
-        assertThat(requests).allMatch(HostSearchRequest::isPopulateSoftware);
-        verify(hostMachineResolver, times(1)).resolve(eq("t1"), anyList());
-    }
-
-    @Test
-    void enrichFromHostSoftware_reusesTheHostSnapshotAcrossCalls() {
-        AtomicInteger fleetCalls = new AtomicInteger();
-        when(tenantIdProvider.getTenantId()).thenReturn("t1");
-        when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(1L, new Machine()));
-        Row first = new Row("a");
-        Row second = new Row("a");
-
-        for (Row row : List.of(first, second)) {
-            enricher.enrichFromHostSoftware(List.of(row),
-                    request -> { fleetCalls.incrementAndGet(); return List.of(hostWith(1L, "a")); },
-                    software -> Stream.of(software.getName()),
-                    r -> r.name, Row::setCount);
-        }
-
-        assertThat(fleetCalls).hasValue(1);
-        assertThat(second.count).isEqualTo(1);
-        verify(hostMachineResolver, times(1)).resolve(eq("t1"), anyList());
-    }
-
-    @Test
-    void enrichFromHostSoftware_emptyRows_noFleetCall() {
-        AtomicInteger fleetCalls = new AtomicInteger();
-
+    void enrichFromHostSoftware_emptyRows_noHostLoad() {
         enricher.enrichFromHostSoftware(List.<Row>of(),
-                request -> { fleetCalls.incrementAndGet(); return List.of(); },
-                software -> Stream.of(software.getName()),
+                request -> List.of(),
+                item -> Stream.of(item.getName()),
                 row -> row.name, Row::setCount);
 
-        assertThat(fleetCalls).hasValue(0);
-        verifyNoInteractions(hostMachineResolver, tenantIdProvider);
+        verifyNoInteractions(hostSoftwareCache);
     }
 
-    private static Host hostWith(long id, String... softwareNames) {
-        Host h = host(id);
-        h.setSoftware(java.util.Arrays.stream(softwareNames).map(name -> {
-            FleetSoftware software = new FleetSoftware();
-            software.setName(name);
-            return software;
-        }).toList());
-        return h;
+    private static List<FleetSoftware> software(String... names) {
+        return java.util.Arrays.stream(names).map(FleetDeviceCountEnricherTest::installed).toList();
+    }
+
+    private static FleetSoftware installed(String name) {
+        FleetSoftware item = new FleetSoftware();
+        item.setName(name);
+        return item;
     }
 
     private static Host host(long id) {
