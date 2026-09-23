@@ -42,9 +42,10 @@ public class DefaultToolUpstreamResolver implements ToolUpstreamResolver {
     private URI resolveByType(IntegratedTool tool, ServerHttpRequest request,
                               String stripPrefix, ToolUrlType type) {
         ToolUrl toolUrl = toolUrlService.getUrlByToolType(tool, type)
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new ToolConfigurationException(
                         "Tool " + tool.getKey() + " has no " + type + " url configured"));
         return proxyUrlResolver.resolve(
                 tool.getKey(), toolUrl.getUrl(), toolUrl.getPort(), request.getURI(), stripPrefix);
     }
 }
+
