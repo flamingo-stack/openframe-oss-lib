@@ -85,7 +85,7 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
         assertThat(created.getTitle()).as("Title should be echoed back").isEqualTo(request.getTitle());
         assertThat(created.getDescription()).as("Description should be echoed back")
                 .isEqualTo(request.getDescription());
-        assertThat(created.getStatus()).as("A new ticket should have a status").isNotNull();
+        assertThat(created.getStatusKind()).as("A new ticket should have a status kind").isNotNull();
         assertThat(created.getStatusDefinition()).as("A new ticket should resolve a status definition")
                 .isNotNull();
         assertThat(created.getCreatedAt()).as("Ticket createdAt should not be null").isNotNull();
@@ -200,19 +200,21 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
 
         assertThat(statistics.getTotalCount()).as("Total count should not be negative")
                 .isGreaterThanOrEqualTo(0);
-        if (statistics.getStatusCounts() != null) {
-            assertThat(statistics.getStatusCounts()).allSatisfy(count -> {
-                assertThat(count.getStatus()).as("Status count should name a status").isNotNull();
-                assertThat(count.getCount()).as("Status count should not be negative")
-                        .isGreaterThanOrEqualTo(0);
-            });
-            // Per-status counts partition the same set the total counts, so the parts cannot exceed it.
-            int summed = statistics.getStatusCounts().stream()
-                    .mapToInt(count -> count.getCount() == null ? 0 : count.getCount())
-                    .sum();
-            assertThat(summed).as("Per-status counts should not exceed the reported total")
-                    .isLessThanOrEqualTo(statistics.getTotalCount());
-        }
+        // Not guarded on null any more. It used to read getStatusCounts(), which the API stopped
+        // returning, so the guard was always true and every assertion below it was skipped silently.
+        assertThat(statistics.getStatusDefinitionCounts())
+                .as("Statistics should break down by status definition").isNotNull();
+        assertThat(statistics.getStatusDefinitionCounts()).allSatisfy(count -> {
+            assertThat(count.getStatus()).as("Status count should name a status definition").isNotNull();
+            assertThat(count.getCount()).as("Status count should not be negative")
+                    .isGreaterThanOrEqualTo(0);
+        });
+        // Per-status counts partition the same set the total counts, so the parts cannot exceed it.
+        int summed = statistics.getStatusDefinitionCounts().stream()
+                .mapToInt(count -> count.getCount() == null ? 0 : count.getCount())
+                .sum();
+        assertThat(summed).as("Per-status counts should not exceed the reported total")
+                .isLessThanOrEqualTo(statistics.getTotalCount());
     }
 
     // --- tags -------------------------------------------------------------------------------
