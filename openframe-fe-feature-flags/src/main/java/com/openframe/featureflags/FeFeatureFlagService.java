@@ -24,7 +24,11 @@ import java.util.Map;
  * </ol>
  *
  * <p>The DB lookup is cached per tenant via Caffeine with a short TTL so the
- * GraphQL query stays cheap on hot paths.
+ * GraphQL query stays cheap on hot paths. The TTL is a fallback bound only:
+ * callers that mutate the {@link FeFeatureFlags} document (e.g. an admin API
+ * in another module) must call {@link #invalidate(String)} or
+ * {@link #invalidateAll()} so the change is visible immediately instead of
+ * waiting up to {@link #CACHE_TTL} for the stale entry to expire.
  */
 @Slf4j
 @Service
@@ -55,6 +59,26 @@ public class FeFeatureFlagService {
         Map<String, Boolean> merged = new LinkedHashMap<>(defaults);
         merged.putAll(overrides);
         return merged;
+    }
+
+    /**
+     * Evicts the cached overrides for a single tenant. Must be invoked by any
+     * writer of the {@link FeFeatureFlags} document (e.g. an admin API) right
+     * after a successful write so the next {@link #getEffectiveFlags()} call
+     * observes the change instead of serving a stale cached value for up to
+     * {@link #CACHE_TTL}.
+     */
+    public void invalidate(String tenantId) {
+        overridesCache.invalidate(tenantId);
+    }
+
+    /**
+     * Evicts all cached overrides across tenants. Useful when the writer of
+     * the {@link FeFeatureFlags} document cannot determine the affected
+     * tenant id at write time.
+     */
+    public void invalidateAll() {
+        overridesCache.invalidateAll();
     }
 
     private Map<String, Boolean> loadOverrides() {
