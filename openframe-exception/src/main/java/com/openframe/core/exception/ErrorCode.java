@@ -1,5 +1,10 @@
 package com.openframe.core.exception;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
 public enum ErrorCode {
 
     // Generic HTTP error codes
@@ -34,6 +39,8 @@ public enum ErrorCode {
     ORGANIZATION_NOT_FOUND("ORGANIZATION_NOT_FOUND", 404),
     CUSTOMER_NOT_FOUND("CUSTOMER_NOT_FOUND", 404),
     ORGANIZATION_HAS_MACHINES("ORGANIZATION_HAS_MACHINES", 409),
+    KNOWLEDGE_BASE_ITEM_NOT_FOUND("KNOWLEDGE_BASE_ITEM_NOT_FOUND", 404),
+    KNOWLEDGE_BASE_ATTACHMENT_NOT_FOUND("KNOWLEDGE_BASE_ATTACHMENT_NOT_FOUND", 404),
 
     // Tag specific
     TAG_NOT_FOUND("TAG_NOT_FOUND", 404),
@@ -49,6 +56,7 @@ public enum ErrorCode {
 
     // Ticket specific
     TICKET_NOT_FOUND("TICKET_NOT_FOUND", 404),
+    TICKET_NOTE_NOT_FOUND("TICKET_NOTE_NOT_FOUND", 404),
     TICKET_INVALID_TRANSITION("TICKET_INVALID_TRANSITION", 409),
     TICKET_AI_DISABLED("TICKET_AI_DISABLED", 409),
     TICKET_STATUS_NOT_FOUND("TICKET_STATUS_NOT_FOUND", 404),
@@ -66,21 +74,9 @@ public enum ErrorCode {
     // Infrastructure error codes
     TYPE_MISMATCH("TYPE_MISMATCH", 400),
     PINOT_QUERY_ERROR("PINOT_QUERY_ERROR", 503),
+    LOKI_QUERY_ERROR("LOKI_QUERY_ERROR", 503),
     DATABASE_ERROR("DATABASE_ERROR", 503);
 
     private final String code;
     private final int httpStatus;
-
-    ErrorCode(String code, int httpStatus) {
-        this.code = code;
-        this.httpStatus = httpStatus;
-    }
-
-    public String getCode() {
-        return code;
-    }
-
-    public int getHttpStatus() {
-        return httpStatus;
-    }
 }

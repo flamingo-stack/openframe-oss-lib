@@ -1,27 +1,26 @@
 package com.openframe.sdk.fleetmdm.model;
 
-/**
- * Request parameters for host search
- */
 public class HostSearchRequest {
-    
+
     private String query;
     private Integer page;
     private Integer perPage;
     private String orderKey;
     private String orderDirection;
-    
+    private Long softwareTitleId;
+    private Long softwareVersionId;
+    private String cve;
+
     public HostSearchRequest() {
-        // Default values
         this.page = 0;
         this.perPage = 100;
     }
-    
+
     public HostSearchRequest(String query) {
         this();
         this.query = query;
     }
-    
+
     public HostSearchRequest(String query, Integer page, Integer perPage) {
         this.query = query;
         this.page = page != null ? page : 0;
@@ -66,5 +65,29 @@ public class HostSearchRequest {
 
     public void setOrderDirection(String orderDirection) {
         this.orderDirection = orderDirection;
+    }
+
+    public Long getSoftwareTitleId() {
+        return softwareTitleId;
+    }
+
+    public void setSoftwareTitleId(Long softwareTitleId) {
+        this.softwareTitleId = softwareTitleId;
+    }
+
+    public Long getSoftwareVersionId() {
+        return softwareVersionId;
+    }
+
+    public void setSoftwareVersionId(Long softwareVersionId) {
+        this.softwareVersionId = softwareVersionId;
+    }
+
+    public String getCve() {
+        return cve;
+    }
+
+    public void setCve(String cve) {
+        this.cve = cve;
     }
 }

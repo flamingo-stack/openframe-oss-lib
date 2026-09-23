@@ -7,11 +7,9 @@ import com.openframe.api.dto.ticket.CreateTicketInput;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.dto.ticket.TransitionTicketInput;
 import com.openframe.api.dto.ticket.UpdateTicketInput;
-import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.service.ticket.*;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.ticket.*;
 import com.openframe.external.mapper.TicketMapper;
@@ -68,9 +66,7 @@ public class TicketController {
     @GetMapping
     @ResponseStatus(OK)
     public TicketsResponse getTickets(
-            @Parameter(description = "Legacy statuses to filter by (tenants without the custom-status lifecycle)")
-            @RequestParam(required = false) List<TicketStatus> statuses,
-            @Parameter(description = "Lifecycle status ids to filter by (see /statuses)")
+            @Parameter(description = "Status ids to filter by (see /statuses)")
             @RequestParam(required = false) List<String> statusIds,
             @Parameter(description = "Customer ids to filter by")
             @RequestParam(required = false) List<String> customerIds,
@@ -96,7 +92,7 @@ public class TicketController {
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
         CountedGenericQueryResult<Ticket> result = ticketService.getTickets(
                 principal,
-                filter(statuses, statusIds, customerIds, assigneeIds, tagIds),
+                filter(statusIds, customerIds, assigneeIds, tagIds),
                 CursorPaginationCriteria.builder().cursor(ExternalCursors.requireTicketCursor(cursor)).limit(limit).build(),
                 search,
                 SortInput.from("customerName".equals(sortField) ? "organizationName" : sortField, sortDirection));
@@ -108,7 +104,6 @@ public class TicketController {
     @GetMapping("/filters")
     @ResponseStatus(OK)
     public TicketFiltersResponse getTicketFilters(
-            @RequestParam(required = false) List<TicketStatus> statuses,
             @RequestParam(required = false) List<String> statusIds,
             @RequestParam(required = false) List<String> customerIds,
             @RequestParam(required = false) List<String> assigneeIds,
@@ -118,7 +113,7 @@ public class TicketController {
         log.debug("Getting ticket filters - userId: {}, apiKeyId: {}", caller.userId(), caller.apiKeyId());
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
         return ticketMapper.toFiltersResponse(ticketFilterService.getFilters(
-                principal, filter(statuses, statusIds, customerIds, assigneeIds, tagIds)).join());
+                principal, filter(statusIds, customerIds, assigneeIds, tagIds)).join());
     }
 
     @Operation(summary = "Get ticket statuses",
@@ -168,9 +163,7 @@ public class TicketController {
 
         log.debug("Getting ticket {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
-        Ticket ticket = ticketService.getTicket(principal, id)
-                .orElseThrow(() -> new TicketNotFoundException(id));
-        return ticketReadService.toResponse(principal, ticket);
+        return ticketReadService.toResponse(principal, ticketReadService.requireTicket(principal, id));
     }
 
     @Operation(summary = "Create a ticket",
@@ -301,6 +294,10 @@ public class TicketController {
     }
 
     @Operation(summary = "Add a tag to a ticket")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Ticket not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @PostMapping("/{id}/tags/{tagId}")
     @ResponseStatus(OK)
     public TicketResponse addTag(
@@ -310,11 +307,16 @@ public class TicketController {
 
         log.info("Adding tag {} to ticket {} - userId: {}, apiKeyId: {}", tagId, id, caller.userId(), caller.apiKeyId());
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
+        ticketReadService.requireTicket(principal, id);
         ticketTagService.addTagToTicket(principal, id, tagId);
         return getTicket(id, caller);
     }
 
     @Operation(summary = "Remove a tag from a ticket")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Ticket not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @DeleteMapping("/{id}/tags/{tagId}")
     @ResponseStatus(OK)
     public TicketResponse removeTag(
@@ -324,6 +326,7 @@ public class TicketController {
 
         log.info("Removing tag {} from ticket {} - userId: {}, apiKeyId: {}", tagId, id, caller.userId(), caller.apiKeyId());
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
+        ticketReadService.requireTicket(principal, id);
         ticketTagService.removeTagFromTicket(principal, id, tagId);
         return getTicket(id, caller);
     }
@@ -331,7 +334,9 @@ public class TicketController {
     @Operation(summary = "Add an internal note to a ticket")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Note created",
-                    content = @Content(schema = @Schema(implementation = TicketNoteResponse.class)))
+                    content = @Content(schema = @Schema(implementation = TicketNoteResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Ticket not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/{id}/notes")
     @ResponseStatus(CREATED)
@@ -342,10 +347,15 @@ public class TicketController {
 
         log.info("Adding note to ticket {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
+        ticketReadService.requireTicket(principal, id);
         return ticketMapper.toNoteResponse(ticketNoteService.addNote(principal, id, request.content()));
     }
 
     @Operation(summary = "Update a ticket note", description = "Only the note author can edit it")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Note not found on this ticket",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @PutMapping("/{id}/notes/{noteId}")
     @ResponseStatus(OK)
     public TicketNoteResponse updateNote(
@@ -356,10 +366,15 @@ public class TicketController {
 
         log.info("Updating note {} on ticket {} - userId: {}, apiKeyId: {}", noteId, id, caller.userId(), caller.apiKeyId());
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
+        ticketReadService.requireNote(id, noteId);
         return ticketMapper.toNoteResponse(ticketNoteService.updateNote(principal, noteId, request.content()));
     }
 
     @Operation(summary = "Delete a ticket note", description = "Only the note author can delete it")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Note not found on this ticket",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @DeleteMapping("/{id}/notes/{noteId}")
     @ResponseStatus(NO_CONTENT)
     public void deleteNote(
@@ -369,13 +384,13 @@ public class TicketController {
 
         log.info("Deleting note {} on ticket {} - userId: {}, apiKeyId: {}", noteId, id, caller.userId(), caller.apiKeyId());
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
+        ticketReadService.requireNote(id, noteId);
         ticketNoteService.deleteNote(principal, noteId);
     }
 
-    private static TicketFilterInput filter(List<TicketStatus> statuses, List<String> statusIds,
-                                            List<String> customerIds, List<String> assigneeIds, List<String> tagIds) {
+    private static TicketFilterInput filter(List<String> statusIds, List<String> customerIds,
+                                            List<String> assigneeIds, List<String> tagIds) {
         return TicketFilterInput.builder()
-                .statuses(statuses)
                 .statusIds(statusIds)
                 .organizationIds(customerIds)
                 .assigneeIds(assigneeIds)

@@ -56,6 +56,11 @@ const BASELINE: Record<string, string> = {
   design_doc: '/api/design-docs?ids=a,b',
   openframe_tenant: '/api/openframe-tenants?ids=a,b',
   prospect_call: '/api/prospect-calls?ids=a,b',
+  // 2026-09: code intelligence — the review rules and the code graph as chat
+  // sources on product-hub.
+  code_rule: '/api/code-rules/cards?ids=a,b',
+  code_repo: '/api/code-graph/repos?ids=a,b',
+  code_deployment: '/api/code-graph/deployments?ids=a,b',
 };
 
 describe('buildListUrl — byte parity with the hub mappers', () => {
