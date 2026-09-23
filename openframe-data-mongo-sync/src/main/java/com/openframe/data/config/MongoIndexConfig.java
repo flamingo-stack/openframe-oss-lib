@@ -1,6 +1,7 @@
 package com.openframe.data.config;
 
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.mongodb.MongoCommandException;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,12 @@ public class MongoIndexConfig {
      * {@link #SCRIPTS_NAME_UNIQUE_INDEX}: uniqueness ignores soft-deleted rows.
      */
     private static final String SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX = "script_schedules_tenant_name_notDeleted_unique";
+
+    /**
+     * MongoDB error code returned when dropping an index that does not exist.
+     * See https://www.mongodb.com/docs/manual/reference/error-codes/ (IndexNotFound = 27).
+     */
+    private static final int INDEX_NOT_FOUND_ERROR_CODE = 27;
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -98,9 +105,15 @@ public class MongoIndexConfig {
         try {
             mongoTemplate.indexOps(collection).dropIndex(indexName);
             log.info("Dropped stale index '{}' from collection '{}'", indexName, collection);
+        } catch (MongoCommandException e) {
+            if (e.getErrorCode() == INDEX_NOT_FOUND_ERROR_CODE) {
+                // Index doesn't exist — nothing to do
+                log.debug("Index '{}' not found on collection '{}', skipping", indexName, collection);
+            } else {
+                log.warn("Unexpected error dropping index '{}' on collection '{}'", indexName, collection, e);
+            }
         } catch (Exception e) {
-            // Index doesn't exist — nothing to do
-            log.debug("Index '{}' not found on collection '{}', skipping", indexName, collection);
+            log.warn("Unexpected error dropping index '{}' on collection '{}'", indexName, collection, e);
         }
     }
 }
