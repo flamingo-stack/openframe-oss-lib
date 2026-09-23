@@ -21,6 +21,10 @@ const Slider = forwardRef<HTMLInputElement, SliderProps>(
     return (
       <input
         type="range"
+        role="slider"
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={value[0]}
         className={cn(
           'flex h-5 w-full cursor-pointer appearance-none items-center rounded-lg bg-secondary outline-none',
           '[&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary',
