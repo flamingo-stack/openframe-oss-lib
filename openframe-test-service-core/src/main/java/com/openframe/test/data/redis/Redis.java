@@ -118,8 +118,10 @@ public class Redis {
      * environment migrates without anyone editing config. {@link RedisConfig#getConfiguredCluster()}
      * still wins where someone pinned an answer.
      *
-     * <p>A probe that cannot connect assumes a cluster: that is what every environment but dev is today,
-     * and it keeps the behaviour unchanged where the probe itself is the thing that is broken.
+     * <p>A probe that cannot connect assumes a cluster for that one lookup - that is what every
+     * environment but dev is today, so it keeps the behaviour unchanged where the probe itself is the
+     * thing that is broken. Only an answer the server actually gave is remembered: this pod lives for
+     * days, and a probe lost to one dropped SYN must not pin a guess for all of them.
      */
     private static boolean clusterMode(JedisClientConfig config) {
         Boolean pinned = RedisConfig.getConfiguredCluster();
@@ -131,22 +133,29 @@ public class Redis {
             return known;
         }
         synchronized (Redis.class) {
-            if (detectedCluster == null) {
-                detectedCluster = probeCluster(config);
+            Boolean answered = detectedCluster;
+            if (answered != null) {
+                return answered;
             }
-            return detectedCluster;
+            Boolean probed = probeCluster(config);
+            if (probed == null) {
+                return true;
+            }
+            detectedCluster = probed;
+            return probed;
         }
     }
 
-    private static boolean probeCluster(JedisClientConfig config) {
+    /** What the server says about itself, or {@code null} when it did not answer. */
+    private static Boolean probeCluster(JedisClientConfig config) {
         HostAndPort node = RedisConfig.getNode();
         try (Jedis jedis = new Jedis(node, config)) {
             boolean enabled = jedis.clusterInfo().contains("cluster_enabled:1");
             log.info("Redis at {} reports cluster mode {}", node, enabled ? "enabled" : "disabled");
             return enabled;
         } catch (Exception e) {
-            log.warn("Could not read CLUSTER INFO from {}; assuming a cluster", node, e);
-            return true;
+            log.warn("Could not read CLUSTER INFO from {}; assuming a cluster for this lookup", node, e);
+            return null;
         }
     }
 
