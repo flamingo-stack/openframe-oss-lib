@@ -332,39 +332,51 @@ function extLabel(fileName: string): string {
   return fileName.slice(dot + 1, dot + 4).toLowerCase();
 }
 
-/** One blob URL per `File`, so a render React discards (StrictMode's double
- *  invoke, a suspended tree) reuses the allocation instead of leaking a fresh
- *  one. The entry is dropped again by the revoke below. */
-const objectUrlByFile = new WeakMap<File, string>();
+/** One blob URL per `File`, refcounted so that the same `File` object staged
+ *  simultaneously in two mounted chip strips (e.g. a shared draft across two
+ *  windows/tabs) shares a single allocation without either instance's
+ *  unmount-time revoke pulling the URL out from under the other. A render
+ *  React discards (StrictMode's double invoke, a suspended tree) increments
+ *  and decrements symmetrically, so it also still reuses the allocation
+ *  instead of leaking a fresh one. The entry (and its blob URL) is dropped
+ *  only once the refcount reaches zero. */
+const objectUrlEntryByFile = new WeakMap<File, { url: string; refCount: number }>();
 
 /** Manage an `URL.createObjectURL` blob URL for the lifetime of the
  *  component. Returns null when `file` is null or during SSR.
- *  Revokes on unmount AND when `file` changes.
+ *  Revokes on unmount AND when `file` changes — but only once no other
+ *  mounted consumer of the same `File` still holds a reference.
  *
  *  Allocated during render rather than published into state from an effect: the
  *  url is a pure function of the `File` (memoised per file above, so allocating
  *  it is idempotent), and holding it in state meant every newly attached file
  *  cost a second render pass and showed an empty preview tile in between. The
- *  effect is left owning only the revoke — the half that genuinely belongs to
- *  the commit lifecycle. */
+ *  effect is left owning only the refcounted revoke — the half that genuinely
+ *  belongs to the commit lifecycle. */
 function useObjectUrl(file: File | null): string | null {
   const url = useMemo(() => {
     // `File` only ever exists after a user interaction, so this is null on the
     // server AND on the hydration render — no mismatch.
     if (!file || typeof window === 'undefined') return null;
-    let existing = objectUrlByFile.get(file);
-    if (!existing) {
-      existing = URL.createObjectURL(file);
-      objectUrlByFile.set(file, existing);
+    let entry = objectUrlEntryByFile.get(file);
+    if (!entry) {
+      entry = { url: URL.createObjectURL(file), refCount: 0 };
+      objectUrlEntryByFile.set(file, entry);
     }
-    return existing;
+    return entry.url;
   }, [file]);
 
   useEffect(() => {
     if (!file || !url) return undefined;
+    const entry = objectUrlEntryByFile.get(file);
+    if (!entry) return undefined;
+    entry.refCount += 1;
     return () => {
-      objectUrlByFile.delete(file);
-      URL.revokeObjectURL(url);
+      entry.refCount -= 1;
+      if (entry.refCount <= 0) {
+        objectUrlEntryByFile.delete(file);
+        URL.revokeObjectURL(entry.url);
+      }
     };
   }, [file, url]);
 
