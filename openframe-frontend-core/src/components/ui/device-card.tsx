@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { formatDateTimeYmd } from '../../utils/format';
 import type { OSPlatformId } from '../../utils/os-platforms';
 import { OSTypeIcon } from '../features/os-type-badge';
 import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon';
@@ -64,16 +65,9 @@ export function DeviceCard({
   const formatLastSeen = (lastSeen?: string | Date) => {
     if (!lastSeen) return null;
 
-    const date = typeof lastSeen === 'string' ? new Date(lastSeen) : lastSeen;
-    // UTC getters so "last seen" is identical on server (UTC) and client
-    // (local) — otherwise React #418 hydration mismatch.
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-
-    return `${year}/${month}/${day}, ${hours}:${minutes}`;
+    // UTC-pinned so the server and every client agree (React #418), through the
+    // one renderer rather than hand-built `getUTC*` strings.
+    return formatDateTimeYmd(lastSeen, null) || null;
   };
 
   return (

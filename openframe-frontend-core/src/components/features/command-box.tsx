@@ -4,6 +4,7 @@ import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
 import { Button } from '../ui/button';
+import { FadePreview } from '../ui/fade-preview';
 
 export interface CommandBoxAction {
   /** Button label */
@@ -35,6 +36,16 @@ export interface CommandBoxProps {
   commandClassName?: string;
   /** Maximum lines to show (uses line-clamp, 0 for unlimited) */
   maxLines?: number;
+  /**
+   * Fixed height for the command area, in lines of `text-code`. Unlike
+   * `maxLines`, the box is this tall whatever the content: every box in a list
+   * lines up, and text that changes live (a template being filled in) never
+   * moves the layout. Longer text fades out under the shared `FadePreview` with
+   * a "Show all" toggle; it NEVER scrolls inside the box, because a nested
+   * scroller captures the wheel and stops the page from scrolling under the
+   * pointer. Takes precedence over `maxLines`. Nothing is hidden from `onCopy`.
+   */
+  visibleLines?: number;
   /** When set, shows a copy icon button in the top-right corner of the box */
   onCopy?: () => void;
   /** Accessible label for the corner copy button */
@@ -92,23 +103,45 @@ export function CommandBox({
   className,
   commandClassName,
   maxLines = 0,
+  visibleLines,
   onCopy,
   copyAriaLabel = 'Copy command',
 }: CommandBoxProps) {
+  const fixedHeight = visibleLines !== undefined && visibleLines > 0;
   // Get static line-clamp class or undefined for unlimited
-  const lineClampClass = maxLines > 0 ? lineClampClasses[maxLines] : undefined;
+  const lineClampClass = !fixedHeight && maxLines > 0 ? lineClampClasses[maxLines] : undefined;
 
-  const commandText = (
+  const text = (
     <div
       className={cn(
         'break-all text-ods-text-primary text-code',
-        onCopy && 'min-w-0 flex-1',
+        !fixedHeight && onCopy && 'min-w-0 flex-1',
         lineClampClass,
         commandClassName,
       )}
     >
       {command}
     </div>
+  );
+
+  // The height is N rows of the `text-code` line height token, so it follows
+  // the responsive type scale instead of a pixel guess.
+  const commandText = fixedHeight ? (
+    <div className={cn(onCopy && 'min-w-0 flex-1')}>
+      {/* No `resetKey`: the text of a live template changes on every keystroke,
+          and collapsing on each one would fold an expanded box under the
+          typist, the exact jump this mode exists to prevent. Nothing goes stale
+          without it: the expanded height is re-measured on every commit. */}
+      <FadePreview
+        fixedHeight
+        collapsedHeight={`calc(${visibleLines} * var(--font-line-space-h6-caption))`}
+        labels={{ more: 'Show all', less: 'Show less' }}
+      >
+        {text}
+      </FadePreview>
+    </div>
+  ) : (
+    text
   );
 
   return (

@@ -36,6 +36,23 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
     }) as MediaQueryList;
 }
 
+// --- ResizeObserver -------------------------------------------------------
+//
+// jsdom does not implement it, and `new ResizeObserver(...)` THROWS — so any
+// component built on `useCollapsible` (every expandable chat row) takes its
+// test file down on mount, for a measurement the test never asserts on.
+//
+// Inert on purpose: it never fires, so the collapsible keeps whatever height it
+// computed from jsdom's zero-sized layout. A test that needs a real measurement
+// has to drive it explicitly rather than lean on this stub.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 // --- Web Storage on Node >= 22 -------------------------------------------
 //
 // Node ships its OWN `localStorage` global (experimental Web Storage). It is

@@ -16,6 +16,7 @@ export { LockOpenKeyholeIcon } from './lock-open-keyhole-icon';
 export { LockSquareIcon } from './lock-square-icon';
 export { PasscodeIcon } from './passcode-icon';
 export { ScanIcon } from './scan-icon';
+export { ScanXmarkIcon } from './scan-xmark-icon';
 export { ShieldAltIcon } from './shield-alt-icon';
 export { ShieldCheckIcon } from './shield-check-icon';
 export { ShieldExclamationIcon } from './shield-exclamation-icon';

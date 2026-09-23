@@ -53,7 +53,7 @@ import {
   type MeetingHost,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
-import { formatDurationCompact } from '../../utils/format';
+import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
 import { BookingForm, BookingFormSkeleton, DEFAULT_SUBMIT_LABEL, type BookingFormProps } from './booking-form';
 import { Confirmation } from './confirmation';
@@ -105,6 +105,13 @@ export interface HubSpotMeetingSchedulerProps {
    */
   onBack?: () => void;
   onBooked?: (b: BookingConfirmation) => void;
+  /**
+   * What the visitor sees: the step, or `'unavailable'` when the degraded box
+   * replaces the flow (the load failed, or the link cannot be booked natively).
+   * Reported on mount and on every change. For a host that shows something
+   * beside the card at some stages only (a landing page's explore nudge).
+   */
+  onStageChange?: (stage: SchedulerStage) => void;
   className?: string;
   /**
    * Panel order.
@@ -146,6 +153,8 @@ export interface HubSpotMeetingSchedulerProps {
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
+/** `onStageChange`'s value: a step, or the degraded box that replaces the flow. */
+export type SchedulerStage = Step | 'unavailable';
 
 /** Values collected at the details step, held until a slot picks the instant. */
 type StashedDetails = {
@@ -236,31 +245,17 @@ const STEP_PANEL_CLASS = cn('flex flex-1 flex-col', PANEL_STEP_CLASS);
 export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
 
 /**
- * The same box for `flow="details-first"`, where the tallest stage is the
- * DETAILS FORM (email + first/last + the link's declared questions + the
- * consent block + Continue) rather than the calendar.
+ * The box for `flow="details-first"`'s CALENDAR and confirmation stages (and its
+ * degraded stand-in), 638px from `md` (`4904:118213`), 812px on phones (the
+ * calendar stage's natural height at 375px: header strip + six fixed weeks +
+ * the 9.75rem chip cap). Fixed, not a floor, for the slot-first reason: the
+ * times column scrolls inside a stated height.
  *
- * Still a fixed pair, not a floor: everything below the card derives a definite
- * height from it, and a floor was already tried here — it pinned the short
- * stages and let the tall one push the wrapper, which is the screen-shake the
- * fixed height exists to remove.
- *
- * ONE number from `md` up, not two: 638px, the card both mocks draw
- * (`4904:117130` form-only, `4904:118213` three columns). The form stage has no
- * sidebar to stack into a header strip, so nothing about it changes between
- * tablet and desktop, and the calendar stage fits the same box at both — the
- * times column scrolls inside it as it always has.
- *
- * PHONES get a stated height too — the one place this flow departs from
- * slot-first's "the page is the scroller". Slot-first's two stages are the
- * same shape on a phone (calendar + a capped times list either way), so it
- * needs none. Details-first's are not: the form stage, the calendar stage and
- * the two-line confirmation each have their own natural height, and a paid
- * landing page that grows and shrinks by tens of pixels on every step reads as
- * broken. 812px is the calendar stage's natural height at 375px (header strip
- * + six fixed weeks + the 9.75rem chip cap), so that stage fits exactly and the
- * form stage — shorter on the shipped links — sits in it; a link declaring more
- * questions scrolls the form inside the card, as it already does from `md`.
+ * The FORM stage is NOT boxed. It renders at its natural height, so every
+ * question the HubSpot link declares is on the page instead of scrolling inside
+ * a card cut off mid-consent. What keeps that from jumping is the form's own
+ * footprint discipline: the SSR seed renders the real form on first paint, and
+ * the cold-start `BookingFormSkeleton` draws the same rows through the same grid.
  *
  * Hosts read it through `SCHEDULER_FLOW_PRESETS[flow].height`, never directly.
  */
@@ -400,6 +395,7 @@ export function HubSpotMeetingScheduler({
   fallbackUrl,
   onBack,
   onBooked,
+  onStageChange,
   className,
   flow = DEFAULT_SCHEDULER_FLOW,
   detailsForm: DetailsForm = BookingForm,
@@ -443,6 +439,26 @@ export function HubSpotMeetingScheduler({
 
   const preset = SCHEDULER_FLOW_PRESETS[flow];
   const [step, setStep] = useState<Step>(preset.initialStep);
+  // The same predicates, in the same order, as the degraded returns below: a
+  // cold load is still the current step; a failed load or a link the form cannot
+  // reproduce is the degraded box.
+  const stage: SchedulerStage =
+    !(isLoadingAvailability && !availability) &&
+    (Boolean(availabilityError) || !availability || !isNativelyBookable(availability))
+      ? 'unavailable'
+      : step;
+  // Reported from an effect, not beside each `setStep`: the stage moves in several
+  // places (one of them during render, on a link swap), and a host setState run
+  // from this component's render is a cross-component update. The ref keeps an
+  // inline host callback from re-firing on every render; it is written in an
+  // effect, never during render.
+  const onStageChangeRef = useRef(onStageChange);
+  useEffect(() => {
+    onStageChangeRef.current = onStageChange;
+  });
+  useEffect(() => {
+    onStageChangeRef.current?.(stage);
+  }, [stage]);
   // State, not a ref: the link-swap reset below writes it DURING RENDER, and
   // this file's own rule forbids writing a ref there. "Frozen" means written
   // once at Continue, not `useRef`.
@@ -688,12 +704,23 @@ export function HubSpotMeetingScheduler({
    * last-wins, so appending it after would make a host's own `h-*` unreachable,
    * which is the override the height-inside-CARD_CLASS arrangement allows today.
    */
-  const cardClass = cn(CARD_CLASS, preset.height, detailsFirst && 'flex flex-col', formOnly && 'bg-ods-bg', className);
+  // details-first's form stage grows with the link's questions (see
+  // MEETING_SCHEDULER_DETAILS_FIRST_H); every other stage keeps the stated box.
+  // `formOnly` is exactly that stage (`detailsFirst && step === 'details'`), so
+  // slot-first, the calendar, the confirmation and the skeleton of either stay boxed.
+  const boxed = !formOnly;
+  const cardClass = cn(
+    CARD_CLASS,
+    boxed ? preset.height : 'md:h-auto',
+    detailsFirst && 'flex flex-col',
+    formOnly && 'bg-ods-bg',
+    className,
+  );
   /** details-first states a height on phones too (see MEETING_SCHEDULER_DETAILS_FIRST_H), so
-   *  the wrappers that let content shrink into a stated height run at every width here. */
-  const innerClass = cn(CARD_INNER_CLASS, detailsFirst && 'min-h-0 flex-1');
-  const actionPanelClass = cn(ACTION_PANEL_CLASS, detailsFirst && 'min-h-0 overflow-y-auto');
-  const stepPanelClass = cn(STEP_PANEL_CLASS, detailsFirst && 'min-h-0 overflow-y-auto');
+   *  the wrappers that let content shrink into a stated height run at every width there. */
+  const innerClass = cn(CARD_INNER_CLASS, detailsFirst && boxed && 'min-h-0 flex-1');
+  const actionPanelClass = cn(ACTION_PANEL_CLASS, detailsFirst && boxed && 'min-h-0 overflow-y-auto');
+  const stepPanelClass = cn(STEP_PANEL_CLASS, detailsFirst && boxed && 'min-h-0 overflow-y-auto');
 
   /** One card SHAPE for every degraded return below. */
   const degraded = (message: string) => (
@@ -818,16 +845,8 @@ export function HubSpotMeetingScheduler({
                   RangeError on rather than ignoring. */}
               {selectedSlot != null && durationMs != null && timezone != null && (
                 <p className="text-ods-text-primary text-h4">
-                  {new Intl.DateTimeFormat(undefined, {
-                    timeZone: timezone,
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    timeZoneName: 'short',
-                  }).format(new Date(selectedSlot))}{' '}
-                  · {formatDurationCompact(durationMs / 1000)}
+                  {formatDateWithTimezone(selectedSlot, timezone, 'weekdayDateTimeZoned', { viewerLocale: true })} ·{' '}
+                  {formatDurationCompact(durationMs / 1000)}
                 </p>
               )}
               <DetailsForm

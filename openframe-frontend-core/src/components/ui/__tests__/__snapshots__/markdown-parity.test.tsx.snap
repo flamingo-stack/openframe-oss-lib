@@ -31,7 +31,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: auto-url-inside-m
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: auto-url-inside-table-not-embedded 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none">
-<div class="table-container my-6 overflow-x-auto"><div class="min-w-full rounded-lg border border-ods-border bg-ods-card"><table class="w-full table-fixed md:table-auto"><thead class="bg-ods-bg-surface"><tr><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Site</th></tr></thead><tbody><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm"><a href="https://blog.example.com/post-5" class="relative text-ods-accent no-underline transition-colors duration-200 after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-0 after:bg-ods-accent after:transition-all after:duration-300 after:content-[''] hover:after:w-full " target="_blank" rel="noopener noreferrer">https://blog.example.com/post-5</a></td></tr></tbody></table></div></div></article></div></div>"
+<div class="table-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card"><table class="w-full table-fixed md:table-auto [&amp;_tr:last-child_td]:border-b-0"><thead class="bg-ods-bg-surface"><tr><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Site</th></tr></thead><tbody><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm"><a href="https://blog.example.com/post-5" class="relative text-ods-accent no-underline transition-colors duration-200 after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-0 after:bg-ods-accent after:transition-all after:duration-300 after:content-[''] hover:after:w-full " target="_blank" rel="noopener noreferrer">https://blog.example.com/post-5</a></td></tr></tbody></table></div></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: auto-url-reddit 1`] = `
@@ -136,7 +136,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: fenced-code-unkno
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: gfm-table 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none">
-<div class="table-container my-6 overflow-x-auto"><div class="min-w-full rounded-lg border border-ods-border bg-ods-card"><table class="w-full table-fixed md:table-auto"><thead class="bg-ods-bg-surface"><tr><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Col A</th><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Col B</th></tr></thead><tbody><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">a1</td><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">b1</td></tr><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">a2</td><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">b2</td></tr></tbody></table></div></div></article></div></div>"
+<div class="table-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card"><table class="w-full table-fixed md:table-auto [&amp;_tr:last-child_td]:border-b-0"><thead class="bg-ods-bg-surface"><tr><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Col A</th><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Col B</th></tr></thead><tbody><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">a1</td><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">b1</td></tr><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">a2</td><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">b2</td></tr></tbody></table></div></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: headings-with-emoji-and-dupes 1`] = `
@@ -258,39 +258,18 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: loose-ordered-lis
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: mermaid 1`] = `
-"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="mermaid-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card p-4 md:p-6 lg:p-8"><style>
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="mermaid-container relative my-6 rounded-lg border border-ods-border bg-ods-card p-4 md:p-6 lg:p-8"><style>
+  /* The pan surface is a scroll region with NO scrollbars: drag, wheel,
+     arrows and the toolbar move it (a canvas, the way dbdiagram, Figma and
+     Excalidraw draw one). Two mechanisms for one motion read as a bug. */
+  .mermaid-frame-pan { scrollbar-width: none; -ms-overflow-style: none; }
+  .mermaid-frame-pan::-webkit-scrollbar { display: none; }
   .mermaid-svg-container svg {
-    max-width: 100% !important;
-    height: auto !important;
-    min-height: 200px;
+    max-width: 100%;
+    height: auto;
     font-family: 'DM Sans', sans-serif !important;
     font-size: 14px !important;
   }
-  @media (min-width: 1520px) {
-    .mermaid-svg-container svg {
-      max-width: 900px !important;
-      max-height: 700px !important;
-      min-height: 300px;
-      font-size: 16px !important;
-    }
-  }
-  @media (min-width: 768px) and (max-width: 1519px) {
-    .mermaid-svg-container svg {
-      max-width: 700px !important;
-      max-height: 600px !important;
-      min-height: 250px;
-      font-size: 15px !important;
-    }
-  }
-  @media (max-width: 767px) {
-    .mermaid-svg-container svg {
-      max-width: 90vw !important;
-      max-height: 400px !important;
-      min-height: 200px;
-      font-size: 13px !important;
-    }
-  }
-  .mermaid-svg-container svg[width] { width: 100% !important; }
   .mermaid-svg-container .node rect,
   .mermaid-svg-container .node circle,
   .mermaid-svg-container .node ellipse,
@@ -304,7 +283,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: mermaid 1`] = `
     .mermaid-svg-container .node text,
     .mermaid-svg-container .edgeLabel text { font-size: 16px !important; }
   }
-</style><div class="flex min-h-[200px] w-full items-center justify-center md:min-h-[250px] lg:min-h-[300px]"><div class="mermaid-svg-container flex w-full max-w-full justify-center" data-testid="mermaid-svg-container" style="font-size: 14px;"><svg data-mock-mermaid="true" width="100%" height="auto"></svg></div></div></div></pre></article></div></div>"
+</style><div class="absolute right-2 top-2 z-10 flex items-center gap-[var(--spacing-system-xxs)] rounded-md bg-ods-card" role="group" aria-label="Diagram zoom"><button class="relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)] whitespace-nowrap rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus disabled:pointer-events-none [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border h-8 w-8 p-[var(--spacing-system-xxs)] [&amp;_svg]:h-4 [&amp;_svg]:w-4" aria-label="Zoom out" title="Zoom out (−, ⌘/Ctrl + wheel)"><span class="contents"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zoom-out"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line><line x1="8" x2="14" y1="11" y2="11"></line></svg></span></button><button class="relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)] whitespace-nowrap rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus disabled:pointer-events-none [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border h-6 px-[var(--spacing-system-sf)] py-0 font-normal text-h6 [&amp;_svg]:h-3.5 [&amp;_svg]:w-3.5" disabled="" aria-label="Reset zoom" title="Back to 100% (0)"><span class="contents">100%</span></button><button class="relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)] whitespace-nowrap rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus disabled:pointer-events-none [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border h-8 w-8 p-[var(--spacing-system-xxs)] [&amp;_svg]:h-4 [&amp;_svg]:w-4" aria-label="Zoom in" title="Zoom in (+, ⌘/Ctrl + wheel)"><span class="contents"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zoom-in"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line><line x1="11" x2="11" y1="8" y2="14"></line><line x1="8" x2="14" y1="11" y2="11"></line></svg></span></button><button class="relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)] whitespace-nowrap rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus disabled:pointer-events-none [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border h-8 w-8 p-[var(--spacing-system-xxs)] [&amp;_svg]:h-4 [&amp;_svg]:w-4" aria-label="Fit to frame" title="Fit the whole diagram in the frame (f)"><span class="contents"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-maximize2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></span></button></div><div class="min-h-[200px] max-h-[70svh] md:min-h-[250px] flex w-full overflow-auto outline-none focus-visible:ring-1 focus-visible:ring-ods-accent mermaid-frame-pan select-none cursor-grab" style="justify-content: safe center; align-items: safe center;" data-testid="mermaid-frame" data-frame="content" tabindex="0" role="region" aria-label="Diagram. Drag to pan; Ctrl or Cmd plus wheel, or + and -, to zoom; 0 resets; f fits." title="Drag to pan · ⌘/Ctrl + wheel to zoom"><div class="mermaid-svg-container flex shrink-0 justify-center" data-testid="mermaid-svg-container" data-zoom="1" style="font-size: 14px; width: 100%;"><svg data-mock-mermaid="true" width="100" height="50"></svg></div></div></div></pre></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: mismatched-fence-carve-does-not-shelter-opener 1`] = `
@@ -1297,7 +1276,7 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: fenced-code-unk
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: gfm-table 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none">
-<div class="table-container my-6 overflow-x-auto"><div class="min-w-full rounded-lg border border-ods-border bg-ods-card"><table class="w-full table-fixed md:table-auto"><thead class="bg-ods-bg-surface"><tr><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Col A</th><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Col B</th></tr></thead><tbody><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">a1</td><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">b1</td></tr><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">a2</td><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">b2</td></tr></tbody></table></div></div></article></div></div>"
+<div class="table-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card"><table class="w-full table-fixed md:table-auto [&amp;_tr:last-child_td]:border-b-0"><thead class="bg-ods-bg-surface"><tr><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Col A</th><th class="break-words border-r border-ods-border px-2 py-3 text-left font-semibold text-ods-accent last:border-r-0 md:px-4 text-xs md:text-sm">Col B</th></tr></thead><tbody><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">a1</td><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">b1</td></tr><tr><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">a2</td><td class="whitespace-normal break-words border-b border-r border-ods-border px-2 py-3 text-ods-text-primary last:border-r-0 md:px-4 text-xs md:text-sm">b2</td></tr></tbody></table></div></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: headings-with-emoji-and-dupes 1`] = `
@@ -1420,39 +1399,18 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: loose-ordered-l
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: mermaid 1`] = `
-"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="mermaid-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card p-4 md:p-6 lg:p-8"><style>
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="mermaid-container relative my-6 rounded-lg border border-ods-border bg-ods-card p-4 md:p-6 lg:p-8"><style>
+  /* The pan surface is a scroll region with NO scrollbars: drag, wheel,
+     arrows and the toolbar move it (a canvas, the way dbdiagram, Figma and
+     Excalidraw draw one). Two mechanisms for one motion read as a bug. */
+  .mermaid-frame-pan { scrollbar-width: none; -ms-overflow-style: none; }
+  .mermaid-frame-pan::-webkit-scrollbar { display: none; }
   .mermaid-svg-container svg {
-    max-width: 100% !important;
-    height: auto !important;
-    min-height: 200px;
+    max-width: 100%;
+    height: auto;
     font-family: 'DM Sans', sans-serif !important;
     font-size: 14px !important;
   }
-  @media (min-width: 1520px) {
-    .mermaid-svg-container svg {
-      max-width: 900px !important;
-      max-height: 700px !important;
-      min-height: 300px;
-      font-size: 16px !important;
-    }
-  }
-  @media (min-width: 768px) and (max-width: 1519px) {
-    .mermaid-svg-container svg {
-      max-width: 700px !important;
-      max-height: 600px !important;
-      min-height: 250px;
-      font-size: 15px !important;
-    }
-  }
-  @media (max-width: 767px) {
-    .mermaid-svg-container svg {
-      max-width: 90vw !important;
-      max-height: 400px !important;
-      min-height: 200px;
-      font-size: 13px !important;
-    }
-  }
-  .mermaid-svg-container svg[width] { width: 100% !important; }
   .mermaid-svg-container .node rect,
   .mermaid-svg-container .node circle,
   .mermaid-svg-container .node ellipse,
@@ -1466,7 +1424,7 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: mermaid 1`] = `
     .mermaid-svg-container .node text,
     .mermaid-svg-container .edgeLabel text { font-size: 16px !important; }
   }
-</style><div class="flex min-h-[200px] w-full items-center justify-center md:min-h-[250px] lg:min-h-[300px]"><div class="mermaid-svg-container flex w-full max-w-full justify-center" data-testid="mermaid-svg-container" style="font-size: 14px;"><svg data-mock-mermaid="true" width="100%" height="auto"></svg></div></div></div></pre></article></div></div>"
+</style><div class="absolute right-2 top-2 z-10 flex items-center gap-[var(--spacing-system-xxs)] rounded-md bg-ods-card" role="group" aria-label="Diagram zoom"><button class="relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)] whitespace-nowrap rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus disabled:pointer-events-none [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border h-8 w-8 p-[var(--spacing-system-xxs)] [&amp;_svg]:h-4 [&amp;_svg]:w-4" aria-label="Zoom out" title="Zoom out (−, ⌘/Ctrl + wheel)"><span class="contents"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zoom-out"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line><line x1="8" x2="14" y1="11" y2="11"></line></svg></span></button><button class="relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)] whitespace-nowrap rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus disabled:pointer-events-none [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border h-6 px-[var(--spacing-system-sf)] py-0 font-normal text-h6 [&amp;_svg]:h-3.5 [&amp;_svg]:w-3.5" disabled="" aria-label="Reset zoom" title="Back to 100% (0)"><span class="contents">100%</span></button><button class="relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)] whitespace-nowrap rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus disabled:pointer-events-none [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border h-8 w-8 p-[var(--spacing-system-xxs)] [&amp;_svg]:h-4 [&amp;_svg]:w-4" aria-label="Zoom in" title="Zoom in (+, ⌘/Ctrl + wheel)"><span class="contents"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zoom-in"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line><line x1="11" x2="11" y1="8" y2="14"></line><line x1="8" x2="14" y1="11" y2="11"></line></svg></span></button><button class="relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)] whitespace-nowrap rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus disabled:pointer-events-none [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 bg-ods-card text-ods-text-primary hover:bg-ods-bg-hover active:bg-ods-bg-active disabled:bg-ods-card disabled:text-ods-text-disabled aria-disabled:bg-ods-card aria-disabled:text-ods-text-disabled border border-ods-border hover:border-ods-border-hover active:border-ods-border-active disabled:border-ods-border aria-disabled:border-ods-border h-8 w-8 p-[var(--spacing-system-xxs)] [&amp;_svg]:h-4 [&amp;_svg]:w-4" aria-label="Fit to frame" title="Fit the whole diagram in the frame (f)"><span class="contents"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-maximize2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg></span></button></div><div class="min-h-[200px] max-h-[70svh] md:min-h-[250px] flex w-full overflow-auto outline-none focus-visible:ring-1 focus-visible:ring-ods-accent mermaid-frame-pan select-none cursor-grab" style="justify-content: safe center; align-items: safe center;" data-testid="mermaid-frame" data-frame="content" tabindex="0" role="region" aria-label="Diagram. Drag to pan; Ctrl or Cmd plus wheel, or + and -, to zoom; 0 resets; f fits." title="Drag to pan · ⌘/Ctrl + wheel to zoom"><div class="mermaid-svg-container flex shrink-0 justify-center" data-testid="mermaid-svg-container" data-zoom="1" style="font-size: 14px; width: 100%;"><svg data-mock-mermaid="true" width="100" height="50"></svg></div></div></div></pre></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: mismatched-fence-carve-does-not-shelter-opener 1`] = `

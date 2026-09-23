@@ -23,9 +23,10 @@
 
 import { FileText } from 'lucide-react';
 import type React from 'react';
-import { getBaseUrl } from '../../../utils/cn';
+import { getPlatformUrl } from '../../../platform-domains';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import { canonicalContentRefType } from '../../../utils/list-url';
+import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
 import type { ChatRef } from '../chat-ref.types';
 import { safeHref } from './compact-card-classes';
 import { getIconComponent } from './icon-registry';
@@ -93,7 +94,7 @@ export interface SourceRowContext {
    * replacement for the single `chipBasePlatform`. Maps a doc-table documentType
    * (`'markdown'`, `'data_room_doc'`, …) → the platform whose PUBLIC doc viewer
    * hosts it + that viewer's base path. A doc chip with no `externalUrl` resolves
-   * to `getBaseUrl(platform)/<basePath>/<path>` PER ROW — so a chat mixing several
+   * to `getPlatformUrl(platform)/<basePath>/<path>` PER ROW — so a chat mixing several
    * doc sources sends EACH to its own home (markdown→flamingo/knowledge-base,
    * data_room_doc→company-hub/data-room) instead of one static fallback for all.
    * Wins over `chipBasePlatform` when a row's documentType has an entry.
@@ -154,13 +155,9 @@ function pickSourceIcon(sourceRepo: string | null, documentType: string | null |
   return { icon, iconLabel };
 }
 
-/**
- * Doc-table documentTypes — rows that carry an in-app `path` (not an entity
- * `externalUrl`) and resolve to a doc viewer. The SAME set an embedder keys its
- * `docPlatformTargets` map by (markdown = product docs, data_room_doc = data room),
- * declared once so the two can't silently diverge.
- */
-export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc'] as const;
+// Declared once in `utils/source-grouping`; re-exported so embedders that key
+// `docPlatformTargets` by it keep their import.
+export { DOC_TABLE_TYPES };
 
 /**
  * Only doc-table rows (DOC_TABLE_TYPES) fall back to doc-viewer navigation when no
@@ -212,11 +209,11 @@ export function resolveSourceRowCTA(row: SourceRowInput, ctx: SourceRowContext =
         // slash-stripping regex `/^\/+|\/+$/g` tripped CodeQL's js/polynomial-redos (high)
         // since `\/+$` backtracks on inputs with many '/'. split/filter/join is linear.
         const seg = docTarget.basePath.split('/').filter(Boolean).join('/');
-        const base = `${getBaseUrl(docTarget.platform)}${seg ? `/${seg}` : ''}/`;
+        const base = `${getPlatformUrl(docTarget.platform)}${seg ? `/${seg}` : ''}/`;
         href = safeHref(new URL(safePath, base).toString()) ?? null;
         targetPlatform = docTarget.platform;
       } else if (ctx.chipBasePlatform) {
-        const base = `${getBaseUrl(ctx.chipBasePlatform)}/knowledge-base/`;
+        const base = `${getPlatformUrl(ctx.chipBasePlatform)}/knowledge-base/`;
         href = safeHref(new URL(safePath, base).toString()) ?? null;
         targetPlatform = ctx.chipBasePlatform;
       } else if (ctx.baseRoute) {

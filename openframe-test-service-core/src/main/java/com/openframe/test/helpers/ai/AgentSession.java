@@ -47,7 +47,8 @@ public final class AgentSession implements AutoCloseable {
         }
 
         AgentIdentity identity = AgentIdentity.readFrom(ssh);
-        String token = AgentAuthApi.getClientCredentialsToken(identity.clientId(), identity.clientSecret());
+        String token = AgentAuthApi.getClientCredentialsToken(
+                identity.machineId(), identity.clientId(), identity.clientSecret());
         RequestSpecHelper.setBearerToken(token);
         log.info("Acting as AGENT for machine {}", identity.machineId());
         return new AgentSession(identity.machineId());

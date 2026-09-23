@@ -1,7 +1,8 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -9,13 +10,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Repository for {@link ScriptExecution} rows in the History list.
- *
- * <p>Cursor-paged listing lives on {@link CustomScriptExecutionRepository}
- * (MongoTemplate-backed), keeping all {@code Criteria}/cursor/sort assembly in
- * the data layer — same split as {@code ScriptRepository}.
- */
 @Repository
 public interface ScriptExecutionRepository
         extends MongoRepository<ScriptExecution, String>, CustomScriptExecutionRepository {
@@ -28,5 +22,10 @@ public interface ScriptExecutionRepository
 
     Optional<ScriptExecution> findFirstByTenantIdAndExecutionId(String tenantId, String executionId);
 
+    List<ScriptExecution> findByTenantIdAndExecutionId(String tenantId, String executionId);
+
     List<ScriptExecution> findByStatusAndDispatchedAtBefore(ExecutionStatus status, Instant dispatchedAtBefore);
+
+    Optional<ScriptExecution> findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
+            String tenantId, String machineId, String scriptId, ExecutionSource source);
 }

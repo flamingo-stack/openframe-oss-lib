@@ -120,7 +120,7 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
                     keyspaceName, commandResultTtlSeconds);
 
         } catch (Exception e) {
-            logger.error("Failed to create keyspace '{}': {}", keyspaceName, e.getMessage());
+            logger.error("Failed to create keyspace '{}'", keyspaceName, e);
             throw new RuntimeException("Failed to ensure Cassandra keyspace exists", e);
         }
     }
