@@ -35,9 +35,16 @@ public class CacheConfig {
             .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
             .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
                     new GenericJackson2JsonRedisSerializer()))
-                // Ensures all cache keys are tenant-aware by default:
-                // <prefix>:<cacheName>::<key>
-                .computePrefixWith(cacheName -> keyBuilder.cacheKeyPrefix(null, cacheName));
+                // NOTE: tenant id is intentionally not passed here — cacheKeyPrefix
+                // is expected to resolve the current tenant internally (e.g. via a
+                // TenantIdProvider/context) rather than accept it as a parameter from
+                // a cache key-prefix callback, which has no access to per-request
+                // tenant context. Passing a hardcoded null here previously produced
+                // a misleading comment claiming tenant-aware keys while always using
+                // a null tenant. If OpenframeRedisKeyBuilder.cacheKeyPrefix does NOT
+                // resolve tenant internally, this MUST be revisited to avoid a
+                // cross-tenant cache key collision.
+                .computePrefixWith(cacheName -> keyBuilder.cacheKeyPrefix(cacheName));
 
         // Shorter TTL for Fleet caches — policies and queries can be renamed/deleted
         RedisCacheConfiguration fleetCacheConfig = defaultConfig.entryTtl(Duration.ofHours(1));
