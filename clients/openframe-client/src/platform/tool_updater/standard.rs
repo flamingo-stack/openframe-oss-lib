@@ -16,52 +16,7 @@ impl StandardToolUpdater {
     pub fn new(deps: ToolUpdaterDeps) -> Self {
         Self { deps }
     }
-
-    /// Honour the executable path the installer recorded. A folder-extraction config
-    /// installs to e.g. `<tool>/bin/tool`, not `<tool>/agent` — writing to the latter
-    /// regardless left the tool running its old binary while the record, and the backend,
-    /// reported the new version. `ServiceToolUpdater::resolve_executable_path` already
-    /// does this; Standard was the outlier.
-    fn resolve_executable_path(&self, tool: &InstalledTool) -> std::path::PathBuf {
-        let agent_path = self
-            .deps
-            .directory_manager
-            .get_agent_path(&tool.tool_agent_id);
-
-        let recorded = match &tool.installation {
-            Installation::Standard {
-                executable_path: Some(exec_path),
-            } => Some(exec_path.as_str()),
-            _ => None,
-        };
-
-        resolve_recorded_executable(agent_path, recorded)
-    }
 }
-
-/// Resolve a recorded executable path against the default `<tool>/agent` path, mirroring
-/// `DirectoryManager::get_tool_executable_path`. Absolute paths (unix `/…`, Windows `C:\…`)
-/// are taken as-is; a relative path is joined onto the tool's own directory.
-///
-/// Split out from the method above purely so it can be tested without constructing a whole
-/// `ToolUpdaterDeps` — it is the part that decides which file an update overwrites, and
-/// getting it wrong silently leaves the tool running its old binary.
-fn resolve_recorded_executable(
-    agent_path: std::path::PathBuf,
-    recorded: Option<&str>,
-) -> std::path::PathBuf {
-    match recorded {
-        Some(exec_path) if exec_path.starts_with('/') || exec_path.contains(':') => {
-            std::path::PathBuf::from(exec_path)
-        }
-        Some(exec_path) => agent_path.parent().unwrap_or(&agent_path).join(exec_path),
-        None => agent_path,
-    }
-}
-
-#[cfg(test)]
-#[path = "standard_tests.rs"]
-mod tests;
 
 #[async_trait]
 impl ToolUpdater for StandardToolUpdater {
@@ -76,7 +31,10 @@ impl ToolUpdater for StandardToolUpdater {
             .await
             .with_context(|| format!("Failed to stop tool: {}", tool_agent_id))?;
 
-        let agent_path = self.resolve_executable_path(tool);
+        let agent_path = self
+            .deps
+            .directory_manager
+            .get_tool_executable_path(&tool.tool_agent_id, tool.installation.executable_path());
         clear_aside_binary(&agent_path, tool_agent_id).await;
         log_update_survivors(&self.deps, tool).await;
 
@@ -97,7 +55,10 @@ impl ToolUpdater for StandardToolUpdater {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Applying Standard tool update");
 
-        let agent_path = self.resolve_executable_path(tool);
+        let agent_path = self
+            .deps
+            .directory_manager
+            .get_tool_executable_path(&tool.tool_agent_id, tool.installation.executable_path());
         download_and_write_binary(&self.deps, config, &agent_path, tool_agent_id).await?;
         Ok(None)
     }
@@ -119,7 +80,10 @@ impl ToolUpdater for StandardToolUpdater {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Rolling back Standard tool update");
 
-        let agent_path = self.resolve_executable_path(tool);
+        let agent_path = self
+            .deps
+            .directory_manager
+            .get_tool_executable_path(&tool.tool_agent_id, tool.installation.executable_path());
         restore_from_backup(ctx.backup_path.as_ref(), &agent_path, tool_agent_id).await
     }
 }

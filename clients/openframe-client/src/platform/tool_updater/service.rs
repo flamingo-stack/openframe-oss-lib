@@ -22,24 +22,9 @@ impl ServiceToolUpdater {
     }
 
     fn resolve_executable_path(&self, tool: &InstalledTool) -> PathBuf {
-        let agent_path = self
-            .deps
+        self.deps
             .directory_manager
-            .get_agent_path(&tool.tool_agent_id);
-
-        if let Installation::Service {
-            executable_path: Some(exec_path),
-            ..
-        } = &tool.installation
-        {
-            if exec_path.starts_with('/') || exec_path.contains(':') {
-                PathBuf::from(exec_path)
-            } else {
-                agent_path.parent().unwrap_or(&agent_path).join(exec_path)
-            }
-        } else {
-            agent_path
-        }
+            .get_tool_executable_path(&tool.tool_agent_id, tool.installation.executable_path())
     }
 
     /// Check if download config targets an .app bundle

@@ -18,8 +18,14 @@ impl GuiAppToolUpdater {
         Self { deps }
     }
 
+    /// Sibling of the bundle so the rename stays on one volume, dot-prefixed so an
+    /// interrupted update never leaves a second app visible in Finder.
     fn backup_path_for(bundle: &Path) -> PathBuf {
-        bundle.with_extension("app.update-backup")
+        let name = bundle
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "bundle".to_string());
+        bundle.with_file_name(format!(".{name}.update-backup"))
     }
 
     /// Renames the installed `.app` to a sibling backup so a failed download can be undone.
@@ -35,11 +41,17 @@ impl GuiAppToolUpdater {
             warn!(tool_id = %tool_agent_id, "No .app bundle in {} — updating without a backup", executable_path);
             return Ok(None);
         };
+        let backup = Self::backup_path_for(&bundle);
+
+        // A backup left by a run that died mid-download is the only copy of the app. Adopt
+        // it when the bundle is gone; drop it as stale when the bundle is back.
         if !bundle.exists() {
+            if backup.exists() {
+                info!(tool_id = %tool_agent_id, "Adopting the backup left by an interrupted update");
+                return Ok(Some(backup));
+            }
             return Ok(None);
         }
-
-        let backup = Self::backup_path_for(&bundle);
         if backup.exists() {
             tokio::fs::remove_dir_all(&backup).await.ok();
         }

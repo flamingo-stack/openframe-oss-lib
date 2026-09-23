@@ -556,10 +556,7 @@ impl ToolRunManager {
             }
             let tool_id = tool.tool_agent_id.clone();
             info!(tool_id = %tool_id, "Relaunching tool supervisor after the aborted update");
-            if let Err(e) = self.run_tool(tool, false).await {
-                warn!(tool_id = %tool_id, "Failed to relaunch tool after the aborted update: {:#}", e);
-                self.clear_running_tool(&tool_id).await;
-            }
+            self.run_tool(tool, false).await;
         }
         info!("Tool run manager: supervision resumed after the aborted update");
         Ok(())
@@ -669,13 +666,7 @@ impl ToolRunManager {
             let tool_id = tool.tool_agent_id.clone();
             if self.try_mark_running(&tool_id).await {
                 info!("Running tool {}", tool_id);
-                // One tool must never abort the startup sequence: this error reached
-                // Client::start() through `?` and ended the service core, so a single
-                // tool that could not be launched took the whole agent down with it.
-                if let Err(e) = self.run_tool(tool, false).await {
-                    warn!(tool_id = %tool_id, "Failed to start tool during startup: {:#}", e);
-                    self.clear_running_tool(&tool_id).await;
-                }
+                self.run_tool(tool, false).await;
             } else {
                 warn!("Tool {} is already running - skipping", tool_id);
             }
@@ -694,14 +685,8 @@ impl ToolRunManager {
         }
 
         info!("Running new single tool {}", installed_tool.tool_agent_id);
-        let tool_id = installed_tool.tool_agent_id.clone();
-        // Release the mark taken above if supervision never started, or the tool stays
-        // marked running forever and every later attempt skips it as already running.
-        let result = self.run_tool(installed_tool, true).await;
-        if result.is_err() {
-            self.clear_running_tool(&tool_id).await;
-        }
-        result
+        self.run_tool(installed_tool, true).await;
+        Ok(())
     }
 
     async fn try_mark_running(&self, tool_id: &str) -> bool {
@@ -720,14 +705,14 @@ impl ToolRunManager {
     }
 
     #[allow(unused_variables)]
-    async fn run_tool(&self, tool: InstalledTool, new_tool: bool) -> Result<()> {
+    async fn run_tool(&self, tool: InstalledTool, new_tool: bool) {
         if tool.installation.is_service() {
             info!(
                 "Installation::Service for {} - self-managed, skipping launch",
                 tool.tool_agent_id
             );
             self.clear_running_tool(&tool.tool_agent_id).await;
-            return Ok(());
+            return;
         }
 
         let updating_tools = self.updating_tools.clone();
@@ -741,6 +726,10 @@ impl ToolRunManager {
 
         tokio::spawn(async move {
             let mut launch_backoff = FailureLogBackoff::new();
+            // Only on the first pass, and again after a supervised child exits. A launch
+            // retry must not re-kill: a GuiApp that needs longer than the 3s verify window
+            // would be killed by the next iteration, forever.
+            let mut kill_leftovers_now = true;
             loop {
                 // Self-update in progress — stop the loop entirely
                 if shutdown_break(&shutting_down, &running_tools, &tool.tool_agent_id).await {
@@ -772,25 +761,18 @@ impl ToolRunManager {
 
                 let log_attempt = launch_backoff.should_log();
 
-                // Leftovers from a previous run have to be gone before we launch, or two
-                // instances fight over the same state. The kill belongs inside the loop:
-                // a process that will not die is a retryable launch failure like any other
-                // — run once ahead of the loop, its error propagated out of Client::start()
-                // and ended the service core over one stuck tool, and skipping the launch
-                // instead would leave the tool unsupervised until someone reinstalled it.
-                // Windows GUI apps are owned by the HKLM Run autorun, not us — never kill them.
+                // A leftover that will not die is a retryable launch failure, not a fatal
+                // one. Windows GUI apps belong to the HKLM Run autorun — never kill them.
                 #[cfg(target_os = "windows")]
                 let kill_leftovers = !installation.is_gui_app();
                 #[cfg(not(target_os = "windows"))]
                 let kill_leftovers = true;
 
-                if kill_leftovers {
+                if kill_leftovers && kill_leftovers_now {
                     if let Err(e) = tool_kill_service.stop_tool(&tool.tool_agent_id).await {
                         let failures = launch_backoff.record_failure(log_attempt);
-                        // Escalate the *retry* delay, not just the logging. A process that
-                        // survives three force-kills is usually wedged in the kernel and
-                        // only a reboot clears it, so a fixed 5s retry would mean a full
-                        // sysinfo process scan every 5s for the life of the machine.
+                        // Escalate the retry delay, not just the logging: each attempt is a
+                        // full process-table scan and a wedged process only clears on reboot.
                         let delay =
                             (RETRY_DELAY_SECONDS * failures).min(KILL_RETRY_MAX_DELAY_SECONDS);
                         if log_attempt {
@@ -801,6 +783,7 @@ impl ToolRunManager {
                         sleep(Duration::from_secs(delay)).await;
                         continue;
                     }
+                    kill_leftovers_now = false;
                 }
 
                 let processed_args =
@@ -912,11 +895,8 @@ impl ToolRunManager {
                                     let prefs = crate::platform::preferences_writer::args_to_pairs(
                                         &processed_args,
                                     );
-                                    // Preferences are the ONLY channel a GuiApp's args travel
-                                    // on macOS, so launching after a failed write starts the
-                                    // app with no serverUrl and reports success — the app
-                                    // then stays misconfigured until someone reinstalls it.
-                                    // Treat it as a launch failure and retry instead.
+                                    // Preferences are the only channel GuiApp args travel on
+                                    // macOS; launching without them starts an unconfigured app.
                                     if let Err(e) =
                                         crate::platform::preferences_writer::write(bid, prefs)
                                     {
@@ -1080,17 +1060,16 @@ impl ToolRunManager {
                                "Failed to wait for tool process - restarting in {} seconds: {:#}", RETRY_DELAY_SECONDS, e);
                     }
                 }
+                kill_leftovers_now = true;
                 sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
             }
         });
-
-        Ok(())
     }
 }
 
-/// Clears the updating flag on drop (surviving cancellation and panic), releasing the tool lock only after the flag clears.
-/// Lives here rather than in one caller because the update, restart and install paths all need the same guarantee:
-/// a leaked flag parks the tool's supervisor, defers its connection processing, and blocks every client self-update.
+/// Clears the updating flag on drop (surviving cancellation and panic), releasing the tool
+/// lock only once the flag is clear. Used by the update and restart paths; install and
+/// uninstall still pair mark/clear by hand.
 pub struct UpdatingGuard {
     tool_run_manager: ToolRunManager,
     tool_agent_id: String,

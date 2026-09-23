@@ -121,12 +121,8 @@ fn windows_service_main(_args: Vec<std::ffi::OsString>) {
         }
     });
 
-    // Report a non-zero exit code so the SCM treats this as a failure. The recovery
-    // ladder installed at register time (10s/60s/300s) plus
-    // `set_failure_actions_on_non_crash_failures` only fire when SERVICE_STOPPED
-    // carries a non-zero code; reporting Win32(0) on both paths made a dead core
-    // indistinguishable from an operator-requested stop, so nothing ever restarted it.
-    // The reason goes through tracing, not stderr, or it never reaches openframe.log.
+    // A non-zero exit code is what makes SCM treat this as a failure and fire the
+    // configured recovery ladder; Win32(0) on both paths meant nothing ever restarted.
     if let Err(e) = result {
         error!("Service core failed: {:#}", e);
         let _ = set_service_status(

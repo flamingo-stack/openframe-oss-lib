@@ -69,6 +69,25 @@ impl ToolAgentUpdateService {
             tool_agent_id, new_version
         );
 
+        // Lock before reading anything: everything below reads and rewrites the registry
+        // record, and a concurrent uninstall holding this lock can delete it underneath us —
+        // a stale copy written back afterwards resurrects a tool whose binary is gone.
+        // Defer rather than block, like uninstall and restart do.
+        let tool_lock = self.tool_run_manager.tool_lock(tool_agent_id).await;
+        let _lock_guard = match tool_lock.try_lock_owned() {
+            Ok(guard) => guard,
+            Err(_) => {
+                info!(
+                    "Tool {} busy with another operation, deferring update",
+                    tool_agent_id
+                );
+                anyhow::bail!(
+                    "tool {} busy, deferring update for redelivery",
+                    tool_agent_id
+                );
+            }
+        };
+
         // Check if tool is installed
         let mut installed_tool = match self
             .installed_tools_service
@@ -152,32 +171,11 @@ impl ToolAgentUpdateService {
             return Ok(());
         }
 
-        // Serialise against install/reinstall/uninstall/restart, which all take this same
-        // lock. Updates arrive on a different NATS stream, so without it an uninstall can
-        // delete the registry record while this update holds a stale copy and then writes
-        // it back — resurrecting a record for a tool whose binary is gone. Deferring (like
-        // uninstall and restart do) rather than blocking keeps a slow neighbour from
-        // pushing this past ack_wait into a duplicate delivery.
-        let tool_lock = self.tool_run_manager.tool_lock(tool_agent_id).await;
-        let lock_guard = match tool_lock.try_lock_owned() {
-            Ok(guard) => guard,
-            Err(_) => {
-                info!(
-                    "Tool {} is busy with another operation, deferring update for redelivery",
-                    tool_agent_id
-                );
-                anyhow::bail!(
-                    "tool {} busy with another operation, deferring update for redelivery",
-                    tool_agent_id
-                );
-            }
-        };
-
         // Mark as updating once for all updates; the guard clears the flag — and only then
         // releases the lock — on return, panic or cancellation. A leaked flag parks the
         // tool's supervisor and blocks every client self-update for the process lifetime.
         let _updating =
-            UpdatingGuard::acquire(&self.tool_run_manager, tool_agent_id, Some(lock_guard)).await;
+            UpdatingGuard::acquire(&self.tool_run_manager, tool_agent_id, Some(_lock_guard)).await;
 
         // A Standard->GuiApp migration self-relaunches, so only relaunch here if it was already a GUI app.
         let was_gui_before_update =
@@ -241,13 +239,13 @@ impl ToolAgentUpdateService {
             // and `launchctl load` on an already-loaded job is a no-op that still reports
             // success — so the restart below would silently start nothing on macOS.
             info!(tool_id = %tool_agent_id, "Stopping tool for asset updates");
+            stopped_for_assets = true;
             self.tool_kill_service
                 .stop_installed_tool(installed_tool, false)
                 .await
                 .with_context(|| {
                     format!("Failed to stop tool {} for asset updates", tool_agent_id)
                 })?;
-            stopped_for_assets = true;
         }
 
         // 2. Asset updates (tool already stopped by tool_update or above).
@@ -269,9 +267,25 @@ impl ToolAgentUpdateService {
         // silently takes the agent down until a reboot or a reinstall. Supervised installs
         // are relaunched by their run loop once the updating flag clears.
         if stopped_for_assets {
-            if let Installation::Service { service_name, .. } = &installed_tool.installation {
-                self.restart_service_after_assets(tool_agent_id, service_name)
-                    .await;
+            match &installed_tool.installation {
+                Installation::Service { service_name, .. } => {
+                    self.restart_service_after_assets(tool_agent_id, service_name)
+                        .await;
+                }
+                // The macOS GuiApp supervisor exits once the app is verified running, so
+                // nothing is left to relaunch it; spawn a fresh one. Windows GuiApps are
+                // relaunched by relaunch_windows_gui_app at the end of process_update.
+                #[cfg(target_os = "macos")]
+                Installation::GuiApp { .. } => {
+                    if let Err(e) = self
+                        .tool_run_manager
+                        .run_new_tool(installed_tool.clone())
+                        .await
+                    {
+                        warn!(tool_id = %tool_agent_id, "Failed to relaunch GuiApp after asset updates: {:#}", e);
+                    }
+                }
+                _ => {}
             }
         }
 
