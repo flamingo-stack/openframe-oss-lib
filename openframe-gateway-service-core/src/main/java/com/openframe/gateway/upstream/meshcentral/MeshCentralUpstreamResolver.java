@@ -110,24 +110,15 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
      * {@code build(true)} here — its strict {@code QUERY_PARAM} validation
      * rejects '=' in query values (e.g. base64 padding in mesh auth cookies),
      * which would crash the resolver on every WS request. Concatenating the
-     * already-encoded raw components and letting {@link URI#URI(String)} parse
-     * the result sidesteps that validation.
+     * already-encoded raw components and letting {@link URI#URI(String, String, String, int, String, String, String)}
+     * multi-argument constructor recompose them keeps the raw query/fragment
+     * intact (no re-encoding of already-percent-encoded '=' etc.) while still
+     * validating scheme/host/authority structure, unlike parsing a
+     * hand-concatenated string with {@link URI#URI(String)}.
      */
     private URI withPath(URI uri, String newPath) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(uri.getScheme()).append("://");
-        if (uri.getRawAuthority() != null) {
-            sb.append(uri.getRawAuthority());
-        }
-        sb.append(newPath);
-        if (uri.getRawQuery() != null) {
-            sb.append("?").append(uri.getRawQuery());
-        }
-        if (uri.getRawFragment() != null) {
-            sb.append("#").append(uri.getRawFragment());
-        }
         try {
-            return new URI(sb.toString());
+            return new URI(uri.getScheme(), uri.getRawAuthority(), newPath, uri.getRawQuery(), uri.getRawFragment());
         } catch (URISyntaxException e) {
             throw new IllegalStateException("Failed to build mesh upstream URI", e);
         }
