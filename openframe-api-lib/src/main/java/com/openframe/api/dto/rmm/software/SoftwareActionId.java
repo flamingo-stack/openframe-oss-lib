@@ -1,9 +1,18 @@
 package com.openframe.api.dto.rmm.software;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
-public record SoftwareActionId(String executionId, String bundleId, String scheduleId) {
+@Getter
+@AllArgsConstructor
+public class SoftwareActionId {
+
+    private final String executionId;
+    private final String bundleId;
+    private final String scheduleId;
 
     private static final String SEP = ":"; // absent in UUIDs / Mongo ObjectIds, and not regex-special
 
