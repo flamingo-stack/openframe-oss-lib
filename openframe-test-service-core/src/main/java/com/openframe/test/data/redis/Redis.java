@@ -23,6 +23,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 public class Redis {
@@ -53,9 +54,12 @@ public class Redis {
                 // CLUSTER SLOTS to succeed first, and the advertised addresses are not reachable from the
                 // test pod, which is how this lookup broke on qa (JedisClusterOperationException: could
                 // not initialize cluster slots cache) and took the password-reset case with it.
-                for (HostAndPort node : RedisConfig.getClusterNodes()) {
+                Set<HostAndPort> seeds = RedisConfig.getClusterNodes();
+                int scanned = 0;
+                for (HostAndPort node : seeds) {
                     try (UnifiedJedis client = new JedisPooled(node, config)) {
                         String token = findToken(client, pattern, email);
+                        scanned++;
                         if (token != null) {
                             return token;
                         }
@@ -63,6 +67,14 @@ public class Redis {
                         // Node unreachable or holding none of the slots — try the next seed.
                         log.debug("Seed {} did not answer the password-reset scan: {}", node, e.toString());
                     }
+                }
+                if (scanned == 0) {
+                    // "Scanned every node and the token is not there yet" and "could not scan anything" are
+                    // the same null to the caller, and the caller polls on it until a timeout. Only one of
+                    // those is worth waking someone for: a reset that never lands leaves the tenant-report
+                    // account half-rotated, which a re-run cannot repair.
+                    log.warn("None of the {} Redis seeds could be scanned for the password-reset token; "
+                            + "the token may exist and be unreachable rather than absent", seeds.size());
                 }
                 return null;
             }
