@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "openframe.integration.tool.enabled", havingValue = "true")
@@ -43,21 +45,27 @@ public class FleetMdmAgentRegistrationSecretRetriever implements ToolAgentRegist
 
     @Override
     public String getSecret() {
+        // Get the integrated tool configuration
+        Optional<IntegratedTool> integratedToolOptional = integratedToolService.getToolByKey(TOOL_ID);
+        IntegratedTool integratedTool = integratedToolOptional
+                .orElseThrow(() -> new IllegalStateException("Found no tool with id " + TOOL_ID));
+
+        Optional<ToolUrl> toolUrlOptional = toolUrlService.getUrlByToolType(integratedTool, ToolUrlType.API);
+        ToolUrl toolUrl = toolUrlOptional
+                .orElseThrow(() -> new IllegalStateException("Found no api url for tool with id" + TOOL_ID));
+
+        String toolUrlHost = toolUrl.getUrl();
+        int toolUrlPort = toolUrl.getPort();
+        String apiUrl = toolUrlHost + ":" + toolUrlPort;
+
+        String apiKey = integratedTool.getCredentials().getApiKey().getKey();
+        String apiToken = apiKey;
+
         try {
-            // Get the integrated tool configuration
-            IntegratedTool integratedTool = integratedToolService.getToolByKey(TOOL_ID)
-                    .orElseThrow(() -> new IllegalStateException("Found no tool with id " + TOOL_ID));
-            
-            ToolUrl toolUrl = toolUrlService.getUrlByToolType(integratedTool, ToolUrlType.API)
-                    .orElseThrow(() -> new IllegalStateException("Found no api url for tool with id" + TOOL_ID));
-
-            String apiUrl = toolUrl.getUrl() + ":" + toolUrl.getPort();
-            String apiToken = integratedTool.getCredentials().getApiKey().getKey();
-
             // Create Fleet MDM client and get enroll secret
             FleetMdmClient client = new FleetMdmClient(apiUrl, apiToken, tenantId);
             String enrollSecret = client.getEnrollSecret();
-            
+
             log.info("Successfully retrieved enroll secret from Fleet MDM");
             return enrollSecret;
         } catch (Exception e) {
