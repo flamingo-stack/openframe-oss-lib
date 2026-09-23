@@ -5,6 +5,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.MachineTagEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/v1/devices")
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "false", matchIfMissing = true)
 public class DevicePinotResyncController {
 
     private final MachineRepository machineRepository;
