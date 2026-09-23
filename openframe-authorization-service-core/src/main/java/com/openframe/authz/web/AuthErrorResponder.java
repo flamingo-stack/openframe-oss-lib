@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URLEncoder;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -30,13 +31,17 @@ public class AuthErrorResponder {
     private String authErrorUrl;
 
     public void send(HttpServletResponse response, HttpServletRequest request, String event, Exception e,
-                     String fallbackMessage) throws IOException {
+                     String fallbackMessage) {
         log.error("Auth failure [{}] event={} tenantId={} uri={} detail={}",
                 classify(e), event, TenantContext.getTenantId(),
                 request != null ? request.getRequestURI() : null, e.getMessage(), e);
 
         String message = hasText(e.getMessage()) ? e.getMessage() : fallbackMessage;
-        response.sendRedirect(authErrorUrl + "?error=" + URLEncoder.encode(message, UTF_8));
+        try {
+            response.sendRedirect(authErrorUrl + "?error=" + URLEncoder.encode(message, UTF_8));
+        } catch (IOException ioe) {
+            throw new UncheckedIOException(ioe);
+        }
     }
 
     private String classify(Exception e) {
