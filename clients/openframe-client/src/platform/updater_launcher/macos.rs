@@ -37,7 +37,9 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<LaunchedUpdater> {
 
     // Create a temporary plist to run the update script as a one-shot launchd job
     // This ensures the script survives when our service is stopped
-    let plist_path = std::env::temp_dir().join("com.openframe.updater.plist");
+    // Use a per-invocation filename to avoid races with concurrent update attempts
+    let plist_path =
+        std::env::temp_dir().join(format!("com.openframe.updater-{}.plist", Uuid::new_v4()));
 
     // Remove any leftover updater job from a previous failed update
     let _ = Command::new("launchctl")
@@ -70,7 +72,10 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<LaunchedUpdater> {
             &params.transcript_path.to_string_lossy(),
         );
 
-    std::fs::write(&plist_path, &plist_content).context("Failed to write updater plist")?;
+    if let Err(e) = std::fs::write(&plist_path, &plist_content) {
+        let _ = std::fs::remove_file(&script_path);
+        return Err(e).context("Failed to write updater plist");
+    }
 
     info!("Updater plist created at: {}", plist_path.display());
 
@@ -79,12 +84,29 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<LaunchedUpdater> {
         .arg("load")
         .arg(&plist_path)
         .output()
-        .context("Failed to load updater plist")?;
+        .context("Failed to load updater plist");
+
+    let output = match output {
+        Ok(output) => output,
+        Err(e) => {
+            let _ = std::fs::remove_file(&plist_path);
+            let _ = std::fs::remove_file(&script_path);
+            return Err(e).context("Failed to load updater plist");
+        }
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        let _ = std::fs::remove_file(&plist_path);
+        let _ = std::fs::remove_file(&script_path);
         return Err(anyhow!("Failed to load updater plist: {}", stderr));
     }
+
+    // The plist has served its purpose once loaded; launchd reads it once at load
+    // time and does not need the file to persist. Remove it now to avoid leaving
+    // stray files in /tmp. The script itself is still needed by the launchd job,
+    // so it is intentionally left for the job to execute and clean up.
+    let _ = std::fs::remove_file(&plist_path);
 
     info!("macOS bash updater launched via launchd");
 
