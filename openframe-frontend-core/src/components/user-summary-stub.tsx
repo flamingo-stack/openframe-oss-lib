@@ -79,6 +79,11 @@ const formatNumber = (n: number) => {
   return n.toLocaleString();
 };
 
+// Resolve the subtitle/email line: prefer a non-blank subtitle, then a
+// non-blank email, then a non-breaking space placeholder to preserve layout.
+const resolveSubtitle = (subtitle: string | null | undefined, email: string | null | undefined) =>
+  subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0';
+
 export function UserSummary({
   name,
   email,
@@ -133,13 +138,8 @@ export function UserSummary({
             {name}
             {mspPreview?.name && <span className="text-ods-text-secondary"> • {mspPreview.name}</span>}
           </p>
-          <p
-            className="truncate text-ods-text-secondary text-h6"
-            title={
-              subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'
-            }
-          >
-            {subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'}
+          <p className="truncate text-ods-text-secondary text-h6" title={resolveSubtitle(subtitle, email)}>
+            {resolveSubtitle(subtitle, email)}
           </p>
         </div>
       </div>
@@ -195,11 +195,9 @@ export function UserSummary({
             </p>
             <p
               className="truncate break-all text-ods-text-secondary text-h4"
-              title={
-                subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'
-              }
+              title={resolveSubtitle(subtitle, email)}
             >
-              {subtitle && subtitle.trim().length > 0 ? subtitle : email && email.trim().length > 0 ? email : '\u00A0'}
+              {resolveSubtitle(subtitle, email)}
             </p>
             {mspPreview &&
               (() => {
