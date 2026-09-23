@@ -34,15 +34,14 @@ public class DeviceHostInventoryLoader {
     private static final int SOFTWARE_FETCH_PAGE = 500;
     private static final int SOFTWARE_FETCH_CAP = 5000;
 
-    private final FleetMdmClientProvider fleetClientProvider;
     private final DeviceService deviceService;
     private final FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
 
-    public HostInventory load(String machineId) {
+    public HostInventory load(FleetMdmClient fleet, String machineId) {
         Machine machine = requireMachine(machineId);
-        return findHostId(machine)
-                .map(this::loadInventory)
+        return findHostId(fleet, machine)
+                .map(hostId -> loadInventory(fleet, hostId))
                 .orElseGet(HostInventory::empty);
     }
 
@@ -51,12 +50,12 @@ public class DeviceHostInventoryLoader {
                 .orElseThrow(() -> new NotFoundException("Device not found: " + machineId));
     }
 
-    private Optional<Long> findHostId(Machine machine) {
+    private Optional<Long> findHostId(FleetMdmClient fleet, Machine machine) {
         String lookupKey = firstNonBlank(machine.getOsUuid(), machine.getSerialNumber(), machine.getHostname());
         if (!hasText(lookupKey)) {
             return Optional.empty();
         }
-        List<Host> candidates = fleet().searchHosts(lookupKey);
+        List<Host> candidates = fleet.searchHosts(lookupKey);
         String tenantId = tenantIdProvider.getTenantId();
         Map<Long, Machine> machinesByHostId = hostMachineResolver.resolve(tenantId, candidates);
         Optional<Long> hostId = machinesByHostId.entrySet().stream()
@@ -73,17 +72,17 @@ public class DeviceHostInventoryLoader {
         return Objects.equals(candidate.getMachineId(), machine.getMachineId());
     }
 
-    private HostInventory loadInventory(long hostId) {
-        List<HostSoftwareTitle> titles = fetchAllTitles(hostId);
-        List<FleetSoftware> hostSoftware = fetchHostSoftware(hostId);
+    private static HostInventory loadInventory(FleetMdmClient fleet, long hostId) {
+        List<HostSoftwareTitle> titles = fetchAllTitles(fleet, hostId);
+        List<FleetSoftware> hostSoftware = fetchHostSoftware(fleet, hostId);
         return HostInventory.of(titles, hostSoftware);
     }
 
-    private List<HostSoftwareTitle> fetchAllTitles(long hostId) {
+    private static List<HostSoftwareTitle> fetchAllTitles(FleetMdmClient fleet, long hostId) {
         List<HostSoftwareTitle> all = new ArrayList<>();
         int page = 0;
         while (all.size() < SOFTWARE_FETCH_CAP) {
-            HostSoftwareResponse response = fleet().listHostSoftware(hostId, page, SOFTWARE_FETCH_PAGE);
+            HostSoftwareResponse response = fleet.listHostSoftware(hostId, page, SOFTWARE_FETCH_PAGE);
             if (isExhausted(response)) {
                 break;
             }
@@ -104,16 +103,12 @@ public class DeviceHostInventoryLoader {
         return response.getMeta() == null || !Boolean.TRUE.equals(response.getMeta().getHasNextResults());
     }
 
-    private List<FleetSoftware> fetchHostSoftware(long hostId) {
-        HostVulnerabilityInventory host = fleet().getHostVulnerabilityInventoryById(hostId);
+    private static List<FleetSoftware> fetchHostSoftware(FleetMdmClient fleet, long hostId) {
+        HostVulnerabilityInventory host = fleet.getHostVulnerabilityInventoryById(hostId);
         return hasSoftware(host) ? host.software() : List.of();
     }
 
     private static boolean hasSoftware(HostVulnerabilityInventory host) {
         return host != null && !isEmpty(host.software());
-    }
-
-    private FleetMdmClient fleet() {
-        return fleetClientProvider.client();
     }
 }

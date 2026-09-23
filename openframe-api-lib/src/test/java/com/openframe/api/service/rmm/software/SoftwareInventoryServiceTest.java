@@ -489,7 +489,7 @@ class SoftwareInventoryServiceTest {
     @Test
     void listSoftwareForDevice_emptyInventory_emptyPage() {
         // setup
-        when(deviceHostInventoryLoader.load(MACHINE_ID)).thenReturn(HostInventory.empty());
+        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.empty());
 
         // execution
         PageResult<SoftwareResponse> result =
@@ -511,11 +511,11 @@ class SoftwareInventoryServiceTest {
 
         // verifications
         assertThat(ex.getMessage()).contains("publisher").contains("Sortable fields");
-        verify(deviceHostInventoryLoader, never()).load(MACHINE_ID);
+        verify(deviceHostInventoryLoader, never()).load(fleet, MACHINE_ID);
     }
 
     private void stubInventory(List<HostSoftwareTitle> titles, List<FleetSoftware> hostSoftware) {
-        when(deviceHostInventoryLoader.load(MACHINE_ID)).thenReturn(HostInventory.of(titles, hostSoftware));
+        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.of(titles, hostSoftware));
     }
 
     private static SoftwareTitle titleWithCves(String name, int cveCount) {

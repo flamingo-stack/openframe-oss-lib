@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,7 +43,6 @@ class DeviceHostInventoryLoaderTest {
     private static final int FETCH_PAGE_SIZE = 500;
     private static final String CVE_A = "CVE-2024-0001";
 
-    @Mock private FleetMdmClientProvider fleetClientProvider;
     @Mock private FleetMdmClient fleet;
     @Mock private DeviceService deviceService;
     @Mock private FleetHostMachineResolver hostMachineResolver;
@@ -69,24 +69,24 @@ class DeviceHostInventoryLoaderTest {
         when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
 
         // execution
-        NotFoundException ex = assertThrows(NotFoundException.class, () -> loader.load(MACHINE_ID));
+        NotFoundException ex = assertThrows(NotFoundException.class, () -> loader.load(fleet, MACHINE_ID));
 
         // verifications
         assertThat(ex.getMessage()).contains(MACHINE_ID);
     }
 
     @Test
-    void load_machineWithoutFleetIdentifiers_emptyInventoryWithoutFleetSearch() {
+    void load_machineWithoutFleetIdentifiers_emptyInventoryWithoutFleetCalls() {
         // setup
         machine.setOsUuid(null);
         when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
 
         // execution
-        HostInventory inventory = loader.load(MACHINE_ID);
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
 
         // verifications
         assertThat(inventory.getTitles()).isEmpty();
-        verify(fleetClientProvider, never()).client();
+        verifyNoInteractions(fleet);
     }
 
     @Test
@@ -98,7 +98,7 @@ class DeviceHostInventoryLoaderTest {
         when(hostMachineResolver.resolve(TENANT_ID, List.of(host))).thenReturn(Map.of(HOST_ID, otherMachine));
 
         // execution
-        HostInventory inventory = loader.load(MACHINE_ID);
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
 
         // verifications
         assertThat(inventory.getTitles()).isEmpty();
@@ -114,7 +114,7 @@ class DeviceHostInventoryLoaderTest {
         stubHostDetails(hostSoftware("Google Chrome", "120.0", vulnerability(CVE_A, 9.8, null)));
 
         // execution
-        HostInventory inventory = loader.load(MACHINE_ID);
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
 
         // verifications
         assertThat(inventory.getTitles()).extracting(HostSoftwareTitle::getName).containsExactly("Google Chrome");
@@ -131,7 +131,7 @@ class DeviceHostInventoryLoaderTest {
         stubHostDetails();
 
         // execution
-        HostInventory inventory = loader.load(MACHINE_ID);
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
 
         // verifications
         assertThat(inventory.getTitles())
@@ -141,7 +141,6 @@ class DeviceHostInventoryLoaderTest {
 
     private void stubMachineLookup() {
         when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
-        when(fleetClientProvider.client()).thenReturn(fleet);
         when(fleet.searchHosts(OS_UUID)).thenReturn(List.of(host));
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
     }

@@ -268,7 +268,7 @@ public class SoftwareInventoryService {
                                                               String search, int page, Integer perPage,
                                                               SortInput sort) {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
-        HostInventory inventory = deviceHostInventoryLoader.load(machineId);
+        HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = inventory.getTitles().stream()
                 .map(title -> toDeviceSoftwareRow(title, inventory))
                 .filter(row -> matchesDeviceSoftwareFilter(row, filter))
