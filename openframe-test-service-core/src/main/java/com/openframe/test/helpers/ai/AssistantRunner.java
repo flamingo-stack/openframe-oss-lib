@@ -8,6 +8,7 @@ import com.openframe.test.data.dto.ai.SendMessageRequest;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 /**
@@ -51,17 +52,19 @@ public class AssistantRunner {
 
     /**
      * Anchor for the terminal-marker comparison. Uses the server-assigned createdAt of the user message;
-     * falls back to a slightly-in-the-past instant if the field is missing, to avoid clock-skew races
-     * that could hide a legitimately newer assistant reply.
+     * falls back to a slightly-in-the-past instant only if the field is missing entirely, to avoid clock-skew
+     * races that could hide a legitimately newer assistant reply. A malformed (non-null) createdAt is treated
+     * as a bug and fails loudly rather than being silently papered over.
      */
     private static Instant parseSentAt(String createdAt) {
-        if (createdAt != null && !createdAt.isBlank()) {
-            try {
-                return Instant.parse(createdAt);
-            } catch (Exception ignored) {
-                // fall through
-            }
+        if (createdAt == null || createdAt.isBlank()) {
+            return Instant.now().minusSeconds(5);
         }
-        return Instant.now().minusSeconds(5);
+        try {
+            return Instant.parse(createdAt);
+        } catch (DateTimeParseException e) {
+            throw new IllegalStateException("Malformed createdAt returned by server: " + createdAt, e);
+        }
     }
 }
+
