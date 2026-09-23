@@ -3,7 +3,7 @@
 import { Search, X, Plus, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../utils';
-import { Button } from '../ui';
+import { Button, Input } from '../ui';
 
 interface Tag {
   id: number;
@@ -139,7 +139,7 @@ export function TagsSelector({
           ))}
 
           {/* Search Input - Takes remaining space */}
-          <input
+          <Input
             type="text"
             value={searchQuery}
             onChange={e => {
