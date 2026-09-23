@@ -36,47 +36,12 @@ export interface ListPageLayoutProps {
 /**
  * @deprecated Use `PageLayout` from `'../layout/page-layout'` instead.
  *
- * Standardized Layout for List Pages
- *
- * A comprehensive layout component that provides 100% consistent structure
- * for all list-based pages throughout the OpenFrame application.
- *
- * ## Layout Structure:
- * ```
- * ┌─────────────────────────────────────────────────────────────┐
- * │ Title (left aligned)    │    Header Actions (right aligned) │
- * ├─────────────────────────────────────────────────────────────┤
- * │                 Search Bar (full width)                    │
- * ├─────────────────────────────────────────────────────────────┤
- * │                Table/Grid with Filters                     │
- * │                    (main content)                          │
- * └─────────────────────────────────────────────────────────────┘
- * ```
- *
- * ## Key Features:
- * - **Consistent Spacing**: All pages use identical padding and gaps
- * - **Responsive Design**: Works seamlessly across all screen sizes
- * - **Accessibility**: Proper semantic HTML and ARIA support
- * - **Error Handling**: Built-in error state display
- * - **Flexible Actions**: Supports any combination of buttons/controls
- * - **Search Integration**: Standardized search bar positioning
- *
- * ## Currently Used By:
- * - `/devices` - Device management with table/grid toggle
- * - `/logs-page` - Log analysis with refresh functionality
- * - `/scripts` - Script management with new/refresh actions
- * - `/mingo` tabs - Archive/current chats with filtering
- * - `/policies-and-queries` tabs - Policy management with refresh/new actions
- *
- * ## Design Tokens:
- * - Uses ODS design system tokens for consistent theming
- * - Maintains proper contrast ratios and accessibility standards
- * - Supports both light and dark mode themes
- *
- * ## Performance:
- * - Minimal re-renders through proper prop drilling
- * - Optimized for large datasets with virtualization support
- * - Built-in debouncing for search operations
+ * Thin compatibility shim retained for existing callers. This component is no
+ * longer independently maintained: it delegates its page chrome to
+ * `ListPageContainer` (which itself wraps the legacy container) and only owns
+ * the search bar + mobile filter behavior that has not yet been migrated to
+ * `PageLayout`/`TitleBlock`. Do not add new features here — migrate the
+ * caller to `PageLayout` instead.
  *
  * @example
  * ```tsx
