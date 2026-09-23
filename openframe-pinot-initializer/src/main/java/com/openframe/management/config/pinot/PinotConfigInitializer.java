@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -32,6 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Configuration
+@RequiredArgsConstructor
 public class PinotConfigInitializer {
 
     private final ResourceLoader resourceLoader;
@@ -55,13 +57,6 @@ public class PinotConfigInitializer {
             new PinotConfig("devices", "schema-devices.json", "table-config-devices.json", null),
             new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null)
     );
-
-    public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
-        this.resourceLoader = resourceLoader;
-        this.environment = environment;
-        this.restTemplate = new RestTemplate();
-        this.objectMapper = new ObjectMapper();
-    }
 
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
@@ -98,20 +93,21 @@ public class PinotConfigInitializer {
         try {
             String schemaConfig = resolvePlaceholders(loadResource(config.getSchemaFile()));
             String realtimeTableConfig = resolvePlaceholders(loadResource(config.getTableRealtimeConfigFile()));
+            String configName = config.getName();
 
-            deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + config.getName());
-            deployWithRetry(() -> deployTableConfig(realtimeTableConfig, config.getName()), "realtime table config for " + config.getName());
+            deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + configName);
+            deployWithRetry(() -> deployTableConfig(realtimeTableConfig, configName), "realtime table config for " + configName);
 
 
             if (config.getTableOfflineConfigFile() != null) {
                 String offlineTableConfig = resolvePlaceholders(loadResource(config.getTableOfflineConfigFile()));
-                deployWithRetry(() -> deployTableConfig(offlineTableConfig, config.getName()), "offline table config for " + config.getName());
+                deployWithRetry(() -> deployTableConfig(offlineTableConfig, configName), "offline table config for " + configName);
 
             }
 
-            deployWithRetry(() -> reloadSegments(realtimeTableConfig), "segment reload for " + config.getName());
+            deployWithRetry(() -> reloadSegments(realtimeTableConfig), "segment reload for " + configName);
 
-            log.info("Successfully deployed Pinot configuration for: {}", config.getName());
+            log.info("Successfully deployed Pinot configuration for: {}", configName);
 
         } catch (Exception e) {
             log.error("Failed to load Pinot configuration files for {}", config.getName(), e);
