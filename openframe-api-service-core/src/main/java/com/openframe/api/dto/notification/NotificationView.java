@@ -3,13 +3,27 @@ package com.openframe.api.dto.notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.ReadStatus;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.Map;
 
+@Data
 @Builder
-public record NotificationView(String id, NotificationSeverity severity, String title, String description,
-                               Instant createdAt, NotificationCategory category,
-                               String type, Map<String, String> attributes,
-                               boolean read, ReadStatus status)     {}
+@NoArgsConstructor
+@AllArgsConstructor
+public class NotificationView {
+    private String id;
+    private NotificationSeverity severity;
+    private String title;
+    private String description;
+    private Instant createdAt;
+    private NotificationCategory category;
+    private String type;
+    private Map<String, String> attributes;
+    private boolean read;
+    private ReadStatus status;
+}
