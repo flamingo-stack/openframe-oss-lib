@@ -87,7 +87,8 @@ public class KnowledgeBaseDataFetcher {
     public List<Tag> knowledgeBaseTags(@InputArgument String folderId,
                                        @InputArgument Boolean archived) {
         if (folderId != null) {
-            return knowledgeBaseService.getTagsInSubtree(RELAY.fromGlobalId(folderId).getId());
+            String rawFolderId = RELAY.fromGlobalId(folderId).getId();
+            return knowledgeBaseService.getTagsInSubtree(rawFolderId);
         }
         log.debug("Fetching all KB tags (archived={})", archived);
         return knowledgeBaseTagService.getAllTags(Boolean.TRUE.equals(archived));
