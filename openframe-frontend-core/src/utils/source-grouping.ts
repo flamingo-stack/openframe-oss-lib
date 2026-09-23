@@ -48,7 +48,7 @@ export function recordCountLabel(count: number): string {
 type GroupedItem = NonNullable<ChatSource['items']>[number];
 
 /** One row of a group. `index` is set only when the row was cited on its own
- *  (a flat MCP source); a server-grouped row shares the group's number. */
+ *  (a flat MCP source): a server-grouped row shares the group's number. */
 export type GroupedSourceRow = GroupedItem;
 
 /**
@@ -107,7 +107,7 @@ function typeOf(source: TableSource): string {
  *  row: no `id` or no type means Open-only, no Ask. */
 function joinsTableChip(source: ChatSource): source is TableSource {
   if (!source.sourceRepo) return false;
-  return groupsByTable(typeOf({ ...source, sourceRepo: source.sourceRepo }));
+  return groupsByTable(source.documentType || defaultDocumentTypeForTableId(source.sourceRepo) || '');
 }
 
 /** A source's dropdown rows: a grouped chip's own items, or the flat row itself. */
