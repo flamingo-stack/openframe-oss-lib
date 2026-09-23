@@ -149,12 +149,21 @@ class IntegrationControllerTest {
     }
 
     @Test
-    void proxyExceptionBecomes500WithItsMessage() throws Exception {
+    void proxyExceptionPropagatesForCentralHandlerToMap() throws Exception {
         when(restProxyService.proxyApiRequest(eq(TOOL_ID), any(), isNull()))
                 .thenThrow(new IllegalStateException("boom"));
 
-        mockMvc.perform(get("/tools/tactical-rmm/api/v1/agents"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(content().string("Internal server error: boom"));
+        try {
+            mockMvc.perform(get("/tools/tactical-rmm/api/v1/agents"));
+        } catch (Exception ex) {
+            Throwable cause = ex;
+            while (cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            assertEquals(IllegalStateException.class, cause.getClass());
+            assertEquals("boom", cause.getMessage());
+            return;
+        }
+        throw new AssertionError("Expected exception to propagate to a central exception handler");
     }
 }
