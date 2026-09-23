@@ -4,6 +4,7 @@ import { forwardRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { EyeIcon } from '../icons-v2-generated/interface/eye-icon';
 import { EyeOffIcon } from '../icons-v2-generated/interface/eye-off-icon';
+import { Button } from './button';
 import { Input, type InputProps } from './input';
 
 export type PasswordInputProps = Omit<InputProps, 'type' | 'endAdornment'>;
@@ -21,8 +22,10 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(({ disabl
       // Ellipsize an over-long password/value when the field isn't focused (per the mockup)
       className={cn('[&_input]:text-ellipsis', className)}
       endAdornment={
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           tabIndex={-1}
           disabled={disabled}
           aria-label={visible ? 'Hide password' : 'Show password'}
@@ -30,7 +33,7 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(({ disabl
           className="flex items-center text-ods-text-secondary transition-colors hover:text-ods-text-primary disabled:cursor-not-allowed"
         >
           <Icon className="h-6 w-6" />
-        </button>
+        </Button>
       }
       {...props}
     />
