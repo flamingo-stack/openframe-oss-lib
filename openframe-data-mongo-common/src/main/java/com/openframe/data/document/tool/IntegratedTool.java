@@ -8,6 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.List;
+import java.util.Optional;
 @Data
 @Builder
 @NoArgsConstructor
@@ -42,24 +43,26 @@ public class IntegratedTool implements TenantScoped {
     private String[] allowedEndpoints;
     private Object[] debeziumConnectors;
 
-    public String apiUrl() {
+    public Optional<String> apiUrl() {
         if (toolUrls == null || toolUrls.isEmpty()) {
-            throw new IllegalStateException("Integrated tool has no configured URLs: " + key);
+            return Optional.empty();
         }
-        ToolUrl api = toolUrls.stream()
+        return toolUrls.stream()
                 .filter(u -> u.getType() == ToolUrlType.API)
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Integrated tool has no API URL: " + key));
-        String port = api.getPort();
-        return (port == null || port.isBlank()) ? api.getUrl() : api.getUrl() + ":" + port;
+                .map(api -> {
+                    String port = api.getPort();
+                    return (port == null || port.isBlank()) ? api.getUrl() : api.getUrl() + ":" + port;
+                });
     }
 
-    public String apiToken() {
+    public Optional<String> apiToken() {
         ToolApiKey apiKey = credentials == null ? null : credentials.getApiKey();
         String value = apiKey == null ? null : apiKey.getKey();
         if (value == null || value.isBlank()) {
-            throw new IllegalStateException("Integrated tool has no API token configured: " + key);
+            return Optional.empty();
         }
-        return value;
+        return Optional.of(value);
     }
 }
+
