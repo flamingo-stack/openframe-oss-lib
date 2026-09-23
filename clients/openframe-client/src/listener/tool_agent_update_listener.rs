@@ -21,6 +21,12 @@ use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{error, info, warn};
 
+/// Upper bound on how many full retry cycles create_consumer() will attempt
+/// before giving up and surfacing a fatal error to its caller. This prevents
+/// a persistent misconfiguration (e.g. a permissions violation) from causing
+/// an infinite, silent retry loop.
+const CONSUMER_MAX_TOTAL_CYCLES: u32 = 20;
+
 #[derive(Clone)]
 pub struct ToolAgentUpdateListener {
     pub nats_connection_manager: NatsConnectionManager,
@@ -82,7 +88,7 @@ impl ToolAgentUpdateListener {
             let js = jetstream::new((*client).clone());
 
             let consumer = tokio::select! {
-                consumer = self.create_consumer(&js, &machine_id) => consumer,
+                consumer = self.create_consumer(&js, &machine_id) => consumer?,
                 _ = client_rx.changed() => {
                     info!("NATS client replaced, rebinding tool agent update consumer");
                     continue;
@@ -102,8 +108,7 @@ impl ToolAgentUpdateListener {
                                 }
                             }
                             Some(Err(e)) => {
-                                error!("Message stream error, recreating consumer: {:#}", e);
-                                return Err(anyhow::anyhow!("Message stream error: {}", e));
+                                warn!("Message decode/stream error, skipping message: {:#}", e);
                             }
                             None => {
                                 warn!("Message stream ended, rebinding consumer");
@@ -125,7 +130,11 @@ impl ToolAgentUpdateListener {
                             let mut client_rx = client_rx.clone();
                             tokio::spawn(async move {
                                 tokio::select! {
-                                    _ = listener.create_consumer(&js, &machine_id) => {}
+                                    result = listener.create_consumer(&js, &machine_id) => {
+                                        if let Err(e) = result {
+                                            error!("Failed to re-provision tool agent update consumer: {:#}", e);
+                                        }
+                                    }
                                     _ = client_rx.changed() => {}
                                 }
                                 reprovisioning.store(false, Ordering::SeqCst);
@@ -203,7 +212,7 @@ impl ToolAgentUpdateListener {
         }
     }
 
-    async fn create_consumer(&self, js: &jetstream::Context, machine_id: &str) -> PushConsumer {
+    async fn create_consumer(&self, js: &jetstream::Context, machine_id: &str) -> Result<PushConsumer> {
         let consumer_configuration = Self::build_consumer_configuration(machine_id);
         let mut cycle = 0u32;
 
@@ -226,7 +235,7 @@ impl ToolAgentUpdateListener {
                 {
                     Ok(consumer) => {
                         info!("Consumer created for stream: {}", Self::STREAM_NAME);
-                        return consumer;
+                        return Ok(consumer);
                     }
                     Err(e) => {
                         let error_msg = format!("{:?}", e);
@@ -243,7 +252,7 @@ impl ToolAgentUpdateListener {
                                     "Retrieved existing consumer for stream: {}",
                                     Self::STREAM_NAME
                                 );
-                                return existing_consumer;
+                                return Ok(existing_consumer);
                             }
                         }
 
@@ -270,6 +279,19 @@ impl ToolAgentUpdateListener {
                         }
                     }
                 }
+            }
+
+            if cycle >= CONSUMER_MAX_TOTAL_CYCLES {
+                error!(
+                    "Exceeded maximum retry cycles ({}) creating consumer for stream {}. Giving up.",
+                    CONSUMER_MAX_TOTAL_CYCLES,
+                    Self::STREAM_NAME
+                );
+                return Err(anyhow::anyhow!(
+                    "Failed to create consumer for stream {} after {} cycles",
+                    Self::STREAM_NAME,
+                    CONSUMER_MAX_TOTAL_CYCLES
+                ));
             }
 
             info!(
