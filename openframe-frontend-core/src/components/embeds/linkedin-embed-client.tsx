@@ -2,6 +2,7 @@
 
 import { ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Button } from '../ui/button';
 import { LinkedinIcon } from '../icons-v2-generated/brand-logos/linkedin-icon';
 import { LinkedInContainer } from './embed-container';
 
@@ -11,9 +12,21 @@ import { LinkedInContainer } from './embed-container';
  * URN can be derived, so the component falls back to a link instead of a broken
  * (X-Frame-blocked) iframe.
  */
+function isLinkedInEmbedUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host !== 'linkedin.com' && !host.endsWith('.linkedin.com')) return false;
+    return parsed.pathname.includes('/embed/');
+  } catch {
+    return false;
+  }
+}
+
 function toLinkedInEmbedUrl(url: string): string {
   if (!url) return '';
-  if (url.includes('linkedin.com/embed/')) return url.split('?')[0];
+  if (isLinkedInEmbedUrl(url)) return url.split('?')[0];
   let m = url.match(/urn:li:(activity|share|ugcPost):(\d+)/i);
   if (m) return `https://www.linkedin.com/embed/feed/update/urn:li:${m[1]}:${m[2]}`;
   m = url.match(/activity[-:](\d{15,25})/i);
@@ -42,15 +55,12 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
             <LinkedinIcon className="h-5 w-5 shrink-0" />
             <span>LinkedIn post</span>
           </div>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center space-x-2 rounded-md border border-ods-border bg-ods-card px-4 py-2 text-ods-text-primary transition-colors text-h6 hover:bg-ods-bg-hover"
-          >
-            <LinkedinIcon className="h-4 w-4" />
-            <span>View on LinkedIn</span>
-          </a>
+          <Button asChild variant="outline">
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <LinkedinIcon className="h-4 w-4" />
+              <span>View on LinkedIn</span>
+            </a>
+          </Button>
         </div>
       </LinkedInContainer>
     );
