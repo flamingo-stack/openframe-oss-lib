@@ -70,7 +70,6 @@ export function useLocalStorage<T>(
       const next = storage.load();
       isFromStorageEvent.current = true;
       setStoredValue(next ?? initialValueRef.current);
-      console.log(`🔄 ${next === null ? 'Cleared' : 'Updated'} localStorage key "${key}" from ${source}`);
     };
 
     const handleStorageChange = (e: StorageEvent) => {
@@ -121,3 +120,4 @@ export function useLocalStorage<T>(
 
   return [storedValue, setValue];
 }
+
