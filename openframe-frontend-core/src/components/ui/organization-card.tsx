@@ -4,6 +4,7 @@ import { Monitor } from 'lucide-react';
 import type React from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
+import { Button } from './button';
 import { EntityImage } from './entity-image';
 
 export interface Organization {
@@ -81,9 +82,9 @@ export function OrganizationCard({
 
       {/* Action button (top-right) - only if no device count */}
       {!deviceCount && showActionButton && actionButton && (
-        <button
+        <Button
           className={cn(
-            'absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded transition-colors',
+            'absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded p-0 transition-colors',
             actionButton.variant === 'primary'
               ? 'bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover'
               : 'text-ods-text-secondary hover:bg-ods-error-secondary hover:text-ods-error',
@@ -93,7 +94,7 @@ export function OrganizationCard({
           aria-label={actionButton.label}
         >
           {actionButton.icon}
-        </button>
+        </Button>
       )}
 
       {/* Header */}
