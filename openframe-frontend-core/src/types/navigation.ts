@@ -165,6 +165,14 @@ export interface NavigationSidebarItem {
   icon: React.ReactNode;
   path?: string;
   unreadCount?: number;
+  /**
+   * A stamp after the label — "Beta" on a module still behind a flag. One short
+   * word: every surface draws it at the badge scale, and in the 56px rail, where
+   * the label is gone, the word under the glyph is all the row has room for.
+   * Cased as it should be read ("Beta"): the surfaces upper-case it themselves,
+   * and the row's accessible name becomes "Devices (Beta)".
+   */
+  badge?: string;
   isActive?: boolean;
   onClick?: () => void;
   children?: NavigationSidebarItem[];

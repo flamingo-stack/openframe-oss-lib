@@ -4,6 +4,7 @@ import { cloneElement, memo, type ReactElement, type ReactNode, type MouseEvent 
 import Link from '../../embed-shims/next-link';
 import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
+import { NavigationItemBadge } from './navigation-item-badge';
 import { UnreadDot } from './unread-dot';
 
 interface IconProps {
@@ -50,6 +51,9 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
 }: NavigationSidebarItemButtonProps) {
   const unreadCount = item.unreadCount ?? 0;
   const hasUnread = unreadCount > 0;
+  // The accessible name carries the stamp — "Devices (Beta)" — because `aria-label`
+  // replaces the content; the rail's tooltip is the same string.
+  const name = item.badge ? `${item.label} (${item.badge})` : item.label;
 
   const className = cn(
     // `isolate` scopes the hover layer's negative z-index to this row, so it
@@ -90,22 +94,52 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
 
   const content: ReactNode = (
     <>
-      <div className="relative flex flex-shrink-0 items-center justify-center">
+      {/* In the rail a stamped row is glyph over word, centred as one stack: a
+          24px glyph, an xxs gap and the 12px word make 40px in the 56px row, so
+          the glyph rises 8px and the word sits 8px off the bottom. The glyph
+          moves by transform on the label's clock, so a collapse slides it up as
+          the word fades in; nothing moves in the expanded row. */}
+      <div
+        className={cn(
+          'relative flex flex-shrink-0 items-center justify-center transition-transform duration-300',
+          item.badge && !showLabel && '-translate-y-[var(--spacing-system-xsf)]',
+        )}
+      >
         {cloneElement(item.icon as ReactElement<IconProps>, {
           color: isActive && !disabled ? 'text-ods-accent' : 'text-ods-text-secondary',
         })}
         {hasUnread && !showLabel && <UnreadDot size="fixed" />}
       </div>
 
+      {/* The label column: the label and its stamp, fading together on collapse.
+          The wrapper clips — a `shrink-0` stamp beside a zero-width label would
+          otherwise overflow the rail and hand the sidebar a horizontal scrollbar. */}
       <span
         className={cn(
-          'flex-1 truncate text-left transition-[opacity,margin-left] duration-300 text-h4',
+          'flex min-w-0 flex-1 items-center overflow-hidden text-left transition-[opacity,margin-left] duration-300',
           showLabel ? 'ml-[var(--spacing-system-xs)] opacity-100' : 'ml-0 opacity-0',
         )}
         aria-hidden={!showLabel}
       >
-        {item.label}
+        <span className="min-w-0 truncate text-h4">{item.label}</span>
+        {item.badge && <NavigationItemBadge label={item.badge} className="ml-[var(--spacing-system-xs)] shrink-0" />}
       </span>
+
+      {/* The rail's stamp: the lower half of the stack above. Absolutely
+          positioned so it takes no room in the expanded row, and fading opposite
+          the label on the same clock, so a collapse hands the word from one
+          place to the other. */}
+      {item.badge && (
+        <NavigationItemBadge
+          bare
+          label={item.badge}
+          aria-hidden
+          className={cn(
+            'pointer-events-none absolute inset-x-0 bottom-[var(--spacing-system-xsf)] transition-opacity duration-300',
+            showLabel ? 'opacity-0' : 'opacity-100',
+          )}
+        />
+      )}
 
       {hasUnread && showLabel && (
         <span className="flex size-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent p-2">
@@ -117,8 +151,8 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
 
   const shared = {
     className,
-    title: !showLabel ? item.label : undefined,
-    'aria-label': item.label,
+    title: !showLabel ? name : undefined,
+    'aria-label': name,
     'aria-current': isActive ? ('page' as const) : undefined,
   };
 
