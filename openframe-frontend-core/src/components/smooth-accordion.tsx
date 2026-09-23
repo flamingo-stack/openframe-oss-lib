@@ -67,12 +67,15 @@ export const SmoothAccordionContent = forwardRef<
   const [maxHeight, setMaxHeight] = useState<number>(0);
   const contentInnerRef = useRef<HTMLDivElement | null>(null);
 
-  const composedRef = (node: HTMLDivElement) => {
-    // Allow Radix to receive ref as well
-    if (typeof ref === 'function') ref(node);
-    else if (ref) ref.current = node;
-    contentInnerRef.current = node;
-  };
+  const composedRef = useCallback(
+    (node: HTMLDivElement) => {
+      // Allow Radix to receive ref as well
+      if (typeof ref === 'function') ref(node);
+      else if (ref) ref.current = node;
+      contentInnerRef.current = node;
+    },
+    [ref],
+  );
 
   const updateHeight = useCallback(() => {
     if (contentInnerRef.current) {
