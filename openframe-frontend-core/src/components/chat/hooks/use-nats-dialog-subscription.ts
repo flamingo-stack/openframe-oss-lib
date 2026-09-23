@@ -263,8 +263,8 @@ export function useNatsDialogSubscription({
           const dataStr = decoder.decode(msg.data);
           const parsed: unknown = JSON.parse(dataStr);
           onEventRef.current(parsed, messageType);
-        } catch {
-          // Ignore parse errors
+        } catch (err) {
+          console.warn('[NATS] failed to parse message payload:', err);
         }
       };
 
@@ -329,8 +329,8 @@ export function useNatsDialogSubscription({
           const dataStr = decoder.decode(msg.data);
           const parsed: unknown = JSON.parse(dataStr);
           onEventRef.current(parsed, messageType);
-        } catch {
-          // Ignore parse errors
+        } catch (err) {
+          console.warn('[NATS] failed to parse message payload:', err);
         }
       };
 
