@@ -27,7 +27,8 @@ export interface PositiveIntOptions {
  * accepts `'12'`, `12`, `'12.9'` (→ 12) and `'0x10'` (→ 16), and rejects `'12abc'`
  * and `'abc'` (`NaN`) — the historical `parseInt` accepted `'12abc'` as 12 and
  * produced `NaN` for `'abc'`. A value below `min` falls back. The RESULT (parsed
- * value or fallback alike) is clamped to `max`, so "never exceeds max" has one owner.
+ * value or fallback alike) is clamped to `min` and `max`, so "never below min,
+ * never above max" has one owner.
  */
 export function positiveInt<TFallback = number>(
   raw: string | number | null | undefined,
@@ -36,8 +37,14 @@ export function positiveInt<TFallback = number>(
 ): number | TFallback {
   // The fallback is returned AS GIVEN — capping only ever applies to a value
   // parsed out of the input, so a caller with no default (`null`) gets its
-  // sentinel back untouched instead of `Math.min(null, max)`.
-  const capped = (v: number) => (max == null ? v : Math.min(v, max));
+  // sentinel back untouched instead of `Math.min(null, max)`. When the
+  // fallback IS a number, it is clamped the same way a parsed value would be
+  // (floor at `min`, ceiling at `max`), so a caller can't slip an
+  // out-of-range default past the same contract the parsed branch enforces.
+  const capped = (v: number) => {
+    const floored = Math.max(v, min);
+    return max == null ? floored : Math.min(floored, max);
+  };
   if (raw === null || raw === undefined || raw === '') {
     return typeof fallback === 'number' ? capped(fallback) : fallback;
   }
