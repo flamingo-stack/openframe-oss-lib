@@ -142,8 +142,9 @@ PaginationItem.displayName = 'PaginationItem';
 const PaginationLink = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(
   ({ className, ...props }, ref) => {
     return (
-      <button
+      <Button
         ref={ref}
+        variant="outline"
         className={cn(
           'inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background transition-colors text-h6 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           className,
