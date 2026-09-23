@@ -146,6 +146,8 @@ public class RemoteDesktopPage {
     };
 
     // Short on purpose: the gate renders with the page or not at all, and stage and prod pay this.
+    /** Same budget as the other MeshCentral session waits — a painting canvas is the session working. */
+    private static final int DESKTOP_PAINT_MS = 60_000;
     private static final int GATE_PROBE_MS = 5_000;
 
     private static final int GATE_SETTLE_MS = 20_000;
@@ -207,7 +209,8 @@ public class RemoteDesktopPage {
     }
 
     public boolean waitForDesktop() {
-        page.waitForCondition(this::canvasIsNotBlank);
+        page.waitForCondition(this::canvasIsNotBlank,
+                new Page.WaitForConditionOptions().setTimeout(DESKTOP_PAINT_MS));
         return true;
     }
 

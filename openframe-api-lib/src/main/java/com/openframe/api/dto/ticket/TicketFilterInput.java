@@ -1,6 +1,6 @@
 package com.openframe.api.dto.ticket;
 
-import com.openframe.data.document.ticket.TicketStatus;
+import com.openframe.data.document.ticket.filter.TicketActivityFilter;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,9 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TicketFilterInput {
-    @Size(max = 5)
-    private List<TicketStatus> statuses;
-    /** Filter by custom status ids. */
+    /** Filter by lifecycle status ids. */
     @Size(max = 50)
     private List<String> statusIds;
     @Size(max = 50)
@@ -25,8 +23,10 @@ public class TicketFilterInput {
     private List<String> assigneeIds;
     @Size(max = 20)
     private List<String> tagIds;
-    /** true keeps only tickets the caller has unread notifications about; false and null do not filter. */
+    /** true keeps only tickets with client-chat messages the caller has not read; false and null do not filter. */
     private Boolean hasUnreadNotifications;
+    @Size(max = 3)
+    private List<TicketActivityFilter> activity;
     //TODO Backward compatibility alias. Remove after FE alignment
     @Deprecated
     private List<String> labelIds;

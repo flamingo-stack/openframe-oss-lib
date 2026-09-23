@@ -25,6 +25,10 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-mongo-sync</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-redis</artifactId>
+        </dependency>
 
         <!-- OpenFrame Dependencies -->
         <dependency>
@@ -34,6 +38,10 @@
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-pinot</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-loki</artifactId>
         </dependency>
 
         <!-- Spring Framework -->
@@ -93,6 +101,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

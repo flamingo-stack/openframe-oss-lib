@@ -7,6 +7,7 @@ import com.openframe.test.data.dto.script.*;
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.test.api.graphql.ScriptQueries.RUN_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.ARCHIVE_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.CREATE_SCRIPT;
 import static com.openframe.test.api.graphql.ScriptQueries.DELETE_SCRIPT;
@@ -101,6 +102,24 @@ public class ScriptApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath().getObject("data.unarchiveScript", Script.class);
+    }
+
+    /**
+     * Dispatch a saved script to one machine and return the executionId Fleet correlates the agent's
+     * asynchronous result by. Nothing is persisted by the call itself — the row this produces in the
+     * script's history arrives once the agent reports, so a caller asserting on history must poll.
+     */
+    public static String runScript(String machineId, String scriptId, String privilegeLevel) {
+        Map<String, Object> input = Map.of(
+                "machineId", machineId,
+                "scriptId", scriptId,
+                "privilegeLevel", privilegeLevel
+        );
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", RUN_SCRIPT, "variables", Map.of("input", input)))
+                .post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getString("data.runScript.executionId");
     }
 
     /** Execution history of one script, newest first. */

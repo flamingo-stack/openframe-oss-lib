@@ -1,7 +1,11 @@
 package com.openframe.api.service;
 
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.event.DeviceNicknameUpdatedEvent;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.device.DeviceService;
@@ -22,13 +26,17 @@ import com.openframe.data.service.machine.MachineWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
 import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
@@ -37,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -59,11 +68,14 @@ class DeviceServiceTest {
     @Mock private DeviceFilterOptionMapper deviceFilterOptionMapper;
     @Mock
     private TenantIdProvider tenantIdProvider;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, deviceOnlineDispatchRepository, machineWriter,
                 tagRepository, tagAssignmentRepository,
-                deviceStatusProcessor, scheduleScriptDeviceService, deviceFilterOptionMapper, tenantIdProvider);
+                deviceStatusProcessor, scheduleScriptDeviceService, deviceFilterOptionMapper, tenantIdProvider,
+                eventPublisher);
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         lenient().when(machineRepository.countMachines(any(), any(MachineQueryFilter.class), any())).thenReturn(0L);
         lenient().when(machineRepository.findMachinesWithCursor(any(), any(MachineQueryFilter.class), any(),
@@ -370,6 +382,31 @@ class DeviceServiceTest {
     }
 
     @Test
+    @DisplayName("updateNickname: publishes the invalidation event for the renamed machine once the write succeeded")
+    void updateNickname_publishesInvalidationEventAfterWrite() {
+        DeviceService s = service();
+        stubAtomicNicknameUpdate("m1");
+
+        s.updateNickname("m1", "Reception iMac");
+
+        ArgumentCaptor<DeviceNicknameUpdatedEvent> captor = ArgumentCaptor.forClass(DeviceNicknameUpdatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getMachineId()).isEqualTo("m1");
+    }
+
+    @Test
+    @DisplayName("updateNickname: an unknown device fails before anything is published — nothing to invalidate")
+    void updateNickname_unknownDevice_doesNotPublish() {
+        DeviceService s = service();
+        when(machineWriter.update(eq("m1"), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> s.updateNickname("m1", "Reception iMac"))
+                .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
     @DisplayName("updateNickname: a blank value clears the nickname (stored as null)")
     void updateNickname_blankClears() {
         DeviceService s = service();
@@ -398,5 +435,74 @@ class DeviceServiceTest {
         assertThatThrownBy(() -> s.updateNickname("nope", "x"))
                 .isInstanceOf(DeviceNotFoundException.class);
         verify(machineRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "3, 2, 2, true",
+            "2, 2, 2, false",
+            "1, 2, 1, false",
+            "0, 2, 0, false"
+    })
+    void queryDevices_rowsReturnedAgainstLimit_pageTrimmedAndNextPageFlagged(
+            int returned, int limit, int expectedItems, boolean expectedHasNextPage) {
+        DeviceService s = service();
+        when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                isNull(), eq(limit + 1), isNull(), eq("DESC"))).thenReturn(machinesWithIds(returned));
+
+        CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(limit, null), null, null);
+
+        assertThat(result.getItems()).hasSize(expectedItems);
+        assertThat(result.getPageInfo().isHasNextPage()).isEqualTo(expectedHasNextPage);
+    }
+
+    @Test
+    void queryDevices_moreRowsThanLimit_endCursorIsLastShownRowNotProbeRow() {
+        DeviceService s = service();
+        when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                isNull(), eq(3), isNull(), eq("DESC"))).thenReturn(machinesWithIds(3));
+
+        CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(2, null), null, null);
+
+        assertThat(result.getItems()).extracting(Machine::getId).containsExactly("id-1", "id-2");
+        assertThat(result.getPageInfo())
+                .returns(CursorCodec.encode("id-1"), PageInfo::getStartCursor)
+                .returns(CursorCodec.encode("id-2"), PageInfo::getEndCursor);
+    }
+
+    @Test
+    void queryDevices_noRows_noCursorsAndNoNextPage() {
+        DeviceService s = service();
+
+        CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(2, null), null, null);
+
+        assertThat(result.getItems()).isEmpty();
+        assertThat(result.getPageInfo())
+                .returns(false, PageInfo::isHasNextPage)
+                .returns(null, PageInfo::getStartCursor)
+                .returns(null, PageInfo::getEndCursor);
+    }
+
+    @Test
+    void queryDevices_cursorGiven_hasPreviousPage() {
+        DeviceService s = service();
+        when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                eq("id-0"), eq(3), isNull(), eq("DESC"))).thenReturn(machinesWithIds(1));
+
+        CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(2, "id-0"), null, null);
+
+        assertThat(result.getPageInfo().isHasPreviousPage()).isTrue();
+    }
+
+    private static CursorPaginationCriteria page(int limit, String cursor) {
+        return CursorPaginationCriteria.builder().limit(limit).cursor(cursor).build();
+    }
+
+    private static List<Machine> machinesWithIds(int count) {
+        return IntStream.rangeClosed(1, count).mapToObj(i -> {
+            Machine m = new Machine();
+            m.setId("id-" + i);
+            return m;
+        }).toList();
     }
 }

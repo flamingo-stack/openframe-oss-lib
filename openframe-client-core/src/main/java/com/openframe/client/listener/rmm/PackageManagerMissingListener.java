@@ -10,11 +10,13 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import io.nats.client.Connection;
 import io.nats.client.Message;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 
 @Component
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @Slf4j
 public class PackageManagerMissingListener extends AbstractJetStreamPushListener {
 

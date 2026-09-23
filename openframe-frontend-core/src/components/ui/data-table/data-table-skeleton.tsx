@@ -26,6 +26,16 @@ export const ROW_HEIGHT_MOBILE = 'h-[66px]';
  */
 export const ROW_SHELL_CLASSES = 'items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]';
 
+/**
+ * The column every row slot stacks in, and the gap between two of them.
+ *
+ * One constant for the same reason as `ROW_SHELL_CLASSES`: the body's rows, its
+ * loading skeleton and the infinite footer's fallback skeleton all stack here,
+ * and the footer used to stack in nothing at all — its placeholder rows were
+ * bare children of the table root, touching each other.
+ */
+export const ROW_STACK_CLASSES = 'flex w-full flex-col gap-[var(--spacing-system-xsf)]';
+
 export interface DataTableSkeletonProps {
   rows?: number;
   className?: string;
@@ -128,19 +138,27 @@ export function ReservedEmptyState({
   innerHeightClassName?: string;
   children: ReactNode;
 }) {
+  // ONE grid cell holds both layers, so the box is as tall as the TALLER of
+  // the two: a short reservation (three compact rows) never clips the empty
+  // state, and a tall one still reserves its slots. The former absolute
+  // overlay took no height of its own, so a message taller than the slots
+  // spilled out of the host's horizontal scroller and grew it a vertical
+  // scrollbar — the header scrolled away inside a section.
   return (
-    <div className={cn('relative flex w-full flex-col', gapClassName)}>
-      <PlaceholderRows
-        count={count}
-        rowHeightClassName={rowHeightClassName}
-        innerHeightClassName={innerHeightClassName}
-      />
+    <div className="grid w-full">
+      <div className={cn('flex w-full flex-col [grid-area:1/1]', gapClassName)}>
+        <PlaceholderRows
+          count={count}
+          rowHeightClassName={rowHeightClassName}
+          innerHeightClassName={innerHeightClassName}
+        />
+      </div>
       {/* `sticky left-0` + `w-screen max-w-full`: hosts wrap tables in a
           horizontal scroller with a forced min-width, and an overlay centred on
           that CANVAS puts the message off-screen on a phone. This centres it on
           the visible area instead, and collapses to plain centring when the
           table is not wider than its container. */}
-      <div className="absolute inset-0 flex items-center">
+      <div className="flex items-center [grid-area:1/1]">
         <div className="sticky left-0 flex w-screen max-w-full justify-center">{children}</div>
       </div>
     </div>

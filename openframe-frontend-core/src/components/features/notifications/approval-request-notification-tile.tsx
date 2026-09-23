@@ -19,6 +19,8 @@ export interface ApprovalRequestNotificationTileProps {
   liveDurationMs?: number;
   defaultExpanded?: boolean;
   className?: string;
+  /** Title lines before the ellipsis — see `NotificationTileProps.titleLines`. */
+  titleLines?: 1 | 2;
 }
 
 export function ApprovalRequestNotificationTile({
@@ -30,6 +32,7 @@ export function ApprovalRequestNotificationTile({
   liveDurationMs,
   defaultExpanded = false,
   className,
+  titleLines,
 }: ApprovalRequestNotificationTileProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   // Toggling the command section pins the tile so a live pop-up doesn't
@@ -83,6 +86,7 @@ export function ApprovalRequestNotificationTile({
       onComplete={onComplete}
       onSettle={onSettle}
       className={className}
+      titleLines={titleLines}
       paused={pinned || processing}
       actions={
         <div className="flex w-full items-center gap-[var(--spacing-system-xs)]">

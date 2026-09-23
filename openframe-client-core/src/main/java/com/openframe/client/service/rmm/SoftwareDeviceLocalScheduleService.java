@@ -8,7 +8,6 @@ import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.script.ScriptStatus;
-import com.openframe.data.nats.publisher.MachineTimezoneRequestNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
@@ -16,8 +15,8 @@ import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -43,7 +42,6 @@ public class SoftwareDeviceLocalScheduleService {
     private final MachineRepository machineRepository;
     private final ScheduleDeviceLocalDispatchRepository dispatchRepository;
     private final SoftwareScheduleFireDispatcher fireDispatcher;
-    private final MachineTimezoneRequestNatsPublisher timezoneRequestPublisher;
 
     @Value("${openframe.rmm.schedule.device-local.catchup-seconds}")
     private long catchupSeconds;
@@ -110,12 +108,10 @@ public class SoftwareDeviceLocalScheduleService {
         if (repeat == null && DeviceLocalOccurrence.isHandled(sentinel)) {
             return;
         }
-        timezoneRequestPublisher.request(machineId, schedule.getId());
 
         String zoneId = machine.getTimezone();
         if (isBlank(zoneId)) {
-            log.info("DEVICE_LOCAL software scheduleId={} machineId={} has no known timezone yet — requested, deferring",
-                    schedule.getId(), machineId);
+            log.info("DEVICE_LOCAL software scheduleId={} machineId={} has no reported timezone yet — skipping this tick", schedule.getId(), machineId);
             return;
         }
         ZoneId zone = parseZone(schedule, machineId, zoneId);
@@ -185,7 +181,7 @@ public class SoftwareDeviceLocalScheduleService {
     }
 
     private List<String> resolveTargets(SoftwareSchedule schedule) {
-        return targetResolver.resolveMachineIds(schedule.getTenantId(), schedule.getId());
+        return targetResolver.resolveMachineIds(schedule);
     }
 
     private ZoneId parseZone(SoftwareSchedule schedule, String machineId, String zoneId) {

@@ -314,8 +314,10 @@ export function MingoWelcome({
           squeezing the composer. `pauseOnHover` freezes the hovered row so a
           moving chip never dodges a click; hover/focus previews the action's
           full prompt in the composer. */}
+          {/* The standalone chip sits one WALL PITCH above the wall, so it reads
+              as that wall's first row rather than a separate control. */}
           {(onStartGuideChat || (quickActions && quickActions.length > 0)) && (
-            <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xsf)]">
+            <div className="flex shrink-0 flex-col gap-[var(--chip-wall-gap)]">
               {onStartGuideChat && (
                 <QuickActionChipButton
                   label="Start Guide Chat"

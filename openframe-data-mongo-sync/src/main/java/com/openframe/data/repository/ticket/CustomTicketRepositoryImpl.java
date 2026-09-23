@@ -1,8 +1,9 @@
 package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
+import com.openframe.data.document.ticket.filter.TicketActivityCriteria;
+import com.openframe.data.document.ticket.filter.TicketActivityFilter;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
@@ -11,6 +12,7 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.BasicQuery;
@@ -20,8 +22,10 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +59,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_RESOLVED_AT = "resolvedAt";
     private static final String FIELD_ORDER = "order";
+    private static final String FIELD_LAST_ACTIVITY_AT = "lastActivityAt";
+    private static final String FIELD_AWAITING_CLIENT_SINCE = "awaitingClientSince";
 
     private static final String CASE_INSENSITIVE = "i";
 
@@ -73,6 +79,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             FIELD_CREATED_AT,
             FIELD_UPDATED_AT,
             FIELD_RESOLVED_AT,
+            FIELD_LAST_ACTIVITY_AT,
             FIELD_ORDER
     );
 
@@ -87,7 +94,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
 
         if (filter != null) {
             addCriteriaIfNotEmpty(query, FIELD_TICKET_NUMBER, filter.getTicketNumbers());
-            addCriteriaIfNotEmpty(query, FIELD_STATUS, filter.getStatuses());
             addCriteriaIfNotEmpty(query, FIELD_STATUS_ID, filter.getStatusIds());
             addCriteriaIfNotEmpty(query, FIELD_STATUS_KIND, filter.getStatusKinds());
             addCriteriaIfNotEmpty(query, FIELD_ORGANIZATION_ID, filter.getOrganizationIds());
@@ -95,6 +101,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             addCriteriaIfNotEmpty(query, FIELD_DEVICE_ID, filter.getDeviceIds());
             addCriteriaIfNotEmpty(query, FIELD_CREATION_SOURCE, filter.getCreationSources());
             applyCreatedAtRange(query, filter.getCreatedAtFrom(), filter.getCreatedAtTo());
+            applyActivityCriteria(query, filter.getActivity());
         }
 
         if (restrictToTicketIds != null) {
@@ -174,6 +181,59 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             criteria = criteria.lt(to);
         }
         query.addCriteria(criteria);
+    }
+
+    private void applyActivityCriteria(Query query, TicketActivityCriteria activity) {
+        if (activity == null || activity.isEmpty()) {
+            return;
+        }
+        List<Criteria> clauses = new ArrayList<>();
+        if (activity.has(TicketActivityFilter.STALE)) {
+            clauses.addAll(thresholdClauses(activity, true));
+        }
+        if (activity.has(TicketActivityFilter.ACTIVE)) {
+            clauses.addAll(thresholdClauses(activity, false));
+        }
+        if (activity.has(TicketActivityFilter.AWAITING_EXTERNAL)) {
+            clauses.add(Criteria.where(FIELD_AWAITING_CLIENT_SINCE).ne(null));
+        }
+        if (clauses.isEmpty()) {
+            return;
+        }
+        query.addCriteria(new Criteria().orOperator(clauses.toArray(new Criteria[0])));
+    }
+
+    private List<Criteria> thresholdClauses(TicketActivityCriteria activity, boolean stale) {
+        List<Criteria> clauses = new ArrayList<>();
+        Map<String, Instant> byStatus = activity.staleCutoffByStatusId();
+
+        if (byStatus != null && !byStatus.isEmpty()) {
+            Map<Instant, List<String>> statusesByCutoff = new LinkedHashMap<>();
+            byStatus.forEach((statusId, cutoff) ->
+                    statusesByCutoff.computeIfAbsent(cutoff, key -> new ArrayList<>()).add(statusId));
+            statusesByCutoff.forEach((cutoff, statusIds) -> clauses.add(new Criteria().andOperator(
+                    Criteria.where(FIELD_STATUS_ID).in(statusIds),
+                    activityCutoffCriteria(cutoff, stale))));
+        }
+
+        Instant fallback = activity.defaultStaleCutoff();
+        if (fallback != null) {
+            Criteria unmappedStatus = byStatus == null || byStatus.isEmpty()
+                    ? new Criteria()
+                    : Criteria.where(FIELD_STATUS_ID).nin(byStatus.keySet());
+            clauses.add(new Criteria().andOperator(unmappedStatus, activityCutoffCriteria(fallback, stale)));
+        }
+        return clauses;
+    }
+
+    private Criteria activityCutoffCriteria(Instant cutoff, boolean stale) {
+        Criteria onActivity = stale
+                ? Criteria.where(FIELD_LAST_ACTIVITY_AT).lt(cutoff)
+                : Criteria.where(FIELD_LAST_ACTIVITY_AT).gte(cutoff);
+        Criteria onCreatedAt = new Criteria().andOperator(
+                Criteria.where(FIELD_LAST_ACTIVITY_AT).is(null),
+                stale ? Criteria.where(FIELD_CREATED_AT).lt(cutoff) : Criteria.where(FIELD_CREATED_AT).gte(cutoff));
+        return new Criteria().orOperator(onActivity, onCreatedAt);
     }
 
     @Override
@@ -267,6 +327,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             case FIELD_CREATED_AT -> ticket.getCreatedAt();
             case FIELD_UPDATED_AT -> ticket.getUpdatedAt();
             case FIELD_RESOLVED_AT -> ticket.getResolvedAt();
+            case FIELD_LAST_ACTIVITY_AT -> ticket.getLastActivityAt();
             case FIELD_ORDER -> ticket.getOrder();
             default -> null;
         };
@@ -275,33 +336,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     @Override
     public long countTickets(Query query) {
         return mongoTemplate.count(query, Ticket.class);
-    }
-
-    @Override
-    public Map<TicketStatus, Long> countTicketsByStatus() {
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(tenantCriteria()),
-                Aggregation.group(FIELD_STATUS).count().as(AGG_COUNT),
-                Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS)
-        );
-
-        AggregationResults<Document> results = mongoTemplate.aggregate(
-                aggregation, Ticket.class, Document.class);
-
-        Map<TicketStatus, Long> statusCounts = new EnumMap<>(TicketStatus.class);
-        for (Document doc : results.getMappedResults()) {
-            String statusStr = doc.getString(FIELD_STATUS);
-            if (statusStr != null) {
-                try {
-                    TicketStatus status = TicketStatus.valueOf(statusStr);
-                    statusCounts.put(status, doc.getInteger(AGG_COUNT).longValue());
-                } catch (IllegalArgumentException e) {
-                    log.warn("Unknown ticket status: {}", statusStr);
-                }
-            }
-        }
-
-        return statusCounts;
     }
 
     @Override
@@ -382,19 +416,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     }
 
     @Override
-    public int updateStatusBulk(TicketStatus fromStatus, TicketStatus toStatus) {
-        Query query = new Query(Criteria.where(FIELD_STATUS).is(fromStatus));
-        Update update = new Update()
-                .set(FIELD_STATUS, toStatus)
-                .set(FIELD_UPDATED_AT, Instant.now());
-
-        long modifiedCount = mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
-        log.debug("Bulk status update: {} -> {}, modified: {}", fromStatus, toStatus, modifiedCount);
-
-        return (int) modifiedCount;
-    }
-
-    @Override
     public int reassignTicketsToStatus(String fromStatusId, String toStatusId, TicketStatusKind toKind) {
         Query query = new Query(Criteria.where(FIELD_STATUS_ID).is(fromStatusId));
         return reassignTicketsToStatus(query, toStatusId, toKind);
@@ -421,6 +442,39 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
                 .set(FIELD_UPDATED_AT, Instant.now());
 
         mongoTemplate.updateFirst(query, update, Ticket.class);
+    }
+
+    /**
+     * Stamps activity with a targeted update. Never a full save: the document carries
+     * {@code @LastModifiedDate updatedAt}, which clients read as "the status moved", and saving the
+     * whole ticket on every message would silently redefine that field.
+     */
+    @Override
+    public Optional<Ticket> updateLastActivityAt(String ticketId, Instant lastActivityAt) {
+        Query query = new Query(Criteria.where(ID_FIELD).is(ticketId));
+        Update update = new Update().set(FIELD_LAST_ACTIVITY_AT, lastActivityAt);
+        return stamp(query, update);
+    }
+
+    /**
+     * Stamps activity and marks the ticket as waiting on the client in one write.
+     * {@code awaitingSince} of null clears the wait — the client has answered.
+     */
+    @Override
+    public Optional<Ticket> updateActivityAndAwaiting(String ticketId, Instant lastActivityAt, Instant awaitingSince) {
+        Query query = new Query(Criteria.where(ID_FIELD).is(ticketId));
+        Update update = new Update().set(FIELD_LAST_ACTIVITY_AT, lastActivityAt);
+        if (awaitingSince == null) {
+            update.unset(FIELD_AWAITING_CLIENT_SINCE);
+        } else {
+            update.set(FIELD_AWAITING_CLIENT_SINCE, awaitingSince);
+        }
+        return stamp(query, update);
+    }
+
+    private Optional<Ticket> stamp(Query query, Update update) {
+        FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
+        return Optional.ofNullable(mongoTemplate.findAndModify(query, update, options, Ticket.class));
     }
 
     @Override

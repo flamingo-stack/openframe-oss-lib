@@ -26,7 +26,7 @@ import static com.openframe.test.data.generator.CursorGenerator.limit;
 import static com.openframe.test.data.generator.DeviceGenerator.offlineDevicesFilter;
 import static com.openframe.test.data.generator.DeviceGenerator.onlineDevicesFilter;
 import static com.openframe.test.data.generator.KnowledgeBaseGenerator.attachmentFile;
-import static com.openframe.test.data.generator.TicketGenerator.activeTickets;
+import static com.openframe.test.data.generator.TicketGenerator.allTickets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("saas")
@@ -40,7 +40,7 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("List tickets")
     public void testListTickets() {
-        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(20));
+        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
         assertThat(connection).as("Tickets connection should not be null").isNotNull();
         assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
         // No withFailMessage() here on purpose. It overrides the per-field .as() descriptions below,
@@ -164,11 +164,11 @@ public class TicketsTest extends BaseTest {
     @DisplayName("Search ticket")
     @Order(2)
     public void testSearchTicket() {
-        TicketConnection all = TicketApi.getTickets(activeTickets(), limit(1));
+        TicketConnection all = TicketApi.getTickets(allTickets(), limit(1));
         assertThat(all.getEdges()).as("Expected at least one ticket to search for").isNotEmpty();
         Ticket existing = TicketGenerator.firstTicket(all);
 
-        TicketConnection found = TicketApi.getTickets(activeTickets(), limit(20), existing.getTitle());
+        TicketConnection found = TicketApi.getTickets(allTickets(), limit(20), existing.getTitle());
         assertThat(found.getEdges()).as("Search by title should return at least one ticket").isNotEmpty();
         assertThat(found.getEdges()).extracting(edge -> edge.getNode().getId())
                 .as("Search results should contain the ticket matched by title")
@@ -180,9 +180,14 @@ public class TicketsTest extends BaseTest {
     @DisplayName("Resolve ticket")
     @Order(4)
     public void testResolveTicket() {
-        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(1));
-        assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
-        String ticketId = TicketGenerator.firstTicketId(connection);
+        // Without the old lifecycle filter a bare listing can hand back a ticket that is already RESOLVED
+        // or ARCHIVED, and resolving one of those is not a valid transition. Select on the kind instead,
+        // the same way the archive case below does.
+        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
+        assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
+        Ticket resolvable = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
+        assertThat(resolvable).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
+        String ticketId = resolvable.getId();
 
         String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
         assertThat(resolvedStatusId).as("No system status definition found for kind RESOLVED").isNotNull();
@@ -201,11 +206,10 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("Archive non-resolved ticket is rejected")
     public void testArchiveActiveTicketRejected() {
-        // Only RESOLVED → ARCHIVED is a valid transition. The legacy `status` filter can still surface
-        // tickets that have since moved to RESOLVED (transitionTicket does not sync the legacy field),
-        // so pick one whose lifecycle status kind is neither RESOLVED nor ARCHIVED.
-        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(20));
-        assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
+        // Only RESOLVED → ARCHIVED is a valid transition, and an unfiltered listing carries tickets in
+        // every column, so pick one whose lifecycle status kind is neither RESOLVED nor ARCHIVED.
+        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
+        assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
         Ticket ticket = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
         assertThat(ticket).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
         String ticketId = ticket.getId();
@@ -306,7 +310,7 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("Get ticket")
     public void testGetTicket() {
-        TicketConnection connection = TicketApi.getTickets(activeTickets(), limit(1));
+        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(1));
         assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
         String ticketId = TicketGenerator.firstTicketId(connection);
 
@@ -551,7 +555,7 @@ public class TicketsTest extends BaseTest {
         for (String id : stagedAttachmentIds) {
             try {
                 TicketApi.deleteTempAttachment(id);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException | AssertionError ignored) {
                 // best effort: already discarded by the case, or gone with its ticket
             }
         }
@@ -565,14 +569,14 @@ public class TicketsTest extends BaseTest {
                 if (!"ARCHIVED".equals(kind)) {
                     TicketApi.transitionTicket(ticket.getId(), TicketApi.resolveSystemStatusId("ARCHIVED"));
                 }
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException | AssertionError ignored) {
                 // best effort: a failed cleanup must not mask the case that failed
             }
         }
         for (String id : createdStatusIds) {
             try {
                 TicketApi.deleteTicketStatus(id);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException | AssertionError ignored) {
                 // best effort
             }
         }
