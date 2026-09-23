@@ -15,6 +15,7 @@ import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.service.rmm.device.DeviceInventoryService;
 import com.openframe.api.service.rmm.software.SoftwareInventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 public class SoftwareDataFetcher {
 
     private final SoftwareInventoryService softwareInventoryService;
+    private final DeviceInventoryService deviceInventoryService;
 
     @DgsQuery
     public SoftwareResponse software(@InputArgument String id) {
@@ -47,6 +49,18 @@ public class SoftwareDataFetcher {
                 ? Boolean.TRUE : null;
         return PageCursors.toConnection(softwareInventoryService.listSoftware(
                 search, page, perPage, sort, vulnerable));
+    }
+
+    @DgsQuery
+    public CountedGenericConnection<GenericEdge<SoftwareResponse>> deviceSoftware(
+            @InputArgument String machineId, @InputArgument SoftwareFilterInput filter,
+            @InputArgument Integer first, @InputArgument String after,
+            @InputArgument Integer last, @InputArgument String before,
+            @InputArgument String search, @InputArgument SortInput sort) {
+        int page = PageCursors.decodePage(after != null ? after : before);
+        Integer perPage = first != null ? first : last;
+        return PageCursors.toConnection(
+                deviceInventoryService.listSoftware(machineId, filter, search, page, perPage, sort));
     }
 
     @DgsQuery

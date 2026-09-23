@@ -7,6 +7,7 @@ import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSearchResponse;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareResponse;
 import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import com.openframe.sdk.fleetmdm.model.QueryResult;
 import com.openframe.sdk.fleetmdm.model.LiveQueryCampaign;
@@ -142,6 +143,19 @@ public class FleetMdmClient {
     public HostVulnerabilityInventory getHostVulnerabilityInventoryById(long id) {
         String url = baseUrl + HOSTS_URL + "/" + id;
         return getHost(id, url, HostVulnerabilityInventory.class);
+    }
+
+    public HostSoftwareResponse listHostSoftware(long hostId, int page, int perPage) {
+        String action = "list software of Fleet host " + hostId;
+        return call(action, () -> {
+            String path = HOSTS_URL + "/" + hostId + "/software?page=" + page + "&per_page=" + perPage;
+            HttpResponse<String> response = sendRequest(path, "GET", null);
+            if (response.statusCode() == 404) {
+                return null;
+            }
+            checkResponse(response, action);
+            return MAPPER.readValue(response.body(), HostSoftwareResponse.class);
+        });
     }
 
     private <T> T getHost(long id, String url, Class<T> responseType) {
