@@ -35,6 +35,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 @DgsComponent
@@ -52,7 +53,8 @@ public class SoftwareBundleDataFetcher {
 
     @DgsQuery
     public SoftwareBundleResponse softwareBundle(@InputArgument String id) {
-        return softwareBundleService.findById(decodeId(id)).orElse(null);
+        return softwareBundleService.findById(decodeId(id))
+                .orElseThrow(() -> new NoSuchElementException("SoftwareBundle not found for id: " + id));
     }
 
     @DgsMutation
@@ -183,6 +185,7 @@ public class SoftwareBundleDataFetcher {
         try {
             return RELAY.fromGlobalId(id).getId();
         } catch (Exception e) {
+            log.warn("Failed to decode relay global id '{}', falling back to raw value: {}", id, e.getMessage());
             return id;
         }
     }
