@@ -168,7 +168,7 @@ public class SoftwareInventoryService {
                         .toList();
     }
 
-    private static Comparator<SoftwareResponse> comparatorFor(String field, boolean desc) {
+    static Comparator<SoftwareResponse> comparatorFor(String field, boolean desc) {
         Comparator<SoftwareResponse> base = switch (field) {
             case "name" -> Comparator.comparing(row -> row.getName() == null ? "" : row.getName(),
                     String.CASE_INSENSITIVE_ORDER);
@@ -184,14 +184,18 @@ public class SoftwareInventoryService {
                 String.CASE_INSENSITIVE_ORDER);
     }
 
-    private static int cveCount(SoftwareResponse row) {
+    static int cveCount(SoftwareResponse row) {
         return row.getVulnerabilitySummary() == null ? 0 : row.getVulnerabilitySummary().getCveCount();
     }
 
-    private static int severityRank(SoftwareResponse row) {
+    static int severityRank(SoftwareResponse row) {
         SoftwareCveSeverity s = row.getVulnerabilitySummary() == null
                 ? null : row.getVulnerabilitySummary().getHighestSeverity();
-        return s == null ? 0 : switch (s) {
+        return s == null ? 0 : severityRank(s);
+    }
+
+    static int severityRank(SoftwareCveSeverity severity) {
+        return switch (severity) {
             case CRITICAL -> 4;
             case HIGH -> 3;
             case MEDIUM -> 2;
