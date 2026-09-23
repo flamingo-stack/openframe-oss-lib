@@ -4,6 +4,7 @@ import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { PenEditIcon, UserIcon, UserPlusIcon } from '../icons-v2-generated';
 import { Autocomplete, type AutocompleteOption } from './autocomplete';
+import { Button } from './button';
 import { DeletedUserAvatar } from './deleted-user-avatar';
 import { SearchableSelect, type SearchableSelectOption } from './searchable-select';
 import { SquareAvatar } from './square-avatar';
@@ -90,12 +91,13 @@ function CompactAssigneeDropdown({
     : undefined;
 
   const trigger = hasAssignee ? (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={handleTriggerClick}
       aria-label="Change assignee"
       className={cn(
-        'shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
+        'h-auto shrink-0 rounded-full p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
         className,
       )}
     >
@@ -110,21 +112,22 @@ function CompactAssigneeDropdown({
           variant="round"
         />
       )}
-    </button>
+    </Button>
   ) : (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={handleTriggerClick}
       aria-label="Assign user"
       className={cn(
-        'flex size-8 shrink-0 items-center justify-center rounded-full border border-ods-border',
+        'flex size-8 shrink-0 items-center justify-center rounded-full border border-ods-border p-0',
         'text-ods-text-secondary transition-colors hover:border-ods-accent hover:text-ods-accent',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
         className,
       )}
     >
       <UserPlusIcon className="size-4" />
-    </button>
+    </Button>
   );
 
   // Intercepted trigger: render the plain button — no dropdown to open.
@@ -231,10 +234,11 @@ function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex flex-col justify-center">
             <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-xxs)]">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => setIsEditing(true)}
-                className="group flex cursor-pointer items-center gap-[var(--spacing-system-xxs)] text-left"
+                className="group flex h-auto cursor-pointer items-center gap-[var(--spacing-system-xxs)] p-0 text-left"
               >
                 <PenEditIcon className="size-4 shrink-0 text-ods-text-secondary transition-colors group-hover:text-ods-accent" />
                 <span
@@ -246,7 +250,7 @@ function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign
                 >
                   {currentAssignee.name}
                 </span>
-              </button>
+              </Button>
             </div>
             <span className="truncate text-ods-text-secondary text-h6">Assigned</span>
           </div>
@@ -257,14 +261,15 @@ function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign
 
   return (
     <div className={cn('min-w-0', className)}>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setIsEditing(true)}
-        className="flex cursor-pointer items-center gap-[var(--spacing-system-xxs)] truncate text-left text-ods-accent underline transition-opacity text-h4 hover:opacity-80"
+        className="flex h-auto cursor-pointer items-center gap-[var(--spacing-system-xxs)] truncate p-0 text-left text-ods-accent underline transition-opacity text-h4 hover:opacity-80"
       >
         <UserIcon className="size-4 shrink-0" />
         <span>Assign User</span>
-      </button>
+      </Button>
       <span className="block truncate text-ods-text-secondary text-h6">Assigned</span>
     </div>
   );
