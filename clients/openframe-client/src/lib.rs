@@ -27,7 +27,6 @@ pub mod service;
 /// management details behind a common API.
 pub mod service_adapter;
 pub mod system;
-pub mod updater;
 pub mod utils;
 
 pub mod cli;
