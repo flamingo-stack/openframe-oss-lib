@@ -28,7 +28,8 @@ public class ScheduleDeliveryRepublisher implements DeliveryRepublisher {
                     objectMapper.readValue(messageJson, ScriptScheduleExecutionMessage.class);
             scriptScheduleNatsPublisher.publish(machineId, message);
         } catch (Exception e) {
-            log.warn("Failed to re-publish schedule delivery machineId={}: {}", machineId, e.getMessage());
+            log.warn("Failed to re-publish schedule delivery machineId={}", machineId, e);
         }
     }
 }
+
