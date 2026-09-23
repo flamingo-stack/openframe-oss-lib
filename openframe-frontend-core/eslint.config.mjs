@@ -172,6 +172,10 @@ export default defineConfig([
       // it hangs: the `left-0` / `right-0` class on that box. No `screen`
       // query reaches a role-less element, so the test walks up from Apply.
       'src/components/features/__tests__/filters-dropdown-placement.test.tsx',
+      // Same shape again: FieldWrapper's wrapper is a role-less <div>, and what
+      // is under test is its display mode — `contents` versus a positioned box —
+      // which no `screen` query can reach, so the test walks up from the control.
+      'src/components/ui/__tests__/field-wrapper-error-slot.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',
