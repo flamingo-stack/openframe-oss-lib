@@ -2,6 +2,7 @@ package com.openframe.data.nats.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.openframe.delivery.spec.DeliveryPayload;
+import com.openframe.delivery.spec.DeliveryRef;
 
 import com.openframe.data.document.toolagent.SessionType;
 import lombok.Getter;
@@ -14,7 +15,7 @@ import java.util.List;
 public class ToolInstallationMessage implements DeliveryPayload {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    private String dispatchId;
+    private DeliveryRef delivery;
 
     private String toolAgentId;
     private String toolId;

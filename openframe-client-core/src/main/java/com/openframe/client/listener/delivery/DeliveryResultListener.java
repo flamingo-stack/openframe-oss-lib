@@ -7,6 +7,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.DeliveryResultMessage;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.track.DeliveryTracker;
 import io.nats.client.Connection;
 import io.nats.client.Message;
@@ -77,7 +78,7 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
             DeliveryResultMessage report = objectMapper.readValue(payload, DeliveryResultMessage.class);
             if (!isComplete(report)) {
                 metrics.recordResultRejected(REJECTED_INCOMPLETE);
-                log.error("Delivery result rejected, agent violates the contract (type, targetId, dispatchId, result required or unknown): machineId={} payload={}",
+                log.error("Delivery result rejected, agent violates the contract (delivery block incomplete or result unknown): machineId={} payload={}",
                         machineId, payload);
                 message.ack();
                 return;
@@ -94,9 +95,10 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
     }
 
     private void apply(String machineId, DeliveryResultMessage report) {
-        DeliveryType type = report.getType();
-        String targetId = report.getTargetId();
-        String dispatchId = report.getDispatchId();
+        DeliveryRef delivery = report.getDelivery();
+        DeliveryType type = delivery.getType();
+        String targetId = delivery.getTargetId();
+        String dispatchId = delivery.getDispatchId();
         switch (report.getResult()) {
             case ACKED -> deliveryTracker.acknowledge(type, targetId, machineId, dispatchId);
             case DONE -> deliveryTracker.complete(type, targetId, machineId, dispatchId);
@@ -105,9 +107,11 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
     }
 
     private static boolean isComplete(DeliveryResultMessage report) {
-        return report.getType() != null
-                && hasText(report.getTargetId())
-                && hasText(report.getDispatchId())
+        DeliveryRef delivery = report.getDelivery();
+        return delivery != null
+                && delivery.getType() != null
+                && hasText(delivery.getTargetId())
+                && hasText(delivery.getDispatchId())
                 && report.getResult() != null;
     }
 }

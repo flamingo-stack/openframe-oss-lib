@@ -9,6 +9,7 @@ import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.spec.DeliveryPayload;
+import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.track.DeliveryId;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +41,8 @@ public class DeliveryRecorder {
         String machineId = request.getMachineId();
         String id = DeliveryId.of(type, targetId, machineId);
         DeliveryPayload payload = request.getPayload();
-        String dispatchId = payload.getDispatchId();
+        DeliveryRef delivery = payload.getDelivery();
+        String dispatchId = delivery.getDispatchId();
         String payloadJson = toJson(payload);
         Policy policy = properties.resolve(type);
         long ackThresholdSeconds = policy.getAckThresholdSeconds();

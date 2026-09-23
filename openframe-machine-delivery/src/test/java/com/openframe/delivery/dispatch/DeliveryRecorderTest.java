@@ -6,6 +6,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryTestPolicies;
+import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.TestPayload;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +41,7 @@ class DeliveryRecorderTest {
     void setUp() {
         TestPayload payload = new TestPayload();
         payload.setValue(VALUE);
-        payload.setDispatchId(DISPATCH_ID);
+        payload.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UNINSTALL, MACHINE_ID, DISPATCH_ID));
         request = DeliveryRequest.<TestPayload>builder()
                 .type(DeliveryType.CLIENT_UNINSTALL)
                 .targetId(MACHINE_ID)

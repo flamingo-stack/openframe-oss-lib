@@ -2,7 +2,7 @@ package com.openframe.delivery.spec;
 
 public interface DeliveryPayload {
 
-    String getDispatchId();
+    DeliveryRef getDelivery();
 
-    void setDispatchId(String dispatchId);
+    void setDelivery(DeliveryRef delivery);
 }

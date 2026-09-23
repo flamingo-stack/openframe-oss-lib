@@ -5,6 +5,6 @@ import lombok.Data;
 @Data
 public class TestPayload implements DeliveryPayload {
 
-    private String dispatchId;
+    private DeliveryRef delivery;
     private String value;
 }

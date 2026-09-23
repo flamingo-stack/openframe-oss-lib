@@ -2,6 +2,7 @@ package com.openframe.delivery.dispatch;
 
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.spec.DeliveryPayload;
+import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
@@ -26,7 +27,9 @@ public class DeliveryDispatcher {
         DeliveryRequest<DeliveryPayload> request = spec.request(seed);
         DeliveryPayload payload = request.getPayload();
         String dispatchId = UUID.randomUUID().toString();
-        payload.setDispatchId(dispatchId);
+        String targetId = request.getTargetId();
+        DeliveryRef delivery = new DeliveryRef(type, targetId, dispatchId);
+        payload.setDelivery(delivery);
         recorder.record(request);
         String machineId = request.getMachineId();
         spec.publish(machineId, payload);

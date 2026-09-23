@@ -60,7 +60,9 @@ class DeliveryDispatcherTest {
         dispatcher.dispatch(seed);
 
         // verifications
-        assertThat(payload.getDispatchId()).isNotBlank();
+        assertThat(payload.getDelivery().getType()).isEqualTo(DeliveryType.TOOL_INSTALLATION);
+        assertThat(payload.getDelivery().getTargetId()).isEqualTo(TARGET_ID);
+        assertThat(payload.getDelivery().getDispatchId()).isNotBlank();
         verify(recorder).record(request);
         verify(spec).publish(MACHINE_ID, payload);
     }
