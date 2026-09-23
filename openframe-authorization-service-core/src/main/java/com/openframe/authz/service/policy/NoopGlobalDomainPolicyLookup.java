@@ -13,3 +13,4 @@ public class NoopGlobalDomainPolicyLookup implements GlobalDomainPolicyLookup {
 		return Optional.empty();
 	}
 }
+
