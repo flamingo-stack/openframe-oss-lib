@@ -27,6 +27,13 @@ public class SshMachineVerifier {
 
     private static final int EXEC_TIMEOUT_SECONDS = 30;
 
+    // SSH host key verification is intentionally disabled (PromiscuousVerifier) below: this client
+    // targets an isolated, ephemeral test-lab fleet (see MachineConfig) whose host keys are not
+    // pinned or distributed anywhere, so strict verification is not currently practical. Flagged
+    // explicitly here since credentials are sent over this unverified channel via authPassword.
+    private static final String HOST_KEY_VERIFICATION_JUSTIFICATION =
+            "Host key verification is disabled for isolated test-lab machines only; do not reuse this client against production hosts.";
+
     private final String host;
     private final int port;
     private final String user;
@@ -97,6 +104,11 @@ public class SshMachineVerifier {
      * <p>On Windows the command (raw PowerShell) is wrapped as {@code powershell -EncodedCommand <base64>}
      * so it runs correctly regardless of the box's default OpenSSH shell — some machines default to
      * {@code cmd.exe}, others to PowerShell — and so no cross-shell quoting can corrupt it.
+     *
+     * <p><strong>Security note:</strong> host key verification is disabled via
+     * {@link PromiscuousVerifier} — see {@link #HOST_KEY_VERIFICATION_JUSTIFICATION}. This client is for
+     * use against isolated, disposable test-lab machines only; it must not be pointed at machines whose
+     * compromise would matter, since credentials are sent over this unverified channel.
      */
     public ExecResult exec(String command) {
         String actual = os == MachineOs.WINDOWS ? wrapPowerShell(command) : command;
