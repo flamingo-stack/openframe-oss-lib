@@ -33,6 +33,9 @@ public class DefaultSequenceRepository implements SequenceRepository {
                 .upsert(true);
         TenantSequence result = mongoTemplate.findAndModify(
                 query, update, options, TenantSequence.class);
+        if (result == null) {
+            throw new IllegalStateException("Sequence upsert returned no document for: " + sequenceName);
+        }
         int value = result.getValue();
         log.debug("Sequence '{}' incremented to: {}", sequenceName, value);
         return value;
