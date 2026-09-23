@@ -94,17 +94,7 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
 
   const content: ReactNode = (
     <>
-      {/* In the rail a stamped row is glyph over word, centred as one stack: a
-          24px glyph, an xxs gap and the 12px word make 40px in the 56px row, so
-          the glyph rises 8px and the word sits 8px off the bottom. The glyph
-          moves by transform on the label's clock, so a collapse slides it up as
-          the word fades in; nothing moves in the expanded row. */}
-      <div
-        className={cn(
-          'relative flex flex-shrink-0 items-center justify-center transition-transform duration-300',
-          item.badge && !showLabel && '-translate-y-[var(--spacing-system-xsf)]',
-        )}
-      >
+      <div className="relative flex flex-shrink-0 items-center justify-center">
         {cloneElement(item.icon as ReactElement<IconProps>, {
           color: isActive && !disabled ? 'text-ods-accent' : 'text-ods-text-secondary',
         })}
@@ -113,7 +103,10 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
 
       {/* The label column: the label and its stamp, fading together on collapse.
           The wrapper clips — a `shrink-0` stamp beside a zero-width label would
-          otherwise overflow the rail and hand the sidebar a horizontal scrollbar. */}
+          otherwise overflow the rail and hand the sidebar a horizontal scrollbar.
+          The rail draws no stamp of its own: a word under one glyph read as a
+          caption the other rows lack, so there the row's tooltip and accessible
+          name carry it. */}
       <span
         className={cn(
           'flex min-w-0 flex-1 items-center overflow-hidden text-left transition-[opacity,margin-left] duration-300',
@@ -124,22 +117,6 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
         <span className="min-w-0 truncate text-h4">{item.label}</span>
         {item.badge && <NavigationItemBadge label={item.badge} className="ml-[var(--spacing-system-xs)] shrink-0" />}
       </span>
-
-      {/* The rail's stamp: the lower half of the stack above. Absolutely
-          positioned so it takes no room in the expanded row, and fading opposite
-          the label on the same clock, so a collapse hands the word from one
-          place to the other. */}
-      {item.badge && (
-        <NavigationItemBadge
-          bare
-          label={item.badge}
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute inset-x-0 bottom-[var(--spacing-system-xsf)] transition-opacity duration-300',
-            showLabel ? 'opacity-0' : 'opacity-100',
-          )}
-        />
-      )}
 
       {hasUnread && showLabel && (
         <span className="flex size-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent p-2">

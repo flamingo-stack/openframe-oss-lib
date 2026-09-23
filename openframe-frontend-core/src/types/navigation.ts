@@ -167,10 +167,10 @@ export interface NavigationSidebarItem {
   unreadCount?: number;
   /**
    * A stamp after the label — "Beta" on a module still behind a flag. One short
-   * word: every surface draws it at the badge scale, and in the 56px rail, where
-   * the label is gone, the word under the glyph is all the row has room for.
-   * Cased as it should be read ("Beta"): the surfaces upper-case it themselves,
-   * and the row's accessible name becomes "Devices (Beta)".
+   * word, drawn as a chip beside the label in the expanded sidebar and the mobile
+   * menu; the minimized rail carries it only in the row's tooltip and accessible
+   * name. Cased as it should be read ("Beta"): the surfaces upper-case it
+   * themselves, and the accessible name becomes "Devices (Beta)".
    */
   badge?: string;
   isActive?: boolean;
