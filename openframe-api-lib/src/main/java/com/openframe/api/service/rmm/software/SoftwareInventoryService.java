@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
+import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
@@ -8,12 +9,19 @@ import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
+import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
+import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
+import com.openframe.api.service.rmm.fleet.HostInventory;
+import com.openframe.api.service.rmm.fleet.HostInventory.CveHit;
+import com.openframe.api.service.rmm.vulnerability.FleetGlobalVulnerabilityMapper;
 import com.openframe.api.util.FleetSoftwareMapper;
 import com.openframe.api.util.FleetVulnerabilityMapper;
 import com.openframe.data.document.device.Machine;
@@ -23,8 +31,11 @@ import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.FleetTenantHeader;
+import com.openframe.sdk.fleetmdm.model.FleetVulnerability;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareInstalledVersion;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
@@ -47,6 +58,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.apache.commons.lang3.StringUtils.containsIgnoreCase;
+import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
@@ -59,6 +72,7 @@ public class SoftwareInventoryService {
     private static final int HOSTS_PER_TITLE_LIMIT = 500;
     private static final Set<String> SORTABLE = Set.of("name", "devicesCount", "cveCount", "highestSeverity", "severity");
     private static final String SORTABLE_FIELDS = "name, devicesCount, cveCount, highestSeverity";
+    private static final String DEFAULT_SORT_FIELD = "name";
     private static final int TITLES_FETCH_PAGE = 500;
     private static final int TITLES_FETCH_CAP = 5000;
 
@@ -66,6 +80,7 @@ public class SoftwareInventoryService {
     private final FleetDeviceCountEnricher deviceCountEnricher;
     private final com.openframe.api.service.rmm.fleet.FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
+    private final DeviceHostInventoryLoader deviceHostInventoryLoader;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -168,7 +183,7 @@ public class SoftwareInventoryService {
                         .toList();
     }
 
-    static Comparator<SoftwareResponse> comparatorFor(String field, boolean desc) {
+    private static Comparator<SoftwareResponse> comparatorFor(String field, boolean desc) {
         Comparator<SoftwareResponse> base = switch (field) {
             case "name" -> Comparator.comparing(row -> row.getName() == null ? "" : row.getName(),
                     String.CASE_INSENSITIVE_ORDER);
@@ -184,17 +199,17 @@ public class SoftwareInventoryService {
                 String.CASE_INSENSITIVE_ORDER);
     }
 
-    static int cveCount(SoftwareResponse row) {
+    private static int cveCount(SoftwareResponse row) {
         return row.getVulnerabilitySummary() == null ? 0 : row.getVulnerabilitySummary().getCveCount();
     }
 
-    static int severityRank(SoftwareResponse row) {
+    private static int severityRank(SoftwareResponse row) {
         SoftwareCveSeverity s = row.getVulnerabilitySummary() == null
                 ? null : row.getVulnerabilitySummary().getHighestSeverity();
         return s == null ? 0 : severityRank(s);
     }
 
-    static int severityRank(SoftwareCveSeverity severity) {
+    private static int severityRank(SoftwareCveSeverity severity) {
         return switch (severity) {
             case CRITICAL -> 4;
             case HIGH -> 3;
@@ -247,6 +262,105 @@ public class SoftwareInventoryService {
             return true;
         }
         return row.getStatus() != null && filter.getStatuses().contains(row.getStatus());
+    }
+
+    public PageResult<SoftwareResponse> listSoftwareForDevice(String machineId, SoftwareFilterInput filter,
+                                                              String search, int page, Integer perPage,
+                                                              SortInput sort) {
+        Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
+        HostInventory inventory = deviceHostInventoryLoader.load(machineId);
+        List<SoftwareResponse> rows = inventory.getTitles().stream()
+                .map(title -> toDeviceSoftwareRow(title, inventory))
+                .filter(row -> matchesDeviceSoftwareFilter(row, filter))
+                .filter(row -> matchesDeviceSoftwareSearch(row, search))
+                .sorted(order)
+                .toList();
+        PageResult<SoftwareResponse> result = paginateList(rows, page, perPage);
+        enrichRealDevicesCount(result.items());
+        return result;
+    }
+
+    private static Comparator<SoftwareResponse> deviceSoftwareOrder(SortInput sort) {
+        String field = hasSortField(sort) ? sort.getField() : DEFAULT_SORT_FIELD;
+        return comparatorFor(field, isDescending(sort));
+    }
+
+    private static boolean hasSortField(SortInput sort) {
+        return sort != null && hasText(sort.getField());
+    }
+
+    private static boolean isDescending(SortInput sort) {
+        return sort != null && sort.getDirection() == SortDirection.DESC;
+    }
+
+    private static SoftwareResponse toDeviceSoftwareRow(HostSoftwareTitle title, HostInventory inventory) {
+        String id = Objects.toString(title.getId(), null);
+        SoftwareSource source = FleetSoftwareCategory.of(title.getSource()).source();
+        List<HostSoftwareInstalledVersion> installed = HostInventory.installedVersionsOf(title);
+        return SoftwareResponse.builder()
+                .id(id)
+                .name(title.getName())
+                .source(source)
+                .currentVersion(installedVersion(installed))
+                .olderVersionsCount(Math.max(0, installed.size() - 1))
+                .vulnerabilitySummary(summarizeDeviceSoftware(title, inventory))
+                .build();
+    }
+
+    private static String installedVersion(List<HostSoftwareInstalledVersion> installed) {
+        return installed.stream()
+                .map(HostSoftwareInstalledVersion::getVersion)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static SoftwareVulnerabilitySummaryResponse summarizeDeviceSoftware(HostSoftwareTitle title,
+                                                                            HostInventory inventory) {
+        List<CveHit> hits = HostInventory.hitsOf(title).toList();
+        if (hits.isEmpty()) {
+            return null;
+        }
+        long distinctCves = hits.stream().map(CveHit::getCve).distinct().count();
+        SoftwareCveSeverity highest = hits.stream()
+                .map(inventory::detail)
+                .flatMap(Optional::stream)
+                .map(FleetVulnerability::getCvssScore)
+                .map(FleetGlobalVulnerabilityMapper::bucketSeverity)
+                .filter(Objects::nonNull)
+                .max(Comparator.comparingInt(SoftwareInventoryService::severityRank))
+                .orElse(null);
+        return SoftwareVulnerabilitySummaryResponse.builder()
+                .cveCount((int) distinctCves)
+                .highestSeverity(highest)
+                .build();
+    }
+
+    private static boolean matchesDeviceSoftwareFilter(SoftwareResponse row, SoftwareFilterInput filter) {
+        if (filter == null) {
+            return true;
+        }
+        return matchesSources(row, filter.getSources()) && meetsMinSeverity(row, filter.getMinSeverity());
+    }
+
+    private static boolean matchesSources(SoftwareResponse row, List<SoftwareSource> sources) {
+        return isEmpty(sources) || sources.contains(row.getSource());
+    }
+
+    private static boolean meetsMinSeverity(SoftwareResponse row, SoftwareCveSeverity min) {
+        if (isNoCutoff(min)) {
+            return true;
+        }
+        return severityRank(row) >= severityRank(min);
+    }
+
+    private static boolean isNoCutoff(SoftwareCveSeverity min) {
+        return min == null || min == SoftwareCveSeverity.NONE;
+    }
+
+    private static boolean matchesDeviceSoftwareSearch(SoftwareResponse row, String search) {
+        return !hasText(search)
+                || containsIgnoreCase(row.getName(), search)
+                || containsIgnoreCase(row.getPublisher(), search);
     }
 
     public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, String search) {
