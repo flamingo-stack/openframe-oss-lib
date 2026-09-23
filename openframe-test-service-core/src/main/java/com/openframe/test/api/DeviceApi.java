@@ -5,6 +5,7 @@ import com.openframe.test.data.dto.device.fleet.FleetHost;
 import com.openframe.test.data.dto.device.mesh.MeshDevice;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,6 +17,7 @@ import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.*;
 import static io.restassured.RestAssured.given;
 
+@Slf4j
 public class DeviceApi {
 
     private static final String DEVICES = "api/devices/{machineId}";
@@ -222,10 +224,10 @@ public class DeviceApi {
                 .get(FLEET_HOST);
         if (response.getStatusCode() == 200) {
             return response.then().extract().jsonPath().getString("host.os_version");
-        } else {
-            System.out.printf("%s%s -> %d%n", getBaseUrl(), FLEET_HOST.replace("{fleetId}", fleetId), response.getStatusCode());
         }
-        return null;
+        log.warn("{}{} -> {}", getBaseUrl(), FLEET_HOST.replace("{fleetId}", fleetId), response.getStatusCode());
+        throw new IllegalStateException(String.format("Failed to fetch fleet host %s: status %d",
+                fleetId, response.getStatusCode()));
     }
 
     public static DeviceFilters getDeviceFilters() {
