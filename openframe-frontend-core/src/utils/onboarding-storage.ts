@@ -26,7 +26,9 @@ export function saveOnboardingState(key: string, state: OnboardingState): void {
 
   try {
     localStorage.setItem(key, JSON.stringify(state));
-    console.log('💾 Saved onboarding state:', state);
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[onboarding-storage] Saved onboarding state:', state);
+    }
 
     // Dispatch custom event for cross-tab sync
     if (typeof window !== 'undefined') {
@@ -51,8 +53,18 @@ export function loadOnboardingState(key: string): OnboardingState {
     const raw = localStorage.getItem(key);
     if (!raw) return DEFAULT_STATE;
 
-    const parsed = JSON.parse(raw) as OnboardingState;
-    return parsed;
+    const parsed = JSON.parse(raw) as Partial<OnboardingState>;
+    if (!Array.isArray(parsed.completedSteps) || !Array.isArray(parsed.skippedSteps)) {
+      console.warn('[onboarding-storage] Invalid onboarding state shape, falling back to default');
+      return DEFAULT_STATE;
+    }
+
+    return {
+      completedSteps: parsed.completedSteps,
+      skippedSteps: parsed.skippedSteps,
+      dismissed: typeof parsed.dismissed === 'boolean' ? parsed.dismissed : DEFAULT_STATE.dismissed,
+      lastUpdated: typeof parsed.lastUpdated === 'string' ? parsed.lastUpdated : DEFAULT_STATE.lastUpdated,
+    };
   } catch (err) {
     console.warn('[onboarding-storage] Failed parsing localStorage data:', err);
     return DEFAULT_STATE;
