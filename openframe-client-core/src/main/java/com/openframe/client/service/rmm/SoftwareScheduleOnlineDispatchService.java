@@ -35,6 +35,7 @@ import static java.util.stream.Collectors.toSet;
 public class SoftwareScheduleOnlineDispatchService {
 
     private static final String FIELD_FIRST_SEEN_AT = "firstSeenAt";
+    private static final int MAX_DISPATCH_ATTEMPTS = 5;
 
     private final SoftwareScheduleOnlineDispatchRepository dispatchRepository;
     private final MachineRepository machineRepository;
@@ -110,8 +111,18 @@ public class SoftwareScheduleOnlineDispatchService {
                 row.setDispatchedAt(now);
                 changed.add(row);
             } catch (Exception ex) {
-                log.error("Software schedule reconnect dispatch failed: tenantId={} machineId={} scheduleId={} (will retry next tick)",
-                        row.getTenantId(), row.getMachineId(), row.getScheduleId(), ex);
+                int attempts = row.getDispatchAttempts() + 1;
+                row.setDispatchAttempts(attempts);
+                if (attempts >= MAX_DISPATCH_ATTEMPTS) {
+                    row.setStatus(DeviceOnlineDispatchStatus.FAILED);
+                    changed.add(row);
+                    log.error("Software schedule reconnect dispatch failed permanently after {} attempts: tenantId={} machineId={} scheduleId={} — marking FAILED",
+                            attempts, row.getTenantId(), row.getMachineId(), row.getScheduleId(), ex);
+                } else {
+                    changed.add(row);
+                    log.error("Software schedule reconnect dispatch failed (attempt {}/{}): tenantId={} machineId={} scheduleId={} (will retry next tick)",
+                            attempts, MAX_DISPATCH_ATTEMPTS, row.getTenantId(), row.getMachineId(), row.getScheduleId(), ex);
+                }
             }
         }
         return changed;
