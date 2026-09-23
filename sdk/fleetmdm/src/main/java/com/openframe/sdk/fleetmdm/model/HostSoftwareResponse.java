@@ -12,8 +12,6 @@ public class HostSoftwareResponse {
 
     private List<HostSoftwareTitle> software;
 
-    private Integer count;
-
     private Meta meta;
 
     @Data
