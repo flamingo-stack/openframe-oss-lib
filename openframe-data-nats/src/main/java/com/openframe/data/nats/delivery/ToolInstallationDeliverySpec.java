@@ -12,10 +12,7 @@ import com.openframe.data.nats.mapper.LocalFilenameConfigurationMapper;
 import com.openframe.data.nats.model.ToolInstallationMessage;
 import com.openframe.data.nats.publisher.NatsMessagePublisher;
 import com.openframe.delivery.spec.DeliveryRequest;
-import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -28,27 +25,13 @@ import static java.util.Objects.requireNonNullElse;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty("spring.cloud.stream.enabled")
-public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallationDeliverySpec.Seed, ToolInstallationMessage> {
+public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallationDeliverySeed, ToolInstallationMessage> {
 
     private static final String SUBJECT_TEMPLATE = "machine.%s.tool-installation";
 
     private final NatsMessagePublisher natsMessagePublisher;
     private final DownloadConfigurationMapper downloadConfigurationMapper;
     private final LocalFilenameConfigurationMapper localFilenameConfigurationMapper;
-
-    @Getter
-    @AllArgsConstructor
-    public static class Seed implements DeliverySeed {
-        private final String machineId;
-        private final IntegratedToolAgent toolAgent;
-        private final IntegratedTool tool;
-        private final boolean reinstall;
-
-        @Override
-        public DeliveryType type() {
-            return DeliveryType.TOOL_INSTALLATION;
-        }
-    }
 
     @Override
     public DeliveryType getType() {
@@ -62,7 +45,7 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
 
     // targetId must equal the agentType the agent sends in installed-agent, or complete() never finds the row
     @Override
-    public DeliveryRequest<ToolInstallationMessage> request(Seed seed) {
+    public DeliveryRequest<ToolInstallationMessage> request(ToolInstallationDeliverySeed seed) {
         IntegratedToolAgent toolAgent = seed.getToolAgent();
         ToolInstallationMessage message = buildMessage(toolAgent, seed.getTool(), seed.isReinstall());
         String targetId = toolAgent.getKey();

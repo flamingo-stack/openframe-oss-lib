@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-import java.util.Optional;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.BACKOFF_MULTIPLIER;
@@ -20,7 +19,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeliveryPropertiesTest {
 
     private static final int UNINSTALL_MAX_ATTEMPTS = 5;
-    private static final String MIN_AGENT_VERSION = "1.4.0";
 
     private DeliveryProperties properties;
 
@@ -97,30 +95,6 @@ class DeliveryPropertiesTest {
 
         // verifications
         assertThat(enabled).isFalse();
-    }
-
-    @Test
-    void minAgentVersion_typeNotListed_empty() {
-        // setup
-        properties.setMinAgentVersion(Map.of());
-
-        // execution
-        Optional<String> minAgentVersion = properties.minAgentVersion(DeliveryType.TOOL_INSTALLATION);
-
-        // verifications
-        assertThat(minAgentVersion).isEmpty();
-    }
-
-    @Test
-    void minAgentVersion_typeListed_versionReturned() {
-        // setup
-        properties.setMinAgentVersion(Map.of(DeliveryType.TOOL_INSTALLATION, MIN_AGENT_VERSION));
-
-        // execution
-        Optional<String> minAgentVersion = properties.minAgentVersion(DeliveryType.TOOL_INSTALLATION);
-
-        // verifications
-        assertThat(minAgentVersion).contains(MIN_AGENT_VERSION);
     }
 
     @Test

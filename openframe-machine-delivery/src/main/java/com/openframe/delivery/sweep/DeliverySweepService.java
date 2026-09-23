@@ -9,7 +9,9 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
+import com.openframe.delivery.config.DeliveryProperties.Sweep;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliverySeed;
@@ -92,13 +94,14 @@ public class DeliverySweepService {
             closer.fail(delivery, DeliveryFailure.OFFLINE, DeliveryStatus.UNACKED, now);
             return;
         }
-        long recheckSeconds = policy.getMaxRetryIntervalSeconds();
-        Instant recheckAt = now.plusSeconds(recheckSeconds);
+        Sweep sweep = properties.getSweep();
+        long recheckMillis = sweep.getInterval();
+        Instant recheckAt = now.plusMillis(recheckMillis);
         Instant dueAt = earliest(windowEnd, recheckAt);
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
-        repository.park(id, DeliveryStatus.UNACKED, dispatchedAt, dueAt);
-        log.debug("Delivery parked, machine not online: id={} dueAt={} windowEnd={}", id, dueAt, windowEnd);
+        repository.postpone(id, DeliveryStatus.UNACKED, dispatchedAt, dueAt);
+        log.debug("Delivery waits for the machine to come online: id={} dueAt={} windowEnd={}", id, dueAt, windowEnd);
     }
 
     private void republish(MachineDelivery delivery, Policy policy, Instant now) {

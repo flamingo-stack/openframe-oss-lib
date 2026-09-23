@@ -13,7 +13,6 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.Optional;
 
 import static java.lang.Boolean.FALSE;
 import static java.util.Objects.requireNonNullElse;
@@ -39,16 +38,8 @@ public class DeliveryProperties {
     // a type not listed here is off: every environment switches each type on explicitly
     private Map<DeliveryType, Boolean> enabled = new EnumMap<>(DeliveryType.class);
 
-    // first agent version that acks the type; a type not listed here keeps every machine on the old path
-    private Map<DeliveryType, String> minAgentVersion = new EnumMap<>(DeliveryType.class);
-
     public boolean isEnabled(DeliveryType type) {
         return enabled.getOrDefault(type, FALSE);
-    }
-
-    public Optional<String> minAgentVersion(DeliveryType type) {
-        String version = minAgentVersion.get(type);
-        return Optional.ofNullable(version);
     }
 
     public Policy resolve(DeliveryType type) {
@@ -63,6 +54,9 @@ public class DeliveryProperties {
     @Setter
     public static class Sweep {
 
+        @NotNull
+        @Positive
+        private Long interval;
         @NotNull
         @Positive
         private Integer batchSize;

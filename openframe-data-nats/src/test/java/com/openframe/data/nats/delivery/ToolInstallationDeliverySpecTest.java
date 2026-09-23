@@ -55,7 +55,7 @@ class ToolInstallationDeliverySpecTest {
     void request_toolAgent_messageBuiltAndTargetIsAgentKey() {
         // setup
         when(downloadConfigurationMapper.map(null, VERSION)).thenReturn(List.of());
-        ToolInstallationDeliverySpec.Seed seed = new ToolInstallationDeliverySpec.Seed(MACHINE_ID, toolAgent, tool, true);
+        ToolInstallationDeliverySeed seed = new ToolInstallationDeliverySeed(MACHINE_ID, toolAgent, tool, true);
 
         // execution
         DeliveryRequest<ToolInstallationMessage> request = spec.request(seed);
@@ -79,7 +79,7 @@ class ToolInstallationDeliverySpecTest {
         toolAgent.setToolId(null);
         tool.setToolType(null);
         when(downloadConfigurationMapper.map(null, VERSION)).thenReturn(List.of());
-        ToolInstallationDeliverySpec.Seed seed = new ToolInstallationDeliverySpec.Seed(MACHINE_ID, toolAgent, tool, false);
+        ToolInstallationDeliverySeed seed = new ToolInstallationDeliverySeed(MACHINE_ID, toolAgent, tool, false);
 
         // execution
         DeliveryRequest<ToolInstallationMessage> request = spec.request(seed);

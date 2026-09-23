@@ -2,8 +2,6 @@ package com.openframe.client.listener.rmm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.rmm.ScriptExecutionAcknowledgeService;
-import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.delivery.track.DeliveryTracker;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.data.nats.rmm.model.ScriptExecutionAcknowledgeMessage;
 import io.nats.client.Connection;
@@ -19,18 +17,15 @@ public class ScriptExecutionAcknowledgeListener extends AbstractJetStreamPushLis
 
     private final ObjectMapper objectMapper;
     private final ScriptExecutionAcknowledgeService acknowledgeService;
-    private final DeliveryTracker deliveryTracker;
 
     public ScriptExecutionAcknowledgeListener(
             Connection natsConnection,
             ObjectMapper objectMapper,
-            ScriptExecutionAcknowledgeService acknowledgeService,
-            DeliveryTracker deliveryTracker
+            ScriptExecutionAcknowledgeService acknowledgeService
     ) {
         super(natsConnection);
         this.objectMapper = objectMapper;
         this.acknowledgeService = acknowledgeService;
-        this.deliveryTracker = deliveryTracker;
     }
 
     @Override
@@ -63,23 +58,10 @@ public class ScriptExecutionAcknowledgeListener extends AbstractJetStreamPushLis
         String payload = new String(message.getData(), StandardCharsets.UTF_8);
         try {
             ScriptExecutionAcknowledgeMessage ack = objectMapper.readValue(payload, ScriptExecutionAcknowledgeMessage.class);
-            if (isDeliveryAck(ack)) {
-                deliveryTracker.acknowledge(ack.getType(), ack.getTargetId(), ack.getMachineId(), ack.getDispatchId());
-            }
-            if (isScriptAck(ack)) {
-                acknowledgeService.acknowledge(ack);
-            }
+            acknowledgeService.acknowledge(ack);
             message.ack();
         } catch (Exception e) {
             log.error("Unexpected error processing execution ack: {}", payload, e);
         }
-    }
-
-    private static boolean isDeliveryAck(ScriptExecutionAcknowledgeMessage ack) {
-        return ack.getType() != null && ack.getTargetId() != null;
-    }
-
-    private static boolean isScriptAck(ScriptExecutionAcknowledgeMessage ack) {
-        return ack.getType() == null || ack.getType() == DeliveryType.SCRIPT_SCHEDULE;
     }
 }

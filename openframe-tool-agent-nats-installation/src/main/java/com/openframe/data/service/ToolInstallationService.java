@@ -3,9 +3,9 @@ package com.openframe.data.service;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.nats.delivery.ToolInstallationDeliverySpec;
+import com.openframe.data.nats.delivery.ToolInstallationDeliverySeed;
 import com.openframe.data.nats.publisher.ToolInstallationNatsPublisher;
-import com.openframe.delivery.dispatch.DeliveryGate;
+import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +25,7 @@ public class ToolInstallationService {
     private final IntegratedToolService integratedToolService;
     private final ToolCommandParamsResolver toolCommandParamsResolver;
     private final ToolInstallationNatsPublisher toolInstallationNatsPublisher;
-    private final DeliveryGate deliveryGate;
+    private final DeliveryProperties deliveryProperties;
     private final DeliveryDispatcher deliveryDispatcher;
 
     public void process(String machineId, IntegratedToolAgent toolAgent) {
@@ -72,8 +72,8 @@ public class ToolInstallationService {
 
 
     private void publish(String machineId, IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
-        if (deliveryGate.isOpen(DeliveryType.TOOL_INSTALLATION, machineId)) {
-            ToolInstallationDeliverySpec.Seed seed = new ToolInstallationDeliverySpec.Seed(machineId, toolAgent, tool, reinstall);
+        if (deliveryProperties.isEnabled(DeliveryType.TOOL_INSTALLATION)) {
+            ToolInstallationDeliverySeed seed = new ToolInstallationDeliverySeed(machineId, toolAgent, tool, reinstall);
             deliveryDispatcher.dispatch(seed);
             return;
         }

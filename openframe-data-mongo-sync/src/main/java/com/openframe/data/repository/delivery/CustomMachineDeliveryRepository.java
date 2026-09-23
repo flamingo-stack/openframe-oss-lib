@@ -20,17 +20,16 @@ public interface CustomMachineDeliveryRepository {
 
     boolean postponeAfterError(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt);
 
-    boolean park(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt);
 
     boolean markAcked(String id, String dispatchId, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt);
 
-    boolean markDone(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
+    boolean markDone(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
 
     boolean markCancelled(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
 
     boolean markCancelled(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant finishedAt, Instant expiresAt);
 
     boolean markFailed(String id, Set<DeliveryStatus> from, Instant dispatchedAt, DeliveryFailure failure, Instant finishedAt, Instant expiresAt);
+    boolean markFailed(String id, String dispatchId, Set<DeliveryStatus> from, DeliveryFailure failure, String error, Instant finishedAt, Instant expiresAt);
 
-    long wake(String machineId, Set<DeliveryStatus> from, Instant dueAt);
 }
