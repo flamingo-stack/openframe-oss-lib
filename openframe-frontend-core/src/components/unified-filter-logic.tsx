@@ -6,6 +6,7 @@ import { scrollElementIntoView } from '../utils/scroll-into-view';
 // Top of file, not the mid-file import block below: this one is used inside
 // the hook at the top of the file, so `no-use-before-define` is right about it.
 import { positiveInt } from '../utils/search-params';
+import { formatClassification, formatPricingModel } from '../utils/format-text-stub';
 
 /**
  * Unified AND Filter Logic
@@ -396,8 +397,6 @@ export function useUnifiedFiltering(config: FilterConfig) {
     isPending,
   };
 }
-
-import { formatClassification, formatPricingModel } from '../utils/format-text-stub';
 
 // Helper functions for filter labels
 function getFilterLabel(filterKey: string): string {
