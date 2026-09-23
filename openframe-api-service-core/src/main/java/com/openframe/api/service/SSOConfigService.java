@@ -21,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.NoSuchElementException;
 
 import static com.openframe.data.document.sso.SSOConfig.OPENFRAME_PROVIDER;
 import static java.lang.Boolean.TRUE;
@@ -130,15 +131,16 @@ public class SSOConfigService {
             toggleOpenframeLogin(enabled);
             return;
         }
-        ssoConfigRepository.findByProvider(provider)
-                .ifPresent(config -> {
-                    config.setEnabled(enabled);
-                    SSOConfig savedConfig = ssoConfigRepository.save(config);
-                    log.info("Successfully {} SSO configuration for provider '{}'",
-                            enabled ? "enabled" : "disabled", provider);
+        SSOConfig config = ssoConfigRepository.findByProvider(provider)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "SSO configuration for provider '" + provider + "' not found"));
 
-                    ssoConfigProcessor.postProcessConfigToggled(savedConfig);
-                });
+        config.setEnabled(enabled);
+        SSOConfig savedConfig = ssoConfigRepository.save(config);
+        log.info("Successfully {} SSO configuration for provider '{}'",
+                enabled ? "enabled" : "disabled", provider);
+
+        ssoConfigProcessor.postProcessConfigToggled(savedConfig);
     }
 
     /**
