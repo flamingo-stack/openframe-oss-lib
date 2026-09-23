@@ -20,7 +20,6 @@ import com.openframe.data.document.ticket.ClientTicketOwner;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketOwner;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.document.user.User;
@@ -148,14 +147,13 @@ public class TicketService {
                 .ticketNumber(ticketNumberService.getNextTicketNumber())
                 .title(input.getTitle())
                 .description(input.getDescription())
-                .status(isAgentCreated ? TicketStatus.TECH_REQUIRED : TicketStatus.ACTIVE)
                 .creationSource(isAgentCreated ? TicketCreationSource.FAE_FORM : TicketCreationSource.ADMIN_DASHBOARD)
                 .owner(buildTicketOwner(principal))
                 .build();
 
         if (isAgentCreated) {
             populateDeviceFromPrincipal(ticket, principal);
-            applyInitialStatusIfLifecycle(ticket);
+            applyInitialStatus(ticket, TicketStatusKind.TECH_REQUIRED);
         } else {
             populateAdminFields(ticket, input);
             // Manually (admin) created tickets pick a custom status (default: first custom),
@@ -192,13 +190,12 @@ public class TicketService {
 
         Ticket ticket = Ticket.builder()
                 .ticketNumber(ticketNumberService.getNextTicketNumber())
-                .status(TicketStatus.ACTIVE)
                 .creationSource(TicketCreationSource.FAE_DIALOG)
                 .owner(buildTicketOwner(principal))
                 .build();
 
         populateDeviceFromPrincipal(ticket, principal);
-        applyInitialStatusIfLifecycle(ticket);
+        applyInitialStatus(ticket, TicketStatusKind.AI_ASSISTANCE);
 
         ticket.setOrder(computeTopOrder(ticket));
 
@@ -220,13 +217,12 @@ public class TicketService {
                 .ticketNumber(ticketNumberService.getNextTicketNumber())
                 .title(title)
                 .description(description)
-                .status(TicketStatus.TECH_REQUIRED)
                 .creationSource(TicketCreationSource.FAE_DIALOG)
                 .owner(buildTicketOwner(principal))
                 .build();
 
         populateDeviceFromPrincipal(ticket, principal);
-        applyInitialStatusIfLifecycle(ticket);
+        applyInitialStatus(ticket, TicketStatusKind.TECH_REQUIRED);
 
         ticket.setOrder(computeTopOrder(ticket));
 
@@ -384,8 +380,8 @@ public class TicketService {
         return ticketLifecycleService.computeRankAtTop(ticket.getStatusId());
     }
 
-    private void applyInitialStatusIfLifecycle(Ticket ticket) {
-        ticketLifecycleService.applyInitialStatus(ticket);
+    private void applyInitialStatus(Ticket ticket, TicketStatusKind kind) {
+        ticketLifecycleService.applyInitialStatus(ticket, kind);
     }
 
     private void applyManualStatusIfLifecycle(Ticket ticket, String requestedStatusId) {

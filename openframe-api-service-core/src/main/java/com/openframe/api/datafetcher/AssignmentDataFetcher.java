@@ -18,6 +18,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.ticket.TicketStatus;
 import graphql.relay.Relay;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -114,6 +115,18 @@ public class AssignmentDataFetcher {
         Ticket ticket = dfe.getSource();
         String ticketId = ticket.getId();
         return RELAY.toGlobalId("Ticket", ticketId);
+    }
+
+    /**
+     * The legacy status, kept for clients built before the lifecycle rollout — the mobile and
+     * desktop shells ship a frozen web bundle. Nothing stores it any more, so it is derived from
+     * the lifecycle kind; this schema exposes no kind of its own.
+     * TODO(lifecycle-rollout): drop once no released shell reads it.
+     */
+    @DgsData(parentType = "Ticket", field = "status")
+    public String ticketLegacyStatus(DgsDataFetchingEnvironment dfe) {
+        Ticket ticket = dfe.getSource();
+        return TicketStatus.fromKind(ticket.getStatusKind()).name();
     }
 
     @DgsData(parentType = "ItemAssignment", field = "target")

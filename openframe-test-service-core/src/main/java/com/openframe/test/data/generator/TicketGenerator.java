@@ -77,34 +77,14 @@ public class TicketGenerator {
                 .build();
     }
 
-    public static TicketFilterInput activeTickets() {
-        return TicketFilterInput.builder()
-                .statuses(List.of("ACTIVE"))
-                .build();
+    /** Every ticket in the tenant: the API no longer offers a lifecycle axis to narrow this by. */
+    public static TicketFilterInput allTickets() {
+        return TicketFilterInput.builder().build();
     }
 
     public static TicketFilterInput ticketsWithStatusId(String statusId) {
         return TicketFilterInput.builder()
                 .statusIds(List.of(statusId))
-                .build();
-    }
-
-    /**
-     * One lifecycle column, restricted to records the reorder mutation will actually accept as anchors.
-     * <p>
-     * {@code statusIds} selects the column; the legacy {@code status} enum is a separate axis, and a
-     * column listing carries archived records alongside live ones. Reorder requires the moved ticket and
-     * its neighbour to agree on that enum, so an unfiltered listing eventually fails with
-     * {@code "Neighbor <id> is in status ACTIVE, expected ARCHIVED"} — the bottom of the column is where
-     * archived leftovers settle, and that is exactly the ticket {@code moveLastBeforeFirst} picks up.
-     * <p>
-     * This is tenant state, not a one-off: every pipeline run archives the tickets it created, so a
-     * shared tenant reaccumulates them and the failure returns however often the data is cleaned.
-     */
-    public static TicketFilterInput activeTicketsWithStatusId(String statusId) {
-        return TicketFilterInput.builder()
-                .statusIds(List.of(statusId))
-                .statuses(List.of("ACTIVE"))
                 .build();
     }
 
