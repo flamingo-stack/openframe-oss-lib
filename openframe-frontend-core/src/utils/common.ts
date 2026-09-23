@@ -1,18 +1,9 @@
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+export { cn } from './cn';
 
 /**
  * Utility functions for common operations
  */
-
-/**
- * Merge class names with Tailwind CSS
- * @param inputs - Class names to merge
- * @returns Merged class names
- */
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 /**
  * Human-readable message for a caught value.
@@ -163,3 +154,4 @@ export function pick<T extends object, K extends keyof T>(source: T, keys: reado
  * silently inheriting.
  */
 export const NO_CLIENT_CACHE = { staleTime: 0 } as const;
+
