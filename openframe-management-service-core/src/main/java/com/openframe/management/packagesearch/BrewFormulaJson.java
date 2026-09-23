@@ -1,13 +1,17 @@
 package com.openframe.management.packagesearch;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
 
 @Data
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 class BrewFormulaJson {
 
@@ -21,7 +25,9 @@ class BrewFormulaJson {
     private Boolean disabled;
 
     @Data
+    @Builder
     @NoArgsConstructor
+    @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Versions {
         private String stable;

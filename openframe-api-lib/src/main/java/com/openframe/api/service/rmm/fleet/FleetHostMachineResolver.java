@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.fleet;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.sdk.fleetmdm.model.Host;
@@ -60,8 +61,14 @@ public class FleetHostMachineResolver {
 
     private static Map<String, Machine> index(List<Machine> machines, Function<Machine, String> key) {
         return machines.stream()
+                .filter(FleetHostMachineResolver::isCountable)
                 .filter(m -> isNotBlank(key.apply(m)))
                 .collect(Collectors.toMap(key, Function.identity(), (a, b) -> a));
+    }
+
+    private static boolean isCountable(Machine machine) {
+        DeviceStatus status = machine.getStatus();
+        return status == DeviceStatus.ONLINE || status == DeviceStatus.OFFLINE;
     }
 
     private static Machine lookup(Map<String, Machine> byKey, String key) {

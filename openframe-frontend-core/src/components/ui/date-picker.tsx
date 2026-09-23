@@ -757,7 +757,7 @@ export function DatePicker(props: DatePickerProps) {
   );
 
   return (
-    <FieldWrapper label={label} error={error}>
+    <FieldWrapper label={label} error={error} errorSlot={'error' in props}>
       {picker}
     </FieldWrapper>
   );
@@ -790,23 +790,24 @@ const generateMinuteOptions = (): string[] => {
   return Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 };
 
-export function DatePickerInput({
-  placeholder = 'Select date',
-  formatDate = defaultFormatDate,
-  disabled = false,
-  className,
-  numberOfMonths = 1,
-  fromDate,
-  toDate,
-  locale,
-  value,
-  onChange,
-  showTime = false,
-  use24HourFormat = false,
-  label,
-  error,
-  invalid = false,
-}: DatePickerInputProps) {
+export function DatePickerInput(props: DatePickerInputProps) {
+  const {
+    placeholder = 'Select date',
+    formatDate = defaultFormatDate,
+    disabled = false,
+    className,
+    numberOfMonths = 1,
+    fromDate,
+    toDate,
+    locale,
+    value,
+    onChange,
+    showTime = false,
+    use24HourFormat = false,
+    label,
+    error,
+    invalid = false,
+  } = props;
   const [open, setOpen] = useState(false);
   const isInvalid = invalid || !!error;
 
@@ -988,7 +989,7 @@ export function DatePickerInput({
   );
 
   return (
-    <FieldWrapper label={label} error={error} className={className}>
+    <FieldWrapper label={label} error={error} errorSlot={'error' in props} className={className}>
       {content}
     </FieldWrapper>
   );
@@ -1036,24 +1037,25 @@ const generateTimeOptions = (intervalMinutes: number, use24Hour: boolean): { val
   return options;
 };
 
-export function DatePickerInputSimple({
-  placeholder = 'Select date',
-  formatDate = defaultFormatDate,
-  disabled = false,
-  className,
-  numberOfMonths = 1,
-  fromDate,
-  toDate,
-  locale,
-  value,
-  onChange,
-  showTime = false,
-  timeInterval = 30,
-  use24HourFormat = false,
-  label,
-  error,
-  invalid = false,
-}: DatePickerInputSimpleProps) {
+export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
+  const {
+    placeholder = 'Select date',
+    formatDate = defaultFormatDate,
+    disabled = false,
+    className,
+    numberOfMonths = 1,
+    fromDate,
+    toDate,
+    locale,
+    value,
+    onChange,
+    showTime = false,
+    timeInterval = 30,
+    use24HourFormat = false,
+    label,
+    error,
+    invalid = false,
+  } = props;
   const [open, setOpen] = useState(false);
   const isInvalid = invalid || !!error;
 
@@ -1181,7 +1183,7 @@ export function DatePickerInputSimple({
   );
 
   return (
-    <FieldWrapper label={label} error={error} className={className}>
+    <FieldWrapper label={label} error={error} errorSlot={'error' in props} className={className}>
       {content}
     </FieldWrapper>
   );

@@ -58,7 +58,6 @@ class TicketMapperTest {
                 .ticketNumber(42)
                 .title("Printer is on fire")
                 .description("Smoke everywhere")
-                .status(TicketStatus.RESOLVED)
                 .statusId("st-resolved")
                 .statusKind(TicketStatusKind.RESOLVED)
                 .creationSource(TicketCreationSource.ADMIN_DASHBOARD)
@@ -88,7 +87,6 @@ class TicketMapperTest {
         assertEquals(42, response.getTicketNumber());
         assertEquals("Printer is on fire", response.getTitle());
         assertEquals("Smoke everywhere", response.getDescription());
-        assertEquals(TicketStatus.RESOLVED, response.getStatus());
         assertEquals(TicketStatusKind.RESOLVED, response.getStatusKind());
         assertEquals(TicketCreationSource.ADMIN_DASHBOARD, response.getCreationSource());
         assertEquals(new TicketOwnerResponse(TicketOwnerType.ADMIN, null, "user-9"), response.getOwner());
@@ -423,9 +421,6 @@ class TicketMapperTest {
         TicketStatisticsResponse response = mapper.toStatisticsResponse(statistics);
 
         assertEquals(12, response.getTotalCount());
-        assertEquals(List.of(
-                new TicketStatisticsResponse.StatusCount(TicketStatus.ACTIVE, 7),
-                new TicketStatisticsResponse.StatusCount(TicketStatus.RESOLVED, 5)), response.getStatusCounts());
         assertEquals(2, response.getStatusDefinitionCounts().size());
         TicketStatisticsResponse.StatusDefinitionCount aiCount = response.getStatusDefinitionCounts().get(0);
         assertEquals("st-ai", aiCount.getStatus().getId());
@@ -443,7 +438,6 @@ class TicketMapperTest {
         TicketStatisticsResponse response = mapper.toStatisticsResponse(new TicketStatistics());
 
         assertNull(response.getTotalCount());
-        assertEquals(List.of(), response.getStatusCounts());
         assertEquals(List.of(), response.getStatusDefinitionCounts());
         assertNull(response.getAverageResolutionTimeFormatted());
         assertNull(response.getAverageRating());

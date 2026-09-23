@@ -46,7 +46,6 @@ class TicketServiceInsightLinkTest {
     @Mock private OrganizationRepository organizationRepository;
     @Mock private UserRepository userRepository;
     @Mock private AssignmentService assignmentService;
-    @Mock private TicketOrderCalculationService ticketOrderCalculationService;
     @Mock private TicketLifecycleService ticketLifecycleService;
     @Mock private TicketResolverStamp ticketResolverStamp;
     @Mock private TicketStalenessResolver ticketStalenessResolver;

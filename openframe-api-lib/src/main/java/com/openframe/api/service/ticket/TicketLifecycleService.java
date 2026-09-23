@@ -9,7 +9,6 @@ import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
@@ -28,6 +27,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 import static com.openframe.api.service.ticket.TicketTransitionPolicyValidator.MANUALLY_CREATABLE_KINDS;
@@ -45,6 +45,9 @@ import static org.springframework.util.StringUtils.hasText;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TicketLifecycleService {
+
+    private static final Set<TicketStatusKind> INITIAL_KINDS =
+            Set.of(TicketStatusKind.AI_ASSISTANCE, TicketStatusKind.TECH_REQUIRED);
 
     private final TicketRepository ticketRepository;
     private final TicketStatusDefinitionRepository statusRepository;
@@ -152,12 +155,13 @@ public class TicketLifecycleService {
     }
 
     /**
-     * Stamps a newly created ticket with the lifecycle status (statusId/statusKind) that corresponds
-     * to its initial legacy {@link TicketStatus}, so the ticket is immediately findable by the
-     * custom-status filter (and not only after the next backfill migration run).
+     * Stamps a newly created ticket with the system status of the given kind. Only the two entry
+     * kinds are allowed: a ticket starts either with the assistant or in the technician queue.
      */
-    public void applyInitialStatus(Ticket ticket) {
-        TicketStatusKind kind = initialKindFor(ticket.getStatus());
+    public void applyInitialStatus(Ticket ticket, TicketStatusKind kind) {
+        if (!INITIAL_KINDS.contains(kind)) {
+            throw new IllegalStateException("Unsupported initial ticket status kind: " + kind);
+        }
         TicketStatusDefinition status = requireByKind(kind);
         ticket.setStatusId(status.getId());
         ticket.setStatusKind(status.getKind());
@@ -178,14 +182,6 @@ public class TicketLifecycleService {
         ticket.setStatusId(target.getId());
         ticket.setStatusKind(target.getKind());
         log.debug("Applied manual initial status {} (id={}) to new ticket", target.getName(), target.getId());
-    }
-
-    private TicketStatusKind initialKindFor(TicketStatus legacyStatus) {
-        return switch (legacyStatus) {
-            case ACTIVE -> TicketStatusKind.AI_ASSISTANCE;
-            case TECH_REQUIRED -> TicketStatusKind.TECH_REQUIRED;
-            default -> throw new IllegalStateException("Unsupported initial ticket status: " + legacyStatus);
-        };
     }
 
     private TicketStatusDefinition requireManuallyCreatableStatus(String statusId) {
