@@ -22,16 +22,21 @@ class RetryingHttpClientFactory {
     // waiting on a retransmit, and the only question is how long we wait before giving up and dialling
     // again. At 10s that cost 42 connect timeouts 210 of the 333 seconds in one run.
     //
-    // 2s keeps the connects that survive one retransmit (~1s) and abandons the rest to the retry below,
-    // which reconnects in under a millisecond when the next SYN gets through. Worst case per request
-    // falls from ~57s (5 attempts x 10s + backoff) to ~17s, and the common single-drop case from ~10.5s
-    // to ~2.5s.
+    // 2s was tried and reverted. It made each drop cheap, but the timeout is also what sets how long a
+    // request can ride out a burst: 5 attempts x 2s + backoff spans ~17.5s against ~57.5s at 10s. On the
+    // qa dev suite of 2026-09-22 21:00 the drop rate tripled (67 failed attempts against 21 earlier that
+    // evening), bursts outlasted the shorter budget, and two cases failed outright with
+    // ConnectTimeoutException after exhausting their retries. Wall clock barely moved either — 333s to
+    // 306s — because three times the drops ate the saving.
+    //
+    // If this is revisited, raise CONNECT_RETRIES alongside it rather than alone: 2s with 8 retries spans
+    // ~45s, close to today's resilience, while still costing 2s per drop instead of 10.
     //
     // Socket timeout stays generous: that one covers the server thinking, which is a different problem.
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration SOCKET_TIMEOUT = Duration.ofSeconds(32);
-    // 5 attempts (initial + 4 retries) plus backoff. At a ~10% drop rate, five independent attempts put
-    // the odds of exhausting them at about one in a hundred thousand.
+    // 5 attempts (initial + 4 retries) plus backoff, spanning ~57.5s of wall clock, so a burst of drops
+    // is ridden out rather than failing the test.
     private static final int CONNECT_RETRIES = 4;
     private static final Duration RETRY_BACKOFF_BASE = Duration.ofMillis(500);
     private static final Duration RETRY_BACKOFF_MAX = Duration.ofSeconds(5);

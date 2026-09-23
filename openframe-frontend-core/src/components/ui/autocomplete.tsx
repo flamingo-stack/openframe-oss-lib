@@ -742,7 +742,13 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
   );
 
   return (
-    <FieldWrapper label={label} labelVariant={labelVariant} error={error} className={className}>
+    <FieldWrapper
+      label={label}
+      labelVariant={labelVariant}
+      error={error}
+      errorSlot={'error' in props}
+      className={className}
+    >
       <div className="relative" ref={containerRef}>
         {popover}
 
