@@ -113,14 +113,32 @@ const digitsOf = (s: string): string => s.replace(/\D/g, '');
 const MIN_COPY_MATCH_LENGTH = 2;
 /** Digits-only phone matching needs a real phone-sized run to be meaningful. */
 const MIN_PHONE_DIGITS = 7;
+/**
+ * The largest legitimate difference between an E.164-with-country-code phone
+ * and its national-format rendition is the country calling code prefix,
+ * which is never more than 3 digits. Anchoring the allowed suffix-match
+ * length difference to this bound (rather than any endsWith/startsWith
+ * match) prevents a bot from forgiving the honeypot by concatenating an
+ * unrelated 7+-digit field with any numeric-looking value elsewhere in the
+ * payload — only a genuine country-code-prefix difference is tolerated.
+ */
+const MAX_PHONE_PREFIX_DIFF = 3;
 
 /**
- * Phone-sized digit runs match when one ENDS WITH the other: a manager fills
- * the stored national format ("(555) 123-4567") while the client posts E.164
- * ("+15551234567") — same phone, differing only by the country-code prefix.
+ * Phone-sized digit runs match when one ENDS WITH the other AND the length
+ * difference is no larger than a country-calling-code prefix: a manager
+ * fills the stored national format ("(555) 123-4567") while the client posts
+ * E.164 ("+15551234567") — same phone, differing only by the country-code
+ * prefix. Bounding the difference (rather than accepting any endsWith/
+ * startsWith superset) stops a bot from forgiving the honeypot by pairing a
+ * 7+-digit decoy with any longer numeric field (e.g. an ID or zip+phone
+ * concatenation) that merely happens to end with it.
  */
 const phoneDigitsMatch = (a: string, b: string): boolean =>
-  a.length >= MIN_PHONE_DIGITS && b.length >= MIN_PHONE_DIGITS && (a.endsWith(b) || b.endsWith(a));
+  a.length >= MIN_PHONE_DIGITS &&
+  b.length >= MIN_PHONE_DIGITS &&
+  Math.abs(a.length - b.length) <= MAX_PHONE_PREFIX_DIFF &&
+  (a.endsWith(b) || b.endsWith(a));
 
 /**
  * Find the body field the decoy value was COPIED from — the autofill
@@ -193,3 +211,4 @@ export const splitCsvEnv = (s?: string): string[] =>
     ?.split(',')
     .map(t => t.trim())
     .filter(Boolean) ?? [];
+
