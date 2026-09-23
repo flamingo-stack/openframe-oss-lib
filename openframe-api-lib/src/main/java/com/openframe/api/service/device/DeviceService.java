@@ -44,6 +44,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -97,13 +98,19 @@ public class DeviceService {
         return paginate(machineFilter(filterOptions, null, null), search, paginationCriteria, sort);
     }
 
+    /**
+     * Queries devices assigned to the given machine IDs.
+     *
+     * @param machineIds the collection of machine IDs to scope the query to; must not be null.
+     *                    Callers must pass an empty collection explicitly if there is no restriction to apply.
+     */
     public CountedGenericQueryResult<Machine> queryAssignedDevices(Collection<String> machineIds,
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search,
                                                   SortInput sort) {
-        Collection<String> scope = machineIds == null ? List.of() : machineIds;
-        return paginate(scheduleDeviceFilter(filterOptions, null, scope), search, paginationCriteria, sort);
+        Objects.requireNonNull(machineIds, "machineIds must not be null");
+        return paginate(scheduleDeviceFilter(filterOptions, null, machineIds), search, paginationCriteria, sort);
     }
 
     public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<OsType> osTypes,
