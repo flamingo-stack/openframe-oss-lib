@@ -38,6 +38,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,6 +47,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -106,8 +108,12 @@ public class SoftwareInventoryService {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
 
-        List<SoftwareResponse> all = fetchAllTitles(search, vulnerable);
-        enrichRealDevicesCount(all);
+        List<SoftwareTitle> titles = fetchAllTitles(search, vulnerable);
+        Map<Long, String> titleIdByVersionId = titleIdByVersionId(titles);
+        List<SoftwareResponse> all = mapTitles(titles);
+        deviceCountEnricher.enrichFromHostSoftware(all, fleet()::searchHosts,
+                software -> Stream.ofNullable(titleIdByVersionId.get(software.getId())),
+                SoftwareResponse::getId, SoftwareResponse::setDevicesCount);
         List<SoftwareResponse> withDevices = all.stream()
                 .filter(row -> deviceCount(row) > 0)
                 .toList();
@@ -140,8 +146,8 @@ public class SoftwareInventoryService {
     }
 
 
-    private List<SoftwareResponse> fetchAllTitles(String search, Boolean vulnerable) {
-        List<SoftwareResponse> all = new ArrayList<>();
+    private List<SoftwareTitle> fetchAllTitles(String search, Boolean vulnerable) {
+        List<SoftwareTitle> all = new ArrayList<>();
         int page = 0;
         while (all.size() < TITLES_FETCH_CAP) {
             SoftwareTitleRequest request = SoftwareTitleRequest.builder()
@@ -149,7 +155,9 @@ public class SoftwareInventoryService {
                     .vulnerable(vulnerable)
                     .build();
             SoftwareTitlesResponse response = fleet().listSoftwareTitles(request);
-            all.addAll(mapTitles(response));
+            if (response.getSoftwareTitles() != null) {
+                all.addAll(response.getSoftwareTitles());
+            }
             boolean hasNext = response.getMeta() != null
                     && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
             if (!hasNext || response.getSoftwareTitles() == null || response.getSoftwareTitles().isEmpty()) {
@@ -160,12 +168,25 @@ public class SoftwareInventoryService {
         return all;
     }
 
-    private static List<SoftwareResponse> mapTitles(SoftwareTitlesResponse response) {
-        return response.getSoftwareTitles() == null ? List.of()
-                : response.getSoftwareTitles().stream()
-                        .map(FleetSoftwareMapper::toResponse)
-                        .filter(Objects::nonNull)
-                        .toList();
+    private static List<SoftwareResponse> mapTitles(List<SoftwareTitle> titles) {
+        return titles.stream()
+                .map(FleetSoftwareMapper::toResponse)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private static Map<Long, String> titleIdByVersionId(List<SoftwareTitle> titles) {
+        Map<Long, String> byVersionId = new HashMap<>();
+        for (SoftwareTitle title : titles) {
+            if (title.getId() == null || title.getVersions() == null) {
+                continue;
+            }
+            title.getVersions().stream()
+                    .map(SoftwareTitleVersion::getId)
+                    .filter(Objects::nonNull)
+                    .forEach(versionId -> byVersionId.put(versionId, title.getId().toString()));
+        }
+        return byVersionId;
     }
 
     private static Comparator<SoftwareResponse> comparatorFor(String field, boolean desc) {
@@ -333,7 +354,7 @@ public class SoftwareInventoryService {
     public SoftwareFilters getSoftwareFilters(String search) {
         // Facet counts don't depend on the enriched devicesCount, so bypass enrichRealDevicesCount
         // here — it would fire N Fleet /hosts lookups just to produce numbers we don't use.
-        List<SoftwareResponse> titles = fetchAllTitles(search, null);
+        List<SoftwareResponse> titles = mapTitles(fetchAllTitles(search, null));
         return SoftwareFilters.builder()
                 .sources(facet(titles, SoftwareResponse::getSource))
                 .versionStatuses(facet(titles, SoftwareResponse::getVersionStatus))

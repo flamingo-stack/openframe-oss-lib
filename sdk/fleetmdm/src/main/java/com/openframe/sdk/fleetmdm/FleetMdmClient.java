@@ -264,6 +264,10 @@ public class FleetMdmClient {
             params.add("vulnerability=" + URLEncoder.encode(searchRequest.getCve(), StandardCharsets.UTF_8));
         }
 
+        if (searchRequest.isPopulateSoftware()) {
+            params.add("populate_software=true");
+        }
+
         if (!params.isEmpty()) {
             urlBuilder.append("?").append(String.join("&", params));
         }

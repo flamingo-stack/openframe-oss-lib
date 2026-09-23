@@ -10,6 +10,7 @@ public class HostSearchRequest {
     private Long softwareTitleId;
     private Long softwareVersionId;
     private String cve;
+    private boolean populateSoftware;
 
     public HostSearchRequest() {
         this.page = 0;
@@ -89,5 +90,13 @@ public class HostSearchRequest {
 
     public void setCve(String cve) {
         this.cve = cve;
+    }
+
+    public boolean isPopulateSoftware() {
+        return populateSoftware;
+    }
+
+    public void setPopulateSoftware(boolean populateSoftware) {
+        this.populateSoftware = populateSoftware;
     }
 }
