@@ -147,11 +147,14 @@ function reducer(state: Notification[], action: Action): Notification[] {
   }
 }
 
+let idCounter = 0;
+
 function generateId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  return `n_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  idCounter = (idCounter + 1) % Number.MAX_SAFE_INTEGER;
+  return `n_${Date.now().toString(36)}_${idCounter.toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function NotificationsProvider({
