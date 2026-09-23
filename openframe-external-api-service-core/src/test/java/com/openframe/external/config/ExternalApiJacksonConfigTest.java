@@ -2,6 +2,8 @@ package com.openframe.external.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -80,6 +82,12 @@ class ExternalApiJacksonConfigTest {
         assertTrue(mapper.getRegisteredModuleIds().size() > 1);
     }
 
-    record Payload(String id, Instant createdAt, Instant updatedAt, Map<String, Object> extra) {
+    @Getter
+    @AllArgsConstructor
+    static class Payload {
+        private final String id;
+        private final Instant createdAt;
+        private final Instant updatedAt;
+        private final Map<String, Object> extra;
     }
 }
