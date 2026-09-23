@@ -6,6 +6,7 @@ import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.DeliveryResultMessage;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
+import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.track.DeliveryTracker;
 import io.nats.client.Connection;
 import io.nats.client.Message;
@@ -20,20 +21,26 @@ import static org.springframework.util.StringUtils.hasText;
 @Component
 public class DeliveryResultListener extends AbstractJetStreamPushListener {
 
+    private static final String REJECTED_INCOMPLETE = "incomplete";
+    private static final String REJECTED_MALFORMED = "malformed";
+
     private final ObjectMapper objectMapper;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
     private final DeliveryTracker deliveryTracker;
+    private final DeliveryMetrics metrics;
 
     public DeliveryResultListener(
             Connection natsConnection,
             ObjectMapper objectMapper,
             NatsTopicMachineIdExtractor machineIdExtractor,
-            DeliveryTracker deliveryTracker
+            DeliveryTracker deliveryTracker,
+            DeliveryMetrics metrics
     ) {
         super(natsConnection);
         this.objectMapper = objectMapper;
         this.machineIdExtractor = machineIdExtractor;
         this.deliveryTracker = deliveryTracker;
+        this.metrics = metrics;
     }
 
     @Override
@@ -69,14 +76,17 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
             String machineId = machineIdExtractor.extract(subject);
             DeliveryResultMessage report = objectMapper.readValue(payload, DeliveryResultMessage.class);
             if (!isComplete(report)) {
-                log.warn("Delivery result without type, targetId, dispatchId or result dropped: machineId={} payload={}", machineId, payload);
+                metrics.recordResultRejected(REJECTED_INCOMPLETE);
+                log.error("Delivery result rejected, agent violates the contract (type, targetId, dispatchId, result required or unknown): machineId={} payload={}",
+                        machineId, payload);
                 message.ack();
                 return;
             }
             apply(machineId, report);
             message.ack();
         } catch (JsonProcessingException | IllegalArgumentException permanentlyBad) {
-            log.warn("Dropping malformed delivery result subject={} payload={}", subject, payload, permanentlyBad);
+            metrics.recordResultRejected(REJECTED_MALFORMED);
+            log.error("Delivery result rejected, malformed: subject={} payload={}", subject, payload, permanentlyBad);
             message.ack();
         } catch (Exception e) {
             log.error("Unexpected error processing delivery result: {}", payload, e);

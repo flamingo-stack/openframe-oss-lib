@@ -3,6 +3,7 @@ package com.openframe.client.listener.delivery;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.track.DeliveryTracker;
 import io.nats.client.Connection;
 import io.nats.client.Message;
@@ -43,13 +44,14 @@ class DeliveryResultListenerTest {
 
     @Mock private Connection natsConnection;
     @Mock private DeliveryTracker deliveryTracker;
+    @Mock private DeliveryMetrics metrics;
     @Mock private Message message;
 
     private DeliveryResultListener listener;
 
     @BeforeEach
     void setUp() {
-        listener = new DeliveryResultListener(natsConnection, new ObjectMapper(), new NatsTopicMachineIdExtractor(), deliveryTracker);
+        listener = new DeliveryResultListener(natsConnection, new ObjectMapper(), new NatsTopicMachineIdExtractor(), deliveryTracker, metrics);
     }
 
     @Test
@@ -92,7 +94,7 @@ class DeliveryResultListenerTest {
     }
 
     @Test
-    void handleMessage_withoutDispatchId_droppedAndAcked() {
+    void handleMessage_withoutDispatchId_rejectedCountedAndAcked() {
         // setup
         stubMessage(WITHOUT_DISPATCH_ID);
 
@@ -101,11 +103,12 @@ class DeliveryResultListenerTest {
 
         // verifications
         verifyNoInteractions(deliveryTracker);
+        verify(metrics).recordResultRejected("incomplete");
         verify(message).ack();
     }
 
     @Test
-    void handleMessage_unknownResult_droppedAndAcked() {
+    void handleMessage_unknownResult_rejectedCountedAndAcked() {
         // setup
         stubMessage(UNKNOWN_RESULT);
 
@@ -114,11 +117,12 @@ class DeliveryResultListenerTest {
 
         // verifications
         verifyNoInteractions(deliveryTracker);
+        verify(metrics).recordResultRejected("incomplete");
         verify(message).ack();
     }
 
     @Test
-    void handleMessage_unknownType_droppedAndAcked() {
+    void handleMessage_unknownType_rejectedCountedAndAcked() {
         // setup
         stubMessage(UNKNOWN_TYPE);
 
@@ -127,11 +131,12 @@ class DeliveryResultListenerTest {
 
         // verifications
         verifyNoInteractions(deliveryTracker);
+        verify(metrics).recordResultRejected("incomplete");
         verify(message).ack();
     }
 
     @Test
-    void handleMessage_malformedPayload_droppedAndAcked() {
+    void handleMessage_malformedPayload_rejectedCountedAndAcked() {
         // setup
         stubMessage(MALFORMED);
 
@@ -140,6 +145,7 @@ class DeliveryResultListenerTest {
 
         // verifications
         verifyNoInteractions(deliveryTracker);
+        verify(metrics).recordResultRejected("malformed");
         verify(message).ack();
     }
 
