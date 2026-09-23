@@ -86,31 +86,32 @@ export function switchPlatformTheme(platform: Platform): void {
 }
 
 /**
- * Gets a semantic color value for the current platform
+ * Gets a semantic color value for the current platform.
+ *
+ * Reads the resolved value of `--color-{semanticName}` for `platform` without
+ * mutating the global `data-app-type` attribute: instead of flipping the
+ * document's platform theme (which is a shared, global, event-dispatching
+ * side effect that can race with concurrent callers), the lookup is scoped to
+ * a detached, off-document element carrying its own `data-app-type`
+ * attribute so CSS custom properties cascade the same way but nothing
+ * observable by the rest of the app ever changes.
  */
 export function getSemanticColor(semanticName: string, platform?: Platform): string | undefined {
   if (typeof window === 'undefined') return undefined;
 
   const currentPlatform = platform || getCurrentPlatform();
 
-  // Switch platform temporarily to get the color
-  const originalPlatform = getCurrentPlatform();
-  if (currentPlatform !== originalPlatform) {
-    switchPlatformTheme(currentPlatform);
-  }
-
   const testElement = document.createElement('div');
+  testElement.setAttribute('data-app-type', currentPlatform);
+  testElement.style.position = 'absolute';
+  testElement.style.visibility = 'hidden';
+  testElement.style.pointerEvents = 'none';
   document.body.appendChild(testElement);
 
   const computedStyle = getComputedStyle(testElement);
   const colorValue = computedStyle.getPropertyValue(`--color-${semanticName}`);
 
   document.body.removeChild(testElement);
-
-  // Restore original platform
-  if (currentPlatform !== originalPlatform) {
-    switchPlatformTheme(originalPlatform);
-  }
 
   return colorValue.trim() || undefined;
 }
@@ -347,3 +348,4 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
     b: Math.round(hue2rgb(hk - 1 / 3) * 255),
   };
 }
+
