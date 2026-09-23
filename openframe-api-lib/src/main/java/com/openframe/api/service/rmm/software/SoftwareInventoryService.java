@@ -107,8 +107,11 @@ public class SoftwareInventoryService {
         }
 
         List<SoftwareResponse> all = fetchAllTitles(search, vulnerable);
-        enrichRealDevicesCount(all);
-        List<SoftwareResponse> withDevices = all.stream()
+        List<SoftwareResponse> installed = all.stream()
+                .filter(row -> deviceCount(row) > 0)
+                .toList();
+        enrichRealDevicesCount(installed);
+        List<SoftwareResponse> withDevices = installed.stream()
                 .filter(row -> deviceCount(row) > 0)
                 .toList();
         List<SoftwareResponse> ordered = field == null
