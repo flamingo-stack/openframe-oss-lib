@@ -6,6 +6,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = {"openframe.delivery.enabled", "openframe.delivery.sweep.enabled"}, havingValue = "true")
+@ConditionalOnProperty(name = "openframe.delivery.sweep.enabled", havingValue = "true")
 public class DeliveryWatchdogService {
 
     private final MachineDeliveryRepository repository;

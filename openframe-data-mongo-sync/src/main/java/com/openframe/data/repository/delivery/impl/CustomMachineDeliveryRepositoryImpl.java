@@ -25,18 +25,18 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
 
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
-    private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_ATTEMPTS = "attempts";
     private static final String FIELD_ERRORS = "errors";
+    private static final String FIELD_DISPATCH_ID = "dispatchId";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_DUE_AT = "dueAt";
-    private static final String FIELD_PARKED = "parked";
     private static final String FIELD_ACKED_AT = "ackedAt";
     private static final String FIELD_FINISHED_AT = "finishedAt";
     private static final String FIELD_EXPIRES_AT = "expiresAt";
     private static final String FIELD_FAILURE = "failure";
+    private static final String FIELD_ERROR = "error";
 
     private static final Sort OLDEST_DUE_FIRST = Sort.by(FIELD_DUE_AT);
 
@@ -91,27 +91,18 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     }
 
     @Override
-    public boolean park(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt) {
-        Update update = new Update()
-                .set(FIELD_DUE_AT, dueAt)
-                .set(FIELD_PARKED, true);
-        return updateOne(sameDispatch(id, from, dispatchedAt), update);
-    }
-
-    @Override
-    public boolean markAcked(String id, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt) {
+    public boolean markAcked(String id, String dispatchId, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt) {
         Update update = new Update()
                 .set(FIELD_STATUS, DeliveryStatus.ACKED)
                 .set(FIELD_ACKED_AT, ackedAt)
-                .set(FIELD_DUE_AT, dueAt)
-                .set(FIELD_PARKED, false);
-        return updateOne(stillIn(id, from), update);
+                .set(FIELD_DUE_AT, dueAt);
+        return updateOne(thisDispatch(id, from, dispatchId), update);
     }
 
     @Override
-    public boolean markDone(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
+    public boolean markDone(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.DONE, finishedAt, expiresAt);
-        return updateOne(stillIn(id, from), update);
+        return updateOne(thisDispatch(id, from, dispatchId), update);
     }
 
     @Override
@@ -134,16 +125,11 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     }
 
     @Override
-    public long wake(String machineId, Set<DeliveryStatus> from, Instant dueAt) {
-        Criteria parkedRowsOfMachine = Criteria.where(FIELD_MACHINE_ID).is(machineId)
-                .and(FIELD_STATUS).in(from)
-                .and(FIELD_PARKED).is(true);
-        Query query = new Query(parkedRowsOfMachine);
-        Update update = new Update()
-                .set(FIELD_DUE_AT, dueAt)
-                .set(FIELD_PARKED, false);
-        UpdateResult result = mongoTemplate.updateMulti(query, update, MachineDelivery.class);
-        return result.getModifiedCount();
+    public boolean markFailed(String id, String dispatchId, Set<DeliveryStatus> from, DeliveryFailure failure, String error, Instant finishedAt, Instant expiresAt) {
+        Update update = closed(DeliveryStatus.FAILED, finishedAt, expiresAt)
+                .set(FIELD_FAILURE, failure)
+                .set(FIELD_ERROR, error);
+        return updateOne(thisDispatch(id, from, dispatchId), update);
     }
 
     private static void setField(Update update, String field, Object value) {
@@ -167,6 +153,10 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
 
     private static Criteria sameDispatch(String id, Set<DeliveryStatus> from, Instant dispatchedAt) {
         return stillIn(id, from).and(FIELD_DISPATCHED_AT).is(dispatchedAt);
+    }
+
+    private static Criteria thisDispatch(String id, Set<DeliveryStatus> from, String dispatchId) {
+        return stillIn(id, from).and(FIELD_DISPATCH_ID).is(dispatchId);
     }
 
     private boolean updateOne(Criteria criteria, Update update) {
