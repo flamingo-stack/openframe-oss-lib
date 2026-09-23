@@ -143,4 +143,3 @@ export type VideoProcessingEntityType =
   | 'how_i_work'
   | 'walkthrough_video'
   | 'prospect_call';
-// Fri May 15 14:58:59 EDT 2026
