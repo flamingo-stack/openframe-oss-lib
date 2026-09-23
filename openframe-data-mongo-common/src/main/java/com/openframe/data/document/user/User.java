@@ -2,6 +2,7 @@ package com.openframe.data.document.user;
 import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.experimental.SuperBuilder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -14,7 +15,7 @@ import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "users")
@@ -52,4 +53,3 @@ public class User implements TenantScoped {
         this.email = email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }
-
