@@ -39,7 +39,7 @@ async function serveStatic(req, res) {
   // Resolve within DIST; SPA fallback to index.html for client routes.
   const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '')
   const target = path.resolve(DIST, rel)
-  const safe = target.startsWith(DIST)
+  const safe = target === DIST || target.startsWith(DIST + path.sep)
   try {
     const file = safe && path.extname(target) ? await readFile(target) : await readFile(path.join(DIST, 'index.html'))
     const ext = safe && path.extname(target) ? path.extname(target) : '.html'
@@ -66,3 +66,4 @@ http
   .listen(PORT, () =>
     console.log(`[proxy] dist/ + ${CONTENT_PREFIX} → ${hubTarget(env)}  ·  http://localhost:${PORT}`),
   )
+
