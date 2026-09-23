@@ -5,7 +5,7 @@ use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use super::log_parser::{parse_log_line, LogDeduplicator, LogEntry};
 
@@ -59,7 +59,7 @@ impl LogSource for FileLogSource {
 
     fn read(&mut self, max_count: usize) -> Result<Vec<LogEntry>> {
         let (entries, new_offset) =
-            read_log_file(&self.log_path, self.committed_offset, max_count)?;
+            read_log_file(&self.name, &self.log_path, self.committed_offset, max_count)?;
         self.pending_offset = new_offset;
         Ok(entries)
     }
@@ -74,10 +74,20 @@ impl LogSource for FileLogSource {
     }
 }
 
-fn read_log_file(path: &Path, position: u64, max_count: usize) -> Result<(Vec<LogEntry>, u64)> {
+fn read_log_file(
+    source_name: &str,
+    path: &Path,
+    position: u64,
+    max_count: usize,
+) -> Result<(Vec<LogEntry>, u64)> {
     let mut file = File::open(path).context("Failed to open log file")?;
     let metadata = file.metadata()?;
     let start_position = if metadata.len() < position {
+        warn!(
+            "Log file '{}' at {:?} was truncated or rotated (size {} < previous offset {}); \
+             resuming read from start of file, entries between offset {} and truncation may have been skipped",
+            source_name, path, metadata.len(), position, position
+        );
         0
     } else {
         position
