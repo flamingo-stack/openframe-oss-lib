@@ -22,10 +22,6 @@ public class IntegratedToolService {
         return toolRepository.findAll();
     }
 
-    public Optional<IntegratedTool> getTool(String toolType) {
-        return toolRepository.findByType(toolType);
-    }
-
     /** Look up by human-readable key (e.g. "fleetmdm-server"). TenantAwareMongoTemplate auto-scopes by tenantId. */
     public Optional<IntegratedTool> getToolByKey(String key) {
         return toolRepository.findByKey(key);
