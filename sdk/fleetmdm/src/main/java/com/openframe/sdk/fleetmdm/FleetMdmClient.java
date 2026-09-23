@@ -34,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -133,18 +134,40 @@ public class FleetMdmClient {
      * Get a single host by ID from Fleet MDM
      * @param id Host ID
      * @return Host object or null if not found
+     * @deprecated use {@link #findHostById(long)} which returns {@code Optional<Host>} instead of
+     *             a possibly-null value, per OFJAVA-013. Retained for source/binary compatibility.
      */
+    @Deprecated
     public Host getHostById(long id) {
+        return findHostById(id).orElse(null);
+    }
+
+    /**
+     * Get a single host by ID from Fleet MDM
+     * @param id Host ID
+     * @return an {@link Optional} containing the Host, or empty if not found
+     */
+    public Optional<Host> findHostById(long id) {
         String url = baseUrl + HOSTS_URL + "/" + id + "?exclude_software=true";
         return getHost(id, url, Host.class);
     }
 
+    /**
+     * @deprecated use {@link #findHostVulnerabilityInventoryById(long)} which returns
+     *             {@code Optional<HostVulnerabilityInventory>} instead of a possibly-null value,
+     *             per OFJAVA-013. Retained for source/binary compatibility.
+     */
+    @Deprecated
     public HostVulnerabilityInventory getHostVulnerabilityInventoryById(long id) {
+        return findHostVulnerabilityInventoryById(id).orElse(null);
+    }
+
+    public Optional<HostVulnerabilityInventory> findHostVulnerabilityInventoryById(long id) {
         String url = baseUrl + HOSTS_URL + "/" + id;
         return getHost(id, url, HostVulnerabilityInventory.class);
     }
 
-    private <T> T getHost(long id, String url, Class<T> responseType) {
+    private <T> Optional<T> getHost(long id, String url, Class<T> responseType) {
         return call("fetch Fleet host " + id, () -> {
             HttpRequest request = addHeaders(HttpRequest.newBuilder()
                     .uri(URI.create(url)))
@@ -157,14 +180,14 @@ public class FleetMdmClient {
             if (response.statusCode() == 401) {
                 throw new FleetMdmApiException("Authentication failed. Please check your API token.", response.statusCode(), response.body());
             } else if (response.statusCode() == 404) {
-                return null;
+                return Optional.<T>empty();
             } else if (response.statusCode() != 200) {
                 throw new FleetMdmApiException("Failed to fetch host", response.statusCode(), response.body());
             }
 
             JsonNode responseBody = MAPPER.readTree(response.body());
             JsonNode host = responseBody.path("host");
-            return MAPPER.treeToValue(host, responseType);
+            return Optional.ofNullable(MAPPER.treeToValue(host, responseType));
         });
     }
 
