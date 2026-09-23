@@ -121,7 +121,7 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
 
         } catch (Exception e) {
             logger.error("Failed to create keyspace '{}'", keyspaceName, e);
-            throw new RuntimeException("Failed to ensure Cassandra keyspace exists", e);
+            throw new CassandraInitializationException("Failed to ensure Cassandra keyspace exists", e);
         }
     }
 
