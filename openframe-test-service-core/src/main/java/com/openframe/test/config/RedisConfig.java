@@ -69,20 +69,28 @@ public class RedisConfig {
     }
 
     /**
-     * Whether the server runs in cluster mode. True for the in-cluster shard set every environment
-     * but dev still uses; dev points at a single Memorystore instance, where a cluster client fails
-     * on topology discovery because cluster mode is disabled server-side.
+     * Pins cluster mode instead of letting {@link com.openframe.test.data.redis.Redis} ask the server.
+     * An override for the case where the probe cannot be trusted; leaving it unset is the normal path.
      */
     public static void setCluster(boolean enabled) {
         cluster = enabled;
     }
 
-    public static boolean isCluster() {
+    /**
+     * The pinned answer, or {@code null} when nobody pinned one and the server should be asked.
+     *
+     * <p>SaaS Redis is migrating to Memorystore for Valkey — a single node with cluster mode disabled —
+     * one environment at a time, so the answer differs per environment and changes under us as the
+     * migration proceeds. Detecting it costs one {@code CLUSTER INFO}, which both topologies answer, so
+     * an environment moves without anyone editing config, and this override exists only as an escape
+     * hatch.
+     */
+    public static Boolean getConfiguredCluster() {
         if (cluster != null) {
             return cluster;
         }
         String env = System.getenv("REDIS_CLUSTER");
-        return (env == null || env.trim().isEmpty()) || Boolean.parseBoolean(env);
+        return (env == null || env.trim().isEmpty()) ? null : Boolean.parseBoolean(env);
     }
 
     public static Set<HostAndPort> getClusterNodes() {

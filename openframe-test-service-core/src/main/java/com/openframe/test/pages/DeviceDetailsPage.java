@@ -2,12 +2,17 @@ package com.openframe.test.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.AriaRole;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.function.Supplier;
 
 /**
  * Page Object for the Device Details page.
  * URL pattern: /devices/details/{id}/
  */
+@Slf4j
 public class DeviceDetailsPage {
 
     private final Page page;
@@ -58,6 +63,12 @@ public class DeviceDetailsPage {
      * seconds was not enough to tell a slow session from one that never starts.
      */
     private static final int MESH_SESSION_TIMEOUT_MS = 60_000;
+
+    /** Attempts at opening a mesh session before the case fails. Two: enough for a blip, not enough to hide a defect. */
+    private static final int MESH_SESSION_ATTEMPTS = 2;
+
+    /** Budget for getting back to this page between attempts. */
+    private static final int RETURN_TIMEOUT_MS = 30_000;
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -152,15 +163,17 @@ public class DeviceDetailsPage {
      * @return a new {@link RemoteDesktopPage} scoped to the same page
      */
     public RemoteDesktopPage openRemoteDesktop() {
-        // href is query-param based (/devices/details/remote-desktop?id=…), so
-        // match on "contains" rather than "ends-with".
-        page.locator("main a[href*='/remote-desktop']").first().click();
-        page.waitForURL(
-                url -> url.contains("/remote-desktop"),
-                new Page.WaitForURLOptions().setTimeout(15_000));
-        // The approval gate stands between the route and the canvas on qa and dev; clearing it here
-        // keeps waitForCanvasVisible a plain wait.
-        return new RemoteDesktopPage(page).clearApprovalGate().waitForCanvasVisible(MESH_SESSION_TIMEOUT_MS);
+        return withMeshSessionRetry("Remote Desktop", () -> {
+            // href is query-param based (/devices/details/remote-desktop?id=…), so
+            // match on "contains" rather than "ends-with".
+            page.locator("main a[href*='/remote-desktop']").first().click();
+            page.waitForURL(
+                    url -> url.contains("/remote-desktop"),
+                    new Page.WaitForURLOptions().setTimeout(15_000));
+            // The approval gate stands between the route and the canvas on qa and dev; clearing it here
+            // keeps waitForCanvasVisible a plain wait.
+            return new RemoteDesktopPage(page).clearApprovalGate().waitForCanvasVisible(MESH_SESSION_TIMEOUT_MS);
+        });
     }
 
     /**
@@ -170,12 +183,14 @@ public class DeviceDetailsPage {
      * @return a new {@link FileManagerPage} scoped to the same page
      */
     public FileManagerPage openFileManager() {
-        openMoreActionsMenu();
-        clickMenuItemByText("Manage Files");
-        FileManagerPage fileManagerPage = new FileManagerPage(this.page);
-        page.waitForCondition(fileManagerPage::isLoaded,
-                new Page.WaitForConditionOptions().setTimeout(MESH_SESSION_TIMEOUT_MS));
-        return fileManagerPage;
+        return withMeshSessionRetry("File Manager", () -> {
+            openMoreActionsMenu();
+            clickMenuItemByText("Manage Files");
+            FileManagerPage fileManagerPage = new FileManagerPage(this.page);
+            page.waitForCondition(fileManagerPage::isLoaded,
+                    new Page.WaitForConditionOptions().setTimeout(MESH_SESSION_TIMEOUT_MS));
+            return fileManagerPage;
+        });
     }
 
     /**
@@ -192,11 +207,52 @@ public class DeviceDetailsPage {
      * @return a new {@link RemoteShellPage} scoped to the same page
      */
     public RemoteShellPage openRemoteShellPowerShell() {
-        openRemoteShellMenu();
-        clickMenuItemByText("PowerShell");
-        RemoteShellPage remoteShellPage = new RemoteShellPage(this.page);
-        remoteShellPage.waitForOutputContaining("PS ", MESH_SESSION_TIMEOUT_MS);
-        return remoteShellPage;
+        return withMeshSessionRetry("Remote Shell (PowerShell)", () -> {
+            openRemoteShellMenu();
+            clickMenuItemByText("PowerShell");
+            RemoteShellPage remoteShellPage = new RemoteShellPage(this.page);
+            remoteShellPage.waitForOutputContaining("PS ", MESH_SESSION_TIMEOUT_MS);
+            return remoteShellPage;
+        });
+    }
+
+    /**
+     * Opens a MeshCentral session, and on a timeout returns to this page and tries once more.
+     *
+     * <p>Establishing the session is the flaky step, not the feature under test. The relay can be slow
+     * to answer — on the qa nightly of 2026-09-21 the control channel took 8.6s for its first frame
+     * against a healthy 0.2s, the file manager's own load gave up, and the listing arrived seconds after
+     * the 60s budget expired. Retrying the session keeps that from failing a case whose assertions never
+     * got to run, while leaving those assertions exactly as strict as they were.
+     *
+     * <p><b>It deliberately does not retry forever.</b> A session that never starts is a real defect —
+     * see the remote-shell case that sits at <i>Idle</i> with no relay socket opened at all — so two
+     * attempts fail the case, and every attempt beyond the first is logged so "passed on the second try,
+     * three nights running" stays readable rather than invisible.
+     *
+     * <p>Recovery navigates back to the URL captured before the attempt rather than calling
+     * {@code goBack()}: an attempt that failed before it navigated would otherwise leave the device list,
+     * not this page. The active tab is not restored because the action bar these openers use sits above
+     * the tabs and does not depend on one.
+     */
+    private <T> T withMeshSessionRetry(String what, Supplier<T> open) {
+        String from = page.url();
+        TimeoutError lastFailure = null;
+        for (int attempt = 1; attempt <= MESH_SESSION_ATTEMPTS; attempt++) {
+            try {
+                return open.get();
+            } catch (TimeoutError timeout) {
+                lastFailure = timeout;
+                log.warn("{} did not come up within {}s (attempt {} of {})",
+                        what, MESH_SESSION_TIMEOUT_MS / 1000, attempt, MESH_SESSION_ATTEMPTS);
+                if (attempt < MESH_SESSION_ATTEMPTS) {
+                    page.navigate(from);
+                    page.waitForCondition(this::isLoaded,
+                            new Page.WaitForConditionOptions().setTimeout(RETURN_TIMEOUT_MS));
+                }
+            }
+        }
+        throw lastFailure;
     }
 
     // ── ⋯ More-actions menu ───────────────────────────────────────────────────
