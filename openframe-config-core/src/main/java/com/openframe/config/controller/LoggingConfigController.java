@@ -20,15 +20,22 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class LoggingConfigController {
 
+    private static final int HTTP_DEFAULT_PORT = 80;
+    private static final int HTTPS_DEFAULT_PORT = 443;
+
     @GetMapping(value = "/{filename:.+}", produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> getLoggingConfig(@PathVariable String filename, HttpServletRequest request) throws Exception {
-        log.debug("Received request for logging config file: {}", filename);
+        log.debug("Received request for logging config file");
+
+        if (filename.contains("..") || filename.startsWith("/") || filename.startsWith("\\")) {
+            log.error("Rejected invalid logging config filename request");
+            return ResponseEntity.notFound().build();
+        }
 
         ClassPathResource resource = new ClassPathResource("logging/" + filename);
-        log.debug("Looking for resource at: logging/{}", filename);
 
         if (!resource.exists()) {
-            log.error("Resource not found: logging/{}", filename);
+            log.error("Resource not found for requested logging config file");
             return ResponseEntity.notFound().build();
         }
 
@@ -36,10 +43,9 @@ public class LoggingConfigController {
         log.debug("Original content length: {}", content.length());
 
         String serverUrl = request.getScheme() + "://" + request.getServerName();
-        if (request.getServerPort() != 80 && request.getServerPort() != 443) {
+        if (request.getServerPort() != HTTP_DEFAULT_PORT && request.getServerPort() != HTTPS_DEFAULT_PORT) {
             serverUrl += ":" + request.getServerPort();
         }
-        log.debug("Server URL: {}", serverUrl);
 
         content = StringUtils.replace(content, "resource=\"logging/", "url=\"" + serverUrl + "/logging/");
 
