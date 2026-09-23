@@ -35,11 +35,23 @@ public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventD
 
     /** Shared cluster only: event tenant for the Fleet API lookup (see FleetQueryResultEventDeserializer). */
     private String eventTenantId(JsonNode afterField) {
-        if (clusterTenantIdResolver == null) {
+        return resolveFleetEventTenantId(clusterTenantIdResolver, afterField);
+    }
+
+    /**
+     * Shared helper for Fleet deserializers: resolves the event tenant id for the Fleet API lookup
+     * using the given resolver, or {@code null} if the resolver is not available.
+     */
+    protected Optional<String> resolveFleetEventTenantIdOptional(ClusterTenantIdResolver resolver, JsonNode afterField) {
+        return Optional.ofNullable(resolveFleetEventTenantId(resolver, afterField));
+    }
+
+    private String resolveFleetEventTenantId(ClusterTenantIdResolver resolver, JsonNode afterField) {
+        if (resolver == null) {
             return null;
         }
         return extractFleetTeamId(afterField)
-                .map(teamId -> clusterTenantIdResolver.resolveTenantId(IntegratedToolType.FLEET, teamId))
+                .map(teamId -> resolver.resolveTenantId(IntegratedToolType.FLEET, teamId))
                 .orElse(null);
     }
 
