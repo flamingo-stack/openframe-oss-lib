@@ -206,11 +206,10 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("Archive non-resolved ticket is rejected")
     public void testArchiveActiveTicketRejected() {
-        // Only RESOLVED → ARCHIVED is a valid transition. The legacy `status` filter can still surface
-        // tickets that have since moved to RESOLVED (transitionTicket does not sync the legacy field),
-        // so pick one whose lifecycle status kind is neither RESOLVED nor ARCHIVED.
+        // Only RESOLVED → ARCHIVED is a valid transition, and an unfiltered listing carries tickets in
+        // every column, so pick one whose lifecycle status kind is neither RESOLVED nor ARCHIVED.
         TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
-        assertThat(connection.getEdges()).as("Expected at least one ACTIVE ticket").isNotEmpty();
+        assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
         Ticket ticket = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
         assertThat(ticket).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
         String ticketId = ticket.getId();
