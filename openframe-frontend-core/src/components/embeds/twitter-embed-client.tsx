@@ -91,11 +91,16 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
   const error = extractedTweetId ? fetchError : 'Invalid tweet URL or ID';
   const loading = extractedTweetId ? fetchLoading : false;
 
-  // Normalize the Twitter URL
+  // Normalize the Twitter URL. When the source `url` is not itself a
+  // twitter.com/x.com URL (e.g. a bare tweet ID or a t.co redirect), we
+  // cannot know the real author handle, so we must not fabricate one:
+  // Twitter's oEmbed endpoint can validate the path segment against the
+  // real author in some cases. Use the status-only path form instead,
+  // which oEmbed accepts without requiring a (possibly wrong) username.
   const tweetUrl =
     url.includes('twitter.com') || url.includes('x.com')
       ? url
-      : `https://twitter.com/twitter/status/${extractedTweetId}`;
+      : `https://twitter.com/i/status/${extractedTweetId}`;
 
   useEffect(() => {
     // Only run once
