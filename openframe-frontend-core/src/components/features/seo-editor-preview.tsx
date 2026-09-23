@@ -104,12 +104,18 @@ export function SEOEditorPreview({
     setIsUploading(true);
     try {
       const url = await onOgImageUpload(file);
+      setImageError(false);
       onOgImageUrlChange(url);
     } catch (error) {
       console.error('OG image upload failed:', error);
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleRemoveImage = () => {
+    setImageError(false);
+    onOgImageUrlChange('');
   };
 
   return (
@@ -277,7 +283,7 @@ export function SEOEditorPreview({
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => onOgImageUrlChange('')}
+                    onClick={handleRemoveImage}
                     disabled={disabled}
                     className="rounded-full bg-white text-black opacity-0 hover:bg-gray-100 group-hover:opacity-100"
                   >
@@ -307,7 +313,7 @@ export function SEOEditorPreview({
             )}
 
             {onOgImageUpload && (
-              <input
+              <Input
                 ref={setFileInputRef}
                 type="file"
                 accept="image/*"
