@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @ConditionalOnClass(CassandraRepository.class)
-@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.rmm.enabled", havingValue = "true", matchIfMissing = true)
 public class CommandResultCassandraMessageHandler
         implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
