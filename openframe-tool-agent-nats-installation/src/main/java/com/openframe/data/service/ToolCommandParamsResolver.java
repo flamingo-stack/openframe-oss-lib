@@ -1,5 +1,6 @@
 package com.openframe.data.service;
 
+import com.openframe.data.service.exception.RegistrationSecretRetrieverNotFoundException;
 import com.openframe.data.service.secretretriver.ToolAgentRegistrationSecretRetriever;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -47,7 +48,7 @@ public class ToolCommandParamsResolver {
                 .filter(retriever -> isSuitable(toolId, retriever))
                 .findFirst()
                 .map(ToolAgentRegistrationSecretRetriever::getSecret)
-                .orElseThrow(() -> new IllegalStateException("No tool agent registration secret retriver found for " + toolId));
+                .orElseThrow(() -> new RegistrationSecretRetrieverNotFoundException(toolId));
     }
 
     private boolean isSuitable(String toolId, ToolAgentRegistrationSecretRetriever retriever) {
