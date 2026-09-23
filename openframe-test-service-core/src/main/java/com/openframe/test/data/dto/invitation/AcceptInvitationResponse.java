@@ -27,10 +27,10 @@ public class AcceptInvitationResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String tenantId;
-    private String passwordHash;
     private Boolean emailVerified;
     private String loginProvider;
     private String externalUserId;
     private Instant lastLogin;
     private String fullName;
 }
+
