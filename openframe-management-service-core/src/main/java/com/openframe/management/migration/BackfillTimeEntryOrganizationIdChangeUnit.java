@@ -7,12 +7,17 @@ import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @ChangeUnit(id = "backfill-timeentry-organization-id", order = "007", author = "openframe")
@@ -36,24 +41,56 @@ public class BackfillTimeEntryOrganizationIdChangeUnit {
         int skippedMissingTicket = 0;
         int skippedTicketWithoutOrg = 0;
 
+        Set<String> ticketIds = new HashSet<>();
         for (TimeEntry entry : entries) {
-            Query ticketQuery = new Query(Criteria.where(ID_FIELD).is(entry.getTicketId())
+            ticketIds.add(entry.getTicketId());
+        }
+
+        Map<String, String> ticketIdToOrgId = new HashMap<>();
+        if (!ticketIds.isEmpty()) {
+            Query ticketQuery = new Query(Criteria.where(ID_FIELD).in(ticketIds)
                     .and(TENANT_ID_FIELD).is(tenantId));
-            Ticket ticket = mongoTemplate.findOne(ticketQuery, Ticket.class);
-
-            if (ticket == null) {
-                skippedMissingTicket++;
-                continue;
+            List<Ticket> tickets = mongoTemplate.find(ticketQuery, Ticket.class);
+            for (Ticket ticket : tickets) {
+                if (ticket.getOrganizationId() != null) {
+                    ticketIdToOrgId.put(ticket.getId(), ticket.getOrganizationId());
+                }
             }
+        }
 
-            String organizationId = ticket.getOrganizationId();
+        BulkOperations bulkOps = null;
+
+        for (TimeEntry entry : entries) {
+            String organizationId = ticketIdToOrgId.get(entry.getTicketId());
+
             if (organizationId == null) {
-                skippedTicketWithoutOrg++;
+                if (!ticketIdToOrgId.containsKey(entry.getTicketId())) {
+                    boolean ticketExists = ticketIds.contains(entry.getTicketId());
+                }
+            }
+
+            if (organizationId == null) {
+                if (ticketIds.contains(entry.getTicketId()) && !ticketIdToOrgId.containsKey(entry.getTicketId())) {
+                    skippedTicketWithoutOrg++;
+                } else if (!ticketIds.contains(entry.getTicketId())) {
+                    skippedMissingTicket++;
+                } else {
+                    skippedTicketWithoutOrg++;
+                }
                 continue;
             }
 
-            setOrganizationId(mongoTemplate, entry.getId(), organizationId);
+            if (bulkOps == null) {
+                bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, TimeEntry.class);
+            }
+            Query byId = new Query(Criteria.where(ID_FIELD).is(entry.getId()));
+            Update update = new Update().set(ORGANIZATION_ID_FIELD, organizationId);
+            bulkOps.updateOne(byId, update);
             backfilled++;
+        }
+
+        if (bulkOps != null) {
+            bulkOps.execute();
         }
 
         log.info("Backfilled organizationId on {} time entries (skipped {} missing tickets, {} tickets without org)",
@@ -63,10 +100,5 @@ public class BackfillTimeEntryOrganizationIdChangeUnit {
     @RollbackExecution
     public void rollback() {
     }
-
-    private void setOrganizationId(MongoTemplate mongoTemplate, String entryId, String organizationId) {
-        Query byId = new Query(Criteria.where(ID_FIELD).is(entryId));
-        Update update = new Update().set(ORGANIZATION_ID_FIELD, organizationId);
-        mongoTemplate.updateFirst(byId, update, TimeEntry.class);
-    }
 }
+
