@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("negative")
 @DisplayName("Mingo — safety")
 public class MingoSafetyTest extends MingoBaseTest {
+
+    private static final Logger log = LoggerFactory.getLogger(MingoSafetyTest.class);
 
     private static final SshMachineVerifier ssh = new SshMachineVerifier();
     private static String host;
@@ -186,16 +190,16 @@ public class MingoSafetyTest extends MingoBaseTest {
                 if (resolved != null) {
                     TicketApi.transitionTicket(createdTicketId, resolved);
                 }
-            } catch (RuntimeException ignored) {
-                // best-effort cleanup
+            } catch (RuntimeException e) {
+                log.warn("Best-effort cleanup failed to resolve ticket {}", createdTicketId, e);
             }
             createdTicketId = null;
         }
         if (createdArticleId != null) {
             try {
                 KnowledgeBaseApi.archiveArticle(createdArticleId);
-            } catch (RuntimeException ignored) {
-                // best-effort
+            } catch (RuntimeException e) {
+                log.warn("Best-effort cleanup failed to archive article {}", createdArticleId, e);
             }
             createdArticleId = null;
         }
