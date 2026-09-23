@@ -7,7 +7,11 @@ use super::{
     backup_binary, cleanup_backup, clear_aside_binary, download_and_write_binary,
     log_update_survivors, restore_from_backup, ToolUpdater, ToolUpdaterDeps, UpdateContext,
 };
+#[cfg(target_os = "windows")]
+use crate::config::service_stop::EXEC_UNLOCK_WAIT_SECS;
 use crate::models::{DownloadConfiguration, Installation, InstalledTool};
+#[cfg(target_os = "windows")]
+use crate::platform::binary_writer;
 #[cfg(target_os = "macos")]
 use crate::platform::{binary_writer, remove_app_bundle_path};
 use crate::platform::{system_service, DirectoryManager};
@@ -86,6 +90,11 @@ impl ServiceToolUpdater {
                   "Orphan remediation: .old still locked but no tool process is running — starting the service anyway");
         }
 
+        binary_writer::wait_until_executable_unlocked(
+            exec_path,
+            std::time::Duration::from_secs(EXEC_UNLOCK_WAIT_SECS),
+        )
+        .await;
         match system_service::start_service(service_name).await {
             Ok(()) => {
                 info!(tool_id = %tool_agent_id, "Service {service_name} restarted on the updated binary")
@@ -204,13 +213,32 @@ impl ToolUpdater for ServiceToolUpdater {
                     // Benign: SCM recovery already restarted it on the new binary; start_service below no-ops on RUNNING.
                     info!(tool_id = %tool_agent_id,
                           "Service {service_name} already active with the updated binary");
+                } else {
+                    // A running service would hold the exe itself, so only probe when SCM says it is stopped.
+                    binary_writer::wait_until_executable_unlocked(
+                        &exec_path,
+                        std::time::Duration::from_secs(EXEC_UNLOCK_WAIT_SECS),
+                    )
+                    .await;
                 }
             }
 
             info!(tool_id = %tool_agent_id, "Starting service: {}", service_name);
-            system_service::start_service(service_name)
-                .await
-                .with_context(|| format!("Failed to start service: {}", service_name))?;
+            if let Err(e) = system_service::start_service(service_name).await {
+                // A wedged SCM can fail the call although the service did come up; the process scan needs no SCM.
+                if self
+                    .deps
+                    .tool_kill_service
+                    .is_installed_tool_running(tool)
+                    .await
+                {
+                    warn!(tool_id = %tool_agent_id,
+                          "start_service failed but {service_name} is running — treating as started: {e:#}");
+                } else {
+                    return Err(e)
+                        .with_context(|| format!("Failed to start service: {}", service_name));
+                }
+            }
         }
 
         cleanup_backup(ctx.backup_path.as_ref(), tool_agent_id).await;

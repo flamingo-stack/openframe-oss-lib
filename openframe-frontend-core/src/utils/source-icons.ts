@@ -79,6 +79,15 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'design-docs': 'file-text',
   'openframe-tenants': 'openframe',
   'prospect-calls': 'phone',
+
+  // Code intelligence
+  'code-rules': 'check-square',
+  'code-graph-repos': 'github',
+  'code-graph-deployments': 'package',
+  'code-graph-files': 'file-text',
+  'code-symbols': 'box',
+  'code-duplicates': 'search',
+  'code-impact': 'activity',
 };
 
 /** Lookup an icon name by RagTableConfig.id. Returns undefined when
@@ -161,6 +170,15 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   'design-docs': 'Design Docs',
   'openframe-tenants': 'OpenFrame Tenants',
   'prospect-calls': 'Prospect calls',
+
+  // Code intelligence
+  'code-rules': 'Code Rules',
+  'code-graph-repos': 'Repositories',
+  'code-graph-deployments': 'Deployments',
+  'code-graph-files': 'Code Files',
+  'code-symbols': 'Code Symbols',
+  'code-duplicates': 'Duplicates',
+  'code-impact': 'Change Impact',
 };
 
 /** Lookup a human-readable label by RagTableConfig.id. Falls back
@@ -245,6 +263,15 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   design_doc: 'design-docs',
   openframe_tenant: 'openframe-tenants',
   prospect_call: 'prospect-calls',
+
+  // Code intelligence
+  code_rule: 'code-rules',
+  code_repo: 'code-graph-repos',
+  code_deployment: 'code-graph-deployments',
+  code_file: 'code-graph-files',
+  code_symbol: 'code-symbols',
+  code_duplicate: 'code-duplicates',
+  code_impact: 'code-impact',
 };
 
 /**

@@ -97,11 +97,6 @@ public class DeviceService {
         return paginate(machineFilter(filterOptions, null, null), search, paginationCriteria, sort);
     }
 
-    /**
-     * Same as {@link #queryDevices} but restricted to a fixed set of machineIds (e.g. the
-     * devices assigned to a script schedule). A {@code null}/empty set yields an empty page;
-     * the restriction is intersected with any tag filter.
-     */
     public CountedGenericQueryResult<Machine> queryAssignedDevices(Collection<String> machineIds,
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
@@ -170,20 +165,12 @@ public class DeviceService {
                 .build();
     }
 
-    /**
-     * All machineIds of devices matching {@code filter}/{@code search} within the given platforms —
-     * backs "Add all devices" for a schedule (resolve the whole filtered set at once, unpaginated).
-     */
     public List<String> findDeviceIdsForPlatforms(Collection<OsType> platformNames,
                                                   DeviceFilterCriteria filterOptions, String search) {
         return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
                 scheduleDeviceFilter(filterOptions, platformNames, null), search);
     }
 
-    /**
-     * Of the given machineIds, those matching {@code filter}/{@code search} — backs "Remove all
-     * devices" (the assigned set narrowed by the Selected-tab filter). Empty/null in → empty out.
-     */
     public List<String> findAssignedDeviceIds(Collection<String> machineIds,
                                               DeviceFilterCriteria filterOptions, String search) {
         if (machineIds == null || machineIds.isEmpty()) {
@@ -194,6 +181,11 @@ public class DeviceService {
         }
         return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
                 scheduleDeviceFilter(filterOptions, null, machineIds), search);
+    }
+
+    public List<String> findAllDeviceIds(DeviceFilterCriteria filterOptions, String search) {
+        return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
+                scheduleDeviceFilter(filterOptions, null, null), search);
     }
 
     private CountedGenericQueryResult<Machine> paginate(MachineQueryFilter filter, String search,
@@ -233,10 +225,8 @@ public class DeviceService {
                 .build();
     }
 
-    /** Statuses a device may have to be offered to / kept on a script schedule: only live agents. */
     private static final Set<DeviceStatus> SCHEDULE_ALLOWED_STATUSES = EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
 
-    /** Every status other than {@link #SCHEDULE_ALLOWED_STATUSES}, applied as a {@code $nin} on top of any user filter. */
     private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
             .filter(status -> !SCHEDULE_ALLOWED_STATUSES.contains(status))
             .map(Enum::name)
@@ -275,11 +265,7 @@ public class DeviceService {
         return osTypeScope != null && !osTypeScope.isEmpty() ? new ArrayList<>(osTypeScope) : null;
     }
 
-    /**
-     * Combine the tag-filter machineId restriction with an explicit caller restriction into a
-     * single {@code $in} set. {@code null} on a side means "no restriction from that side";
-     * when both are present the result is their intersection (possibly empty).
-     */
+    // null on a side = no restriction from that side; both present = intersection (possibly empty).
     private static Collection<String> intersectMachineIds(List<String> tagMachineIds, Collection<String> restrict) {
         if (tagMachineIds == null && restrict == null) {
             return null;
@@ -294,11 +280,7 @@ public class DeviceService {
         return tagMachineIds.stream().filter(restrictSet::contains).collect(Collectors.toList());
     }
 
-    /**
-     * Resolves tag-based filters (tagKeys, tagValues) to a set of machineIds.
-     * Returns null if no tag filters are applied, meaning no restriction needed.
-     * Returns an empty list if tag filters are applied but no machines match.
-     */
+    // null = no tag filter applied (no restriction); empty list = filter applied but nothing matched.
     private List<String> resolveTagFilterToMachineIds(DeviceFilterCriteria filter) {
         boolean hasTagKeys = filter.getTagKeys() != null && !filter.getTagKeys().isEmpty();
         boolean hasTagValues = filter.getTagValues() != null && !filter.getTagValues().isEmpty();

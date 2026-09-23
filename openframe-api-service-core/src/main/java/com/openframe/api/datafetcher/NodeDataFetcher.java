@@ -13,6 +13,7 @@ import com.openframe.api.service.rmm.schedule.ScheduleRunService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
 import graphql.relay.Relay;
@@ -42,6 +43,9 @@ public class NodeDataFetcher {
 
     @Autowired(required = false)
     private TenantRepository tenantRepository;
+
+    @Autowired(required = false)
+    private SoftwareBundleService softwareBundleService;
 
     @DgsQuery
     public Object node(@InputArgument String id) {
@@ -79,9 +83,8 @@ public class NodeDataFetcher {
             case SCRIPT_EXECUTION -> scriptExecutionService.findById(globalId.getId()).orElse(null);
             case SCRIPT_SCHEDULE -> scheduleScriptService.findById(globalId.getId()).orElse(null);
             case SCHEDULE_RUN -> scheduleRunService.findById(globalId.getId()).orElse(null);
-            case TENANT -> tenantRepository != null
-                    ? tenantRepository.findById(globalId.getId()).orElse(null)
-                    : null;
+            case TENANT -> tenantRepository != null ? tenantRepository.findById(globalId.getId()).orElse(null) : null;
+            case SOFTWARE_BUNDLE -> softwareBundleService != null ? softwareBundleService.findById(globalId.getId()).orElse(null) : null;
             default -> throw new IllegalArgumentException("Unsupported node type: " + globalId.getType());
         };
     }

@@ -20,7 +20,6 @@ input DeviceLogFilterInput {
     levels: [DeviceLogLevel!]  # Any of these levels; all levels when omitted
     contains: [String!]        # All of these must appear in the message; case-insensitive, matched literally. Max 5 terms of 256 characters
     excludes: [String!]        # None of these may appear in the message; same matching and limits
-    regex: String              # Opt-in RE2 pattern, case-insensitive, max 256 characters. Lookaround and backreferences are rejected
     from: Instant              # Inclusive; defaults to 7 days before `to`
     to: Instant                # Inclusive; defaults to now. The range may not exceed 30 days
 }

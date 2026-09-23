@@ -21,6 +21,8 @@ public class ToolConnectionListener extends AbstractJetStreamPushListener {
     private final ToolConnectionService toolConnectionService;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
 
+    // Manual constructor is required because the superclass AbstractJetStreamPushListener
+    // requires an explicit super(natsConnection) call, which @RequiredArgsConstructor cannot express.
     public ToolConnectionListener(
             Connection natsConnection,
             ObjectMapper objectMapper,

@@ -10,6 +10,8 @@ import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
@@ -216,6 +218,33 @@ class SoftwareScheduleServiceTest {
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(deleted));
 
         assertThatThrownBy(() -> service.get(SCHEDULE_ID)).isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("setDeviceCriteria: switches the schedule to CRITERIA and stores the rule")
+    void setDeviceCriteria_switchesToCriteria() {
+        SoftwareSchedule existing = existingActive();
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
+        ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder()
+                .organizationIds(List.of("org-1")).build();
+
+        service.setDeviceCriteria(SCHEDULE_ID, criteria, ACTOR);
+
+        ArgumentCaptor<SoftwareSchedule> saved = ArgumentCaptor.forClass(SoftwareSchedule.class);
+        verify(scheduleRepository).save(saved.capture());
+        assertThat(saved.getValue().getSelectionMode()).isEqualTo(ScheduleDeviceSelectionMode.CRITERIA);
+        assertThat(saved.getValue().getDeviceCriteria()).isEqualTo(criteria);
+    }
+
+    @Test
+    @DisplayName("getMachineIds: delegates to the target resolver (CRITERIA resolved live)")
+    void getMachineIds_delegatesToResolver() {
+        SoftwareSchedule existing = existingActive();
+        existing.setSelectionMode(ScheduleDeviceSelectionMode.CRITERIA);
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
+        when(targetResolver.resolveMachineIds(existing)).thenReturn(List.of("m-7", "m-8"));
+
+        assertThat(service.getMachineIds(SCHEDULE_ID)).containsExactly("m-7", "m-8");
     }
 
     private static SoftwareSchedule existingActive() {

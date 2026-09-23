@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod update_config;
 
-/// Timing and retry budget for stopping tool processes and OS services.
+/// Timing and retry budget for stopping, replacing and (re)starting tool processes and OS services.
 pub mod service_stop {
     // SERVICE_* constants are referenced only on Windows; allow platform-conditional dead code.
     #![allow(dead_code)]
@@ -23,8 +23,14 @@ pub mod service_stop {
     pub const SERVICE_FORCE_KILL_MAX_ATTEMPTS: u32 = 6;
     /// Cap on a blocking SCM `stop()` before force-killing (else hangs ~4 min).
     pub const SERVICE_STOP_CALL_TIMEOUT_SECS: u64 = 10;
-    /// Start attempts for a service before giving up.
-    pub const SERVICE_START_MAX_ATTEMPTS: u32 = 3;
+    /// Backoff between Windows service start attempts (s); attempts = len + 1, ~30 s of waiting in total.
+    pub const SERVICE_START_RETRY_DELAYS_SECS: [u64; 5] = [1, 2, 4, 8, 15];
+    /// Cap on fsync of a written binary; a slower disk only logs a warning (s).
+    pub const BINARY_SYNC_TIMEOUT_SECS: u64 = 30;
+    /// Max wait for a freshly written executable to open exclusively (writer/AV released) before a service start.
+    pub const EXEC_UNLOCK_WAIT_SECS: u64 = 30;
+    /// Poll interval of the exclusive-open probe (ms).
+    pub const EXEC_UNLOCK_POLL_INTERVAL_MS: u64 = 250;
     /// Cap on any blocking SCM query (status/config/delete) so a wedged SCM can't hang a task.
     pub const SCM_QUERY_TIMEOUT_SECS: u64 = 10;
     /// Cap on a blocking SCM `start()` call (StartService can stall behind a busy service).

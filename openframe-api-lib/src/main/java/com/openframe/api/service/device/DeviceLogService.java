@@ -28,8 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 import static java.util.stream.Collectors.joining;
 
@@ -55,8 +53,6 @@ public class DeviceLogService {
 
     private static final String AGENT_LOGS_JOB = "agent-logs";
     private static final String CASE_INSENSITIVE = "(?i)";
-    /** Lookaround, atomic groups and backreferences: Java compiles them, Loki's RE2 engine rejects them. */
-    private static final Pattern UNSUPPORTED_REGEX = Pattern.compile("\\(\\?[=!<>]|\\\\[1-9]");
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
 
     private final LokiClient lokiClient;
@@ -124,9 +120,6 @@ public class DeviceLogService {
         // Line filters before the metadata filter: the cheapest stage runs first
         appendTermFilters(query, " |~ ", criteria.getContains());
         appendTermFilters(query, " !~ ", criteria.getExcludes());
-        if (StringUtils.hasText(criteria.getRegex())) {
-            query.append(" |~ ").append(LogQl.quote(CASE_INSENSITIVE + criteria.getRegex()));
-        }
         return query.append(" | machine_id=").append(LogQl.quote(machineId)).toString();
     }
 
@@ -229,7 +222,6 @@ public class DeviceLogService {
     private static void validateSearch(DeviceLogFilterCriteria criteria) {
         validateTerms(criteria.getContains(), "contains");
         validateTerms(criteria.getExcludes(), "excludes");
-        validateRegex(criteria.getRegex());
     }
 
     /**
@@ -252,26 +244,6 @@ public class DeviceLogService {
         }
         if (used > MAX_SEARCH_TERMS) {
             throw new IllegalArgumentException(field + " cannot hold more than " + MAX_SEARCH_TERMS + " terms");
-        }
-    }
-
-    /**
-     * Rejected here rather than at Loki, so a mistyped pattern reads as a bad request instead of a failed query.
-     */
-    private static void validateRegex(String regex) {
-        if (!StringUtils.hasText(regex)) {
-            return;
-        }
-        if (regex.length() > MAX_SEARCH_LENGTH) {
-            throw new IllegalArgumentException("regex cannot exceed " + MAX_SEARCH_LENGTH + " characters");
-        }
-        if (UNSUPPORTED_REGEX.matcher(regex).find()) {
-            throw new IllegalArgumentException("regex cannot use lookaround, atomic groups or backreferences");
-        }
-        try {
-            Pattern.compile(regex);
-        } catch (PatternSyntaxException e) {
-            throw new IllegalArgumentException("regex is not valid: " + e.getDescription());
         }
     }
 
