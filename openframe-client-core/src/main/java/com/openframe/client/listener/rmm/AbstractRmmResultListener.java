@@ -41,7 +41,7 @@ public abstract class AbstractRmmResultListener<T extends RmmResultMessage> {
             log.info("Subscribed to {} results: subject={}", label(), subject());
         } catch (Exception e) {
             log.error("Failed to subscribe to {} results", label(), e);
-            throw new RuntimeException("Failed to subscribe to " + label() + " results", e);
+            throw new RmmSubscriptionException("Failed to subscribe to " + label() + " results", e);
         }
     }
 
