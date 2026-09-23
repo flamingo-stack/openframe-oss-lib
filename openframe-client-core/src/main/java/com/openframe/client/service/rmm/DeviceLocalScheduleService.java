@@ -127,19 +127,22 @@ public class DeviceLocalScheduleService {
             return;
         }
         Instant occurrenceAt = occurrence.toInstant(ZoneOffset.UTC);
-        if (DeviceLocalOccurrence.isAlreadyHandled(sentinel, occurrenceAt)) {
+        boolean alreadyHandled = DeviceLocalOccurrence.isAlreadyHandled(sentinel, occurrenceAt);
+        if (alreadyHandled) {
             return;
         }
 
         Instant fireAt = occurrence.atZone(zone).toInstant();
-        if (now.isAfter(fireAt.plusSeconds(window))) {
+        Instant missedThreshold = fireAt.plusSeconds(window);
+        if (now.isAfter(missedThreshold)) {
             record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.MISSED, sentinel);
             log.warn("DEVICE_LOCAL scheduleId={} machineId={} occurrence fireAt={} past the fire window ({}s) at "
                     + "now={} — marked MISSED, advancing", schedule.getId(), machineId, fireAt, window, now);
             return;
         }
 
-        if (!record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.FIRED, sentinel)) {
+        boolean recorded = record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.FIRED, sentinel);
+        if (!recorded) {
             return;
         }
         fireDispatcher.dispatch(schedule, List.of(machineId), now);
@@ -158,8 +161,10 @@ public class DeviceLocalScheduleService {
         if (isBlank(zoneId)) {
             if (repeat == null) {
                 Instant occurrenceAt = startWallClock.toInstant(ZoneOffset.UTC);
-                if (!DeviceLocalOccurrence.isAlreadyHandled(sentinel, occurrenceAt)
-                        && now.isAfter(DeviceLocalOccurrence.latestPossibleFireAt(startWallClock, null).plusSeconds(window))) {
+                boolean alreadyHandled = DeviceLocalOccurrence.isAlreadyHandled(sentinel, occurrenceAt);
+                Instant latestPossibleFireAt = DeviceLocalOccurrence.latestPossibleFireAt(startWallClock, null);
+                Instant missedThreshold = latestPossibleFireAt.plusSeconds(window);
+                if (!alreadyHandled && now.isAfter(missedThreshold)) {
                     record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.MISSED, sentinel);
                     log.warn("DEVICE_LOCAL scheduleId={} machineId={} offline with no known timezone past its run "
                             + "window — marked MISSED", schedule.getId(), machineId);
@@ -177,7 +182,8 @@ public class DeviceLocalScheduleService {
             return;
         }
         Instant occurrenceAt = occurrence.toInstant(ZoneOffset.UTC);
-        if (DeviceLocalOccurrence.isAlreadyHandled(sentinel, occurrenceAt)) {
+        boolean alreadyHandled = DeviceLocalOccurrence.isAlreadyHandled(sentinel, occurrenceAt);
+        if (alreadyHandled) {
             return;
         }
 
