@@ -96,11 +96,14 @@ fn current() -> &'static OsSpec {
     static LOGGED: Once = Once::new();
 
     let spec = SPEC.get_or_init(detect);
-    LOGGED.call_once(|| log_spec_and_verdicts(spec));
+    LOGGED.call_once(|| {
+        log_spec(spec);
+        log_gated_managers(spec);
+    });
     spec
 }
 
-fn log_spec_and_verdicts(spec: &OsSpec) {
+fn log_spec(spec: &OsSpec) {
     info!(
         arch = ?spec.arch,
         product_type = ?spec.product_type,
@@ -108,7 +111,9 @@ fn log_spec_and_verdicts(spec: &OsSpec) {
         build = ?spec.build,
         "Detected machine spec for package manager support"
     );
+}
 
+fn log_gated_managers(spec: &OsSpec) {
     for id in ManagerId::for_current_platform() {
         if let Support::Unsupported(reason) = support_of(*id, spec) {
             warn!(
