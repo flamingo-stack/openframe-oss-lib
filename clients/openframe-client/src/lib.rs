@@ -762,8 +762,12 @@ impl Client {
         self.script_schedule_execution_listener.start().await?;
         info!("Script schedule execution listener started");
 
-        // Start tool run manager
-        self.tool_run_manager.run().await?;
+        // Start tool run manager. A tool lane that cannot start must not end the service
+        // core — the agent still has to heartbeat, stream logs and accept remote commands,
+        // which is how an operator repairs that tool in the first place.
+        if let Err(e) = self.tool_run_manager.run().await {
+            error!("Failed to start tool run manager: {:#}", e);
+        }
 
         // Start mesh self-heal watcher (re-fetch .msh + bounce agent if held on a stale MeshID).
         self.mesh_self_heal_service.run().await?;

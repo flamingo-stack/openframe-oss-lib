@@ -133,12 +133,21 @@ impl LastKnownGoodService {
                 );
                 self.promote(running_version).await
             }
+            // Any other mismatch: the running binary is NOT the anchored one, so it must
+            // not become the reserve. This arm used to seed it anyway — its message said
+            // "running below anchor" but nothing checked the direction, so the common case
+            // (running *newer* than the anchor, i.e. an update whose verification has not
+            // promoted yet) copied an unverified binary into the reserve while the anchor
+            // still named the old version. A rollback then preferred that reserve, restored
+            // the very binary that had just failed, and deleted the good backup behind it.
+            // No reserve is strictly safer than a wrong one: the pre-swap backup still
+            // covers rollback, and the next verified update re-promotes a correct reserve.
             Some(anchor_version) => {
                 warn!(
-                    "Rollback protection degraded: reserve missing, running {} below anchor {} — rebuilding reserve from running binary, anchor unchanged",
+                    "Rollback protection degraded: reserve missing and running {} does not match anchor {} — leaving the reserve unset for a verified update to rebuild",
                     running_version, anchor_version
                 );
-                self.copy_running_to_reserve()
+                Ok(())
             }
             None => {
                 info!(

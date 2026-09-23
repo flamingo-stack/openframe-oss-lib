@@ -8,8 +8,40 @@ use bytes::Bytes;
 use reqwest::Client;
 use std::io::Cursor;
 use std::path::Path;
+#[cfg(target_os = "macos")]
+use std::path::{Component, PathBuf};
 use tokio::time::Duration;
 use tracing::{info, warn};
+
+/// Join an archive entry path under `target_dir`, refusing anything that could escape it.
+/// `Path::join` with an absolute entry *replaces* the base, and `..` is resolved by the OS,
+/// so an unsanitised entry in a downloaded archive writes anywhere on disk — as root, and
+/// with the archive's own mode bits. `tar::Archive::unpack` guards this; this hand-rolled
+/// loop has to do it itself.
+///
+/// Gated to macOS alongside its only caller, `extract_all_from_tar_gz`: on other platforms
+/// `download_and_extract_all` refuses outright, so an ungated helper here is dead code and
+/// `clippy -D warnings` rejects it.
+#[cfg(target_os = "macos")]
+fn safe_join(target_dir: &Path, entry_path: &Path) -> Result<PathBuf> {
+    for component in entry_path.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => {
+                return Err(anyhow!(
+                    "Refusing archive entry with an unsafe path: {}",
+                    entry_path.display()
+                ))
+            }
+        }
+    }
+    Ok(target_dir.join(entry_path))
+}
+
+// macOS-gated alongside `safe_join` itself.
+#[cfg(all(test, target_os = "macos"))]
+#[path = "github_download_service_tests.rs"]
+mod tests;
 
 #[derive(Clone)]
 pub struct GithubDownloadService {
@@ -409,7 +441,7 @@ impl GithubDownloadService {
         for entry_result in archive.entries().context("Failed to read tar entries")? {
             let mut entry = entry_result.context("Failed to read tar entry")?;
             let path = entry.path().context("Failed to get entry path")?;
-            let dest_path = target_dir.join(&path);
+            let dest_path = safe_join(target_dir, &path)?;
 
             if entry.header().entry_type().is_dir() {
                 fs::create_dir_all(&dest_path).with_context(|| {
