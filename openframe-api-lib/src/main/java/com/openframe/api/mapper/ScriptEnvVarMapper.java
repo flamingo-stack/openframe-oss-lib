@@ -12,7 +12,7 @@ public final class ScriptEnvVarMapper {
 
     public static List<ScriptEnvVar> toEntity(List<ScriptEnvVarInput> input) {
         if (input == null) {
-            return null;
+            return List.of();
         }
         return input.stream()
                 .map(e -> ScriptEnvVar.builder()
@@ -23,3 +23,4 @@ public final class ScriptEnvVarMapper {
                 .toList();
     }
 }
+
