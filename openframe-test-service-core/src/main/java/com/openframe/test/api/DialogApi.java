@@ -122,8 +122,13 @@ public class DialogApi {
                 "query", ARCHIVE_DIALOG,
                 "variables", Map.of("input", Map.of("id", dialogId))
         );
-        given(getAuthorizedSpec())
+        var response = given(getAuthorizedSpec())
                 .body(body).post(CHAT_GRAPHQL)
-                .then().statusCode(200);
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath();
+        List<MutationError> userErrors = response.getList("data.archiveDialog.userErrors", MutationError.class);
+        if (userErrors != null && !userErrors.isEmpty()) {
+            throw new AssertionError("archiveDialog returned userErrors: " + userErrors);
+        }
     }
 }
