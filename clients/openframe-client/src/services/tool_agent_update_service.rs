@@ -69,10 +69,6 @@ impl ToolAgentUpdateService {
             tool_agent_id, new_version
         );
 
-        // Lock before reading anything: everything below reads and rewrites the registry
-        // record, and a concurrent uninstall holding this lock can delete it underneath us —
-        // a stale copy written back afterwards resurrects a tool whose binary is gone.
-        // Defer rather than block, like uninstall and restart do.
         let tool_lock = self.tool_run_manager.tool_lock(tool_agent_id).await;
         let _lock_guard = match tool_lock.try_lock_owned() {
             Ok(guard) => guard,
@@ -171,9 +167,6 @@ impl ToolAgentUpdateService {
             return Ok(());
         }
 
-        // Mark as updating once for all updates; the guard clears the flag — and only then
-        // releases the lock — on return, panic or cancellation. A leaked flag parks the
-        // tool's supervisor and blocks every client self-update for the process lifetime.
         let _updating =
             UpdatingGuard::acquire(&self.tool_run_manager, tool_agent_id, Some(_lock_guard)).await;
 
@@ -234,10 +227,6 @@ impl ToolAgentUpdateService {
         let mut stopped_for_assets = false;
         if !needs_tool_update && !assets_to_update.is_empty() {
             // Only assets to update - stop tool once before all asset updates.
-            // `stop_installed_tool`, not `stop_tool`: for Installation::Service this stops
-            // the OS service itself. A process-pattern kill leaves the launchd job loaded,
-            // and `launchctl load` on an already-loaded job is a no-op that still reports
-            // success — so the restart below would silently start nothing on macOS.
             info!(tool_id = %tool_agent_id, "Stopping tool for asset updates");
             stopped_for_assets = true;
             self.tool_kill_service
@@ -249,8 +238,6 @@ impl ToolAgentUpdateService {
         }
 
         // 2. Asset updates (tool already stopped by tool_update or above).
-        // The result is held rather than propagated so the restart below still runs: a tool
-        // we stopped must be started again even when an asset failed halfway.
         let mut asset_result = Ok(());
         for asset in assets_to_update {
             asset_result = self
@@ -261,20 +248,12 @@ impl ToolAgentUpdateService {
             }
         }
 
-        // A Service install is not supervised by the run manager — `run_tool` returns early
-        // for it and `run()` never starts services — so an asset-only update that stopped
-        // the tool has to start it again. Without this a routine asset bump (e.g. osqueryd)
-        // silently takes the agent down until a reboot or a reinstall. Supervised installs
-        // are relaunched by their run loop once the updating flag clears.
         if stopped_for_assets {
             match &installed_tool.installation {
                 Installation::Service { service_name, .. } => {
                     self.restart_service_after_assets(tool_agent_id, service_name)
                         .await;
                 }
-                // The macOS GuiApp supervisor exits once the app is verified running, so
-                // nothing is left to relaunch it; spawn a fresh one. Windows GuiApps are
-                // relaunched by relaunch_windows_gui_app at the end of process_update.
                 #[cfg(target_os = "macos")]
                 Installation::GuiApp { .. } => {
                     if let Err(e) = self
@@ -292,17 +271,6 @@ impl ToolAgentUpdateService {
         asset_result
     }
 
-    /// Start a Service tool back up after an asset-only update.
-    ///
-    /// Retry and start-verification deliberately live in `system_service::start_service`
-    /// rather than here, so there is one implementation of "starting a service is flaky"
-    /// (see #2230, which gives it a backoff schedule and classifies non-retryable codes).
-    ///
-    /// Returns nothing instead of an error on purpose: every asset version was already
-    /// persisted and published by `do_asset_update`, so a redelivery finds nothing left to
-    /// update and acks immediately — propagating an error here would look like a retry
-    /// while actually discarding the message with the tool still stopped. A loud log is the
-    /// honest signal; the alternative is a failure that silently disappears.
     async fn restart_service_after_assets(&self, tool_agent_id: &str, service_name: &str) {
         info!(tool_id = %tool_agent_id, service = %service_name, "Restarting service tool after asset updates");
 

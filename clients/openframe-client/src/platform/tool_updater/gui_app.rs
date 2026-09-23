@@ -18,8 +18,6 @@ impl GuiAppToolUpdater {
         Self { deps }
     }
 
-    /// Sibling of the bundle so the rename stays on one volume, dot-prefixed so an
-    /// interrupted update never leaves a second app visible in Finder.
     fn backup_path_for(bundle: &Path) -> PathBuf {
         let name = bundle
             .file_name()
@@ -28,10 +26,6 @@ impl GuiAppToolUpdater {
         bundle.with_file_name(format!(".{name}.update-backup"))
     }
 
-    /// Renames the installed `.app` to a sibling backup so a failed download can be undone.
-    /// The old code deleted the bundle outright and then downloaded its replacement, so a
-    /// dropped connection left no app at all and a rollback that could only log
-    /// "reinstall required". A rename is atomic, same-volume, and costs nothing.
     async fn move_bundle_aside(
         executable_path: &str,
         tool_agent_id: &str,
@@ -43,8 +37,6 @@ impl GuiAppToolUpdater {
         };
         let backup = Self::backup_path_for(&bundle);
 
-        // A backup left by a run that died mid-download is the only copy of the app. Adopt
-        // it when the bundle is gone; drop it as stale when the bundle is back.
         if !bundle.exists() {
             if backup.exists() {
                 info!(tool_id = %tool_agent_id, "Adopting the backup left by an interrupted update");
@@ -111,8 +103,6 @@ impl ToolUpdater for GuiAppToolUpdater {
             );
         };
 
-        // The old bundle was moved aside in `prepare`, so the destination is already free
-        // and `rollback` can put it back if this download fails.
         let applications_dir = PathBuf::from("/Applications");
 
         info!(tool_id = %tool_agent_id, "Downloading and installing new version from: {}", config.link);
@@ -143,9 +133,6 @@ impl ToolUpdater for GuiAppToolUpdater {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Finalizing GuiApp update");
 
-        // `finalize` only runs after a successful apply, so the kept-aside bundle has done
-        // its job. Drop it here rather than after the relaunch, so the early return below
-        // cannot leak a full copy of the app into /Applications.
         if let Some(backup) = &ctx.backup_path {
             if backup.exists() {
                 if let Err(e) = tokio::fs::remove_dir_all(backup).await {
@@ -235,7 +222,6 @@ impl ToolUpdater for GuiAppToolUpdater {
             anyhow::bail!("Could not resolve the .app bundle path for {tool_agent_id}");
         };
 
-        // A partially extracted new bundle must not block the restore.
         if bundle.exists() {
             tokio::fs::remove_dir_all(&bundle).await.ok();
         }

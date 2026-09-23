@@ -121,8 +121,6 @@ fn windows_service_main(_args: Vec<std::ffi::OsString>) {
         }
     });
 
-    // A non-zero exit code is what makes SCM treat this as a failure and fire the
-    // configured recovery ladder; Win32(0) on both paths meant nothing ever restarted.
     if let Err(e) = result {
         error!("Service core failed: {:#}", e);
         let _ = set_service_status(

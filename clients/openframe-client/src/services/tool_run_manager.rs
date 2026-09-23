@@ -726,9 +726,6 @@ impl ToolRunManager {
 
         tokio::spawn(async move {
             let mut launch_backoff = FailureLogBackoff::new();
-            // Only on the first pass, and again after a supervised child exits. A launch
-            // retry must not re-kill: a GuiApp that needs longer than the 3s verify window
-            // would be killed by the next iteration, forever.
             let mut kill_leftovers_now = true;
             loop {
                 // Self-update in progress — stop the loop entirely
@@ -761,8 +758,7 @@ impl ToolRunManager {
 
                 let log_attempt = launch_backoff.should_log();
 
-                // A leftover that will not die is a retryable launch failure, not a fatal
-                // one. Windows GUI apps belong to the HKLM Run autorun — never kill them.
+                // Windows GUI apps belong to the HKLM Run autorun — never kill them.
                 #[cfg(target_os = "windows")]
                 let kill_leftovers = !installation.is_gui_app();
                 #[cfg(not(target_os = "windows"))]
@@ -771,8 +767,6 @@ impl ToolRunManager {
                 if kill_leftovers && kill_leftovers_now {
                     if let Err(e) = tool_kill_service.stop_tool(&tool.tool_agent_id).await {
                         let failures = launch_backoff.record_failure(log_attempt);
-                        // Escalate the retry delay, not just the logging: each attempt is a
-                        // full process-table scan and a wedged process only clears on reboot.
                         let delay =
                             (RETRY_DELAY_SECONDS * failures).min(KILL_RETRY_MAX_DELAY_SECONDS);
                         if log_attempt {
@@ -895,8 +889,6 @@ impl ToolRunManager {
                                     let prefs = crate::platform::preferences_writer::args_to_pairs(
                                         &processed_args,
                                     );
-                                    // Preferences are the only channel GuiApp args travel on
-                                    // macOS; launching without them starts an unconfigured app.
                                     if let Err(e) =
                                         crate::platform::preferences_writer::write(bid, prefs)
                                     {
@@ -1067,9 +1059,7 @@ impl ToolRunManager {
     }
 }
 
-/// Clears the updating flag on drop (surviving cancellation and panic), releasing the tool
-/// lock only once the flag is clear. Used by the update and restart paths; install and
-/// uninstall still pair mark/clear by hand.
+/// Clears the updating flag on drop, releasing the tool lock only once the flag is clear.
 pub struct UpdatingGuard {
     tool_run_manager: ToolRunManager,
     tool_agent_id: String,

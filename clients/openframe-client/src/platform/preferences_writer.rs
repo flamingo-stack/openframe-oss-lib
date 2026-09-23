@@ -19,11 +19,6 @@ pub fn write<'a>(
     }
 
     for (key, value) in &prefs {
-        // `launchctl asuser` first, `sudo -u` only as a fallback — the same order
-        // `user_session::launch_as_user` uses. From a LaunchDaemon there is no user
-        // session bootstrap, so a bare `sudo -u defaults write` is rejected by cfprefsd
-        // ("Could not write domain ...; exiting") and the app then launches with none of
-        // its configuration, because preferences are the only channel GuiApp args travel.
         let status = Command::new("launchctl")
             .args([
                 "asuser",

@@ -9,10 +9,6 @@ fn join(entry: &str) -> Option<PathBuf> {
     safe_join(&target(), Path::new(entry)).ok()
 }
 
-// ---------------------------------------------------------------- accepted
-
-/// tar archives routinely prefix entries with `./`; rejecting those would break every
-/// legitimate download.
 #[test]
 fn accepts_leading_current_dir() {
     assert_eq!(
@@ -37,10 +33,6 @@ fn accepts_a_bare_filename() {
     );
 }
 
-// ---------------------------------------------------------------- rejected
-
-/// The reason this helper exists: `Path::join` with an absolute entry *replaces* the base,
-/// so an unsanitised archive entry would write outside the target — as root.
 #[test]
 fn rejects_an_absolute_entry() {
     assert!(join("/Library/LaunchDaemons/evil.plist").is_none());
@@ -50,9 +42,6 @@ fn rejects_an_absolute_entry() {
 fn rejects_parent_traversal() {
     assert!(join("../../../../etc/cron.d/evil").is_none());
 }
-
-/// `..` must be rejected wherever it appears, not just at the start — `components()`
-/// normalises `.` but never `..`, so an interior segment still escapes.
 #[test]
 fn rejects_interior_parent_traversal() {
     assert!(join("OpenFrame.app/../../../etc/passwd").is_none());
@@ -62,8 +51,6 @@ fn rejects_interior_parent_traversal() {
 fn rejects_a_root_relative_entry() {
     assert!(join("//srv/evil").is_none());
 }
-
-/// Every rejected entry must fail loudly rather than resolve to something surprising.
 #[test]
 fn rejection_names_the_offending_entry() {
     let err = safe_join(&target(), Path::new("../escape"))

@@ -762,7 +762,6 @@ impl Client {
         self.script_schedule_execution_listener.start().await?;
         info!("Script schedule execution listener started");
 
-        // A tool lane that cannot start must not end the service core.
         if let Err(e) = self.tool_run_manager.run().await {
             error!("Failed to start tool run manager: {:#}", e);
         }
