@@ -270,13 +270,14 @@ export function FeatureListSkeleton({
 }) {
   if (grouped) {
     // Grouped features with sections
+    const featuresPerGroup = Math.max(1, Math.ceil(features / 3));
     return (
       <div className={cn('space-y-6', className)}>
         {Array.from({ length: 3 }).map((_, groupIndex) => (
           <div key={groupIndex} className="space-y-3">
             <TextSkeleton.Subheading className="w-1/3" />
             <div className="space-y-2">
-              {Array.from({ length: features / 3 }).map((_feature, featureIndex) => (
+              {Array.from({ length: featuresPerGroup }).map((_feature, featureIndex) => (
                 <div key={featureIndex} className="flex items-center gap-3">
                   {showIcons && <MediaSkeleton.Icon size="sm" />}
                   <TextSkeleton.Body className="w-2/3" />
@@ -372,3 +373,4 @@ export function PricingSkeleton({ className, plans = 3 }: ContentSkeletonProps &
     </div>
   );
 }
+
