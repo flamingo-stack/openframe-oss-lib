@@ -7,6 +7,7 @@ use crate::service_adapter::{CrossPlatformServiceManager, ServiceConfig};
 use crate::services::{
     AgentConfigurationService, DeregistrationService, InitialConfigurationService,
     InstalledToolsService, ToolCommandParamsResolver, ToolKillService, ToolUninstallService,
+    UpdateCleanupService,
 };
 
 const SERVICE_NAME: &str = "client";
@@ -15,6 +16,43 @@ const DESCRIPTION: &str = "OpenFrame client service for remote management and mo
 
 /// CLI subcommand the detached process runs to remove the client.
 const UNINSTALL_SUBCOMMAND: &str = "uninstall";
+
+/// Removes the copies the update flow leaves next to the binary: `<exe>.lkg`,
+/// `<exe>.prev`, `<exe>.old`, `<exe>.bad`, `<exe>.bak`, `<exe>.backup.<ts>`.
+/// Matched by prefix on purpose: every sibling written next to the binary is
+/// an update artefact, and an enumerated list would leave the next suffix
+/// behind on uninstall again.
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn remove_binary_siblings(install_path: &Path) {
+    let Some(dir) = install_path.parent() else {
+        return;
+    };
+    let Some(exe_name) = install_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+    else {
+        return;
+    };
+    let prefix = format!("{exe_name}.");
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if !entry.file_name().to_string_lossy().starts_with(&prefix) {
+            continue;
+        }
+        let path = entry.path();
+        match std::fs::remove_file(&path) {
+            Ok(()) => info!("Removed update leftover: {}", path.display()),
+            Err(e) => warn!("Failed to remove update leftover {}: {}", path.display(), e),
+        }
+    }
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn remove_update_temp_files(install_path: &Path) {
+    UpdateCleanupService::for_binary(install_path.to_path_buf()).sweep_temp_leftovers(None);
+}
 
 /// Spawn a detached `openframe-client uninstall` that survives this service being stopped.
 /// Self-uninstall stops the `com.openframe.client` service (our own process), so it must run
@@ -429,6 +467,9 @@ pub async fn uninstall_windows(
         deregistration_service.retry_if_unreported().await;
     }
 
+    remove_binary_siblings(install_path);
+    remove_update_temp_files(install_path);
+
     // Launch cleanup script to remove binary after process exit
     if install_path.exists() {
         info!("Launching binary cleanup script...");
@@ -544,6 +585,9 @@ pub async fn uninstall_macos(
         }
     }
 
+    remove_binary_siblings(install_path);
+    remove_update_temp_files(install_path);
+
     // Final chance to report the uninstall now that the wipe is done.
     if let Some(deregistration_service) = &deregistration_service {
         deregistration_service.retry_if_unreported().await;
@@ -556,3 +600,7 @@ pub async fn uninstall_macos(
 
     Ok(())
 }
+
+#[cfg(all(test, any(target_os = "windows", target_os = "macos")))]
+#[path = "uninstall_tests.rs"]
+mod tests;
