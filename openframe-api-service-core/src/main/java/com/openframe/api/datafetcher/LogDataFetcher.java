@@ -18,7 +18,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 
 @DgsComponent
 @Slf4j
@@ -89,13 +89,14 @@ public class LogDataFetcher {
         log.debug("Fetching audit details for ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {}",
                 ingestDay, toolType, eventType, timestamp, toolEventId);
 
-        Optional<LogDetails> details = logService.findLogDetails(ingestDay, toolType, eventType, timestamp, toolEventId);
-        if (details.isPresent()) {
-            log.debug("Successfully fetched audit details for toolEventId: {}", toolEventId);
-            return details.get();
-        } else {
-            log.debug("No audit details found for toolEventId: {}", toolEventId);
-            return null;
-        }
+        return logService.findLogDetails(ingestDay, toolType, eventType, timestamp, toolEventId)
+                .map(d -> {
+                    log.debug("Successfully fetched audit details for toolEventId: {}", toolEventId);
+                    return d;
+                })
+                .orElseThrow(() -> {
+                    log.debug("No audit details found for toolEventId: {}", toolEventId);
+                    return new NoSuchElementException("No audit details found for toolEventId: " + toolEventId);
+                });
     }
 } 
