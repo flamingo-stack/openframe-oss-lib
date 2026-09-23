@@ -83,6 +83,15 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
         return executeFacetQuery(OS_TYPE, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, OS_TYPE);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * NOTE: unlike {@link #getStatusFilterOptions}, {@link #getDeviceTypeFilterOptions},
+     * {@link #getOsTypeFilterOptions} and {@link #getTagKeyFilterOptions} (which all count every
+     * device except DELETED), this method restricts the counted universe to active devices
+     * (status ONLINE or OFFLINE only). Callers iterating over all facet methods with the same
+     * arguments should not assume the totals are comparable across facets.
+     */
     @Override
     public Map<String, Integer> getOrganizationFilterOptions(
             String tenantId,
