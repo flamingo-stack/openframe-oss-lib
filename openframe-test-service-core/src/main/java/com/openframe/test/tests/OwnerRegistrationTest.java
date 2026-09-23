@@ -39,7 +39,7 @@ public class OwnerRegistrationTest extends BaseTest {
         UserRegistrationResponse response = RegistrationApi.registerUser(userRegistrationRequest);
         assertThat(response.getId()).as("Registration response id should not be null").isNotNull();
         assertThat(response.getOwnerId()).as("Registration response ownerId should not be null").isNotNull();
-//        assertThat(response.getCreatedAt()).as("Registration response createdAt should not be null").isNotNull();
+        assertThat(response.getCreatedAt()).as("Registration response createdAt should not be null").isNotNull();
         assertThat(response.getUpdatedAt()).as("Registration response updatedAt should not be null").isNotNull();
         assertThat(response).as("Registration response should match expected")
                 .usingRecursiveComparison()
@@ -62,14 +62,4 @@ public class OwnerRegistrationTest extends BaseTest {
         MeResponse response = UserApi.me();
         assertThat(response.isAuthenticated()).as("Could not login").isTrue();
     }
-
-//    @Order(3)
-//    @Test
-//    @DisplayName("Check that default organization is created")
-//    public void testDefaultOrganizationCreated() {
-//        Map<String, String> cookies = AuthFlow.login(UserConfig.getUser());
-//        AuthHelper.setCookies(cookies);
-//        List<Organization> organizations = OrganizationApi.getOrganizations(true);
-//        assertThat(organizations).as("No Default organization created").isNotEmpty();
-//    }
 }
