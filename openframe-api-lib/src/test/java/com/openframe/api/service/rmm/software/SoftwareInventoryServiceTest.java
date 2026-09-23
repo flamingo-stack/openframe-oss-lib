@@ -292,6 +292,7 @@ class SoftwareInventoryServiceTest {
         SoftwareTitle t = new SoftwareTitle();
         t.setName(name);
         t.setSource(fleetSource);
+        t.setHostsCount(1);
         SoftwareTitleVersion v = new SoftwareTitleVersion();
         v.setVersion("1.0");
         t.setVersions(List.of(v));
@@ -350,6 +351,7 @@ class SoftwareInventoryServiceTest {
     private static SoftwareTitle titleWithCves(String name, int cveCount) {
         SoftwareTitle t = new SoftwareTitle();
         t.setName(name);
+        t.setHostsCount(1); // installed on >=1 Fleet host so it survives the cheap pre-filter; enrichment refines the count
         SoftwareTitleVersion v = new SoftwareTitleVersion();
         v.setVersion("1.0");
         v.setVulnerabilities(java.util.stream.IntStream.range(0, cveCount)
