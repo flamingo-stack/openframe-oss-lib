@@ -164,12 +164,18 @@ public class ScriptService {
             return null;
         }
 
+        var shells = input.getShells();
+        var statuses = input.getStatuses();
+        var supportedPlatforms = input.getSupportedPlatforms();
+        var tagIds = input.getTagIds();
+        var createdByIds = input.getAuthorIds();
+
         return ScriptQueryFilter.builder()
-                .shells(input.getShells())
-                .statuses(input.getStatuses())
-                .supportedPlatforms(input.getSupportedPlatforms())
-                .tagIds(input.getTagIds())
-                .createdByIds(input.getAuthorIds())
+                .shells(shells)
+                .statuses(statuses)
+                .supportedPlatforms(supportedPlatforms)
+                .tagIds(tagIds)
+                .createdByIds(createdByIds)
                 .build();
     }
 
@@ -275,3 +281,4 @@ public class ScriptService {
                 .build();
     }
 }
+
