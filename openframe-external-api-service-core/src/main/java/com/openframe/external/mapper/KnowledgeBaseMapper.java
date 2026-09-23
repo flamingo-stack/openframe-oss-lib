@@ -7,6 +7,8 @@ import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.external.dto.knowledgebase.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -15,7 +17,12 @@ import java.util.List;
 public class KnowledgeBaseMapper extends BaseRestMapper {
 
     /** Per-item related data gathered by the read service. */
-    public record ItemRelations(List<Tag> tags, List<KnowledgeBaseItemAttachment> attachments) {
+    @Getter
+    @AllArgsConstructor
+    public static class ItemRelations {
+        private final List<Tag> tags;
+        private final List<KnowledgeBaseItemAttachment> attachments;
+
         public static ItemRelations empty() {
             return new ItemRelations(List.of(), List.of());
         }
@@ -38,8 +45,8 @@ public class KnowledgeBaseMapper extends BaseRestMapper {
                 .lastModifiedBy(item.getLastModifiedBy())
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
-                .tags(toTagResponses(rel.tags()))
-                .attachments(toAttachmentResponses(rel.attachments()))
+                .tags(toTagResponses(rel.getTags()))
+                .attachments(toAttachmentResponses(rel.getAttachments()))
                 .build();
     }
 
