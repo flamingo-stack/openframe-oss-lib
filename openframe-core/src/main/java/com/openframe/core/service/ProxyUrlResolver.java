@@ -45,14 +45,24 @@ public class ProxyUrlResolver {
             }
             log.debug("Path to proxy: {}", pathToProxy);
 
-            URI targetUri = UriComponentsBuilder.newInstance()
+            String base = UriComponentsBuilder.newInstance()
                     .scheme(integratedToolUri.getScheme())
                     .host(isLocalProfile() ? "localhost" : integratedToolUri.getHost())
                     .port(toolPort)
-                    .path(pathToProxy)
-                    .query(originalUri.getQuery())
                     .build()
-                    .toUri();
+                    .toUriString();
+            String rawPath = originalUri.getRawPath();
+            String rawQuery = originalUri.getRawQuery();
+            String toolPathRaw = prefix + "/" + toolId;
+            String pathToProxyRaw = rawPath != null && rawPath.indexOf(toolPathRaw) >= 0
+                    ? rawPath.substring(rawPath.indexOf(toolPathRaw) + toolPathRaw.length())
+                    : pathToProxy;
+            if (pathToProxyRaw.isEmpty()) {
+                pathToProxyRaw = "/";
+            }
+            // Use raw (already percent-encoded) path and query to avoid re-encoding and
+            // preserve the semantics of any percent-encoded reserved characters.
+            URI targetUri = new URI(base + pathToProxyRaw + (rawQuery != null ? "?" + rawQuery : ""));
 
             log.debug("Resolved target URI: {}", targetUri);
             return targetUri;
