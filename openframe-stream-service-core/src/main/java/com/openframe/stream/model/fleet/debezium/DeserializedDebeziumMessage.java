@@ -33,3 +33,4 @@ public class DeserializedDebeziumMessage extends CommonDebeziumMessage {
     private String userId;
     private Set<Destination> excludedDestinations;
 }
+
