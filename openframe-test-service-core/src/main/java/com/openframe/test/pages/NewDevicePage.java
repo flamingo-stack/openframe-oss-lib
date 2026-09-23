@@ -236,7 +236,13 @@ public class NewDevicePage {
                   for (const el of all) {
                     if (el.onclick) {
                       const txt = el.textContent?.trim();
-                      if (txt === platformName || txt.startsWith(platformName)) {
+                      // Exact match on the platform name, or, for "Linux", also match
+                      // the "Linux (coming soon)" label. This is scoped to the
+                      // specific platform name to avoid one label's prefix
+                      // incorrectly matching another platform's element.
+                      const matches = txt === platformName
+                        || (platformName === 'Linux' && txt?.startsWith('Linux'));
+                      if (matches) {
                         const inner = el.children[0];
                         if (inner && typeof inner.className === 'string') {
                           return !inner.className.includes('opacity-50') && !inner.className.includes('cursor-not-allowed');
