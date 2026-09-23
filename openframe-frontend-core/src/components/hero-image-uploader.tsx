@@ -35,22 +35,59 @@ interface HeroImageUploaderProps {
  * `uploadEndpoint` is caller-supplied, and the three endpoints in the fleet
  * answer with three different envelopes — `{ data: { url } }` (the hub's
  * media routes), `{ url }` (the blob upload proxy) and `{ file_url }` (the
- * legacy supabase route). Returns null when none of them is a usable string,
- * which the caller reports as "Invalid upload response".
+ * legacy supabase route). Before checking for a URL field, this also rejects
+ * payloads carrying an explicit error/failure indicator (`error`, `success:
+ * false`, or a non-2xx-ish `status`/`statusCode`) so a backend error payload
+ * that happens to contain an unrelated url-like field isn't mistaken for a
+ * successful upload. Throws distinct errors for a present-but-empty URL
+ * string versus a genuinely malformed/error response, which the caller
+ * surfaces via toast.
  */
-function readUploadedUrl(payload: unknown): string | null {
-  if (typeof payload !== 'object' || payload === null) return null;
+function readUploadedUrl(payload: unknown): string {
+  if (typeof payload !== 'object' || payload === null) {
+    throw new Error('Invalid upload response');
+  }
 
-  if ('data' in payload) {
-    const nested = payload.data;
-    if (typeof nested === 'object' && nested !== null && 'url' in nested) {
-      if (typeof nested.url === 'string' && nested.url) return nested.url;
+  const isErrorPayload = (obj: Record<string, unknown>): boolean => {
+    if ('error' in obj && obj.error) return true;
+    if ('success' in obj && obj.success === false) return true;
+    if ('status' in obj && typeof obj.status === 'number' && obj.status >= 400) return true;
+    if ('statusCode' in obj && typeof obj.statusCode === 'number' && obj.statusCode >= 400) return true;
+    return false;
+  };
+
+  const record = payload as Record<string, unknown>;
+  if (isErrorPayload(record)) {
+    throw new Error('Upload failed');
+  }
+
+  const extractFrom = (obj: Record<string, unknown>, key: string): string | undefined => {
+    if (!(key in obj)) return undefined;
+    const value = obj[key];
+    if (typeof value !== 'string') return undefined;
+    if (!value) throw new Error('Upload response missing URL');
+    return value;
+  };
+
+  if ('data' in record) {
+    const nested = record.data;
+    if (typeof nested === 'object' && nested !== null) {
+      const nestedRecord = nested as Record<string, unknown>;
+      if (isErrorPayload(nestedRecord)) {
+        throw new Error('Upload failed');
+      }
+      const url = extractFrom(nestedRecord, 'url');
+      if (url) return url;
     }
   }
-  if ('url' in payload && typeof payload.url === 'string' && payload.url) return payload.url;
-  if ('file_url' in payload && typeof payload.file_url === 'string' && payload.file_url) return payload.file_url;
 
-  return null;
+  const url = extractFrom(record, 'url');
+  if (url) return url;
+
+  const fileUrl = extractFrom(record, 'file_url');
+  if (fileUrl) return fileUrl;
+
+  throw new Error('Invalid upload response');
 }
 
 /**
@@ -131,9 +168,7 @@ export function HeroImageUploader({
         const res = await fetch(uploadEndpoint, { method: 'POST', body: fd });
         if (!res.ok) throw new Error('Upload failed');
         const json: unknown = await res.json();
-        const url = readUploadedUrl(json);
-        if (!url) throw new Error('Invalid upload response');
-        uploadedUrl = url;
+        uploadedUrl = readUploadedUrl(json);
       }
 
       onChange(uploadedUrl);
