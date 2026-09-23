@@ -87,7 +87,15 @@ public class CommandDispatchService {
                 .timeout(input.getTimeoutSeconds())
                 .build();
 
-        machineIds.forEach(machineId -> commandNatsPublisher.publishCommand(machineId, message));
+        machineIds.forEach(machineId -> {
+            try {
+                commandNatsPublisher.publishCommand(machineId, message);
+            } catch (Exception e) {
+                log.error("Failed to publish batch command executionId={} machineId={}, marking execution FAILED",
+                        executionId, machineId, e);
+                commandExecutionService.markFailed(executionId, machineId, e.getMessage());
+            }
+        });
 
         log.info("Dispatched batch command executionId={} to {} machines", executionId, machineIds.size());
         return DispatchResponse.builder()
