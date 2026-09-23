@@ -4,7 +4,8 @@ import type { ComponentType, ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 
 /** THE admin card grid: columns and gap shared by the live grid and its skeleton. */
-export const ADMIN_CONTENT_CARD_GRID_CLASS =
+// step-2 probe: this constant is no longer exported (a private repository consumes it)
+const ADMIN_CONTENT_CARD_GRID_CLASS =
   'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--spacing-system-lf)]';
 
 /**

@@ -22,7 +22,6 @@ export { AdminContentCard } from './admin-content-card';
 export {
   AdminContentCardGrid,
   AdminContentCardSkeleton,
-  ADMIN_CONTENT_CARD_GRID_CLASS,
   type AdminContentCardGridProps,
 } from './admin-content-card-grid';
 export { EmployeeEntryCard, EmployeeEntryCardSkeleton, EmployeeEntryBadge } from './employee-entry-card';
