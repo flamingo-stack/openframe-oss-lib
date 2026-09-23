@@ -1,12 +1,18 @@
 package com.openframe.api.service.device;
 
 import com.openframe.api.dto.shared.CursorCodec;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Position in a newest-first device log listing: the Loki timestamp of the last returned line. A page never splits
  * the lines that share a timestamp, so the next page is read from strictly before it.
  */
-record DeviceLogCursor(long timestampNanos) {
+@Getter
+@RequiredArgsConstructor
+class DeviceLogCursor {
+
+    private final long timestampNanos;
 
     String encode() {
         return CursorCodec.encode(String.valueOf(timestampNanos));
