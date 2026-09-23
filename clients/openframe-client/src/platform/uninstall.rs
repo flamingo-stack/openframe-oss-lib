@@ -7,6 +7,7 @@ use crate::service_adapter::{CrossPlatformServiceManager, ServiceConfig};
 use crate::services::{
     AgentConfigurationService, DeregistrationService, InitialConfigurationService,
     InstalledToolsService, ToolCommandParamsResolver, ToolKillService, ToolUninstallService,
+    UpdateCleanupService,
 };
 
 const SERVICE_NAME: &str = "client";
@@ -15,6 +16,43 @@ const DESCRIPTION: &str = "OpenFrame client service for remote management and mo
 
 /// CLI subcommand the detached process runs to remove the client.
 const UNINSTALL_SUBCOMMAND: &str = "uninstall";
+
+/// Removes the copies the update flow leaves next to the binary: `<exe>.lkg`,
+/// `<exe>.prev`, `<exe>.old`, `<exe>.bad`, `<exe>.bak`, `<exe>.backup.<ts>`.
+/// Matched by prefix on purpose: every sibling written next to the binary is
+/// an update artefact, and an enumerated list would leave the next suffix
+/// behind on uninstall again.
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn remove_binary_siblings(install_path: &Path) {
+    let Some(dir) = install_path.parent() else {
+        return;
+    };
+    let Some(exe_name) = install_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+    else {
+        return;
+    };
+    let prefix = format!("{exe_name}.");
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if !entry.file_name().to_string_lossy().starts_with(&prefix) {
+            continue;
+        }
+        let path = entry.path();
+        match std::fs::remove_file(&path) {
+            Ok(()) => info!("Removed update leftover: {}", path.display()),
+            Err(e) => warn!("Failed to remove update leftover {}: {}", path.display(), e),
+        }
+    }
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn remove_update_temp_files(install_path: &Path) {
+    UpdateCleanupService::for_binary(install_path.to_path_buf()).sweep_temp_leftovers(None);
+}
 
 /// Spawn a detached `openframe-client uninstall` that survives this service being stopped.
 /// Self-uninstall stops the `com.openframe.client` service (our own process), so it must run
@@ -81,44 +119,6 @@ fn spawn_detached_uninstall_windows(install_path: &Path) -> Result<()> {
 
     info!("Self-uninstall process launched (PID: {})", child.id());
     Ok(())
-}
-
-pub fn remove_binary_siblings(install_path: &Path) {
-    let Some(dir) = install_path.parent() else {
-        return;
-    };
-    let Some(exe_name) = install_path
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-    else {
-        return;
-    };
-    let stem = install_path
-        .file_stem()
-        .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_else(|| exe_name.clone());
-    let prefixes = [format!("{exe_name}."), format!(".{stem}-update-")];
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().to_string();
-        if !prefixes.iter().any(|p| name.starts_with(p)) {
-            continue;
-        }
-        let path = entry.path();
-        match std::fs::remove_file(&path) {
-            Ok(()) => info!("Removed update leftover: {}", path.display()),
-            Err(e) => warn!("Failed to remove update leftover {}: {}", path.display(), e),
-        }
-    }
-}
-
-async fn remove_update_temp_files() {
-    match crate::services::UpdateCleanupService::new() {
-        Ok(cleanup) => cleanup.cleanup_all().await,
-        Err(e) => warn!("Failed to initialize update cleanup: {:#}", e),
-    }
 }
 
 pub fn orbit_dir() -> std::path::PathBuf {
@@ -455,7 +455,7 @@ pub async fn uninstall_windows(
     }
 
     remove_binary_siblings(install_path);
-    remove_update_temp_files().await;
+    remove_update_temp_files(install_path);
 
     // Launch cleanup script to remove binary after process exit
     if install_path.exists() {
@@ -573,7 +573,7 @@ pub async fn uninstall_macos(
     }
 
     remove_binary_siblings(install_path);
-    remove_update_temp_files().await;
+    remove_update_temp_files(install_path);
 
     // Final chance to report the uninstall now that the wipe is done.
     if let Some(deregistration_service) = &deregistration_service {
@@ -588,83 +588,6 @@ pub async fn uninstall_macos(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::remove_binary_siblings;
-    use std::fs;
-
-    fn touch(dir: &std::path::Path, name: &str) {
-        fs::write(dir.join(name), b"x").unwrap();
-    }
-
-    fn remaining(dir: &std::path::Path) -> Vec<String> {
-        let mut names: Vec<String> = fs::read_dir(dir)
-            .unwrap()
-            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
-            .collect();
-        names.sort();
-        names
-    }
-
-    #[test]
-    fn removes_update_leftovers_next_to_windows_binary() {
-        let dir = tempfile::tempdir().unwrap();
-        for name in [
-            "openframe-client.exe",
-            "openframe-client.exe.lkg",
-            "openframe-client.exe.lkg.tmp",
-            "openframe-client.exe.prev",
-            "openframe-client.exe.old",
-            "openframe-client.exe.bak",
-            "openframe-client.exe.bad",
-            "openframe-client.exe.backup.1700000000",
-            ".openframe-client-update-abc123",
-            "openframe-client-updater.exe",
-            "openframe-client-updater.exe.lkg",
-            "openframe.cmd",
-        ] {
-            touch(dir.path(), name);
-        }
-
-        remove_binary_siblings(&dir.path().join("openframe-client.exe"));
-
-        assert_eq!(
-            remaining(dir.path()),
-            vec![
-                "openframe-client-updater.exe",
-                "openframe-client-updater.exe.lkg",
-                "openframe-client.exe",
-                "openframe.cmd",
-            ]
-        );
-    }
-
-    #[test]
-    fn removes_update_leftovers_next_to_unix_binary() {
-        let dir = tempfile::tempdir().unwrap();
-        for name in [
-            "openframe-client",
-            "openframe-client.lkg",
-            "openframe-client.prev",
-            "openframe-client.backup.1700000000",
-            ".openframe-client-update-abc123",
-            "openframe-client-updater",
-            "openframe",
-        ] {
-            touch(dir.path(), name);
-        }
-
-        remove_binary_siblings(&dir.path().join("openframe-client"));
-
-        assert_eq!(
-            remaining(dir.path()),
-            vec!["openframe", "openframe-client", "openframe-client-updater"]
-        );
-    }
-
-    #[test]
-    fn missing_directory_is_ignored() {
-        let dir = tempfile::tempdir().unwrap();
-        remove_binary_siblings(&dir.path().join("missing").join("openframe-client"));
-    }
-}
+#[cfg(all(test, any(target_os = "windows", target_os = "macos")))]
+#[path = "uninstall_tests.rs"]
+mod tests;

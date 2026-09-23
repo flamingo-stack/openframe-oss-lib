@@ -172,7 +172,6 @@ try {
     }
 
     Write-Output "Boot marker matched target version '$TargetVersion'"
-    Remove-Item -Path $PrevPath -Force -ErrorAction SilentlyContinue
 
     Set-UpdatePhase -Phase "verifying"
 
