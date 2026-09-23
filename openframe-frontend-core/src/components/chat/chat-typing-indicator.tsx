@@ -1,6 +1,30 @@
-import { forwardRef } from 'react';
+import { forwardRef, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import type { ChatTypingIndicatorProps } from './types';
+
+const DOT_PULSE_STYLE_ID = 'chat-typing-indicator-dot-pulse-keyframes';
+
+const dotAnimation = `
+  @keyframes dotPulse {
+    0%, 80%, 100% {
+      transform: scale(1);
+      opacity: 0.7;
+    }
+    40% {
+      transform: scale(1.5);
+      opacity: 1;
+    }
+  }
+`;
+
+function ensureDotPulseStyleInjected() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(DOT_PULSE_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = DOT_PULSE_STYLE_ID;
+  style.textContent = dotAnimation;
+  document.head.appendChild(style);
+}
 
 const ChatTypingIndicator = forwardRef<HTMLDivElement, ChatTypingIndicatorProps>(
   ({ className, size = 'md', showText = false, dotClassName, ...props }, ref) => {
@@ -16,22 +40,12 @@ const ChatTypingIndicator = forwardRef<HTMLDivElement, ChatTypingIndicatorProps>
       lg: 'h-8',
     };
 
-    const dotAnimation = `
-      @keyframes dotPulse {
-        0%, 80%, 100% {
-          transform: scale(1);
-          opacity: 0.7;
-        }
-        40% {
-          transform: scale(1.5);
-          opacity: 1;
-        }
-      }
-    `;
+    useEffect(() => {
+      ensureDotPulseStyleInjected();
+    }, []);
 
     return (
       <div ref={ref} className={cn('flex items-center gap-2', className)} {...props}>
-        <style dangerouslySetInnerHTML={{ __html: dotAnimation }} />
         {showText && <span className="text-ods-text-secondary text-h6">Assistant is typing</span>}
         <div className={cn('inline-flex items-center justify-center gap-1', containerSizeClasses[size])}>
           <div
