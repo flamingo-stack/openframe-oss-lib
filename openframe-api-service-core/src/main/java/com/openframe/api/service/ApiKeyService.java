@@ -42,6 +42,8 @@ public class ApiKeyService {
 
         try {
             return buildAndSaveApiKey(userId, request.name(), request.description(), request.expiresAt());
+        } catch (ApiKeyException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to create API key for user: {}", userId, e);
             throw new ApiKeyException("Failed to create API key", e);
@@ -183,10 +185,12 @@ public class ApiKeyService {
         String description = existingKey.getDescription();
         Instant expiresAt = existingKey.getExpiresAt();
 
+        CreateApiKeyResponse response = buildAndSaveApiKey(userId, name, description, expiresAt);
+
         apiKeyRepository.delete(existingKey);
         log.debug("Deleted old API key: {}", keyId);
 
-        return buildAndSaveApiKey(userId, name, description, expiresAt);
+        return response;
     }
 
     /**
