@@ -58,7 +58,6 @@ class TicketMapperTest {
                 .ticketNumber(42)
                 .title("Printer is on fire")
                 .description("Smoke everywhere")
-                .status(TicketStatus.RESOLVED)
                 .statusId("st-resolved")
                 .statusKind(TicketStatusKind.RESOLVED)
                 .creationSource(TicketCreationSource.ADMIN_DASHBOARD)
