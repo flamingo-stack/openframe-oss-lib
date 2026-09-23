@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
+import java.util.NoSuchElementException;
 
 /**
  * GraphQL DataFetcher for Organization queries.
@@ -82,12 +83,15 @@ public class OrganizationDataFetcher {
     public Organization organization(@InputArgument @NotBlank String id) {
         String organizationId = RELAY.fromGlobalId(id).getId();
         log.debug("Fetching organization by global ID: {}, organizationId: {}", id, organizationId);
-        return organizationService.getOrganizationByOrganizationId(organizationId).orElse(null);
+        return organizationService.getOrganizationByOrganizationId(organizationId)
+                .orElseThrow(() -> new NoSuchElementException("Organization not found: " + organizationId));
     }
 
     @DgsQuery
     public Organization organizationByOrganizationId(@InputArgument @NotBlank String organizationId) {
         log.debug("Fetching organization by organizationId: {}", organizationId);
-        return organizationService.getOrganizationByOrganizationId(organizationId).orElse(null);
+        return organizationService.getOrganizationByOrganizationId(organizationId)
+                .orElseThrow(() -> new NoSuchElementException("Organization not found: " + organizationId));
     }
 }
+
