@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Slf4j
 @RestController
@@ -28,18 +29,19 @@ public class IntegratedToolController {
     private final List<IntegratedToolPostSaveHook> postSaveHooks;
 
     @GetMapping
-    public Map<String, Object> getTools() {
-        return Map.of(
+    public ResponseEntity<Map<String, Object>> getTools() {
+        return ResponseEntity.ok(Map.of(
             "status", "success",
             "tools", toolService.getAllTools()
-        );
+        ));
     }
 
     @GetMapping("/{id}")
-    public Map<String, Object> getTool(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> getTool(@PathVariable String id) {
         return toolService.getTool(id)
-            .map(tool -> Map.of("status", "success", "tool", tool))
-            .orElse(Map.of("status", "error", "message", "Tool not found"));
+            .map(tool -> ResponseEntity.ok(Map.of("status", "success", "tool", (Object) tool)))
+            .orElse(ResponseEntity.status(NOT_FOUND)
+                    .body(Map.of("status", "error", "message", "Tool not found")));
     }
 
     @Data
@@ -83,7 +85,7 @@ public class IntegratedToolController {
         } catch (Exception e) {
             log.error("Failed to save tool: {}", key, e);
             return ResponseEntity.status(INTERNAL_SERVER_ERROR)
-                    .body(Map.of("status", "error", "message", e.getMessage()));
+                    .body(Map.of("status", "error", "message", "Failed to save tool configuration"));
         }
     }
 }
