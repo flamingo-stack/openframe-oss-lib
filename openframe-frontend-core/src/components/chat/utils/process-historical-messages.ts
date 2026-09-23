@@ -99,8 +99,9 @@ function pushStandaloneMessages(
  *   - compaction summaries arrive in `summary` (realtime: `text`);
  *   - APPROVAL_RESULT rows carry `resolvedByName` (realtime chunks carry
  *     the resolver's name as `displayName`);
- *   - `approvalType` defaults to 'CLIENT' (legacy history parity;
- *     realtime defaults APPROVAL_REQUEST to 'USER');
+ *   - `approvalType` defaults to 'USER', matching the realtime NATS
+ *     decoder's APPROVAL_REQUEST default — a persisted row missing
+ *     approvalType must render identically to its live counterpart;
  *   - batch `toolCalls` pass through verbatim (already the persisted
  *     `PendingToolCallData` shape — no normalization pass).
  *
@@ -188,7 +189,7 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
         return {
           type: 'approval-request',
           requestId: data.approvalRequestId,
-          approvalType: data.approvalType || 'CLIENT',
+          approvalType: data.approvalType || 'USER',
           command: data.command || '',
           explanation: data.explanation,
           ...(Array.isArray(data.toolCalls) ? { toolCalls: data.toolCalls } : {}),
@@ -406,7 +407,7 @@ function applyHistoryEvent(
       break;
 
     case 'approval-request': {
-      const approvalType = event.approvalType || 'CLIENT';
+      const approvalType = event.approvalType || 'USER';
       const toolCalls = event.toolCalls;
       const isBatch = !!toolCalls && toolCalls.length > 0;
       // Same rule the live kernels use — a card must not change where it
@@ -853,3 +854,4 @@ export function extractErrorMessages(
  * alias for the established import sites.
  */
 export const processHistoricalMessagesWithErrors = processHistoricalMessages;
+
