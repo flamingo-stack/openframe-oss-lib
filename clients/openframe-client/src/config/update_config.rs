@@ -36,7 +36,7 @@ pub const NATS_PAYLOAD_HEADROOM_BYTES: usize = 64 * 1024;
 pub const BOOT_MARKER_WAIT_SECS: u64 = 90;
 /// Unverified boots tolerated before an update is treated as failed.
 pub const CRASH_LOOP_MAX_BOOT_ATTEMPTS: u32 = 3;
-/// Refuse update messages below the LKG anchor (flip to force a downgrade).
+/// Refuse client updates below the LKG anchor and tool updates below the installed version (flip to force a downgrade).
 pub const ALLOW_DOWNGRADE: bool = false;
 /// Updater transcripts kept after pruning; one is written per update attempt.
 pub const UPDATER_TRANSCRIPTS_KEPT: usize = 5;

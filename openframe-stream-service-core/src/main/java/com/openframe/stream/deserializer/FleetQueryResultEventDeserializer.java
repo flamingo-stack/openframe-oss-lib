@@ -122,6 +122,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
                 errorJson.set("output", parsedError);
             } catch (Exception e) {
                 // If not valid JSON, store as plain text
+                log.warn("Error field is not valid JSON, storing as plain text: {}", errorText);
                 errorJson.put("output", errorText);
             }
             

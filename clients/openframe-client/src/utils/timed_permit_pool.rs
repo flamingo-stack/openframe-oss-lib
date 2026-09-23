@@ -1,8 +1,34 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Result;
+use thiserror::Error;
 use tokio::sync::Semaphore;
+
+/// Why a pooled call produced no value.
+#[derive(Debug, Error)]
+pub enum PermitPoolError {
+    #[error("{what} not attempted: all {max} call slots busy")]
+    Busy { what: String, max: usize },
+    #[error("{what} not attempted: permit pool closed: {source}")]
+    Closed {
+        what: String,
+        source: tokio::sync::AcquireError,
+    },
+    #[error("{what} timed out after {ms}ms")]
+    TimedOut { what: String, ms: u128 },
+    #[error("{what} task failed: {source}")]
+    TaskFailed {
+        what: String,
+        source: tokio::task::JoinError,
+    },
+}
+
+impl PermitPoolError {
+    /// True when no call was issued, so no blocking thread is parked and a retry costs the pool nothing.
+    pub fn is_busy(&self) -> bool {
+        matches!(self, Self::Busy { .. })
+    }
+}
 
 /// Runs blocking closures off-runtime under a timeout, with a permit pool bounding how many threads timed-out (abandoned) calls can leave parked.
 pub struct TimedPermitPool {
@@ -19,7 +45,12 @@ impl TimedPermitPool {
     }
 
     /// Fails fast when no permit frees within the timeout; the permit rides inside the closure so it releases only when the blocking call actually returns.
-    pub async fn call<T, F>(&self, what: &str, timeout: Duration, f: F) -> Result<T>
+    pub async fn call<T, F>(
+        &self,
+        what: &str,
+        timeout: Duration,
+        f: F,
+    ) -> Result<T, PermitPoolError>
     where
         F: FnOnce() -> T + Send + 'static,
         T: Send + 'static,
@@ -27,18 +58,16 @@ impl TimedPermitPool {
         let permit = match tokio::time::timeout(timeout, self.permits.clone().acquire_owned()).await
         {
             Err(_elapsed) => {
-                return Err(anyhow::anyhow!(
-                    "{} not attempted: all {} call slots busy",
-                    what,
-                    self.max
-                ))
+                return Err(PermitPoolError::Busy {
+                    what: what.to_string(),
+                    max: self.max,
+                })
             }
-            Ok(Err(closed)) => {
-                return Err(anyhow::anyhow!(
-                    "{} not attempted: permit pool closed: {}",
-                    what,
-                    closed
-                ))
+            Ok(Err(source)) => {
+                return Err(PermitPoolError::Closed {
+                    what: what.to_string(),
+                    source,
+                })
             }
             Ok(Ok(permit)) => permit,
         };
@@ -51,12 +80,14 @@ impl TimedPermitPool {
         )
         .await
         {
-            Err(_elapsed) => Err(anyhow::anyhow!(
-                "{} timed out after {}ms",
-                what,
-                timeout.as_millis()
-            )),
-            Ok(Err(join_err)) => Err(anyhow::anyhow!("{} task failed: {}", what, join_err)),
+            Err(_elapsed) => Err(PermitPoolError::TimedOut {
+                what: what.to_string(),
+                ms: timeout.as_millis(),
+            }),
+            Ok(Err(source)) => Err(PermitPoolError::TaskFailed {
+                what: what.to_string(),
+                source,
+            }),
             Ok(Ok(v)) => Ok(v),
         }
     }
