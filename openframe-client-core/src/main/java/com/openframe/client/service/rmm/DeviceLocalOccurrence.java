@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Optional;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -18,13 +19,13 @@ public final class DeviceLocalOccurrence {
     private DeviceLocalOccurrence() {
     }
 
-    public static LocalDateTime currentDueOccurrence(LocalDateTime startWallClock, Long repeat, ZoneId zone, Instant now) {
+    public static Optional<LocalDateTime> currentDueOccurrence(LocalDateTime startWallClock, Long repeat, ZoneId zone, Instant now) {
         Instant firstFireAt = startWallClock.atZone(zone).toInstant();
         if (now.isBefore(firstFireAt)) {
-            return null;
+            return Optional.empty();
         }
         if (repeat == null) {
-            return startWallClock;
+            return Optional.of(startWallClock);
         }
         long elapsedSeconds = Duration.between(startWallClock, LocalDateTime.ofInstant(now, zone)).getSeconds();
         long k = Math.max(0, elapsedSeconds / repeat);
@@ -33,7 +34,7 @@ public final class DeviceLocalOccurrence {
             k--;
             occurrence = startWallClock.plusSeconds(k * repeat);
         }
-        return occurrence;
+        return Optional.of(occurrence);
     }
 
     public static ZoneId parseZone(String zoneId) {
