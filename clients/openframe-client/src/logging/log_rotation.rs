@@ -1,7 +1,7 @@
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use std::fs::{self, File};
-use std::io::{self, Write};
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use tracing::{error, info};
 
@@ -64,15 +64,31 @@ impl LogRotationManager {
             let _ = fs::remove_file(&archive_path);
         }
 
-        let contents = fs::read(&self.log_file_path)?;
+        // Open the log file for read/write so we can read its current
+        // contents and truncate it via the same file handle. This keeps
+        // the read-and-truncate sequence tied to a single open file,
+        // narrowing the window in which appended data between the read
+        // and the truncate could be lost, and lets us truncate only the
+        // bytes we actually archived (using set_len on the byte count we
+        // read) rather than blindly recreating the file.
+        let mut log_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&self.log_file_path)?;
+
+        let mut contents = Vec::new();
+        log_file.read_to_end(&mut contents)?;
+        let archived_len = contents.len() as u64;
 
         let output = File::create(&archive_path)?;
         let mut encoder = GzEncoder::new(output, Compression::default());
         encoder.write_all(&contents)?;
         encoder.finish()?;
 
-        // Truncate original file
-        File::create(&self.log_file_path)?;
+        // Truncate only the portion of the file we archived, preserving
+        // any bytes appended by another writer after our read completed.
+        log_file.set_len(archived_len)?;
+        log_file.seek(SeekFrom::Start(0))?;
 
         Ok(())
     }
