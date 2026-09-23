@@ -47,7 +47,7 @@ public final class ClientWritePolicy {
             "security policy", "not permitted", "blocked by your organization");
 
     /** The cached verdict; {@code null} until the first case asks. */
-    private static Boolean permitted;
+    private static volatile Boolean permitted;
 
     private ClientWritePolicy() {
     }
