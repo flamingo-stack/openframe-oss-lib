@@ -8,6 +8,8 @@ import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
@@ -49,14 +51,14 @@ public class SoftwareDataFetcher {
 
     @DgsQuery
     public CountedGenericConnection<GenericEdge<SoftwareOnDeviceResponse>> softwareDevices(
-            @InputArgument String softwareId, @InputArgument Object filter,
+            @InputArgument String softwareId, @InputArgument SoftwareOnDeviceFilterInput filter,
             @InputArgument Integer first, @InputArgument String after,
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument Object sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
         Integer perPage = first != null ? first : last;
         return PageCursors.toConnection(
-                softwareInventoryService.listDevicesForSoftware(softwareId, search, page, perPage));
+                softwareInventoryService.listDevicesForSoftware(softwareId, filter, search, page, perPage));
     }
 
     @DgsQuery
@@ -76,5 +78,11 @@ public class SoftwareDataFetcher {
     @DgsQuery
     public SoftwareFilters softwareFilters(@InputArgument Object filter, @InputArgument String search) {
         return softwareInventoryService.getSoftwareFilters(search);
+    }
+
+    @DgsQuery
+    public SoftwareOnDeviceFilters softwareDeviceFilters(@InputArgument String softwareId,
+                                                         @InputArgument Object filter, @InputArgument String search) {
+        return softwareInventoryService.getSoftwareDeviceFilters(softwareId, search);
     }
 }
