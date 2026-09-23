@@ -12,18 +12,19 @@ import java.time.Instant;
 @Component
 public class AccessTokenGenerator {
 
-    private static final String TOKEN_TYPE = "Bearer";
-
     private final JwtService jwtService;
     @Getter
     private final int expirationSeconds;
+    private final String issuer;
 
     public AccessTokenGenerator(
             JwtService jwtService,
-            @Value("${security.oauth2.token.access.expiration-seconds}") int expirationSeconds
+            @Value("${security.oauth2.token.access.expiration-seconds}") int expirationSeconds,
+            @Value("${security.oauth2.token.access.issuer:https://auth.openframe.com}") String issuer
     ) {
         this.jwtService = jwtService;
         this.expirationSeconds = expirationSeconds;
+        this.issuer = issuer;
     }
 
     public String generate(OAuthClient client, String grantType) {
@@ -33,7 +34,7 @@ public class AccessTokenGenerator {
 
     private JwtClaimsSet buildClaims(OAuthClient client, String grantType) {
         return JwtClaimsSet.builder()
-                .issuer("https://auth.openframe.com")
+                .issuer(issuer)
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(expirationSeconds))
                 .subject(client.getClientId())
