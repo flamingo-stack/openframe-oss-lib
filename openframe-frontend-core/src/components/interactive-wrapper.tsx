@@ -119,7 +119,8 @@ export const InteractiveWrapper = forwardRef<HTMLElement, InteractiveWrapperProp
       }
     }, [state, onStateChange]);
 
-    // Merge refs
+    // Merge refs on every render so the forwarded ref stays in sync even if
+    // interactiveRef.current wasn't attached yet when this effect first ran.
     React.useEffect(() => {
       if (ref) {
         if (typeof ref === 'function') {
@@ -128,7 +129,7 @@ export const InteractiveWrapper = forwardRef<HTMLElement, InteractiveWrapperProp
           ref.current = interactiveRef.current;
         }
       }
-    }, [ref, interactiveRef]);
+    });
 
     const Component = as;
 
