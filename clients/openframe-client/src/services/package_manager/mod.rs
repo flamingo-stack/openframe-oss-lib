@@ -3,6 +3,7 @@ mod brew;
 #[cfg(target_os = "windows")]
 mod choco;
 pub mod presence_report;
+mod support;
 #[cfg(target_os = "windows")]
 mod winget;
 
