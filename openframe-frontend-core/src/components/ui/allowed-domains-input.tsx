@@ -115,18 +115,16 @@ const AllowedDomainsInput = forwardRef<HTMLDivElement, AllowedDomainsInputProps>
         </div>
 
         {/* Add Domain button */}
-        <button
+        <Button
           type="button"
-          className={cn(
-            'flex items-center gap-2 py-2 text-ods-text-primary transition-colors hover:text-ods-accent',
-            disabled && 'cursor-not-allowed opacity-50',
-          )}
+          variant="transparent"
+          leftIcon={<PlusCircle className="h-5 w-5 text-ods-text-secondary" />}
           onClick={addDomain}
           disabled={disabled}
+          className="flex items-center gap-2 py-2 text-ods-text-primary transition-colors hover:text-ods-accent"
         >
-          <PlusCircle className="h-5 w-5 text-ods-text-secondary" />
           <span className="font-bold text-h6">Add Domain</span>
-        </button>
+        </Button>
 
         {/* Error message */}
         {displayError && <p className="text-ods-error text-h6">{displayError}</p>}
