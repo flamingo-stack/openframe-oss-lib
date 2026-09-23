@@ -1,6 +1,7 @@
 package com.openframe.management.migration;
 
 import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptShell;
@@ -9,15 +10,21 @@ import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.management.systemscript.ManagedScriptDefinition;
 import com.openframe.management.systemscript.SoftwareScriptDefinition;
 import com.openframe.management.systemscript.SystemScriptDefinition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -135,6 +142,39 @@ class SeedManagedScriptsChangeUnitTest {
     }
 
     @Test
+    void refreshesScriptsStoredUnderTheBodyOnlyHash() {
+        when(scriptRepository.findByTenantIdAndNameAndType(any(), any(), any())).thenReturn(Optional.empty());
+        when(scriptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        changeUnit.execution(scriptRepository, tenantIdProvider);
+        ArgumentCaptor<Script> seeded = ArgumentCaptor.forClass(Script.class);
+        verify(scriptRepository, times(TOTAL_DEFINITIONS)).save(seeded.capture());
+
+        Script legacy = byName(seeded.getAllValues(), SystemScriptCode.INSTALL_BREW.canonicalName());
+        legacy.setContentHash(sha256(legacy.getScriptBody()));
+        ScriptRepository secondRepo = mock(ScriptRepository.class);
+        for (Script script : seeded.getAllValues()) {
+            when(secondRepo.findByTenantIdAndNameAndType(TENANT_ID, script.getName(), script.getType()))
+                    .thenReturn(Optional.of(script));
+        }
+
+        changeUnit.execution(secondRepo, tenantIdProvider);
+
+        verify(secondRepo).save(legacy);
+    }
+
+    @Test
+    void elevatedUserDefinitionsAreWindowsOnly() {
+        List<String> offWindows = Stream.<ManagedScriptDefinition>concat(
+                        Arrays.stream(SystemScriptDefinition.values()),
+                        Arrays.stream(SoftwareScriptDefinition.values()))
+                .filter(definition -> definition.getPrivilegeLevel() == PrivilegeLevel.ELEVATED_USER)
+                .filter(definition -> definition.getOsType() != OsType.WINDOWS)
+                .map(ManagedScriptDefinition::getCanonicalName)
+                .toList();
+        assertEquals(List.of(), offWindows);
+    }
+
+    @Test
     void everyManagedScriptCodeHasExactlyOneSeedingDefinition() {
         for (SystemScriptCode code : SystemScriptCode.values()) {
             long definitions = Arrays.stream(SystemScriptDefinition.values())
@@ -147,6 +187,15 @@ class SeedManagedScriptsChangeUnitTest {
                     .filter(d -> d.getCode() == code)
                     .count();
             assertEquals(1, definitions, "software code without exactly one seeding definition: " + code);
+        }
+    }
+
+    private static String sha256(String value) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 

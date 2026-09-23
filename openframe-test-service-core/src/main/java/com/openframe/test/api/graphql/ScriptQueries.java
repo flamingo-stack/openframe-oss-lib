@@ -148,6 +148,12 @@ public class ScriptQueries {
             }
             """.formatted(EXECUTION_NODE);
 
+    public static final String RUN_SCRIPT = """
+            mutation RunScript($input: RunScriptInput!) {
+                runScript(input: $input) { executionId }
+            }
+            """;
+
     public static final String SCRIPT_EXECUTION_FILTERS = """
             query ScriptExecutionFilters($scriptId: ID!) {
                 scriptExecutionFilters(scriptId: $scriptId) {

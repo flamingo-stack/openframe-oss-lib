@@ -23,7 +23,10 @@ const SelectTrigger = forwardRef<
     labelVariant?: 'default' | 'large';
     error?: string;
   }
->(({ className, children, invalid, label, labelVariant, error, ...props }, ref) => {
+>((allProps, ref) => {
+  const { className, children, invalid, label, labelVariant, error, ...props } = allProps;
+  // Wired for a message even while `error` is undefined — see `FieldWrapper.errorSlot`.
+  const errorSlot = 'error' in allProps;
   const isInvalid = invalid || !!error;
 
   const trigger = (
@@ -73,7 +76,7 @@ const SelectTrigger = forwardRef<
   );
 
   return (
-    <FieldWrapper label={label} labelVariant={labelVariant} error={error}>
+    <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorSlot={errorSlot}>
       {trigger}
     </FieldWrapper>
   );

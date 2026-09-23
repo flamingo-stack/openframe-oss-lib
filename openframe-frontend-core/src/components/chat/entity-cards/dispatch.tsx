@@ -46,13 +46,19 @@ import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-
 import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon';
 import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentation-bar-icon';
 import { PresentationLineIcon } from '../../icons-v2-generated/charts/presentation-line-icon';
+import { BracketCurlyCheckIcon } from '../../icons-v2-generated/coding/bracket-curly-check-icon';
 import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
+import { CodeSquareIcon } from '../../icons-v2-generated/coding/code-square-icon';
+import { CodingBranchIcon } from '../../icons-v2-generated/coding/coding-branch-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
+import { PackageIcon } from '../../icons-v2-generated/coding/package-icon';
 import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
 import { ChatQuoteIcon } from '../../icons-v2-generated/communication/chat-quote-icon';
 import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
 import { ClipboardListIcon } from '../../icons-v2-generated/documents/clipboard-list-icon';
+import { Copy01Icon } from '../../icons-v2-generated/documents/copy-01-icon';
+import { FileCodeIcon } from '../../icons-v2-generated/documents/file-code-icon';
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon';
 import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon';
 import { BankIcon } from '../../icons-v2-generated/finance/bank-icon';
@@ -1348,6 +1354,21 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
   openframe_tenant: { label: 'OpenFrame tenant', icon: () => <OpenFrameGlyph size={24} /> },
   prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
+  // Code intelligence (product-hub internal): the review rules a repository is
+  // held to, the repositories themselves, and one row per deployment
+  // environment. Glyph cards like their siblings — none of the three has a
+  // cover image, and a rule is read in the admin screen it links to.
+  code_rule: { label: 'Code rule', icon: () => <BracketCurlyCheckIcon size={24} /> },
+  code_repo: { label: 'Repository', icon: () => <CodingBranchIcon size={24} /> },
+  code_deployment: { label: 'Deployment', icon: () => <PackageIcon size={24} /> },
+  // The graph's own objects: one source file's public surface, one public
+  // symbol, a near-duplicate cluster, and a pull request's blast radius.
+  // Glyph cards for the same reason as their three siblings — none carries a
+  // cover image, and each links to the admin screen that renders it in full.
+  code_file: { label: 'Code file', icon: () => <FileCodeIcon size={24} /> },
+  code_symbol: { label: 'Code symbol', icon: () => <CodeSquareIcon size={24} /> },
+  code_duplicate: { label: 'Duplicate code', icon: () => <Copy01Icon size={24} /> },
+  code_impact: { label: 'Change impact', icon: () => <CodingPullRequestIcon size={24} /> },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>

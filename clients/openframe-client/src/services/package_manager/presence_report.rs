@@ -1,4 +1,4 @@
-use super::{ManagerId, Presence, PRESENCE_PROBE_TIMEOUT_SECS};
+use super::{support, ManagerId, Presence, PRESENCE_PROBE_TIMEOUT_SECS};
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use anyhow::{anyhow, Result};
@@ -45,6 +45,10 @@ impl PackageManagerPresenceReporter {
         let mut failures = Vec::new();
 
         for id in ManagerId::for_current_platform() {
+            if !support::is_supported(*id) {
+                continue;
+            }
+
             if id.presence().await != Presence::Absent {
                 continue;
             }

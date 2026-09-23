@@ -47,7 +47,7 @@ public class SeedManagedScriptsChangeUnit {
 
     private void ensure(ScriptRepository scriptRepository, String tenantId, ManagedScriptDefinition definition) {
         String body = loadBody(definition);
-        String contentHash = sha256(body);
+        String contentHash = sha256(fingerprint(definition, body));
 
         scriptRepository.findByTenantIdAndNameAndType(tenantId, definition.getCanonicalName(), definition.getScriptType())
                 .ifPresentOrElse(
@@ -105,10 +105,20 @@ public class SeedManagedScriptsChangeUnit {
         }
     }
 
-    private static String sha256(String body) {
+    private static String fingerprint(ManagedScriptDefinition definition, String body) {
+        return String.join("\n",
+                body,
+                definition.getShell().name(),
+                definition.getPrivilegeLevel().name(),
+                String.valueOf(definition.getDefaultTimeoutSeconds()),
+                definition.getOsType().name(),
+                definition.getDescription());
+    }
+
+    private static String sha256(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(body.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
             throw new IllegalStateException("SHA-256 unavailable", e);

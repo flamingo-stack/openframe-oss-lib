@@ -14,21 +14,29 @@ import java.util.Optional;
 @Repository
 public interface MachineRepository extends MongoRepository<Machine, String>, CustomMachineRepository{
     Optional<Machine> findByMachineId(String machineId);
-    
+
     List<Machine> findByHostnameContainingIgnoreCase(String hostname);
-    
+
     List<Machine> findByTypeAndHostnameContainingIgnoreCase(DeviceType deviceType, String hostname);
-    
+
     List<Machine> findByType(DeviceType deviceType);
-    
+
     List<Machine> findByMachineIdIn(Collection<String> machineIds);
 
     List<Machine> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds);
 
+    List<Machine> findByTenantIdAndOsUuidIn(String tenantId, Collection<String> osUuids);
+
+    List<Machine> findByTenantIdAndSerialNumberIn(String tenantId, Collection<String> serialNumbers);
+
+    List<Machine> findByTenantIdAndHostnameIn(String tenantId, Collection<String> hostnames);
+
     Optional<Machine> findByTenantIdAndMachineId(String tenantId, String machineId);
 
     List<Machine> findByMachineIdInAndStatus(Collection<String> machineIds, DeviceStatus status);
-    
+
+    List<Machine> findByMachineIdInAndStatusIn(Collection<String> machineIds, Collection<DeviceStatus> statuses);
+
     List<Machine> findByStatusIn(Collection<DeviceStatus> statuses);
 
     long countByStatusIn(Collection<DeviceStatus> statuses);
@@ -42,4 +50,4 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     boolean existsByOrganizationId(String organizationId);
 
     boolean existsByOrganizationIdAndStatusNotIn(String organizationId, Collection<DeviceStatus> statuses);
-} 
+}

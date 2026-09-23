@@ -51,7 +51,7 @@ public class ToolMapper {
                     .build();
         }
 
-        List<ToolResponse> tools = result.getTools().stream()
+        List<ToolResponse> tools = result.getTools() == null ? List.of() : result.getTools().stream()
                 .map(this::toToolResponse)
                 .collect(Collectors.toList());
 
