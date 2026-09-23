@@ -249,8 +249,13 @@ fn spawn_source_discovery(
     directory_manager: DirectoryManager,
 ) {
     tokio::spawn(async move {
+        let mut meshcentral_discovered = false;
         loop {
             tokio::time::sleep(Duration::from_secs(SOURCE_DISCOVERY_INTERVAL_SECS)).await;
+
+            if meshcentral_discovered {
+                continue;
+            }
 
             match create_meshcentral_source(&installed_tools_service, &directory_manager).await {
                 Some(source) => {
@@ -258,7 +263,7 @@ fn spawn_source_discovery(
                     if tx.send(source).await.is_err() {
                         return;
                     }
-                    return;
+                    meshcentral_discovered = true;
                 }
                 None => {
                     debug!(
