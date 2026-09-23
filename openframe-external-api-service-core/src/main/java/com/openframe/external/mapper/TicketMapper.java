@@ -13,6 +13,8 @@ import com.openframe.data.document.ticket.TicketNote;
 import com.openframe.data.document.ticket.TicketOwner;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.external.dto.ticket.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -20,12 +22,16 @@ import java.util.List;
 @Component
 public class TicketMapper extends BaseRestMapper {
 
-    /** Per-ticket related data gathered by the read service. */
-    public record TicketRelations(List<Tag> tags,
-                                  List<TicketNote> notes,
-                                  List<TicketAttachment> attachments,
-                                  TicketStatusDefinition statusDefinition,
-                                  List<TicketStatusDefinition> availableTransitions) {
+    // Per-ticket related data gathered by the read service.
+    @Getter
+    @AllArgsConstructor
+    public static class TicketRelations {
+        private final List<Tag> tags;
+        private final List<TicketNote> notes;
+        private final List<TicketAttachment> attachments;
+        private final TicketStatusDefinition statusDefinition;
+        private final List<TicketStatusDefinition> availableTransitions;
+
         public static TicketRelations empty() {
             return new TicketRelations(List.of(), List.of(), List.of(), null, null);
         }
@@ -39,8 +45,8 @@ public class TicketMapper extends BaseRestMapper {
                 .title(ticket.getTitle())
                 .description(ticket.getDescription())
                 .statusKind(ticket.getStatusKind())
-                .statusDefinition(toStatusResponse(rel.statusDefinition()))
-                .availableTransitions(rel.availableTransitions() == null ? null : toStatusResponses(rel.availableTransitions()))
+                .statusDefinition(toStatusResponse(rel.getStatusDefinition()))
+                .availableTransitions(rel.getAvailableTransitions() == null ? null : toStatusResponses(rel.getAvailableTransitions()))
                 .creationSource(ticket.getCreationSource())
                 .owner(toOwnerResponse(ticket.getOwner()))
                 .deviceId(ticket.getDeviceId())
@@ -53,9 +59,9 @@ public class TicketMapper extends BaseRestMapper {
                 .assignedName(ticket.getAssignedName())
                 .escalatedByUser(ticket.getEscalatedByUser())
                 .aiDisabled(ticket.isAiDisabled())
-                .tags(toTagResponses(rel.tags()))
-                .attachments(rel.attachments().stream().map(this::toAttachmentResponse).toList())
-                .notes(rel.notes().stream().map(this::toNoteResponse).toList())
+                .tags(toTagResponses(rel.getTags()))
+                .attachments(rel.getAttachments().stream().map(this::toAttachmentResponse).toList())
+                .notes(rel.getNotes().stream().map(this::toNoteResponse).toList())
                 .order(ticket.getOrder())
                 .createdAt(ticket.getCreatedAt())
                 .updatedAt(ticket.getUpdatedAt())
@@ -162,6 +168,9 @@ public class TicketMapper extends BaseRestMapper {
     }
 
     public TicketStatisticsResponse toStatisticsResponse(TicketStatistics statistics) {
+        if (statistics == null) {
+            statistics = new TicketStatistics();
+        }
         return TicketStatisticsResponse.builder()
                 .totalCount(statistics.getTotalCount())
                 .statusDefinitionCounts(statistics.getStatusDefinitionCounts() == null ? List.of()
