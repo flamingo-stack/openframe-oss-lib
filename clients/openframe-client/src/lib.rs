@@ -27,7 +27,6 @@ pub mod service;
 /// management details behind a common API.
 pub mod service_adapter;
 pub mod system;
-pub mod updater;
 pub mod utils;
 
 pub mod cli;
@@ -762,8 +761,9 @@ impl Client {
         self.script_schedule_execution_listener.start().await?;
         info!("Script schedule execution listener started");
 
-        // Start tool run manager
-        self.tool_run_manager.run().await?;
+        if let Err(e) = self.tool_run_manager.run().await {
+            error!("Failed to start tool run manager: {:#}", e);
+        }
 
         // Start mesh self-heal watcher (re-fetch .msh + bounce agent if held on a stale MeshID).
         self.mesh_self_heal_service.run().await?;
