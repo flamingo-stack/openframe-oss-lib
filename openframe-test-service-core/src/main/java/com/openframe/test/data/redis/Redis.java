@@ -146,15 +146,25 @@ public class Redis {
         }
     }
 
-    /** What the server says about itself, or {@code null} when it did not answer. */
+    /**
+     * What the server says about itself, or {@code null} when it did not answer.
+     *
+     * <p>{@code INFO cluster}, not {@code CLUSTER INFO}. The two are easy to confuse and only one of
+     * them answers this question: {@code cluster_enabled} lives in INFO's Cluster section, while
+     * CLUSTER INFO reports a cluster's <em>state</em> - {@code cluster_state}, {@code cluster_slots_*},
+     * {@code cluster_known_nodes} - and never carries {@code cluster_enabled} at all. Matching on it
+     * there is therefore false for every server alive, including a real cluster, which then takes the
+     * standalone path and answers MOVED to the first MGET. That is exactly how this broke the
+     * production tenant report on 2026-09-23.
+     */
     private static Boolean probeCluster(JedisClientConfig config) {
         HostAndPort node = RedisConfig.getNode();
         try (Jedis jedis = new Jedis(node, config)) {
-            boolean enabled = jedis.clusterInfo().contains("cluster_enabled:1");
+            boolean enabled = jedis.info("cluster").contains("cluster_enabled:1");
             log.info("Redis at {} reports cluster mode {}", node, enabled ? "enabled" : "disabled");
             return enabled;
         } catch (Exception e) {
-            log.warn("Could not read CLUSTER INFO from {}; assuming a cluster for this lookup", node, e);
+            log.warn("Could not read INFO from {}; assuming a cluster for this lookup", node, e);
             return null;
         }
     }
