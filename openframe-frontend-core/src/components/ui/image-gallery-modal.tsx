@@ -134,12 +134,20 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
                   const errorDiv = document.createElement('div');
                   errorDiv.className =
                     'image-error flex flex-col items-center justify-center text-white text-center px-8';
-                  errorDiv.innerHTML = `
-                    <p class="text-xl mb-4">${isHeic ? 'HEIC format not supported in browser' : 'Failed to load image'}</p>
-                    <a href="${imageUrl}" download class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-colors">
-                      Download original file
-                    </a>
-                  `;
+
+                  const message = document.createElement('p');
+                  message.className = 'text-xl mb-4';
+                  message.textContent = isHeic ? 'HEIC format not supported in browser' : 'Failed to load image';
+
+                  const link = document.createElement('a');
+                  link.href = imageUrl;
+                  link.setAttribute('download', '');
+                  link.className =
+                    'px-4 py-2 bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-colors';
+                  link.textContent = 'Download original file';
+
+                  errorDiv.appendChild(message);
+                  errorDiv.appendChild(link);
                   parent.appendChild(errorDiv);
                 }
               }}
