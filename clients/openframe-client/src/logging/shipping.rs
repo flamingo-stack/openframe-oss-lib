@@ -18,6 +18,7 @@ pub struct LogShipper {
     sender: mpsc::Sender<String>,
     endpoint: String,
     agent_id: String,
+    task_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl LogShipper {
@@ -28,23 +29,41 @@ impl LogShipper {
         let endpoint_clone = endpoint.clone();
         let agent_id_clone = agent_id.clone();
 
-        let shipper = LogShipper {
-            sender,
-            endpoint,
-            agent_id,
-        };
-
         // Spawn background shipping task
-        tokio::spawn(async move {
+        let task_handle = tokio::spawn(async move {
             Self::ship_logs(receiver, endpoint_clone, agent_id_clone).await;
         });
 
-        shipper
+        LogShipper {
+            sender,
+            endpoint,
+            agent_id,
+            task_handle: Some(task_handle),
+        }
     }
 
     pub async fn send(&self, log: String) -> Result<()> {
         self.sender.send(log).await?;
         Ok(())
+    }
+
+    /// Signal the background shipping task to drain any remaining logs and
+    /// shut down, then wait for it to finish.
+    pub async fn shutdown(&mut self) {
+        // Dropping the sender's clone is not enough since `self.sender` is
+        // still held; explicitly close the channel by dropping it here isn't
+        // possible without consuming `self`, so we rely on the receiver loop
+        // exiting when all senders are dropped. Since `LogShipper` owns the
+        // only sender, we take it out to close the channel now.
+        if let Some(handle) = self.task_handle.take() {
+            // Replace sender with a closed one to trigger receiver.recv() == None
+            let (dummy_sender, _) = mpsc::channel(1);
+            let _ = std::mem::replace(&mut self.sender, dummy_sender);
+
+            if let Err(e) = handle.await {
+                tracing::error!("Log shipping task failed during shutdown: {:#}", e);
+            }
+        }
     }
 
     async fn ship_logs(mut receiver: mpsc::Receiver<String>, endpoint: String, agent_id: String) {
@@ -54,15 +73,33 @@ impl LogShipper {
         loop {
             tokio::select! {
                 // Wait for either a new log message or the batch timeout
-                Some(log) = receiver.recv() => {
-                    batch.push(log);
+                maybe_log = receiver.recv() => {
+                    match maybe_log {
+                        Some(log) => {
+                            batch.push(log);
 
-                    // Ship batch if it reaches max size
-                    if batch.len() >= BATCH_SIZE {
-                        if let Err(e) = Self::send_batch(&client, &endpoint, &agent_id, batch.clone()).await {
-                            tracing::error!("Failed to ship log batch: {:#}", e);
+                            // Ship batch if it reaches max size
+                            if batch.len() >= BATCH_SIZE {
+                                if let Err(e) = Self::send_batch(&client, &endpoint, &agent_id, batch.clone()).await {
+                                    tracing::error!("Failed to ship log batch: {:#}", e);
+                                }
+                                batch.clear();
+                            }
                         }
-                        batch.clear();
+                        None => {
+                            // Channel closed (sender dropped / shutdown requested).
+                            // Drain any remaining logs still in the channel buffer.
+                            while let Ok(log) = receiver.try_recv() {
+                                batch.push(log);
+                            }
+                            if !batch.is_empty() {
+                                if let Err(e) = Self::send_batch(&client, &endpoint, &agent_id, batch.clone()).await {
+                                    tracing::error!("Failed to ship log batch: {:#}", e);
+                                }
+                                batch.clear();
+                            }
+                            return;
+                        }
                     }
                 }
                 _ = sleep(BATCH_TIMEOUT) => {
@@ -98,5 +135,17 @@ impl LogShipper {
             .error_for_status()?;
 
         Ok(())
+    }
+}
+
+impl Drop for LogShipper {
+    fn drop(&mut self) {
+        // Best-effort: abort the background task if it hasn't been shut down
+        // gracefully via `shutdown()`. This prevents the task from leaking
+        // forever if the LogShipper is dropped without an explicit shutdown,
+        // though any buffered logs in that case may still be lost.
+        if let Some(handle) = self.task_handle.take() {
+            handle.abort();
+        }
     }
 }
