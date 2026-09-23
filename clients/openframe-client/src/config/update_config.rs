@@ -31,6 +31,9 @@ pub const FALLBACK_PUBLISH_MAX_RETRIES: u32 = 20;
 pub const NATS_PAYLOAD_FALLBACK_BYTES: usize = 5 * 1024 * 1024;
 pub const NATS_PAYLOAD_HEADROOM_BYTES: usize = 64 * 1024;
 
+/// Refuse tool updates below the installed version (flip to force a downgrade).
+pub const ALLOW_DOWNGRADE: bool = false;
+
 // NATS message settings
 pub const CONSUMER_ACK_WAIT_SECS: u64 = 120;
 pub const CONSUMER_MAX_DELIVER: i64 = 10; // Maximum delivery attempts

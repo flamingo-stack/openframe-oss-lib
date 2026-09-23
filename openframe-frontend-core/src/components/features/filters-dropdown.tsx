@@ -178,17 +178,26 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
       const dropdownWidth = 320; // Fixed width from the dropdown
       const viewportWidth = window.innerWidth;
 
-      const spaceRight = viewportWidth - triggerRect.right;
-      const spaceLeft = triggerRect.left;
+      // The panel hangs off ONE edge of the trigger — its left for `bottom-start`,
+      // its right for `bottom-end` — so what has to fit is the panel's own width
+      // from that edge, not the room beyond the trigger's far side. A trigger as
+      // wide as its column (a table's filter header, `w-full` of a `flex-1`
+      // cell) would otherwise report no room past its right edge while the
+      // panel, hung from its left, has the whole column to itself — and flip to
+      // the far end of the row, away from the label it belongs to.
+      const fitsFromLeft = triggerRect.left + dropdownWidth <= viewportWidth;
+      const fitsFromRight = triggerRect.right - dropdownWidth >= 0;
+      const center = (triggerRect.left + triggerRect.right) / 2;
+      const fitsCentered = center - dropdownWidth / 2 >= 0 && center + dropdownWidth / 2 <= viewportWidth;
 
       let optimalPlacement = placement;
 
-      if (placement === 'bottom-start' && spaceRight < dropdownWidth && spaceLeft >= dropdownWidth) {
+      if (placement === 'bottom-start' && !fitsFromLeft && fitsFromRight) {
         optimalPlacement = 'bottom-end';
-      } else if (placement === 'bottom-end' && spaceLeft < dropdownWidth && spaceRight >= dropdownWidth) {
+      } else if (placement === 'bottom-end' && !fitsFromRight && fitsFromLeft) {
         optimalPlacement = 'bottom-start';
-      } else if (placement === 'bottom' && (spaceLeft < dropdownWidth / 2 || spaceRight < dropdownWidth / 2)) {
-        optimalPlacement = spaceLeft > spaceRight ? 'bottom-end' : 'bottom-start';
+      } else if (placement === 'bottom' && !fitsCentered) {
+        optimalPlacement = !fitsFromLeft && fitsFromRight ? 'bottom-end' : 'bottom-start';
       }
 
       setActualPlacement(optimalPlacement);

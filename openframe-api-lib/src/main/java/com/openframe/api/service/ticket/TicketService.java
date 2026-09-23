@@ -71,7 +71,6 @@ public class TicketService {
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
     private final AssignmentService assignmentService;
-    private final TicketOrderCalculationService ticketOrderCalculationService;
     private final TicketLifecycleService ticketLifecycleService;
     private final TicketResolverStamp ticketResolverStamp;
     private final List<TicketEventListener> listeners;
@@ -176,6 +175,7 @@ public class TicketService {
             createAssignments(ticketId, AssignmentTargetType.DEVICE, input.getAssignedDeviceIds());
             createAssignments(ticketId, AssignmentTargetType.TICKET, input.getAssignedTicketIds());
             createAssignments(ticketId, AssignmentTargetType.KNOWLEDGE_ARTICLE, input.getAssignedKnowledgeArticleIds());
+            linkInsight(input.getInsightId(), ticketId);
         }
 
         listeners.forEach(listener -> listener.onTicketCreated(savedTicket, input, principal));
@@ -359,138 +359,10 @@ public class TicketService {
         return ticketRepository.save(ticket);
     }
 
-    // TODO(lifecycle-rollout): drop legacy per-status mutations (putOnHold/resolve/archive/reopen) once clients use transitionTicket
-    @Transactional
-    public Ticket putTicketOnHold(AuthPrincipal principal, @NotBlank String ticketId) {
-        validateAdminAccess(principal);
-        ensureLegacyStatusMutationAllowed();
-        log.info("Putting ticket {} on hold by: {}", ticketId, principal.getDisplayName());
-
-        Ticket ticket = getById(ticketId);
-        TicketStatus previousStatus = ticket.getStatus();
-        validateTransition(ticket, TicketStatus.ON_HOLD);
-        ticket.setStatus(TicketStatus.ON_HOLD);
-
-        Ticket saved = ticketRepository.save(ticket);
-        notifyLegacyStatusChanged(saved, previousStatus, principal);
-        return saved;
-    }
-
-    @Transactional
-    public Ticket resolveTicket(AuthPrincipal principal, @NotBlank String ticketId) {
-        validateAdminAccess(principal);
-        ensureLegacyStatusMutationAllowed();
-        log.info("Resolving ticket {} by: {}", ticketId, principal.getDisplayName());
-
-        Ticket ticket = getById(ticketId);
-        TicketStatus previousStatus = ticket.getStatus();
-        validateTransition(ticket, TicketStatus.RESOLVED);
-        ticket.setStatus(TicketStatus.RESOLVED);
-        ticket.setResolvedAt(Instant.now());
-        ticketResolverStamp.stamp(ticket, principal);
-
-        Ticket saved = ticketRepository.save(ticket);
-        notifyLegacyStatusChanged(saved, previousStatus, principal);
-        return saved;
-    }
-
-    @Transactional
-    public Ticket archiveTicket(AuthPrincipal principal, @NotBlank String ticketId) {
-        validateAdminAccess(principal);
-        ensureLegacyStatusMutationAllowed();
-        log.info("Archiving ticket {} by: {}", ticketId, principal.getDisplayName());
-
-        Ticket ticket = getById(ticketId);
-        TicketStatus previousStatus = ticket.getStatus();
-        validateTransition(ticket, TicketStatus.ARCHIVED);
-        ticket.setStatus(TicketStatus.ARCHIVED);
-
-        Ticket saved = ticketRepository.save(ticket);
-        notifyLegacyStatusChanged(saved, previousStatus, principal);
-        return saved;
-    }
-
-    @Transactional
-    public Ticket reopenTicket(AuthPrincipal principal, @NotBlank String ticketId) {
-        validateAdminAccess(principal);
-        ensureLegacyStatusMutationAllowed();
-        log.info("Reopening ticket {} by: {}", ticketId, principal.getDisplayName());
-
-        Ticket ticket = getById(ticketId);
-        TicketStatus previousStatus = ticket.getStatus();
-        validateTransition(ticket, TicketStatus.RESOLVED);
-        ticket.setStatus(TicketStatus.RESOLVED);
-
-        Ticket saved = ticketRepository.save(ticket);
-        notifyLegacyStatusChanged(saved, previousStatus, principal);
-        return saved;
-    }
-
     @Transactional
     public Ticket reorderTicket(AuthPrincipal principal, ReorderTicketInput input) {
         validateAdminAccess(principal);
-
-        // TODO(lifecycle-rollout): drop the legacy body below once clients always send statusId
-        if (input.getStatusId() != null) {
-            return ticketLifecycleService.reorderTicket(principal, input);
-        }
-
-        String ticketId = input.getId();
-        String afterTicketId = input.getAfterTicketId();
-        String beforeTicketId = input.getBeforeTicketId();
-        TicketStatus requestedStatus = input.getStatus();
-        String user = principal.getDisplayName();
-
-        log.info("Reordering ticket {} after={}, before={}, status={} by: {}",
-                ticketId, afterTicketId, beforeTicketId, requestedStatus, user);
-
-        Ticket ticket = getById(ticketId);
-        TicketStatus previousStatus = ticket.getStatus();
-
-        boolean isStatusChanged = isStatusChanged(ticket, requestedStatus);
-        if (isStatusChanged) {
-            applyStatusChange(ticket, requestedStatus);
-        }
-
-        TicketStatus columnStatus = ticket.getStatus();
-        String newOrder = ticketOrderCalculationService.computeRankBetween(afterTicketId, beforeTicketId, columnStatus);
-        ticket.setOrder(newOrder);
-
-        Ticket saved = ticketRepository.save(ticket);
-        if (isStatusChanged) {
-            notifyLegacyStatusChanged(saved, previousStatus, principal);
-        }
-
-        return saved;
-    }
-
-    /**
-     * Mirrors an externally-driven legacy status (e.g. the client conversation's status) onto the
-     * ticket. Idempotent; skips ARCHIVED; bypasses auth and transition rules.
-     */
-    @Transactional
-    // TODO(lifecycle-rollout): drop together with the dialog→ticket status sync after rollout
-    public void syncLegacyStatus(@NotBlank String ticketId, TicketStatus target) {
-        Ticket ticket = ticketRepository.findById(ticketId).orElse(null);
-        if (ticket == null) {
-            log.debug("syncLegacyStatus: ticket not found, id={}", ticketId);
-            return;
-        }
-        TicketStatus current = ticket.getStatus();
-        if (current == TicketStatus.ARCHIVED) {
-            return;
-        }
-        if (target == null || current == target) {
-            return;
-        }
-        log.info("Syncing ticket {} status {} → {}", ticketId, current, target);
-        ticket.setStatus(target);
-        if (target == TicketStatus.RESOLVED) {
-            ticket.setResolvedAt(Instant.now());
-        } else if (target == TicketStatus.ACTIVE) {
-            ticket.setResolvedAt(null);
-        }
-        ticketRepository.save(ticket);
+        return ticketLifecycleService.reorderTicket(principal, input);
     }
 
     @Transactional
@@ -506,10 +378,6 @@ public class TicketService {
 
     // ---------- internals ----------
 
-    private void notifyLegacyStatusChanged(Ticket saved, TicketStatus previousStatus, AuthPrincipal principal) {
-        listeners.forEach(listener -> listener.onLegacyStatusChanged(saved, previousStatus, principal));
-    }
-
     // Columns are grouped by statusId, so a new ticket's top rank is computed against its statusId
     // column. Requires the lifecycle status to be applied beforehand.
     private String computeTopOrder(Ticket ticket) {
@@ -522,37 +390,6 @@ public class TicketService {
 
     private void applyManualStatusIfLifecycle(Ticket ticket, String requestedStatusId) {
         ticketLifecycleService.applyManualInitialStatus(ticket, requestedStatusId);
-    }
-
-    // Custom statuses are authoritative and transitions must go through transitionTicket;
-    // the legacy enum-based mutations would silently desync statusId/statusKind.
-    private void ensureLegacyStatusMutationAllowed() {
-        throw new IllegalStateException(
-                "Legacy status mutations are disabled while ticket lifecycle is enabled; use transitionTicket");
-    }
-
-    private boolean isStatusChanged(Ticket ticket, TicketStatus targetTicketStatus) {
-        if (targetTicketStatus == null) {
-            return false;
-        }
-        return targetTicketStatus != ticket.getStatus();
-    }
-
-    private void applyStatusChange(Ticket ticket, TicketStatus target) {
-        validateTransition(ticket, target);
-        ticket.setStatus(target);
-        if (target == TicketStatus.RESOLVED) {
-            ticket.setResolvedAt(Instant.now());
-        } else if (target != TicketStatus.ARCHIVED) {
-            ticket.setResolvedAt(null);
-        }
-    }
-
-    private void validateTransition(Ticket ticket, TicketStatus targetStatus) {
-        if (!ticket.getStatus().canTransitionTo(targetStatus)) {
-            throw new IllegalStateException(
-                    "Invalid status transition: " + ticket.getStatus() + " → " + targetStatus);
-        }
     }
 
     private Ticket getById(String ticketId) {
@@ -579,7 +416,6 @@ public class TicketService {
             return new TicketQueryFilter();
         }
         return TicketQueryFilter.builder()
-                .statuses(filter.getStatuses())
                 .statusIds(filter.getStatusIds())
                 .organizationIds(filter.getOrganizationIds())
                 .assigneeIds(filter.getAssigneeIds())
@@ -679,6 +515,16 @@ public class TicketService {
 
     private boolean hasAssignee(Ticket ticket) {
         return hasText(ticket.getAssignedTo());
+    }
+
+    // TODO: insight is a SaaS concept and should not be named here.
+    // The insight is the item and the ticket its target, the other way round from the assignments
+    // above: an insight can be filed as several tickets over time.
+    private void linkInsight(String insightId, String ticketId) {
+        if (!hasText(insightId)) {
+            return;
+        }
+        assignmentService.assignItem(insightId, AssignmentItemType.INSIGHT, AssignmentTargetType.TICKET, ticketId);
     }
 
     private void createAssignments(String ticketId, AssignmentTargetType targetType, List<String> targetIds) {

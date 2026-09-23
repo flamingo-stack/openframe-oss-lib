@@ -126,6 +126,19 @@ pub async fn remove_directory_with_retry(path: &Path, max_retries: u32) -> Resul
                 return Ok(());
             }
             Err(e) => {
+                // Sharing violation (os error 32): a process holds a file open without
+                // FILE_SHARE_DELETE. Identify the holders, evict the safe ones, and retry.
+                #[cfg(target_os = "windows")]
+                if crate::platform::file_lock::is_file_in_use_error(&e) {
+                    warn!(
+                        "Removal of {} blocked by a sharing violation on attempt {}/{}; attempting lock-aware recovery",
+                        path.display(),
+                        attempt,
+                        max_retries
+                    );
+                    crate::platform::lock_recovery::evict_holders_for_removal(path).await;
+                }
+
                 if attempt < max_retries {
                     let wait_secs = std::cmp::min(2_u64.pow(attempt - 1), 8); // Exponential backoff, max 8 seconds
                     warn!(

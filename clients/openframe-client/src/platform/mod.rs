@@ -6,6 +6,7 @@ pub mod dmg_extractor;
 pub mod file_acl;
 pub mod file_lock;
 pub mod installation_detector;
+pub mod lock_recovery;
 pub mod machine_info_persistence;
 pub mod permissions;
 pub mod system_service;
