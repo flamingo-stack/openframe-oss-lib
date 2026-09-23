@@ -70,7 +70,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
                     .tenantId(getTenantId(after).orElse(null))
                     .build();
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Error converting Map to DebeziumMessage", e);
+            throw new DebeziumMessageConversionException("Error converting Map to DebeziumMessage", e);
         }
     }
 
@@ -301,4 +301,17 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
             node.put(key, value.toString());
         }
     }
+
+    /**
+     * Domain-specific exception representing a failure to convert a raw Debezium payload
+     * into the internal message representation. Unchecked per OFJAVA-014, but distinctly
+     * typed per OFJAVA-015/OFJAVA-017 so callers and the central handler can distinguish
+     * this failure mode from generic runtime errors.
+     */
+    public static class DebeziumMessageConversionException extends RuntimeException {
+        public DebeziumMessageConversionException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
 }
+
