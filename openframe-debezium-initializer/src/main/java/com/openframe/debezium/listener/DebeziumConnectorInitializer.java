@@ -5,8 +5,8 @@ import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.debezium.service.DebeziumService;
 import com.openframe.debezium.util.ConnectorSpecs;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -15,35 +15,37 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 @ConditionalOnProperty(name = "openframe.debezium.health-check.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
 public class DebeziumConnectorInitializer {
 
     private final DebeziumService debeziumService;
-    private final IntegratedToolService integratedToolService;
+    private final Optional<IntegratedToolService> integratedToolService;
     private final TenantIdProvider tenantIdProvider;
 
     @Value("${openframe.debezium.reconcile.delete-orphans:false}")
     private boolean deleteOrphans;
 
-    @Autowired
-    public DebeziumConnectorInitializer(DebeziumService debeziumService,
-                                        @Autowired(required = false) IntegratedToolService integratedToolService,
-                                        TenantIdProvider tenantIdProvider) {
-        this.debeziumService = debeziumService;
-        this.integratedToolService = integratedToolService;
-        this.tenantIdProvider = tenantIdProvider;
-    }
-
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         log.info("Application ready, checking Debezium connectors...");
-        reconcileOrphanedConnectors();
-        initializeConnectorsIfEmpty();
+        try {
+            reconcileOrphanedConnectors();
+        } catch (Exception e) {
+            log.error("Failed to reconcile orphaned Debezium connectors", e);
+        }
+        try {
+            initializeConnectorsIfEmpty();
+        } catch (Exception e) {
+            log.error("Failed to initialize Debezium connectors", e);
+        }
     }
 
     /**
@@ -60,13 +62,13 @@ public class DebeziumConnectorInitializer {
      * initialization from MongoDB.
      */
     public void reconcileOrphanedConnectors() {
-        if (!deleteOrphans || integratedToolService == null) {
+        if (!deleteOrphans || integratedToolService.isEmpty()) {
             return;
         }
         if (!tenantIdProvider.isTenantRegistered()) {
             return;
         }
-        Set<String> knownBaseNames = integratedToolService.getAllTools().stream()
+        Set<String> knownBaseNames = integratedToolService.get().getAllTools().stream()
                 .flatMap(ConnectorSpecs::specStreamOf)
                 .map(ConnectorSpecs::nameOf)
                 .filter(Objects::nonNull)
@@ -91,7 +93,7 @@ public class DebeziumConnectorInitializer {
      * Only runs if a tenant is registered — prevents creating connectors on empty clusters.
      */
     public void initializeConnectorsIfEmpty() {
-        if (integratedToolService == null) {
+        if (integratedToolService.isEmpty()) {
             log.debug("IntegratedToolService is not available, skipping connector initialization");
             return;
         }
@@ -109,7 +111,7 @@ public class DebeziumConnectorInitializer {
 
         log.info("No Debezium connectors found, initializing from MongoDB...");
 
-        List<IntegratedTool> tools = integratedToolService.getAllTools();
+        List<IntegratedTool> tools = integratedToolService.get().getAllTools();
         int createdCount = 0;
 
         for (IntegratedTool tool : tools) {
