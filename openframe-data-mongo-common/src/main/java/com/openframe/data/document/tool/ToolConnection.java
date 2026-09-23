@@ -1,12 +1,18 @@
 package com.openframe.data.document.tool;
 import com.openframe.data.document.TenantScoped;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "tool_connections")
 @CompoundIndexes({
         @CompoundIndex(name = "tenant_machine_tool_idx", def = "{'tenantId': 1, 'machineId': 1, 'toolType': 1}", unique = true)
