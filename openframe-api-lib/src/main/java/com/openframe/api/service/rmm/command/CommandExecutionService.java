@@ -55,14 +55,26 @@ public class CommandExecutionService {
      * requested machine that exists. Tenant-scoped; rows may still be
      * {@link ExecutionStatus#RUNNING} when the agent has not reported yet. Mirror of
      * {@code ScriptExecutionService.getBatchResults} — backs the bulk command runner.
+     * If the number of returned rows is less than the number of requested machineIds,
+     * a warning is logged identifying the missing machineIds, since callers may expect
+     * a 1:1 correspondence between requested machineIds and returned rows.
      */
     public List<CommandExecution> getBatchResults(String executionId, List<String> machineIds) {
         String tenantId = tenantIdProvider.getTenantId();
-        return machineIds.stream()
+        List<CommandExecution> results = machineIds.stream()
                 .map(machineId -> commandExecutionRepository
                         .findByTenantIdAndExecutionIdAndMachineId(tenantId, executionId, machineId))
                 .flatMap(Optional::stream)
                 .toList();
+        if (results.size() < machineIds.size()) {
+            List<String> foundMachineIds = results.stream().map(CommandExecution::getMachineId).toList();
+            List<String> missingMachineIds = machineIds.stream()
+                    .filter(machineId -> !foundMachineIds.contains(machineId))
+                    .toList();
+            log.warn("Batch command results missing rows: executionId={} requested={} found={} missingMachineIds={}",
+                    executionId, machineIds.size(), results.size(), missingMachineIds);
+        }
+        return results;
     }
 
     private CommandExecution buildRunningRow(String executionId,
