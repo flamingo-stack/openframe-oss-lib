@@ -6,7 +6,6 @@ fn windows(edition: Option<&str>, product_type: ProductType, build: Option<u32>)
         product_type,
         edition_id: edition.map(str::to_string),
         build,
-        store_provisioned: None,
     }
 }
 
@@ -16,7 +15,6 @@ fn mac(arch: Arch) -> OsSpec {
         product_type: ProductType::Unknown,
         edition_id: None,
         build: None,
-        store_provisioned: None,
     }
 }
 
@@ -78,27 +76,24 @@ fn winget_is_supported_on_server_2025() {
 }
 
 #[test]
-fn winget_is_gated_on_a_server_with_an_unreadable_build() {
-    let spec = windows(Some("ServerStandard"), ProductType::Server, None);
-    assert!(is_gated(ManagerId::Winget, &spec));
+fn an_unreadable_build_never_gates() {
+    let server = windows(Some("ServerStandard"), ProductType::Server, None);
+    assert_eq!(support_of(ManagerId::Winget, &server), Support::Supported);
+
+    let desktop = windows(Some("Professional"), ProductType::Workstation, None);
+    assert_eq!(support_of(ManagerId::Winget, &desktop), Support::Supported);
 }
 
 #[test]
 fn winget_is_supported_on_multi_session_despite_the_server_product_type() {
-    let spec = windows(Some("ServerRdsh"), ProductType::Server, Some(26100));
+    let spec = windows(Some("ServerRdsh"), ProductType::Server, Some(19044));
     assert_eq!(support_of(ManagerId::Winget, &spec), Support::Supported);
 }
 
 #[test]
-fn store_provisioning_never_changes_the_verdict() {
-    let gated = windows(Some("EnterpriseS"), ProductType::Workstation, Some(17763));
-    let mut with_store = gated.clone();
-    with_store.store_provisioned = Some(true);
-
-    assert_eq!(
-        support_of(ManagerId::Winget, &gated),
-        support_of(ManagerId::Winget, &with_store)
-    );
+fn an_unreadable_edition_still_gates_an_old_server() {
+    let spec = windows(None, ProductType::Server, Some(20348));
+    assert!(is_gated(ManagerId::Winget, &spec));
 }
 
 #[test]
@@ -108,7 +103,6 @@ fn unknown_facts_fail_open() {
         product_type: ProductType::Unknown,
         edition_id: None,
         build: None,
-        store_provisioned: None,
     };
     assert_eq!(support_of(ManagerId::Brew, &spec), Support::Supported);
     assert_eq!(support_of(ManagerId::Winget, &spec), Support::Supported);

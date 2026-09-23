@@ -1,9 +1,9 @@
 use super::ManagerId;
-use std::sync::OnceLock;
+use std::sync::{Once, OnceLock};
 use tracing::{info, warn};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Arch {
+enum Arch {
     Arm64,
     X86_64,
     Unknown,
@@ -11,29 +11,28 @@ pub enum Arch {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
-pub enum ProductType {
+enum ProductType {
     Workstation,
     Server,
     Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OsSpec {
-    pub arch: Arch,
-    pub product_type: ProductType,
-    pub edition_id: Option<String>,
-    pub build: Option<u32>,
-    pub store_provisioned: Option<bool>,
+struct OsSpec {
+    arch: Arch,
+    product_type: ProductType,
+    edition_id: Option<String>,
+    build: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Support {
+enum Support {
     Supported,
     Unsupported(&'static str),
 }
 
 const MIN_WINGET_BUILD: u32 = 17763;
-const SERVER_WITH_WINGET_BUILD: u32 = 26100;
+const MIN_SERVER_WINGET_BUILD: u32 = 26100;
 
 const STORELESS_EDITIONS: &[&str] = &[
     "EnterpriseS",
@@ -48,7 +47,7 @@ pub fn is_supported(id: ManagerId) -> bool {
     support_of(id, current()) == Support::Supported
 }
 
-pub fn support_of(id: ManagerId, spec: &OsSpec) -> Support {
+fn support_of(id: ManagerId, spec: &OsSpec) -> Support {
     match id {
         ManagerId::Brew => brew(spec),
         ManagerId::Winget => winget(spec),
@@ -64,54 +63,49 @@ fn brew(spec: &OsSpec) -> Support {
 }
 
 fn winget(spec: &OsSpec) -> Support {
+    let edition = spec.edition_id.as_deref();
+
     if spec.build.is_some_and(|build| build < MIN_WINGET_BUILD) {
         return Support::Unsupported("winget needs Windows 10 1809 or later");
     }
 
-    if has_edition(spec, STORELESS_EDITIONS) {
+    if edition_in(edition, STORELESS_EDITIONS) {
         return Support::Unsupported(
             "winget needs the Microsoft Store, absent on this Windows edition",
         );
     }
 
-    if has_edition(spec, MULTI_SESSION_EDITIONS) {
-        return Support::Supported;
-    }
-
-    if spec.product_type == ProductType::Server {
-        return match spec.build {
-            Some(build) if build >= SERVER_WITH_WINGET_BUILD => Support::Supported,
-            _ => Support::Unsupported("winget needs Windows Server 2025 or later"),
-        };
+    if spec.product_type == ProductType::Server
+        && !edition_in(edition, MULTI_SESSION_EDITIONS)
+        && spec
+            .build
+            .is_some_and(|build| build < MIN_SERVER_WINGET_BUILD)
+    {
+        return Support::Unsupported("winget needs Windows Server 2025 or later");
     }
 
     Support::Supported
 }
 
-fn has_edition(spec: &OsSpec, editions: &[&str]) -> bool {
-    spec.edition_id.as_deref().is_some_and(|actual| {
-        editions
-            .iter()
-            .any(|known| actual.eq_ignore_ascii_case(known))
-    })
+fn edition_in(edition: Option<&str>, known: &[&str]) -> bool {
+    edition.is_some_and(|actual| known.iter().any(|name| actual.eq_ignore_ascii_case(name)))
 }
 
-pub fn current() -> &'static OsSpec {
+fn current() -> &'static OsSpec {
     static SPEC: OnceLock<OsSpec> = OnceLock::new();
-    SPEC.get_or_init(|| {
-        let spec = detect();
-        log_verdicts(&spec);
-        spec
-    })
+    static LOGGED: Once = Once::new();
+
+    let spec = SPEC.get_or_init(detect);
+    LOGGED.call_once(|| log_spec_and_verdicts(spec));
+    spec
 }
 
-fn log_verdicts(spec: &OsSpec) {
+fn log_spec_and_verdicts(spec: &OsSpec) {
     info!(
         arch = ?spec.arch,
         product_type = ?spec.product_type,
         edition_id = ?spec.edition_id,
         build = ?spec.build,
-        store_provisioned = ?spec.store_provisioned,
         "Detected machine spec for package manager support"
     );
 
@@ -123,7 +117,6 @@ fn log_verdicts(spec: &OsSpec) {
                 product_type = ?spec.product_type,
                 edition_id = ?spec.edition_id,
                 build = ?spec.build,
-                store_provisioned = ?spec.store_provisioned,
                 "Package manager gated as unsupported on this machine"
             );
         }
@@ -137,7 +130,6 @@ fn detect() -> OsSpec {
         product_type: ProductType::Unknown,
         edition_id: None,
         build: None,
-        store_provisioned: None,
     }
 }
 
@@ -214,28 +206,7 @@ fn detect() -> OsSpec {
         product_type,
         edition_id,
         build,
-        store_provisioned: store_provisioned(&hklm),
     }
-}
-
-#[cfg(target_os = "windows")]
-fn store_provisioned(hklm: &winreg::RegKey) -> Option<bool> {
-    const APPX_STORE: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Appx\AppxAllUserStore";
-    const STORE_PREFIX: &str = "Microsoft.WindowsStore";
-
-    let root = hklm.open_subkey(APPX_STORE).ok()?;
-
-    let provisioned = ["Applications", "InboxApplications"].iter().any(|subkey| {
-        root.open_subkey(subkey)
-            .map(|key| {
-                key.enum_keys()
-                    .flatten()
-                    .any(|name| name.starts_with(STORE_PREFIX))
-            })
-            .unwrap_or(false)
-    });
-
-    Some(provisioned)
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -245,7 +216,6 @@ fn detect() -> OsSpec {
         product_type: ProductType::Unknown,
         edition_id: None,
         build: None,
-        store_provisioned: None,
     }
 }
 
