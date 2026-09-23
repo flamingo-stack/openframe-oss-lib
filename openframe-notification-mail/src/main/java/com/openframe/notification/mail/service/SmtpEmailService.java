@@ -1,5 +1,6 @@
 package com.openframe.notification.mail.service;
 
+import com.openframe.notification.mail.exception.UnsupportedEmailOperationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,7 +42,7 @@ public class SmtpEmailService implements EmailService {
 
     @Override
     public void sendEmailVerificationEmail(String toEmail, String verifyToken) {
-        throw new UnsupportedOperationException("Email verification via SMTP is not supported; use HubSpot provider");
+        throw new UnsupportedEmailOperationException("Email verification via SMTP is not supported; use HubSpot provider");
     }
 
     @Override
