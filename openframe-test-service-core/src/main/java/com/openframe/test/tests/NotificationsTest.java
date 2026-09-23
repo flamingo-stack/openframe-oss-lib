@@ -129,7 +129,7 @@ public class NotificationsTest extends BaseTest {
     @DisplayName("Mark a ticket's notifications read")
     @Order(3)
     public void testMarkReadForTicket() {
-        TicketConnection tickets = TicketApi.getTickets(TicketGenerator.activeTickets(), limit(1));
+        TicketConnection tickets = TicketApi.getTickets(TicketGenerator.allTickets(), limit(1));
         Ticket ticket = tickets == null || tickets.getEdges() == null || tickets.getEdges().isEmpty()
                 ? null : TicketGenerator.firstTicket(tickets);
         String entityId = ticket != null ? ticket.getId() : "e2e-" + RUN_ID + "-no-such-ticket";

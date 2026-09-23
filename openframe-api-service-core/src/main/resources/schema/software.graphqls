@@ -52,6 +52,10 @@ extend type Query {
     Vulnerability-severity dropdowns. Mirrors scriptFilters / deviceFilters."""
     softwareFilters(filter: SoftwareFilterInput, search: String): SoftwareFilters!
 
+    """Faceted filter-option counts for a software title's Devices tab — the Status dropdown.
+    Mirrors softwareFilters; scoped to the devices that have this software installed."""
+    softwareDeviceFilters(softwareId: ID!, filter: SoftwareOnDeviceFilterInput, search: String): SoftwareOnDeviceFilters!
+
     """Single global CVE record by id (e.g. "CVE-2024-38063"). Null when Fleet has no record.
     Populates the vulnerability detail page — includes affected-software list."""
     vulnerability(cveId: String!): Vulnerability
@@ -218,6 +222,10 @@ type SoftwareFilters {
     sources: [SoftwareFilterOption!]!
     versionStatuses: [SoftwareFilterOption!]!
     severities: [SoftwareFilterOption!]!
+}
+
+type SoftwareOnDeviceFilters {
+    statuses: [SoftwareFilterOption!]!
 }
 
 type SoftwareFilterOption {
