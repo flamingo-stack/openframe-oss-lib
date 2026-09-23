@@ -12,6 +12,7 @@ export function FileManagerBreadcrumb({ items, onItemClick, className }: FileMan
         <React.Fragment key={item.path}>
           {index > 0 && <ChevronRight className="h-4 w-4 flex-shrink-0 text-ods-text-tertiary" />}
           <button
+            type="button"
             onClick={() => onItemClick?.(item.path)}
             className={cn(
               'shrink-0 rounded px-1 py-0.5 transition-colors hover:bg-ods-bg-hover',
