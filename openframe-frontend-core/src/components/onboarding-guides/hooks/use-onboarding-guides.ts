@@ -46,9 +46,11 @@ export const onboardingGuideKeys = {
   },
 };
 
+const EMPTY_ONBOARDING_GUIDE_FILTERS: OnboardingGuideFilters = {};
+
 export function useOnboardingGuides(filters?: OnboardingGuideFilters) {
   return useQuery({
-    queryKey: onboardingGuideKeys.list(filters || {}),
+    queryKey: onboardingGuideKeys.list(filters || EMPTY_ONBOARDING_GUIDE_FILTERS),
     queryFn: async (): Promise<OnboardingGuideListResponse> => {
       const params = new URLSearchParams();
       if (filters?.search) params.set('search', filters.search);
