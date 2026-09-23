@@ -1,4 +1,5 @@
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
+use crate::config::update_config::ALLOW_DOWNGRADE;
 use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 use crate::models::{Installation, InstalledAsset, ToolRecordState};
 use crate::platform::{
@@ -12,7 +13,9 @@ use crate::services::InstalledAgentMessagePublisher;
 use crate::services::InstalledToolsService;
 use crate::services::ToolCommandParamsResolver;
 use crate::services::ToolKillService;
+use crate::utils::version_comparator::compare_versions;
 use anyhow::{Context, Result};
+use std::cmp::Ordering;
 use tracing::{error, info, warn};
 
 #[derive(Clone)]
@@ -119,7 +122,28 @@ impl ToolAgentUpdateService {
             }
         }
 
-        let needs_tool_update = needs_repair || installed_tool.version != *new_version;
+        let version_order = compare_versions(&installed_tool.version, new_version);
+        let tool_downgrade =
+            !ALLOW_DOWNGRADE && !needs_repair && version_order == Some(Ordering::Less);
+        if tool_downgrade {
+            warn!(
+                "Tool {} refusing downgrade to {} — installed {} is newer, skipping stale update message",
+                tool_agent_id, new_version, installed_tool.version
+            );
+        }
+        let version_changed = match version_order {
+            Some(order) => order != Ordering::Equal,
+            None => {
+                if installed_tool.version != *new_version {
+                    warn!(
+                        "Tool {} versions {:?} -> {:?} are not semver, applying without downgrade check",
+                        tool_agent_id, installed_tool.version, new_version
+                    );
+                }
+                installed_tool.version != *new_version
+            }
+        };
+        let needs_tool_update = needs_repair || (!tool_downgrade && version_changed);
         let assets_to_update: Vec<_> = message
             .assets
             .as_ref()
@@ -137,8 +161,22 @@ impl ToolAgentUpdateService {
                         {
                             return false;
                         }
-                        let existing = installed_tool.assets.iter().find(|ia| ia.id == a.asset_id);
-                        existing.map(|e| e.version.as_str()) != Some(new_version)
+                        let Some(existing) =
+                            installed_tool.assets.iter().find(|ia| ia.id == a.asset_id)
+                        else {
+                            return true;
+                        };
+                        match compare_versions(&existing.version, new_version) {
+                            Some(Ordering::Less) if !ALLOW_DOWNGRADE => {
+                                warn!(
+                                    "Asset {} refusing downgrade to {} — installed {} is newer",
+                                    a.asset_id, new_version, existing.version
+                                );
+                                false
+                            }
+                            Some(order) => order != Ordering::Equal,
+                            None => existing.version != new_version,
+                        }
                     })
                     .collect()
             })
