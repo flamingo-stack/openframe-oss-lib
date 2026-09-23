@@ -1,6 +1,9 @@
 package com.openframe.api.dto.organization;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
@@ -9,6 +12,9 @@ import java.time.Instant;
  * Maps to OrganizationFilterInput from GraphQL schema.
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OrganizationFilterInput {
     private String category;
     private Integer minEmployees;
@@ -20,3 +26,4 @@ public class OrganizationFilterInput {
     /** Inclusive upper bound of the last-activity range (UTC). */
     private Instant lastActivityTo;
 }
+
