@@ -35,6 +35,8 @@ export interface MingoHistoryRailProps {
   onRequestArchive?: (dialog: DialogItem) => void;
   /** Request a shareable link — enables the row "Copy chat link" action. */
   onRequestCopyLink?: (dialog: DialogItem) => void;
+  /** Request context compaction — enables the row "Compact chat memory" action. */
+  onRequestCompact?: (dialog: DialogItem) => void;
   /** Ownership scope shown as a two-state "My Chats / All Chats" selector
    *  between "Start New Chat" and the list. Rendered only when BOTH `scope`
    *  and `onScopeChange` are provided; the host owns the state and refilters
@@ -88,6 +90,7 @@ export function MingoHistoryRail({
   onRequestRename,
   onRequestArchive,
   onRequestCopyLink,
+  onRequestCompact,
   scope,
   onScopeChange,
   searchQuery,
@@ -169,6 +172,7 @@ export function MingoHistoryRail({
           onRequestRename={onRequestRename}
           onRequestArchive={onRequestArchive}
           onRequestCopyLink={onRequestCopyLink}
+          onRequestCompact={onRequestCompact}
           searchQuery={searchQuery}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}

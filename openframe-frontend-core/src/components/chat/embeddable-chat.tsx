@@ -54,7 +54,7 @@ import {
 } from '../icons-v2-generated';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
+import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
@@ -63,6 +63,7 @@ import { SquareAvatar } from '../ui/square-avatar';
 import { ChatArchivePage } from './chat-archive-page';
 import { ChatAttachmentChipStrip } from './chat-attachment-bar';
 import { ChatComposer } from './chat-composer';
+import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatMessageList } from './chat-message-list';
@@ -250,6 +251,7 @@ export interface EmbeddableChatProps {
    * (`ChatDialogCapabilities`) — one type, whether the list is host-owned or
    * adapter-owned. `onCopyLink` adds "Copy chat link" to the header ⋯ menu and
    * every row menu; the host owns the URL shape and the clipboard write.
+   * `compactDialog` adds "Compact chat memory" to the same menus.
    */
   mingoDialogCapabilities?: ChatDialogCapabilities;
 
@@ -2023,6 +2025,10 @@ function EmbeddableChatInner({
     activeDialogId && activeDialog && mingoCaps.canArchive ? () => setArchiveTarget(activeDialog) : undefined;
   const headerOnCopyLink =
     activeDialogId && activeDialog && mingoCaps.onCopyLink ? () => mingoCaps.onCopyLink?.(activeDialog) : undefined;
+  const headerOnCompact =
+    activeDialogId && activeDialog && mingoCaps.compactDialog
+      ? () => mingoCaps.compactDialog?.(activeDialog)
+      : undefined;
   const headerOnOpenArchive = fetchArchivedDialogs ? openArchive : undefined;
 
   // Header person (sub-line + 32px avatar, Figma 113:63273): the dialog OWNER
@@ -2110,11 +2116,12 @@ function EmbeddableChatInner({
   );
 
   // Desktop split header ⋯ menu (active, non-archived conversation only).
-  const splitHeaderMenuItems = [
-    headerOnCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: headerOnCopyLink },
-    headerOnRename && { id: 'rename', label: 'Rename chat', onClick: headerOnRename },
-    headerOnArchive && { id: 'archive', label: 'Archive chat', onClick: headerOnArchive },
-  ].filter(Boolean) as ActionsMenuItem[];
+  const splitHeaderMenuItems = chatDialogMenuItems({
+    onCopyLink: headerOnCopyLink,
+    onRename: headerOnRename,
+    onCompact: headerOnCompact,
+    onArchive: headerOnArchive,
+  });
 
   // Narrow (single-column) header. The Mingo empty state splits into a "Current
   // Chats" list header (search + archive, no back) and a "New Chat" compose
@@ -2158,6 +2165,7 @@ function EmbeddableChatInner({
         onRestore: headerOnRestore,
         onRename: headerOnRename,
         onArchive: headerOnArchive,
+        onCompact: headerOnCompact,
         onCopyLink: headerOnCopyLink,
         onOpenArchive: headerOnOpenArchive,
       };
@@ -2389,6 +2397,7 @@ function EmbeddableChatInner({
                         onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                         onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
                         onRequestCopyLink={mingoCaps.onCopyLink}
+                        onRequestCompact={mingoCaps.compactDialog}
                         scope={dialogScope}
                         onScopeChange={setDialogScope}
                         searchQuery={mingoCaps.searchQuery}
@@ -2418,6 +2427,7 @@ function EmbeddableChatInner({
                       onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                       onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
                       onRequestCopyLink={mingoCaps.onCopyLink}
+                      onRequestCompact={mingoCaps.compactDialog}
                       scope={dialogScope}
                       onScopeChange={setDialogScope}
                       searchQuery={mingoCaps.searchQuery}

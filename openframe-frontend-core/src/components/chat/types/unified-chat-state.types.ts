@@ -64,6 +64,12 @@ export interface ChatDialogCapabilities {
   /** "Copy chat link" — the owner of the URL shape + clipboard write. */
   onCopyLink?: (dialog: DialogItem) => void;
   /**
+   * "Compact chat memory" — summarizes the dialog's AI context on demand. The
+   * host owns the request and its feedback; the compaction itself streams into
+   * the thread as the usual context-compaction message.
+   */
+  compactDialog?: (dialog: DialogItem) => void;
+  /**
    * When the list has settled EMPTY and is unsearched, land on the composer
    * instead of an empty "Current Chats" screen.
    *
