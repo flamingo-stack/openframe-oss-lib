@@ -17,6 +17,16 @@ public final class PipelineContext {
 
     private static volatile String orgId;
 
+    /**
+     * Set by a runner that is executing a flat, single-tag run rather than an ordered pipeline.
+     *
+     * <p>Opt-out rather than opt-in on purpose. Unset means "behave as before", so a library carrying
+     * this guard is safe to release before the runner that sets the flag exists; the pipelines keep
+     * publishing exactly as they do today and only a runner that has been taught to say "standalone"
+     * changes behaviour.
+     */
+    private static volatile boolean standaloneRun;
+
     // Tenant registered by OwnerRegistrationTest (random email + subdomain). The all-tests pipeline
     // reads these after the registration phase so the E2E lifecycle runs against the tenant that was
     // just registered, rather than the static param tenant.
@@ -116,7 +126,36 @@ public final class PipelineContext {
                 && registeredDomain != null && !registeredDomain.isBlank();
     }
 
+    /**
+     * Declare that this run is a flat tag selection, not an ordered pipeline, so tests that exist to
+     * hand fixtures to a later phase keep them to themselves.
+     *
+     * <p>The case that forced this: {@code OrganizationsTest} publishes the org it creates so the
+     * pipeline can install a device into it and archive it last. In the dev suite the same test runs
+     * as an ordinary functional case with no install step behind it, so it published an org that would
+     * stay empty — and every later device lookup, which scopes itself through
+     * {@code BaseTest.pipelineScoped}, was narrowed into it. On the qa dev suite of 2026-09-23 21:00
+     * that turned a healthy tenant into "No devices in org 9406ef48-…" for the nickname case, 25
+     * seconds after "Create Organization" passed.
+     *
+     * <p>Call after {@link #clear()}, which resets this along with everything else.
+     */
+    public static void markStandaloneRun() {
+        standaloneRun = true;
+    }
+
+    /** Whether a runner has declared this run a flat tag selection. False unless something said so. */
+    public static boolean isStandaloneRun() {
+        return standaloneRun;
+    }
+
+    /** True when fixtures published here will actually be consumed by a later phase. */
+    public static boolean publishesToLaterPhase() {
+        return !standaloneRun;
+    }
+
     public static void clear() {
+        standaloneRun = false;
         orgId = null;
         registeredEmail = null;
         registeredDomain = null;
