@@ -9,6 +9,7 @@ import io.restassured.config.LogConfig;
 import io.restassured.config.SSLConfig;
 import io.restassured.filter.log.LogDetail;
 import io.restassured.filter.log.RequestLoggingFilter;
+import io.restassured.filter.log.ResponseLoggingFilter;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
@@ -42,6 +43,17 @@ public class RequestSpecHelper {
     private static final ThreadLocal<String> bearerToken = new ThreadLocal<>();
     private static Boolean enableLogging = true;
 
+    /**
+     * Whether to log response bodies as well as requests. Null until someone says, and then the
+     * environment decides.
+     *
+     * <p>Off by default, unlike requests, because it is the expensive one: about 4.5x the log volume,
+     * which on a full pipeline run is roughly 54k lines becoming 240k against an appender that caps at
+     * 50MB. Losing the start of a run to rollover costs more than the bodies are worth on a green run.
+     * Turn it on for the run you are actually diagnosing.
+     */
+    private static Boolean logResponses;
+
     public static void setBaseUrl(String url) {
         baseUrl.set(url);
     }
@@ -52,6 +64,24 @@ public class RequestSpecHelper {
 
     public static void setEnableLogging(boolean enabled) {
         enableLogging = enabled;
+    }
+
+    /** Explicit wins; see {@link #logResponses()} for what happens when nobody sets it. */
+    public static void setLogResponses(boolean enabled) {
+        logResponses = enabled;
+    }
+
+    /**
+     * An explicit {@link #setLogResponses} wins, else {@code TEST_LOG_RESPONSES}, else off.
+     *
+     * <p>The env var is the local escape hatch: {@code TEST_LOG_RESPONSES=true mvn test -Dtest=...}
+     * needs no code change and no redeploy to see what a server actually returned.
+     */
+    static boolean logResponses() {
+        if (logResponses != null) {
+            return logResponses;
+        }
+        return Boolean.parseBoolean(System.getenv("TEST_LOG_RESPONSES"));
     }
 
     public static ResponseSpecification graphqlSuccess() {
@@ -179,6 +209,21 @@ public class RequestSpecHelper {
             // RequestLoggingFilter takes its blacklist as a constructor argument rather than reading the
             // LogConfig one, so the header must be named here too or the key is printed in full.
             builder.addFilter(new RequestLoggingFilter(LogDetail.ALL, true, SLF4J_STREAM, true, BLACKLISTED_HEADERS));
+            // Responses too. They were already logged on a *failed* validation, by
+            // enableLoggingOfRequestAndResponseIfValidationFails above — but never on a successful one,
+            // and that is the case you need when asking "did the server accept this?". The status a
+            // ticket ended in after a transition the suite did not assert on, what a mutation actually
+            // returned: those calls pass, so nothing was recorded and diagnosing them meant re-running
+            // the case by hand against a live tenant.
+            //
+            // No duplicate on failure: RestAssured skips its validation-failure logging once a filter
+            // has emitted. Verified against a forced 503 — two requests, two responses, one each.
+            //
+            // The same redacting stream, which matters more here than for requests — a login response
+            // carries the session in Set-Cookie, and Slf4jOutputStream strips it on the way out.
+            if (logResponses()) {
+                builder.addFilter(new ResponseLoggingFilter(LogDetail.ALL, SLF4J_STREAM));
+            }
         }
         return builder;
     }
