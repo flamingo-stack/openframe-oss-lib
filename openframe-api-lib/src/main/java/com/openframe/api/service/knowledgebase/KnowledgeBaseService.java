@@ -318,15 +318,7 @@ public class KnowledgeBaseService {
     }
 
     private static int indexOfId(List<KnowledgeBaseItem> items, String id) {
-        if (id == null) {
-            return -1;
-        }
-        for (int i = 0; i < items.size(); i++) {
-            if (id.equals(items.get(i).getId())) {
-                return i;
-            }
-        }
-        return -1;
+        return items.stream().map(KnowledgeBaseItem::getId).toList().indexOf(id);
     }
 
     private CountedGenericQueryResult<KnowledgeBaseItem> queryFoldersOnly(
