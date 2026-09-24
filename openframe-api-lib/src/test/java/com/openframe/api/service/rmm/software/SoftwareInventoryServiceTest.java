@@ -497,7 +497,7 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
-    void listSoftwareForDevice_pageRequested_onlyPageItemsGetFleetWideDeviceCounts() {
+    void listSoftwareForDevice_pageRequested_everyFilteredRowCountedFromHostSoftwareNotPerRow() {
         // setup
         stubInventory(
                 List.of(title(10L, "Google Chrome", "apps", "120.0"),
@@ -514,8 +514,29 @@ class SoftwareInventoryServiceTest {
         verify(deviceCountEnricher).enrichFromHostSoftware(pageRowsCaptor.capture(), any(), any(), any(), any());
         assertThat(pageRowsCaptor.getValue())
                 .extracting(SoftwareResponse::getName)
-                .containsExactly("Google Chrome", "node");
+                .containsExactly("Google Chrome", "node", "zsh");
         verify(deviceCountEnricher, never()).enrich(anyList(), any(), any());
+    }
+
+    @Test
+    void listSoftwareForDevice_sortDevicesCountDesc_orderedByFleetWideCount() {
+        // setup
+        stubInventory(
+                List.of(title(10L, "Google Chrome", "apps", "120.0"),
+                        title(11L, "node", "homebrew_packages", "20.1"),
+                        title(12L, "zsh", "homebrew_packages", "5.9")),
+                List.of());
+        simulateEnricherSetsCounts(Map.of("Google Chrome", 1, "node", 5, "zsh", 3));
+        SortInput sort = SortInput.builder().field("devicesCount").direction(SortDirection.DESC).build();
+
+        // execution
+        PageResult<SoftwareResponse> result =
+                service.listSoftwareForDevice(MACHINE_ID, null, null, FIRST_PAGE, PAGE_SIZE, sort);
+
+        // verifications
+        assertThat(result.items())
+                .extracting(SoftwareResponse::getName, SoftwareResponse::getDevicesCount)
+                .containsExactly(tuple("node", 5), tuple("zsh", 3), tuple("Google Chrome", 1));
     }
 
     @Test
@@ -563,6 +584,16 @@ class SoftwareInventoryServiceTest {
         // verifications
         assertThat(ex.getMessage()).contains("publisher").contains("Sortable fields");
         verify(deviceHostInventoryLoader, never()).load(fleet, MACHINE_ID);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void simulateEnricherSetsCounts(Map<String, Integer> countByName) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(4);
+            rows.forEach(row -> setter.accept(row, countByName.get(row.getName())));
+            return null;
+        }).when(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), any(), any(), any());
     }
 
     private void stubInventory(List<HostSoftwareTitle> titles, List<FleetSoftware> hostSoftware) {

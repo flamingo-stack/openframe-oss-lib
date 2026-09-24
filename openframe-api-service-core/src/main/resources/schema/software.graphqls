@@ -92,7 +92,7 @@ extend type Query {
 
     """Software installed on one device. One row = one installed title, the same node as `softwares`.
     Version fields are read in this device's scope: `currentVersion` is the version installed here.
-    `devicesCount` stays fleet-wide. Sortable fields: name, cveCount, highestSeverity (default: name).
+    `devicesCount` stays fleet-wide. Sortable fields: name, devicesCount, cveCount, highestSeverity (default: name).
     Unknown machineId → NOT_FOUND; a known device with nothing installed → empty connection."""
     deviceSoftware(
         machineId: String!,

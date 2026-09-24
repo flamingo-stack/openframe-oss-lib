@@ -314,11 +314,10 @@ public class SoftwareInventoryService {
                 .map(title -> toDeviceSoftwareRow(title, inventory))
                 .filter(row -> matchesDeviceSoftwareFilter(row, filter))
                 .filter(row -> matchesDeviceSoftwareSearch(row, search))
-                .sorted(order)
                 .toList();
-        PageResult<SoftwareResponse> result = paginateList(rows, page, perPage);
-        enrichDevicesCountFromHosts(result.items());
-        return result;
+        enrichDevicesCountFromHosts(rows);
+        List<SoftwareResponse> ordered = rows.stream().sorted(order).toList();
+        return paginateList(ordered, page, perPage);
     }
 
     private void enrichDevicesCountFromHosts(List<SoftwareResponse> rows) {
