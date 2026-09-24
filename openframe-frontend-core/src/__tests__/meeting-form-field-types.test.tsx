@@ -1,7 +1,20 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
+  DECIMAL_LITERAL_RE,
+  FORM_FIELD_TYPES,
+  FORM_FIELD_TYPES_WITH_OPTIONS,
+  ISO_DATE_RE,
+  MULTI_VALUE_SEPARATOR,
+  PHONE_RE,
+  SUPPORTED_FORM_FIELD_TYPES,
   blocksNativeBooking,
+  formFieldTypeHasOptions,
+  normalizeFormFields,
+  splitMultiValue,
+  type FormFieldResolution,
+  type FormFieldTypeSpec,
+  type SupportedMeetingFormField,
   isRecognisedFormFieldType,
   makeBookingSchema,
   normalizeFormField,
@@ -174,5 +187,54 @@ describe('BookingForm — a link with a phone question (the reported outage)', (
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Booking' }));
     expect(await screen.findByText('Please enter a valid phone number for Phone')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe('registry exports', () => {
+  it('every control declares a spec with a validator, and options only where it picks from them', () => {
+    for (const type of SUPPORTED_FORM_FIELD_TYPES) {
+      const spec: FormFieldTypeSpec = FORM_FIELD_TYPES[type];
+      expect(typeof spec.validator).toBe('function');
+    }
+    expect([...FORM_FIELD_TYPES_WITH_OPTIONS].sort()).toEqual(['multiselect', 'radio', 'select']);
+  });
+
+  it('the wire-shape patterns accept exactly their shapes', () => {
+    expect(DECIMAL_LITERAL_RE.test('-12.5')).toBe(true);
+    expect(DECIMAL_LITERAL_RE.test('1e3')).toBe(false);
+    expect(PHONE_RE.test('+1 (415) 555-2671 x 12')).toBe(true);
+    expect(PHONE_RE.test('five five five')).toBe(false);
+    expect(ISO_DATE_RE.test('2026-09-24')).toBe(true);
+    expect(ISO_DATE_RE.test('24/09/2026')).toBe(false);
+  });
+
+  it('splitMultiValue reads the ;-joined wire value', () => {
+    expect(MULTI_VALUE_SEPARATOR).toBe(';');
+    expect(splitMultiValue('a;b')).toEqual(['a', 'b']);
+    expect(splitMultiValue('')).toEqual([]);
+    expect(splitMultiValue(undefined)).toEqual([]);
+  });
+
+  it('normalizeFormFields keeps declared order, drops what is not drawn, and records the HubSpot type', () => {
+    const drawn: SupportedMeetingFormField[] = normalizeFormFields([
+      q('phonenumber'),
+      q('html'),
+      q('file'),
+      q('booleancheckbox', { options: ['true', 'false'] }),
+    ]);
+    expect(drawn.map(f => [f.type, f.hubspotType])).toEqual([
+      ['phone', 'phonenumber'],
+      ['checkbox', 'booleancheckbox'],
+    ]);
+    expect(drawn[1].options).toBeUndefined();
+    const hidden: FormFieldResolution[] = ['display', 'unanswerable'];
+    expect(hidden).toContain(resolveFormFieldControl(q('html')));
+  });
+
+  it('formFieldTypeHasOptions (deprecated) still answers for hosts built on the old registry', () => {
+    for (const t of ['select', 'radio', 'checkbox', 'hologram']) expect(formFieldTypeHasOptions(t)).toBe(true);
+    for (const t of ['text', 'number', 'phonenumber', 'booleancheckbox', 'html', 'file']) {
+      expect(formFieldTypeHasOptions(t)).toBe(false);
+    }
   });
 });

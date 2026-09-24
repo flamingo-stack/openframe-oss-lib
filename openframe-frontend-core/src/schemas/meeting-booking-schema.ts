@@ -376,6 +376,23 @@ export function resolveFormFieldControl(field: MeetingFormField): FormFieldResol
 }
 
 /**
+ * @deprecated Kept for hosts built against the closed six-type registry (they
+ * asked this to decide whether to forward `options`). Answers for any HubSpot
+ * type through the resolver: true when the type resolves to an option control
+ * once options are present. New hosts forward options whenever HubSpot sends
+ * them and do not need this.
+ */
+export function formFieldTypeHasOptions(type: string): boolean {
+  const control = resolveFormFieldControl({ name: '', label: '', type, required: false, options: ['_'] });
+  return control !== 'display' && control !== 'unanswerable' && FORM_FIELD_TYPES[control].hasOptions;
+}
+
+/** @deprecated The option controls (see `formFieldTypeHasOptions`). */
+export const FORM_FIELD_TYPES_WITH_OPTIONS: readonly SupportedFormFieldType[] = SUPPORTED_FORM_FIELD_TYPES.filter(
+  type => FORM_FIELD_TYPES[type].hasOptions,
+);
+
+/**
  * Whether the question's `fieldType` is one the resolver maps EXPLICITLY — as
  * opposed to guessing from its data type or falling back to text. A host logs
  * the false case: the form still works, but a better control may be one table
