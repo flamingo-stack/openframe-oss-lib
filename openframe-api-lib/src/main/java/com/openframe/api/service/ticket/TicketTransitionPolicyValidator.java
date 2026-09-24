@@ -1,6 +1,7 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
+import com.openframe.api.exception.ticket.TicketStatusLockedByApprovalException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
 import com.openframe.api.service.ticket.spi.TicketClientConversationGate;
 import com.openframe.data.document.ticket.Ticket;
@@ -17,12 +18,14 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.openframe.data.document.ticket.TicketStatusKind.*;
 
 /**
- * The allowed-transition matrix between status kinds, plus the reopen-to-assistant rule.
+ * The allowed-transition matrix between status kinds, the reopen-to-assistant rule, and the
+ * pending-approval lock that freezes a Tech Required ticket until the request is resolved.
  */
 @Component
 @RequiredArgsConstructor
@@ -51,6 +54,7 @@ public class TicketTransitionPolicyValidator {
         if (isSameStatus(ticket, target)) {
             return target;
         }
+        assertNotLockedByPendingApproval(ticket);
         if (!isAllowedKindTransition(currentKind, targetKind) || !mayReopenInto(ticket, target)) {
             throw buildInvalidTransition(ticket, targetKind);
         }
@@ -58,6 +62,9 @@ public class TicketTransitionPolicyValidator {
     }
 
     public List<TicketStatusDefinition> allowedNext(Ticket ticket) {
+        if (isLockedByPendingApproval(ticket)) {
+            return List.of();
+        }
         Set<TicketStatusKind> allowedKinds = allowedKinds(ticket.getStatusKind());
         return statusRepository.findAllByOrderByPositionAsc().stream()
                 .filter(status -> allowedKinds.contains(status.getKind()))
@@ -65,6 +72,35 @@ public class TicketTransitionPolicyValidator {
                 .filter(this::isManuallySelectable)
                 .filter(status -> mayReopenInto(ticket, status))
                 .toList();
+    }
+
+    private void assertNotLockedByPendingApproval(Ticket ticket) {
+        lockingApprovalRequestId(ticket).ifPresent(approvalRequestId -> rejectLocked(ticket, approvalRequestId));
+    }
+
+    private boolean isLockedByPendingApproval(Ticket ticket) {
+        return lockingApprovalRequestId(ticket).isPresent();
+    }
+
+    /**
+     * Only Tech Required is frozen: that is the stage a parked approval puts the ticket in, and moving
+     * it anywhere else would leave the request orphaned. Other stages resolve or cancel the request
+     * as part of their own transition side effects.
+     */
+    private Optional<String> lockingApprovalRequestId(Ticket ticket) {
+        if (ticket.getStatusKind() != TECH_REQUIRED) {
+            return Optional.empty();
+        }
+        TicketClientConversationGate gate = conversationGate.getIfAvailable();
+        if (gate == null) {
+            return Optional.empty();
+        }
+        return gate.findPendingApprovalRequestId(ticket.getId());
+    }
+
+    private void rejectLocked(Ticket ticket, String approvalRequestId) {
+        String ticketId = ticket.getId();
+        throw new TicketStatusLockedByApprovalException(ticketId, approvalRequestId);
     }
 
     /**
