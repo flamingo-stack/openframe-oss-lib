@@ -10,10 +10,13 @@ import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Pure entity &harr; DTO mapping for script schedules. Mirrors {@link ScriptMapper};
@@ -23,14 +26,16 @@ import java.util.List;
 @Component
 public class ScriptScheduleMapper {
 
-    public ScheduleScript toEntity(String tenantId, CreateScriptScheduleInput input) {
+    public ScheduleScript toEntity(String tenantId, CreateScriptScheduleInput input,
+                                   Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId) {
         return ScheduleScript.builder()
                 .tenantId(tenantId)
                 .name(input.getName())
                 .description(input.getDescription())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .scriptIds(input.getScriptIds())
-                .scriptCustomParams(toCustomParams(input.getScriptCustomParams()))
+                .scriptCustomParams(toCustomParams(input.getScriptCustomParams(),
+                        Map.of(), scriptDefaultsByScriptId))
                 .trigger(defaultTrigger(input.getTrigger()))
                 .timeReference(defaultTimeReference(input.getTimeReference()))
                 .offlineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()))
@@ -40,12 +45,16 @@ public class ScriptScheduleMapper {
                 .build();
     }
 
-    public void updateEntity(ScheduleScript existing, UpdateScriptScheduleInput input) {
+    public void updateEntity(ScheduleScript existing, UpdateScriptScheduleInput input,
+                             Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId) {
         existing.setName(input.getName());
         existing.setDescription(input.getDescription());
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setScriptIds(input.getScriptIds());
-        existing.setScriptCustomParams(toCustomParams(input.getScriptCustomParams()));
+        // update: the prior stored override wins over script defaults so a customized secret is kept.
+        Map<String, List<ScriptEnvVar>> storedByScriptId = storedOverridesByScriptId(existing);
+        existing.setScriptCustomParams(toCustomParams(input.getScriptCustomParams(),
+                storedByScriptId, scriptDefaultsByScriptId));
         existing.setTrigger(defaultTrigger(input.getTrigger()));
         existing.setTimeReference(defaultTimeReference(input.getTimeReference()));
         existing.setOfflineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()));
@@ -97,16 +106,46 @@ public class ScriptScheduleMapper {
                 .build();
     }
 
-    private static List<ScheduledScriptCustomParams> toCustomParams(List<ScheduledScriptCustomParamsInput> input) {
+    private static List<ScheduledScriptCustomParams> toCustomParams(
+            List<ScheduledScriptCustomParamsInput> input,
+            Map<String, List<ScriptEnvVar>> storedOverridesByScriptId,
+            Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId) {
         if (input == null) {
             return null;
         }
         return input.stream()
-                .map(p -> ScheduledScriptCustomParams.builder()
-                        .scriptId(p.getScriptId())
-                        .args(p.getArgs())
-                        .envVars(ScriptEnvVarMapper.toEntity(p.getEnvVars()))
-                        .build())
+                .map(p -> buildCustomParam(p, storedOverridesByScriptId, scriptDefaultsByScriptId))
                 .toList();
+    }
+
+    private static ScheduledScriptCustomParams buildCustomParam(
+            ScheduledScriptCustomParamsInput p,
+            Map<String, List<ScriptEnvVar>> storedOverridesByScriptId,
+            Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId) {
+        // Named locals — PMD's NoMethodCallAsArgument (OFJAVA-002) rejects inline builder args.
+        String scriptId = p.getScriptId();
+        List<ScriptEnvVar> stored = storedOverridesByScriptId.getOrDefault(scriptId, List.of());
+        List<ScriptEnvVar> defaults = scriptDefaultsByScriptId.getOrDefault(scriptId, List.of());
+        List<ScriptEnvVar> resolvedEnvVars = ScriptEnvVarMapper.toEntityResolvingSecrets(
+                p.getEnvVars(), stored, defaults);
+        List<String> args = p.getArgs();
+        return ScheduledScriptCustomParams.builder()
+                .scriptId(scriptId)
+                .args(args)
+                .envVars(resolvedEnvVars)
+                .build();
+    }
+
+    private static Map<String, List<ScriptEnvVar>> storedOverridesByScriptId(ScheduleScript existing) {
+        List<ScheduledScriptCustomParams> current = existing.getScriptCustomParams();
+        if (current == null || current.isEmpty()) {
+            return Map.of();
+        }
+        return current.stream()
+                .filter(p -> p.getScriptId() != null && p.getEnvVars() != null)
+                .collect(Collectors.toMap(
+                        ScheduledScriptCustomParams::getScriptId,
+                        ScheduledScriptCustomParams::getEnvVars,
+                        (a, b) -> a));
     }
 }
