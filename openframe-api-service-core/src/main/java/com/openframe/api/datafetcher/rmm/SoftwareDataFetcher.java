@@ -50,6 +50,18 @@ public class SoftwareDataFetcher {
     }
 
     @DgsQuery
+    public CountedGenericConnection<GenericEdge<SoftwareResponse>> deviceSoftware(
+            @InputArgument String machineId, @InputArgument SoftwareFilterInput filter,
+            @InputArgument Integer first, @InputArgument String after,
+            @InputArgument Integer last, @InputArgument String before,
+            @InputArgument String search, @InputArgument SortInput sort) {
+        int page = PageCursors.decodePage(after != null ? after : before);
+        Integer perPage = first != null ? first : last;
+        return PageCursors.toConnection(
+                softwareInventoryService.listSoftwareForDevice(machineId, filter, search, page, perPage, sort));
+    }
+
+    @DgsQuery
     public CountedGenericConnection<GenericEdge<SoftwareOnDeviceResponse>> softwareDevices(
             @InputArgument String softwareId, @InputArgument SoftwareOnDeviceFilterInput filter,
             @InputArgument Integer first, @InputArgument String after,
