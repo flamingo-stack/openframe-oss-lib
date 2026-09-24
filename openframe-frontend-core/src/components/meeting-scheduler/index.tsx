@@ -46,7 +46,7 @@ import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { BOOKING_IN_FLIGHT_MESSAGE, useMeetingBooking } from '../../hooks/use-meeting-booking';
 import { useToast } from '../../hooks/use-toast';
 import {
-  isSupportedFormField,
+  blocksNativeBooking,
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
@@ -369,13 +369,16 @@ export function SchedulerDegradedCard({
 }
 
 /**
- * Fail-closed gate: a link whose declared questions include an unsupported
- * type, or whose consent block is malformed, must NOT render a half-working
- * native form (a silently dropped required question or missing consent copy
- * is worse than no native form) — the escape hatch takes over.
+ * Fail-closed gate: a link with a REQUIRED question no control can answer (a
+ * file upload), or whose consent block is malformed, must NOT render a
+ * half-working native form (a silently dropped required question or missing
+ * consent copy is worse than no native form) — the escape hatch takes over.
+ * An unfamiliar question TYPE is not a reason: it resolves to the nearest
+ * control (`resolveFormFieldControl`), so one new HubSpot type can no longer
+ * take the whole booking form down.
  */
 function isNativelyBookable(availability: MeetingAvailability): boolean {
-  if (!availability.formFields.every(isSupportedFormField)) return false;
+  if (availability.formFields.some(blocksNativeBooking)) return false;
   const consent = availability.legalConsent;
   if (consent) {
     if (typeof consent.processingConsentText !== 'string') return false;
