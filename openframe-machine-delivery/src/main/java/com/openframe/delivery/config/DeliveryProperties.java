@@ -14,6 +14,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.EnumMap;
 import java.util.Map;
 
+import static java.lang.Boolean.FALSE;
 import static java.util.Objects.requireNonNullElse;
 
 @Getter
@@ -22,9 +23,6 @@ import static java.util.Objects.requireNonNullElse;
 @Component
 @ConfigurationProperties(prefix = "openframe.delivery")
 public class DeliveryProperties {
-
-    @NotNull
-    private Boolean enabled;
 
     @Valid
     @NotNull
@@ -37,8 +35,11 @@ public class DeliveryProperties {
     // deliberately not @Valid: a per-type entry lists only the fields it overrides
     private Map<DeliveryType, Policy> types = new EnumMap<>(DeliveryType.class);
 
-    public boolean isEnabled() {
-        return enabled;
+    // a type not listed here is off: every environment switches each type on explicitly
+    private Map<DeliveryType, Boolean> enabled = new EnumMap<>(DeliveryType.class);
+
+    public boolean isEnabled(DeliveryType type) {
+        return enabled.getOrDefault(type, FALSE);
     }
 
     public Policy resolve(DeliveryType type) {
@@ -53,6 +54,9 @@ public class DeliveryProperties {
     @Setter
     public static class Sweep {
 
+        @NotNull
+        @Positive
+        private Long interval;
         @NotNull
         @Positive
         private Integer batchSize;

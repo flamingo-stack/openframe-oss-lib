@@ -8,6 +8,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliverySpec;
@@ -33,6 +34,7 @@ import static com.openframe.delivery.config.DeliveryTestPolicies.BATCH_SIZE;
 import static com.openframe.delivery.config.DeliveryTestPolicies.MAX_ATTEMPTS;
 import static com.openframe.delivery.config.DeliveryTestPolicies.MAX_RETRY_INTERVAL;
 import static com.openframe.delivery.config.DeliveryTestPolicies.RECONNECT_WINDOW;
+import static com.openframe.delivery.config.DeliveryTestPolicies.SWEEP_INTERVAL_MILLIS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -52,7 +54,7 @@ class DeliverySweepServiceTest {
     private static final String PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\"}";
     private static final String CORRUPT_JSON = "not-json";
     private static final long TWO_DAYS_SECONDS = 172_800L;
-    private static final long ONE_MINUTE_SECONDS = 60L;
+    private static final long TEN_SECONDS = 10L;
     private static final long FIRST_RETRY_DELAY = ACK_THRESHOLD * BACKOFF_MULTIPLIER;
     private static final long CLOCK_SLACK_SECONDS = 5L;
     private static final int MANY_ATTEMPTS_ALLOWED = 10;
@@ -216,7 +218,7 @@ class DeliverySweepServiceTest {
     }
 
     @Test
-    void retryPending_offlineFarFromWindowEnd_parkedUntilNextRecheck() {
+    void retryPending_offlineFarFromWindowEnd_postponedToNextSweep() {
         // setup
         Instant before = Instant.now();
         stubDue(delivery);
@@ -226,17 +228,18 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(repository).park(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), dueAtCaptor.capture());
+        verify(repository).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), dueAtCaptor.capture());
+        Instant nextSweep = before.plusMillis(SWEEP_INTERVAL_MILLIS);
         assertThat(dueAtCaptor.getValue())
-                .isAfterOrEqualTo(before.plusSeconds(MAX_RETRY_INTERVAL))
-                .isBefore(before.plusSeconds(MAX_RETRY_INTERVAL + CLOCK_SLACK_SECONDS));
+                .isAfterOrEqualTo(nextSweep)
+                .isBefore(nextSweep.plusSeconds(CLOCK_SLACK_SECONDS));
         verifyNoInteractions(registry, closer, metrics);
     }
 
     @Test
-    void retryPending_offlineCloseToWindowEnd_parkedUntilWindowEnd() {
+    void retryPending_offlineCloseToWindowEnd_postponedToWindowEnd() {
         // setup
-        Instant recently = Instant.now().minusSeconds(RECONNECT_WINDOW - ONE_MINUTE_SECONDS);
+        Instant recently = Instant.now().minusSeconds(RECONNECT_WINDOW - TEN_SECONDS);
         delivery.setDispatchedAt(recently);
         stubDue(delivery);
         stubMachineNotOnline();
@@ -245,7 +248,7 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(repository).park(delivery.getId(), DeliveryStatus.UNACKED, recently, recently.plusSeconds(RECONNECT_WINDOW));
+        verify(repository).postpone(delivery.getId(), DeliveryStatus.UNACKED, recently, recently.plusSeconds(RECONNECT_WINDOW));
     }
 
     @Test
@@ -261,7 +264,7 @@ class DeliverySweepServiceTest {
 
         // verifications
         verify(closer).fail(eq(delivery), eq(DeliveryFailure.OFFLINE), eq(DeliveryStatus.UNACKED), any(Instant.class));
-        verify(repository, never()).park(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(twoDaysAgo), any(Instant.class));
+        verify(repository, never()).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(twoDaysAgo), any(Instant.class));
     }
 
     @Test
