@@ -143,12 +143,7 @@ public class UserService {
         }
     }
 
-    /**
-     * Transfer the OWNER role from the requester to another active user in the tenant.
-     * Only the current owner can transfer ownership. The new owner is granted first and the
-     * requester demoted after, so a failure in between leaves two owners (recoverable by a
-     * second transfer) rather than none.
-     */
+    // New owner is granted before the requester is demoted, so a mid-failure leaves two owners rather than none
     public void transferOwnership(String newOwnerId, String requesterUserId) {
         User requester = userRepository.findById(requesterUserId)
                 .orElseThrow(() -> new UserNotFoundException(requesterUserId));
@@ -182,13 +177,7 @@ public class UserService {
         }
     }
 
-    /**
-     * Erase personal data on self-deletion. The email tombstone must stay unique per user
-     * because of the unique {tenantId, email} index on the users collection, and freeing the
-     * real email lets the person register a fresh account later instead of reactivating this
-     * one. The document is an AuthUser at runtime (polymorphic {@code _class} mapping), so
-     * credential fields are cleared too.
-     */
+    // Tombstone email frees the real address for re-registration while keeping the unique {tenantId, email} index intact
     private void anonymize(User user) {
         user.setEmail("deleted-" + user.getId() + "@deleted.invalid");
         user.setFirstName("Deleted");
