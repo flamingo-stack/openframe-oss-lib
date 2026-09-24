@@ -6,6 +6,7 @@ import com.openframe.data.document.tenant.TenantKey;
 import com.openframe.data.repository.tenant.TenantKeyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.security.interfaces.RSAPrivateKey;
@@ -29,11 +30,20 @@ public class TenantKeyService {
             log.warn("Multiple active signing keys detected for tenantId='{}' (count={}) - this may cause kid mismatches", tenantId, activeCount);
         }
 
-        TenantKey doc = tenantKeyRepository.findFirstByTenantIdAndActiveTrue(tenantId).orElse(null);
+        // Oldest first: with no ordering, a tenant holding two active keys could sign with either one.
+        TenantKey doc = tenantKeyRepository.findFirstByTenantIdAndActiveTrueOrderByCreatedAtAsc(tenantId).orElse(null);
         if (doc == null) {
             log.info("No active signing key found for tenantId='{}'. Generating a new key...", tenantId);
-            doc = createAndStore(tenantId);
-            log.info("Generated new signing key for tenantId='{}' with kid='{}' createdAt='{}'", tenantId, doc.getKeyId(), doc.getCreatedAt());
+            try {
+                doc = createAndStore(tenantId);
+                log.info("Generated new signing key for tenantId='{}' with kid='{}' createdAt='{}'", tenantId, doc.getKeyId(), doc.getCreatedAt());
+            } catch (DuplicateKeyException e) {
+                // A concurrent request created the tenant's key first; the unique partial index on
+                // (tenantId, active=true) rejected ours, so sign with the winner's key.
+                doc = tenantKeyRepository.findFirstByTenantIdAndActiveTrueOrderByCreatedAtAsc(tenantId)
+                        .orElseThrow(() -> e);
+                log.info("Concurrent signing key creation for tenantId='{}' - using kid='{}'", tenantId, doc.getKeyId());
+            }
         } else {
             log.debug("Using active signing key for tenantId='{}' with kid='{}' createdAt='{}'", tenantId, doc.getKeyId(), doc.getCreatedAt());
         }
