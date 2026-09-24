@@ -453,6 +453,13 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
    */
   reserveAvatarOffset?: boolean;
   disabled?: boolean;
+  /**
+   * Placeholder shown while `disabled`, in the prompt's place — what the user
+   * cannot do right now. Defaults to the connection-lost copy, which is what
+   * `disabled` has meant so far (the ticket reply composer); a host that
+   * disables the input for another reason says so here.
+   */
+  disabledPlaceholder?: string;
   maxRows?: number;
   showSendButton?: boolean;
   sendButtonLabel?: string;

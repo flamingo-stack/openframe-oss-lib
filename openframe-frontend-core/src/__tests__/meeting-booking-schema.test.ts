@@ -17,9 +17,9 @@ const endpoints = (required: boolean): MeetingFormField => ({
 });
 
 describe('meeting booking schema — number questions', () => {
-  it('treats a Number property as natively bookable, and unknown types as not', () => {
+  it('treats a Number property as natively bookable, and so is any other question type', () => {
     expect(isSupportedFormField(endpoints(true))).toBe(true);
-    expect(isSupportedFormField({ name: 'phone', label: 'Phone', type: 'phonenumber', required: false })).toBe(false);
+    expect(isSupportedFormField({ name: 'phone', label: 'Phone', type: 'phonenumber', required: false })).toBe(true);
   });
 
   it('accepts a decimal literal and keeps it a string on the wire', () => {
