@@ -92,7 +92,7 @@ extend type Query {
 
     """Software installed on one device. One row = one installed title, the same node as `softwares`.
     Version fields are read in this device's scope: `currentVersion` is the version installed here.
-    `devicesCount` stays fleet-wide. Sortable fields: name, cveCount, highestSeverity (default: name).
+    `devicesCount` stays fleet-wide. Sortable fields: name, devicesCount, cveCount, highestSeverity (default: name).
     Unknown machineId → NOT_FOUND; a known device with nothing installed → empty connection."""
     deviceSoftware(
         machineId: String!,
@@ -104,6 +104,10 @@ extend type Query {
         search: String,
         sort: SortInput
     ): SoftwareConnection!
+
+    """Faceted filter-option counts for one device's software — same scope as deviceSoftware(machineId, search);
+    mirrors softwareFilters. Unknown machineId → NOT_FOUND; a device with nothing installed → empty facets."""
+    deviceSoftwareFilters(machineId: String!, filter: SoftwareFilterInput, search: String): SoftwareFilters!
 
     """CVEs present on one device. One row = one CVE (not CVE × software), the same node as `vulnerabilities`.
     `affectedSoftware` is scoped to this host and populated on every row; `devicesCount` stays fleet-wide.
@@ -119,6 +123,10 @@ extend type Query {
         search: String,
         sort: SortInput
     ): VulnerabilityConnection!
+
+    """Faceted severity counts for one device's CVEs — same scope as deviceVulnerabilities(machineId, search);
+    mirrors vulnerabilityFilters. Unknown machineId → NOT_FOUND; a device with no CVEs → empty facets."""
+    deviceVulnerabilityFilters(machineId: String!, filter: VulnerabilityFilterInput, search: String): VulnerabilityFilters!
 }
 
 # ────────── Software (aggregate row) ──────────

@@ -93,6 +93,12 @@ public class SoftwareDataFetcher {
     }
 
     @DgsQuery
+    public SoftwareFilters deviceSoftwareFilters(@InputArgument String machineId, @InputArgument Object filter,
+                                                 @InputArgument String search) {
+        return softwareInventoryService.getDeviceSoftwareFilters(machineId, search);
+    }
+
+    @DgsQuery
     public SoftwareOnDeviceFilters softwareDeviceFilters(@InputArgument String softwareId,
                                                          @InputArgument Object filter, @InputArgument String search) {
         return softwareInventoryService.getSoftwareDeviceFilters(softwareId, search);
