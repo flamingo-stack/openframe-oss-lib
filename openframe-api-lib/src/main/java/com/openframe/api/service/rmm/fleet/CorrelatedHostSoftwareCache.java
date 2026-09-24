@@ -73,7 +73,7 @@ public class CorrelatedHostSoftwareCache {
         HostSearchRequest request = new HostSearchRequest();
         request.setPage(page);
         request.setPerPage(HOSTS_PAGE);
-        request.setPopulateSoftware(true);
+        request.includeSoftware();
         return request;
     }
 

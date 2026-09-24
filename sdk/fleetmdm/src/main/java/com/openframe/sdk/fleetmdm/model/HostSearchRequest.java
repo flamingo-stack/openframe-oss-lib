@@ -96,7 +96,7 @@ public class HostSearchRequest {
         return populateSoftware;
     }
 
-    public void setPopulateSoftware(boolean populateSoftware) {
-        this.populateSoftware = populateSoftware;
+    public void includeSoftware() {
+        this.populateSoftware = true;
     }
 }

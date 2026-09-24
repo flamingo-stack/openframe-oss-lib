@@ -375,7 +375,8 @@ public class SoftwareInventoryService {
     public SoftwareFilters getSoftwareFilters(String search) {
         // Facet counts don't depend on the enriched devicesCount, so bypass enrichRealDevicesCount
         // here — it would fire N Fleet /hosts lookups just to produce numbers we don't use.
-        List<SoftwareResponse> titles = mapTitles(fetchAllTitles(search, null));
+        List<SoftwareTitle> fetched = fetchAllTitles(search, null);
+        List<SoftwareResponse> titles = mapTitles(fetched);
         return SoftwareFilters.builder()
                 .sources(facet(titles, SoftwareResponse::getSource))
                 .versionStatuses(facet(titles, SoftwareResponse::getVersionStatus))
