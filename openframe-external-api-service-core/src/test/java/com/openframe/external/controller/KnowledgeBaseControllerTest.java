@@ -852,6 +852,17 @@ class KnowledgeBaseControllerTest {
     }
 
     @Test
+    void createArticleWithUnknownTagIs404AndCreatesNothing() throws Exception {
+        when(principalResolver.resolve(ExternalApiMockMvc.USER_ID)).thenReturn(owner());
+        when(knowledgeBaseReadService.requireTag("missing")).thenThrow(new KnowledgeBaseTagNotFoundException("missing"));
+
+        mockMvc.perform(json(post(BASE + "/articles"), Map.of("name", "VPN setup", "tagIds", List.of("missing"))))
+                .andExpect(status().isNotFound());
+
+        verify(knowledgeBaseService, never()).createArticle(anyString(), any());
+    }
+
+    @Test
     void createArticleWithBlankNameIs400() throws Exception {
         mockMvc.perform(json(post(BASE + "/articles"), Map.of("name", " ", "content", "# Steps")))
                 .andExpect(status().isBadRequest())
