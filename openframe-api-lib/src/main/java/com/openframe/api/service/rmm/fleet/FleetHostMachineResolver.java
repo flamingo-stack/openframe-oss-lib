@@ -71,8 +71,9 @@ public class FleetHostMachineResolver {
     }
 
     private Map<Long, Machine> resolveByConnection(String tenantId, List<Host> hosts) {
-        List<String> hostIds = hostIds(hosts);
-        List<ToolConnection> connections = toolConnectionRepository.findByAgentToolIdInAndToolType(hostIds, ToolType.FLEET_MDM);
+        Map<String, Long> hostIdByAgentToolId = hostIdsByAgentToolId(hosts);
+        List<String> agentToolIds = List.copyOf(hostIdByAgentToolId.keySet());
+        List<ToolConnection> connections = toolConnectionRepository.findByAgentToolIdInAndToolType(agentToolIds, ToolType.FLEET_MDM);
         if (connections.isEmpty()) {
             return Map.of();
         }
@@ -82,22 +83,23 @@ public class FleetHostMachineResolver {
         Map<Long, Machine> byHostId = new HashMap<>();
         connections.stream()
                 .sorted(NEWEST_FIRST)
-                .forEach(connection -> claim(byHostId, connection, byMachineId));
+                .forEach(connection -> claim(byHostId, connection, byMachineId, hostIdByAgentToolId));
         return byHostId;
     }
 
-    private static List<String> hostIds(List<Host> hosts) {
+    private static Map<String, Long> hostIdsByAgentToolId(List<Host> hosts) {
         return hosts.stream()
                 .map(Host::getId)
                 .filter(Objects::nonNull)
-                .map(String::valueOf)
-                .toList();
+                .distinct()
+                .collect(Collectors.toMap(String::valueOf, Function.identity()));
     }
 
-    private static void claim(Map<Long, Machine> byHostId, ToolConnection connection, Map<String, Machine> byMachineId) {
+    private static void claim(Map<Long, Machine> byHostId, ToolConnection connection,
+                              Map<String, Machine> byMachineId, Map<String, Long> hostIdByAgentToolId) {
         Machine machine = byMachineId.get(connection.getMachineId());
-        if (machine != null) {
-            Long hostId = Long.valueOf(connection.getAgentToolId());
+        Long hostId = hostIdByAgentToolId.get(connection.getAgentToolId());
+        if (machine != null && hostId != null) {
             byHostId.putIfAbsent(hostId, machine);
         }
     }
