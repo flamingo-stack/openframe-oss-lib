@@ -29,9 +29,6 @@ public class TicketResponse {
 
     private String description;
 
-    /** Contract values: ACTIVE, TECH_REQUIRED, ON_HOLD, RESOLVED, ARCHIVED. Kept as String so a new backend value deserializes rather than throwing. */
-    private String status;
-
     /** Contract values: AI_ASSISTANCE, TECH_REQUIRED, RESOLVED, ARCHIVED, CUSTOM. Kept as String so a new backend value deserializes rather than throwing. */
     private String statusKind;
 
