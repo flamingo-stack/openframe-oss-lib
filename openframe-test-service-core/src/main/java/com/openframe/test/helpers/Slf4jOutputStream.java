@@ -26,6 +26,19 @@ class Slf4jOutputStream extends OutputStream {
     private static final Pattern NAMED_SECRET =
             Pattern.compile("(?i)\\b(access_token|refresh_token|client_secret)=\\S+");
 
+    /**
+     * The same secrets in a JSON body, where the separator is {@code :} and the value is quoted — so
+     * {@link #NAMED_SECRET}, which wants {@code name=value}, never matches.
+     *
+     * <p>Not hypothetical: {@code AgentAuthApi} reads {@code accessToken} out of the agent token
+     * exchange's response, so logging responses prints that JWT in full unless this catches it. The key
+     * is matched whole between its quotes, so {@code "token_type"} is left alone while {@code "token"}
+     * is not, and {@code _?} covers both {@code access_token} and {@code accessToken}.
+     */
+    private static final Pattern JSON_SECRET = Pattern.compile(
+            "(?i)(\"(?:access_?token|refresh_?token|id_?token|client_?secret|api_?key|initial_?key"
+                    + "|password|secret|token)\"\\s*:\\s*\")[^\"]*(\")");
+
     /** A bearer value anywhere in a line — a body or a param, where the header blacklist cannot reach. */
     private static final Pattern BEARER = Pattern.compile("(?i)(Bearer\\s+)\\S+");
 
@@ -64,6 +77,7 @@ class Slf4jOutputStream extends OutputStream {
     /** Visible for testing: strips secret values while leaving the field name, so the shape still reads. */
     static String redact(String line) {
         String redacted = NAMED_SECRET.matcher(line).replaceAll("$1=" + REDACTED);
+        redacted = JSON_SECRET.matcher(redacted).replaceAll("$1" + REDACTED + "$2");
         return BEARER.matcher(redacted).replaceAll("$1" + REDACTED);
     }
 

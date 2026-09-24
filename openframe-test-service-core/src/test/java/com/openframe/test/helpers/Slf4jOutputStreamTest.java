@@ -57,6 +57,43 @@ class Slf4jOutputStreamTest {
     }
 
     @Test
+    @DisplayName("A JSON-encoded token is redacted — the shape the agent token exchange returns")
+    void redactsJsonAccessToken() {
+        String line = Slf4jOutputStream.redact(
+                "    \"accessToken\" : \"eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhZ2VudF8wZTk5\",");
+
+        assertThat(line).doesNotContain("eyJhbGciOiJSUzI1NiJ9");
+        assertThat(line).contains("\"accessToken\" : \"<redacted>\"");
+    }
+
+    @Test
+    @DisplayName("Snake case, camel case and a quoted client secret are all covered")
+    void redactsJsonVariants() {
+        assertThat(Slf4jOutputStream.redact("{\"access_token\":\"aaa bbb\"}"))
+                .isEqualTo("{\"access_token\":\"<redacted>\"}");
+        assertThat(Slf4jOutputStream.redact("{\"clientSecret\": \"s3cr3t\"}"))
+                .isEqualTo("{\"clientSecret\": \"<redacted>\"}");
+        assertThat(Slf4jOutputStream.redact("{\"password\":\"Test123!\"}"))
+                .isEqualTo("{\"password\":\"<redacted>\"}");
+    }
+
+    @Test
+    @DisplayName("A value containing spaces is still bounded by its closing quote")
+    void redactsWholeQuotedValue() {
+        String line = Slf4jOutputStream.redact("{\"token\": \"a b c\", \"id\": \"keep-me\"}");
+
+        assertThat(line).isEqualTo("{\"token\": \"<redacted>\", \"id\": \"keep-me\"}");
+    }
+
+    @Test
+    @DisplayName("token_type is not a secret and survives")
+    void leavesTokenTypeAlone() {
+        String line = Slf4jOutputStream.redact("{\"token_type\": \"Bearer\", \"expires_in\": 900}");
+
+        assertThat(line).contains("\"token_type\": \"Bearer\"");
+    }
+
+    @Test
     @DisplayName("An ordinary line is untouched")
     void leavesOrdinaryLinesAlone() {
         String line = "Request URI:\thttps://stage.openframe.miami/api/graphql";
