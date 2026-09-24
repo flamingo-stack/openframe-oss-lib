@@ -130,13 +130,9 @@ public final class PipelineContext {
      * Declare that this run is a flat tag selection, not an ordered pipeline, so tests that exist to
      * hand fixtures to a later phase keep them to themselves.
      *
-     * <p>The case that forced this: {@code OrganizationsTest} publishes the org it creates so the
-     * pipeline can install a device into it and archive it last. In the dev suite the same test runs
-     * as an ordinary functional case with no install step behind it, so it published an org that would
-     * stay empty — and every later device lookup, which scopes itself through
-     * {@code BaseTest.pipelineScoped}, was narrowed into it. On the qa dev suite of 2026-09-23 21:00
-     * that turned a healthy tenant into "No devices in org 9406ef48-…" for the nickname case, 25
-     * seconds after "Create Organization" passed.
+     * <p>Without it {@code OrganizationsTest} publishes an org that only a pipeline's install step ever
+     * puts a device into, and {@code BaseTest.pipelineScoped} then narrows every later device lookup
+     * into it — so in a flat run every device case after it searches an org that stays empty.
      *
      * <p>Call after {@link #clear()}, which resets this along with everything else.
      */
