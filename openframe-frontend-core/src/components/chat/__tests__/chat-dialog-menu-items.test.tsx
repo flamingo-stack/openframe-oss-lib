@@ -25,7 +25,7 @@ describe('chatDialogMenuItems', () => {
       'Compact Chat Memory',
       'Archive Chat',
     ]);
-    expect(items.every(item => item.icon)).toBe(true);
+    expect(items.every(item => item.icon !== undefined)).toBe(true);
   });
 
   it('omits actions without a handler', () => {
