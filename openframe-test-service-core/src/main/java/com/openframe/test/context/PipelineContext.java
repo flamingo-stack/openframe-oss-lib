@@ -17,6 +17,16 @@ public final class PipelineContext {
 
     private static volatile String orgId;
 
+    /**
+     * Set by a runner that is executing a flat, single-tag run rather than an ordered pipeline.
+     *
+     * <p>Opt-out rather than opt-in on purpose. Unset means "behave as before", so a library carrying
+     * this guard is safe to release before the runner that sets the flag exists; the pipelines keep
+     * publishing exactly as they do today and only a runner that has been taught to say "standalone"
+     * changes behaviour.
+     */
+    private static volatile boolean standaloneRun;
+
     // Tenant registered by OwnerRegistrationTest (random email + subdomain). The all-tests pipeline
     // reads these after the registration phase so the E2E lifecycle runs against the tenant that was
     // just registered, rather than the static param tenant.
@@ -116,7 +126,32 @@ public final class PipelineContext {
                 && registeredDomain != null && !registeredDomain.isBlank();
     }
 
+    /**
+     * Declare that this run is a flat tag selection, not an ordered pipeline, so tests that exist to
+     * hand fixtures to a later phase keep them to themselves.
+     *
+     * <p>Without it {@code OrganizationsTest} publishes an org that only a pipeline's install step ever
+     * puts a device into, and {@code BaseTest.pipelineScoped} then narrows every later device lookup
+     * into it — so in a flat run every device case after it searches an org that stays empty.
+     *
+     * <p>Call after {@link #clear()}, which resets this along with everything else.
+     */
+    public static void markStandaloneRun() {
+        standaloneRun = true;
+    }
+
+    /** Whether a runner has declared this run a flat tag selection. False unless something said so. */
+    public static boolean isStandaloneRun() {
+        return standaloneRun;
+    }
+
+    /** True when fixtures published here will actually be consumed by a later phase. */
+    public static boolean publishesToLaterPhase() {
+        return !standaloneRun;
+    }
+
     public static void clear() {
+        standaloneRun = false;
         orgId = null;
         registeredEmail = null;
         registeredDomain = null;
