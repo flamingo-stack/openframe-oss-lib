@@ -55,26 +55,34 @@ public class SessionConfig {
      * JDK serialization, but an attribute that no longer deserializes reads as absent instead of
      * failing the request. Spring Security bumps its serialVersionUID on every minor release, so after
      * such an upgrade stored sessions would otherwise 500 until they expire; this way the user just
-     * starts a fresh login.
+     * starts a fresh login. The bean name is what Spring Session looks the serializer up by.
      */
     @Bean
     public RedisSerializer<Object> springSessionDefaultRedisSerializer() {
-        JdkSerializationRedisSerializer delegate = new JdkSerializationRedisSerializer(getClass().getClassLoader());
-        return new RedisSerializer<>() {
-            @Override
-            public byte[] serialize(Object value) throws SerializationException {
-                return delegate.serialize(value);
-            }
+        return new LenientJdkSerializationRedisSerializer(SessionConfig.class.getClassLoader());
+    }
 
-            @Override
-            public Object deserialize(byte[] bytes) {
-                try {
-                    return delegate.deserialize(bytes);
-                } catch (SerializationException e) {
-                    log.warn("Discarding session attribute that cannot be deserialized: {}", e.getMessage());
-                    return null;
-                }
+    private static final class LenientJdkSerializationRedisSerializer implements RedisSerializer<Object> {
+
+        private final JdkSerializationRedisSerializer delegate;
+
+        private LenientJdkSerializationRedisSerializer(ClassLoader classLoader) {
+            this.delegate = new JdkSerializationRedisSerializer(classLoader);
+        }
+
+        @Override
+        public byte[] serialize(Object value) {
+            return delegate.serialize(value);
+        }
+
+        @Override
+        public Object deserialize(byte[] bytes) {
+            try {
+                return delegate.deserialize(bytes);
+            } catch (SerializationException e) {
+                log.warn("Discarding session attribute that cannot be deserialized: {}", e.getMessage());
+                return null;
             }
-        };
+        }
     }
 }

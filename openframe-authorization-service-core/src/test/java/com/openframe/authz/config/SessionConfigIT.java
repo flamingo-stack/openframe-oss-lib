@@ -99,12 +99,12 @@ class SessionConfigIT {
     @DisplayName("Given a stored attribute that no longer deserializes, when the session is read, then the attribute is absent instead of the request failing")
     void undeserializableAttribute_readsAsAbsent() throws Exception {
         try (ConfigurableApplicationContext pod = startPod()) {
-            String cookie = sessionCookie(get(pod, "/put?value=x", null));
-            StringRedisTemplate redis = pod.getBean(StringRedisTemplate.class);
-            String key = redis.keys("of:{" + TENANT + "}:session:sessions:*").iterator().next();
-            redis.opsForHash().put(key, "sessionAttr:value", "not-java-serialized");
+            HttpResponse<String> put = get(pod, "/put?value=x", null);
+            // Spring Session stores each attribute as a "sessionAttr:<name>" field of the session hash.
+            pod.getBean(StringRedisTemplate.class).opsForHash()
+                    .put("of:{" + TENANT + "}:session:sessions:" + put.body(), "sessionAttr:value", "not-java-serialized");
 
-            HttpResponse<String> read = get(pod, "/get", cookie);
+            HttpResponse<String> read = get(pod, "/get", sessionCookie(put));
 
             assertThat(read.statusCode()).isEqualTo(200);
             assertThat(read.body()).isEqualTo("none");
@@ -153,7 +153,7 @@ class SessionConfigIT {
             @GetMapping("/put")
             String put(HttpSession session, @RequestParam String value) {
                 session.setAttribute("value", value);
-                return "ok";
+                return session.getId();
             }
 
             @GetMapping("/get")
