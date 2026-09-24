@@ -1,4 +1,4 @@
-package com.openframe.delivery.sweep;
+package com.openframe.delivery.track;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
@@ -33,6 +33,10 @@ class DeliveryCloserTest {
 
     private static final String DELIVERY_ID = "CLIENT_UNINSTALL:openframe-client:mach-42";
     private static final String REASON = "machine gone";
+    private static final String TARGET_ID = "openframe-client";
+    private static final String MACHINE_ID = "mach-42";
+    private static final String DISPATCH_ID = "d-1";
+    private static final String ERROR = "download failed";
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliverySpecRegistry registry;
@@ -107,6 +111,33 @@ class DeliveryCloserTest {
         assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.FAILED);
         verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.TIMEOUT);
         verifyNoInteractions(spec);
+    }
+
+    @Test
+    void failReported_openRowOfThisDispatch_rowFailedMetricCountedSpecNotified() {
+        // setup
+        when(repository.markFailed(DELIVERY_ID, DISPATCH_ID, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, ERROR, now, now.plusSeconds(TTL))).thenReturn(true);
+        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.of(delivery));
+        doReturn(Optional.of(spec)).when(registry).find(DeliveryType.CLIENT_UNINSTALL);
+
+        // execution
+        closer.failReported(DeliveryType.CLIENT_UNINSTALL, TARGET_ID, MACHINE_ID, DISPATCH_ID, ERROR, now);
+
+        // verifications
+        verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.AGENT_ERROR);
+        verify(spec).onFailed(delivery, DeliveryFailure.AGENT_ERROR);
+    }
+
+    @Test
+    void failReported_rowOfAnotherDispatchOrClosed_nothingRecorded() {
+        // setup
+        when(repository.markFailed(DELIVERY_ID, DISPATCH_ID, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, ERROR, now, now.plusSeconds(TTL))).thenReturn(false);
+
+        // execution
+        closer.failReported(DeliveryType.CLIENT_UNINSTALL, TARGET_ID, MACHINE_ID, DISPATCH_ID, ERROR, now);
+
+        // verifications
+        verifyNoInteractions(metrics, registry, spec);
     }
 
     @Test

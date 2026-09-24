@@ -275,7 +275,7 @@ public class KnowledgeBaseService {
     private CountedGenericQueryResult<KnowledgeBaseItem> queryMixed(
             KnowledgeBaseFilterCriteria filter, String search,
             List<String> restrictToItemIds, CursorPaginationCriteria normalized) {
-        boolean isFirstPage = !normalized.hasCursor();
+        String cursor = normalized.getCursor();
         int limit = normalized.getLimit();
 
         List<KnowledgeBaseItem> allFolders = repository.findFoldersForParent(
@@ -285,19 +285,29 @@ public class KnowledgeBaseService {
                 KnowledgeBaseItemType.ARTICLE, restrictToItemIds, filter.getStatuses());
         long totalCount = allFolders.size() + articleCount;
 
-        List<KnowledgeBaseItem> displayedFolders = isFirstPage
-                ? (allFolders.size() > limit ? allFolders.subList(0, limit) : allFolders)
+        // Folders come first, then articles. A cursor pointing at a folder continues the folder list;
+        // any other cursor is an article cursor and the folders have already been served.
+        int folderCursorIndex = indexOfId(allFolders, cursor);
+        boolean inFolders = cursor == null || folderCursorIndex >= 0;
+        List<KnowledgeBaseItem> remainingFolders = inFolders
+                ? allFolders.subList(folderCursorIndex + 1, allFolders.size())
                 : List.of();
-        boolean foldersTruncated = isFirstPage && allFolders.size() > displayedFolders.size();
+        List<KnowledgeBaseItem> displayedFolders = remainingFolders.size() > limit
+                ? remainingFolders.subList(0, limit)
+                : remainingFolders;
+        boolean foldersTruncated = remainingFolders.size() > displayedFolders.size();
 
         int articleLimit = Math.max(0, limit - displayedFolders.size());
+        String articleCursor = inFolders ? null : cursor;
         PagedArticles paged = articleLimit > 0
                 ? fetchArticlesPage(filter.getParentId(), search,
-                        restrictToItemIds, filter.getStatuses(), normalized.getCursor(), articleLimit)
+                        restrictToItemIds, filter.getStatuses(), articleCursor, articleLimit)
                 : new PagedArticles(List.of(), false);
 
         List<KnowledgeBaseItem> combined = Stream.concat(displayedFolders.stream(), paged.items().stream()).toList();
-        boolean hasNextPage = paged.hasNextPage() || foldersTruncated;
+        // A page filled by folders alone still has a next page when articles follow them.
+        boolean articlesPending = articleLimit == 0 && inFolders && articleCount > 0;
+        boolean hasNextPage = paged.hasNextPage() || foldersTruncated || articlesPending;
         PageInfo pageInfo = buildPageInfo(combined, hasNextPage, normalized.hasCursor());
 
         return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
@@ -305,6 +315,10 @@ public class KnowledgeBaseService {
                 .pageInfo(pageInfo)
                 .filteredCount((int) totalCount)
                 .build();
+    }
+
+    private static int indexOfId(List<KnowledgeBaseItem> items, String id) {
+        return items.stream().map(KnowledgeBaseItem::getId).toList().indexOf(id);
     }
 
     private CountedGenericQueryResult<KnowledgeBaseItem> queryFoldersOnly(

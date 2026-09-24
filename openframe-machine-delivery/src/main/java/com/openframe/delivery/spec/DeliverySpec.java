@@ -4,7 +4,7 @@ import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 
-public interface DeliverySpec<S extends DeliverySeed, P> {
+public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload> {
 
     DeliveryType getType();
 
