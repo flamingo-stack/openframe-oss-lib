@@ -3,6 +3,9 @@ package com.openframe.api.service.rmm.fleet;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.tool.ToolConnection;
+import com.openframe.data.document.tool.ToolType;
+import com.openframe.data.repository.tool.ToolConnectionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -21,6 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import static org.apache.commons.lang3.StringUtils.firstNonBlank;
+import static org.apache.commons.lang3.StringUtils.isNumeric;
 import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
 
@@ -37,6 +41,7 @@ public class DeviceHostInventoryLoader {
     private final FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
     private final CorrelatedHostSoftwareCache hostSoftwareCache;
+    private final ToolConnectionRepository toolConnectionRepository;
 
     public HostInventory load(FleetMdmClient fleet, String machineId) {
         Machine machine = requireMachine(machineId);
@@ -51,6 +56,17 @@ public class DeviceHostInventoryLoader {
     }
 
     private Optional<Long> findHostId(FleetMdmClient fleet, Machine machine) {
+        return connectedHostId(machine).or(() -> searchHostId(fleet, machine));
+    }
+
+    private Optional<Long> connectedHostId(Machine machine) {
+        return toolConnectionRepository.findByMachineIdAndToolType(machine.getMachineId(), ToolType.FLEET_MDM)
+                .map(ToolConnection::getAgentToolId)
+                .filter(agentToolId -> isNumeric(agentToolId))
+                .map(Long::valueOf);
+    }
+
+    private Optional<Long> searchHostId(FleetMdmClient fleet, Machine machine) {
         String lookupKey = firstNonBlank(machine.getOsUuid(), machine.getSerialNumber(), machine.getHostname());
         if (!hasText(lookupKey)) {
             return Optional.empty();
