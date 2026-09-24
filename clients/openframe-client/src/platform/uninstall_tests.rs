@@ -1,4 +1,4 @@
-use super::remove_binary_siblings;
+use super::{remove_binary_siblings, remove_orbit_dir};
 use std::fs;
 use std::path::Path;
 
@@ -73,4 +73,24 @@ fn removes_update_leftovers_next_to_unix_binary() {
 fn missing_directory_is_ignored() {
     let dir = tempfile::tempdir().unwrap();
     remove_binary_siblings(&dir.path().join("missing").join("openframe-client"));
+}
+
+#[tokio::test]
+async fn removes_orbit_directory_with_enrollment_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let orbit = dir.path().join("orbit");
+    fs::create_dir_all(orbit.join("osquery.db")).unwrap();
+    touch(&orbit, "secret-orbit-node-key.txt");
+    touch(&orbit.join("osquery.db"), "CURRENT");
+
+    remove_orbit_dir(&orbit).await;
+
+    assert!(!orbit.exists());
+    assert!(dir.path().exists());
+}
+
+#[tokio::test]
+async fn missing_orbit_directory_is_ignored() {
+    let dir = tempfile::tempdir().unwrap();
+    remove_orbit_dir(&dir.path().join("orbit")).await;
 }
