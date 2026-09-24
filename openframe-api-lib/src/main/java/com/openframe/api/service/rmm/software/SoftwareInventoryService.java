@@ -23,6 +23,7 @@ import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.FleetTenantHeader;
+import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
@@ -46,7 +47,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
@@ -106,8 +109,10 @@ public class SoftwareInventoryService {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
 
-        List<SoftwareResponse> all = fetchAllTitles(search, vulnerable);
-        enrichRealDevicesCount(all);
+        List<SoftwareTitle> titles = fetchAllTitles(search, vulnerable);
+        Map<Long, String> titleIdByVersionId = titleIdByVersionId(titles);
+        List<SoftwareResponse> all = mapTitles(titles);
+        enrichDevicesCountFromHosts(all, titleIdByVersionId);
         List<SoftwareResponse> withDevices = all.stream()
                 .filter(row -> deviceCount(row) > 0)
                 .toList();
@@ -115,6 +120,19 @@ public class SoftwareInventoryService {
                 ? withDevices
                 : withDevices.stream().sorted(comparatorFor(field, desc)).toList();
         return paginateList(ordered, page, perPage);
+    }
+
+    private void enrichDevicesCountFromHosts(List<SoftwareResponse> rows, Map<Long, String> titleIdByVersionId) {
+        FleetMdmClient client = fleet();
+        deviceCountEnricher.enrichFromHostSoftware(rows, client::searchHosts,
+                software -> titleIdOf(software, titleIdByVersionId),
+                SoftwareResponse::getId, SoftwareResponse::setDevicesCount);
+    }
+
+    private static Stream<String> titleIdOf(FleetSoftware software, Map<Long, String> titleIdByVersionId) {
+        Long versionId = software.getId();
+        String titleId = titleIdByVersionId.get(versionId);
+        return Stream.ofNullable(titleId);
     }
 
     private static int deviceCount(SoftwareResponse row) {
@@ -140,8 +158,8 @@ public class SoftwareInventoryService {
     }
 
 
-    private List<SoftwareResponse> fetchAllTitles(String search, Boolean vulnerable) {
-        List<SoftwareResponse> all = new ArrayList<>();
+    private List<SoftwareTitle> fetchAllTitles(String search, Boolean vulnerable) {
+        List<SoftwareTitle> all = new ArrayList<>();
         int page = 0;
         while (all.size() < TITLES_FETCH_CAP) {
             SoftwareTitleRequest request = SoftwareTitleRequest.builder()
@@ -149,10 +167,11 @@ public class SoftwareInventoryService {
                     .vulnerable(vulnerable)
                     .build();
             SoftwareTitlesResponse response = fleet().listSoftwareTitles(request);
-            all.addAll(mapTitles(response));
+            List<SoftwareTitle> batch = titlesOf(response);
+            all.addAll(batch);
             boolean hasNext = response.getMeta() != null
                     && Boolean.TRUE.equals(response.getMeta().getHasNextResults());
-            if (!hasNext || response.getSoftwareTitles() == null || response.getSoftwareTitles().isEmpty()) {
+            if (!hasNext || batch.isEmpty()) {
                 break;
             }
             page++;
@@ -160,12 +179,35 @@ public class SoftwareInventoryService {
         return all;
     }
 
-    private static List<SoftwareResponse> mapTitles(SoftwareTitlesResponse response) {
-        return response.getSoftwareTitles() == null ? List.of()
-                : response.getSoftwareTitles().stream()
-                        .map(FleetSoftwareMapper::toResponse)
-                        .filter(Objects::nonNull)
-                        .toList();
+    private static List<SoftwareResponse> mapTitles(List<SoftwareTitle> titles) {
+        return titles.stream()
+                .map(FleetSoftwareMapper::toResponse)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private static List<SoftwareTitle> titlesOf(SoftwareTitlesResponse response) {
+        List<SoftwareTitle> titles = response.getSoftwareTitles();
+        return isEmpty(titles) ? List.of() : titles;
+    }
+
+    private static Map<Long, String> titleIdByVersionId(List<SoftwareTitle> titles) {
+        return titles.stream()
+                .filter(SoftwareInventoryService::hasIdAndVersions)
+                .flatMap(SoftwareInventoryService::versionIdToTitleId)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (first, second) -> first));
+    }
+
+    private static boolean hasIdAndVersions(SoftwareTitle title) {
+        return title.getId() != null && !isEmpty(title.getVersions());
+    }
+
+    private static Stream<Map.Entry<Long, String>> versionIdToTitleId(SoftwareTitle title) {
+        String titleId = title.getId().toString();
+        return title.getVersions().stream()
+                .map(SoftwareTitleVersion::getId)
+                .filter(Objects::nonNull)
+                .map(versionId -> Map.entry(versionId, titleId));
     }
 
     private static Comparator<SoftwareResponse> comparatorFor(String field, boolean desc) {
@@ -333,7 +375,8 @@ public class SoftwareInventoryService {
     public SoftwareFilters getSoftwareFilters(String search) {
         // Facet counts don't depend on the enriched devicesCount, so bypass enrichRealDevicesCount
         // here — it would fire N Fleet /hosts lookups just to produce numbers we don't use.
-        List<SoftwareResponse> titles = fetchAllTitles(search, null);
+        List<SoftwareTitle> fetched = fetchAllTitles(search, null);
+        List<SoftwareResponse> titles = mapTitles(fetched);
         return SoftwareFilters.builder()
                 .sources(facet(titles, SoftwareResponse::getSource))
                 .versionStatuses(facet(titles, SoftwareResponse::getVersionStatus))
