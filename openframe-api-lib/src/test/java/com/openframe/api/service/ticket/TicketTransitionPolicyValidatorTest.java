@@ -1,6 +1,7 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
+import com.openframe.api.exception.ticket.TicketStatusLockedByApprovalException;
 import com.openframe.api.service.ticket.spi.TicketClientConversationGate;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketResolver;
@@ -22,7 +23,11 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -34,6 +39,7 @@ import static org.mockito.Mockito.when;
 class TicketTransitionPolicyValidatorTest {
 
     private static final String TICKET_ID = "ticket-1";
+    private static final String APPROVAL_ID = "approval-1";
 
     @Mock private TicketStatusDefinitionRepository statusRepository;
     @Mock private TicketStatusHistoryRepository historyRepository;
@@ -145,6 +151,89 @@ class TicketTransitionPolicyValidatorTest {
         // execution + verifications
         assertThatThrownBy(() -> validator.validateAndResolve(closedTicket(resolved), aiAssistance.getId()))
                 .isInstanceOf(InvalidTicketTransitionException.class);
+    }
+
+    @Test
+    void validateAndResolve_techRequiredWithPendingApproval_rejectedNamingTheRequest() {
+        // setup
+        when(statusRepository.findById(inProgress.getId())).thenReturn(Optional.of(inProgress));
+        when(conversationGate.findPendingApprovalRequestId(TICKET_ID)).thenReturn(Optional.of(APPROVAL_ID));
+        Ticket ticket = closedTicket(techRequired);
+
+        // execution
+        TicketStatusLockedByApprovalException ex = assertThrows(TicketStatusLockedByApprovalException.class,
+                () -> validator.validateAndResolve(ticket, inProgress.getId()));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("Ticket status is locked while approval request approval-1 "
+                + "is pending. Approve or reject it before changing the status.");
+        assertThat(ex.getExtensions())
+                .containsEntry("ticketId", TICKET_ID)
+                .containsEntry("approvalRequestId", APPROVAL_ID);
+    }
+
+    @Test
+    void validateAndResolve_techRequiredWithPendingApproval_sameStatusStillPasses() {
+        // setup
+        when(statusRepository.findById(techRequired.getId())).thenReturn(Optional.of(techRequired));
+        Ticket ticket = closedTicket(techRequired);
+
+        // execution
+        TicketStatusDefinition target = validator.validateAndResolve(ticket, techRequired.getId());
+
+        // verifications
+        assertThat(target).isEqualTo(techRequired);
+        verifyNoInteractions(conversationGate);
+    }
+
+    @Test
+    void validateAndResolve_techRequiredWithoutPendingApproval_allowed() {
+        // setup
+        when(statusRepository.findById(resolved.getId())).thenReturn(Optional.of(resolved));
+        when(conversationGate.findPendingApprovalRequestId(TICKET_ID)).thenReturn(Optional.empty());
+        Ticket ticket = closedTicket(techRequired);
+
+        // execution + verifications
+        assertThatCode(() -> validator.validateAndResolve(ticket, resolved.getId()))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validateAndResolve_customStatusTicket_pendingApprovalNotConsulted() {
+        // setup
+        when(statusRepository.findById(resolved.getId())).thenReturn(Optional.of(resolved));
+        Ticket ticket = closedTicket(inProgress);
+
+        // execution
+        validator.validateAndResolve(ticket, resolved.getId());
+
+        // verifications
+        verify(conversationGate, never()).findPendingApprovalRequestId(TICKET_ID);
+    }
+
+    @Test
+    void validateAndResolve_noGateDeployed_techRequiredMovesFreely() {
+        // setup
+        when(statusRepository.findById(resolved.getId())).thenReturn(Optional.of(resolved));
+        when(gateProvider.getIfAvailable()).thenReturn(null);
+        Ticket ticket = closedTicket(techRequired);
+
+        // execution + verifications
+        assertThatCode(() -> validator.validateAndResolve(ticket, resolved.getId()))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void allowedNext_techRequiredWithPendingApproval_nothingOffered() {
+        // setup
+        when(conversationGate.findPendingApprovalRequestId(TICKET_ID)).thenReturn(Optional.of(APPROVAL_ID));
+
+        // execution
+        List<TicketStatusDefinition> next = validator.allowedNext(closedTicket(techRequired));
+
+        // verifications
+        assertThat(next).isEmpty();
+        verifyNoInteractions(statusRepository);
     }
 
     private Ticket closedTicket(TicketStatusDefinition status) {
