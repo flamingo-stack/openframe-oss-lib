@@ -27,12 +27,6 @@ public class MongoIndexConfig {
      */
     private static final String SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX = "script_schedules_tenant_name_notDeleted_unique";
 
-    /**
-     * Partial-unique index on {@code tenant_keys}: at most one ACTIVE signing key per tenant.
-     * Inactive (rotated-out) keys are excluded so they can pile up freely.
-     */
-    private static final String TENANT_KEYS_ACTIVE_UNIQUE_INDEX = "tenant_keys_tenant_active_unique";
-
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -98,22 +92,6 @@ public class MongoIndexConfig {
                         .named(SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX)
                         .partial(PartialIndexFilter.of(Criteria.where("status")
                                 .in(ScriptStatus.ACTIVE.name(), ScriptStatus.ARCHIVED.name()))));
-
-        // Tenant signing keys: TenantKeyService creates a key on first use with a check-then-insert,
-        // so concurrent first requests used to create two active keys (kid mismatches). This index
-        // makes the loser's insert fail with DuplicateKeyException, which the service handles.
-        // Guarded: a database that still holds duplicates must not fail startup — it logs instead,
-        // and the index is created on the first boot after the duplicates are deactivated.
-        try {
-            mongoTemplate.indexOps("tenant_keys").ensureIndex(
-                    new Index().on("tenantId", Sort.Direction.ASC)
-                            .unique()
-                            .named(TENANT_KEYS_ACTIVE_UNIQUE_INDEX)
-                            .partial(PartialIndexFilter.of(Criteria.where("active").is(true))));
-        } catch (Exception e) {
-            log.error("Could not create unique index '{}' on tenant_keys - deactivate duplicate active keys per tenant: {}",
-                    TENANT_KEYS_ACTIVE_UNIQUE_INDEX, e.getMessage());
-        }
     }
 
     private void dropStaleIndex(String collection, String indexName) {
