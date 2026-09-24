@@ -4,6 +4,9 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.fleet.HostInventory.CveHit;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.tool.ToolConnection;
+import com.openframe.data.document.tool.ToolType;
+import com.openframe.data.repository.tool.ToolConnectionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -52,6 +55,7 @@ class DeviceHostInventoryLoaderTest {
     @Mock private FleetHostMachineResolver hostMachineResolver;
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private CorrelatedHostSoftwareCache hostSoftwareCache;
+    @Mock private ToolConnectionRepository toolConnectionRepository;
 
     @Captor private ArgumentCaptor<Function<HostSearchRequest, List<Host>>> hostSearchCaptor;
 
@@ -94,6 +98,55 @@ class DeviceHostInventoryLoaderTest {
         // verifications
         assertThat(inventory.getTitles()).isEmpty();
         verifyNoInteractions(fleet);
+    }
+
+    @Test
+    void load_fleetConnectionKnown_hostTakenFromItWithoutSearch() {
+        // setup
+        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
+        stubFleetConnection(String.valueOf(HOST_ID));
+        stubHostSoftwarePage(0, false, title(10L, "Google Chrome", "apps", "120.0"));
+        stubCorrelatedSoftware();
+
+        // execution
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
+
+        // verifications
+        assertThat(inventory.getTitles()).extracting(HostSoftwareTitle::getName).containsExactly("Google Chrome");
+        verify(fleet, never()).searchHosts(OS_UUID);
+        verifyNoInteractions(hostMachineResolver);
+    }
+
+    @Test
+    void load_connectedHostGoneFromFleet_emptyInventory() {
+        // setup
+        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
+        stubFleetConnection(String.valueOf(HOST_ID));
+        when(fleet.listHostSoftware(HOST_ID, 0, FETCH_PAGE_SIZE)).thenReturn(null);
+        when(hostSoftwareCache.softwareByHostId(any())).thenReturn(Map.of());
+
+        // execution
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
+
+        // verifications
+        assertThat(inventory.getTitles()).isEmpty();
+        assertThat(inventory.hits()).isEmpty();
+    }
+
+    @Test
+    void load_fleetConnectionWithoutNumericHostId_fallsBackToSearch() {
+        // setup
+        stubCorrelatedHost();
+        stubFleetConnection("unresolved-agent-id");
+        stubHostSoftwarePage(0, false, title(10L, "Google Chrome", "apps", "120.0"));
+        stubCorrelatedSoftware();
+
+        // execution
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
+
+        // verifications
+        assertThat(inventory.getTitles()).extracting(HostSoftwareTitle::getName).containsExactly("Google Chrome");
+        verify(fleet).searchHosts(OS_UUID);
     }
 
     @Test
@@ -183,6 +236,15 @@ class DeviceHostInventoryLoaderTest {
         when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
         when(fleet.searchHosts(OS_UUID)).thenReturn(List.of(host));
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+    }
+
+    private void stubFleetConnection(String agentToolId) {
+        ToolConnection connection = new ToolConnection();
+        connection.setMachineId(MACHINE_ID);
+        connection.setToolType(ToolType.FLEET_MDM);
+        connection.setAgentToolId(agentToolId);
+        when(toolConnectionRepository.findByMachineIdAndToolType(MACHINE_ID, ToolType.FLEET_MDM))
+                .thenReturn(Optional.of(connection));
     }
 
     private void stubCorrelatedHost() {
