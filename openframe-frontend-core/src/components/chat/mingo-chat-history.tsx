@@ -22,17 +22,17 @@ export interface MingoChatHistoryProps {
   activeDialogId?: string;
   /** Open a dialog. */
   onSelectDialog?: (id: string) => void;
-  /** Request rename — enables the row "Rename chat" action. The host opens
+  /** Request rename — enables the row "Rename Chat" action. The host opens
    *  the Rename modal; the list does no inline editing. */
   onRequestRename?: (dialog: DialogItem) => void;
-  /** Request archive — enables the row "Archive chat" action. The host opens
+  /** Request archive — enables the row "Archive Chat" action. The host opens
    *  the Archive confirmation modal. */
   onRequestArchive?: (dialog: DialogItem) => void;
-  /** Request a shareable link — enables the row "Copy chat link" action. The host
+  /** Request a shareable link — enables the row "Copy Chat Link" action. The host
    *  owns the URL shape and the copy itself (the list knows neither the app's
    *  routes nor whether a clipboard is available). */
   onRequestCopyLink?: (dialog: DialogItem) => void;
-  /** Request context compaction — enables the row "Compact chat memory" action. */
+  /** Request context compaction — enables the row "Compact Chat Memory" action. */
   onRequestCompact?: (dialog: DialogItem) => void;
   /** Current server-side search term. Drives the "No chats found" empty state;
    *  the search INPUT lives in the panel header, not in this list. The host

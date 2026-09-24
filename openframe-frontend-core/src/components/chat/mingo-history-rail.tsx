@@ -29,13 +29,13 @@ export interface MingoHistoryRailProps {
    *  the welcome. Rendered as the pinned "Start New Chat" button above the list,
    *  in every state (including the no-chats empty state). */
   onNewChat?: () => void;
-  /** Request rename — enables the row "Rename chat" action. */
+  /** Request rename — enables the row "Rename Chat" action. */
   onRequestRename?: (dialog: DialogItem) => void;
-  /** Request archive — enables the row "Archive chat" action. */
+  /** Request archive — enables the row "Archive Chat" action. */
   onRequestArchive?: (dialog: DialogItem) => void;
-  /** Request a shareable link — enables the row "Copy chat link" action. */
+  /** Request a shareable link — enables the row "Copy Chat Link" action. */
   onRequestCopyLink?: (dialog: DialogItem) => void;
-  /** Request context compaction — enables the row "Compact chat memory" action. */
+  /** Request context compaction — enables the row "Compact Chat Memory" action. */
   onRequestCompact?: (dialog: DialogItem) => void;
   /** Ownership scope shown as a two-state "My Chats / All Chats" selector
    *  between "Start New Chat" and the list. Rendered only when BOTH `scope`

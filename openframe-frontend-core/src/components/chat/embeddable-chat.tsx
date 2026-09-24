@@ -249,9 +249,9 @@ export interface EmbeddableChatProps {
    *
    * Same shape an adapter reports through `UnifiedChatState.dialogCapabilities`
    * (`ChatDialogCapabilities`) — one type, whether the list is host-owned or
-   * adapter-owned. `onCopyLink` adds "Copy chat link" to the header ⋯ menu and
+   * adapter-owned. `onCopyLink` adds "Copy Chat Link" to the header ⋯ menu and
    * every row menu; the host owns the URL shape and the clipboard write.
-   * `compactDialog` adds "Compact chat memory" to the same menus.
+   * `compactDialog` adds "Compact Chat Memory" to the same menus.
    */
   mingoDialogCapabilities?: ChatDialogCapabilities;
 

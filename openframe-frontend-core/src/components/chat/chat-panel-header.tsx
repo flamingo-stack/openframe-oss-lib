@@ -42,13 +42,13 @@ export interface ChatPanelHeaderProps {
   onClose: () => void;
   /** Restore/unarchive — renders the refresh button (archived view only). */
   onRestore?: () => void;
-  /** Rename — adds the "Rename chat" item to the ⋯ menu. */
+  /** Rename — adds the "Rename Chat" item to the ⋯ menu. */
   onRename?: () => void;
-  /** Archive — adds the "Archive chat" item to the ⋯ menu. */
+  /** Archive — adds the "Archive Chat" item to the ⋯ menu. */
   onArchive?: () => void;
-  /** Compact — adds the "Compact chat memory" item to the ⋯ menu. */
+  /** Compact — adds the "Compact Chat Memory" item to the ⋯ menu. */
   onCompact?: () => void;
-  /** Copy a shareable link to the open conversation — adds the "Copy chat link"
+  /** Copy a shareable link to the open conversation — adds the "Copy Chat Link"
    *  item to the ⋯ menu. The host owns the URL and the copy. */
   onCopyLink?: () => void;
   /** Open the Chat Archive page — renders the clock button (list view only). */

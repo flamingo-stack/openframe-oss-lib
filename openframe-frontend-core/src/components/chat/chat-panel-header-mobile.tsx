@@ -4,7 +4,7 @@ import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon, ClockHistoryIcon, XmarkIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
-import { chatDialogMenuItems } from './chat-dialog-menu-items';
+import { chatDialogMenuItems, chatMenuIconClassName } from './chat-dialog-menu-items';
 import type { ChatPanelHeaderProps } from './chat-panel-header';
 
 export interface ChatPanelHeaderMobileProps extends ChatPanelHeaderProps {
@@ -52,12 +52,12 @@ export function ChatPanelHeaderMobile({
       onOpenArchive && {
         id: 'open-archive',
         label: 'Chat Archive',
-        icon: <ClockHistoryIcon className="h-full w-full" />,
+        icon: <ClockHistoryIcon className={chatMenuIconClassName} />,
         onClick: onOpenArchive,
       },
     isArchivedView && onRestore && { id: 'unarchive', label: 'Unarchive Chat', onClick: onRestore },
     ...(isArchivedView ? [] : chatDialogMenuItems({ onCopyLink, onRename, onCompact, onArchive })),
-  ].filter(Boolean) as ActionsMenuItem[];
+  ].filter((item): item is ActionsMenuItem => !!item);
 
   return (
     <div
