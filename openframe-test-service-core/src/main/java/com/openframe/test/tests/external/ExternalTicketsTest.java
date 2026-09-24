@@ -48,25 +48,41 @@ public class ExternalTicketsTest extends ExternalApiBaseTest {
 
     private static final String UNKNOWN_ID = "000000000000000000000000";
     private static final String ARCHIVED_KIND = "ARCHIVED";
+    private static final String RESOLVED_KIND = "RESOLVED";
 
     private static TicketResponse created;
     private static TicketNoteResponse note;
 
-    /** Archive what we created; there is no delete, so this is as clean as the contract allows. */
+    /**
+     * Archive what we created; there is no delete, so this is as clean as the contract allows.
+     *
+     * <p>Two transitions, not one. Only RESOLVED may move to ARCHIVED — {@code TicketsTest} asserts
+     * that rule in both directions — and {@code created} is a freshly made ticket, so it is never
+     * RESOLVED. Going straight to ARCHIVED was therefore rejected on every run, silently: the call goes
+     * through {@code transitionRaw}, which asserts no status, and the catch logs at warn. Every
+     * external-api run leaked its ticket in a live status.
+     */
     @AfterAll
     public static void cleanup() {
         if (created == null) {
             return;
         }
         try {
-            ExternalTicketApi.getStatuses().stream()
-                    .filter(status -> ARCHIVED_KIND.equals(status.getKind()))
-                    .findFirst()
-                    .ifPresent(archived -> ExternalTicketApi.transitionRaw(
-                            created.getId(), archived.getId(), "extapi suite teardown"));
+            List<TicketStatusResponse> statuses = ExternalTicketApi.getStatuses();
+            transitionTo(statuses, RESOLVED_KIND);
+            transitionTo(statuses, ARCHIVED_KIND);
         } catch (Exception e) {
             log.warn("Could not archive ticket {} during teardown: {}", created.getId(), e.getMessage());
         }
+    }
+
+    /** Moves the created ticket to the system status of the given kind, if the tenant exposes one. */
+    private static void transitionTo(List<TicketStatusResponse> statuses, String kind) {
+        statuses.stream()
+                .filter(status -> kind.equals(status.getKind()))
+                .findFirst()
+                .ifPresent(target -> ExternalTicketApi.transitionRaw(
+                        created.getId(), target.getId(), "extapi suite teardown"));
     }
 
     // --- lifecycle ---------------------------------------------------------------------------
