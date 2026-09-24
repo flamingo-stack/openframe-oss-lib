@@ -29,8 +29,14 @@ public class RequestSpecHelper {
 
     /** Gateway header carrying the External API key; stripped by the gateway before the service sees it. */
     private static final String X_API_KEY = "X-API-Key";
-    /** Headers whose values are secrets and must never reach the console or the Slack run report. */
-    private static final Set<String> BLACKLISTED_HEADERS = Set.of(X_API_KEY);
+    /**
+     * Headers whose values are secrets and must never reach the console or the Slack run report.
+     *
+     * <p>Only headers. Cookies and form params are printed from RestAssured's own model and a header
+     * blacklist cannot reach them, so the session cookies and the agent's client secret are redacted in
+     * {@link Slf4jOutputStream} instead. Both mechanisms are needed; neither covers the other.
+     */
+    private static final Set<String> BLACKLISTED_HEADERS = Set.of(X_API_KEY, "Authorization", "X-Initial-Key");
 
     private static final ThreadLocal<String> baseUrl = new ThreadLocal<>();
     private static final ThreadLocal<String> bearerToken = new ThreadLocal<>();
