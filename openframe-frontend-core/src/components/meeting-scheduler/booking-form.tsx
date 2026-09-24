@@ -11,7 +11,9 @@ import {
   DECIMAL_LITERAL_RE,
   fieldTypeSpec,
   makeDeferredBookingSchema,
-  isSupportedFormField,
+  MULTI_VALUE_SEPARATOR,
+  normalizeFormFields,
+  splitMultiValue,
   type BuiltInBookingField,
   type MeetingAvailability,
   type SupportedFormFieldType,
@@ -151,6 +153,12 @@ interface ControlArgs {
 const placeholderFor = (field: ControlArgs['field']): string | undefined =>
   field.placeholder ?? fieldTypeSpec(field.type).placeholder?.(field);
 
+/** An option's display text: HubSpot's label when it differs from the submitted value. */
+const optionLabel = (field: ControlArgs['field'], value: string): string => field.optionLabels?.[value] ?? value;
+
+/** A free-text answer is sent without the whitespace a paste drags in. */
+const trimmed = (v: unknown): string => String(v ?? '').trim();
+
 /** `<input type="number">` accepts `1e3` and ` 12 `; the wire wants the
  *  decimal literal the validator checks. A value ALREADY in that shape passes
  *  verbatim (`007` included) — a long integer or a tiny decimal must not be
@@ -206,6 +214,28 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       {...register(registerName as never, { setValueAs: canonicalNumber })}
     />
   ),
+  phone: ({ field, id, registerName, error, register }) => (
+    <Input
+      id={id}
+      type="tel"
+      inputMode="tel"
+      autoComplete="tel"
+      required={field.required}
+      aria-invalid={Boolean(error)}
+      placeholder={placeholderFor(field)}
+      {...register(registerName as never, { setValueAs: trimmed })}
+    />
+  ),
+  date: ({ field, id, registerName, error, register }) => (
+    // The native picker emits exactly the wire shape (`YYYY-MM-DD`).
+    <Input
+      id={id}
+      type="date"
+      required={field.required}
+      aria-invalid={Boolean(error)}
+      {...register(registerName as never)}
+    />
+  ),
   select: ({ field, id, registerName, error, control }) => (
     <Controller
       control={control}
@@ -218,7 +248,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
           <SelectContent>
             {(field.options ?? []).map(opt => (
               <SelectItem key={opt} value={opt}>
-                {opt}
+                {optionLabel(field, opt)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -240,11 +270,41 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
           {(field.options ?? []).map(opt => (
             <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
               <RadioGroupItem id={`${id}-${opt}`} value={opt} />
-              <Label htmlFor={`${id}-${opt}`}>{opt}</Label>
+              <Label htmlFor={`${id}-${opt}`}>{optionLabel(field, opt)}</Label>
             </div>
           ))}
         </RadioGroup>
       )}
+    />
+  ),
+  multiselect: ({ field, id, registerName, error, control }) => (
+    // HubSpot's "multiple checkboxes": the answer is its `;`-joined value list,
+    // held in that wire shape so the validator and the POST see one string.
+    <Controller
+      control={control}
+      name={registerName as never}
+      render={({ field: rhf }) => {
+        const selected = splitMultiValue(rhf.value);
+        const toggle = (opt: string, on: boolean) => {
+          const next = (field.options ?? []).filter(o => (o === opt ? on : selected.includes(o)));
+          rhf.onChange(next.join(MULTI_VALUE_SEPARATOR));
+        };
+        return (
+          <div id={id} role="group" className="flex flex-col gap-[var(--spacing-system-xs)]">
+            {(field.options ?? []).map(opt => (
+              <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
+                <Checkbox
+                  id={`${id}-${opt}`}
+                  checked={selected.includes(opt)}
+                  onCheckedChange={v => toggle(opt, v === true)}
+                  aria-invalid={Boolean(error)}
+                />
+                <Label htmlFor={`${id}-${opt}`}>{optionLabel(field, opt)}</Label>
+              </div>
+            ))}
+          </div>
+        );
+      }}
     />
   ),
   checkbox: ({ field, id, registerName, error, control }) => (
@@ -344,7 +404,10 @@ export function BookingForm({
   getSignals,
 }: BookingFormProps) {
   const { formFields, legalConsent } = availability;
-  const supportedFields = useMemo(() => formFields.filter(isSupportedFormField), [formFields]);
+  // Every declared question resolved to a control (`resolveFormFieldControl`) —
+  // an unfamiliar HubSpot type is drawn as its nearest control, never dropped
+  // silently and never a reason to hide the form.
+  const supportedFields = useMemo(() => normalizeFormFields(formFields), [formFields]);
   // The DEFERRED schema in both flows: it is the wider of the two, and a strict
   // resolver is not assignable to `Resolver<BookingFormValues>`. The strict
   // schema is the server's contract — see `makeBookingSchema`'s docblock.

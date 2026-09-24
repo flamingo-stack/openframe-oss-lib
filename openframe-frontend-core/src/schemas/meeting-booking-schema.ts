@@ -86,12 +86,25 @@ export interface SchedulingLinksPayload {
   fetchedAt: string;
 }
 
+/**
+ * One declared question as the host forwards it. `type` is HubSpot's
+ * `fieldType` (the control HubSpot draws: `phonenumber`, `booleancheckbox`…)
+ * VERBATIM, and `dataType` its `type` (the stored value's kind: `string`,
+ * `enumeration`, `phone_number`…). Neither is a closed set: the widget resolves
+ * ANY pair to a control through `resolveFormFieldControl`, so a type HubSpot
+ * adds tomorrow renders as the nearest control instead of taking the form down.
+ */
 export interface MeetingFormField {
   name: string;
   label: string;
   type: string;
+  /** HubSpot's property data type — the fallback when `type` is unknown. Optional: older hosts omit it. */
+  dataType?: string;
   required: boolean;
+  /** Option VALUES (what is submitted). */
   options?: string[];
+  /** Option value → display label, when HubSpot's label differs from the value. */
+  optionLabels?: Record<string, string>;
 }
 
 /**
@@ -158,22 +171,25 @@ export type MeetingBookingErrorCode = (typeof MEETING_BOOKING_ERROR_CODES)[numbe
 // ---------------------------------------------------------------------------
 
 /**
- * THE registry of HubSpot question types the native form supports — one entry
- * per `fieldType`, and the ONLY place a type is declared. Everything else
- * derives from it: `SupportedFormFieldType` is its key union,
- * `SUPPORTED_FORM_FIELD_TYPES` its keys, `FORM_FIELD_TYPES_WITH_OPTIONS` the
- * entries that carry `options`, and `makeBookingSchema` maps each answer
- * through the entry's validator. The widget's control table
- * (`booking-form.tsx`) is a `Record` over the same key union, so a type added
- * here without a control is a COMPILE error, not a silent gap.
+ * THE registry of CONTROLS the native form can draw — one entry per control,
+ * and the ONLY place a control is declared. Everything else derives from it:
+ * `SupportedFormFieldType` is its key union, `SUPPORTED_FORM_FIELD_TYPES` its
+ * keys, and `makeBookingSchema` maps each answer through the entry's
+ * validator. The widget's control table (`booking-form.tsx`) is a `Record`
+ * over the same key union, so a control added here without a renderer is a
+ * COMPILE error, not a silent gap.
  *
- * Fail-closed: a `fieldType` with no entry makes the link "not natively
- * bookable" and the card falls back to the HubSpot escape hatch.
+ * These are controls, NOT HubSpot's type vocabulary. A HubSpot question
+ * reaches a control through `resolveFormFieldControl` (exact `fieldType`, then
+ * its data type, then a generic fallback), so the open set of HubSpot types
+ * maps onto this closed set of controls and no type is ever "unsupported".
+ * The one thing that still falls back to HubSpot's own page is a REQUIRED
+ * question no control can answer (a file upload) — see `blocksNativeBooking`.
  *
- * Every string type rides the wire as a STRING (HubSpot's book endpoint takes
- * `{ name, value: string }`); `checkbox` is the one boolean. `number` is a
- * Number property validated as a decimal literal — what `<input type="number">`
- * emits and what the property stores.
+ * Every string control rides the wire as a STRING (HubSpot's book endpoint
+ * takes `{ name, value: string }`); `checkbox` is the one boolean. `number` is
+ * a decimal literal, `multiselect` HubSpot's `;`-joined enumeration value,
+ * `date` an ISO `YYYY-MM-DD`.
  */
 export interface FormFieldTypeSpec {
   /** The answer's wire shape, which also decides how required/optional wraps it. */
@@ -199,6 +215,32 @@ const optionValidator: FormFieldTypeSpec['validator'] = (field, base) =>
 /** The wire shape of a number answer — what the form canonicalises TO and the validator checks. */
 export const DECIMAL_LITERAL_RE = /^-?\d+(\.\d+)?$/;
 
+/** HubSpot's separator for a multi-value enumeration (`a;b;c`). */
+export const MULTI_VALUE_SEPARATOR = ';';
+
+/** Split a multiselect answer into its values (empty string → none). */
+export const splitMultiValue = (value: unknown): string[] =>
+  typeof value === 'string' && value ? value.split(MULTI_VALUE_SEPARATOR) : [];
+
+/**
+ * A phone answer: digits with the punctuation people actually type (`+1 (415)
+ * 555-2671`, `020 7946 0958 ext. 12`). Deliberately a SHAPE check, not a
+ * numbering-plan check — HubSpot stores the string as typed, and rejecting a
+ * valid number we failed to parse is worse than accepting an odd one.
+ */
+export const PHONE_RE = /^\+?[\d\s().\-/]+(?:\s*(?:x|ext\.?)\s*\d+)?$/i;
+const PHONE_MIN_DIGITS = 5;
+const PHONE_MAX_DIGITS = 20;
+const phoneDigits = (v: string) => v.replace(/\D/g, '').length;
+
+/** A date answer as `<input type="date">` emits it. */
+export const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const isRealIsoDate = (v: string) => {
+  if (!ISO_DATE_RE.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+};
+
 export const FORM_FIELD_TYPES = {
   text: {
     kind: 'string',
@@ -222,8 +264,33 @@ export const FORM_FIELD_TYPES = {
         .max(32, { message: `${field.label} is too long` })
         .regex(DECIMAL_LITERAL_RE, { message: `${field.label} must be a number` }),
   },
+  phone: {
+    kind: 'string',
+    hasOptions: false,
+    validator: (field, base) =>
+      base
+        .max(40, { message: `${field.label} is too long` })
+        .refine(
+          v => !v || (PHONE_RE.test(v) && phoneDigits(v) >= PHONE_MIN_DIGITS && phoneDigits(v) <= PHONE_MAX_DIGITS),
+          { message: `Please enter a valid phone number for ${field.label}` },
+        ),
+    placeholder: field => `Enter ${field.label}`,
+  },
+  date: {
+    kind: 'string',
+    hasOptions: false,
+    validator: (field, base) => base.refine(v => !v || isRealIsoDate(v), { message: `${field.label} must be a date` }),
+  },
   select: { kind: 'string', hasOptions: true, validator: optionValidator },
   radio: { kind: 'string', hasOptions: true, validator: optionValidator },
+  multiselect: {
+    kind: 'string',
+    hasOptions: true,
+    validator: (field, base) =>
+      base.refine(v => splitMultiValue(v).every(part => (field.options ?? []).includes(part)), {
+        message: `Please choose valid options for ${field.label}`,
+      }),
+  },
   checkbox: { kind: 'boolean', hasOptions: false, validator: () => z.boolean() },
 } as const satisfies Record<string, FormFieldTypeSpec>;
 
@@ -231,22 +298,141 @@ export type SupportedFormFieldType = keyof typeof FORM_FIELD_TYPES;
 
 export const SUPPORTED_FORM_FIELD_TYPES = Object.keys(FORM_FIELD_TYPES) as readonly SupportedFormFieldType[];
 
-/** The types whose `options` the host must forward (select, radio). */
-export const FORM_FIELD_TYPES_WITH_OPTIONS: readonly SupportedFormFieldType[] = SUPPORTED_FORM_FIELD_TYPES.filter(
-  type => FORM_FIELD_TYPES[type].hasOptions,
-);
+// ---------------------------------------------------------------------------
+// HubSpot type → control resolution (open set in, closed set out)
+// ---------------------------------------------------------------------------
 
-/** Whether a raw HubSpot field type is one whose answers come from declared options. */
-export function formFieldTypeHasOptions(type: string): boolean {
-  return (FORM_FIELD_TYPES_WITH_OPTIONS as readonly string[]).includes(type);
+/**
+ * What a HubSpot question resolves to: a drawable control, `display` (a
+ * read-only block — `html`, `calculation_*` — never rendered, never
+ * submitted) or `unanswerable` (nothing the booking POST can carry, e.g. a
+ * file upload).
+ */
+export type FormFieldResolution = SupportedFormFieldType | 'display' | 'unanswerable';
+
+/**
+ * HubSpot `fieldType` spellings → resolution. Keys are lower-cased. A spelling
+ * missing here is NOT an error: resolution falls through to the data type and
+ * then to a generic control. Add an entry only to draw a BETTER control for a
+ * type, never to make one "work".
+ *
+ * `checkbox` is absent on purpose: in HubSpot it is "multiple checkboxes" (an
+ * enumeration with options), while older links sent it for a single yes/no —
+ * `resolveFormFieldControl` decides by whether options came with it.
+ */
+const FIELD_TYPE_CONTROLS: Readonly<Record<string, FormFieldResolution>> = {
+  text: 'text',
+  textarea: 'textarea',
+  number: 'number',
+  select: 'select',
+  radio: 'radio',
+  booleancheckbox: 'checkbox',
+  phonenumber: 'phone',
+  date: 'date',
+  html: 'display',
+  file: 'unanswerable',
+};
+
+/** HubSpot property data types (`type`) → resolution, used when `fieldType` is unknown. */
+const DATA_TYPE_CONTROLS: Readonly<Record<string, FormFieldResolution>> = {
+  string: 'text',
+  number: 'number',
+  enumeration: 'select',
+  bool: 'checkbox',
+  date: 'date',
+  datetime: 'date',
+  phone_number: 'phone',
+};
+
+const hasDeclaredOptions = (field: MeetingFormField) => (field.options?.length ?? 0) > 0;
+
+/**
+ * THE one mapping from a HubSpot question to what the form does with it.
+ * Total: every input yields a resolution, so an unrecognised type can never
+ * make a link unbookable — at worst it is a text box. An option control with
+ * no options degrades to text (nothing to pick from, but still answerable).
+ */
+export function resolveFormFieldControl(field: MeetingFormField): FormFieldResolution {
+  const fieldType = (field.type ?? '').toLowerCase();
+  const withOptions = hasDeclaredOptions(field);
+  const usable = (r: FormFieldResolution | undefined): FormFieldResolution | undefined => {
+    if (!r || r === 'display' || r === 'unanswerable') return r;
+    return FORM_FIELD_TYPES[r].hasOptions && !withOptions ? 'text' : r;
+  };
+
+  if (fieldType === 'checkbox') return withOptions ? 'multiselect' : 'checkbox';
+  if (fieldType.startsWith('calculation')) return 'display';
+  // A control name resolves to itself, so resolution is IDEMPOTENT: the form
+  // resolves once to draw, then hands the resolved fields to the schema
+  // factory, which resolves again (the server rebuild resolves raw ones).
+  const asControl = Object.prototype.hasOwnProperty.call(FORM_FIELD_TYPES, fieldType)
+    ? (fieldType as SupportedFormFieldType)
+    : undefined;
+  return (
+    usable(FIELD_TYPE_CONTROLS[fieldType] ?? asControl) ??
+    usable(DATA_TYPE_CONTROLS[(field.dataType ?? '').toLowerCase()]) ??
+    (withOptions ? 'select' : 'text')
+  );
 }
 
-export function isSupportedFormField(field: MeetingFormField): field is SupportedMeetingFormField {
-  return Object.prototype.hasOwnProperty.call(FORM_FIELD_TYPES, field.type);
+/**
+ * Whether the question's `fieldType` is one the resolver maps EXPLICITLY — as
+ * opposed to guessing from its data type or falling back to text. A host logs
+ * the false case: the form still works, but a better control may be one table
+ * entry away.
+ */
+export function isRecognisedFormFieldType(type: string): boolean {
+  const t = (type ?? '').toLowerCase();
+  return (
+    t === 'checkbox' ||
+    t.startsWith('calculation') ||
+    Object.prototype.hasOwnProperty.call(FIELD_TYPE_CONTROLS, t) ||
+    Object.prototype.hasOwnProperty.call(FORM_FIELD_TYPES, t)
+  );
 }
 
-/** A declared question whose `type` is in the registry. */
-export type SupportedMeetingFormField = MeetingFormField & { type: SupportedFormFieldType };
+/** A declared question after resolution: `type` is the CONTROL, `hubspotType` what HubSpot sent. */
+export type SupportedMeetingFormField = MeetingFormField & { type: SupportedFormFieldType; hubspotType?: string };
+
+/** One question → its drawable form, or null when the form does not draw it (display / unanswerable). */
+export function normalizeFormField(
+  field: MeetingFormField & { hubspotType?: string },
+): SupportedMeetingFormField | null {
+  const control = resolveFormFieldControl(field);
+  if (control === 'display' || control === 'unanswerable') return null;
+  // A control that takes no options drops them (a `booleancheckbox` arrives
+  // with HubSpot's `true`/`false` pair), which also keeps a re-resolution of
+  // the result on the same control.
+  const normalized: SupportedMeetingFormField = {
+    ...field,
+    type: control,
+    hubspotType: field.hubspotType ?? field.type,
+  };
+  if (!FORM_FIELD_TYPES[control].hasOptions) {
+    delete normalized.options;
+    delete normalized.optionLabels;
+  }
+  return normalized;
+}
+
+/** The questions the native form draws and validates, in declared order. */
+export function normalizeFormFields(fields: readonly MeetingFormField[]): SupportedMeetingFormField[] {
+  return fields.flatMap(f => normalizeFormField(f) ?? []);
+}
+
+/** Whether the native form draws this question (false for display blocks and unanswerable questions). */
+export function isSupportedFormField(field: MeetingFormField): boolean {
+  return normalizeFormField(field) !== null;
+}
+
+/**
+ * The ONLY reason left to hand a link to HubSpot's own page: a REQUIRED
+ * question no control can answer. An optional one is simply left out — the
+ * visitor can still book, and HubSpot does not require it.
+ */
+export function blocksNativeBooking(field: MeetingFormField): boolean {
+  return field.required && resolveFormFieldControl(field) === 'unanswerable';
+}
 
 /**
  * The scheduler's fixed identity fields. HubSpot's book endpoint takes them
@@ -381,8 +567,11 @@ function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.Zod
   slot: { startTimeMs: TStart; durationMs: TDuration; timezone: TZone },
 ) {
   const answers: Record<string, z.ZodTypeAny> = {};
-  for (const field of formFields) {
-    if (!isSupportedFormField(field)) continue; // unsupported types are fail-closed at render time
+  // Resolved HERE, not by the caller: the server rebuild passes the link's raw
+  // questions, so client and server resolve every type through the same rule.
+  // Display blocks and unanswerable optional questions carry no answer.
+  const drawn = normalizeFormFields(formFields);
+  for (const field of drawn) {
     const spec: FormFieldTypeSpec = FORM_FIELD_TYPES[field.type];
     // required/optional wrapping follows the answer's wire KIND, not its type:
     // a boolean is true-or-absent, a string is non-empty-or-empty. For strings
@@ -407,7 +596,7 @@ function buildBookingSchema<TStart extends z.ZodTypeAny, TDuration extends z.Zod
   // omitting the `formFields` key entirely would skip every per-question
   // rule. When the link declares at least one required supported question,
   // the object itself is required.
-  const hasRequiredAnswers = formFields.some(f => isSupportedFormField(f) && f.required);
+  const hasRequiredAnswers = drawn.some(f => f.required);
   const answersObject = z.object(answers);
 
   return (
