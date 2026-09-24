@@ -317,8 +317,17 @@ public class SoftwareInventoryService {
                 .sorted(order)
                 .toList();
         PageResult<SoftwareResponse> result = paginateList(rows, page, perPage);
-        enrichRealDevicesCount(result.items());
+        enrichDevicesCountFromHosts(result.items());
         return result;
+    }
+
+    private void enrichDevicesCountFromHosts(List<SoftwareResponse> rows) {
+        if (isEmpty(rows)) {
+            return;
+        }
+        List<SoftwareTitle> catalog = fetchAllTitles(null, null);
+        Map<Long, String> titleIdByVersionId = titleIdByVersionId(catalog);
+        enrichDevicesCountFromHosts(rows, titleIdByVersionId);
     }
 
     private static Comparator<SoftwareResponse> deviceSoftwareOrder(SortInput sort) {

@@ -42,8 +42,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.hostSoftware;
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.title;
@@ -77,6 +77,7 @@ class SoftwareInventoryServiceTest {
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
 
     @Captor private ArgumentCaptor<List<SoftwareResponse>> pageRowsCaptor;
+    @Captor private ArgumentCaptor<Function<FleetSoftware, Stream<String>>> keysOfCaptor;
 
     private SoftwareInventoryService service;
 
@@ -510,14 +511,32 @@ class SoftwareInventoryServiceTest {
         // verifications
         assertThat(result.hasNext()).isTrue();
         assertThat(result.filteredCount()).isEqualTo(3);
-        verify(deviceCountEnricher).enrich(pageRowsCaptor.capture(), any(Function.class), any(BiConsumer.class));
+        verify(deviceCountEnricher).enrichFromHostSoftware(pageRowsCaptor.capture(), any(), any(), any(), any());
         assertThat(pageRowsCaptor.getValue())
                 .extracting(SoftwareResponse::getName)
                 .containsExactly("Google Chrome", "node");
+        verify(deviceCountEnricher, never()).enrich(anyList(), any(), any());
     }
 
     @Test
-    void listSoftwareForDevice_emptyInventory_emptyPage() {
+    void listSoftwareForDevice_pageRequested_devicesCountKeyedByCatalogTitleOfHostSoftwareVersion() {
+        // setup
+        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID))
+                .thenReturn(HostInventory.of(List.of(title(10L, "Google Chrome", "apps", "120.0")), List.of()));
+        SoftwareTitlesResponse catalog = catalog(10L, 7L);
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(catalog);
+        FleetSoftware chromeVersion = installed(7L);
+
+        // execution
+        service.listSoftwareForDevice(MACHINE_ID, null, null, FIRST_PAGE, PAGE_SIZE, null);
+
+        // verifications
+        verify(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), keysOfCaptor.capture(), any(), any());
+        assertThat(keysOfCaptor.getValue().apply(chromeVersion)).containsExactly("10");
+    }
+
+    @Test
+    void listSoftwareForDevice_emptyInventory_emptyPageWithoutCatalogOrCountLookups() {
         // setup
         when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.empty());
 
@@ -528,6 +547,8 @@ class SoftwareInventoryServiceTest {
         // verifications
         assertThat(result.items()).isEmpty();
         assertThat(result.filteredCount()).isZero();
+        verify(fleet, never()).listSoftwareTitles(any(SoftwareTitleRequest.class));
+        verifyNoInteractions(deviceCountEnricher);
     }
 
     @Test
@@ -546,6 +567,18 @@ class SoftwareInventoryServiceTest {
 
     private void stubInventory(List<HostSoftwareTitle> titles, List<FleetSoftware> hostSoftware) {
         when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.of(titles, hostSoftware));
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(new SoftwareTitlesResponse());
+    }
+
+    private static SoftwareTitlesResponse catalog(long titleId, long versionId) {
+        SoftwareTitleVersion version = new SoftwareTitleVersion();
+        version.setId(versionId);
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(titleId);
+        title.setVersions(List.of(version));
+        SoftwareTitlesResponse response = new SoftwareTitlesResponse();
+        response.setSoftwareTitles(List.of(title));
+        return response;
     }
 
     private static SoftwareTitle titleWithCves(String name, int cveCount) {

@@ -9,12 +9,14 @@ import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.FleetVulnerability;
 import com.openframe.sdk.fleetmdm.model.Host;
+import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareResponse;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
-import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,12 +24,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.hostSoftware;
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.title;
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.vulnerability;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -47,6 +51,9 @@ class DeviceHostInventoryLoaderTest {
     @Mock private DeviceService deviceService;
     @Mock private FleetHostMachineResolver hostMachineResolver;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private CorrelatedHostSoftwareCache hostSoftwareCache;
+
+    @Captor private ArgumentCaptor<Function<HostSearchRequest, List<Host>>> hostSearchCaptor;
 
     @InjectMocks private DeviceHostInventoryLoader loader;
 
@@ -103,15 +110,15 @@ class DeviceHostInventoryLoaderTest {
         // verifications
         assertThat(inventory.getTitles()).isEmpty();
         verify(fleet, never()).listHostSoftware(HOST_ID, 0, FETCH_PAGE_SIZE);
-        verify(fleet, never()).getHostVulnerabilityInventoryById(HOST_ID);
+        verifyNoInteractions(hostSoftwareCache);
     }
 
     @Test
-    void load_correlatedHost_titlesJoinedWithHostCveDetails() {
+    void load_correlatedHost_titlesJoinedWithCachedHostSoftwareCveDetails() {
         // setup
         stubCorrelatedHost();
         stubHostSoftwarePage(0, false, title(10L, "Google Chrome", "apps", "120.0", CVE_A));
-        stubHostDetails(hostSoftware("Google Chrome", "120.0", vulnerability(CVE_A, 9.8, null)));
+        stubCorrelatedSoftware(hostSoftware("Google Chrome", "120.0", vulnerability(CVE_A, 9.8, null)));
 
         // execution
         HostInventory inventory = loader.load(fleet, MACHINE_ID);
@@ -123,12 +130,45 @@ class DeviceHostInventoryLoaderTest {
     }
 
     @Test
+    void load_correlatedHost_softwareCacheFilledThroughCallersFleetClient() {
+        // setup
+        stubCorrelatedHost();
+        stubHostSoftwarePage(0, false, title(10L, "Google Chrome", "apps", "120.0"));
+        stubCorrelatedSoftware();
+        HostSearchRequest request = new HostSearchRequest();
+
+        // execution
+        loader.load(fleet, MACHINE_ID);
+
+        // verifications
+        verify(hostSoftwareCache).softwareByHostId(hostSearchCaptor.capture());
+        hostSearchCaptor.getValue().apply(request);
+        verify(fleet).searchHosts(request);
+    }
+
+    @Test
+    void load_hostAbsentFromSoftwareCache_titlesKeptWithoutCveDetails() {
+        // setup
+        stubCorrelatedHost();
+        stubHostSoftwarePage(0, false, title(10L, "Google Chrome", "apps", "120.0", CVE_A));
+        when(hostSoftwareCache.softwareByHostId(any())).thenReturn(Map.of());
+
+        // execution
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
+
+        // verifications
+        assertThat(inventory.getTitles()).extracting(HostSoftwareTitle::getName).containsExactly("Google Chrome");
+        CveHit hit = inventory.hits().findFirst().orElseThrow();
+        assertThat(inventory.detail(hit)).isEmpty();
+    }
+
+    @Test
     void load_titlesSpanTwoPages_allPagesCollected() {
         // setup
         stubCorrelatedHost();
         stubHostSoftwarePage(0, true, title(10L, "Google Chrome", "apps", "120.0"));
         stubHostSoftwarePage(1, false, title(11L, "node", "homebrew_packages", "20.1"));
-        stubHostDetails();
+        stubCorrelatedSoftware();
 
         // execution
         HostInventory inventory = loader.load(fleet, MACHINE_ID);
@@ -159,8 +199,7 @@ class DeviceHostInventoryLoaderTest {
         when(fleet.listHostSoftware(HOST_ID, page, FETCH_PAGE_SIZE)).thenReturn(response);
     }
 
-    private void stubHostDetails(FleetSoftware... software) {
-        HostVulnerabilityInventory inventory = new HostVulnerabilityInventory(HOST_ID, "host-1", null, List.of(software));
-        when(fleet.getHostVulnerabilityInventoryById(HOST_ID)).thenReturn(inventory);
+    private void stubCorrelatedSoftware(FleetSoftware... software) {
+        when(hostSoftwareCache.softwareByHostId(any())).thenReturn(Map.of(HOST_ID, List.of(software)));
     }
 }

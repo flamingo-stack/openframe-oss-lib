@@ -9,7 +9,6 @@ import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareResponse;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
-import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -37,6 +36,7 @@ public class DeviceHostInventoryLoader {
     private final DeviceService deviceService;
     private final FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
+    private final CorrelatedHostSoftwareCache hostSoftwareCache;
 
     public HostInventory load(FleetMdmClient fleet, String machineId) {
         Machine machine = requireMachine(machineId);
@@ -72,10 +72,15 @@ public class DeviceHostInventoryLoader {
         return Objects.equals(candidate.getMachineId(), machine.getMachineId());
     }
 
-    private static HostInventory loadInventory(FleetMdmClient fleet, long hostId) {
+    private HostInventory loadInventory(FleetMdmClient fleet, long hostId) {
         List<HostSoftwareTitle> titles = fetchAllTitles(fleet, hostId);
-        List<FleetSoftware> hostSoftware = fetchHostSoftware(fleet, hostId);
+        List<FleetSoftware> hostSoftware = correlatedSoftwareOf(fleet, hostId);
         return HostInventory.of(titles, hostSoftware);
+    }
+
+    private List<FleetSoftware> correlatedSoftwareOf(FleetMdmClient fleet, long hostId) {
+        Map<Long, List<FleetSoftware>> softwareByHostId = hostSoftwareCache.softwareByHostId(fleet::searchHosts);
+        return softwareByHostId.getOrDefault(hostId, List.of());
     }
 
     private static List<HostSoftwareTitle> fetchAllTitles(FleetMdmClient fleet, long hostId) {
@@ -101,14 +106,5 @@ public class DeviceHostInventoryLoader {
 
     private static boolean isLastPage(HostSoftwareResponse response) {
         return response.getMeta() == null || !Boolean.TRUE.equals(response.getMeta().getHasNextResults());
-    }
-
-    private static List<FleetSoftware> fetchHostSoftware(FleetMdmClient fleet, long hostId) {
-        HostVulnerabilityInventory host = fleet.getHostVulnerabilityInventoryById(hostId);
-        return hasSoftware(host) ? host.software() : List.of();
-    }
-
-    private static boolean hasSoftware(HostVulnerabilityInventory host) {
-        return host != null && !isEmpty(host.software());
     }
 }
