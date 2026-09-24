@@ -331,6 +331,8 @@ type AffectedSoftware {
     source: SoftwareSource
     version: String
     devicesCount: Int
+    """Distinct customers (organizations) among the affected devices — powers the "N Customers" line."""
+    customersCount: Int
     resolvedInVersion: String
 }
 
