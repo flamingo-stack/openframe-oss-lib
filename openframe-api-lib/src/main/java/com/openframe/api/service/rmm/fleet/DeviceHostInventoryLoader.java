@@ -99,6 +99,10 @@ public class DeviceHostInventoryLoader {
         return softwareByHostId.getOrDefault(hostId, List.of());
     }
 
+    public List<HostSoftwareTitle> titlesForHost(FleetMdmClient fleet, long hostId) {
+        return fetchAllTitles(fleet, hostId);
+    }
+
     private static List<HostSoftwareTitle> fetchAllTitles(FleetMdmClient fleet, long hostId) {
         List<HostSoftwareTitle> all = new ArrayList<>();
         int page = 0;
