@@ -87,6 +87,26 @@ class CustomMachineDeliveryRepositoryImplTest {
     }
 
     @Test
+    void upsertPending_rowClosedByPreviousDispatch_closingFieldsUnset() {
+        // setup
+        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).build();
+        when(mongoTemplate.getConverter()).thenReturn(converter);
+        when(mongoTemplate.tenantId()).thenReturn(TENANT_ID);
+
+        // execution
+        repository.upsertPending(delivery);
+
+        // verifications
+        verify(mongoTemplate).upsert(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class));
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("$unset")
+                .contains("ackedAt")
+                .contains("finishedAt")
+                .contains("failure")
+                .contains("error");
+    }
+
+    @Test
     void markRepublished_sameDispatchAndAttemptStillPending_attemptCountedAndTrue() {
         // setup
         UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);

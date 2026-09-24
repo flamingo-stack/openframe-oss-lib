@@ -55,12 +55,17 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         return mongoTemplate.find(query, MachineDelivery.class);
     }
 
-    // $set per field, not a replacement document: a replacement is inserted without the tenant of the scoped filter
+    // $set per field, not a replacement document: a replacement is inserted without the tenant of the scoped filter;
+    // null fields are not written, so what a previous dispatch closed the row with has to be unset explicitly
     @Override
     public void upsertPending(MachineDelivery delivery) {
         Document document = new Document();
         mongoTemplate.getConverter().write(delivery, document);
-        Update update = new Update().set(FIELD_TENANT_ID, tenantId());
+        Update update = new Update().set(FIELD_TENANT_ID, tenantId())
+                .unset(FIELD_ACKED_AT)
+                .unset(FIELD_FINISHED_AT)
+                .unset(FIELD_FAILURE)
+                .unset(FIELD_ERROR);
         document.forEach((field, value) -> setField(update, field, value));
         String id = delivery.getId();
         Query byId = new Query(Criteria.where(FIELD_ID).is(id));
