@@ -586,6 +586,60 @@ class SoftwareInventoryServiceTest {
         verify(deviceHostInventoryLoader, never()).load(fleet, MACHINE_ID);
     }
 
+    @Test
+    void getDeviceSoftwareFilters_titlesWithMixedSourcesAndSeverities_countedPerValueWithoutCountLookups() {
+        // setup
+        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.of(
+                List.of(title(10L, "Google Chrome", "apps", "120.0", CVE_CRITICAL),
+                        title(11L, "node", "homebrew_packages", "20.1", CVE_MEDIUM),
+                        title(12L, "zsh", "homebrew_packages", "5.9")),
+                List.of(hostSoftware("Google Chrome", "120.0", vulnerability(CVE_CRITICAL, 9.8, null)),
+                        hostSoftware("node", "20.1", vulnerability(CVE_MEDIUM, 5.0, null)))));
+
+        // execution
+        SoftwareFilters filters = service.getDeviceSoftwareFilters(MACHINE_ID, null);
+
+        // verifications
+        assertThat(filters.getSources())
+                .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("BREW", 2), tuple("UNMANAGED", 1));
+        assertThat(filters.getSeverities())
+                .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("CRITICAL", 1), tuple("MEDIUM", 1));
+        assertThat(filters.getVersionStatuses()).isEmpty();
+        verifyNoInteractions(deviceCountEnricher);
+        verify(fleet, never()).listSoftwareTitles(any(SoftwareTitleRequest.class));
+    }
+
+    @Test
+    void getDeviceSoftwareFilters_searchApplied_onlyMatchingTitlesCounted() {
+        // setup
+        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.of(
+                List.of(title(10L, "Google Chrome", "apps", "120.0"), title(11L, "node", "homebrew_packages", "20.1")),
+                List.of()));
+
+        // execution
+        SoftwareFilters filters = service.getDeviceSoftwareFilters(MACHINE_ID, "chrome");
+
+        // verifications
+        assertThat(filters.getSources())
+                .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("UNMANAGED", 1));
+    }
+
+    @Test
+    void getDeviceSoftwareFilters_emptyInventory_emptyFacets() {
+        // setup
+        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.empty());
+
+        // execution
+        SoftwareFilters filters = service.getDeviceSoftwareFilters(MACHINE_ID, null);
+
+        // verifications
+        assertThat(filters.getSources()).isEmpty();
+        assertThat(filters.getSeverities()).isEmpty();
+    }
+
     @SuppressWarnings("unchecked")
     private void simulateEnricherSetsCounts(Map<String, Integer> countByName) {
         org.mockito.Mockito.doAnswer(inv -> {

@@ -105,6 +105,10 @@ extend type Query {
         sort: SortInput
     ): SoftwareConnection!
 
+    """Faceted filter-option counts for one device's software — same scope as deviceSoftware(machineId, search);
+    mirrors softwareFilters. Unknown machineId → NOT_FOUND; a device with nothing installed → empty facets."""
+    deviceSoftwareFilters(machineId: String!, filter: SoftwareFilterInput, search: String): SoftwareFilters!
+
     """CVEs present on one device. One row = one CVE (not CVE × software), the same node as `vulnerabilities`.
     `affectedSoftware` is scoped to this host and populated on every row; `devicesCount` stays fleet-wide.
     Sortable fields: severity (by cvssScore, unrated last), discoveredAt (default: severity DESC, cveId ASC).
@@ -119,6 +123,10 @@ extend type Query {
         search: String,
         sort: SortInput
     ): VulnerabilityConnection!
+
+    """Faceted severity counts for one device's CVEs — same scope as deviceVulnerabilities(machineId, search);
+    mirrors vulnerabilityFilters. Unknown machineId → NOT_FOUND; a device with no CVEs → empty facets."""
+    deviceVulnerabilityFilters(machineId: String!, filter: VulnerabilityFilterInput, search: String): VulnerabilityFilters!
 }
 
 # ────────── Software (aggregate row) ──────────

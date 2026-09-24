@@ -310,14 +310,25 @@ public class SoftwareInventoryService {
                                                               SortInput sort) {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
-        List<SoftwareResponse> rows = inventory.getTitles().stream()
+        List<SoftwareResponse> rows = deviceSoftwareRows(inventory, filter, search);
+        enrichDevicesCountFromHosts(rows);
+        List<SoftwareResponse> ordered = rows.stream().sorted(order).toList();
+        return paginateList(ordered, page, perPage);
+    }
+
+    public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
+        HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
+        List<SoftwareResponse> rows = deviceSoftwareRows(inventory, null, search);
+        return softwareFilters(rows);
+    }
+
+    private static List<SoftwareResponse> deviceSoftwareRows(HostInventory inventory, SoftwareFilterInput filter,
+                                                             String search) {
+        return inventory.getTitles().stream()
                 .map(title -> toDeviceSoftwareRow(title, inventory))
                 .filter(row -> matchesDeviceSoftwareFilter(row, filter))
                 .filter(row -> matchesDeviceSoftwareSearch(row, search))
                 .toList();
-        enrichDevicesCountFromHosts(rows);
-        List<SoftwareResponse> ordered = rows.stream().sorted(order).toList();
-        return paginateList(ordered, page, perPage);
     }
 
     private void enrichDevicesCountFromHosts(List<SoftwareResponse> rows) {
@@ -502,6 +513,10 @@ public class SoftwareInventoryService {
         // here — it would fire N Fleet /hosts lookups just to produce numbers we don't use.
         List<SoftwareTitle> fetched = fetchAllTitles(search, null);
         List<SoftwareResponse> titles = mapTitles(fetched);
+        return softwareFilters(titles);
+    }
+
+    private static SoftwareFilters softwareFilters(List<SoftwareResponse> titles) {
         return SoftwareFilters.builder()
                 .sources(facet(titles, SoftwareResponse::getSource))
                 .versionStatuses(facet(titles, SoftwareResponse::getVersionStatus))
