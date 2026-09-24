@@ -24,13 +24,7 @@ public class TenantKeyService {
     private final AuthenticationKeyPairGenerator keyPairGenerator;
 
     public RSAKey getOrCreateActiveKey(String tenantId) {
-        long activeCount = tenantKeyRepository.countByTenantIdAndActiveTrue(tenantId);
-        if (activeCount > 1) {
-            log.warn("Multiple active signing keys detected for tenantId='{}' (count={}) - this may cause kid mismatches", tenantId, activeCount);
-        }
-
-        // Oldest first: with no ordering, a tenant holding two active keys could sign with either one.
-        TenantKey doc = tenantKeyRepository.findFirstByTenantIdAndActiveTrueOrderByCreatedAtAsc(tenantId).orElse(null);
+        TenantKey doc = tenantKeyRepository.findFirstByTenantIdAndActiveTrue(tenantId).orElse(null);
         if (doc == null) {
             log.info("No active signing key found for tenantId='{}'. Generating a new key...", tenantId);
             doc = createAndStore(tenantId);

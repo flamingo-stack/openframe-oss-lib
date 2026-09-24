@@ -8,7 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface TenantKeyRepository extends MongoRepository<TenantKey, String> {
-    Optional<TenantKey> findFirstByTenantIdAndActiveTrueOrderByCreatedAtAsc(String tenantId);
-
-    long countByTenantIdAndActiveTrue(String tenantId);
+    Optional<TenantKey> findFirstByTenantIdAndActiveTrue(String tenantId);
 }
