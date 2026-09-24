@@ -210,8 +210,7 @@ class SoftwareInventoryServiceTest {
 
         // Invariant: facet reads must never fire the enricher — that would explode into N Fleet
         // /hosts lookups per facet request.
-        org.mockito.Mockito.verify(deviceCountEnricher, org.mockito.Mockito.never())
-                .enrich(anyList(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(deviceCountEnricher);
     }
 
     // Simulate the enricher's side-effect: write count back via the passed countSetter.
@@ -220,10 +219,10 @@ class SoftwareInventoryServiceTest {
     private void simulateEnricherSetsCount(int count) {
         org.mockito.Mockito.doAnswer(inv -> {
             List<SoftwareResponse> rows = inv.getArgument(0);
-            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(2);
+            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(4);
             rows.forEach(row -> setter.accept(row, count));
             return null;
-        }).when(deviceCountEnricher).enrich(anyList(), any(), any());
+        }).when(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), any(), any(), any());
     }
 
     @Test
@@ -305,14 +304,45 @@ class SoftwareInventoryServiceTest {
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
         org.mockito.Mockito.doAnswer(inv -> {
             List<SoftwareResponse> rows = inv.getArgument(0);
-            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(2);
+            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(4);
             rows.forEach(row -> setter.accept(row, "Keep".equals(row.getName()) ? 1 : 0));
             return null;
-        }).when(deviceCountEnricher).enrich(anyList(), any(), any());
+        }).when(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), any(), any(), any());
 
         PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, null, null);
 
         assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Keep");
+    }
+
+    @Test
+    @DisplayName("listSoftware: a host's software version is counted under the title that owns that version id")
+    @SuppressWarnings("unchecked")
+    void listSoftware_keysHostSoftwareByTitleOfItsVersion() {
+        SoftwareTitle chrome = titleWithSource("Chrome", "homebrew_packages");
+        chrome.setId(42L);
+        chrome.getVersions().get(0).setId(7L);
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of(chrome));
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+        simulateEnricherSetsCount(1);
+
+        service.listSoftware("", 0, 20, null, null);
+
+        org.mockito.ArgumentCaptor<java.util.function.Function<FleetSoftware, java.util.stream.Stream<String>>> keysOf =
+                org.mockito.ArgumentCaptor.forClass(java.util.function.Function.class);
+        org.mockito.ArgumentCaptor<java.util.function.Function<SoftwareResponse, String>> rowKey =
+                org.mockito.ArgumentCaptor.forClass(java.util.function.Function.class);
+        org.mockito.Mockito.verify(deviceCountEnricher)
+                .enrichFromHostSoftware(anyList(), any(), keysOf.capture(), rowKey.capture(), any());
+        assertThat(keysOf.getValue().apply(installed(7L))).containsExactly("42");
+        assertThat(keysOf.getValue().apply(installed(8L))).isEmpty();
+        assertThat(rowKey.getValue().apply(SoftwareResponse.builder().id("42").build())).isEqualTo("42");
+    }
+
+    private static FleetSoftware installed(long versionId) {
+        FleetSoftware software = new FleetSoftware();
+        software.setId(versionId);
+        return software;
     }
 
     private static SoftwareTitle titleWithSource(String name, String fleetSource) {

@@ -9,8 +9,11 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
+import com.openframe.delivery.config.DeliveryProperties.Sweep;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
@@ -28,7 +31,7 @@ import static java.util.stream.Collectors.toSet;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = {"openframe.delivery.enabled", "openframe.delivery.sweep.enabled"}, havingValue = "true")
+@ConditionalOnProperty(name = "openframe.delivery.sweep.enabled", havingValue = "true")
 public class DeliverySweepService {
 
     private final MachineDeliveryRepository repository;
@@ -91,20 +94,21 @@ public class DeliverySweepService {
             closer.fail(delivery, DeliveryFailure.OFFLINE, DeliveryStatus.UNACKED, now);
             return;
         }
-        long recheckSeconds = policy.getMaxRetryIntervalSeconds();
-        Instant recheckAt = now.plusSeconds(recheckSeconds);
+        Sweep sweep = properties.getSweep();
+        long recheckMillis = sweep.getInterval();
+        Instant recheckAt = now.plusMillis(recheckMillis);
         Instant dueAt = earliest(windowEnd, recheckAt);
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
-        repository.park(id, DeliveryStatus.UNACKED, dispatchedAt, dueAt);
-        log.debug("Delivery parked, machine not online: id={} dueAt={} windowEnd={}", id, dueAt, windowEnd);
+        repository.postpone(id, DeliveryStatus.UNACKED, dispatchedAt, dueAt);
+        log.debug("Delivery waits for the machine to come online: id={} dueAt={} windowEnd={}", id, dueAt, windowEnd);
     }
 
     private void republish(MachineDelivery delivery, Policy policy, Instant now) {
         DeliveryType type = delivery.getType();
-        DeliverySpec<DeliverySeed, Object> spec = registry.require(type);
-        Class<Object> payloadClass = spec.getPayloadClass();
-        Object payload = readPayload(delivery, payloadClass);
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
+        DeliveryPayload payload = readPayload(delivery, payloadClass);
         String machineId = delivery.getMachineId();
         boolean published = publish(spec, machineId, payload);
         if (!published) {
@@ -128,7 +132,7 @@ public class DeliverySweepService {
                 type, delivery.getTargetId(), machineId, attempt, dueAt);
     }
 
-    private static boolean publish(DeliverySpec<DeliverySeed, Object> spec, String machineId, Object payload) {
+    private static boolean publish(DeliverySpec<DeliverySeed, DeliveryPayload> spec, String machineId, DeliveryPayload payload) {
         try {
             spec.publish(machineId, payload);
             return true;

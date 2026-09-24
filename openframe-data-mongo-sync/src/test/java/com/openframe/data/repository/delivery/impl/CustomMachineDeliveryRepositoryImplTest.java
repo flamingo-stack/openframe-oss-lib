@@ -33,6 +33,8 @@ class CustomMachineDeliveryRepositoryImplTest {
     private static final String TENANT_ID = "tenant-1";
     private static final int LIMIT = 500;
     private static final int ATTEMPTS = 1;
+    private static final String DISPATCH_ID = "d-1";
+    private static final String ERROR = "download failed";
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
     @Mock private MongoConverter converter;
@@ -85,6 +87,26 @@ class CustomMachineDeliveryRepositoryImplTest {
     }
 
     @Test
+    void upsertPending_rowClosedByPreviousDispatch_closingFieldsUnset() {
+        // setup
+        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).build();
+        when(mongoTemplate.getConverter()).thenReturn(converter);
+        when(mongoTemplate.tenantId()).thenReturn(TENANT_ID);
+
+        // execution
+        repository.upsertPending(delivery);
+
+        // verifications
+        verify(mongoTemplate).upsert(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class));
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("$unset")
+                .contains("ackedAt")
+                .contains("finishedAt")
+                .contains("failure")
+                .contains("error");
+    }
+
+    @Test
     void markRepublished_sameDispatchAndAttemptStillPending_attemptCountedAndTrue() {
         // setup
         UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
@@ -117,6 +139,27 @@ class CustomMachineDeliveryRepositoryImplTest {
 
         // verifications
         assertThat(republished).isFalse();
+    }
+
+    @Test
+    void markAcked_unackedRowOfThisDispatch_ackedAndTrue() {
+        // setup
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
+
+        // execution
+        boolean acked = repository.markAcked(ID, DISPATCH_ID, DeliveryStatus.UNACKED, now, now);
+
+        // verifications
+        assertThat(acked).isTrue();
+        assertThat(queryCaptor.getValue().getQueryObject().toString())
+                .contains(ID)
+                .contains("PENDING")
+                .contains("dispatchId=" + DISPATCH_ID);
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("ACKED")
+                .contains("ackedAt")
+                .contains("dueAt");
     }
 
     @Test
@@ -159,22 +202,25 @@ class CustomMachineDeliveryRepositoryImplTest {
     }
 
     @Test
-    void wake_parkedRowsOfMachine_unparkedAndModifiedCountReturned() {
+    void markFailed_openRowOfThisDispatch_agentErrorWrittenPayloadDropped() {
         // setup
-        UpdateResult twoRows = UpdateResult.acknowledged(2, 2L, null);
-        when(mongoTemplate.updateMulti(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(twoRows);
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
 
         // execution
-        long woken = repository.wake(MACHINE_ID, DeliveryStatus.UNACKED, now);
+        boolean failed = repository.markFailed(ID, DISPATCH_ID, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, ERROR, now, now);
 
         // verifications
-        assertThat(woken).isEqualTo(2);
+        assertThat(failed).isTrue();
         assertThat(queryCaptor.getValue().getQueryObject().toString())
-                .contains(MACHINE_ID)
+                .contains(ID)
+                .contains("dispatchId=" + DISPATCH_ID)
                 .contains("PENDING")
-                .contains("parked=true");
+                .contains("ACKED");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
-                .contains("parked=false")
-                .contains("dueAt");
+                .contains("FAILED")
+                .contains("AGENT_ERROR")
+                .contains("error=" + ERROR)
+                .contains("$unset");
     }
 }
