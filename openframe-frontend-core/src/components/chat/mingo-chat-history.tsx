@@ -3,10 +3,11 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated';
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
+import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { SquareAvatar } from '../ui/square-avatar';
+import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import type { DialogItem } from './types/component.types';
 
@@ -21,16 +22,18 @@ export interface MingoChatHistoryProps {
   activeDialogId?: string;
   /** Open a dialog. */
   onSelectDialog?: (id: string) => void;
-  /** Request rename — enables the row "Rename chat" action. The host opens
+  /** Request rename — enables the row "Rename Chat" action. The host opens
    *  the Rename modal; the list does no inline editing. */
   onRequestRename?: (dialog: DialogItem) => void;
-  /** Request archive — enables the row "Archive chat" action. The host opens
+  /** Request archive — enables the row "Archive Chat" action. The host opens
    *  the Archive confirmation modal. */
   onRequestArchive?: (dialog: DialogItem) => void;
-  /** Request a shareable link — enables the row "Copy chat link" action. The host
+  /** Request a shareable link — enables the row "Copy Chat Link" action. The host
    *  owns the URL shape and the copy itself (the list knows neither the app's
    *  routes nor whether a clipboard is available). */
   onRequestCopyLink?: (dialog: DialogItem) => void;
+  /** Request context compaction — enables the row "Compact Chat Memory" action. */
+  onRequestCompact?: (dialog: DialogItem) => void;
   /** Current server-side search term. Drives the "No chats found" empty state;
    *  the search INPUT lives in the panel header, not in this list. The host
    *  owns the term and refetches server-side — the list does no filtering. */
@@ -93,6 +96,7 @@ interface RowProps {
   onSelect?: (id: string) => void;
   onRequestRename?: (dialog: DialogItem) => void;
   onRequestCopyLink?: (dialog: DialogItem) => void;
+  onRequestCompact?: (dialog: DialogItem) => void;
   onRequestArchive?: (dialog: DialogItem) => void;
 }
 
@@ -102,34 +106,24 @@ function MingoChatHistoryRow({
   onSelect,
   onRequestCopyLink,
   onRequestRename,
+  onRequestCompact,
   onRequestArchive,
 }: RowProps) {
   const title = dialog.title || 'Untitled Chat';
   const unread = dialog.unreadMessagesCount ?? 0;
-  const hasMenu = !!onRequestRename || !!onRequestArchive || !!onRequestCopyLink;
+  const hasMenu = !!onRequestRename || !!onRequestArchive || !!onRequestCopyLink || !!onRequestCompact;
   const owner = dialog.owner;
   const hasAvatar = !!(owner?.name || owner?.avatarUrl);
   // Keep the `⋯` visible while its menu is open — once Radix moves focus into
   // the portalled content the row loses hover/focus-within.
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const menuItems = [
-    onRequestCopyLink && {
-      id: 'copy-link',
-      label: 'Copy chat link',
-      onClick: () => onRequestCopyLink(dialog),
-    },
-    onRequestRename && {
-      id: 'rename',
-      label: 'Rename chat',
-      onClick: () => onRequestRename(dialog),
-    },
-    onRequestArchive && {
-      id: 'archive',
-      label: 'Archive chat',
-      onClick: () => onRequestArchive(dialog),
-    },
-  ].filter(Boolean) as ActionsMenuItem[];
+  const menuItems = chatDialogMenuItems({
+    onCopyLink: onRequestCopyLink && (() => onRequestCopyLink(dialog)),
+    onRename: onRequestRename && (() => onRequestRename(dialog)),
+    onCompact: onRequestCompact && (() => onRequestCompact(dialog)),
+    onArchive: onRequestArchive && (() => onRequestArchive(dialog)),
+  });
 
   // The item is the full-width row (inside the group's bordered box). Padding
   // lives on the inner content button (badge + title) only — the `⋯` is a
@@ -317,6 +311,7 @@ export function MingoChatHistory({
   onSelectDialog,
   onRequestCopyLink,
   onRequestRename,
+  onRequestCompact,
   onRequestArchive,
   searchQuery,
   hasMore = false,
@@ -400,6 +395,7 @@ export function MingoChatHistory({
                       onSelect={onSelectDialog}
                       onRequestCopyLink={onRequestCopyLink}
                       onRequestRename={onRequestRename}
+                      onRequestCompact={onRequestCompact}
                       onRequestArchive={onRequestArchive}
                     />
                   ))}

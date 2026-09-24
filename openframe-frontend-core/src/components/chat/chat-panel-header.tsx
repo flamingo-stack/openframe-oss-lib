@@ -10,8 +10,9 @@ import {
   SearchIcon,
 } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
+import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { SquareAvatar } from '../ui/square-avatar';
+import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
@@ -41,11 +42,13 @@ export interface ChatPanelHeaderProps {
   onClose: () => void;
   /** Restore/unarchive — renders the refresh button (archived view only). */
   onRestore?: () => void;
-  /** Rename — adds the "Rename chat" item to the ⋯ menu. */
+  /** Rename — adds the "Rename Chat" item to the ⋯ menu. */
   onRename?: () => void;
-  /** Archive — adds the "Archive chat" item to the ⋯ menu. */
+  /** Archive — adds the "Archive Chat" item to the ⋯ menu. */
   onArchive?: () => void;
-  /** Copy a shareable link to the open conversation — adds the "Copy chat link"
+  /** Compact — adds the "Compact Chat Memory" item to the ⋯ menu. */
+  onCompact?: () => void;
+  /** Copy a shareable link to the open conversation — adds the "Copy Chat Link"
    *  item to the ⋯ menu. The host owns the URL and the copy. */
   onCopyLink?: () => void;
   /** Open the Chat Archive page — renders the clock button (list view only). */
@@ -87,6 +90,7 @@ export function ChatPanelHeader({
   onRestore,
   onRename,
   onArchive,
+  onCompact,
   onCopyLink,
   onOpenArchive,
   compact = false,
@@ -97,12 +101,8 @@ export function ChatPanelHeader({
 }: ChatPanelHeaderProps) {
   // Search open (with a wired handler) swaps the title for the inline field.
   const searchInline = searchActive && !!onSearchChange;
-  // Desktop ⋯ menu (active, non-archived conversation only) — rename / archive.
-  const menuItems = [
-    onCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: onCopyLink },
-    onRename && { id: 'rename', label: 'Rename chat', onClick: onRename },
-    onArchive && { id: 'archive', label: 'Archive chat', onClick: onArchive },
-  ].filter(Boolean) as ActionsMenuItem[];
+  // Desktop ⋯ menu (active, non-archived conversation only).
+  const menuItems = chatDialogMenuItems({ onCopyLink, onRename, onCompact, onArchive });
 
   return (
     <>
@@ -122,6 +122,7 @@ export function ChatPanelHeader({
           onRestore={onRestore}
           onRename={onRename}
           onArchive={onArchive}
+          onCompact={onCompact}
           onCopyLink={onCopyLink}
           onOpenArchive={onOpenArchive}
         />
