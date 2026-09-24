@@ -167,6 +167,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     placeholder = 'Enter your Request...',
     reserveAvatarOffset: _reserveAvatarOffset,
     disabled = false,
+    disabledPlaceholder = 'Connection lost. Waiting to reconnect...',
     autoFocus = false,
     fullWidth = false,
     allowEmptySend = false,
@@ -607,8 +608,18 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   the draft is EMPTY, so the editor is always on its plain line
                   box here. */}
               {isEmpty && !showPreview && (
-                <span className="pointer-events-none absolute left-0 top-0 select-none text-ods-text-secondary text-h4">
-                  {disabled ? 'Connection lost. Waiting to reconnect...' : placeholder}
+                <span
+                  className={cn(
+                    // One line, clipped with an ellipsis (Figma 954:28455): the
+                    // disabled copy is a sentence, and the panel's narrowest
+                    // width does not fit it — wrapped, it ran under the row.
+                    'pointer-events-none absolute left-0 top-0 w-full select-none truncate text-h4',
+                    // Disabled reads as disabled (Figma 954:28455): the copy says
+                    // why, and the colour says it is not an invitation to type.
+                    disabled ? 'text-ods-text-disabled' : 'text-ods-text-secondary',
+                  )}
+                >
+                  {disabled ? disabledPlaceholder : placeholder}
                 </span>
               )}
               {/* Ghost preview of a hovered quick-action's prompt. Overlaid like
@@ -642,7 +653,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 data-editor
                 role="textbox"
                 aria-multiline="true"
-                aria-label={typeof placeholder === 'string' ? placeholder : 'Message'}
+                // Named by what it shows: locked, the lock's copy is the name.
+                aria-label={disabled ? disabledPlaceholder : typeof placeholder === 'string' ? placeholder : 'Message'}
                 // `sending` blocks SENDING, never typing. Taking
                 // `contentEditable` away under a focused editor blurs it, and
                 // iOS dismisses the keyboard on blur; restoring it re-establishes
