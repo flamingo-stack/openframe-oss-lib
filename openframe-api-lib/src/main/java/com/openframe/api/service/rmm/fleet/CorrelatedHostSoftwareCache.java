@@ -35,7 +35,6 @@ public class CorrelatedHostSoftwareCache {
             .expireAfterWrite(TTL)
             .build();
 
-    // One load is ~6 MB of Fleet JSON and seconds long; without the TTL every page flip or sort pays it.
     public Map<Long, List<FleetSoftware>> softwareByHostId(Function<HostSearchRequest, List<Host>> hostSearch) {
         String tenantId = tenantIdProvider.getTenantId();
         return softwareByTenant.get(tenantId, key -> loadCorrelatedSoftware(key, hostSearch));
