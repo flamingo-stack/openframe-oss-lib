@@ -54,7 +54,7 @@ import {
 } from '../icons-v2-generated';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
+import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
@@ -62,7 +62,8 @@ import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-c
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatArchivePage } from './chat-archive-page';
 import { ChatAttachmentChipStrip } from './chat-attachment-bar';
-import { ChatComposer } from './chat-composer';
+import { ChatComposer, type ChatComposerLock } from './chat-composer';
+import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatMessageList } from './chat-message-list';
@@ -184,6 +185,15 @@ export interface EmbeddableChatProps {
    * cursor. Scrolling is intentionally disabled too. Defaults to `false`.
    */
   previewMode?: boolean;
+  /**
+   * The host cannot serve a message right now — e.g. the tenant's AI balance
+   * is spent and the agents are paused (Figma 954:28455). The composer stays
+   * in place but takes no input: the editor is disabled with `placeholder`
+   * where the prompt would be, and the `+` menu and Send are inert. Sends that
+   * bypass the composer (quick-action chips, imperative prompts) are the
+   * host's to hold back — it owns their callbacks. `null`/unset = live.
+   */
+  composerLock?: ChatComposerLock | null;
   /** Optional builders for chat-card types whose props live in hub-land
    *  (programs + product_release). Forwarded straight to
    *  `renderChatInlineEntityCard`. */
@@ -248,8 +258,9 @@ export interface EmbeddableChatProps {
    *
    * Same shape an adapter reports through `UnifiedChatState.dialogCapabilities`
    * (`ChatDialogCapabilities`) — one type, whether the list is host-owned or
-   * adapter-owned. `onCopyLink` adds "Copy chat link" to the header ⋯ menu and
+   * adapter-owned. `onCopyLink` adds "Copy Chat Link" to the header ⋯ menu and
    * every row menu; the host owns the URL shape and the clipboard write.
+   * `compactDialog` adds "Compact Chat Memory" to the same menus.
    */
   mingoDialogCapabilities?: ChatDialogCapabilities;
 
@@ -941,6 +952,7 @@ function EmbeddableChatInner({
   defaultOpen,
   showInternalTrigger = true,
   previewMode = false,
+  composerLock = null,
   extras,
   tableIdForDocumentType,
   modes,
@@ -1569,6 +1581,9 @@ function EmbeddableChatInner({
 
   const handleSend = useCallback(
     (text: string) => {
+      // Locked: the disabled editor cannot submit, but a queued Enter or a
+      // stale ref call still lands here — refused at the seam, not by luck.
+      if (composerLock) return;
       // Append chat-attachment markdown lines to the user's bubble.
       let augmentedText = text;
       if (readyAttachments.length > 0) {
@@ -1596,7 +1611,7 @@ function EmbeddableChatInner({
         setContextItems([]);
       }
     },
-    [sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
+    [composerLock, sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
   );
 
   /**
@@ -2023,6 +2038,10 @@ function EmbeddableChatInner({
     activeDialogId && activeDialog && mingoCaps.canArchive ? () => setArchiveTarget(activeDialog) : undefined;
   const headerOnCopyLink =
     activeDialogId && activeDialog && mingoCaps.onCopyLink ? () => mingoCaps.onCopyLink?.(activeDialog) : undefined;
+  const headerOnCompact =
+    activeDialogId && activeDialog && mingoCaps.compactDialog
+      ? () => mingoCaps.compactDialog?.(activeDialog)
+      : undefined;
   const headerOnOpenArchive = fetchArchivedDialogs ? openArchive : undefined;
 
   // Header person (sub-line + 32px avatar, Figma 113:63273): the dialog OWNER
@@ -2110,11 +2129,12 @@ function EmbeddableChatInner({
   );
 
   // Desktop split header ⋯ menu (active, non-archived conversation only).
-  const splitHeaderMenuItems = [
-    headerOnCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: headerOnCopyLink },
-    headerOnRename && { id: 'rename', label: 'Rename chat', onClick: headerOnRename },
-    headerOnArchive && { id: 'archive', label: 'Archive chat', onClick: headerOnArchive },
-  ].filter(Boolean) as ActionsMenuItem[];
+  const splitHeaderMenuItems = chatDialogMenuItems({
+    onCopyLink: headerOnCopyLink,
+    onRename: headerOnRename,
+    onCompact: headerOnCompact,
+    onArchive: headerOnArchive,
+  });
 
   // Narrow (single-column) header. The Mingo empty state splits into a "Current
   // Chats" list header (search + archive, no back) and a "New Chat" compose
@@ -2158,6 +2178,7 @@ function EmbeddableChatInner({
         onRestore: headerOnRestore,
         onRename: headerOnRename,
         onArchive: headerOnArchive,
+        onCompact: headerOnCompact,
         onCopyLink: headerOnCopyLink,
         onOpenArchive: headerOnOpenArchive,
       };
@@ -2389,6 +2410,7 @@ function EmbeddableChatInner({
                         onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                         onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
                         onRequestCopyLink={mingoCaps.onCopyLink}
+                        onRequestCompact={mingoCaps.compactDialog}
                         scope={dialogScope}
                         onScopeChange={setDialogScope}
                         searchQuery={mingoCaps.searchQuery}
@@ -2418,6 +2440,7 @@ function EmbeddableChatInner({
                       onRequestRename={mingoCaps.canRename ? setRenameTarget : undefined}
                       onRequestArchive={mingoCaps.canArchive ? setArchiveTarget : undefined}
                       onRequestCopyLink={mingoCaps.onCopyLink}
+                      onRequestCompact={mingoCaps.compactDialog}
                       scope={dialogScope}
                       onScopeChange={setDialogScope}
                       searchQuery={mingoCaps.searchQuery}
@@ -2639,6 +2662,7 @@ function EmbeddableChatInner({
 
                       <ChatComposer
                         archived={isViewingArchived}
+                        lock={composerLock}
                         inputRef={chatInputRef}
                         onSend={handleSend}
                         onStop={stopMessage}
