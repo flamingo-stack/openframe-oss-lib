@@ -135,6 +135,18 @@ pub fn orbit_dir() -> std::path::PathBuf {
     }
 }
 
+/// Orbit's node key and osquery.db live here; left behind, a reinstall re-joins the old Fleet team.
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+async fn remove_orbit_dir(dir: &Path) {
+    if !dir.exists() {
+        return;
+    }
+    info!("Cleaning up Orbit directory: {}", dir.display());
+    if let Err(e) = remove_directory_with_retry(dir, 5).await {
+        warn!("Failed to remove Orbit directory: {}", e);
+    }
+}
+
 /// Remove a directory with retry logic for locked files
 pub async fn remove_directory_with_retry(path: &Path, max_retries: u32) -> Result<()> {
     if !path.exists() {
@@ -454,13 +466,7 @@ pub async fn uninstall_windows(
         }
     }
 
-    let orbit_dir = orbit_dir();
-    if orbit_dir.exists() {
-        info!("Cleaning up Orbit directory: {}", orbit_dir.display());
-        if let Err(e) = remove_directory_with_retry(&orbit_dir, 5).await {
-            warn!("Failed to remove Orbit directory: {}", e);
-        }
-    }
+    remove_orbit_dir(&orbit_dir()).await;
 
     // Final chance to report the uninstall, before the cleanup script starts waiting on our exit.
     if let Some(deregistration_service) = &deregistration_service {
@@ -554,6 +560,8 @@ pub async fn uninstall_macos(
             warn!("Failed to remove app support directory: {}", e);
         }
     }
+
+    remove_orbit_dir(&orbit_dir()).await;
 
     if install_path.exists() {
         info!("Removing installed binary: {}", install_path.display());
