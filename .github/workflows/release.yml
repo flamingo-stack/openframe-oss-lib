@@ -174,7 +174,7 @@ jobs:
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm install
+        run: npm ci
 
       - name: Build
         if: steps.should_run.outputs.run == 'true'
