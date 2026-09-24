@@ -118,6 +118,22 @@ class DeviceHostInventoryLoaderTest {
     }
 
     @Test
+    void load_connectedHostGoneFromFleet_emptyInventory() {
+        // setup
+        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
+        stubFleetConnection(String.valueOf(HOST_ID));
+        when(fleet.listHostSoftware(HOST_ID, 0, FETCH_PAGE_SIZE)).thenReturn(null);
+        when(hostSoftwareCache.softwareByHostId(any())).thenReturn(Map.of());
+
+        // execution
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
+
+        // verifications
+        assertThat(inventory.getTitles()).isEmpty();
+        assertThat(inventory.hits()).isEmpty();
+    }
+
+    @Test
     void load_fleetConnectionWithoutNumericHostId_fallsBackToSearch() {
         // setup
         stubCorrelatedHost();

@@ -81,6 +81,46 @@ class FleetHostMachineResolverTest {
     }
 
     @Test
+    void resolve_newestConnectionPointsAtMachinePendingDeletion_olderLiveMachineClaimsHost() {
+        // setup
+        Host host = new Host();
+        host.setId(HOST_ID);
+        Machine live = machine(null, DeviceStatus.ONLINE);
+        live.setMachineId("m-live");
+        Machine leaving = machine(null, DeviceStatus.PENDING_DELETION);
+        leaving.setMachineId("m-leaving");
+        when(toolConnectionRepository.findByAgentToolIdInAndToolType(List.of("29"), ToolType.FLEET_MDM))
+                .thenReturn(List.of(connection("m-live", OLDER), connection("m-leaving", NEWER)));
+        when(machineRepository.findByTenantIdAndMachineIdIn(TENANT, List.of("m-live", "m-leaving")))
+                .thenReturn(List.of(live, leaving));
+
+        // execution
+        Map<Long, Machine> resolved = resolver.resolve(TENANT, List.of(host));
+
+        // verifications
+        assertThat(resolved).containsExactly(Map.entry(HOST_ID, live));
+    }
+
+    @Test
+    void resolve_connectionOfAnotherTenantsMachine_ignoredAndIdentifierMatchStillApplies() {
+        // setup
+        Host host = new Host();
+        host.setId(HOST_ID);
+        host.setUuid("u-online");
+        when(toolConnectionRepository.findByAgentToolIdInAndToolType(List.of("29"), ToolType.FLEET_MDM))
+                .thenReturn(List.of(connection("m-foreign", NEWER)));
+        when(machineRepository.findByTenantIdAndMachineIdIn(TENANT, List.of("m-foreign"))).thenReturn(List.of());
+        Machine own = machine("u-online", DeviceStatus.ONLINE);
+        when(machineRepository.findByTenantIdAndOsUuidIn(eq(TENANT), any())).thenReturn(List.of(own));
+
+        // execution
+        Map<Long, Machine> resolved = resolver.resolve(TENANT, List.of(host));
+
+        // verifications
+        assertThat(resolved).containsExactly(Map.entry(HOST_ID, own));
+    }
+
+    @Test
     void resolve_noToolConnections_machineLookupByIdSkipped() {
         // setup
         when(machineRepository.findByTenantIdAndOsUuidIn(eq(TENANT), any()))
