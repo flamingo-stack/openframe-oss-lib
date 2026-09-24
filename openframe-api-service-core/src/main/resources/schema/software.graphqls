@@ -89,6 +89,36 @@ extend type Query {
         search: String,
         sort: SortInput
     ): DeviceConnection!
+
+    """Software installed on one device. One row = one installed title, the same node as `softwares`.
+    Version fields are read in this device's scope: `currentVersion` is the version installed here.
+    `devicesCount` stays fleet-wide. Sortable fields: name, cveCount, highestSeverity (default: name).
+    Unknown machineId → NOT_FOUND; a known device with nothing installed → empty connection."""
+    deviceSoftware(
+        machineId: String!,
+        filter: SoftwareFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): SoftwareConnection!
+
+    """CVEs present on one device. One row = one CVE (not CVE × software), the same node as `vulnerabilities`.
+    `affectedSoftware` is scoped to this host and populated on every row; `devicesCount` stays fleet-wide.
+    Sortable fields: severity (by cvssScore, unrated last), discoveredAt (default: severity DESC, cveId ASC).
+    Unknown machineId → NOT_FOUND; a known device with no CVEs → empty connection."""
+    deviceVulnerabilities(
+        machineId: String!,
+        filter: VulnerabilityFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): VulnerabilityConnection!
 }
 
 # ────────── Software (aggregate row) ──────────
