@@ -62,7 +62,7 @@ import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-c
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatArchivePage } from './chat-archive-page';
 import { ChatAttachmentChipStrip } from './chat-attachment-bar';
-import { ChatComposer } from './chat-composer';
+import { ChatComposer, type ChatComposerLock } from './chat-composer';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderSearchField } from './chat-header-search-field';
@@ -185,6 +185,15 @@ export interface EmbeddableChatProps {
    * cursor. Scrolling is intentionally disabled too. Defaults to `false`.
    */
   previewMode?: boolean;
+  /**
+   * The host cannot serve a message right now — e.g. the tenant's AI balance
+   * is spent and the agents are paused (Figma 954:28455). The composer stays
+   * in place but takes no input: the editor is disabled with `placeholder`
+   * where the prompt would be, and the `+` menu and Send are inert. Sends that
+   * bypass the composer (quick-action chips, imperative prompts) are the
+   * host's to hold back — it owns their callbacks. `null`/unset = live.
+   */
+  composerLock?: ChatComposerLock | null;
   /** Optional builders for chat-card types whose props live in hub-land
    *  (programs + product_release). Forwarded straight to
    *  `renderChatInlineEntityCard`. */
@@ -943,6 +952,7 @@ function EmbeddableChatInner({
   defaultOpen,
   showInternalTrigger = true,
   previewMode = false,
+  composerLock = null,
   extras,
   tableIdForDocumentType,
   modes,
@@ -1571,6 +1581,9 @@ function EmbeddableChatInner({
 
   const handleSend = useCallback(
     (text: string) => {
+      // Locked: the disabled editor cannot submit, but a queued Enter or a
+      // stale ref call still lands here — refused at the seam, not by luck.
+      if (composerLock) return;
       // Append chat-attachment markdown lines to the user's bubble.
       let augmentedText = text;
       if (readyAttachments.length > 0) {
@@ -1598,7 +1611,7 @@ function EmbeddableChatInner({
         setContextItems([]);
       }
     },
-    [sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
+    [composerLock, sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
   );
 
   /**
@@ -2649,6 +2662,7 @@ function EmbeddableChatInner({
 
                       <ChatComposer
                         archived={isViewingArchived}
+                        lock={composerLock}
                         inputRef={chatInputRef}
                         onSend={handleSend}
                         onStop={stopMessage}
