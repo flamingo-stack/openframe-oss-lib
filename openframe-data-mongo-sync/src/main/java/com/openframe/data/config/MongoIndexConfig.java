@@ -27,6 +27,11 @@ public class MongoIndexConfig {
      */
     private static final String SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX = "script_schedules_tenant_name_notDeleted_unique";
 
+    /**
+     * Partial-unique index on {@code tenant_keys}: at most one active signing key per tenant.
+     */
+    private static final String TENANT_KEYS_ACTIVE_UNIQUE_INDEX = "tenant_keys_tenant_active_unique";
+
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -92,6 +97,16 @@ public class MongoIndexConfig {
                         .named(SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX)
                         .partial(PartialIndexFilter.of(Criteria.where("status")
                                 .in(ScriptStatus.ACTIVE.name(), ScriptStatus.ARCHIVED.name()))));
+
+        // Tenant signing keys: TenantKeyService creates a tenant's key on first use, and concurrent
+        // first requests used to store two active keys. Keyed on (tenantId, active) so it does not
+        // clash with TenantKey's plain @Indexed tenantId index.
+        mongoTemplate.indexOps("tenant_keys").ensureIndex(
+                new Index().on("tenantId", Sort.Direction.ASC)
+                        .on("active", Sort.Direction.ASC)
+                        .unique()
+                        .named(TENANT_KEYS_ACTIVE_UNIQUE_INDEX)
+                        .partial(PartialIndexFilter.of(Criteria.where("active").is(true))));
     }
 
     private void dropStaleIndex(String collection, String indexName) {
