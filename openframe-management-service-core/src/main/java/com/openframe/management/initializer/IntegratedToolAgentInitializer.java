@@ -14,6 +14,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
@@ -66,9 +67,9 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
 
             integratedToolAgentService.updateConfigurationFields(configuration);
             log.info("Applied agent configuration: {} from {}", configurationId, agentConfigurationFilePath);
-        } catch (Exception e) {
-            String errorMessage = e.getMessage();
-            log.error("Failed to load agent configuration from {}: {}", agentConfigurationFilePath, errorMessage, e);
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Failed to load agent configuration from " + agentConfigurationFilePath, e);
         }
     }
 

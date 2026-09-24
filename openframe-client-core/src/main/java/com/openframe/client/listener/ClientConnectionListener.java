@@ -31,7 +31,6 @@ public class ClientConnectionListener {
                 Instant eventTimestamp = Instant.parse(event.getTimestamp());
                 machineStatusService.updateToOnline(machineId, eventTimestamp);
             } catch (Exception e) {
-                log.error("Failed to process tool connection event", e);
                 throw new NatsException("Failed to process client connected event", e);
             }
         };
@@ -47,7 +46,6 @@ public class ClientConnectionListener {
                 Instant eventTimestamp = Instant.parse(event.getTimestamp());
                 machineStatusService.updateToOffline(machineId, eventTimestamp);
             } catch (Exception e) {
-                log.error("Failed to process client disconnected event", e);
                 throw new NatsException("Failed to process disconnected connect event", e);
             }
         };
