@@ -6,6 +6,7 @@ import com.openframe.api.dto.rmm.script.BatchRunScriptInput;
 import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.mapper.ScriptEnvVarMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
@@ -67,6 +68,7 @@ public class ScriptDispatchService {
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
+        ScriptEnvVarMapper.validate(input.getEnvVars());
         deviceService.verifyDispatchable(input.getMachineId());
 
         // Tenant-scoped lookup; throws if the script is missing or soft-deleted.
@@ -102,6 +104,7 @@ public class ScriptDispatchService {
 
     public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
+        ScriptEnvVarMapper.validate(input.getEnvVars());
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 
         // Verify every target up front — reject the whole batch if any is unknown,
@@ -297,13 +300,17 @@ public class ScriptDispatchService {
             return;
         }
         for (ScriptEnvVarInput e : envVars) {
-            if (e.getName() != null) {
-                target.put(e.getName(), ScriptEnvVar.builder()
-                        .name(e.getName())
-                        .value(e.getValue() == null ? "" : e.getValue())
-                        .secret(e.isSecret())
-                        .build());
+            if (e.getName() == null) {
+                continue;
             }
+            if (e.getValue() == null && e.isSecret()) {
+                continue;
+            }
+            target.put(e.getName(), ScriptEnvVar.builder()
+                    .name(e.getName())
+                    .value(e.getValue() == null ? "" : e.getValue())
+                    .secret(e.isSecret())
+                    .build());
         }
     }
 }
