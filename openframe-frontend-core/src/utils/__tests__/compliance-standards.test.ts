@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { complianceStandardForName } from '../compliance-standards';
+import { COMPLIANCE_STANDARDS, complianceStandardForName } from '../compliance-standards';
 
 describe('complianceStandardForName', () => {
   it("reads a system's standard id and every common display spelling", () => {
@@ -19,5 +19,20 @@ describe('complianceStandardForName', () => {
     expect(complianceStandardForName(null, 'HIPAA')?.key).toBe('hipaa');
     expect(complianceStandardForName('Internal policy')).toBeNull();
     expect(complianceStandardForName()).toBeNull();
+  });
+});
+
+describe('official logos', () => {
+  it('each standard names the official mark the icon set ships, where one exists', () => {
+    expect(complianceStandardForName('ISO 27001')?.logo).toBe('iso-iec');
+    expect(complianceStandardForName('ISO 42001')?.logo).toBe('iso-iec');
+    expect(complianceStandardForName('ISO 9001')?.logo).toBe('iso');
+    expect(complianceStandardForName('GDPR')?.logo).toBe('eu');
+    expect(complianceStandardForName('HIPAA')?.logo).toBe('hhs');
+    expect(complianceStandardForName('NIST CSF')?.logo).toBe('nist');
+  });
+
+  it('SOC keeps the drawn badge: the AICPA seal is issued only through its logo program', () => {
+    expect(COMPLIANCE_STANDARDS.filter(s => s.key.startsWith('soc')).every(s => s.logo === undefined)).toBe(true);
   });
 });

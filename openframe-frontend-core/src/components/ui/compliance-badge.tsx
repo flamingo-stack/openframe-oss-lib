@@ -1,6 +1,26 @@
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
-import { complianceStandardForName, type ComplianceStandard } from '../../utils/compliance-standards';
+import {
+  complianceStandardForName,
+  type ComplianceLogoKey,
+  type ComplianceStandard,
+} from '../../utils/compliance-standards';
+import {
+  EuLogoIcon,
+  HhsLogoIcon,
+  IsoIecLogoIcon,
+  IsoLogoIcon,
+  NistLogoIcon,
+} from '../icons-v2-generated/compliance-logos';
+
+/** The official marks (`icons-v2/compliance-logos`), by `ComplianceStandard.logo`. */
+const COMPLIANCE_LOGOS: Record<ComplianceLogoKey, ComponentType<{ className?: string; size?: number }>> = {
+  iso: IsoLogoIcon,
+  'iso-iec': IsoIecLogoIcon,
+  nist: NistLogoIcon,
+  eu: EuLogoIcon,
+  hhs: HhsLogoIcon,
+};
 
 /** Font size of the badge's mark, by length, so "SOC 2" and "800-171" both fit the seal. */
 function markFontSize(mark: string): number {
@@ -60,9 +80,10 @@ export function ComplianceBadge({ standard, className }: { standard: ComplianceS
 }
 
 /**
- * THE compliance logo for a framework, by name: its standard's badge when the
- * vocabulary knows it (`complianceStandardForName`, which also accepts a
- * system's standard id such as Vanta's `soc2`), else `fallback`.
+ * THE compliance logo for a framework, by name (`complianceStandardForName`,
+ * which also accepts a system's standard id such as Vanta's `soc2`): the
+ * standard's OFFICIAL mark when the icon set ships one, else its drawn
+ * `ComplianceBadge`; an unknown standard shows `fallback`.
  */
 export function ComplianceLogo({
   names,
@@ -75,5 +96,17 @@ export function ComplianceLogo({
   className?: string;
 }) {
   const standard = complianceStandardForName(...names);
-  return standard ? <ComplianceBadge standard={standard} className={className} /> : <>{fallback}</>;
+  if (!standard) return <>{fallback}</>;
+  const Official = standard.logo ? COMPLIANCE_LOGOS[standard.logo] : null;
+  return Official ? (
+    <span
+      role="img"
+      aria-label={`${standard.body} ${standard.mark}`}
+      className={cn('flex size-10 shrink-0 items-center justify-center', className)}
+    >
+      <Official size={40} aria-hidden="true" />
+    </span>
+  ) : (
+    <ComplianceBadge standard={standard} className={className} />
+  );
 }

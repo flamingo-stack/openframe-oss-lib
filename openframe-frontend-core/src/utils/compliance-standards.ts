@@ -5,9 +5,16 @@
  * `standard` field is `soc2`; its display name is "SOC 2"; a Trust Center
  * editor may write "SOC 2 Type II"). Server-safe, no React.
  *
- * The badge is OUR mark naming the standard, never an issuer's seal: official
- * seals (the AICPA SOC logo, ISO marks) are licensed to certified companies.
+ * `logo` names the OFFICIAL mark shipped in the icon set
+ * (`icons-v2/compliance-logos`, downloaded from Wikimedia Commons, public
+ * domain): ISO's emblem, the ISO/IEC emblem of the joint standards, NIST, the
+ * EU emblem for EU regulations, HHS for HIPAA. A standard without one (the
+ * AICPA SOC seal is issued only through AICPA's logo program) shows our drawn
+ * `ComplianceBadge` instead.
  */
+
+/** The official marks the icon set ships (`icons-v2/compliance-logos`). */
+export type ComplianceLogoKey = 'iso' | 'iso-iec' | 'nist' | 'eu' | 'hhs';
 export interface ComplianceStandard {
   /** Stable key, e.g. `soc2`. */
   key: string;
@@ -17,27 +24,29 @@ export interface ComplianceStandard {
   mark: string;
   /** Folded spellings (lowercase letters + digits) a name may start with. */
   aliases: readonly string[];
+  /** Its official mark in the icon set, when one ships. */
+  logo?: ComplianceLogoKey;
 }
 
 export const COMPLIANCE_STANDARDS: readonly ComplianceStandard[] = [
   { key: 'soc1', body: 'AICPA', mark: 'SOC 1', aliases: ['soc1', 'ssae18'] },
   { key: 'soc2', body: 'AICPA', mark: 'SOC 2', aliases: ['soc2'] },
   { key: 'soc3', body: 'AICPA', mark: 'SOC 3', aliases: ['soc3'] },
-  { key: 'iso27001', body: 'ISO', mark: '27001', aliases: ['iso27001', 'isoiec27001'] },
-  { key: 'iso27017', body: 'ISO', mark: '27017', aliases: ['iso27017', 'isoiec27017'] },
-  { key: 'iso27018', body: 'ISO', mark: '27018', aliases: ['iso27018', 'isoiec27018'] },
-  { key: 'iso27701', body: 'ISO', mark: '27701', aliases: ['iso27701', 'isoiec27701'] },
-  { key: 'iso42001', body: 'ISO', mark: '42001', aliases: ['iso42001', 'isoiec42001'] },
-  { key: 'iso9001', body: 'ISO', mark: '9001', aliases: ['iso9001'] },
-  { key: 'gdpr', body: 'EU', mark: 'GDPR', aliases: ['gdpr'] },
-  { key: 'euaiact', body: 'EU', mark: 'AI ACT', aliases: ['euaiact', 'aiact'] },
-  { key: 'nis2', body: 'EU', mark: 'NIS2', aliases: ['nis2'] },
-  { key: 'dora', body: 'EU', mark: 'DORA', aliases: ['dora'] },
-  { key: 'hipaa', body: 'HHS', mark: 'HIPAA', aliases: ['hipaa'] },
+  { key: 'iso27001', body: 'ISO', mark: '27001', aliases: ['iso27001', 'isoiec27001'], logo: 'iso-iec' },
+  { key: 'iso27017', body: 'ISO', mark: '27017', aliases: ['iso27017', 'isoiec27017'], logo: 'iso-iec' },
+  { key: 'iso27018', body: 'ISO', mark: '27018', aliases: ['iso27018', 'isoiec27018'], logo: 'iso-iec' },
+  { key: 'iso27701', body: 'ISO', mark: '27701', aliases: ['iso27701', 'isoiec27701'], logo: 'iso-iec' },
+  { key: 'iso42001', body: 'ISO', mark: '42001', aliases: ['iso42001', 'isoiec42001'], logo: 'iso-iec' },
+  { key: 'iso9001', body: 'ISO', mark: '9001', aliases: ['iso9001'], logo: 'iso' },
+  { key: 'gdpr', body: 'EU', mark: 'GDPR', aliases: ['gdpr'], logo: 'eu' },
+  { key: 'euaiact', body: 'EU', mark: 'AI ACT', aliases: ['euaiact', 'aiact'], logo: 'eu' },
+  { key: 'nis2', body: 'EU', mark: 'NIS2', aliases: ['nis2'], logo: 'eu' },
+  { key: 'dora', body: 'EU', mark: 'DORA', aliases: ['dora'], logo: 'eu' },
+  { key: 'hipaa', body: 'HHS', mark: 'HIPAA', aliases: ['hipaa'], logo: 'hhs' },
   { key: 'pcidss', body: 'PCI', mark: 'DSS', aliases: ['pcidss', 'pci'] },
-  { key: 'nistcsf', body: 'NIST', mark: 'CSF', aliases: ['nistcsf', 'nistcybersecurityframework'] },
-  { key: 'nist80053', body: 'NIST', mark: '800-53', aliases: ['nist80053', 'nistsp80053'] },
-  { key: 'nist800171', body: 'NIST', mark: '800-171', aliases: ['nist800171', 'nistsp800171'] },
+  { key: 'nistcsf', body: 'NIST', mark: 'CSF', aliases: ['nistcsf', 'nistcybersecurityframework'], logo: 'nist' },
+  { key: 'nist80053', body: 'NIST', mark: '800-53', aliases: ['nist80053', 'nistsp80053'], logo: 'nist' },
+  { key: 'nist800171', body: 'NIST', mark: '800-171', aliases: ['nist800171', 'nistsp800171'], logo: 'nist' },
   { key: 'fedramp', body: 'US GOV', mark: 'FedRAMP', aliases: ['fedramp'] },
   { key: 'cmmc', body: 'DoD', mark: 'CMMC', aliases: ['cmmc'] },
   { key: 'ccpa', body: 'CA', mark: 'CCPA', aliases: ['ccpa', 'cpra'] },
