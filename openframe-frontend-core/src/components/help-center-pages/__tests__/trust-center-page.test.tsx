@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setMockSearchParams } from '../../../../vitest.setup';
 import {
@@ -12,7 +12,7 @@ import {
 } from '../../../types/trust-center';
 import { TRUST_CENTER_FIXTURE_WINDOW_MS, makeTrustCenterData } from '../__fixtures__/trust-center';
 import { TrustCenterPage } from '../trust-center-page';
-import { highlight } from '../trust-center-sections';
+import { filterControlDomains, highlight } from '../trust-center-sections';
 
 // The real ContactForm needs the endpoints + chat runtimes; the page only
 // decides WHAT it is handed, so a stub that echoes its props is the honest
@@ -256,6 +256,19 @@ describe('TrustCenterPage', () => {
     }
   });
 
+  it('monitoring: a tab left open with NO revalidation still flips to paused as the clock passes the window', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    try {
+      render(<TrustCenterPage initialData={makeData()} />);
+      expect(screen.getByText(/^Controls continuously monitored/)).toBeInTheDocument();
+      await act(() => vi.advanceTimersByTimeAsync(WINDOW_MS + 60 * 1000));
+      expect(screen.getByText(/^Monitoring paused/)).toBeInTheDocument();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('controls drawer reads the CURRENT domains: a revalidation while open shows the new controls', async () => {
     const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
     fireEvent.click(screen.getByRole('button', { name: 'View all 4 Infrastructure security controls' }));
@@ -322,5 +335,28 @@ describe('highlight', () => {
 
   it('returns the plain text for an empty query', () => {
     expect(strongOf('Encryption at rest', '   ')).toBeNull();
+  });
+});
+
+describe('filterControlDomains', () => {
+  const domains = makeTrustCenterData().controlDomains;
+  const names = (query: string) => filterControlDomains(domains, query).flatMap(d => d.controls.map(c => c.name));
+
+  it('matches exactly what highlight emphasises: metacharacters literally, case-insensitively', () => {
+    const withMeta = [{ ...domains[0], controls: [{ id: 'm', name: 'Tier a+b storage', description: null }] }];
+    expect(filterControlDomains(withMeta, 'A+B')).toHaveLength(1);
+    expect(filterControlDomains(withMeta, '.*')).toHaveLength(0);
+  });
+
+  it('a whitespace-only query keeps every domain', () => {
+    expect(filterControlDomains(domains, '   ')).toBe(domains);
+  });
+
+  it('every kept control carries a highlight', () => {
+    expect(names('enc').length).toBeGreaterThan(0);
+    for (const name of names('enc')) {
+      render(<p>{highlight(name, 'enc')}</p>);
+    }
+    expect(screen.queryAllByText(/.+/, { selector: 'strong' }).length).toBe(names('enc').length);
   });
 });

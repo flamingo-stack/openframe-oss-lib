@@ -192,15 +192,20 @@ export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFrame
 // ---------------------------------------------------------------------------
 
 /** Client-side filter over control name + description. Exported for tests. */
+/** THE query matcher — search and `highlight` use the same one, so a row never matches without its highlight. */
+function queryMatcher(query: string): RegExp | null {
+  const needle = query.trim();
+  return needle ? new RegExp(escapeRegExp(needle), 'iu') : null;
+}
+
 export function filterControlDomains(domains: TrustCenterControlDomain[], query: string): TrustCenterControlDomain[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return domains;
+  const matcher = queryMatcher(query);
+  if (!matcher) return domains;
   return domains
     .map(domain => ({
       ...domain,
       controls: domain.controls.filter(
-        control =>
-          control.name.toLowerCase().includes(needle) || (control.description ?? '').toLowerCase().includes(needle),
+        control => matcher.test(control.name) || matcher.test(control.description ?? ''),
       ),
     }))
     .filter(domain => domain.controls.length > 0);
@@ -213,8 +218,7 @@ export function filterControlDomains(domains: TrustCenterControlDomain[], query:
  * length (`İ` → `i̇`). Exported for tests.
  */
 export function highlight(text: string, query: string): ReactNode {
-  const needle = query.trim();
-  const match = needle ? new RegExp(escapeRegExp(needle), 'iu').exec(text) : null;
+  const match = queryMatcher(query)?.exec(text) ?? null;
   if (!match) return text;
   const at = match.index;
   const end = at + match[0].length;

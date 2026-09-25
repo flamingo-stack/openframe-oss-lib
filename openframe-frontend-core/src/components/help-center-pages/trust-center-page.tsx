@@ -24,7 +24,7 @@
  * host overrides it.
  */
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
@@ -109,6 +109,9 @@ function visibleSections(data: TrustCenterPublic): Array<(typeof TRUST_CENTER_SE
 }
 
 /** The status line: neutral before mount, then monitored / paused / not enabled. */
+/** How often an open page re-judges "monitored" against the clock. */
+const MONITORING_CLOCK_TICK_MS = 60_000;
+
 function monitoringStatus(
   data: TrustCenterPublic,
   hydrated: boolean,
@@ -152,6 +155,13 @@ export function TrustCenterPage({
     setClock(() => ({ data, nowMs: Date.now() }));
   }
   const nowMs = clock.nowMs;
+  // A tab left open keeps judging the same copy against the passing time, so it
+  // flips to "Monitoring paused" once `syncedAt` leaves the window.
+  useEffect(() => {
+    if (!hydrated) return undefined;
+    const timer = setInterval(() => setClock(current => ({ ...current, nowMs: Date.now() })), MONITORING_CLOCK_TICK_MS);
+    return () => clearInterval(timer);
+  }, [hydrated]);
   const [request, setRequest] = useState<{ open: boolean; documentTitle: string | null }>({
     open: false,
     documentTitle: null,
