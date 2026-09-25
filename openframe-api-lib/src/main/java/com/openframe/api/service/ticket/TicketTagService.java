@@ -1,5 +1,8 @@
 package com.openframe.api.service.ticket;
 
+import com.openframe.api.exception.ticket.TicketNotFoundException;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -144,7 +147,7 @@ public class TicketTagService {
             List<String> notFound = tagIds.stream()
                     .filter(id -> !existingIds.contains(id))
                     .toList();
-            throw new IllegalArgumentException("Tags not found: " + notFound);
+            throw new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tags not found: " + notFound);
         }
     }
 
@@ -177,7 +180,7 @@ public class TicketTagService {
 
     private void validateTicketExists(String ticketId) {
         if (!ticketRepository.existsById(ticketId)) {
-            throw new IllegalArgumentException("Ticket not found: " + ticketId);
+            throw new TicketNotFoundException(ticketId);
         }
     }
 }
