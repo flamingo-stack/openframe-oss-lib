@@ -55,7 +55,6 @@ import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { LoadError } from '../ui/error-state';
-import { SearchInput } from '../ui/search-input';
 import { StatusIndicator } from '../ui/status-indicator';
 import {
   AiSection,
@@ -98,8 +97,6 @@ const defaultDocumentHref = (document: TrustCenterDocument): string | null => do
 interface TrustSectionView {
   lead?: string;
   render: (data: TrustCenterPublic) => ReactNode;
-  /** Right-aligned header content (the controls search). */
-  aside?: ReactNode;
 }
 
 /** Sections that have content, in page order. */
@@ -213,15 +210,6 @@ export function TrustCenterPage({
     },
     controls: {
       lead: 'Security controls currently passing in continuous monitoring (via Vanta).',
-      aside: (
-        <SearchInput
-          placeholder="Search controls"
-          value={controlsQuery}
-          onChange={setControlsQuery}
-          debounceMs={0}
-          showDropdown={false}
-        />
-      ),
       render: d => (
         <ControlsSection
           domains={d.controlDomains}
@@ -263,13 +251,7 @@ export function TrustCenterPage({
             {sections.map(section => {
               const view = views[section.id];
               return (
-                <TrustSection
-                  key={section.id}
-                  id={section.id}
-                  title={section.label}
-                  lead={view.lead}
-                  aside={view.aside}
-                >
+                <TrustSection key={section.id} id={section.id} title={section.label} lead={view.lead}>
                   {view.render(data)}
                 </TrustSection>
               );

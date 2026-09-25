@@ -14,7 +14,7 @@
  * server answers as one flat, grouped, counted list.
  */
 
-import { useMemo, type ReactNode } from 'react';
+import { createElement, useMemo, useState, type ReactNode } from 'react';
 import {
   TRUST_DOCUMENT_REQUEST_PREFIX,
   TRUST_FRAMEWORK_STATUSES,
@@ -29,7 +29,9 @@ import {
   type TrustCenterSubprocessor,
   type TrustFrameworkStatusEntry,
 } from '../../types/trust-center';
+import { getFlagFromCountryName } from '../../utils/country-phone-utils';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
+import { brandLogoForName } from '../chat/utils/icon-library';
 import { ContactForm } from '../contact/contact-form';
 import { FileIcon } from '../icons-v2-generated/documents/file-icon';
 import { FileShieldIcon } from '../icons-v2-generated/documents/file-shield-icon';
@@ -40,12 +42,16 @@ import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { ListEmptyState } from '../list-empty-state';
 import { CardSkeletonGrid } from '../loading/card-skeleton';
+import { TextSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
 import { ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui/modal-v2';
+import { ScrollShadow } from '../ui/scroll-fade';
+import { SearchInput } from '../ui/search-input';
 import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
 import { StatusBadge } from '../ui/status-badge';
+import { TabNavigation, type TabItem } from '../ui/tab-navigation';
 import { Tag } from '../ui/tag';
 
 /** Status `icon` vocabulary (owned by `TRUST_FRAMEWORK_STATUSES`) → icon component, ONE lookup. */
@@ -55,7 +61,6 @@ const FRAMEWORK_ICONS: Record<TrustFrameworkStatusEntry['icon'], typeof ShieldCh
 };
 
 const STACK_CLASSES = 'flex flex-col gap-[var(--spacing-system-l)]';
-const TWO_COLUMN_GRID = 'grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-2';
 const BODY_TEXT = 'text-h6 text-ods-text-secondary';
 /**
  * The right-hand action / status column: ONE width from tablet up, so every
@@ -72,14 +77,11 @@ export function TrustSection({
   id,
   title,
   lead,
-  aside,
   children,
 }: {
   id: string;
   title: string;
   lead?: ReactNode;
-  /** Right-aligned header content (a search box, a CTA). */
-  aside?: ReactNode;
   children: ReactNode;
 }) {
   const headingId = `${id}-heading`;
@@ -90,14 +92,11 @@ export function TrustSection({
       className="flex flex-col gap-[var(--spacing-system-m)]"
       style={{ scrollMarginTop: STICKY_HEADER_OFFSET_PX }}
     >
-      <div className="flex flex-col gap-[var(--spacing-system-s)] md:flex-row md:items-end md:justify-between">
-        <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-          <h2 id={headingId} className={SECTION_HEADING_CLASS}>
-            {title}
-          </h2>
-          {lead ? <p className={BODY_TEXT}>{lead}</p> : null}
-        </div>
-        {aside ? <div className="w-full shrink-0 md:w-80">{aside}</div> : null}
+      <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
+        <h2 id={headingId} className={SECTION_HEADING_CLASS}>
+          {title}
+        </h2>
+        {lead ? <p className={BODY_TEXT}>{lead}</p> : null}
       </div>
       {children}
     </section>
@@ -234,6 +233,49 @@ export interface ControlsSearchState {
   onRetry: () => void;
 }
 
+/** The "every category" tab. */
+const ALL_CONTROLS_TAB = 'all';
+
+/** The controls list's FIXED height: browse, search, loading, empty and error all fill the same box, so nothing below it moves. */
+const CONTROLS_LIST_HEIGHT = 'h-[28rem] md:h-[36rem]';
+
+/** Skeleton rows shown in the list box while a search answer is on its way. */
+const CONTROLS_SKELETON_ROWS = 6;
+
+function controlCount(domains: readonly TrustCenterControlDomain[]): number {
+  return domains.reduce((sum, domain) => sum + domain.controls.length, 0);
+}
+
+function controlsTabId(domain: string): string {
+  return `domain-${domain.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+}
+
+function ControlsListSkeleton() {
+  const rows: PanelRow[] = Array.from({ length: CONTROLS_SKELETON_ROWS }, (_, index) => ({
+    id: `skeleton-${index}`,
+    columns: [
+      {
+        key: 'control',
+        content: (
+          <div className="flex w-full flex-col gap-[var(--spacing-system-xs)]">
+            <TextSkeleton.Body className="w-2/3" />
+            <TextSkeleton.Caption className="w-full" />
+          </div>
+        ),
+      },
+    ],
+  }));
+  return <StackedRowsPanel rows={rows} />;
+}
+
+/**
+ * Controls: category TABS (each with its count), the search INSIDE the
+ * section, and ONE fixed-height list box. Whatever the list shows — every
+ * control, the server's matches, skeleton rows while the answer is on its way,
+ * the empty or the error state — fills the same box, so typing never moves the
+ * page. While searching, the tab counts are the SERVER's matches per category;
+ * a tab only picks which of the returned categories is shown.
+ */
 export function ControlsSection({
   domains,
   query,
@@ -245,59 +287,91 @@ export function ControlsSection({
   search: ControlsSearchState;
   onQueryChange: (query: string) => void;
 }) {
-  const searching = query.trim().length > 0;
-  const results = search.results;
-  const total = useMemo(() => domains.reduce((sum, domain) => sum + domain.controls.length, 0), [domains]);
-  const matches = results?.reduce((sum, domain) => sum + domain.controls.length, 0) ?? 0;
+  const [selectedTab, setSelectedTab] = useState(ALL_CONTROLS_TAB);
+  const trimmed = query.trim();
+  const searching = trimmed.length > 0;
+  // What the list is showing: the server's answer while searching (null until it arrives), else everything.
+  const shown = searching ? search.results : domains;
+  const total = useMemo(() => controlCount(domains), [domains]);
+
+  const tabs: TabItem[] = [
+    { id: ALL_CONTROLS_TAB, label: `All · ${shown === null ? total : controlCount(shown)}` },
+    ...domains.map(domain => {
+      const inShown = shown?.find(candidate => candidate.domain === domain.domain);
+      const count = shown === null ? domain.controls.length : (inShown?.controls.length ?? 0);
+      return { id: controlsTabId(domain.domain), label: `${domain.domain} · ${count}` };
+    }),
+  ];
+  // A category that left the data (a revalidation) falls back to "All".
+  const activeTab = tabs.some(tab => tab.id === selectedTab) ? selectedTab : ALL_CONTROLS_TAB;
+  const visible =
+    shown === null
+      ? null
+      : activeTab === ALL_CONTROLS_TAB
+        ? shown
+        : shown.filter(domain => controlsTabId(domain.domain) === activeTab);
+
+  let summary: string;
+  if (!searching) summary = countLabel(total, 'passing control');
+  else if (search.error) summary = 'Search is unavailable';
+  else if (shown === null) summary = `Searching for “${trimmed}”…`;
+  else summary = `${controlCount(shown)} of ${countLabel(total, 'control')} match “${trimmed}”`;
+
+  let body: ReactNode;
+  if (searching && search.error) {
+    body = <LoadError message="Could not search the controls" onRetry={search.onRetry} />;
+  } else if (visible === null) {
+    body = <ControlsListSkeleton />;
+  } else if (visible.length === 0) {
+    body = (
+      <ListEmptyState
+        isFiltered
+        filtered={{
+          title: searching ? 'No matching controls' : 'No controls in this category',
+          description: searching ? 'Try another word, or another category.' : '',
+          clearText: 'Show all controls',
+        }}
+        onClearFilters={() => {
+          onQueryChange('');
+          setSelectedTab(ALL_CONTROLS_TAB);
+        }}
+        empty={{ title: 'No controls', description: '' }}
+      />
+    );
+  } else {
+    body = (
+      <div className={STACK_CLASSES}>
+        {visible.map(domain => (
+          <StackedRowsPanel
+            key={domain.domain}
+            title={`${domain.domain} · ${domain.controls.length}`}
+            rows={controlRows(domain.controls, trimmed)}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className={STACK_CLASSES}>
-      {searching && results !== null ? (
+    <div className="flex flex-col gap-[var(--spacing-system-m)]">
+      <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={setSelectedTab} />
+      <div className="flex flex-col gap-[var(--spacing-system-s)] md:flex-row md:items-center md:justify-between">
         <p className={BODY_TEXT} aria-live="polite">
-          {matches > 0
-            ? `${matches} of ${countLabel(total, 'control')} match “${query.trim()}”`
-            : `No controls match “${query.trim()}”`}
+          {summary}
         </p>
-      ) : null}
-
-      {searching && search.error ? (
-        <LoadError message="Could not search the controls" onRetry={search.onRetry} />
-      ) : searching && results === null ? (
-        <CardSkeletonGrid count={2} variant="category" />
-      ) : searching && results?.length === 0 ? (
-        <ListEmptyState
-          isFiltered
-          filtered={{
-            title: 'No matching controls',
-            description: 'Try another word, or ask our security team directly.',
-            clearText: 'Show all controls',
-          }}
-          onClearFilters={() => onQueryChange('')}
-          empty={{ title: 'No controls', description: '' }}
-        />
-      ) : searching ? (
-        // Search: ONE flat list, grouped by category, every match visible.
-        <div className={STACK_CLASSES}>
-          {(results ?? []).map(domain => (
-            <StackedRowsPanel
-              key={domain.domain}
-              title={`${domain.domain} · ${domain.controls.length}`}
-              rows={controlRows(domain.controls, query)}
-            />
-          ))}
+        <div className="w-full md:w-80">
+          <SearchInput
+            placeholder="Search controls"
+            value={query}
+            onChange={onQueryChange}
+            debounceMs={0}
+            showDropdown={false}
+          />
         </div>
-      ) : (
-        // Browse: every category with ALL its controls, always — nothing to expand.
-        <div className={TWO_COLUMN_GRID}>
-          {domains.map(domain => (
-            <StackedRowsPanel
-              key={domain.domain}
-              title={`${domain.domain} · ${domain.controls.length}`}
-              rows={controlRows(domain.controls)}
-            />
-          ))}
-        </div>
-      )}
+      </div>
+      <ScrollShadow className={CONTROLS_LIST_HEIGHT} scrollClassName="h-full" data-testid="controls-list">
+        {body}
+      </ScrollShadow>
     </div>
   );
 }
@@ -412,18 +486,42 @@ export function DocumentRequestModal({
 // Subprocessors
 // ---------------------------------------------------------------------------
 
+/** A subprocessor's mark: its brand logo when the icon set has one (`brandLogoForName`), else initials. */
+function subprocessorMark(name: string): ReactNode {
+  const logo = brandLogoForName(name);
+  return logo ? (
+    <span role="img" aria-label={name} className="flex">
+      {createElement(logo, { className: 'size-6' })}
+    </span>
+  ) : (
+    <EntityImage alt={name} fallbackText={name} sizeClassName="size-6" />
+  );
+}
+
+/** "🇺🇸 United States": the flag from the shared country lookup beside the name; the name alone when unknown. */
+function countryWithFlag(country: string): string {
+  const flag = getFlagFromCountryName(country);
+  return flag ? `${flag} ${country}` : country;
+}
+
 export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCenterSubprocessor[] }) {
   const rows: PanelRow[] = subprocessors.map(subprocessor => ({
     id: subprocessor.name,
     columns: [
       {
         key: 'name',
-        leadingIcon: <EntityImage alt={subprocessor.name} fallbackText={subprocessor.name} sizeClassName="size-10" />,
+        leadingIcon: subprocessorMark(subprocessor.name),
         value: subprocessor.name,
         label: subprocessor.purpose,
         href: subprocessor.url ?? undefined,
       },
-      { key: 'location', value: subprocessor.location, label: 'Location', hideAt: 'md', width: 'w-44 shrink-0' },
+      {
+        key: 'location',
+        value: countryWithFlag(subprocessor.location),
+        label: 'Location',
+        hideAt: 'md',
+        width: 'w-48 shrink-0',
+      },
       {
         key: 'category',
         width: 'w-56 shrink-0',

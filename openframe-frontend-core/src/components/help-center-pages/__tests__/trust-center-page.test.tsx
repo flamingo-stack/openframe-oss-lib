@@ -313,6 +313,52 @@ describe('TrustCenterPage', () => {
     expect(await screen.findByText('attest', { selector: 'strong' })).toBeInTheDocument();
   });
 
+  it('controls: category tabs with counts; a tab shows only its category', () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    expect(screen.getByRole('button', { name: 'All · 5' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Identification & authentication · 1' }));
+    expect(screen.getByText('Unique accounts')).toBeInTheDocument();
+    expect(screen.queryByText('Encryption at rest')).toBeNull();
+  });
+
+  it('controls: searching keeps ONE fixed-height list box — skeleton rows while the answer is on its way, then the matches, with server counts on the tabs', async () => {
+    const data = makeData();
+    serveControlsSearch(data);
+    render(<TrustCenterPage initialData={data} />);
+    const box = () => screen.getByTestId('controls-list');
+    const height = box().className;
+    typeSearch('log');
+    expect(screen.getByText(/Searching for “log”/)).toBeInTheDocument();
+    expect(box().className).toBe(height);
+    expect(await screen.findByText(/1 of 5 controls match/)).toBeInTheDocument();
+    expect(box().className).toBe(height);
+    expect(screen.getByRole('button', { name: 'All · 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Identification & authentication · 0' })).toBeInTheDocument();
+  });
+
+  it('subprocessors: a brand logo from the name, and the country with its flag', () => {
+    render(
+      <TrustCenterPage
+        initialData={makeData({
+          subprocessors: [
+            {
+              name: 'Google Cloud Platform',
+              purpose: 'Hosting',
+              location: 'United States',
+              category: 'Infrastructure',
+            },
+            { name: 'Acme Analytics', purpose: 'Analytics', location: 'Atlantis', category: 'Analytics' },
+          ],
+        })}
+      />,
+    );
+    const subprocessors = within(screen.getByRole('region', { name: 'Subprocessors' }));
+    expect(subprocessors.getByRole('img', { name: 'Google Cloud Platform' })).toBeInTheDocument();
+    expect(subprocessors.getByText('🇺🇸 United States')).toBeInTheDocument();
+    // No brand mark and no known country: initials and the plain name.
+    expect(subprocessors.getByText('Atlantis')).toBeInTheDocument();
+  });
+
   it('controls follow the CURRENT data: a revalidated copy shows its new controls', () => {
     const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
     expect(screen.queryByText('Backups tested')).toBeNull();
