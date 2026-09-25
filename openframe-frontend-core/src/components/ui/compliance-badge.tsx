@@ -98,7 +98,8 @@ export function ComplianceLogo({
       aria-label={`${standard.body} ${standard.mark}`}
       className={cn('flex size-10 shrink-0 items-center justify-center', className)}
     >
-      <Official size={40} aria-hidden="true" />
+      {/* Fills the box, so a caller's size class sizes the mark too (not only its frame). */}
+      <Official size={40} className="size-full" aria-hidden="true" />
     </span>
   ) : (
     <ComplianceBadge standard={standard} className={className} />
