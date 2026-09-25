@@ -83,12 +83,6 @@ export const TRUST_CENTER_DOCUMENT_TYPE = 'trust_center';
  *  unless the host re-homes the type through its `composeContentUrl` overrides. */
 export const TRUST_CENTER_PAGE_PATH = '/trust-center';
 
-/** Contact-form reason for a gated document request (HubSpot routing matches the prefix). */
-export const TRUST_DOCUMENT_REQUEST_PREFIX = 'Request trust document';
-export function trustDocumentContactReason(title: string): string {
-  return `${TRUST_DOCUMENT_REQUEST_PREFIX}: ${title}`;
-}
-
 /** A framework as the company's Vanta Trust Center lists it, with its monitoring state from Vanta's control data. */
 export interface TrustCenterFramework {
   id: string;
@@ -171,6 +165,11 @@ export interface TrustCenterPublic {
   connected: boolean;
   /** Where the monitoring data is synced from, for the page's `DataAttribution` line: named and pictured by the hub. */
   dataSource: TrustCenterDataSource;
+  /**
+   * The contact form's help category for a document request: one of the serving
+   * platform's own categories, named by the hub. The page never invents one.
+   */
+  documentRequestCategory: string;
 }
 
 export interface TrustCenterDataSource {
@@ -258,8 +257,7 @@ export function normalizeTrustControlQuery(query: string | null | undefined): st
 /**
  * THE control matcher: the escaped query, case-insensitive, matched on the
  * ORIGINAL text (lowercasing first misaligns offsets wherever it changes a
- * string's length, `İ` → `i̇`). The server filters with it and the page
- * highlights with it, so a returned row always shows why it matched.
+ * string's length, `İ` → `i̇`). The server filters the controls with it.
  */
 export function trustControlQueryMatcher(query: string): RegExp | null {
   const needle = normalizeTrustControlQuery(query);

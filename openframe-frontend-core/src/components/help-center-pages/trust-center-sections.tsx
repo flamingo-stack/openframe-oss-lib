@@ -19,11 +19,8 @@ import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
   TRUST_CENTER_SEARCH_DEBOUNCE_MS,
-  TRUST_DOCUMENT_REQUEST_PREFIX,
   normalizeTrustControlQuery,
   trustCenterControlsUrl,
-  trustControlQueryMatcher,
-  trustDocumentContactReason,
   trustFrameworkBadge,
   trustFrameworkMonitoringEntry,
   type TrustCenterAiPractice,
@@ -180,25 +177,6 @@ export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFrame
 // ---------------------------------------------------------------------------
 
 /**
- * The query's first match in `text`, emphasised (ODS accent). Presentation
- * only: the SERVER decides which controls match (`?q=`), with the same
- * `trustControlQueryMatcher`, so every returned row shows why. Exported for tests.
- */
-export function highlight(text: string, query: string): ReactNode {
-  const match = trustControlQueryMatcher(query)?.exec(text) ?? null;
-  if (!match) return text;
-  const at = match.index;
-  const end = at + match[0].length;
-  return (
-    <>
-      {text.slice(0, at)}
-      <strong className="text-ods-accent">{text.slice(at, end)}</strong>
-      {text.slice(end)}
-    </>
-  );
-}
-
-/**
  * Every control row is ONE fixed height (one line of name, one of description),
  * so the list box shows exactly 5 of them and scrolls for
  * the rest.
@@ -206,7 +184,7 @@ export function highlight(text: string, query: string): ReactNode {
 const CONTROL_ROW_CLASS = 'h-14 md:h-20 overflow-hidden';
 
 /** ONE row renderer for the controls list: fixed-height rows, one line each for name and description. */
-function controlRows(controls: TrustCenterControl[], query = ''): PanelRow[] {
+function controlRows(controls: TrustCenterControl[]): PanelRow[] {
   return controls.map(control => ({
     id: control.id,
     className: CONTROL_ROW_CLASS,
@@ -214,9 +192,8 @@ function controlRows(controls: TrustCenterControl[], query = ''): PanelRow[] {
       {
         key: 'control',
         leadingIcon: <CheckIcon className="text-ods-success" role="img" aria-label="Passing" />,
-        value: highlight(control.name, query),
-        // A description-only match is emphasised too: every kept row shows why it matched.
-        label: control.description ? highlight(control.description, query) : undefined,
+        value: control.name,
+        label: control.description ?? undefined,
       },
     ],
   }));
@@ -322,7 +299,7 @@ export function ControlsSection({ endpoint, seed }: { endpoint: string; seed: Tr
       />
     );
   } else {
-    body = <StackedRowsPanel rows={controlRows(current.controls, query)} />;
+    body = <StackedRowsPanel rows={controlRows(current.controls)} />;
   }
 
   return (
@@ -420,14 +397,16 @@ export function DocumentsSection({
 export function DocumentRequestModal({
   open,
   documentTitle,
+  category,
   onClose,
 }: {
   open: boolean;
+  /** The serving platform's help category for these requests (`TrustCenterPublic.documentRequestCategory`). */
+  category: string;
   /** The document the request started from, or null for "all gated documents". */
   documentTitle: string | null;
   onClose: () => void;
 }) {
-  const reason = documentTitle ? trustDocumentContactReason(documentTitle) : TRUST_DOCUMENT_REQUEST_PREFIX;
   const message = documentTitle
     ? `I'd like access to: ${documentTitle}.`
     : "I'd like access to your gated security documentation.";
@@ -448,7 +427,7 @@ export function DocumentRequestModal({
               noBorder
               noPadding
               hideFields={['companySize', 'referralSource', 'helpCategory']}
-              defaultValues={{ helpCategory: reason, message }}
+              defaultValues={{ helpCategory: category, message }}
               submitLabel="Request access"
               successRedirectUrl=""
               successToastMessage="Thanks — our security team will follow up by email."

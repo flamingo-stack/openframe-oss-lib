@@ -8,16 +8,13 @@ import {
   TRUST_CENTER_TAGLINE,
   TRUST_CENTER_TITLE,
   TRUST_CENTER_API_PATH,
-  TRUST_DOCUMENT_REQUEST_PREFIX,
   filterTrustControlDomains,
   trustCenterControlsUrl,
   type TrustCenterControlsPage,
-  trustDocumentContactReason,
   type TrustCenterPublic,
 } from '../../../types/trust-center';
 import { TRUST_CENTER_FIXTURE_WINDOW_MS, makeTrustCenterData } from '../__fixtures__/trust-center';
 import { TrustCenterPage } from '../trust-center-page';
-import { highlight } from '../trust-center-sections';
 
 // The real ContactForm needs the endpoints + chat runtimes; the page only
 // decides WHAT it is handed, so a stub that echoes its props is the honest
@@ -161,13 +158,13 @@ describe('TrustCenterPage', () => {
     expect(await screen.findByTestId('contact-form')).toBeInTheDocument();
   });
 
-  it('ONE access request: the hero CTA asks for all gated documents, a row asks for its own; marketing fields hidden', async () => {
-    render(<TrustCenterPage initialData={makeData()} />);
+  it("ONE access request, filed under the hub's category: the hero CTA asks for all gated documents, a row names its own in the message", async () => {
+    render(<TrustCenterPage initialData={makeData({ documentRequestCategory: 'Security documents request' })} />);
 
     // PageLayout renders its actions once per breakpoint (desktop + mobile bar).
     fireEvent.click(screen.getAllByRole('button', { name: 'Request access' })[0]);
     let dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByTestId('reason')).toHaveTextContent(TRUST_DOCUMENT_REQUEST_PREFIX);
+    expect(within(dialog).getByTestId('reason')).toHaveTextContent('Security documents request');
     expect(within(dialog).getByTestId('hidden')).toHaveTextContent('companySize|referralSource|helpCategory');
     expect(within(dialog).getByTestId('redirect')).toHaveTextContent('""');
     fireEvent.click(within(dialog).getByText('stub-submit'));
@@ -175,7 +172,7 @@ describe('TrustCenterPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Request SOC 2 report' }));
     dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByTestId('reason')).toHaveTextContent(trustDocumentContactReason('SOC 2 report'));
+    expect(within(dialog).getByTestId('reason')).toHaveTextContent('Security documents request');
     expect(within(dialog).getByTestId('message')).toHaveTextContent('SOC 2 report');
   });
 
@@ -438,14 +435,13 @@ describe('TrustCenterPage', () => {
     typeSearch('lo');
     typeSearch('log');
     expect(screen.getByText(/Searching for/)).toBeInTheDocument();
-    expect(await screen.findByText('Log', { selector: 'strong' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Infrastructure security · 1' })).toBeInTheDocument();
     expect(asked).toEqual([{ domain: 'Infrastructure security', query: 'log' }]);
-    expect(screen.getByRole('button', { name: 'Infrastructure security · 1' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Identification & authentication · 0' })).toBeInTheDocument();
     expect(screen.getByText(/1 in Infrastructure security match “log” · 5 controls in total/)).toBeInTheDocument();
   });
 
-  it('controls: a match only in the description is highlighted in the description; a category with no match says so', async () => {
+  it('controls: a row matched only by its description is listed as returned, with no emphasis; a category with no match says so', async () => {
     const data = makeData();
     data.controlDomains[0].controls[0] = {
       id: 'c1',
@@ -455,18 +451,10 @@ describe('TrustCenterPage', () => {
     serveControls(data);
     render(<TrustCenterPage initialData={data} />);
     typeSearch('attest');
-    expect(await screen.findByText('attest', { selector: 'strong' })).toBeInTheDocument();
+    expect(await screen.findByText('Quarterly attestation by owners')).toBeInTheDocument();
+    expect(screen.queryByText(/.+/, { selector: 'strong' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Identification & authentication · 0' }));
     expect(await screen.findByText('No matching controls')).toBeInTheDocument();
-  });
-
-  it('controls: highlights on the ORIGINAL text, even after a character whose lowercase is longer', async () => {
-    const data = makeData();
-    data.controlDomains[0].controls[3] = { id: 'c5', name: 'İİ Logging enabled', description: null };
-    serveControls(data);
-    render(<TrustCenterPage initialData={data} />);
-    typeSearch('log');
-    expect(await screen.findByText('Log', { selector: 'strong' })).toBeInTheDocument();
   });
 
   it('controls: a failed answer offers a retry, and the retry asks the server again', async () => {
@@ -477,7 +465,7 @@ describe('TrustCenterPage', () => {
     expect(await screen.findByText('Could not load the controls')).toBeInTheDocument();
     serveControls(data);
     fireEvent.click(screen.getByRole('button', { name: /try again|retry/i }));
-    expect(await screen.findByText('Log', { selector: 'strong' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Could not load the controls')).toBeNull());
   });
 });
 
@@ -496,38 +484,6 @@ describe('TrustCenterPage — reuse-only source check', () => {
   });
 });
 
-describe('highlight', () => {
-  /** The emphasised part of `highlight(text, query)`, or null when nothing matched. */
-  function strongOf(text: string, query: string): string | null {
-    render(<p>{highlight(text, query)}</p>);
-    return screen.queryByText(/.+/, { selector: 'strong' })?.textContent ?? null;
-  }
-
-  it('matches regex metacharacters literally', () => {
-    expect(strongOf('Copyright (c) notices', '(c)')).toBe('(c)');
-  });
-
-  it('is case-insensitive on metacharacter queries', () => {
-    expect(strongOf('Tier a+b storage', 'A+B')).toBe('a+b');
-  });
-
-  it('never treats the query as a pattern', () => {
-    expect(strongOf('No match here', '.*')).toBeNull();
-  });
-
-  it('keeps the match aligned after characters whose lowercase changes length', () => {
-    expect(strongOf('İİ audit logging', 'LOG')).toBe('log');
-  });
-
-  it('matches a character whose lowercase changes length', () => {
-    expect(strongOf('İstanbul office', 'İ')).toBe('İ');
-  });
-
-  it('returns the plain text for an empty query', () => {
-    expect(strongOf('Encryption at rest', '   ')).toBeNull();
-  });
-});
-
 describe('trustCenterControlsUrl', () => {
   it('builds /controls beside the endpoint, keeping an embed proxy query string, with domain and a normalized q', () => {
     expect(trustCenterControlsUrl('/api/trust-center')).toBe('/api/trust-center/controls');
@@ -543,7 +499,7 @@ describe('trustCenterControlsUrl', () => {
 describe('filterTrustControlDomains (the server-side filter)', () => {
   const domains = makeTrustCenterData().controlDomains;
 
-  it('matches metacharacters literally and case-insensitively, exactly what highlight emphasises', () => {
+  it('matches metacharacters literally and case-insensitively', () => {
     const withMeta = [{ ...domains[0], controls: [{ id: 'm', name: 'Tier a+b storage', description: null }] }];
     expect(filterTrustControlDomains(withMeta, 'A+B')).toHaveLength(1);
     expect(filterTrustControlDomains(withMeta, '.*')).toHaveLength(0);

@@ -286,7 +286,12 @@ export function TrustCenterPage({
           </aside>
         </div>
 
-        <DocumentRequestModal open={request.open} documentTitle={request.documentTitle} onClose={closeRequest} />
+        <DocumentRequestModal
+          open={request.open}
+          documentTitle={request.documentTitle}
+          category={data.documentRequestCategory}
+          onClose={closeRequest}
+        />
       </>
     );
   }

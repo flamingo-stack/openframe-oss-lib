@@ -88,6 +88,7 @@ export function makeTrustCenterData(overrides: Partial<TrustCenterPublic> = {}):
     monitoredWindowMs: TRUST_CENTER_FIXTURE_WINDOW_MS,
     connected: true,
     dataSource: { name: 'Vanta', logoUrl: 'https://icons.example/vanta.com.png' },
+    documentRequestCategory: 'Security documents request',
     ...overrides,
   };
 }
