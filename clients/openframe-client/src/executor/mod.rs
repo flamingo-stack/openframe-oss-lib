@@ -5,7 +5,7 @@ mod tempfile;
 #[cfg(unix)]
 mod unix;
 #[cfg(windows)]
-mod windows;
+pub(crate) mod windows;
 
 #[cfg(unix)]
 pub use unix::execute_script;
