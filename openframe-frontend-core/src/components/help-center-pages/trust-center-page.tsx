@@ -16,10 +16,12 @@
  * embedders pass their `/content` proxy path). `initialData` (hub SSR) skips the
  * first fetch; a visible tab re-validates after `TRUST_CENTER_CACHE_SECONDS`.
  *
- * MONITORING is derived on the client AFTER MOUNT from `syncedAt` +
- * `monitoredWindowMs` (`isTrustCenterMonitored`). Before mount the status is
- * NEUTRAL (never a claim that flips), and the subtitle only promises continuous
- * monitoring when the projection is connected.
+ * MONITORING is derived on the client AFTER HYDRATION from `syncedAt` +
+ * `monitoredWindowMs` (`isTrustCenterMonitored`), against a clock re-read every
+ * time the data changes — so a long-open tab flips to "Monitoring paused" on
+ * revalidation. Before hydration the status is NEUTRAL (never a claim that
+ * flips). The subtitle is the brand-neutral `TRUST_CENTER_TAGLINE` unless the
+ * host overrides it.
  */
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
@@ -30,12 +32,17 @@ import {
   TRUST_CENTER_API_PATH,
   TRUST_CENTER_CACHE_SECONDS,
   TRUST_CENTER_SECTIONS,
+  TRUST_CENTER_TAGLINE,
+  TRUST_CENTER_TITLE,
   isTrustCenterMonitored,
+  type TrustCenterDocument,
   type TrustCenterPublic,
   type TrustCenterSectionId,
 } from '../../types/trust-center';
 import { formatAbsoluteDate, formatRelativeTime } from '../../utils/date-utils';
+import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
+import { FaqSection } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
@@ -49,7 +56,6 @@ import {
   ControlsSection,
   DocumentRequestModal,
   DocumentsSection,
-  FaqList,
   SubprocessorsSection,
   TrustCenterSkeleton,
   TrustSection,
@@ -65,10 +71,27 @@ export interface TrustCenterPageProps {
   shell?: boolean;
   /** Back-button config. Default: none (a trust center is usually a top-level page). */
   backButton?: { label?: string; href?: string } | false;
-  /** Page title. Default "Trust Center". */
+  /** Page title. Default `TRUST_CENTER_TITLE`. */
   title?: string;
-  /** Overrides the data-driven subtitle. */
+  /** Page subtitle. Default the brand-neutral `TRUST_CENTER_TAGLINE` (a host adds its brand here). */
   subtitle?: string;
+  /**
+   * Where a PUBLIC document's "View" button goes, or `null` to offer a request
+   * instead. Default `document.url`. Hosts map `legalDocType` onto their own
+   * legal route (e.g. `/legal/privacy`) so the reader stays in the app.
+   */
+  documentHref?: (document: TrustCenterDocument) => string | null;
+}
+
+/** The default `documentHref`: the projection's own URL. */
+const defaultDocumentHref = (document: TrustCenterDocument): string | null => document.url ?? null;
+
+/** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
+interface TrustSectionView {
+  lead?: string;
+  render: (data: TrustCenterPublic) => ReactNode;
+  /** Right-aligned header content (the controls search). */
+  aside?: ReactNode;
 }
 
 /** Sections that have content, in page order. */
@@ -109,8 +132,9 @@ export function TrustCenterPage({
   initialData,
   shell = true,
   backButton = false,
-  title = 'Trust Center',
-  subtitle,
+  title = TRUST_CENTER_TITLE,
+  subtitle = TRUST_CENTER_TAGLINE,
+  documentHref = defaultDocumentHref,
 }: TrustCenterPageProps) {
   const router = useRouter();
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
@@ -119,8 +143,15 @@ export function TrustCenterPage({
   });
   // `false` during SSR + hydration, `true` after mount — gates everything clock-dependent.
   const hydrated = useIsHydrated();
-  // Read the clock once per mount (a lazy initialiser, not a render-time call).
-  const [nowMs] = useState(() => Date.now());
+  // The clock is re-read whenever the DATA changes (React's "adjust state while
+  // rendering" pattern, keyed on the data identity): a revalidated copy is judged
+  // against the time it arrived, not the time the tab was opened. Only read
+  // after hydration (`monitoringStatus`), so the SSR value never reaches the DOM.
+  const [clock, setClock] = useState(() => ({ data, nowMs: Date.now() }));
+  if (clock.data !== data) {
+    setClock(() => ({ data, nowMs: Date.now() }));
+  }
+  const nowMs = clock.nowMs;
   const [request, setRequest] = useState<{ open: boolean; documentTitle: string | null }>({
     open: false,
     documentTitle: null,
@@ -137,7 +168,6 @@ export function TrustCenterPage({
       ? undefined
       : { label: backButton.label ?? 'Back to home', onClick: () => router.push(backButton.href ?? '/') };
 
-  const resolvedSubtitle = subtitle ?? 'Security, privacy and AI governance at Flamingo.';
   const hasGatedDocuments = data?.documents.some(document => document.access === 'request') ?? false;
   const actions = data
     ? [
@@ -148,6 +178,44 @@ export function TrustCenterPage({
       ]
     : undefined;
 
+  // Section id → its content. Titles come from `TRUST_CENTER_SECTIONS`; which
+  // sections show comes from `visibleSections` — this map only says what each renders.
+  const views: Record<TrustCenterSectionId, TrustSectionView> = {
+    ai: {
+      lead: 'How customer data is handled by the AI in our products.',
+      render: d => <AiSection practices={d.aiPractices} />,
+    },
+    compliance: {
+      lead: 'Frameworks we are audited against, and what is next.',
+      render: d => <ComplianceSection frameworks={d.frameworks} />,
+    },
+    controls: {
+      lead: 'Security controls currently passing in continuous monitoring (via Vanta).',
+      aside: (
+        <SearchInput
+          placeholder="Search controls"
+          value={controlsQuery}
+          onChange={setControlsQuery}
+          debounceMs={0}
+          showDropdown={false}
+        />
+      ),
+      render: d => (
+        <ControlsSection domains={d.controlDomains} query={controlsQuery} onQueryChange={setControlsQuery} />
+      ),
+    },
+    documents: {
+      lead: 'Public documents open directly. Gated documents are shared under NDA after one short request.',
+      render: d => <DocumentsSection documents={d.documents} documentHref={documentHref} onRequest={openRequest} />,
+    },
+    subprocessors: {
+      lead: 'Third parties that process customer data on our behalf.',
+      render: d => <SubprocessorsSection subprocessors={d.subprocessors} />,
+    },
+    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} /> },
+    contact: { render: d => <ContactSection contact={d.contact} /> },
+  };
+
   let body: ReactNode;
   if (error && !data) {
     body = <LoadError message="Could not load the trust center" onRetry={reload} />;
@@ -155,79 +223,30 @@ export function TrustCenterPage({
     body = isLoading ? <TrustCenterSkeleton /> : null;
   } else {
     const status = monitoringStatus(data, hydrated, nowMs);
-    const shown = new Set(sections.map(section => section.id));
     body = (
       <>
         <StatusIndicator status={status.status} label={status.label} />
 
         <div className="grid grid-cols-1 gap-[var(--spacing-system-xl)] lg:grid-cols-[minmax(0,1fr)_12rem]">
           <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxl)]">
-            {shown.has('ai') && (
-              <TrustSection
-                id="ai"
-                title="AI & data use"
-                lead="How customer data is handled by the AI in our products."
-              >
-                <AiSection practices={data.aiPractices} />
-              </TrustSection>
-            )}
-            {shown.has('compliance') && (
-              <TrustSection
-                id="compliance"
-                title="Compliance"
-                lead="Frameworks we are audited against, and what is next."
-              >
-                <ComplianceSection frameworks={data.frameworks} />
-              </TrustSection>
-            )}
-            {shown.has('controls') && (
-              <TrustSection
-                id="controls"
-                title="Controls"
-                lead="Security controls currently passing in continuous monitoring (via Vanta)."
-                aside={
-                  <SearchInput
-                    placeholder="Search controls"
-                    value={controlsQuery}
-                    onChange={setControlsQuery}
-                    debounceMs={0}
-                    showDropdown={false}
-                  />
-                }
-              >
-                <ControlsSection domains={data.controlDomains} query={controlsQuery} onQueryChange={setControlsQuery} />
-              </TrustSection>
-            )}
-            {shown.has('documents') && (
-              <TrustSection
-                id="documents"
-                title="Documents"
-                lead="Public documents open directly. Gated documents are shared under NDA after one short request."
-              >
-                <DocumentsSection documents={data.documents} onRequest={openRequest} />
-              </TrustSection>
-            )}
-            {shown.has('subprocessors') && (
-              <TrustSection
-                id="subprocessors"
-                title="Subprocessors"
-                lead="Third parties that process customer data on our behalf."
-              >
-                <SubprocessorsSection subprocessors={data.subprocessors} />
-              </TrustSection>
-            )}
-            {shown.has('faq') && (
-              <TrustSection id="faq" title="FAQ">
-                <FaqList faqs={data.faqs} />
-              </TrustSection>
-            )}
-            <TrustSection id="contact" title="Contact">
-              <ContactSection contact={data.contact} />
-            </TrustSection>
+            {sections.map(section => {
+              const view = views[section.id];
+              return (
+                <TrustSection
+                  key={section.id}
+                  id={section.id}
+                  title={section.label}
+                  lead={view.lead}
+                  aside={view.aside}
+                >
+                  {view.render(data)}
+                </TrustSection>
+              );
+            })}
           </div>
 
           <aside className="hidden lg:block" aria-label="Trust center sections">
-            <div className="sticky top-24">
+            <div className="sticky" style={{ top: STICKY_HEADER_OFFSET_PX }}>
               <StickySectionNav
                 sections={sections.map(section => ({ id: section.id, label: section.label }))}
                 activeSection={activeSection}
@@ -245,7 +264,7 @@ export function TrustCenterPage({
   const inner = (
     <PageLayout
       title={title}
-      subtitle={resolvedSubtitle}
+      subtitle={subtitle}
       backButton={backCfg}
       titleSize="h1"
       titleWrap

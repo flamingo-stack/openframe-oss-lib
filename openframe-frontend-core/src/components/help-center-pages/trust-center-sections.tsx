@@ -15,7 +15,6 @@
  */
 
 import { useMemo, useState, type ReactNode } from 'react';
-import type { Faq } from '../../types/faq';
 import {
   TRUST_DOCUMENT_REQUEST_PREFIX,
   trustDocumentContactReason,
@@ -29,8 +28,9 @@ import {
   type TrustCenterSubprocessor,
   type TrustFrameworkStatusEntry,
 } from '../../types/trust-center';
+import { escapeRegExp } from '../../utils/escape-regexp';
+import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { ContactForm } from '../contact/contact-form';
-import { FaqSection } from '../faq/faq-section';
 import { ActivityIcon } from '../icons-v2-generated/charts/activity-icon';
 import { EmailShieldIcon } from '../icons-v2-generated/communication/email-shield-icon';
 import { FileIcon } from '../icons-v2-generated/documents/file-icon';
@@ -86,7 +86,12 @@ export function TrustSection({
 }) {
   const headingId = `${id}-heading`;
   return (
-    <section id={id} aria-labelledby={headingId} className="flex scroll-mt-24 flex-col gap-[var(--spacing-system-m)]">
+    <section
+      id={id}
+      aria-labelledby={headingId}
+      className="flex flex-col gap-[var(--spacing-system-m)]"
+      style={{ scrollMarginTop: STICKY_HEADER_OFFSET_PX }}
+    >
       <div className="flex flex-col gap-[var(--spacing-system-s)] md:flex-row md:items-end md:justify-between">
         <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
           <h2 id={headingId} className={SECTION_HEADING_CLASS}>
@@ -113,7 +118,7 @@ export function AiSection({ practices }: { practices: TrustCenterAiPractice[] })
     <div className="flex flex-col gap-[var(--spacing-system-m)]">
       {commitment ? (
         <CardHorizontal
-          icon={<ShieldCheckIcon className="text-ods-success" />}
+          icon={<ShieldCheckIcon className="text-ods-success" aria-hidden="true" />}
           title={commitment.value}
           description={commitment.label}
           className="border-l-ods-success"
@@ -124,7 +129,7 @@ export function AiSection({ practices }: { practices: TrustCenterAiPractice[] })
           {rest.map(practice => (
             <CardHorizontal
               key={practice.label}
-              icon={<BrainAIIcon />}
+              icon={<BrainAIIcon aria-hidden="true" />}
               title={practice.label}
               description={practice.value}
               borderLeft={false}
@@ -161,7 +166,7 @@ export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFrame
               <DashboardInfoCard
                 key={framework.id}
                 title={entry.label}
-                icon={<Icon />}
+                icon={<Icon aria-hidden="true" />}
                 value={framework.label}
                 subValue={framework.reportPeriod ?? undefined}
                 {...(hasPercent ? { showProgress: true, percentage: framework.percent } : {})}
@@ -201,16 +206,23 @@ export function filterControlDomains(domains: TrustCenterControlDomain[], query:
     .filter(domain => domain.controls.length > 0);
 }
 
-/** The query's first match in `text`, emphasised (ODS accent). */
-function highlight(text: string, query: string): ReactNode {
-  const needle = query.trim().toLowerCase();
-  const at = needle ? text.toLowerCase().indexOf(needle) : -1;
-  if (at < 0) return text;
+/**
+ * The query's first match in `text`, emphasised (ODS accent). Matched on the
+ * ORIGINAL text with a case-insensitive RegExp of the escaped needle — slicing
+ * by `toLowerCase()` offsets misaligns wherever lowercasing changes a string's
+ * length (`İ` → `i̇`). Exported for tests.
+ */
+export function highlight(text: string, query: string): ReactNode {
+  const needle = query.trim();
+  const match = needle ? new RegExp(escapeRegExp(needle), 'iu').exec(text) : null;
+  if (!match) return text;
+  const at = match.index;
+  const end = at + match[0].length;
   return (
     <>
       {text.slice(0, at)}
-      <strong className="text-ods-accent">{text.slice(at, at + needle.length)}</strong>
-      {text.slice(at + needle.length)}
+      <strong className="text-ods-accent">{text.slice(at, end)}</strong>
+      {text.slice(end)}
     </>
   );
 }
@@ -222,7 +234,7 @@ function controlRows(controls: TrustCenterControl[], query = ''): PanelRow[] {
     columns: [
       {
         key: 'control',
-        leadingIcon: <CheckIcon className="text-ods-success" aria-label="Passing" />,
+        leadingIcon: <CheckIcon className="text-ods-success" role="img" aria-label="Passing" />,
         value: highlight(control.name, query),
         label: control.description ?? undefined,
       },
@@ -243,7 +255,11 @@ export function ControlsSection({
   query: string;
   onQueryChange: (query: string) => void;
 }) {
-  const [openDomain, setOpenDomain] = useState<TrustCenterControlDomain | null>(null);
+  // The drawer holds the category NAME and reads its controls from the current
+  // `domains`, so a revalidation while it is open shows the new data (and a
+  // category that disappeared simply closes it).
+  const [openDomainName, setOpenDomainName] = useState<string | null>(null);
+  const openDomain = openDomainName === null ? null : (domains.find(d => d.domain === openDomainName) ?? null);
   const searching = query.trim().length > 0;
   const results = useMemo(() => filterControlDomains(domains, query), [domains, query]);
   const total = useMemo(() => domains.reduce((sum, domain) => sum + domain.controls.length, 0), [domains]);
@@ -296,7 +312,7 @@ export function ControlsSection({
                   <Button
                     variant="transparent"
                     size="small"
-                    onClick={() => setOpenDomain(domain)}
+                    onClick={() => setOpenDomainName(domain.domain)}
                     className="self-start"
                     aria-label={`View all ${domain.controls.length} ${domain.domain} controls`}
                   >
@@ -309,13 +325,8 @@ export function ControlsSection({
         </div>
       )}
 
-      <Drawer open={openDomain !== null} onOpenChange={open => (open ? undefined : setOpenDomain(null))}>
-        <DrawerContent
-          side="right"
-          offsetHeader
-          aria-describedby={undefined}
-          className="w-[calc(100vw-2rem)] sm:w-[32rem] sm:max-w-[calc(100vw-2rem)]"
-        >
+      <Drawer open={openDomain !== null} onOpenChange={open => (open ? undefined : setOpenDomainName(null))}>
+        <DrawerContent side="right" size="medium" offsetHeader aria-describedby={undefined}>
           <DrawerHeader>
             <DrawerTitle>{openDomain?.domain ?? ''}</DrawerTitle>
           </DrawerHeader>
@@ -324,7 +335,7 @@ export function ControlsSection({
               <FeatureList
                 iconBoxSize={40}
                 items={openDomain.controls.map(control => ({
-                  icon: <CheckIcon className="text-ods-success" />,
+                  icon: <CheckIcon className="text-ods-success" role="img" aria-label="Passing" />,
                   title: control.name,
                   description: control.description ?? '',
                 }))}
@@ -343,20 +354,28 @@ export function ControlsSection({
 
 export function DocumentsSection({
   documents,
+  documentHref,
   onRequest,
 }: {
   documents: TrustCenterDocument[];
+  /** Where a public document's "View" goes; `null` → offer a request instead. */
+  documentHref: (document: TrustCenterDocument) => string | null;
   /** Open the ONE access request, optionally for a named document. */
   onRequest: (documentTitle: string | null) => void;
 }) {
   const rows: PanelRow[] = documents.map(document => {
     const gated = document.access === 'request';
+    const href = gated ? null : documentHref(document);
     return {
       id: document.title,
       columns: [
         {
           key: 'document',
-          leadingIcon: gated ? <LockIcon aria-label="Available on request" /> : <FileIcon aria-label="Public" />,
+          leadingIcon: gated ? (
+            <LockIcon role="img" aria-label="Available on request" />
+          ) : (
+            <FileIcon role="img" aria-label="Public" />
+          ),
           value: document.title,
           label: gated ? `${document.kind} · available on request` : `${document.kind} · public`,
         },
@@ -365,7 +384,7 @@ export function DocumentsSection({
           width: 'shrink-0',
           align: 'right',
           content:
-            gated || !document.url ? (
+            href === null ? (
               <Button
                 variant="outline"
                 size="small"
@@ -375,7 +394,7 @@ export function DocumentsSection({
                 Request
               </Button>
             ) : (
-              <Button variant="outline" size="small" href={document.url} aria-label={`View ${document.title}`}>
+              <Button variant="outline" size="small" href={href} aria-label={`View ${document.title}`}>
                 View
               </Button>
             ),
@@ -435,7 +454,7 @@ export function DocumentRequestModal({
 }
 
 // ---------------------------------------------------------------------------
-// Subprocessors, FAQ
+// Subprocessors
 // ---------------------------------------------------------------------------
 
 export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCenterSubprocessor[] }) {
@@ -463,10 +482,6 @@ export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCe
   return <StackedRowsPanel rows={rows} />;
 }
 
-export function FaqList({ faqs }: { faqs: Faq[] }) {
-  return <FaqSection initialFaqs={faqs} heading={null} />;
-}
-
 // ---------------------------------------------------------------------------
 // Contact + loading
 // ---------------------------------------------------------------------------
@@ -476,7 +491,7 @@ export function ContactSection({ contact }: { contact: TrustCenterContact }) {
     <div className={TWO_COLUMN_GRID}>
       <div className="flex flex-col gap-[var(--spacing-system-s)]">
         <CardHorizontal
-          icon={<EmailShieldIcon />}
+          icon={<EmailShieldIcon aria-hidden="true" />}
           title="Report a vulnerability"
           description={`Security questions and responsible disclosure: ${contact.securityEmail}`}
         />
@@ -494,7 +509,7 @@ export function ContactSection({ contact }: { contact: TrustCenterContact }) {
       {contact.statusPageUrl ? (
         <div className="flex flex-col gap-[var(--spacing-system-s)]">
           <CardHorizontal
-            icon={<ActivityIcon />}
+            icon={<ActivityIcon aria-hidden="true" />}
             title="System status"
             description="Live uptime and incident history."
           />

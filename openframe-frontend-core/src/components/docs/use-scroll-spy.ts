@@ -66,8 +66,12 @@ export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrol
       let currentSection = sectionIds[0] ?? '';
 
       // At the bottom of the page the last sections can never reach the offset
-      // line, so they would never highlight: the last one wins there.
-      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      // line, so they would never highlight: the last one wins there. Only on a
+      // page that actually SCROLLS — a short page is "at the bottom" at
+      // scrollY 0, which would otherwise highlight the last section on load.
+      const { scrollHeight } = document.documentElement;
+      const scrollable = scrollHeight > window.innerHeight + 2;
+      const atBottom = scrollable && window.innerHeight + window.scrollY >= scrollHeight - 2;
       if (atBottom) {
         currentSection = sectionIds[sectionIds.length - 1] ?? currentSection;
       } else {

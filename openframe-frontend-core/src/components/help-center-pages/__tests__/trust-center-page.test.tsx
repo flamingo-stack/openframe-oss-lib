@@ -4,11 +4,15 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setMockSearchParams } from '../../../../vitest.setup';
 import {
+  TRUST_CENTER_TAGLINE,
+  TRUST_CENTER_TITLE,
   TRUST_DOCUMENT_REQUEST_PREFIX,
   trustDocumentContactReason,
-  type TrustCenterPublic,
+  type TrustCenterDocument,
 } from '../../../types/trust-center';
+import { TRUST_CENTER_FIXTURE_WINDOW_MS, makeTrustCenterData } from '../__fixtures__/trust-center';
 import { TrustCenterPage } from '../trust-center-page';
+import { highlight } from '../trust-center-sections';
 
 // The real ContactForm needs the endpoints + chat runtimes; the page only
 // decides WHAT it is handed, so a stub that echoes its props is the honest
@@ -32,52 +36,8 @@ vi.mock('../../contact/contact-form', () => ({
   ),
 }));
 
-const WINDOW_MS = 2 * 60 * 60 * 1000;
-
-function makeData(overrides: Partial<TrustCenterPublic> = {}): TrustCenterPublic {
-  return {
-    frameworks: [
-      { id: 'soc2', label: 'SOC 2 Type II', status: 'in_progress' },
-      { id: 'iso27001', label: 'ISO 27001', status: 'planned' },
-    ],
-    controlDomains: [
-      {
-        domain: 'Infrastructure security',
-        controls: [
-          { id: 'c1', name: 'Encryption at rest', description: 'Data stores are encrypted.' },
-          { id: 'c2', name: 'MFA on infrastructure', description: null },
-          { id: 'c4', name: 'Firewalls configured', description: 'Network firewalls filter traffic.' },
-          { id: 'c5', name: 'Logging enabled', description: 'Production logs are retained.' },
-        ],
-      },
-      {
-        domain: 'Identification & authentication',
-        controls: [{ id: 'c3', name: 'Unique accounts', description: 'Every user has an account.' }],
-      },
-    ],
-    policies: [],
-    documents: [
-      { title: 'SOC 2 report', kind: 'Audit report', access: 'request' },
-      { title: 'Privacy policy', kind: 'Policy', access: 'public', url: '/privacy-policy' },
-    ],
-    subprocessors: [{ name: 'Google Cloud', purpose: 'Hosting', location: 'US', category: 'Infrastructure' }],
-    aiPractices: [
-      {
-        label: 'Customer data and model training',
-        value: 'We never use customer data to train AI models',
-        commitment: true,
-      },
-      { label: 'Model providers', value: 'Anthropic (Claude)' },
-    ],
-    faqs: [],
-    contact: { securityEmail: 'security@example.com', statusPageUrl: 'https://status.example.com' },
-    checkedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    syncedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    monitoredWindowMs: WINDOW_MS,
-    connected: true,
-    ...overrides,
-  };
-}
+const WINDOW_MS = TRUST_CENTER_FIXTURE_WINDOW_MS;
+const makeData = makeTrustCenterData;
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -256,6 +216,66 @@ describe('TrustCenterPage', () => {
     expect(screen.queryByText(/paused/)).toBeNull();
     expect(screen.queryByText(/continuously monitored/)).toBeNull();
   });
+  it('defaults to the brand-neutral title + tagline (a host adds its brand via props)', () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    expect(screen.getByRole('heading', { level: 1, name: TRUST_CENTER_TITLE })).toBeInTheDocument();
+    expect(screen.getAllByText(TRUST_CENTER_TAGLINE).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Flamingo/)).toBeNull();
+  });
+
+  it('documentHref: the host routes a legal document to its own page; null offers a request instead', () => {
+    const legalHref = (document: TrustCenterDocument) =>
+      document.legalDocType ? `/legal/${document.legalDocType}` : (document.url ?? null);
+    const { unmount } = render(<TrustCenterPage initialData={makeData()} documentHref={legalHref} />);
+    expect(screen.getByRole('link', { name: 'View Privacy policy' })).toHaveAttribute('href', '/legal/privacy');
+    unmount();
+
+    render(<TrustCenterPage initialData={makeData()} documentHref={() => null} />);
+    expect(screen.queryByRole('link', { name: 'View Privacy policy' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Request Privacy policy' })).toBeInTheDocument();
+  });
+
+  it('monitoring: the clock is re-read when the data changes — a long-open tab flips to paused on revalidation', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const data = makeData();
+      render(<TrustCenterPage initialData={data} />);
+      expect(screen.getByText(/^Controls continuously monitored/)).toBeInTheDocument();
+
+      // Hours later the tab is refocused; the revalidated copy carries the SAME (now stale) syncedAt.
+      vi.setSystemTime(Date.now() + WINDOW_MS + 60 * 60 * 1000);
+      fetchMock.mockResolvedValueOnce(jsonResponse(data));
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+      fireEvent(document, new Event('visibilitychange'));
+
+      await screen.findByText(/^Monitoring paused/);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText(/continuously monitored/)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('controls drawer reads the CURRENT domains: a revalidation while open shows the new controls', async () => {
+    const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'View all 4 Infrastructure security controls' }));
+    let drawer = await screen.findByRole('dialog');
+    expect(within(drawer).queryByText('Backups tested')).toBeNull();
+
+    const fresh = makeData();
+    fresh.controlDomains[0].controls.push({ id: 'c6', name: 'Backups tested', description: null });
+    rerender(<TrustCenterPage initialData={fresh} />);
+    drawer = await screen.findByRole('dialog');
+    expect(within(drawer).getByText('Backups tested')).toBeInTheDocument();
+  });
+
+  it('controls search highlights on the ORIGINAL text, even after a character whose lowercase is longer', () => {
+    const data = makeData();
+    data.controlDomains[0].controls[3] = { id: 'c5', name: 'İİ Logging enabled', description: null };
+    render(<TrustCenterPage initialData={data} />);
+    fireEvent.change(screen.getByPlaceholderText('Search controls'), { target: { value: 'log' } });
+    expect(screen.getByText('Log', { selector: 'strong' })).toBeInTheDocument();
+  });
 });
 
 describe('TrustCenterPage — reuse-only source check', () => {
@@ -270,5 +290,37 @@ describe('TrustCenterPage — reuse-only source check', () => {
     for (const pattern of FORBIDDEN) {
       expect(source).not.toMatch(pattern);
     }
+  });
+});
+
+describe('highlight', () => {
+  /** The emphasised part of `highlight(text, query)`, or null when nothing matched. */
+  function strongOf(text: string, query: string): string | null {
+    render(<p>{highlight(text, query)}</p>);
+    return screen.queryByText(/.+/, { selector: 'strong' })?.textContent ?? null;
+  }
+
+  it('matches regex metacharacters literally', () => {
+    expect(strongOf('Copyright (c) notices', '(c)')).toBe('(c)');
+  });
+
+  it('is case-insensitive on metacharacter queries', () => {
+    expect(strongOf('Tier a+b storage', 'A+B')).toBe('a+b');
+  });
+
+  it('never treats the query as a pattern', () => {
+    expect(strongOf('No match here', '.*')).toBeNull();
+  });
+
+  it('keeps the match aligned after characters whose lowercase changes length', () => {
+    expect(strongOf('İİ audit logging', 'LOG')).toBe('log');
+  });
+
+  it('matches a character whose lowercase changes length', () => {
+    expect(strongOf('İstanbul office', 'İ')).toBe('İ');
+  });
+
+  it('returns the plain text for an empty query', () => {
+    expect(strongOf('Encryption at rest', '   ')).toBeNull();
   });
 });

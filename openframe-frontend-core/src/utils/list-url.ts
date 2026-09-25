@@ -28,7 +28,7 @@
  * mappers can import it from `@flamingo-stack/openframe-frontend-core/utils`.
  */
 
-import { TRUST_CENTER_API_PATH } from '../types/trust-center';
+import { TRUST_CENTER_API_PATH, TRUST_CENTER_DOCUMENT_TYPE } from '../types/trust-center';
 
 /**
  * Legacy ContentRef aliases that predate the RAG `documentType`
@@ -131,7 +131,7 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   // Single-record live source: the route ignores `?ids=` and returns the ONE
   // `TrustCenterPublic` object (card id `TRUST_CENTER_CARD_ID`); see
   // `extractCardItems` for how the loader matches it back.
-  trust_center: (ids, b) => `${b}${TRUST_CENTER_API_PATH}?ids=${ids.join(',')}`,
+  [TRUST_CENTER_DOCUMENT_TYPE]: (ids, b) => `${b}${TRUST_CENTER_API_PATH}?ids=${ids.join(',')}`,
 };
 
 /**

@@ -46,6 +46,10 @@ export const TRUST_CENTER_SECTIONS = [
 
 export type TrustCenterSectionId = (typeof TRUST_CENTER_SECTIONS)[number]['id'];
 
+/** The product name and the brand-neutral tagline every surface shows (page, chat card, SEO, nav). */
+export const TRUST_CENTER_TITLE = 'Trust Center';
+export const TRUST_CENTER_TAGLINE = 'Security, privacy and AI governance.';
+
 /** THE route path. The page default, chat card list-url and embed EPs all read it. */
 export const TRUST_CENTER_API_PATH = '/api/trust-center';
 
@@ -96,6 +100,8 @@ export interface TrustCenterDocument {
   access: 'public' | 'request';
   /** Absolute or host-relative URL for public documents. */
   url?: string | null;
+  /** A public legal document's type (`privacy`, `terms`), so a HOST can route it to its own legal page. */
+  legalDocType?: string | null;
 }
 
 export interface TrustCenterSubprocessor {
@@ -147,4 +153,11 @@ export function isTrustCenterMonitored(
   if (!data.connected || !data.syncedAt) return false;
   const synced = Date.parse(data.syncedAt);
   return Number.isFinite(synced) && nowMs - synced <= data.monitoredWindowMs;
+}
+
+/** "SOC 2 Type II: In progress · ISO 27001: Planned" — the ONE framework summary line (chat card, RAG mapper). */
+export function trustFrameworksSummary(
+  frameworks: ReadonlyArray<Pick<TrustCenterFramework, 'label' | 'status'>>,
+): string {
+  return frameworks.map(f => `${f.label}: ${trustFrameworkStatusEntry(f.status).label}`).join(' · ');
 }

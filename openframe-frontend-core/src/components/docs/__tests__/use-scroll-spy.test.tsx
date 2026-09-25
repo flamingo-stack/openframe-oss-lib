@@ -64,4 +64,11 @@ describe('useScrollSpy', () => {
     scrollTo(1100, 1900); // 1100 + 800 ≥ 1900 → bottom → c (its top, 1500, never passes 1200)
     expect(result.current.activeSection).toBe('c');
   });
+
+  it('a short (non-scrollable) page does NOT jump to the last section — the section tops decide', () => {
+    placeSections(0);
+    const { result } = renderHook(() => useScrollSpy(sections));
+    scrollTo(0, 800); // scrollHeight == innerHeight: "at bottom" at scrollY 0, but nothing scrolls
+    expect(result.current.activeSection).toBe('a');
+  });
 });

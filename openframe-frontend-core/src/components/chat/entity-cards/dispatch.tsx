@@ -36,7 +36,10 @@ import { useRouter } from '../../../embed-shims/next-navigation';
 import {
   TRUST_CENTER_DOCUMENT_TYPE,
   TRUST_CENTER_PAGE_PATH,
+  TRUST_CENTER_TAGLINE,
+  TRUST_CENTER_TITLE,
   trustFrameworkStatusEntry,
+  trustFrameworksSummary,
   type TrustCenterPublic,
   type TrustFrameworkStatusEntry,
 } from '../../../types/trust-center';
@@ -685,14 +688,12 @@ function TrustCenterChatCard({
   const frameworks: TrustCenterPublic['frameworks'] = Array.isArray(raw)
     ? (raw as TrustCenterPublic['frameworks'])
     : [];
-  const summary = frameworks
-    .map(framework => `${framework.label}: ${trustFrameworkStatusEntry(framework.status).label}`)
-    .join(' · ');
+  const summary = trustFrameworksSummary(frameworks);
   const lead = frameworks[0] ? trustFrameworkStatusEntry(frameworks[0].status) : undefined;
   return (
     <MingoInfoCard
-      title="Trust Center"
-      description={summary || 'Security, privacy and AI governance'}
+      title={TRUST_CENTER_TITLE}
+      description={summary || TRUST_CENTER_TAGLINE}
       icon={<ShieldCheckIcon size={24} />}
       status={lead ? { label: lead.label, variant: TRUST_STATUS_TAG_VARIANT[lead.color] } : undefined}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab)}

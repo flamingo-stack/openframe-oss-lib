@@ -48,6 +48,7 @@ export {
   pick,
   NO_CLIENT_CACHE,
 } from './common';
+export { escapeRegExp } from './escape-regexp';
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title';

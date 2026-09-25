@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { chatCardLabel } from '../components/chat/entity-cards/dispatch';
+import {
+  TRUST_CENTER_FIXTURE_FAQ,
+  makeTrustCenterData,
+} from '../components/help-center-pages/__fixtures__/trust-center';
 import { TRUST_CENTER_API_PATH, TRUST_CENTER_CARD_ID } from '../types/trust-center';
 import { extractCardItems, extractItemId, extractItems } from '../utils/extract-items';
 import { buildListUrl } from '../utils/list-url';
@@ -37,14 +41,14 @@ describe('trust_center source wiring', () => {
   });
 
   it('matches the single-record object payload back to the fixed card id', () => {
-    const payload = { frameworks: [], faqs: [{ id: 'f1' }], connected: true };
+    const payload = makeTrustCenterData({ faqs: [TRUST_CENTER_FIXTURE_FAQ] });
     // The generic extractor would read the nested FAQ list as the rows.
-    expect(extractItems(payload)).toEqual([{ id: 'f1' }]);
+    expect(extractItems(payload)).toEqual([TRUST_CENTER_FIXTURE_FAQ]);
     const items = extractCardItems('trust_center', payload);
     expect(items).toHaveLength(1);
     expect(extractItemId('trust_center', items[0])).toBe(TRUST_CENTER_CARD_ID);
     expect(extractCardItems('trust_center', null)).toEqual([]);
     // Every other type is unchanged.
-    expect(extractCardItems('faq', payload)).toEqual([{ id: 'f1' }]);
+    expect(extractCardItems('faq', payload)).toEqual([TRUST_CENTER_FIXTURE_FAQ]);
   });
 });

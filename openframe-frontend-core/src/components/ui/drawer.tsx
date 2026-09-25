@@ -105,14 +105,20 @@ const drawerPanelVariants = cva(
         true: '',
       },
       /** Panel size along the axis the drawer slides on. `default` leaves it to
-       *  the content (or `resizable`); `wide` is the admin detail panel, 90% of
-       *  the viewport. Set the size here, never with a width class. */
+       *  the content (or `resizable`); `medium` is a reading panel (32rem, never
+       *  wider than the viewport minus the wrapper gutters); `wide` is the admin
+       *  detail panel, 90% of the viewport. Set the size here, never with a width class. */
       size: {
         default: '',
+        medium: '',
         wide: '',
       },
     },
     compoundVariants: [
+      { side: 'right', size: 'medium', class: 'w-[min(32rem,calc(100vw-2*var(--spacing-system-mf)))]' },
+      { side: 'left', size: 'medium', class: 'w-[min(32rem,calc(100vw-2*var(--spacing-system-mf)))]' },
+      { side: 'top', size: 'medium', class: 'h-[min(32rem,calc(100vh-2*var(--spacing-system-mf)))]' },
+      { side: 'bottom', size: 'medium', class: 'h-[min(32rem,calc(100vh-2*var(--spacing-system-mf)))]' },
       { side: 'right', size: 'wide', class: 'w-[90vw]' },
       { side: 'left', size: 'wide', class: 'w-[90vw]' },
       { side: 'top', size: 'wide', class: 'h-[90vh]' },
@@ -359,9 +365,9 @@ interface DrawerContentBaseProps
  */
 type DrawerContentSizing =
   | {
-      /** Panel size preset (`wide` = 90% of the viewport). Use it instead of a
-       *  width/height class. */
-      size?: 'default' | 'wide';
+      /** Panel size preset (`medium` = a 32rem reading panel, `wide` = 90% of
+       *  the viewport). Use it instead of a width/height class. */
+      size?: 'default' | 'medium' | 'wide';
       resizable?: false;
     }
   | {

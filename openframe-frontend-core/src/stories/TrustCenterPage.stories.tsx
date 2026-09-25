@@ -1,36 +1,22 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import {
+  TRUST_CENTER_FIXTURE_FAQ,
+  makeTrustCenterData,
+} from '../components/help-center-pages/__fixtures__/trust-center';
 import { TrustCenterPage } from '../components/help-center-pages/trust-center-page';
-import type { TrustCenterPublic } from '../types/trust-center';
 
-// Stories pass `initialData`, so the page never fetches. Instants are computed
-// at module load so the "monitored" story stays inside its window.
-const NOW = Date.now();
-const HOUR = 60 * 60 * 1000;
-
-const BASE: TrustCenterPublic = {
+// Stories pass `initialData`, so the page never fetches. The shared fixture
+// computes its instants when called, so the "monitored" story stays inside its window.
+const BASE = makeTrustCenterData({
   frameworks: [
     { id: 'soc2', label: 'SOC 2 Type II', status: 'in_progress' },
     { id: 'iso27001', label: 'ISO 27001', status: 'planned' },
     { id: 'iso42001', label: 'ISO 42001', status: 'planned' },
   ],
-  controlDomains: [
-    {
-      domain: 'Infrastructure security',
-      controls: [
-        { id: 'c1', name: 'Encryption at rest', description: 'Production data stores are encrypted at rest.' },
-        { id: 'c2', name: 'MFA on infrastructure', description: 'Infrastructure access requires MFA.' },
-      ],
-    },
-    {
-      domain: 'Identification & authentication',
-      controls: [{ id: 'c3', name: 'Unique accounts', description: 'Every person uses a unique account.' }],
-    },
-  ],
-  policies: [],
   documents: [
     { title: 'SOC 2 Type II report', kind: 'Audit report', access: 'request' },
-    { title: 'Privacy policy', kind: 'Policy', access: 'public', url: '/privacy-policy' },
-    { title: 'Terms of service', kind: 'Policy', access: 'public', url: '/terms-of-service' },
+    { title: 'Privacy policy', kind: 'Policy', access: 'public', url: '/privacy-policy', legalDocType: 'privacy' },
+    { title: 'Terms of service', kind: 'Policy', access: 'public', url: '/terms-of-service', legalDocType: 'terms' },
   ],
   subprocessors: [
     { name: 'Google Cloud', purpose: 'Hosting', location: 'US', category: 'Infrastructure' },
@@ -46,28 +32,13 @@ const BASE: TrustCenterPublic = {
     { label: 'Retention', value: 'Prompts are not retained by providers beyond 30 days' },
     { label: 'Governance', value: 'ISO 42001 planned' },
   ],
-  faqs: [
-    {
-      id: 1,
-      question: 'Is Flamingo SOC 2 certified?',
-      answer: 'Our SOC 2 Type II audit is in progress.',
-      section: 'Security',
-      display_order: 1,
-      is_active: true,
-      created_at: '2026-09-01T00:00:00Z',
-      updated_at: '2026-09-01T00:00:00Z',
-    },
-  ],
+  faqs: [TRUST_CENTER_FIXTURE_FAQ],
   contact: {
     securityEmail: 'security@example.com',
     disclosureUrl: 'https://example.com/security',
     statusPageUrl: 'https://status.example.com',
   },
-  checkedAt: new Date(NOW - 0.25 * HOUR).toISOString(),
-  syncedAt: new Date(NOW - 0.5 * HOUR).toISOString(),
-  monitoredWindowMs: 2 * HOUR,
-  connected: true,
-};
+});
 
 const meta = {
   title: 'Features/TrustCenterPage',
