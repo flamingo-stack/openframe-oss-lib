@@ -7,6 +7,7 @@ import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/elemen
 import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
 import {
   memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -82,11 +83,25 @@ export interface TicketCardBodyProps {
    *  `TicketCard` adapts its own `(ticketId, requestId)` signature onto these). */
   onApprove?: (requestId?: string) => void | Promise<void>;
   onReject?: (requestId?: string) => void | Promise<void>;
+  /** Where the card opens. The body sits above the card's own link with pointer
+   *  events off, but the number/time line has to take them back for its tooltip -
+   *  so with an `href` that line is a link of its own, and a click on it opens the
+   *  ticket like a click anywhere else on the card. */
+  href?: string;
+  onLinkClick?: (e: MouseEvent) => void;
 }
 
 /** The card's inner content: title + device/org, priority + assignees, tags,
  *  timestamp, "New Message", and the approval row. Pure — driven only by props. */
-export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprove, onReject }: TicketCardBodyProps) {
+export function TicketCardBody({
+  ticket,
+  columnColor,
+  renderAssignSlot,
+  onApprove,
+  onReject,
+  href,
+  onLinkClick,
+}: TicketCardBodyProps) {
   const showNewMessage = !!ticket.hasNewMessage && !!columnColor;
   const newMessageTextColor = columnColor ? getReadableTextColor(columnColor) : undefined;
 
@@ -143,6 +158,22 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
   // may be empty - the hub hero card and tickets without one send '' - so either
   // half stands on its own and the line disappears with both missing.
   const metaLabel = [ticket.ticketNumber || null, timestampLabel].filter(Boolean).join(' \u2022 ');
+  const metaClass = 'truncate text-ods-text-secondary text-h6';
+  // Out of the tab order: the card's own link is the one stop for the ticket.
+  const meta = href ? (
+    <Link
+      href={href}
+      draggable={false}
+      prefetch={false}
+      tabIndex={-1}
+      onClick={onLinkClick}
+      className={cn('pointer-events-auto block', metaClass)}
+    >
+      {metaLabel}
+    </Link>
+  ) : (
+    <p className={cn(tooltipLabel && 'pointer-events-auto', metaClass)}>{metaLabel}</p>
+  );
 
   return (
     <>
@@ -165,14 +196,12 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         (tooltipLabel ? (
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <p className="pointer-events-auto truncate text-ods-text-secondary text-h6">{metaLabel}</p>
-              </TooltipTrigger>
+              <TooltipTrigger asChild>{meta}</TooltipTrigger>
               <TooltipContent>{tooltipLabel}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         ) : (
-          <p className="truncate text-ods-text-secondary text-h6">{metaLabel}</p>
+          meta
         ))}
       {ticket.escalatedByUser && (
         <div className="flex items-center gap-[var(--spacing-system-xxs)] text-ods-open-yellow text-h6">
@@ -412,9 +441,13 @@ export const TicketCard = memo(function TicketCardImpl({
   const style: CSSProperties = {};
   if (showNewMessage) style.borderColor = columnColor;
 
-  const handleClick = (e: MouseEvent) => {
-    if (isDragging) e.preventDefault();
-  };
+  // Stable between drags: it is handed into the memoized body below.
+  const handleClick = useCallback(
+    (e: MouseEvent) => {
+      if (isDragging) e.preventDefault();
+    },
+    [isDragging],
+  );
 
   // Held as one memoized element, not re-created per render. A card being
   // dragged over re-renders on every edge flip — it owns the hover state that
@@ -430,9 +463,11 @@ export const TicketCard = memo(function TicketCardImpl({
         renderAssignSlot={renderAssignSlot}
         onApprove={onApprove ? requestId => onApprove(ticket.id, requestId) : undefined}
         onReject={onReject ? requestId => onReject(ticket.id, requestId) : undefined}
+        href={href}
+        onLinkClick={handleClick}
       />
     ),
-    [ticket, columnColor, renderAssignSlot, onApprove, onReject],
+    [ticket, columnColor, renderAssignSlot, onApprove, onReject, href, handleClick],
   );
 
   // No transition on the margins below, and that is not a style choice: room is
