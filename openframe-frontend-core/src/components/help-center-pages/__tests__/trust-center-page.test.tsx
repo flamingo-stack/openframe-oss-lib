@@ -242,6 +242,7 @@ describe('TrustCenterPage', () => {
     expect(screen.getByText('Controls continuously monitored')).toBeInTheDocument();
     // WHEN it was synced is the shared attribution line, not the status.
     expect(screen.getByText('Data synced from Vanta')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Vanta' })).toBeInTheDocument();
     expect(screen.getByText(/^Last updated: /)).toBeInTheDocument();
     unmount();
 

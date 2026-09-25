@@ -51,7 +51,7 @@ import {
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection } from '../faq/faq-section';
-import { ShieldCheckIcon } from '../icons-v2-generated/security/shield-check-icon';
+import { VantaIcon } from '../icons/vanta-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
@@ -248,7 +248,7 @@ export function TrustCenterPage({
           <StatusIndicator status={status.status} label={status.label} />
           {data.connected ? (
             <DataAttribution
-              icon={<ShieldCheckIcon className="h-4 w-4" aria-hidden="true" />}
+              icon={<VantaIcon className="h-4 w-auto" />}
               source={TRUST_CENTER_DATA_SOURCE}
               lastUpdated={data.syncedAt}
             />
