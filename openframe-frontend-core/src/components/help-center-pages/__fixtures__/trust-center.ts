@@ -28,8 +28,8 @@ export function makeTrustCenterData(overrides: Partial<TrustCenterPublic> = {}):
   const now = Date.now();
   return {
     frameworks: [
-      { id: 'soc2', label: 'SOC 2 Type II', status: 'in_progress' },
-      { id: 'iso27001', label: 'ISO 27001', status: 'planned' },
+      { id: 'fw-soc2', label: 'SOC 2 Type II', description: 'Type II audit in progress', monitoring: 'monitored' },
+      { id: 'fw-iso27001', label: 'ISO 27001', description: null, monitoring: 'not_monitored' },
     ],
     controlDomains: [
       {
@@ -48,8 +48,21 @@ export function makeTrustCenterData(overrides: Partial<TrustCenterPublic> = {}):
     ],
     policies: [],
     documents: [
-      { title: 'SOC 2 report', kind: 'Audit report', access: 'request' },
-      { title: 'Privacy policy', kind: 'Policy', access: 'public', url: '/privacy-policy', legalDocType: 'privacy' },
+      { id: 'res-soc2', title: 'SOC 2 report', description: 'Audit report', access: 'request', externalUrl: null },
+      {
+        id: 'privacy-policy',
+        title: 'Privacy policy',
+        description: null,
+        access: 'public',
+        externalUrl: 'https://www.example.com/privacy',
+      },
+      {
+        id: 'res-pentest',
+        title: 'Penetration test summary',
+        description: 'Latest external test',
+        access: 'public',
+        externalUrl: null,
+      },
     ],
     subprocessors: [
       { name: 'Google Cloud', purpose: 'Hosting', description: null, location: 'US', url: null, logoUrl: null },

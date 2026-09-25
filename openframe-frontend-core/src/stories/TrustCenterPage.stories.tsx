@@ -9,14 +9,25 @@ import { TrustCenterPage } from '../components/help-center-pages/trust-center-pa
 // computes its instants when called, so the "monitored" story stays inside its window.
 const BASE = makeTrustCenterData({
   frameworks: [
-    { id: 'soc2', label: 'SOC 2 Type II', status: 'in_progress' },
-    { id: 'iso27001', label: 'ISO 27001', status: 'planned' },
-    { id: 'iso42001', label: 'ISO 42001', status: 'planned' },
+    { id: 'fw-soc2', label: 'SOC 2 Type II', description: 'Type II audit in progress', monitoring: 'monitored' },
+    { id: 'fw-iso27001', label: 'ISO 27001', description: null, monitoring: 'not_monitored' },
+    { id: 'fw-iso42001', label: 'ISO 42001', description: 'AI management system', monitoring: 'not_monitored' },
   ],
   documents: [
-    { title: 'SOC 2 Type II report', kind: 'Audit report', access: 'request' },
-    { title: 'Privacy policy', kind: 'Policy', access: 'public', url: '/privacy-policy', legalDocType: 'privacy' },
-    { title: 'Terms of service', kind: 'Policy', access: 'public', url: '/terms-of-service', legalDocType: 'terms' },
+    {
+      id: 'res-soc2',
+      title: 'SOC 2 Type II report',
+      description: 'Audit report',
+      access: 'request',
+      externalUrl: null,
+    },
+    {
+      id: 'privacy-policy',
+      title: 'Privacy policy',
+      description: null,
+      access: 'public',
+      externalUrl: 'https://www.example.com/privacy',
+    },
   ],
   subprocessors: [
     { name: 'Google Cloud', purpose: 'Hosting', description: null, location: 'US', url: null, logoUrl: null },
@@ -75,9 +86,15 @@ export const CertifiedWithPercent: Story = {
     initialData: {
       ...BASE,
       frameworks: [
-        { id: 'soc2', label: 'SOC 2 Type II', status: 'certified', percent: 98, reportPeriod: 'Jan–Jun 2026' },
-        { id: 'iso27001', label: 'ISO 27001', status: 'in_audit' },
-        { id: 'iso42001', label: 'ISO 42001', status: 'planned' },
+        {
+          id: 'fw-soc2',
+          label: 'SOC 2 Type II',
+          description: 'Type II report available',
+          monitoring: 'passing',
+          percent: 98,
+        },
+        { id: 'fw-iso27001', label: 'ISO 27001', description: null, monitoring: 'monitored' },
+        { id: 'fw-iso42001', label: 'ISO 42001', description: null, monitoring: 'not_monitored' },
       ],
       policies: ['Information Security Policy', 'Acceptable Use Policy'],
     },

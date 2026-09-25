@@ -15,19 +15,31 @@
 import { escapeRegExp } from '../utils/escape-regexp';
 import type { Faq } from './faq';
 
-/** Framework audit status. Label, badge colour and icon are owned HERE, once. */
-export const TRUST_FRAMEWORK_STATUSES = [
-  { status: 'certified', label: 'Certified', color: 'success', icon: 'shield-check' },
-  { status: 'in_audit', label: 'In audit', color: 'cyan', icon: 'shield-check' },
-  { status: 'in_progress', label: 'In progress', color: 'warning', icon: 'file-shield' },
-  { status: 'planned', label: 'Planned', color: 'default', icon: 'file-shield' },
+/**
+ * A framework's MONITORING state, from Vanta's live control data — Vanta keeps
+ * no certification status, so none is claimed. `passing` carries the share of
+ * controls passing (published only at or above the hub's threshold);
+ * `monitored` is a framework Vanta monitors below it; `not_monitored` one it
+ * does not monitor. Label, badge colour and icon are owned HERE, once.
+ */
+export const TRUST_FRAMEWORK_MONITORING = [
+  { state: 'passing', label: 'Passing', color: 'success', icon: 'shield-check' },
+  { state: 'monitored', label: 'Monitored', color: 'cyan', icon: 'shield-check' },
+  { state: 'not_monitored', label: 'Not monitored yet', color: 'default', icon: 'file-shield' },
 ] as const;
 
-export type TrustFrameworkStatus = (typeof TRUST_FRAMEWORK_STATUSES)[number]['status'];
-export type TrustFrameworkStatusEntry = (typeof TRUST_FRAMEWORK_STATUSES)[number];
+export type TrustFrameworkMonitoring = (typeof TRUST_FRAMEWORK_MONITORING)[number]['state'];
+export type TrustFrameworkMonitoringEntry = (typeof TRUST_FRAMEWORK_MONITORING)[number];
 
-export function trustFrameworkStatusEntry(status: TrustFrameworkStatus): TrustFrameworkStatusEntry {
-  return TRUST_FRAMEWORK_STATUSES.find(entry => entry.status === status) ?? TRUST_FRAMEWORK_STATUSES[3];
+export function trustFrameworkMonitoringEntry(state: TrustFrameworkMonitoring): TrustFrameworkMonitoringEntry {
+  return TRUST_FRAMEWORK_MONITORING.find(entry => entry.state === state) ?? TRUST_FRAMEWORK_MONITORING[2];
+}
+
+/** THE badge text of a framework: "97% passing", "Monitored", "Not monitored yet". */
+export function trustFrameworkBadge(framework: Pick<TrustCenterFramework, 'monitoring' | 'percent'>): string {
+  return framework.monitoring === 'passing' && typeof framework.percent === 'number'
+    ? `${framework.percent}% passing`
+    : trustFrameworkMonitoringEntry(framework.monitoring).label;
 }
 
 /**
@@ -57,6 +69,9 @@ export const TRUST_CENTER_API_PATH = '/api/trust-center';
 /** How long a copy counts as fresh: the route's s-maxage AND the page's revalidate-on-visible. */
 export const TRUST_CENTER_CACHE_SECONDS = 300;
 
+/** CDN freshness of a document file served through the hub (`…/documents/{id}`): a file changes rarely. */
+export const TRUST_CENTER_DOCUMENT_CACHE_SECONDS = 3600;
+
 /** The single chat card id (`[card://trust_center:main]`). */
 export const TRUST_CENTER_CARD_ID = 'main';
 
@@ -73,13 +88,14 @@ export function trustDocumentContactReason(title: string): string {
   return `${TRUST_DOCUMENT_REQUEST_PREFIX}: ${title}`;
 }
 
+/** A framework as the company's Vanta Trust Center lists it, with its monitoring state from Vanta's control data. */
 export interface TrustCenterFramework {
-  /** Vanta shorthand, e.g. `soc2`. */
   id: string;
   label: string;
-  status: TrustFrameworkStatus;
-  reportPeriod?: string | null;
-  /** Present ONLY when publishable (certified or at/above the hub threshold). */
+  /** The framework's description in the Vanta Trust Center. */
+  description: string | null;
+  monitoring: TrustFrameworkMonitoring;
+  /** Share of controls passing — present ONLY when `monitoring` is `passing` (at/above the hub threshold). */
   percent?: number;
 }
 
@@ -95,14 +111,19 @@ export interface TrustCenterControlDomain {
   controls: TrustCenterControl[];
 }
 
+/**
+ * A document from the company's Vanta Trust Center: a Resource (a file), or a
+ * link it holds (the privacy policy). `public` ones open — a link at
+ * `externalUrl`, a file through the hub (`trustCenterDocumentUrl`); `request`
+ * ones go through the access request.
+ */
 export interface TrustCenterDocument {
+  id: string;
   title: string;
-  kind: string;
+  description: string | null;
   access: 'public' | 'request';
-  /** Absolute or host-relative URL for public documents. */
-  url?: string | null;
-  /** A public legal document's type (`privacy`, `terms`), so a HOST can route it to its own legal page. */
-  legalDocType?: string | null;
+  /** An absolute link Vanta holds (e.g. the privacy policy); null for a file. */
+  externalUrl: string | null;
 }
 
 /** A subprocessor, as the company's Vanta Trust Center lists it (Vanta's fields). */
@@ -167,9 +188,24 @@ export function isTrustCenterMonitored(
 
 /** "SOC 2 Type II: In progress · ISO 27001: Planned" — the ONE framework summary line (chat card, RAG mapper). */
 export function trustFrameworksSummary(
-  frameworks: ReadonlyArray<Pick<TrustCenterFramework, 'label' | 'status'>>,
+  frameworks: ReadonlyArray<Pick<TrustCenterFramework, 'label' | 'monitoring' | 'percent'>>,
 ): string {
-  return frameworks.map(f => `${f.label}: ${trustFrameworkStatusEntry(f.status).label}`).join(' · ');
+  return frameworks.map(f => `${f.label}: ${trustFrameworkBadge(f)}`).join(' · ');
+}
+
+/**
+ * Where a public document opens: its own link, or — for a file — the hub's
+ * documents route beside the page's `endpoint` (which may carry a query string,
+ * e.g. an embed proxy). `null` for a document that is only available on request.
+ */
+export function trustCenterDocumentUrl(
+  endpoint: string,
+  document: Pick<TrustCenterDocument, 'id' | 'access' | 'externalUrl'>,
+): string | null {
+  if (document.access !== 'public') return null;
+  if (document.externalUrl) return document.externalUrl;
+  const [path, query] = endpoint.split('?', 2);
+  return `${path}/documents/${encodeURIComponent(document.id)}${query ? `?${query}` : ''}`;
 }
 
 // ---------------------------------------------------------------------------

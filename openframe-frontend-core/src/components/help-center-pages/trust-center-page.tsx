@@ -41,9 +41,9 @@ import {
   TRUST_CENTER_TITLE,
   isTrustCenterMonitored,
   normalizeTrustControlQuery,
+  trustCenterDocumentUrl,
   trustCenterSearchUrl,
   type TrustCenterControlSearch,
-  type TrustCenterDocument,
   type TrustCenterPublic,
   type TrustCenterSectionId,
 } from '../../types/trust-center';
@@ -83,16 +83,7 @@ export interface TrustCenterPageProps {
   title?: string;
   /** Page subtitle. Default the brand-neutral `TRUST_CENTER_TAGLINE` (a host adds its brand here). */
   subtitle?: string;
-  /**
-   * Where a PUBLIC document's "View" button goes, or `null` to offer a request
-   * instead. Default `document.url`. Hosts map `legalDocType` onto their own
-   * legal route (e.g. `/legal/privacy`) so the reader stays in the app.
-   */
-  documentHref?: (document: TrustCenterDocument) => string | null;
 }
-
-/** The default `documentHref`: the projection's own URL. */
-const defaultDocumentHref = (document: TrustCenterDocument): string | null => document.url ?? null;
 
 /** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
 interface TrustSectionView {
@@ -141,7 +132,6 @@ export function TrustCenterPage({
   backButton = false,
   title = TRUST_CENTER_TITLE,
   subtitle = TRUST_CENTER_TAGLINE,
-  documentHref = defaultDocumentHref,
 }: TrustCenterPageProps) {
   const router = useRouter();
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
@@ -224,7 +214,13 @@ export function TrustCenterPage({
     },
     documents: {
       lead: 'Public documents open directly. Gated documents are shared under NDA after one short request.',
-      render: d => <DocumentsSection documents={d.documents} documentHref={documentHref} onRequest={openRequest} />,
+      render: d => (
+        <DocumentsSection
+          documents={d.documents}
+          documentUrl={document => trustCenterDocumentUrl(endpoint, document)}
+          onRequest={openRequest}
+        />
+      ),
     },
     subprocessors: {
       lead: 'Third parties that process customer data on our behalf.',

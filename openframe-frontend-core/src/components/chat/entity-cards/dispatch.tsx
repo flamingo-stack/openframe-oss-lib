@@ -38,10 +38,11 @@ import {
   TRUST_CENTER_PAGE_PATH,
   TRUST_CENTER_TAGLINE,
   TRUST_CENTER_TITLE,
-  trustFrameworkStatusEntry,
+  trustFrameworkBadge,
+  trustFrameworkMonitoringEntry,
   trustFrameworksSummary,
   type TrustCenterPublic,
-  type TrustFrameworkStatusEntry,
+  type TrustFrameworkMonitoringEntry,
 } from '../../../types/trust-center';
 import { formatDateShort } from '../../../utils/date-formatters';
 import { faqItemAnchor } from '../../../utils/faq-anchor';
@@ -663,15 +664,14 @@ function GlyphChatCard({
 }
 
 /** Framework status colour (a `StatusBadge` scheme) → the card pill's `Tag` variant. */
-const TRUST_STATUS_TAG_VARIANT: Record<TrustFrameworkStatusEntry['color'], MingoInfoCardStatus['variant']> = {
+const TRUST_STATUS_TAG_VARIANT: Record<TrustFrameworkMonitoringEntry['color'], MingoInfoCardStatus['variant']> = {
   success: 'success',
   cyan: 'selectedCyan',
-  warning: 'warning',
   default: 'grey',
 };
 
 /** Trust center (single record: the whole public projection). Title + the
- *  frameworks with their statuses; the lead framework's status is the pill;
+ *  frameworks with their monitoring badges; the lead framework's badge is the pill;
  *  "View trust center" opens the page. Defensive reads — the row is unvalidated. */
 function TrustCenterChatCard({
   item,
@@ -689,7 +689,13 @@ function TrustCenterChatCard({
     ? (raw as TrustCenterPublic['frameworks'])
     : [];
   const summary = trustFrameworksSummary(frameworks);
-  const lead = frameworks[0] ? trustFrameworkStatusEntry(frameworks[0].status) : undefined;
+  const leadFramework = frameworks[0];
+  const lead = leadFramework
+    ? {
+        label: trustFrameworkBadge(leadFramework),
+        color: trustFrameworkMonitoringEntry(leadFramework.monitoring).color,
+      }
+    : undefined;
   return (
     <MingoInfoCard
       title={TRUST_CENTER_TITLE}

@@ -12,7 +12,6 @@ import {
   trustCenterSearchUrl,
   trustDocumentContactReason,
   type TrustCenterPublic,
-  type TrustCenterDocument,
 } from '../../../types/trust-center';
 import { TRUST_CENTER_FIXTURE_WINDOW_MS, makeTrustCenterData } from '../__fixtures__/trust-center';
 import { TrustCenterPage } from '../trust-center-page';
@@ -118,26 +117,25 @@ describe('TrustCenterPage', () => {
     expect(screen.queryByRole('region', { name: 'AI & data use' })).toBeNull();
   });
 
-  it('compliance: one row per framework, proof before roadmap, the status ONCE as a badge, percent only when published', () => {
+  it('compliance: one row per Vanta framework with its description, and ONE monitoring badge — never a certification claim', () => {
     const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
     const compliance = within(screen.getByRole('region', { name: 'Compliance' }));
-    expect(compliance.getAllByText('In progress')).toHaveLength(1);
-    const names = compliance.getAllByText(/SOC 2|ISO 27001|ISO 42001/).map(node => node.textContent);
-    expect(names[0]).toMatch(/SOC 2/);
-    expect(compliance.getAllByText('Planned').length).toBeGreaterThan(0);
-    expect(compliance.queryByText(/controls passing/)).toBeNull();
+    expect(compliance.getByText('SOC 2 Type II')).toBeInTheDocument();
+    expect(compliance.getByText('Type II audit in progress')).toBeInTheDocument();
+    expect(compliance.getByText('Monitored')).toBeInTheDocument();
+    expect(compliance.getByText('Not monitored yet')).toBeInTheDocument();
+    expect(compliance.queryByText(/Certified|passing/)).toBeNull();
 
     rerender(
       <TrustCenterPage
         initialData={makeData({
           frameworks: [
-            { id: 'soc2', label: 'SOC 2 Type II', status: 'certified', percent: 97, reportPeriod: 'Jan–Jun 2026' },
+            { id: 'fw-soc2', label: 'SOC 2 Type II', description: null, monitoring: 'passing', percent: 97 },
           ],
         })}
       />,
     );
-    expect(screen.getByText('Jan–Jun 2026 · 97% of controls passing')).toBeInTheDocument();
-    expect(screen.getAllByText('Certified')).toHaveLength(1);
+    expect(screen.getByText('97% passing')).toBeInTheDocument();
   });
 
   it('questions go through the request form: no security address, no vulnerability or disclosure wording', async () => {
@@ -199,11 +197,9 @@ describe('TrustCenterPage', () => {
     expect(within(dialog).getByTestId('message')).toHaveTextContent('SOC 2 report');
   });
 
-  it('public documents are a same-tab View link, no duplicate access label', () => {
+  it('public documents open in a new tab (a Vanta file or an outside link), without leaving the trust center', () => {
     render(<TrustCenterPage initialData={makeData()} />);
-    const view = screen.getByRole('link', { name: 'View Privacy policy' });
-    expect(view).toHaveAttribute('href', '/privacy-policy');
-    expect(view).not.toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: 'View Privacy policy' })).toHaveAttribute('target', '_blank');
   });
 
   it('hides empty sections and the request CTA when nothing is gated', () => {
@@ -268,16 +264,19 @@ describe('TrustCenterPage', () => {
     expect(screen.queryByText(/Flamingo/)).toBeNull();
   });
 
-  it('documentHref: the host routes a legal document to its own page; null offers a request instead', () => {
-    const legalHref = (document: TrustCenterDocument) =>
-      document.legalDocType ? `/legal/${document.legalDocType}` : (document.url ?? null);
-    const { unmount } = render(<TrustCenterPage initialData={makeData()} documentHref={legalHref} />);
-    expect(screen.getByRole('link', { name: 'View Privacy policy' })).toHaveAttribute('href', '/legal/privacy');
-    unmount();
-
-    render(<TrustCenterPage initialData={makeData()} documentHref={() => null} />);
-    expect(screen.queryByRole('link', { name: 'View Privacy policy' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Request Privacy policy' })).toBeInTheDocument();
+  it('documents: a Vanta link opens itself, a public Vanta file opens through the hub beside the endpoint, a gated one is requested', () => {
+    render(<TrustCenterPage initialData={makeData()} endpoint="/content/api/trust-center" />);
+    const documents = within(screen.getByRole('region', { name: 'Documents' }));
+    expect(documents.getByRole('link', { name: 'View Privacy policy' })).toHaveAttribute(
+      'href',
+      'https://www.example.com/privacy',
+    );
+    expect(documents.getByRole('link', { name: 'View Penetration test summary' })).toHaveAttribute(
+      'href',
+      '/content/api/trust-center/documents/res-pentest',
+    );
+    expect(documents.getByRole('button', { name: 'Request SOC 2 report' })).toBeInTheDocument();
+    expect(documents.getByText('Latest external test')).toBeInTheDocument();
   });
 
   it('monitoring: the clock is re-read when the data changes — a long-open tab flips to paused on revalidation', async () => {

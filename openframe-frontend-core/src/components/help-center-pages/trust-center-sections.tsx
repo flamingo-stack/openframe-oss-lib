@@ -17,17 +17,17 @@
 import { createElement, useMemo, useState, type ReactNode } from 'react';
 import {
   TRUST_DOCUMENT_REQUEST_PREFIX,
-  TRUST_FRAMEWORK_STATUSES,
   trustControlQueryMatcher,
   trustDocumentContactReason,
-  trustFrameworkStatusEntry,
+  trustFrameworkBadge,
+  trustFrameworkMonitoringEntry,
   type TrustCenterAiPractice,
   type TrustCenterControl,
   type TrustCenterControlDomain,
   type TrustCenterDocument,
   type TrustCenterFramework,
   type TrustCenterSubprocessor,
-  type TrustFrameworkStatusEntry,
+  type TrustFrameworkMonitoringEntry,
 } from '../../types/trust-center';
 import { getFlagFromCountryName } from '../../utils/country-phone-utils';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
@@ -53,8 +53,8 @@ import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
 import { StatusBadge } from '../ui/status-badge';
 import { TabNavigation, type TabItem } from '../ui/tab-navigation';
 
-/** Status `icon` vocabulary (owned by `TRUST_FRAMEWORK_STATUSES`) → icon component, ONE lookup. */
-const FRAMEWORK_ICONS: Record<TrustFrameworkStatusEntry['icon'], typeof ShieldCheckIcon> = {
+/** Monitoring `icon` vocabulary (owned by `TRUST_FRAMEWORK_MONITORING`) → icon component, ONE lookup. */
+const FRAMEWORK_ICONS: Record<TrustFrameworkMonitoringEntry['icon'], typeof ShieldCheckIcon> = {
   'shield-check': ShieldCheckIcon,
   'file-shield': FileShieldIcon,
 };
@@ -135,24 +135,15 @@ export function AiSection({ practices }: { practices: TrustCenterAiPractice[] })
 // Compliance
 // ---------------------------------------------------------------------------
 
-/** A framework's secondary line: its report period and, when published, its passing share (the status is the badge). */
-function frameworkDetail(framework: TrustCenterFramework): string | undefined {
-  const parts = [
-    framework.reportPeriod,
-    typeof framework.percent === 'number' ? `${framework.percent}% of controls passing` : null,
-  ].filter((part): part is string => Boolean(part));
-  return parts.length > 0 ? parts.join(' · ') : undefined;
-}
-
 /**
- * Real proof first (certified → in audit → in progress), roadmap items last —
- * one row per framework, status as a badge in a fixed-width column.
+ * One row per framework, in the Vanta Trust Center's order: its name, its
+ * Vanta description, and ONE badge for its monitoring state ("97% passing",
+ * "Monitored", "Not monitored yet") — never a certification claim, which
+ * Vanta's API does not hold.
  */
 export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFramework[] }) {
-  const order = TRUST_FRAMEWORK_STATUSES.map(entry => entry.status);
-  const sorted = [...frameworks].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
-  const rows: PanelRow[] = sorted.map(framework => {
-    const entry = trustFrameworkStatusEntry(framework.status);
+  const rows: PanelRow[] = frameworks.map(framework => {
+    const entry = trustFrameworkMonitoringEntry(framework.monitoring);
     const Icon = FRAMEWORK_ICONS[entry.icon];
     return {
       id: framework.id,
@@ -161,14 +152,14 @@ export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFrame
           key: 'framework',
           leadingIcon: <Icon aria-hidden="true" />,
           value: framework.label,
-          label: frameworkDetail(framework),
+          label: framework.description ?? undefined,
           wrap: true,
         },
         {
-          key: 'status',
+          key: 'monitoring',
           width: ACTION_COLUMN,
           align: 'right',
-          content: <StatusBadge text={entry.label} colorScheme={entry.color} singleLine />,
+          content: <StatusBadge text={trustFrameworkBadge(framework)} colorScheme={entry.color} singleLine />,
         },
       ],
     };
@@ -377,20 +368,20 @@ export function ControlsSection({
 
 export function DocumentsSection({
   documents,
-  documentHref,
+  documentUrl,
   onRequest,
 }: {
   documents: TrustCenterDocument[];
-  /** Where a public document's "View" goes; `null` → offer a request instead. */
-  documentHref: (document: TrustCenterDocument) => string | null;
+  /** Where a public document opens (`trustCenterDocumentUrl`); `null` → offer a request instead. */
+  documentUrl: (document: TrustCenterDocument) => string | null;
   /** Open the ONE access request, optionally for a named document. */
   onRequest: (documentTitle: string | null) => void;
 }) {
   const rows: PanelRow[] = documents.map(document => {
     const gated = document.access === 'request';
-    const href = gated ? null : documentHref(document);
+    const href = gated ? null : documentUrl(document);
     return {
-      id: document.title,
+      id: document.id,
       columns: [
         {
           key: 'document',
@@ -400,7 +391,7 @@ export function DocumentsSection({
             <FileIcon role="img" aria-label="Public" />
           ),
           value: document.title,
-          label: gated ? `${document.kind} · available on request` : `${document.kind} · public`,
+          label: document.description ?? (gated ? 'Available on request' : 'Public'),
           wrap: true,
         },
         {
@@ -418,7 +409,7 @@ export function DocumentsSection({
                 Request
               </Button>
             ) : (
-              <Button variant="outline" size="small" href={href} aria-label={`View ${document.title}`}>
+              <Button variant="outline" size="small" href={href} openInNewTab aria-label={`View ${document.title}`}>
                 View
               </Button>
             ),
