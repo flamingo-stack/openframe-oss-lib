@@ -19,6 +19,7 @@ import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
   TRUST_CENTER_SEARCH_DEBOUNCE_MS,
+  TRUST_CENTER_SECTIONS,
   normalizeTrustControlQuery,
   trustCenterControlsUrl,
   trustFrameworkBadge,
@@ -28,6 +29,7 @@ import {
   type TrustCenterControlsPage,
   type TrustCenterDocument,
   type TrustCenterFramework,
+  type TrustCenterSectionId,
   type TrustCenterSubprocessor,
   type TrustFrameworkMonitoringEntry,
 } from '../../types/trust-center';
@@ -43,8 +45,7 @@ import { ShieldCheckIcon } from '../icons-v2-generated/security/shield-check-ico
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { ListEmptyState } from '../list-empty-state';
-import { CardSkeletonGrid } from '../loading/card-skeleton';
-import { TextSkeleton } from '../loading/unified-skeleton';
+import { TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { ComplianceLogo } from '../ui/compliance-badge';
 import { EntityImage } from '../ui/entity-image';
@@ -62,8 +63,27 @@ const FRAMEWORK_ICONS: Record<TrustFrameworkMonitoringEntry['icon'], typeof Shie
   'file-shield': FileShieldIcon,
 };
 
-const STACK_CLASSES = 'flex flex-col gap-[var(--spacing-system-l)]';
 const BODY_TEXT = 'text-h6 text-ods-text-secondary';
+
+/**
+ * The page body's layout, ONE copy for the loaded page and its skeleton, so the
+ * skeleton cannot drift from what replaces it: the status row, then the sections
+ * beside the section rail.
+ */
+export const TRUST_STATUS_ROW_CLASS =
+  'flex flex-col gap-[var(--spacing-system-xs)] md:flex-row md:items-center md:justify-between';
+export const TRUST_BODY_GRID_CLASS =
+  'grid grid-cols-1 gap-[var(--spacing-system-xl)] lg:grid-cols-[minmax(0,1fr)_12rem]';
+export const TRUST_SECTIONS_COLUMN_CLASS = 'flex min-w-0 flex-col gap-[var(--spacing-system-xxl)]';
+
+/** Each section's one-line lead under its heading (the page and its skeleton read the same copy). */
+export const TRUST_SECTION_LEADS: Partial<Record<TrustCenterSectionId, string>> = {
+  compliance: 'Frameworks we are audited against, and what is next.',
+  controls: 'Security controls currently passing in continuous monitoring (via Vanta).',
+  documents: 'Public documents open directly. Gated documents are shared under NDA after one short request.',
+  subprocessors: 'Third parties that process customer data on our behalf.',
+  ai: 'How customer data is handled by the AI in our products.',
+};
 /**
  * The right-hand action / status column: ONE width from tablet up, so every
  * panel's rows line up; on phones it hugs its content so the title keeps the room.
@@ -540,12 +560,143 @@ export function ContactSection({ onContact }: { onContact: () => void }) {
   );
 }
 
-/** Mirrors the page: a card row, then the controls grid. */
+// ---------------------------------------------------------------------------
+// Skeleton
+// ---------------------------------------------------------------------------
+
+/** A section's heading and lead, exactly as `TrustSection` renders them (real text: it does not load). */
+function SkeletonSection({ id, children }: { id: TrustCenterSectionId; children: ReactNode }) {
+  const label = TRUST_CENTER_SECTIONS.find(section => section.id === id)?.label ?? id;
+  const lead = TRUST_SECTION_LEADS[id];
+  return (
+    <section aria-hidden="true" className="flex flex-col gap-[var(--spacing-system-m)]">
+      <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
+        <h2 className={SECTION_HEADING_CLASS}>{label}</h2>
+        {lead ? <p className={BODY_TEXT}>{lead}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * Rows of the REAL `StackedRowsPanel` (its own row heights and borders) whose
+ * cells hold bars: a mark (a 40px compliance logo or a 24px glyph), a value over
+ * a label, and the right-hand badge or button in the page's `ACTION_COLUMN`.
+ */
+function skeletonRows(count: number, shape: { mark: 'logo' | 'glyph'; action: 'badge' | 'button' }): PanelRow[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `skeleton-${index}`,
+    columns: [
+      {
+        key: 'item',
+        content: (
+          <div className="flex w-full items-center gap-[var(--spacing-system-s)]">
+            <UnifiedSkeleton
+              className={shape.mark === 'logo' ? 'size-10 shrink-0 rounded-full' : 'size-6 shrink-0 rounded'}
+            />
+            <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
+              <UnifiedSkeleton variant="text" className="h-5 w-1/3 md:h-6" />
+              <TextSkeleton.Body className="w-1/2" />
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: 'action',
+        width: ACTION_COLUMN,
+        align: 'right',
+        content:
+          shape.action === 'badge' ? (
+            <UnifiedSkeleton className="h-4 w-28 rounded" />
+          ) : (
+            <UnifiedSkeleton className="h-6 w-16 rounded md:h-8" />
+          ),
+      },
+    ],
+  }));
+}
+
+/** The Controls section while loading: its tab strip, its summary and search, and the list box's own skeleton. */
+function ControlsSectionSkeleton() {
+  return (
+    <div className="flex flex-col gap-[var(--spacing-system-m)]">
+      <div className="flex items-center gap-[var(--spacing-system-xxs)] overflow-hidden">
+        {[0, 1, 2, 3].map(index => (
+          <div key={index} className="shrink-0 p-[var(--spacing-system-m)]">
+            <UnifiedSkeleton variant="text" className="h-5 w-36 md:h-6" />
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-col gap-[var(--spacing-system-s)] md:flex-row md:items-center md:justify-between">
+        <TextSkeleton.Body className="w-48" />
+        <UnifiedSkeleton className="h-11 w-full rounded-[6px] md:h-12 md:w-80" />
+      </div>
+      <div className={CONTROLS_LIST_HEIGHT}>
+        <ControlsListSkeleton />
+      </div>
+    </div>
+  );
+}
+
+/** The section rail while loading: `StickySectionNav`'s line and its 40px items. */
+function SectionRailSkeleton() {
+  return (
+    <div className="sticky" style={{ top: STICKY_HEADER_OFFSET_PX }}>
+      <div className="relative">
+        <div
+          className="absolute -left-0.5 top-0 w-px bg-ods-border"
+          style={{ height: TRUST_CENTER_SECTIONS.length * 40 }}
+        />
+        {TRUST_CENTER_SECTIONS.map(section => (
+          <div key={section.id} className="flex h-10 items-center px-3 py-2">
+            <TextSkeleton.Body className="w-24" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The page BODY while the trust center loads: built on the loaded body's own
+ * layout classes and the real section headings and panels, so nothing moves when
+ * the content replaces it. The status row, then Compliance, Controls and
+ * Documents (what fills the first screens), beside the section rail.
+ */
 export function TrustCenterSkeleton() {
   return (
-    <div className={STACK_CLASSES}>
-      <CardSkeletonGrid count={2} variant="category" />
-      <CardSkeletonGrid count={4} variant="category" />
-    </div>
+    <>
+      <div className={TRUST_STATUS_ROW_CLASS} aria-hidden="true">
+        <div className="flex items-center gap-1.5">
+          <UnifiedSkeleton className="size-3 rounded-full" />
+          <TextSkeleton.Body className="w-44" />
+        </div>
+        {/* `DataAttribution`'s own layout: two lines below `sm`, one row above it. */}
+        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] sm:flex-row sm:items-center sm:gap-[var(--spacing-system-sf)]">
+          <div className="flex items-center gap-[var(--spacing-system-xsf)]">
+            <UnifiedSkeleton className="size-4 rounded" />
+            <TextSkeleton.Body className="w-36" />
+          </div>
+          <TextSkeleton.Body className="w-44" />
+        </div>
+      </div>
+      <div className={TRUST_BODY_GRID_CLASS} aria-busy="true" aria-label="Loading the trust center">
+        <div className={TRUST_SECTIONS_COLUMN_CLASS}>
+          <SkeletonSection id="compliance">
+            <StackedRowsPanel rows={skeletonRows(3, { mark: 'logo', action: 'badge' })} />
+          </SkeletonSection>
+          <SkeletonSection id="controls">
+            <ControlsSectionSkeleton />
+          </SkeletonSection>
+          <SkeletonSection id="documents">
+            <StackedRowsPanel rows={skeletonRows(2, { mark: 'glyph', action: 'button' })} />
+          </SkeletonSection>
+        </div>
+        <aside className="hidden lg:block" aria-hidden="true">
+          <SectionRailSkeleton />
+        </aside>
+      </div>
+    </>
   );
 }
