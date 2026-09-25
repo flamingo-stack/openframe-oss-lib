@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::process::{Output, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 use tokio::sync::{Notify, RwLock};
 use tokio::time::{sleep, timeout};
@@ -31,7 +32,9 @@ const AGENT_ID_MAX_FAST_RETRIES: u32 = 5;
 const AGENT_ID_DEGRADED_BACKOFF_SECONDS: u64 = 300;
 /// Cadence of the periodic re-resolve + re-publish, so a mid-run re-key heals within the hour.
 const REPUBLISH_INTERVAL_SECONDS: u64 = 3600;
+/// Asset whose orphaned processes are swept for tools that launch it (Fleet's `uuid` and orbit).
 const OSQUERYD_ASSET_ID: &str = "osqueryd";
+/// Upper bound on one orphan sweep, so a stuck process snapshot can't wedge the loop.
 const ORPHAN_SWEEP_TIMEOUT_SECONDS: u64 = 30;
 
 // TODO: refactor class
@@ -372,17 +375,40 @@ async fn run_agent_id_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
-    let child = cmd.spawn()?;
+    let mut child = cmd.spawn()?;
     let tree = ProcessTree::attach(&child);
 
-    let run = child.wait_with_output();
-    tokio::pin!(run);
-    match timeout(limit, &mut run).await {
+    let (mut stdout, mut stderr) = (child.stdout.take(), child.stderr.take());
+    // Reap only after the pipes close, so the root stays unreaped (pid not reusable) until a timeout kill.
+    let run = async {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        tokio::try_join!(
+            read_pipe(&mut stdout, &mut out),
+            read_pipe(&mut stderr, &mut err)
+        )?;
+        let status = child.wait().await?;
+        Ok(Output {
+            status,
+            stdout: out,
+            stderr: err,
+        })
+    };
+    match timeout(limit, run).await {
         Ok(result) => result.map(Some),
         Err(_) => {
-            tree.kill();
+            let _ = tokio::task::spawn_blocking(move || tree.kill()).await;
             Ok(None)
         }
+    }
+}
+
+async fn read_pipe<R: AsyncRead + Unpin>(
+    pipe: &mut Option<R>,
+    buf: &mut Vec<u8>,
+) -> std::io::Result<()> {
+    match pipe {
+        Some(r) => r.read_to_end(buf).await.map(drop),
+        None => Ok(()),
     }
 }
 

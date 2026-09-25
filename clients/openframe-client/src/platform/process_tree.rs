@@ -8,7 +8,7 @@ use crate::executor::windows::job::JobHandle;
 /// Windows: kill-on-close Job Object that descendants join; Unix: the child's pid, whose descendants are found on kill.
 pub(crate) struct ProcessTree {
     #[cfg(windows)]
-    job: JobHandle,
+    job: Option<JobHandle>,
     #[cfg(unix)]
     root: u32,
 }
@@ -17,12 +17,9 @@ impl ProcessTree {
     pub(crate) fn attach(child: &Child) -> Self {
         Self {
             #[cfg(windows)]
-            job: match child.raw_handle() {
-                Some(handle) => {
-                    JobHandle::for_handle(windows::Win32::Foundation::HANDLE(handle as isize))
-                }
-                None => JobHandle::for_pid(0),
-            },
+            job: child
+                .raw_handle()
+                .map(|h| JobHandle::for_handle(windows::Win32::Foundation::HANDLE(h as isize))),
             #[cfg(unix)]
             root: child.id().unwrap_or(0),
         }
@@ -31,7 +28,9 @@ impl ProcessTree {
     /// Kill the whole tree. Call only while the child is still unreaped, so its pid can't be reused.
     pub(crate) fn kill(&self) {
         #[cfg(windows)]
-        self.job.terminate();
+        if let Some(job) = &self.job {
+            job.terminate();
+        }
         #[cfg(unix)]
         kill_unix_tree(self.root);
     }

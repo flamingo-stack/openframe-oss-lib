@@ -34,7 +34,7 @@ impl JobHandle {
         }
     }
 
-    pub(crate) fn for_pid(pid: u32) -> Self {
+    pub(super) fn for_pid(pid: u32) -> Self {
         if pid == 0 {
             return JobHandle(None);
         }

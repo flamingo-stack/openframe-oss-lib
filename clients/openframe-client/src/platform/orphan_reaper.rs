@@ -23,7 +23,7 @@ pub(crate) enum OrphanReason {
 }
 
 /// Normalizes an executable path for comparison (Windows paths are case-insensitive and may carry `\\?\`).
-pub(crate) fn normalize_exe(path: &str, case_insensitive: bool) -> String {
+fn normalize_exe(path: &str, case_insensitive: bool) -> String {
     let trimmed = path.strip_prefix(r"\\?\").unwrap_or(path);
     if case_insensitive {
         trimmed.to_lowercase()
@@ -104,9 +104,24 @@ pub(crate) fn reap_orphans(target_exe: &Path) -> usize {
 
     let mut killed = 0;
     for (pid, reason) in &orphans {
-        let Some(process) = sys.process(sysinfo::Pid::from_u32(*pid)) else {
+        let sys_pid = sysinfo::Pid::from_u32(*pid);
+        let Some(snapshot_start) = sys.process(sys_pid).map(|p| p.start_time()) else {
             continue;
         };
+        // Re-check identity right before the kill so a pid reused since the snapshot is never hit.
+        if !sys.refresh_process(sys_pid) {
+            continue;
+        }
+        let Some(process) = sys.process(sys_pid) else {
+            continue;
+        };
+        let same_exe = process.exe().is_some_and(|e| {
+            normalize_exe(&e.to_string_lossy(), cfg!(windows))
+                == normalize_exe(&target, cfg!(windows))
+        });
+        if process.start_time() != snapshot_start || !same_exe {
+            continue;
+        }
         let age_secs = process.run_time();
         if force_kill(*pid) {
             killed += 1;

@@ -66,8 +66,20 @@ fn is_alive(pid: u32) -> bool {
 
 #[cfg(windows)]
 fn is_alive(pid: u32) -> bool {
-    let mut sys = sysinfo::System::new();
-    sys.refresh_process(sysinfo::Pid::from_u32(pid))
+    use windows::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
+    use windows::Win32::System::Threading::{
+        GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    unsafe {
+        let Ok(handle) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
+            return false;
+        };
+        let mut code = 0u32;
+        let running =
+            GetExitCodeProcess(handle, &mut code).is_ok() && code == STILL_ACTIVE.0 as u32;
+        let _ = CloseHandle(handle);
+        running
+    }
 }
 
 fn pid_file(name: &str) -> std::path::PathBuf {
@@ -138,7 +150,7 @@ async fn agent_id_command_timeout_kills_grandchildren() {
     );
     let args = vec!["-NoProfile".to_string(), "-Command".to_string(), script];
 
-    let result = run_agent_id_command("powershell.exe", &args, Duration::from_secs(20))
+    let result = run_agent_id_command("powershell.exe", &args, Duration::from_secs(10))
         .await
         .unwrap();
     assert!(result.is_none(), "command should time out");
