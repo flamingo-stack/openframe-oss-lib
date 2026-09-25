@@ -31,27 +31,30 @@ public class CorrelatedHostSoftwareCache {
 
     private final FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
-    private final Cache<String, Map<Long, List<FleetSoftware>>> softwareByTenant = Caffeine.newBuilder()
+    private final Cache<String, Snapshot> byTenant = Caffeine.newBuilder()
             .expireAfterWrite(TTL)
             .build();
 
-    public Map<Long, List<FleetSoftware>> softwareByHostId(Function<HostSearchRequest, List<Host>> hostSearch) {
-        String tenantId = tenantIdProvider.getTenantId();
-        return softwareByTenant.get(tenantId, key -> loadCorrelatedSoftware(key, hostSearch));
+    public record Snapshot(Map<Long, Machine> machinesByHostId,
+                           Map<Long, List<FleetSoftware>> softwareByHostId) {
     }
 
-    private Map<Long, List<FleetSoftware>> loadCorrelatedSoftware(String tenantId,
-                                                                  Function<HostSearchRequest, List<Host>> hostSearch) {
+    public Snapshot snapshot(Function<HostSearchRequest, List<Host>> hostSearch) {
+        String tenantId = tenantIdProvider.getTenantId();
+        return byTenant.get(tenantId, key -> load(key, hostSearch));
+    }
+
+    public Map<Long, List<FleetSoftware>> softwareByHostId(Function<HostSearchRequest, List<Host>> hostSearch) {
+        return snapshot(hostSearch).softwareByHostId();
+    }
+
+    private Snapshot load(String tenantId, Function<HostSearchRequest, List<Host>> hostSearch) {
         List<Host> hosts = fetchHostsWithSoftware(hostSearch);
         Map<Long, Machine> correlated = hostMachineResolver.resolve(tenantId, hosts);
-        return hosts.stream()
-                .filter(host -> isCorrelated(host, correlated))
+        Map<Long, List<FleetSoftware>> software = hosts.stream()
+                .filter(host -> correlated.containsKey(host.getId()))
                 .collect(Collectors.toMap(Host::getId, CorrelatedHostSoftwareCache::softwareOf));
-    }
-
-    private static boolean isCorrelated(Host host, Map<Long, Machine> correlated) {
-        Long hostId = host.getId();
-        return correlated.containsKey(hostId);
+        return new Snapshot(correlated, software);
     }
 
     private static List<Host> fetchHostsWithSoftware(Function<HostSearchRequest, List<Host>> hostSearch) {
