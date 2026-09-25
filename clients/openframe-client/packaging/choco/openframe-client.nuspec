@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>openframe-client</id>
+    <version>1.3.62</version>
+    <packageSourceUrl>https://github.com/flamingo-stack/openframe-oss-lib/tree/main/clients/openframe-client/packaging/choco</packageSourceUrl>
+    <owners>Openframe</owners>
+    <title>OpenFrame Client</title>
+    <authors>Flamingo AI, Inc.</authors>
+    <projectUrl>https://openframe.ai/</projectUrl>
+    <copyright>Copyright © 2026 Flamingo AI, Inc.</copyright>
+    <licenseUrl>https://github.com/flamingo-stack/openframe-oss-lib/blob/main/LICENSE.md</licenseUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/flamingo-stack/openframe-oss-lib</projectSourceUrl>
+    <docsUrl>https://github.com/flamingo-stack/openframe-oss-lib/blob/main/clients/README.md#openframe-client-device-agent-install-enrol-remove</docsUrl>
+    <bugTrackerUrl>https://github.com/flamingo-stack/openframe-oss-lib/issues</bugTrackerUrl>
+    <tags>openframe rmm monitoring agent msp device-management admin</tags>
+    <summary>Device agent of the OpenFrame platform: installs as a Windows service and connects the machine to your OpenFrame tenant</summary>
+    <description><![CDATA[**OpenFrame Client** is the device agent of the [OpenFrame](https://openframe.ai/) platform (remote monitoring and management for MSPs) by Flamingo AI, Inc. It requires an OpenFrame tenant.
+
+Installing the package is step 1 of 2:
+
+1. `choco install openframe-client -y` downloads the signed agent for this package version from openframe.ai, verifies its SHA-256, copies it to `C:\Program Files\OpenFrame\bin\`, adds that folder to the system PATH and registers the Windows service `com.openframe.client`. The service starts and waits; nothing is sent anywhere yet.
+2. In a new elevated terminal, run the command shown in your OpenFrame dashboard under **Devices → Add device**:
+
+   `openframe-client auth --serverUrl <tenant host> --initialKey <key> --orgId <organization id> --userId <user id>`
+
+   This connects the device to your tenant. `openframe-client doctor` checks the result.
+
+**Updates are delivered by the OpenFrame platform.** Upgrading this package never changes an installed agent, and installing it again on a machine that already runs the service does nothing.
+
+**Uninstall** (`choco uninstall openframe-client` or `openframe-client uninstall`) stops and removes the service, removes the device from your tenant, uninstalls the integrated tools and deletes the program and data directories.
+
+Documentation: https://github.com/flamingo-stack/openframe-oss-lib/blob/main/clients/README.md#openframe-client-device-agent-install-enrol-remove
+]]></description>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
