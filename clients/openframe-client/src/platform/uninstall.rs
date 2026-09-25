@@ -49,6 +49,41 @@ fn remove_binary_siblings(install_path: &Path) {
     }
 }
 
+/// Removes the `openframe` alias earlier versions created next to the binary, and
+/// only that: `openframe` is also the openframe-cli binary name, so a file that is
+/// not our symlink (unix) or shim (Windows) belongs to another tool and stays.
+pub fn remove_legacy_alias(install_path: &Path) {
+    let Some(dir) = install_path.parent() else {
+        return;
+    };
+
+    #[cfg(target_os = "windows")]
+    let (alias, ours) = {
+        let alias = dir.join("openframe.cmd");
+        let target = install_path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let shim = format!("@\"%~dp0{}\" %*\r\n", target);
+        let ours = std::fs::read_to_string(&alias).is_ok_and(|content| content == shim);
+        (alias, ours)
+    };
+    #[cfg(not(target_os = "windows"))]
+    let (alias, ours) = {
+        let alias = dir.join("openframe");
+        let ours = std::fs::read_link(&alias).is_ok_and(|target| target == install_path);
+        (alias, ours)
+    };
+
+    if !ours {
+        return;
+    }
+    match std::fs::remove_file(&alias) {
+        Ok(()) => info!("Removed legacy alias: {}", alias.display()),
+        Err(e) => warn!("Failed to remove legacy alias {}: {}", alias.display(), e),
+    }
+}
+
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 fn remove_update_temp_files(install_path: &Path) {
     UpdateCleanupService::for_binary(install_path.to_path_buf()).sweep_temp_leftovers(None);

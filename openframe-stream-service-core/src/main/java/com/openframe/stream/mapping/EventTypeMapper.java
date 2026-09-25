@@ -40,6 +40,7 @@ public class EventTypeMapper {
         // OpenFrame native RMM (command and script execution results)
         registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.CMD_RUN_FINISHED, UnifiedEventType.COMMAND_RUN_FINISHED);
         registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED, UnifiedEventType.SCRIPT_EXECUTED);
+        registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.SCRIPT_RUN_FAILED, UnifiedEventType.SCRIPT_FAILED);
 
         // Core MeshCentral mappings
         registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.SERVER_STARTED, UnifiedEventType.SYSTEM_START);

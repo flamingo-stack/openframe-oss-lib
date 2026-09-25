@@ -10,7 +10,6 @@ import com.openframe.data.document.toolagent.ToolAgentAssetSource;
 import com.openframe.data.nats.mapper.DownloadConfigurationMapper;
 import com.openframe.data.nats.mapper.LocalFilenameConfigurationMapper;
 import com.openframe.data.nats.model.ToolInstallationMessage;
-import com.openframe.data.nats.publisher.NatsMessagePublisher;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySpec;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +28,6 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
 
     private static final String SUBJECT_TEMPLATE = "machine.%s.tool-installation";
 
-    private final NatsMessagePublisher natsMessagePublisher;
     private final DownloadConfigurationMapper downloadConfigurationMapper;
     private final LocalFilenameConfigurationMapper localFilenameConfigurationMapper;
 
@@ -58,9 +56,8 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
     }
 
     @Override
-    public void publish(String machineId, ToolInstallationMessage payload) {
-        String subject = format(SUBJECT_TEMPLATE, machineId);
-        natsMessagePublisher.publish(subject, payload);
+    public String subject(String machineId) {
+        return format(SUBJECT_TEMPLATE, machineId);
     }
 
     @Override
