@@ -1,4 +1,4 @@
-use super::{remove_binary_siblings, remove_orbit_dir};
+use super::{remove_binary_siblings, remove_legacy_alias, remove_orbit_dir};
 use std::fs;
 use std::path::Path;
 
@@ -93,4 +93,64 @@ async fn removes_orbit_directory_with_enrollment_state() {
 async fn missing_orbit_directory_is_ignored() {
     let dir = tempfile::tempdir().unwrap();
     remove_orbit_dir(&dir.path().join("orbit")).await;
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn legacy_alias_removes_only_our_windows_shim() {
+    let dir = tempfile::tempdir().unwrap();
+    touch(dir.path(), "openframe-client.exe");
+    touch(dir.path(), "openframe.exe");
+    fs::write(
+        dir.path().join("openframe.cmd"),
+        "@\"%~dp0openframe-client.exe\" %*\r\n",
+    )
+    .unwrap();
+
+    remove_legacy_alias(&dir.path().join("openframe-client.exe"));
+
+    assert_eq!(
+        remaining(dir.path()),
+        vec!["openframe-client.exe", "openframe.exe"]
+    );
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn legacy_alias_keeps_a_foreign_windows_cmd() {
+    let dir = tempfile::tempdir().unwrap();
+    touch(dir.path(), "openframe-client.exe");
+    fs::write(dir.path().join("openframe.cmd"), "@echo another tool\r\n").unwrap();
+
+    remove_legacy_alias(&dir.path().join("openframe-client.exe"));
+
+    assert_eq!(
+        remaining(dir.path()),
+        vec!["openframe-client.exe", "openframe.cmd"]
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn legacy_alias_removes_only_our_unix_symlink() {
+    let dir = tempfile::tempdir().unwrap();
+    let install_path = dir.path().join("openframe-client");
+    touch(dir.path(), "openframe-client");
+    std::os::unix::fs::symlink(&install_path, dir.path().join("openframe")).unwrap();
+
+    remove_legacy_alias(&install_path);
+
+    assert_eq!(remaining(dir.path()), vec!["openframe-client"]);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn legacy_alias_keeps_the_openframe_cli_binary() {
+    let dir = tempfile::tempdir().unwrap();
+    touch(dir.path(), "openframe-client");
+    touch(dir.path(), "openframe");
+
+    remove_legacy_alias(&dir.path().join("openframe-client"));
+
+    assert_eq!(remaining(dir.path()), vec!["openframe", "openframe-client"]);
 }

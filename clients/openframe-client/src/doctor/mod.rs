@@ -338,11 +338,11 @@ pub async fn run_healthcheck() -> DoctorReport {
             }
         },
         // Not an error: a parameterless install runs unauthenticated until
-        // `openframe auth` writes the config.
+        // `openframe-client auth` writes the config.
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             results.push(CheckResult::info(
                 CheckCategory::Command,
-                "Awaiting authentication — run 'openframe auth' with your tenant parameters to connect this device",
+                "Awaiting authentication — run 'openframe-client auth' with your tenant parameters to connect this device",
             ));
             return DoctorReport {
                 results,
