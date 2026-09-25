@@ -19,7 +19,7 @@ import { Video } from '../video';
 const TITLE = 'Demo';
 
 function iframe(): HTMLIFrameElement {
-  return screen.getByTitle(TITLE) as HTMLIFrameElement;
+  return screen.getByTitle(TITLE);
 }
 
 function commands(spy: { mock: { calls: unknown[][] } }): string[] {
