@@ -86,7 +86,9 @@ export interface TicketCardBodyProps {
   /** Where the card opens. The body sits above the card's own link with pointer
    *  events off, but the number/time line has to take them back for its tooltip -
    *  so with an `href` that line is a link of its own, and a click on it opens the
-   *  ticket like a click anywhere else on the card. */
+   *  ticket like a click anywhere else on the card. That link is out of the tab
+   *  order, so pass `href` only from a card that already renders its own focusable
+   *  link to the same place, as `TicketCard` does. */
   href?: string;
   onLinkClick?: (e: MouseEvent) => void;
 }
@@ -244,7 +246,9 @@ export function TicketCardBody({
 // drag-and-drop / board context (for embeds, marketing heroes, previews).
 // =============================================================================
 
-export interface TicketCardViewProps extends TicketCardBodyProps {
+/** No `href`: the static card has no card-wide link for keyboard users, so the
+ *  number/time line must not become a pointer-only one. */
+export interface TicketCardViewProps extends Omit<TicketCardBodyProps, 'href' | 'onLinkClick'> {
   className?: string;
   /** Merged over the shell's own — the board uses it to fade the copy it leaves
    *  behind and to place the one that follows the pointer. */
