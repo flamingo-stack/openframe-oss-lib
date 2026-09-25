@@ -1,4 +1,4 @@
-mod job;
+pub(crate) mod job;
 mod process;
 mod run_as_user;
 

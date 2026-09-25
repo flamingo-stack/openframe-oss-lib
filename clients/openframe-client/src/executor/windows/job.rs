@@ -9,7 +9,7 @@ use windows::Win32::System::JobObjects::{
 };
 use windows::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
 
-pub(super) struct JobHandle(Option<HANDLE>);
+pub(crate) struct JobHandle(Option<HANDLE>);
 
 impl JobHandle {
     fn create() -> Option<HANDLE> {
@@ -34,7 +34,7 @@ impl JobHandle {
         }
     }
 
-    pub(super) fn for_pid(pid: u32) -> Self {
+    pub(crate) fn for_pid(pid: u32) -> Self {
         if pid == 0 {
             return JobHandle(None);
         }
@@ -55,7 +55,7 @@ impl JobHandle {
         JobHandle(Some(job))
     }
 
-    pub(super) fn for_handle(process: HANDLE) -> Self {
+    pub(crate) fn for_handle(process: HANDLE) -> Self {
         let Some(job) = Self::create() else {
             return JobHandle(None);
         };
@@ -67,7 +67,7 @@ impl JobHandle {
         JobHandle(Some(job))
     }
 
-    pub(super) fn terminate(&self) {
+    pub(crate) fn terminate(&self) {
         if let Some(job) = self.0 {
             unsafe {
                 let _ = TerminateJobObject(job, 1);
