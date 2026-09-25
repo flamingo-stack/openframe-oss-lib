@@ -110,12 +110,14 @@ describe('TrustCenterPage', () => {
     expect(screen.getByText('Model providers')).toBeInTheDocument();
   });
 
-  it('compliance: the status is shown ONCE, planned frameworks are one roadmap line, percent only when published', () => {
+  it('compliance: one row per framework, proof before roadmap, the status ONCE as a badge, percent only when published', () => {
     const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
-    expect(screen.getAllByText('In progress')).toHaveLength(1);
-    expect(screen.getByText('On our roadmap:')).toBeInTheDocument();
-    expect(screen.getByText('ISO 27001')).toBeInTheDocument();
-    expect(screen.queryByText(/\(\d+%\)/)).toBeNull();
+    const compliance = within(screen.getByRole('region', { name: 'Compliance' }));
+    expect(compliance.getAllByText('In progress')).toHaveLength(1);
+    const names = compliance.getAllByText(/SOC 2|ISO 27001|ISO 42001/).map(node => node.textContent);
+    expect(names[0]).toMatch(/SOC 2/);
+    expect(compliance.getAllByText('Planned').length).toBeGreaterThan(0);
+    expect(compliance.queryByText(/controls passing/)).toBeNull();
 
     rerender(
       <TrustCenterPage
@@ -126,9 +128,16 @@ describe('TrustCenterPage', () => {
         })}
       />,
     );
-    expect(screen.getByText('(97%)')).toBeInTheDocument();
-    expect(screen.getByText('Jan–Jun 2026')).toBeInTheDocument();
-    expect(screen.queryByText('On our roadmap:')).toBeNull();
+    expect(screen.getByText('Jan–Jun 2026 · 97% of controls passing')).toBeInTheDocument();
+    expect(screen.getAllByText('Certified')).toHaveLength(1);
+  });
+
+  it('questions go through the request form: no security address, no vulnerability or disclosure wording', async () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    expect(screen.queryByText(/vulnerab|disclosure|bug bounty|@/i)).toBeNull();
+    expect(screen.queryAllByRole('link').filter(link => link.getAttribute('href')?.startsWith('mailto:'))).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Get in touch' }));
+    expect(await screen.findByTestId('contact-form')).toBeInTheDocument();
   });
 
   it('controls browse: category cards show 3 controls, "View all" opens the full category in a drawer', async () => {
@@ -201,7 +210,6 @@ describe('TrustCenterPage', () => {
           subprocessors: [],
           aiPractices: [],
           faqs: [],
-          contact: { securityEmail: 'security@example.com' },
         })}
       />,
     );

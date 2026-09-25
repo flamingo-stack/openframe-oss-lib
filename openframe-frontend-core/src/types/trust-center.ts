@@ -120,12 +120,6 @@ export interface TrustCenterAiPractice {
   commitment?: boolean;
 }
 
-export interface TrustCenterContact {
-  securityEmail: string;
-  disclosureUrl?: string | null;
-  statusPageUrl?: string | null;
-}
-
 export interface TrustCenterPublic {
   frameworks: TrustCenterFramework[];
   controlDomains: TrustCenterControlDomain[];
@@ -135,7 +129,6 @@ export interface TrustCenterPublic {
   subprocessors: TrustCenterSubprocessor[];
   aiPractices: TrustCenterAiPractice[];
   faqs: Faq[];
-  contact: TrustCenterContact;
   /** ISO instant: most recent passing test run (falls back to the pull time). */
   checkedAt: string | null;
   /** ISO instant: start of the last successful Vanta pull. */

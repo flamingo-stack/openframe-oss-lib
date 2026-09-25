@@ -17,11 +17,11 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   TRUST_DOCUMENT_REQUEST_PREFIX,
+  TRUST_FRAMEWORK_STATUSES,
   trustControlQueryMatcher,
   trustDocumentContactReason,
   trustFrameworkStatusEntry,
   type TrustCenterAiPractice,
-  type TrustCenterContact,
   type TrustCenterControl,
   type TrustCenterControlDomain,
   type TrustCenterDocument,
@@ -31,8 +31,6 @@ import {
 } from '../../types/trust-center';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { ContactForm } from '../contact/contact-form';
-import { ActivityIcon } from '../icons-v2-generated/charts/activity-icon';
-import { EmailShieldIcon } from '../icons-v2-generated/communication/email-shield-icon';
 import { FileIcon } from '../icons-v2-generated/documents/file-icon';
 import { FileShieldIcon } from '../icons-v2-generated/documents/file-shield-icon';
 import { BrainAIIcon } from '../icons-v2-generated/health/brain-ai-icon';
@@ -43,14 +41,13 @@ import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { ListEmptyState } from '../list-empty-state';
 import { CardSkeletonGrid } from '../loading/card-skeleton';
 import { Button } from '../ui/button/button';
-import { CardHorizontal } from '../ui/card';
-import { DashboardInfoCard } from '../ui/dashboard-info-card';
 import { Drawer, DrawerBody, DrawerContent, DrawerHeader, DrawerTitle } from '../ui/drawer';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
 import { FeatureList } from '../ui/feature-list';
 import { ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui/modal-v2';
 import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
+import { StatusBadge } from '../ui/status-badge';
 import { Tag } from '../ui/tag';
 
 /** Status `icon` vocabulary (owned by `TRUST_FRAMEWORK_STATUSES`) → icon component, ONE lookup. */
@@ -65,6 +62,11 @@ const CONTROLS_PER_CARD = 3;
 const STACK_CLASSES = 'flex flex-col gap-[var(--spacing-system-l)]';
 const TWO_COLUMN_GRID = 'grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-2';
 const BODY_TEXT = 'text-h6 text-ods-text-secondary';
+/**
+ * The right-hand action / status column: ONE width from tablet up, so every
+ * panel's rows line up; on phones it hugs its content so the title keeps the room.
+ */
+const ACTION_COLUMN = 'shrink-0 md:w-36';
 
 // ---------------------------------------------------------------------------
 // Section frame
@@ -111,81 +113,78 @@ export function TrustSection({
 // AI & data use
 // ---------------------------------------------------------------------------
 
-/** The data-use commitment boxed first (accent edge), then the rest of the practices as compact cards. */
+/**
+ * The data-use commitment first (success shield), then the other practices —
+ * the page's ONE row style (`StackedRowsPanel`), full sentences wrapped.
+ */
 export function AiSection({ practices }: { practices: TrustCenterAiPractice[] }) {
-  const commitment = practices.find(practice => practice.commitment);
-  const rest = practices.filter(practice => practice !== commitment);
-  return (
-    <div className="flex flex-col gap-[var(--spacing-system-m)]">
-      {commitment ? (
-        <CardHorizontal
-          icon={<ShieldCheckIcon className="text-ods-success" aria-hidden="true" />}
-          title={commitment.value}
-          description={commitment.label}
-          className="border-l-ods-success"
-        />
-      ) : null}
-      {rest.length > 0 ? (
-        <div className="grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-3">
-          {rest.map(practice => (
-            <CardHorizontal
-              key={practice.label}
-              icon={<BrainAIIcon aria-hidden="true" />}
-              title={practice.label}
-              description={practice.value}
-              borderLeft={false}
-              className="h-full items-start border border-ods-border"
-            />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
+  const ordered = [...practices].sort((a, b) => Number(Boolean(b.commitment)) - Number(Boolean(a.commitment)));
+  const rows: PanelRow[] = ordered.map(practice => ({
+    id: practice.label,
+    columns: [
+      practice.commitment
+        ? {
+            key: 'practice',
+            leadingIcon: <ShieldCheckIcon className="text-ods-success" role="img" aria-label="Commitment" />,
+            value: practice.value,
+            label: practice.label,
+            wrap: true,
+          }
+        : {
+            key: 'practice',
+            leadingIcon: <BrainAIIcon aria-hidden="true" />,
+            value: practice.label,
+            label: practice.value,
+            wrap: true,
+          },
+    ],
+  }));
+  return <StackedRowsPanel rows={rows} />;
 }
 
 // ---------------------------------------------------------------------------
 // Compliance
 // ---------------------------------------------------------------------------
 
+/** A framework's secondary line: its report period and, when published, its passing share (the status is the badge). */
+function frameworkDetail(framework: TrustCenterFramework): string | undefined {
+  const parts = [
+    framework.reportPeriod,
+    typeof framework.percent === 'number' ? `${framework.percent}% of controls passing` : null,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(' · ') : undefined;
+}
+
 /**
- * Real proof first: certified / in-audit / in-progress frameworks as tiles
- * (status as the small label, framework as the value — never the status twice).
- * Planned frameworks are one roadmap line, not tiles that push proof down.
+ * Real proof first (certified → in audit → in progress), roadmap items last —
+ * one row per framework, status as a badge in a fixed-width column.
  */
 export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFramework[] }) {
-  const active = frameworks.filter(framework => framework.status !== 'planned');
-  const planned = frameworks.filter(framework => framework.status === 'planned');
-  return (
-    <div className={STACK_CLASSES}>
-      {active.length > 0 ? (
-        <div className={TWO_COLUMN_GRID}>
-          {active.map(framework => {
-            const entry = trustFrameworkStatusEntry(framework.status);
-            const Icon = FRAMEWORK_ICONS[entry.icon];
-            const hasPercent = typeof framework.percent === 'number';
-            return (
-              <DashboardInfoCard
-                key={framework.id}
-                title={entry.label}
-                icon={<Icon aria-hidden="true" />}
-                value={framework.label}
-                subValue={framework.reportPeriod ?? undefined}
-                {...(hasPercent ? { showProgress: true, percentage: framework.percent } : {})}
-              />
-            );
-          })}
-        </div>
-      ) : null}
-      {planned.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-[var(--spacing-system-s)]">
-          <span className={BODY_TEXT}>On our roadmap:</span>
-          {planned.map(framework => (
-            <Tag key={framework.id} variant="outline" label={framework.label} />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
+  const order = TRUST_FRAMEWORK_STATUSES.map(entry => entry.status);
+  const sorted = [...frameworks].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
+  const rows: PanelRow[] = sorted.map(framework => {
+    const entry = trustFrameworkStatusEntry(framework.status);
+    const Icon = FRAMEWORK_ICONS[entry.icon];
+    return {
+      id: framework.id,
+      columns: [
+        {
+          key: 'framework',
+          leadingIcon: <Icon aria-hidden="true" />,
+          value: framework.label,
+          label: frameworkDetail(framework),
+          wrap: true,
+        },
+        {
+          key: 'status',
+          width: ACTION_COLUMN,
+          align: 'right',
+          content: <StatusBadge text={entry.label} colorScheme={entry.color} singleLine />,
+        },
+      ],
+    };
+  });
+  return <StackedRowsPanel rows={rows} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +221,7 @@ function controlRows(controls: TrustCenterControl[], query = ''): PanelRow[] {
         value: highlight(control.name, query),
         // A description-only match is emphasised too: every kept row shows why it matched.
         label: control.description ? highlight(control.description, query) : undefined,
+        wrap: true,
       },
     ],
   }));
@@ -309,7 +309,7 @@ export function ControlsSection({
                 />
                 {hidden > 0 ? (
                   <Button
-                    variant="transparent"
+                    variant="outline"
                     size="small"
                     onClick={() => setOpenDomainName(domain.domain)}
                     className="self-start"
@@ -377,10 +377,11 @@ export function DocumentsSection({
           ),
           value: document.title,
           label: gated ? `${document.kind} · available on request` : `${document.kind} · public`,
+          wrap: true,
         },
         {
           key: 'action',
-          width: 'shrink-0',
+          width: ACTION_COLUMN,
           align: 'right',
           content:
             href === null ? (
@@ -467,10 +468,10 @@ export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCe
         label: subprocessor.purpose,
         href: subprocessor.url ?? undefined,
       },
-      { key: 'location', value: subprocessor.location, label: 'Location', hideAt: 'md', width: 'w-40 shrink-0' },
+      { key: 'location', value: subprocessor.location, label: 'Location', hideAt: 'md', width: 'w-44 shrink-0' },
       {
         key: 'category',
-        width: 'shrink-0',
+        width: 'w-56 shrink-0',
         align: 'right',
         // Phones keep name + purpose readable; the category is a desktop column.
         hideAt: 'md',
@@ -485,41 +486,41 @@ export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCe
 // Contact + loading
 // ---------------------------------------------------------------------------
 
-export function ContactSection({ contact }: { contact: TrustCenterContact }) {
+/**
+ * Security & compliance questions, routed through the page's ONE request flow
+ * (`/api/contact`) — no address is published and no disclosure programme is
+ * advertised (industry practice for trust portals: questions go through the
+ * account relationship, not an open inbox).
+ */
+export function ContactSection({ onContact }: { onContact: () => void }) {
   return (
-    <div className={TWO_COLUMN_GRID}>
-      <div className="flex flex-col gap-[var(--spacing-system-s)]">
-        <CardHorizontal
-          icon={<EmailShieldIcon aria-hidden="true" />}
-          title="Report a vulnerability"
-          description={`Security questions and responsible disclosure: ${contact.securityEmail}`}
-        />
-        <div className="flex flex-wrap gap-[var(--spacing-system-s)]">
-          <Button variant="outline" href={`mailto:${contact.securityEmail}`}>
-            Email security
-          </Button>
-          {contact.disclosureUrl ? (
-            <Button variant="transparent" href={contact.disclosureUrl}>
-              Disclosure policy
-            </Button>
-          ) : null}
-        </div>
-      </div>
-      {contact.statusPageUrl ? (
-        <div className="flex flex-col gap-[var(--spacing-system-s)]">
-          <CardHorizontal
-            icon={<ActivityIcon aria-hidden="true" />}
-            title="System status"
-            description="Live uptime and incident history."
-          />
-          <div className="flex flex-wrap gap-[var(--spacing-system-s)]">
-            <Button variant="outline" href={contact.statusPageUrl} openInNewTab>
-              Status page
-            </Button>
-          </div>
-        </div>
-      ) : null}
-    </div>
+    <StackedRowsPanel
+      rows={[
+        {
+          id: 'questions',
+          columns: [
+            {
+              key: 'questions',
+              leadingIcon: <FileShieldIcon aria-hidden="true" />,
+              value: 'Security questions',
+              label:
+                'Customers and prospective customers can reach our security team for questionnaires, documentation or a review call.',
+              wrap: true,
+            },
+            {
+              key: 'action',
+              width: ACTION_COLUMN,
+              align: 'right',
+              content: (
+                <Button variant="outline" size="small" onClick={onContact}>
+                  Get in touch
+                </Button>
+              ),
+            },
+          ],
+        },
+      ]}
+    />
   );
 }
 

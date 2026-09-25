@@ -33,11 +33,6 @@ const BASE = makeTrustCenterData({
     { label: 'Governance', value: 'ISO 42001 planned' },
   ],
   faqs: [TRUST_CENTER_FIXTURE_FAQ],
-  contact: {
-    securityEmail: 'security@example.com',
-    disclosureUrl: 'https://example.com/security',
-    statusPageUrl: 'https://status.example.com',
-  },
 });
 
 const meta = {

@@ -7,7 +7,7 @@
  * questionnaire needs a deep link per section): hero with the monitoring status
  * and the two actions, then anchored sections in reading order
  * (`TRUST_CENTER_SECTIONS`: AI & data use → compliance → controls → documents →
- * subprocessors → FAQ → contact) with a sticky section rail on desktop
+ * subprocessors → FAQ → questions) with a sticky section rail on desktop
  * (`StickySectionNav` + `useScrollSpy`, the vendor-page / DocViewer pattern).
  * Built ONLY from existing lib components (see `trust-center-sections.tsx`); the
  * chrome is the canonical `PageShell` + frozen `PageLayout`.
@@ -196,13 +196,8 @@ export function TrustCenterPage({
       : { label: backButton.label ?? 'Back to home', onClick: () => router.push(backButton.href ?? '/') };
 
   const hasGatedDocuments = data?.documents.some(document => document.access === 'request') ?? false;
-  const actions = data
-    ? [
-        ...(hasGatedDocuments
-          ? [{ label: 'Request access', variant: 'accent' as const, onClick: () => openRequest(null) }]
-          : []),
-        { label: 'Email security', variant: 'outline' as const, href: `mailto:${data.contact.securityEmail}` },
-      ]
+  const actions = hasGatedDocuments
+    ? [{ label: 'Request access', variant: 'accent' as const, onClick: () => openRequest(null) }]
     : undefined;
 
   // Section id → its content. Titles come from `TRUST_CENTER_SECTIONS`; which
@@ -249,7 +244,7 @@ export function TrustCenterPage({
       render: d => <SubprocessorsSection subprocessors={d.subprocessors} />,
     },
     faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} /> },
-    contact: { render: d => <ContactSection contact={d.contact} /> },
+    contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };
 
   let body: ReactNode;

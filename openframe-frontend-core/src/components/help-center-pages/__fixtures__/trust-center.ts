@@ -61,7 +61,6 @@ export function makeTrustCenterData(overrides: Partial<TrustCenterPublic> = {}):
       { label: 'Model providers', value: 'Anthropic (Claude)' },
     ],
     faqs: [],
-    contact: { securityEmail: 'security@example.com', statusPageUrl: 'https://status.example.com' },
     checkedAt: new Date(now - 5 * 60 * 1000).toISOString(),
     syncedAt: new Date(now - 10 * 60 * 1000).toISOString(),
     monitoredWindowMs: TRUST_CENTER_FIXTURE_WINDOW_MS,
