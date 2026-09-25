@@ -59,16 +59,12 @@ public class SessionConfig {
      */
     @Bean
     public RedisSerializer<Object> springSessionDefaultRedisSerializer() {
-        return new LenientJdkSerializationRedisSerializer(SessionConfig.class.getClassLoader());
+        return new LenientJdkSerializationRedisSerializer(
+                new JdkSerializationRedisSerializer(SessionConfig.class.getClassLoader()));
     }
 
-    private static final class LenientJdkSerializationRedisSerializer implements RedisSerializer<Object> {
-
-        private final JdkSerializationRedisSerializer delegate;
-
-        private LenientJdkSerializationRedisSerializer(ClassLoader classLoader) {
-            this.delegate = new JdkSerializationRedisSerializer(classLoader);
-        }
+    private record LenientJdkSerializationRedisSerializer(JdkSerializationRedisSerializer delegate)
+            implements RedisSerializer<Object> {
 
         @Override
         public byte[] serialize(Object value) {
