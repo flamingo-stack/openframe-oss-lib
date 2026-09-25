@@ -356,10 +356,11 @@ describe('TrustCenterPage', () => {
             {
               name: 'Google Cloud Platform',
               purpose: 'Hosting',
+              description: null,
               location: 'United States',
-              category: 'Infrastructure',
+              url: null,
             },
-            { name: 'Acme Analytics', purpose: 'Analytics', location: 'Atlantis', category: 'Analytics' },
+            { name: 'Acme Analytics', purpose: 'Analytics', description: null, location: 'Atlantis', url: null },
           ],
         })}
       />,

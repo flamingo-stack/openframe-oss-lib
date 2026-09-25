@@ -52,7 +52,6 @@ import { SearchInput } from '../ui/search-input';
 import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
 import { StatusBadge } from '../ui/status-badge';
 import { TabNavigation, type TabItem } from '../ui/tab-navigation';
-import { Tag } from '../ui/tag';
 
 /** Status `icon` vocabulary (owned by `TRUST_FRAMEWORK_STATUSES`) → icon component, ONE lookup. */
 const FRAMEWORK_ICONS: Record<TrustFrameworkStatusEntry['icon'], typeof ShieldCheckIcon> = {
@@ -508,23 +507,16 @@ export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCe
         key: 'name',
         leadingIcon: subprocessorMark(subprocessor.name),
         value: subprocessor.name,
-        label: subprocessor.purpose,
+        label: subprocessor.purpose ?? subprocessor.description ?? undefined,
         href: subprocessor.url ?? undefined,
+        wrap: true,
       },
       {
         key: 'location',
-        value: countryWithFlag(subprocessor.location),
+        value: subprocessor.location ? countryWithFlag(subprocessor.location) : '—',
         label: 'Location',
         hideAt: 'md',
         width: 'w-48 shrink-0',
-      },
-      {
-        key: 'category',
-        width: 'w-56 shrink-0',
-        align: 'right',
-        // Phones keep name + purpose readable; the category is a desktop column.
-        hideAt: 'md',
-        content: <Tag variant="outline" label={subprocessor.category} />,
       },
     ],
   }));

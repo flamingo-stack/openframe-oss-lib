@@ -108,12 +108,15 @@ export interface TrustCenterDocument {
   legalDocType?: string | null;
 }
 
+/** A subprocessor, as the company's Vanta Trust Center lists it (Vanta's fields). */
 export interface TrustCenterSubprocessor {
   name: string;
-  purpose: string;
-  location: string;
-  category: string;
-  url?: string | null;
+  /** What it does for us ("Cloud hosting"). */
+  purpose: string | null;
+  description: string | null;
+  /** Where it processes data, e.g. "United States" (the page adds the flag). */
+  location: string | null;
+  url: string | null;
 }
 
 /** An AI statement: one FAQ of the company's Vanta Trust Center, in its AI category. */

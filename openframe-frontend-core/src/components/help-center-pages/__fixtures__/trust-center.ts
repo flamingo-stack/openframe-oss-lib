@@ -51,7 +51,7 @@ export function makeTrustCenterData(overrides: Partial<TrustCenterPublic> = {}):
       { title: 'SOC 2 report', kind: 'Audit report', access: 'request' },
       { title: 'Privacy policy', kind: 'Policy', access: 'public', url: '/privacy-policy', legalDocType: 'privacy' },
     ],
-    subprocessors: [{ name: 'Google Cloud', purpose: 'Hosting', location: 'US', category: 'Infrastructure' }],
+    subprocessors: [{ name: 'Google Cloud', purpose: 'Hosting', description: null, location: 'US', url: null }],
     aiPractices: [
       {
         label: 'Is customer data used to train AI models?',
