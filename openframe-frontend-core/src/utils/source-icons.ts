@@ -41,6 +41,9 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'customer-interviews': 'users',
   faqs: 'info',
 
+  // Trust (single-record live source over the public Vanta projection)
+  'trust-center': 'shield',
+
   // Financials
   'investor-updates': 'mail',
   'financial-kpis': 'activity',
@@ -125,6 +128,9 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   podcasts: 'Podcasts',
   'customer-interviews': 'Customer Interviews',
   faqs: 'FAQs',
+
+  // Trust
+  'trust-center': 'Trust Center',
 
   // Financials
   'investor-updates': 'Investor Updates',
@@ -224,6 +230,9 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   podcast: 'podcasts',
   customer_interview: 'customer-interviews',
   faq: 'faqs',
+
+  // Trust
+  trust_center: 'trust-center',
 
   // Financials
   investor_update: 'investor-updates',

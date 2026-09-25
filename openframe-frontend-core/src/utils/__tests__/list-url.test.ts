@@ -61,6 +61,9 @@ const BASELINE: Record<string, string> = {
   code_rule: '/api/code-rules/cards?ids=a,b',
   code_repo: '/api/code-graph/repos?ids=a,b',
   code_deployment: '/api/code-graph/deployments?ids=a,b',
+  // 2026-09: the Vanta trust center — a single-record live source; the route
+  // ignores `?ids=` and returns the whole public projection.
+  trust_center: '/api/trust-center?ids=a,b',
 };
 
 describe('buildListUrl — byte parity with the hub mappers', () => {

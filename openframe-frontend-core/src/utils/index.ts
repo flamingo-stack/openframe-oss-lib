@@ -362,7 +362,7 @@ export {
   type ContentRefLayout,
   type ContentRefGridSize,
 } from './content-ref-groups';
-export { extractItems, extractItemId } from './extract-items';
+export { extractItems, extractItemId, extractCardItems } from './extract-items';
 export { FullscreenSwitchController, type FullscreenSwitchOptions } from './fullscreen-switch';
 export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url';
 

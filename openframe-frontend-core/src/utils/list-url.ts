@@ -28,6 +28,8 @@
  * mappers can import it from `@flamingo-stack/openframe-frontend-core/utils`.
  */
 
+import { TRUST_CENTER_API_PATH } from '../types/trust-center';
+
 /**
  * Legacy ContentRef aliases that predate the RAG `documentType`
  * unification — direct lib/embedder callers (e.g. the chat dispatcher's
@@ -126,6 +128,10 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   code_symbol: (ids, b) => `${b}/api/code-graph/symbols?ids=${ids.join(',')}`,
   code_duplicate: (ids, b) => `${b}/api/code-graph/duplicates?ids=${ids.join(',')}`,
   code_impact: (ids, b) => `${b}/api/code-graph/impacts?ids=${ids.join(',')}`,
+  // Single-record live source: the route ignores `?ids=` and returns the ONE
+  // `TrustCenterPublic` object (card id `TRUST_CENTER_CARD_ID`); see
+  // `extractCardItems` for how the loader matches it back.
+  trust_center: (ids, b) => `${b}${TRUST_CENTER_API_PATH}?ids=${ids.join(',')}`,
 };
 
 /**

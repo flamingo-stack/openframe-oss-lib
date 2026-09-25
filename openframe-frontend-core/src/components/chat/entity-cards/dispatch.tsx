@@ -33,6 +33,13 @@ import React, { type ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
+import {
+  TRUST_CENTER_DOCUMENT_TYPE,
+  TRUST_CENTER_PAGE_PATH,
+  trustFrameworkStatusEntry,
+  type TrustCenterPublic,
+  type TrustFrameworkStatusEntry,
+} from '../../../types/trust-center';
 import { formatDateShort } from '../../../utils/date-formatters';
 import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
@@ -69,6 +76,7 @@ import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-tria
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon';
 import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon';
 import { MapIcon } from '../../icons-v2-generated/map-and-travel/map-icon';
+import { ShieldCheckIcon } from '../../icons-v2-generated/security/shield-check-icon';
 import { Megaphone01Icon } from '../../icons-v2-generated/shopping/megaphone-01-icon';
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon';
 import { CheckSquareIcon } from '../../icons-v2-generated/signs-and-symbols/check-square-icon';
@@ -647,6 +655,52 @@ function GlyphChatCard({
       anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
       menuGroups={cardMenuGroups(chatRef.url, discuss)}
       menuAriaLabel="Card actions"
+    />
+  );
+}
+
+/** Framework status colour (a `StatusBadge` scheme) → the card pill's `Tag` variant. */
+const TRUST_STATUS_TAG_VARIANT: Record<TrustFrameworkStatusEntry['color'], MingoInfoCardStatus['variant']> = {
+  success: 'success',
+  cyan: 'selectedCyan',
+  warning: 'warning',
+  default: 'grey',
+};
+
+/** Trust center (single record: the whole public projection). Title + the
+ *  frameworks with their statuses; the lead framework's status is the pill;
+ *  "View trust center" opens the page. Defensive reads — the row is unvalidated. */
+function TrustCenterChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  discuss,
+}: {
+  item: unknown;
+  chatRef: ChatRef;
+  isNewTab: boolean;
+  discuss?: CardDiscussAction;
+}) {
+  const raw = (item as { frameworks?: unknown } | undefined)?.frameworks;
+  const frameworks: TrustCenterPublic['frameworks'] = Array.isArray(raw)
+    ? (raw as TrustCenterPublic['frameworks'])
+    : [];
+  const summary = frameworks
+    .map(framework => `${framework.label}: ${trustFrameworkStatusEntry(framework.status).label}`)
+    .join(' · ');
+  const lead = frameworks[0] ? trustFrameworkStatusEntry(frameworks[0].status) : undefined;
+  return (
+    <MingoInfoCard
+      title="Trust Center"
+      description={summary || 'Security, privacy and AI governance'}
+      icon={<ShieldCheckIcon size={24} />}
+      status={lead ? { label: lead.label, variant: TRUST_STATUS_TAG_VARIANT[lead.color] } : undefined}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss, {
+        label: 'View trust center',
+        icon: <ShieldCheckIcon size={20} />,
+      })}
+      menuAriaLabel="Trust center actions"
     />
   );
 }
@@ -1561,6 +1615,21 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     skeleton: () => <MingoInfoCardSkeleton />,
     render: (item, chatRef, opts) => (
       <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    ),
+  },
+  // Trust center — ONE record (`[card://trust_center:main]`) from the public
+  // projection route; `extractCardItems` turns its object payload into the
+  // single matched row. Destination is the public page unless the host
+  // re-homes the type (`composeContentUrl` override).
+  [TRUST_CENTER_DOCUMENT_TYPE]: {
+    label: 'Trust center',
+    bareInline: true,
+    contentRefType: TRUST_CENTER_DOCUMENT_TYPE,
+    noComposedHref: true,
+    fallbackHref: () => TRUST_CENTER_PAGE_PATH,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => (
+      <TrustCenterChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
   },
   hubspot_ticket: refHydratedEntry('hubspot_ticket', 'HubSpot ticket', (displayRef, opts) => (
