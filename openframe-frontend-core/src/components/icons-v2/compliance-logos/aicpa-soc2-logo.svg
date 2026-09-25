@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <path id="soc2-top-arc" d="M47.41 248.11 A160 160 0 1 1 352.59 248.11"/>
+    <path id="soc2-bottom-arc" d="M24.52 255.33 A184 184 0 0 0 375.48 255.33"/>
+  </defs>
+  <circle cx="200" cy="200" r="199" fill="#FFFFFF"/>
+  <circle cx="200" cy="200" r="196" fill="#0177C1"/>
+  <path d="M13.07 258.94 A196 196 0 0 0 386.93 258.94 L341.15 244.50 A148 148 0 0 1 58.85 244.50 Z" fill="#111111"/>
+  <circle cx="200" cy="200" r="148" fill="#FFFFFF"/>
+  <text font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="24" fill="#FFFFFF"><textPath href="#soc2-top-arc" startOffset="50%" text-anchor="middle" textLength="535" lengthAdjust="spacingAndGlyphs">AICPA Service Organization Control Reports</textPath></text>
+  <text font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="27" font-weight="700" fill="#FFFFFF"><textPath href="#soc2-bottom-arc" startOffset="50%" text-anchor="middle" textLength="340" lengthAdjust="spacingAndGlyphs">Formerly SAS 70 Reports</textPath></text>
+  <text x="200" y="172" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="67" font-weight="300" fill="#0177C1" textLength="279" lengthAdjust="spacingAndGlyphs">AICPA</text>
+  <line x1="102" y1="194.5" x2="296" y2="194.5" stroke="#C6C6C6" stroke-width="1.5"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="78" font-weight="500" fill="#111111" textLength="218" lengthAdjust="spacingAndGlyphs">SOC 2</text>
+</svg>

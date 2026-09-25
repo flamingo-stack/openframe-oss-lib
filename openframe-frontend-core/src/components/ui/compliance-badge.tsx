@@ -6,6 +6,7 @@ import {
   type ComplianceStandard,
 } from '../../utils/compliance-standards';
 import {
+  AicpaSoc2LogoIcon,
   EuLogoIcon,
   HhsLogoIcon,
   IsoIecLogoIcon,
@@ -15,6 +16,7 @@ import {
 
 /** The official marks (`icons-v2/compliance-logos`), by `ComplianceStandard.logo`. */
 const COMPLIANCE_LOGOS: Record<ComplianceLogoKey, ComponentType<{ className?: string; size?: number }>> = {
+  'aicpa-soc2': AicpaSoc2LogoIcon,
   iso: IsoLogoIcon,
   'iso-iec': IsoIecLogoIcon,
   nist: NistLogoIcon,

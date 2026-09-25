@@ -32,7 +32,10 @@ describe('official logos', () => {
     expect(complianceStandardForName('NIST CSF')?.logo).toBe('nist');
   });
 
-  it('SOC keeps the drawn badge: the AICPA seal is issued only through its logo program', () => {
-    expect(COMPLIANCE_STANDARDS.filter(s => s.key.startsWith('soc')).every(s => s.logo === undefined)).toBe(true);
+  it('SOC 2 carries the AICPA SOC 2 seal; SOC 1 and SOC 3 keep the drawn badge', () => {
+    expect(complianceStandardForName('soc2')?.logo).toBe('aicpa-soc2');
+    expect(
+      COMPLIANCE_STANDARDS.filter(s => s.key === 'soc1' || s.key === 'soc3').every(s => s.logo === undefined),
+    ).toBe(true);
   });
 });

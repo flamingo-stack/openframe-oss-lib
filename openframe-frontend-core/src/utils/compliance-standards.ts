@@ -8,13 +8,14 @@
  * `logo` names the OFFICIAL mark shipped in the icon set
  * (`icons-v2/compliance-logos`, downloaded from Wikimedia Commons, public
  * domain): ISO's emblem, the ISO/IEC emblem of the joint standards, NIST, the
- * EU emblem for EU regulations, HHS for HIPAA. A standard without one (the
- * AICPA SOC seal is issued only through AICPA's logo program) shows our drawn
- * `ComplianceBadge` instead.
+ * EU emblem for EU regulations, HHS for HIPAA; and the AICPA SOC 2 seal,
+ * vectorised from the seal the company supplied. AICPA licenses that seal to
+ * companies holding a SOC 2 report with an unqualified opinion. A standard
+ * without a mark shows our drawn `ComplianceBadge` instead.
  */
 
 /** The official marks the icon set ships (`icons-v2/compliance-logos`). */
-export type ComplianceLogoKey = 'iso' | 'iso-iec' | 'nist' | 'eu' | 'hhs';
+export type ComplianceLogoKey = 'aicpa-soc2' | 'iso' | 'iso-iec' | 'nist' | 'eu' | 'hhs';
 export interface ComplianceStandard {
   /** Stable key, e.g. `soc2`. */
   key: string;
@@ -30,7 +31,7 @@ export interface ComplianceStandard {
 
 export const COMPLIANCE_STANDARDS: readonly ComplianceStandard[] = [
   { key: 'soc1', body: 'AICPA', mark: 'SOC 1', aliases: ['soc1', 'ssae18'] },
-  { key: 'soc2', body: 'AICPA', mark: 'SOC 2', aliases: ['soc2'] },
+  { key: 'soc2', body: 'AICPA', mark: 'SOC 2', aliases: ['soc2'], logo: 'aicpa-soc2' },
   { key: 'soc3', body: 'AICPA', mark: 'SOC 3', aliases: ['soc3'] },
   { key: 'iso27001', body: 'ISO', mark: '27001', aliases: ['iso27001', 'isoiec27001'], logo: 'iso-iec' },
   { key: 'iso27017', body: 'ISO', mark: '27017', aliases: ['iso27017', 'isoiec27017'], logo: 'iso-iec' },
