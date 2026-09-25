@@ -156,3 +156,77 @@ fn clock_skewed_parent_from_the_tool_dir_is_kept() {
         .iter()
         .all(|(pid, _)| *pid != 11));
 }
+
+#[test]
+fn live_older_parent_outside_the_tool_dir_is_kept() {
+    let procs = vec![
+        proc(
+            10,
+            r"C:\Program Files\OpenFrame\openframe-client.exe",
+            Some(4),
+            100,
+        ),
+        proc(11, OSQUERYD, Some(10), 105),
+    ];
+    assert!(select_orphans(&procs, OSQUERYD, true).is_empty());
+}
+
+#[test]
+fn same_second_parent_outside_the_tool_dir_is_kept() {
+    let procs = vec![
+        proc(
+            10,
+            r"C:\Program Files\OpenFrame\openframe-client.exe",
+            Some(4),
+            105,
+        ),
+        proc(11, OSQUERYD, Some(10), 105),
+    ];
+    assert!(select_orphans(&procs, OSQUERYD, true).is_empty());
+}
+
+#[test]
+fn unreadable_child_start_time_is_never_a_reuse() {
+    let procs = vec![
+        proc(
+            10,
+            r"C:\Program Files\OpenFrame\openframe-client.exe",
+            Some(4),
+            100,
+        ),
+        proc(11, OSQUERYD, Some(10), 0),
+    ];
+    assert!(select_orphans(&procs, OSQUERYD, true).is_empty());
+}
+
+#[test]
+fn newer_parent_without_exe_counts_as_reused() {
+    let procs = vec![
+        ProcSnapshot {
+            pid: 10,
+            exe: None,
+            parent: Some(4),
+            start_time: 200,
+        },
+        proc(11, OSQUERYD, Some(10), 105),
+    ];
+    assert_eq!(
+        select_orphans(&procs, OSQUERYD, true),
+        vec![(11, OrphanReason::ParentPidReused)]
+    );
+}
+
+#[test]
+fn clock_skewed_unix_parent_from_the_tool_dir_is_kept() {
+    let target = "/Library/Application Support/OpenFrame/fleetmdm-agent/osqueryd";
+    let procs = vec![
+        proc(
+            10,
+            "/Library/Application Support/OpenFrame/fleetmdm-agent/agent",
+            Some(5),
+            200,
+        ),
+        proc(11, target, Some(10), 105),
+    ];
+    assert!(select_orphans(&procs, target, false).is_empty());
+}

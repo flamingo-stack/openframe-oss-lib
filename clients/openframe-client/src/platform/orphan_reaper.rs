@@ -11,7 +11,6 @@ pub(crate) struct ProcSnapshot {
     pub pid: u32,
     pub exe: Option<String>,
     pub parent: Option<u32>,
-    /// Seconds since the epoch.
     pub start_time: u64,
 }
 
@@ -38,7 +37,7 @@ fn parent_dir(path: &str) -> &str {
     path.rfind(['/', '\\']).map_or("", |i| &path[..i])
 }
 
-/// Picks the processes running `target_exe` whose parent is gone; unknown parents are left alone.
+/// Picks processes running `target_exe` whose parent exited (gone, pid reused, or reparented to init).
 pub(crate) fn select_orphans(
     procs: &[ProcSnapshot],
     target_exe: &str,
@@ -68,7 +67,12 @@ pub(crate) fn select_orphans(
             } else {
                 match by_pid.get(&parent) {
                     None => OrphanReason::ParentGone,
-                    Some(pp) if pp.start_time > p.start_time && !in_tool_dir(pp) => {
+                    // start_time 0 means sysinfo couldn't read it, so the order is unknown.
+                    Some(pp)
+                        if p.start_time != 0
+                            && pp.start_time > p.start_time
+                            && !in_tool_dir(pp) =>
+                    {
                         OrphanReason::ParentPidReused
                     }
                     Some(_) => return None,
@@ -80,7 +84,7 @@ pub(crate) fn select_orphans(
 }
 
 /// Kills every orphaned process running `target_exe`; returns how many were killed.
-pub fn reap_orphans(target_exe: &Path) -> usize {
+pub(crate) fn reap_orphans(target_exe: &Path) -> usize {
     let mut sys = System::new();
     sys.refresh_processes_specifics(ProcessRefreshKind::new().with_exe(UpdateKind::Always));
 
@@ -97,18 +101,14 @@ pub fn reap_orphans(target_exe: &Path) -> usize {
 
     let target = target_exe.to_string_lossy();
     let orphans = select_orphans(&snapshot, &target, cfg!(windows));
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
 
     let mut killed = 0;
     for (pid, reason) in &orphans {
         let Some(process) = sys.process(sysinfo::Pid::from_u32(*pid)) else {
             continue;
         };
-        let age_secs = now.saturating_sub(process.start_time());
-        if process.kill() {
+        let age_secs = process.run_time();
+        if force_kill(*pid) {
             killed += 1;
             info!(pid, ?reason, age_secs, exe = %target, "Killed orphaned tool process");
         } else {
@@ -119,6 +119,27 @@ pub fn reap_orphans(target_exe: &Path) -> usize {
         info!(found = orphans.len(), killed, exe = %target, "Orphaned tool process sweep finished");
     }
     killed
+}
+
+// Direct kill: sysinfo's Windows kill() spawns taskkill.exe, which can hang on a WMI-starved host.
+fn force_kill(pid: u32) -> bool {
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+        match OpenProcess(PROCESS_TERMINATE, false, pid) {
+            Ok(handle) => {
+                let killed = TerminateProcess(handle, 1).is_ok();
+                let _ = CloseHandle(handle);
+                killed
+            }
+            Err(_) => false,
+        }
+    }
+    #[cfg(unix)]
+    unsafe {
+        libc::kill(pid as i32, libc::SIGKILL) == 0
+    }
 }
 
 #[cfg(test)]
