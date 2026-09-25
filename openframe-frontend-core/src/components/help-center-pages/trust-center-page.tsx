@@ -15,6 +15,9 @@
  * DATA: `useSelfFetch` against `endpoint` (default `TRUST_CENTER_API_PATH`;
  * embedders pass their `/content` proxy path). `initialData` (hub SSR) skips the
  * first fetch; a visible tab re-validates after `TRUST_CENTER_CACHE_SECONDS`.
+ * Controls SEARCH is answered by the server (`endpoint?q=`, debounced by
+ * `TRUST_CENTER_SEARCH_DEBOUNCE_MS`); the page never filters, it only
+ * highlights the rows the server returned.
  *
  * MONITORING is derived on the client AFTER HYDRATION from `syncedAt` +
  * `monitoredWindowMs` (`isTrustCenterMonitored`), against a clock re-read every
@@ -26,15 +29,20 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
+import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
   TRUST_CENTER_API_PATH,
   TRUST_CENTER_CACHE_SECONDS,
+  TRUST_CENTER_SEARCH_DEBOUNCE_MS,
   TRUST_CENTER_SECTIONS,
   TRUST_CENTER_TAGLINE,
   TRUST_CENTER_TITLE,
   isTrustCenterMonitored,
+  normalizeTrustControlQuery,
+  trustCenterSearchUrl,
+  type TrustCenterControlSearch,
   type TrustCenterDocument,
   type TrustCenterPublic,
   type TrustCenterSectionId,
@@ -167,6 +175,15 @@ export function TrustCenterPage({
     documentTitle: null,
   });
   const [controlsQuery, setControlsQuery] = useState('');
+  const searchQuery = useDebounce(normalizeTrustControlQuery(controlsQuery), TRUST_CENTER_SEARCH_DEBOUNCE_MS);
+  const controlsSearch = useSelfFetch<TrustCenterControlSearch>(
+    searchQuery ? trustCenterSearchUrl(endpoint, searchQuery) : null,
+  );
+  // Results count only when they answer what is typed NOW: while the debounce or
+  // the request is pending, the list shows its loading state, never an older answer.
+  const typedQuery = normalizeTrustControlQuery(controlsQuery);
+  const searchAnswered =
+    typedQuery === searchQuery && !controlsSearch.isLoading && controlsSearch.data?.query === searchQuery;
 
   const sections = useMemo(() => (data ? visibleSections(data) : []), [data]);
   const { activeSection, handleSectionClick } = useScrollSpy(sections);
@@ -211,7 +228,16 @@ export function TrustCenterPage({
         />
       ),
       render: d => (
-        <ControlsSection domains={d.controlDomains} query={controlsQuery} onQueryChange={setControlsQuery} />
+        <ControlsSection
+          domains={d.controlDomains}
+          query={controlsQuery}
+          search={{
+            results: searchAnswered ? (controlsSearch.data?.controlDomains ?? null) : null,
+            error: typedQuery === searchQuery && controlsSearch.error,
+            onRetry: controlsSearch.reload,
+          }}
+          onQueryChange={setControlsQuery}
+        />
       ),
     },
     documents: {

@@ -17,6 +17,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   TRUST_DOCUMENT_REQUEST_PREFIX,
+  trustControlQueryMatcher,
   trustDocumentContactReason,
   trustFrameworkStatusEntry,
   type TrustCenterAiPractice,
@@ -28,7 +29,6 @@ import {
   type TrustCenterSubprocessor,
   type TrustFrameworkStatusEntry,
 } from '../../types/trust-center';
-import { escapeRegExp } from '../../utils/escape-regexp';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { ContactForm } from '../contact/contact-form';
 import { ActivityIcon } from '../icons-v2-generated/charts/activity-icon';
@@ -47,6 +47,7 @@ import { CardHorizontal } from '../ui/card';
 import { DashboardInfoCard } from '../ui/dashboard-info-card';
 import { Drawer, DrawerBody, DrawerContent, DrawerHeader, DrawerTitle } from '../ui/drawer';
 import { EntityImage } from '../ui/entity-image';
+import { LoadError } from '../ui/error-state';
 import { FeatureList } from '../ui/feature-list';
 import { ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui/modal-v2';
 import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
@@ -191,34 +192,13 @@ export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFrame
 // Controls
 // ---------------------------------------------------------------------------
 
-/** THE query matcher — search and `highlight` use the same one, so a row never matches without its highlight. */
-function queryMatcher(query: string): RegExp | null {
-  const needle = query.trim();
-  return needle ? new RegExp(escapeRegExp(needle), 'iu') : null;
-}
-
-/** Client-side filter over control name + description. Exported for tests. */
-export function filterControlDomains(domains: TrustCenterControlDomain[], query: string): TrustCenterControlDomain[] {
-  const matcher = queryMatcher(query);
-  if (!matcher) return domains;
-  return domains
-    .map(domain => ({
-      ...domain,
-      controls: domain.controls.filter(
-        control => matcher.test(control.name) || matcher.test(control.description ?? ''),
-      ),
-    }))
-    .filter(domain => domain.controls.length > 0);
-}
-
 /**
- * The query's first match in `text`, emphasised (ODS accent). Matched on the
- * ORIGINAL text with a case-insensitive RegExp of the escaped needle — slicing
- * by `toLowerCase()` offsets misaligns wherever lowercasing changes a string's
- * length (`İ` → `i̇`). Exported for tests.
+ * The query's first match in `text`, emphasised (ODS accent). Presentation
+ * only: the SERVER decides which controls match (`?q=`), with the same
+ * `trustControlQueryMatcher`, so every returned row shows why. Exported for tests.
  */
 export function highlight(text: string, query: string): ReactNode {
-  const match = queryMatcher(query)?.exec(text) ?? null;
+  const match = trustControlQueryMatcher(query)?.exec(text) ?? null;
   if (!match) return text;
   const at = match.index;
   const end = at + match[0].length;
@@ -251,13 +231,23 @@ function countLabel(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
 }
 
+/** The server's answer to the current query (`GET …?q=`), as the page holds it. */
+export interface ControlsSearchState {
+  /** The matching categories, or null while the answer for the typed query is not in yet. */
+  results: TrustCenterControlDomain[] | null;
+  error: boolean;
+  onRetry: () => void;
+}
+
 export function ControlsSection({
   domains,
   query,
+  search,
   onQueryChange,
 }: {
   domains: TrustCenterControlDomain[];
   query: string;
+  search: ControlsSearchState;
   onQueryChange: (query: string) => void;
 }) {
   // The drawer holds the category NAME and reads its controls from the current
@@ -266,13 +256,13 @@ export function ControlsSection({
   const [openDomainName, setOpenDomainName] = useState<string | null>(null);
   const openDomain = openDomainName === null ? null : (domains.find(d => d.domain === openDomainName) ?? null);
   const searching = query.trim().length > 0;
-  const results = useMemo(() => filterControlDomains(domains, query), [domains, query]);
+  const results = search.results;
   const total = useMemo(() => domains.reduce((sum, domain) => sum + domain.controls.length, 0), [domains]);
-  const matches = results.reduce((sum, domain) => sum + domain.controls.length, 0);
+  const matches = results?.reduce((sum, domain) => sum + domain.controls.length, 0) ?? 0;
 
   return (
     <div className={STACK_CLASSES}>
-      {searching ? (
+      {searching && results !== null ? (
         <p className={BODY_TEXT} aria-live="polite">
           {matches > 0
             ? `${matches} of ${countLabel(total, 'control')} match “${query.trim()}”`
@@ -280,7 +270,11 @@ export function ControlsSection({
         </p>
       ) : null}
 
-      {searching && results.length === 0 ? (
+      {searching && search.error ? (
+        <LoadError message="Could not search the controls" onRetry={search.onRetry} />
+      ) : searching && results === null ? (
+        <CardSkeletonGrid count={2} variant="category" />
+      ) : searching && results?.length === 0 ? (
         <ListEmptyState
           isFiltered
           filtered={{
@@ -294,7 +288,7 @@ export function ControlsSection({
       ) : searching ? (
         // Search: ONE flat list, grouped by category, every match visible.
         <div className={STACK_CLASSES}>
-          {results.map(domain => (
+          {(results ?? []).map(domain => (
             <StackedRowsPanel
               key={domain.domain}
               title={`${domain.domain} · ${domain.controls.length}`}

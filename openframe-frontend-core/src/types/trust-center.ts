@@ -12,6 +12,7 @@
  *   - `percent` is present only when the hub decided it is publishable;
  *   - no totals, failing counts, owners, people or remediation text exist here.
  */
+import { escapeRegExp } from '../utils/escape-regexp';
 import type { Faq } from './faq';
 
 /** Framework audit status. Label, badge colour and icon are owned HERE, once. */
@@ -160,4 +161,62 @@ export function trustFrameworksSummary(
   frameworks: ReadonlyArray<Pick<TrustCenterFramework, 'label' | 'status'>>,
 ): string {
   return frameworks.map(f => `${f.label}: ${trustFrameworkStatusEntry(f.status).label}`).join(' · ');
+}
+
+// ---------------------------------------------------------------------------
+// Controls search — answered by the SERVER (`GET TRUST_CENTER_API_PATH?q=`).
+// The page never filters: it renders what the route returns.
+// ---------------------------------------------------------------------------
+
+/** The route's search parameter. */
+export const TRUST_CENTER_SEARCH_PARAM = 'q';
+/** Longest query the route reads; the rest is ignored. */
+export const TRUST_CENTER_SEARCH_MAX_CHARS = 100;
+/** How long the page waits after the last keystroke before asking the server. */
+export const TRUST_CENTER_SEARCH_DEBOUNCE_MS = 250;
+
+/** The route's answer to `?q=`: the passing controls that match, grouped by category. */
+export interface TrustCenterControlSearch {
+  /** The query this answers (normalized), so a late answer to an older query is recognisable. */
+  query: string;
+  controlDomains: TrustCenterControlDomain[];
+}
+
+/** THE query normalization: trimmed and capped. Empty = no search. */
+export function normalizeTrustControlQuery(query: string | null | undefined): string {
+  return (query ?? '').trim().slice(0, TRUST_CENTER_SEARCH_MAX_CHARS);
+}
+
+/**
+ * THE control matcher: the escaped query, case-insensitive, matched on the
+ * ORIGINAL text (lowercasing first misaligns offsets wherever it changes a
+ * string's length, `İ` → `i̇`). The server filters with it and the page
+ * highlights with it, so a returned row always shows why it matched.
+ */
+export function trustControlQueryMatcher(query: string): RegExp | null {
+  const needle = normalizeTrustControlQuery(query);
+  return needle ? new RegExp(escapeRegExp(needle), 'iu') : null;
+}
+
+/** The controls whose name or description matches; empty categories dropped. Server-side only by convention. */
+export function filterTrustControlDomains(
+  domains: readonly TrustCenterControlDomain[],
+  query: string,
+): TrustCenterControlDomain[] {
+  const matcher = trustControlQueryMatcher(query);
+  if (!matcher) return [...domains];
+  return domains
+    .map(domain => ({
+      ...domain,
+      controls: domain.controls.filter(
+        control => matcher.test(control.name) || matcher.test(control.description ?? ''),
+      ),
+    }))
+    .filter(domain => domain.controls.length > 0);
+}
+
+/** The search URL for an endpoint (which may already carry a query string, e.g. an embed proxy). */
+export function trustCenterSearchUrl(endpoint: string, query: string): string {
+  const separator = endpoint.includes('?') ? '&' : '?';
+  return `${endpoint}${separator}${TRUST_CENTER_SEARCH_PARAM}=${encodeURIComponent(normalizeTrustControlQuery(query))}`;
 }
