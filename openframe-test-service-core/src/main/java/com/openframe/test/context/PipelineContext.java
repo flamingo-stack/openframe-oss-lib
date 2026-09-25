@@ -17,6 +17,9 @@ public final class PipelineContext {
 
     private static volatile String orgId;
 
+    // Tenant remote-access mode the remote-access-setup phase replaced; restored by its teardown.
+    private static volatile String previousRemoteAccessMode;
+
     /**
      * Set by a runner that is executing a flat, single-tag run rather than an ordered pipeline.
      *
@@ -150,9 +153,22 @@ public final class PipelineContext {
         return !standaloneRun;
     }
 
+    /**
+     * The tenant's remote-access mode before the pipeline set it to silent, so the teardown phase can
+     * put it back. Null when nothing changed it.
+     */
+    public static void setPreviousRemoteAccessMode(String mode) {
+        previousRemoteAccessMode = mode;
+    }
+
+    public static String getPreviousRemoteAccessMode() {
+        return previousRemoteAccessMode;
+    }
+
     public static void clear() {
         standaloneRun = false;
         orgId = null;
+        previousRemoteAccessMode = null;
         registeredEmail = null;
         registeredDomain = null;
         initialKey = null;
