@@ -9,7 +9,8 @@ import {
   TRUST_CENTER_API_PATH,
   TRUST_DOCUMENT_REQUEST_PREFIX,
   filterTrustControlDomains,
-  trustCenterSearchUrl,
+  trustCenterControlsUrl,
+  type TrustCenterControlsPage,
   trustDocumentContactReason,
   type TrustCenterPublic,
 } from '../../../types/trust-center';
@@ -58,19 +59,34 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
-/** Stands in for the hub route: answers `?q=` with the SERVER's filter over `data`, and records each search. */
-function serveControlsSearch(data: TrustCenterPublic): string[] {
-  const asked: string[] = [];
+/**
+ * Stands in for the hub's controls endpoint (`/controls?domain=&q=`), answering
+ * exactly as the server does over `data`, and records each request's params.
+ */
+function serveControls(data: TrustCenterPublic): Array<{ domain: string | null; query: string }> {
+  const asked: Array<{ domain: string | null; query: string }> = [];
   fetchMock.mockImplementation(input => {
     const url = new URL(
       typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
       'http://hub',
     );
-    const query = url.searchParams.get('q') ?? '';
-    asked.push(query);
-    return Promise.resolve(
-      jsonResponse({ query, controlDomains: filterTrustControlDomains(data.controlDomains, query) }),
-    );
+    const query = (url.searchParams.get('q') ?? '').trim();
+    const wanted = url.searchParams.get('domain');
+    asked.push({ domain: wanted, query });
+    const all = data.controlDomains;
+    const matching = query ? filterTrustControlDomains(all, query) : all;
+    const domain = all.find(d => d.domain === wanted)?.domain ?? all[0]?.domain ?? null;
+    const page: TrustCenterControlsPage = {
+      domain,
+      query,
+      categories: all.map(d => ({
+        domain: d.domain,
+        count: matching.find(m => m.domain === d.domain)?.controls.length ?? 0,
+      })),
+      controls: matching.find(d => d.domain === domain)?.controls ?? [],
+      total: all.reduce((sum, d) => sum + d.controls.length, 0),
+    };
+    return Promise.resolve(jsonResponse(page));
   });
   return asked;
 }
@@ -94,10 +110,10 @@ describe('TrustCenterPage', () => {
     expect(String(fetchMock.mock.calls[0][0])).toBe('/content/api/trust-center');
   });
 
-  it('is ONE page: every section is an anchored h2, in reading order, AI first', () => {
+  it('is ONE page: every section is an anchored h2, in reading order — AI & data use after Subprocessors, Contact before FAQ', () => {
     render(<TrustCenterPage initialData={makeData()} />);
     const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
-    expect(headings).toEqual(['AI & data use', 'Compliance', 'Controls', 'Documents', 'Subprocessors', 'Contact']);
+    expect(headings).toEqual(['Compliance', 'Controls', 'Documents', 'Subprocessors', 'AI & data use', 'Contact']);
     // Each section is a labelled landmark (a deep-linkable `#id`).
     expect(screen.getByRole('region', { name: 'Controls' })).toHaveAttribute('id', 'controls');
     expect(screen.queryByRole('tab')).toBeNull();
@@ -136,39 +152,6 @@ describe('TrustCenterPage', () => {
     expect(screen.queryAllByRole('link').filter(link => link.getAttribute('href')?.startsWith('mailto:'))).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: 'Get in touch' }));
     expect(await screen.findByTestId('contact-form')).toBeInTheDocument();
-  });
-
-  it('controls browse: EVERY control of every category is shown, always — no "View all", no drawer', () => {
-    render(<TrustCenterPage initialData={makeData()} />);
-    expect(screen.getByText('Encryption at rest')).toBeInTheDocument();
-    // The 4th control of a category is on the page from the start.
-    expect(screen.getByText('Logging enabled')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /View all/ })).toBeNull();
-    expect(screen.queryByRole('dialog')).toBeNull();
-  });
-
-  it('controls search: ONE flat grouped list with every match visible, a count, and clearing restores the grid', async () => {
-    const data = makeData();
-    serveControlsSearch(data);
-    render(<TrustCenterPage initialData={data} />);
-
-    typeSearch('log');
-    // A match beyond the card's first 3 is shown directly — nothing to expand.
-    expect(await screen.findByText(/1 of 5 controls match/)).toBeInTheDocument();
-    // The match is highlighted in its own <strong>; the rest of the name follows it.
-    expect(screen.getByText('Log', { selector: 'strong' })).toBeInTheDocument();
-    expect(screen.getByText('ging enabled', { exact: false })).toBeInTheDocument();
-    expect(screen.queryByText('Encryption at rest')).toBeNull();
-
-    typeSearch('every user');
-    expect(await screen.findByText('Unique accounts')).toBeInTheDocument();
-    expect(screen.getByText(/1 of 5 controls match/)).toBeInTheDocument();
-
-    typeSearch('zzz-nothing');
-    expect(await screen.findByText('No matching controls')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show all controls' }));
-    expect(screen.getByText('Encryption at rest')).toBeInTheDocument();
-    expect(screen.getByText('Logging enabled')).toBeInTheDocument();
   });
 
   it('ONE access request: the hero CTA asks for all gated documents, a row asks for its own; marketing fields hidden', async () => {
@@ -305,42 +288,6 @@ describe('TrustCenterPage', () => {
     }
   });
 
-  it('controls search: a match only in the description is highlighted in the description', async () => {
-    const data = makeData();
-    data.controlDomains[0].controls[0] = {
-      id: 'c1',
-      name: 'Access reviewed',
-      description: 'Quarterly attestation by owners',
-    };
-    serveControlsSearch(data);
-    render(<TrustCenterPage initialData={data} />);
-    typeSearch('attest');
-    expect(await screen.findByText('attest', { selector: 'strong' })).toBeInTheDocument();
-  });
-
-  it('controls: category tabs with counts; a tab shows only its category', () => {
-    render(<TrustCenterPage initialData={makeData()} />);
-    expect(screen.getByRole('button', { name: 'All · 5' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Identification & authentication · 1' }));
-    expect(screen.getByText('Unique accounts')).toBeInTheDocument();
-    expect(screen.queryByText('Encryption at rest')).toBeNull();
-  });
-
-  it('controls: searching keeps ONE fixed-height list box — skeleton rows while the answer is on its way, then the matches, with server counts on the tabs', async () => {
-    const data = makeData();
-    serveControlsSearch(data);
-    render(<TrustCenterPage initialData={data} />);
-    const box = () => screen.getByTestId('controls-list');
-    const height = box().className;
-    typeSearch('log');
-    expect(screen.getByText(/Searching for “log”/)).toBeInTheDocument();
-    expect(box().className).toBe(height);
-    expect(await screen.findByText(/1 of 5 controls match/)).toBeInTheDocument();
-    expect(box().className).toBe(height);
-    expect(screen.getByRole('button', { name: 'All · 1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Identification & authentication · 0' })).toBeInTheDocument();
-  });
-
   it('subprocessors: a brand logo from the name, and the country with its flag', () => {
     render(
       <TrustCenterPage
@@ -419,47 +366,111 @@ describe('TrustCenterPage', () => {
     expect(subprocessors.queryByText('Location')).toBeNull();
   });
 
-  it('controls follow the CURRENT data: a revalidated copy shows its new controls', () => {
-    const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
-    expect(screen.queryByText('Backups tested')).toBeNull();
-    const fresh = makeData();
-    fresh.controlDomains[0].controls.push({ id: 'c6', name: 'Backups tested', description: null });
-    rerender(<TrustCenterPage initialData={fresh} />);
-    expect(screen.getByText('Backups tested')).toBeInTheDocument();
+  it('anchors: a rail click puts #section in the URL through the shared same-page hash navigation (replace, not push)', () => {
+    // The shared setup stubs `window.location` without an origin; give it one for this navigation.
+    const stubbed = window.location;
+    Object.defineProperty(window, 'location', {
+      value: {
+        ...stubbed,
+        origin: 'http://localhost:3000',
+        pathname: '/trust-center',
+        search: '',
+        hash: '',
+        href: 'http://localhost:3000/trust-center',
+      },
+      writable: true,
+    });
+    const replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+    const pushState = vi.spyOn(window.history, 'pushState');
+    try {
+      render(<TrustCenterPage initialData={makeData()} />);
+      const rail = within(screen.getByRole('complementary', { name: 'Trust center sections' }));
+      fireEvent.click(rail.getByRole('button', { name: 'Documents' }));
+      expect(replaceState).toHaveBeenCalledWith(null, '', '/trust-center#documents');
+      expect(pushState).not.toHaveBeenCalled();
+    } finally {
+      replaceState.mockRestore();
+      pushState.mockRestore();
+      Object.defineProperty(window, 'location', { value: stubbed, writable: true });
+    }
   });
 
-  it('controls search highlights on the ORIGINAL text, even after a character whose lowercase is longer', async () => {
+  it('controls: one tab per category (no "All"); the first is server-rendered — all its controls, no request, no title inside the list', () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    expect(screen.queryByRole('button', { name: /^All/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Infrastructure security · 4' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Identification & authentication · 1' })).toBeInTheDocument();
+    const list = within(screen.getByTestId('controls-list'));
+    expect(list.getByText('Encryption at rest')).toBeInTheDocument();
+    expect(list.getByText('Logging enabled')).toBeInTheDocument();
+    expect(list.queryByText(/Infrastructure security/)).toBeNull();
+    expect(screen.getByText('4 passing controls in Infrastructure security')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('controls: a tab switch is a SERVER request for that category, answered into the same fixed-height box', async () => {
+    const data = makeData();
+    const asked = serveControls(data);
+    render(<TrustCenterPage initialData={data} />);
+    const height = screen.getByTestId('controls-list').className;
+    fireEvent.click(screen.getByRole('button', { name: 'Identification & authentication · 1' }));
+    expect(await within(screen.getByTestId('controls-list')).findByText('Unique accounts')).toBeInTheDocument();
+    expect(within(screen.getByTestId('controls-list')).queryByText('Encryption at rest')).toBeNull();
+    expect(asked).toEqual([{ domain: 'Identification & authentication', query: '' }]);
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      trustCenterControlsUrl(TRUST_CENTER_API_PATH, { domain: 'Identification & authentication' }),
+    );
+    expect(screen.getByTestId('controls-list').className).toBe(height);
+  });
+
+  it('controls: search is ONE debounced server request for the shown category; the tabs carry the server match counts', async () => {
+    const data = makeData();
+    const asked = serveControls(data);
+    render(<TrustCenterPage initialData={data} />);
+    typeSearch('l');
+    typeSearch('lo');
+    typeSearch('log');
+    expect(screen.getByText(/Searching for/)).toBeInTheDocument();
+    expect(await screen.findByText('Log', { selector: 'strong' })).toBeInTheDocument();
+    expect(asked).toEqual([{ domain: 'Infrastructure security', query: 'log' }]);
+    expect(screen.getByRole('button', { name: 'Infrastructure security · 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Identification & authentication · 0' })).toBeInTheDocument();
+    expect(screen.getByText(/1 in Infrastructure security match “log” · 5 controls in total/)).toBeInTheDocument();
+  });
+
+  it('controls: a match only in the description is highlighted in the description; a category with no match says so', async () => {
+    const data = makeData();
+    data.controlDomains[0].controls[0] = {
+      id: 'c1',
+      name: 'Access reviewed',
+      description: 'Quarterly attestation by owners',
+    };
+    serveControls(data);
+    render(<TrustCenterPage initialData={data} />);
+    typeSearch('attest');
+    expect(await screen.findByText('attest', { selector: 'strong' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Identification & authentication · 0' }));
+    expect(await screen.findByText('No matching controls')).toBeInTheDocument();
+  });
+
+  it('controls: highlights on the ORIGINAL text, even after a character whose lowercase is longer', async () => {
     const data = makeData();
     data.controlDomains[0].controls[3] = { id: 'c5', name: 'İİ Logging enabled', description: null };
-    serveControlsSearch(data);
+    serveControls(data);
     render(<TrustCenterPage initialData={data} />);
     typeSearch('log');
     expect(await screen.findByText('Log', { selector: 'strong' })).toBeInTheDocument();
   });
 
-  it('controls search is asked of the SERVER, debounced: one request for the settled query, never a client filter', async () => {
-    const data = makeData();
-    const asked = serveControlsSearch(data);
-    render(<TrustCenterPage initialData={data} />);
-    typeSearch('l');
-    typeSearch('lo');
-    typeSearch('log');
-    // Before the answer arrives nothing is filtered in the browser: the list is loading, the grid is gone.
-    expect(screen.queryByText(/controls match/)).toBeNull();
-    expect(await screen.findByText(/1 of 5 controls match/)).toBeInTheDocument();
-    expect(asked).toEqual(['log']);
-    expect(String(fetchMock.mock.calls[0][0])).toBe(trustCenterSearchUrl(TRUST_CENTER_API_PATH, 'log'));
-  });
-
-  it('controls search: a failed search offers a retry, and the retry asks the server again', async () => {
+  it('controls: a failed answer offers a retry, and the retry asks the server again', async () => {
     const data = makeData();
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'down' }, 500));
     render(<TrustCenterPage initialData={data} />);
     typeSearch('log');
-    expect(await screen.findByText('Could not search the controls')).toBeInTheDocument();
-    serveControlsSearch(data);
+    expect(await screen.findByText('Could not load the controls')).toBeInTheDocument();
+    serveControls(data);
     fireEvent.click(screen.getByRole('button', { name: /try again|retry/i }));
-    expect(await screen.findByText(/1 of 5 controls match/)).toBeInTheDocument();
+    expect(await screen.findByText('Log', { selector: 'strong' })).toBeInTheDocument();
   });
 });
 
@@ -510,10 +521,15 @@ describe('highlight', () => {
   });
 });
 
-describe('trustCenterSearchUrl', () => {
-  it('adds q to a bare endpoint and to one that already carries a query string', () => {
-    expect(trustCenterSearchUrl('/api/trust-center', '  a+b ')).toBe('/api/trust-center?q=a%2Bb');
-    expect(trustCenterSearchUrl('/content/api/trust-center?x=1', 'log')).toBe('/content/api/trust-center?x=1&q=log');
+describe('trustCenterControlsUrl', () => {
+  it('builds /controls beside the endpoint, keeping an embed proxy query string, with domain and a normalized q', () => {
+    expect(trustCenterControlsUrl('/api/trust-center')).toBe('/api/trust-center/controls');
+    expect(trustCenterControlsUrl('/api/trust-center', { domain: 'A & B', query: '  a+b ' })).toBe(
+      '/api/trust-center/controls?domain=A+%26+B&q=a%2Bb',
+    );
+    expect(trustCenterControlsUrl('/content/api/trust-center?x=1', { query: 'log' })).toBe(
+      '/content/api/trust-center/controls?x=1&q=log',
+    );
   });
 });
 

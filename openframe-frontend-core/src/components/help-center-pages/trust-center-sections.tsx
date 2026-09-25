@@ -14,16 +14,21 @@
  * server answers as one flat, grouped, counted list.
  */
 
-import { createElement, useMemo, useState, type ReactNode } from 'react';
+import { createElement, useState, type ReactNode } from 'react';
+import { useDebounce } from '../../hooks/ui/use-debounce';
+import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
+  TRUST_CENTER_SEARCH_DEBOUNCE_MS,
   TRUST_DOCUMENT_REQUEST_PREFIX,
+  normalizeTrustControlQuery,
+  trustCenterControlsUrl,
   trustControlQueryMatcher,
   trustDocumentContactReason,
   trustFrameworkBadge,
   trustFrameworkMonitoringEntry,
   type TrustCenterAiPractice,
   type TrustCenterControl,
-  type TrustCenterControlDomain,
+  type TrustCenterControlsPage,
   type TrustCenterDocument,
   type TrustCenterFramework,
   type TrustCenterSubprocessor,
@@ -193,10 +198,18 @@ export function highlight(text: string, query: string): ReactNode {
   );
 }
 
-/** ONE row renderer for every controls list (cards, search results). */
+/**
+ * Every control row is ONE fixed height (one line of name, one of description),
+ * so the list box shows exactly 5 of them and scrolls for
+ * the rest.
+ */
+const CONTROL_ROW_CLASS = 'h-14 md:h-20 overflow-hidden';
+
+/** ONE row renderer for the controls list: fixed-height rows, one line each for name and description. */
 function controlRows(controls: TrustCenterControl[], query = ''): PanelRow[] {
   return controls.map(control => ({
     id: control.id,
+    className: CONTROL_ROW_CLASS,
     columns: [
       {
         key: 'control',
@@ -204,7 +217,6 @@ function controlRows(controls: TrustCenterControl[], query = ''): PanelRow[] {
         value: highlight(control.name, query),
         // A description-only match is emphasised too: every kept row shows why it matched.
         label: control.description ? highlight(control.description, query) : undefined,
-        wrap: true,
       },
     ],
   }));
@@ -214,26 +226,15 @@ function countLabel(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
 }
 
-/** The server's answer to the current query (`GET …?q=`), as the page holds it. */
-export interface ControlsSearchState {
-  /** The matching categories, or null while the answer for the typed query is not in yet. */
-  results: TrustCenterControlDomain[] | null;
-  error: boolean;
-  onRetry: () => void;
-}
+/**
+ * The list box: exactly 5 control rows (`CONTROL_ROW_CLASS`: 3.5rem, 5rem from
+ * md) plus their 1px separators and the panel's border. Controls, loading,
+ * empty and error all fill this same box, so nothing below it moves.
+ */
+const CONTROLS_LIST_HEIGHT = 'h-[calc(5*3.5rem+7px)] md:h-[calc(5*5rem+7px)]';
 
-/** The "every category" tab. */
-const ALL_CONTROLS_TAB = 'all';
-
-/** The controls list's FIXED height: browse, search, loading, empty and error all fill the same box, so nothing below it moves. */
-const CONTROLS_LIST_HEIGHT = 'h-[28rem] md:h-[36rem]';
-
-/** Skeleton rows shown in the list box while a search answer is on its way. */
-const CONTROLS_SKELETON_ROWS = 6;
-
-function controlCount(domains: readonly TrustCenterControlDomain[]): number {
-  return domains.reduce((sum, domain) => sum + domain.controls.length, 0);
-}
+/** Skeleton rows shown in the list box while the server's answer is on its way: exactly the box's visible rows. */
+const CONTROLS_SKELETON_ROWS = 5;
 
 function controlsTabId(domain: string): string {
   return `domain-${domain.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
@@ -242,6 +243,7 @@ function controlsTabId(domain: string): string {
 function ControlsListSkeleton() {
   const rows: PanelRow[] = Array.from({ length: CONTROLS_SKELETON_ROWS }, (_, index) => ({
     id: `skeleton-${index}`,
+    className: CONTROL_ROW_CLASS,
     columns: [
       {
         key: 'control',
@@ -258,92 +260,80 @@ function ControlsListSkeleton() {
 }
 
 /**
- * Controls: category TABS (each with its count), the search INSIDE the
- * section, and ONE fixed-height list box. Whatever the list shows — every
- * control, the server's matches, skeleton rows while the answer is on its way,
- * the empty or the error state — fills the same box, so typing never moves the
- * page. While searching, the tab counts are the SERVER's matches per category;
- * a tab only picks which of the returned categories is shown.
+ * Controls — 100% SERVER-driven. Every tab switch and every (debounced) search
+ * is ONE request to the controls endpoint (`trustCenterControlsUrl`), which
+ * answers the categories with their counts, the category shown and its
+ * controls; the section only renders that answer. One tab per category (no
+ * "All"), the search and the summary line ABOVE a fixed-height list box that
+ * scrolls on its own — loading (skeleton rows), empty and error states fill the
+ * same box, so the page never jumps.
+ *
+ * `seed` is the server-rendered answer for the first category with no query
+ * (the page's own data), so the first paint needs no request.
  */
-export function ControlsSection({
-  domains,
-  query,
-  search,
-  onQueryChange,
-}: {
-  domains: TrustCenterControlDomain[];
-  query: string;
-  search: ControlsSearchState;
-  onQueryChange: (query: string) => void;
-}) {
-  const [selectedTab, setSelectedTab] = useState(ALL_CONTROLS_TAB);
-  const trimmed = query.trim();
-  const searching = trimmed.length > 0;
-  // What the list is showing: the server's answer while searching (null until it arrives), else everything.
-  const shown = searching ? search.results : domains;
-  const total = useMemo(() => controlCount(domains), [domains]);
+export function ControlsSection({ endpoint, seed }: { endpoint: string; seed: TrustCenterControlsPage }) {
+  const [domain, setDomain] = useState<string | null>(seed.domain);
+  const [typed, setTyped] = useState('');
+  const query = useDebounce(normalizeTrustControlQuery(typed), TRUST_CENTER_SEARCH_DEBOUNCE_MS);
+  const url = trustCenterControlsUrl(endpoint, { domain, query });
+  const seedUrl = trustCenterControlsUrl(endpoint, { domain: seed.domain, query: '' });
+  const answer = useSelfFetch<TrustCenterControlsPage>(url, url === seedUrl ? { initialData: seed } : undefined);
 
-  const tabs: TabItem[] = [
-    { id: ALL_CONTROLS_TAB, label: `All · ${shown === null ? total : controlCount(shown)}` },
-    ...domains.map(domain => {
-      const inShown = shown?.find(candidate => candidate.domain === domain.domain);
-      const count = shown === null ? domain.controls.length : (inShown?.controls.length ?? 0);
-      return { id: controlsTabId(domain.domain), label: `${domain.domain} · ${count}` };
-    }),
-  ];
-  // A category that left the data (a revalidation) falls back to "All".
-  const activeTab = tabs.some(tab => tab.id === selectedTab) ? selectedTab : ALL_CONTROLS_TAB;
-  const visible =
-    shown === null
-      ? null
-      : activeTab === ALL_CONTROLS_TAB
-        ? shown
-        : shown.filter(domain => controlsTabId(domain.domain) === activeTab);
+  // The answer counts only when it answers what is on screen NOW (the typed
+  // query, the selected tab); otherwise the box shows its loading state.
+  const typedQuery = normalizeTrustControlQuery(typed);
+  const current =
+    answer.data && !answer.isLoading && typedQuery === query && answer.data.query === query ? answer.data : null;
+  // Tabs keep the last categories the server sent while a new answer loads.
+  const [categories, setCategories] = useState(seed.categories);
+  if (current && current.categories !== categories) setCategories(current.categories);
+  const total = current?.total ?? seed.total;
+
+  const tabs: TabItem[] = categories.map(category => ({
+    id: controlsTabId(category.domain),
+    label: `${category.domain} · ${category.count}`,
+  }));
+  const activeDomain = current?.domain ?? domain;
+  const activeTab = activeDomain ? controlsTabId(activeDomain) : '';
 
   let summary: string;
-  if (!searching) summary = countLabel(total, 'passing control');
-  else if (search.error) summary = 'Search is unavailable';
-  else if (shown === null) summary = `Searching for “${trimmed}”…`;
-  else summary = `${controlCount(shown)} of ${countLabel(total, 'control')} match “${trimmed}”`;
+  if (answer.error && !current) summary = 'Controls are unavailable';
+  else if (!current) summary = typedQuery ? `Searching for “${typedQuery}”…` : 'Loading…';
+  else if (query)
+    summary = `${current.controls.length} in ${current.domain} match “${query}” · ${countLabel(total, 'control')} in total`;
+  else summary = `${countLabel(current.controls.length, 'passing control')} in ${current.domain}`;
 
   let body: ReactNode;
-  if (searching && search.error) {
-    body = <LoadError message="Could not search the controls" onRetry={search.onRetry} />;
-  } else if (visible === null) {
+  if (answer.error && !current) {
+    body = <LoadError message="Could not load the controls" onRetry={answer.reload} />;
+  } else if (!current) {
     body = <ControlsListSkeleton />;
-  } else if (visible.length === 0) {
+  } else if (current.controls.length === 0) {
     body = (
       <ListEmptyState
         isFiltered
         filtered={{
-          title: searching ? 'No matching controls' : 'No controls in this category',
-          description: searching ? 'Try another word, or another category.' : '',
-          clearText: 'Show all controls',
+          title: 'No matching controls',
+          description: 'Try another word, or another category.',
+          clearText: 'Clear search',
         }}
-        onClearFilters={() => {
-          onQueryChange('');
-          setSelectedTab(ALL_CONTROLS_TAB);
-        }}
+        onClearFilters={() => setTyped('')}
         empty={{ title: 'No controls', description: '' }}
       />
     );
   } else {
-    body = (
-      <div className={STACK_CLASSES}>
-        {visible.map(domain => (
-          <StackedRowsPanel
-            key={domain.domain}
-            title={`${domain.domain} · ${domain.controls.length}`}
-            rows={controlRows(domain.controls, trimmed)}
-          />
-        ))}
-      </div>
-    );
+    body = <StackedRowsPanel rows={controlRows(current.controls, query)} />;
   }
 
   return (
     <div className="flex flex-col gap-[var(--spacing-system-m)]">
-      <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={setSelectedTab} />
+      <TabNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={tabId =>
+          setDomain(categories.find(category => controlsTabId(category.domain) === tabId)?.domain ?? null)
+        }
+      />
       <div className="flex flex-col gap-[var(--spacing-system-s)] md:flex-row md:items-center md:justify-between">
         <p className={BODY_TEXT} aria-live="polite">
           {summary}
@@ -351,8 +341,8 @@ export function ControlsSection({
         <div className="w-full md:w-80">
           <SearchInput
             placeholder="Search controls"
-            value={query}
-            onChange={onQueryChange}
+            value={typed}
+            onChange={setTyped}
             debounceMs={0}
             showDropdown={false}
           />

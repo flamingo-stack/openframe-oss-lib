@@ -15,9 +15,8 @@
  * DATA: `useSelfFetch` against `endpoint` (default `TRUST_CENTER_API_PATH`;
  * embedders pass their `/content` proxy path). `initialData` (hub SSR) skips the
  * first fetch; a visible tab re-validates after `TRUST_CENTER_CACHE_SECONDS`.
- * Controls SEARCH is answered by the server (`endpoint?q=`, debounced by
- * `TRUST_CENTER_SEARCH_DEBOUNCE_MS`); the page never filters, it only
- * highlights the rows the server returned.
+ * CONTROLS are answered by the server (`endpoint/controls?domain=&q=`) per tab
+ * and per search; the page never filters, it only highlights what came back.
  *
  * MONITORING is derived on the client AFTER HYDRATION from `syncedAt` +
  * `monitoredWindowMs` (`isTrustCenterMonitored`), against a clock re-read every
@@ -29,25 +28,22 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
-import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
   TRUST_CENTER_API_PATH,
   TRUST_CENTER_CACHE_SECONDS,
-  TRUST_CENTER_SEARCH_DEBOUNCE_MS,
   TRUST_CENTER_SECTIONS,
   TRUST_CENTER_TAGLINE,
   TRUST_CENTER_TITLE,
   isTrustCenterMonitored,
-  normalizeTrustControlQuery,
   trustCenterDocumentUrl,
-  trustCenterSearchUrl,
-  type TrustCenterControlSearch,
+  type TrustCenterControlsPage,
   type TrustCenterPublic,
   type TrustCenterSectionId,
 } from '../../types/trust-center';
-import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
+import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
@@ -105,6 +101,22 @@ function visibleSections(data: TrustCenterPublic): Array<(typeof TRUST_CENTER_SE
   return TRUST_CENTER_SECTIONS.filter(section => hasContent[section.id]);
 }
 
+/**
+ * The Controls section's first answer, from the page's own server data: the
+ * first category's controls with no query — exactly what the controls endpoint
+ * answers for it, so the first paint needs no request.
+ */
+function controlsSeed(data: TrustCenterPublic): TrustCenterControlsPage {
+  const first = data.controlDomains[0] ?? null;
+  return {
+    domain: first?.domain ?? null,
+    query: '',
+    categories: data.controlDomains.map(domain => ({ domain: domain.domain, count: domain.controls.length })),
+    controls: first?.controls ?? [],
+    total: data.controlDomains.reduce((sum, domain) => sum + domain.controls.length, 0),
+  };
+}
+
 /** How often an open page re-judges "monitored" against the clock. */
 const MONITORING_CLOCK_TICK_MS = 60_000;
 
@@ -160,19 +172,20 @@ export function TrustCenterPage({
     open: false,
     documentTitle: null,
   });
-  const [controlsQuery, setControlsQuery] = useState('');
-  const searchQuery = useDebounce(normalizeTrustControlQuery(controlsQuery), TRUST_CENTER_SEARCH_DEBOUNCE_MS);
-  const controlsSearch = useSelfFetch<TrustCenterControlSearch>(
-    searchQuery ? trustCenterSearchUrl(endpoint, searchQuery) : null,
-  );
-  // Results count only when they answer what is typed NOW: while the debounce or
-  // the request is pending, the list shows its loading state, never an older answer.
-  const typedQuery = normalizeTrustControlQuery(controlsQuery);
-  const searchAnswered =
-    typedQuery === searchQuery && !controlsSearch.isLoading && controlsSearch.data?.query === searchQuery;
 
   const sections = useMemo(() => (data ? visibleSections(data) : []), [data]);
-  const { activeSection, handleSectionClick } = useScrollSpy(sections);
+  // Anchors: the shared same-page hash navigation (the FAQ section's pattern).
+  // A rail click puts `#section` in the URL (`replace`: the rail is a table of
+  // contents, not a navigation step) and scrolls below the sticky header; a
+  // visit that ARRIVES with `#section`, and back/forward, scroll there once the
+  // sections have rendered. The scroll spy only lights the rail.
+  const { activeSection } = useScrollSpy(sections);
+  const handleSectionClick = useCallback((sectionId: string) => {
+    navigateSamePageHash(`#${sectionId}`, { headerOffset: STICKY_HEADER_OFFSET_PX, history: 'replace' });
+  }, []);
+  useScrollToHash(sections.length > 0 ? sections.map(section => section.id).join('|') : null, {
+    headerOffset: STICKY_HEADER_OFFSET_PX,
+  });
   const openRequest = useCallback((documentTitle: string | null) => setRequest({ open: true, documentTitle }), []);
   const closeRequest = useCallback(() => setRequest(current => ({ ...current, open: false })), []);
 
@@ -199,18 +212,7 @@ export function TrustCenterPage({
     },
     controls: {
       lead: 'Security controls currently passing in continuous monitoring (via Vanta).',
-      render: d => (
-        <ControlsSection
-          domains={d.controlDomains}
-          query={controlsQuery}
-          search={{
-            results: searchAnswered ? (controlsSearch.data?.controlDomains ?? null) : null,
-            error: typedQuery === searchQuery && controlsSearch.error,
-            onRetry: controlsSearch.reload,
-          }}
-          onQueryChange={setControlsQuery}
-        />
-      ),
+      render: d => <ControlsSection endpoint={endpoint} seed={controlsSeed(d)} />,
     },
     documents: {
       lead: 'Public documents open directly. Gated documents are shared under NDA after one short request.',

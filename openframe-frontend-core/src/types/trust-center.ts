@@ -43,17 +43,18 @@ export function trustFrameworkBadge(framework: Pick<TrustCenterFramework, 'monit
 
 /**
  * Sections of the page, in reading order — the anchor ids (`#controls`) and the
- * sticky section rail. AI & data use comes first: it is an AI-native buyer's
- * first question (2026 trust-center practice: Anthropic, OpenAI, ElevenLabs).
+ * sticky section rail. AI & data use follows Subprocessors: the AI statements
+ * read as the continuation of who processes the data (Anthropic among them);
+ * Contact comes before the FAQ.
  */
 export const TRUST_CENTER_SECTIONS = [
-  { id: 'ai', label: 'AI & data use' },
   { id: 'compliance', label: 'Compliance' },
   { id: 'controls', label: 'Controls' },
   { id: 'documents', label: 'Documents' },
   { id: 'subprocessors', label: 'Subprocessors' },
-  { id: 'faq', label: 'FAQ' },
+  { id: 'ai', label: 'AI & data use' },
   { id: 'contact', label: 'Contact' },
+  { id: 'faq', label: 'FAQ' },
 ] as const;
 
 export type TrustCenterSectionId = (typeof TRUST_CENTER_SECTIONS)[number]['id'];
@@ -210,23 +211,43 @@ export function trustCenterDocumentUrl(
 }
 
 // ---------------------------------------------------------------------------
-// Controls search — answered by the SERVER (`GET TRUST_CENTER_API_PATH?q=`).
+// Controls — answered by the SERVER (`GET TRUST_CENTER_API_PATH/controls?domain=&q=`):
+// the categories, their counts and one category's controls, per request.
 // The page never filters: it renders what the route returns.
 // ---------------------------------------------------------------------------
 
-/** The route's search parameter. */
+/** The controls endpoint's search parameter. */
 export const TRUST_CENTER_SEARCH_PARAM = 'q';
-/** Longest query the route reads; the rest is ignored. */
+/** Longest query the controls endpoint reads; the rest is ignored. */
 export const TRUST_CENTER_SEARCH_MAX_CHARS = 100;
 /** How long the page waits after the last keystroke before asking the server. */
 export const TRUST_CENTER_SEARCH_DEBOUNCE_MS = 250;
 
-/** The route's answer to `?q=`: the passing controls that match, grouped by category. */
-export interface TrustCenterControlSearch {
-  /** The query this answers (normalized), so a late answer to an older query is recognisable. */
-  query: string;
-  controlDomains: TrustCenterControlDomain[];
+/** One control category, with its count: the controls matching the query, else all of its controls. */
+export interface TrustCenterControlCategory {
+  domain: string;
+  count: number;
 }
+
+/**
+ * The controls endpoint's answer (`trustCenterControlsUrl`): the server decides
+ * everything the Controls section shows — which categories exist and their
+ * counts (for the query), which category is shown, and its controls.
+ */
+export interface TrustCenterControlsPage {
+  /** The category answered: the one asked for, else the first; null when there are none. */
+  domain: string | null;
+  /** The normalized query this answers, so a late answer to an older one is recognisable. */
+  query: string;
+  categories: TrustCenterControlCategory[];
+  /** The controls of `domain` that match `query`. */
+  controls: TrustCenterControl[];
+  /** Every published control, across categories (the "of N" in "2 of N match"). */
+  total: number;
+}
+
+/** The controls endpoint's category parameter. */
+export const TRUST_CENTER_DOMAIN_PARAM = 'domain';
 
 /** THE query normalization: trimmed and capped. Empty = no search. */
 export function normalizeTrustControlQuery(query: string | null | undefined): string {
@@ -261,8 +282,20 @@ export function filterTrustControlDomains(
     .filter(domain => domain.controls.length > 0);
 }
 
-/** The search URL for an endpoint (which may already carry a query string, e.g. an embed proxy). */
-export function trustCenterSearchUrl(endpoint: string, query: string): string {
-  const separator = endpoint.includes('?') ? '&' : '?';
-  return `${endpoint}${separator}${TRUST_CENTER_SEARCH_PARAM}=${encodeURIComponent(normalizeTrustControlQuery(query))}`;
+/**
+ * The controls endpoint beside the page's `endpoint` (which may carry a query
+ * string, e.g. an embed proxy): `…/controls?domain=…&q=…`. Every tab switch and
+ * every search is one request here — the page never filters.
+ */
+export function trustCenterControlsUrl(
+  endpoint: string,
+  params: { domain?: string | null; query?: string | null } = {},
+): string {
+  const [path, existing] = endpoint.split('?', 2);
+  const search = new URLSearchParams(existing ?? '');
+  if (params.domain) search.set(TRUST_CENTER_DOMAIN_PARAM, params.domain);
+  const query = normalizeTrustControlQuery(params.query);
+  if (query) search.set(TRUST_CENTER_SEARCH_PARAM, query);
+  const qs = search.toString();
+  return `${path}/controls${qs ? `?${qs}` : ''}`;
 }
