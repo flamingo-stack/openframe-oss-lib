@@ -9,6 +9,7 @@ public enum NotificationCategory {
     SOFTWARE,
     LOGS,
     TICKETS,
+    INSIGHTS,
     MINGO,
     GENERIC
 }
