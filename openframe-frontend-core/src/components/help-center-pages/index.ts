@@ -21,7 +21,7 @@ export { RoadmapPage, type RoadmapPageProps } from './roadmap-page';
 export { ProductReleasesListPage, type ProductReleasesListPageProps } from './product-releases-list-page';
 export { DeliveryPage, type DeliveryPageProps } from './delivery-page';
 export { OnboardingGuidesCatalogPage, type OnboardingGuidesCatalogPageProps } from './onboarding-guides-catalog-page';
-export { TrustCenterPage, type TrustCenterPageProps } from './trust-center-page';
+export { TrustCenterPage, TrustCenterPageSkeleton, type TrustCenterPageProps } from './trust-center-page';
 
 // Existing full-pages re-exported for a single Help Center import site.
 export { FaqDocumentPage, type FaqDocumentPageProps } from '../faq';

@@ -61,6 +61,10 @@ import {
   DocumentRequestModal,
   DocumentsSection,
   SubprocessorsSection,
+  TRUST_BODY_GRID_CLASS,
+  TRUST_SECTIONS_COLUMN_CLASS,
+  TRUST_SECTION_LEADS,
+  TRUST_STATUS_ROW_CLASS,
   TrustCenterSkeleton,
   TrustSection,
 } from './trust-center-sections';
@@ -146,7 +150,6 @@ export function TrustCenterPage({
   title = TRUST_CENTER_TITLE,
   subtitle = TRUST_CENTER_TAGLINE,
 }: TrustCenterPageProps) {
-  const router = useRouter();
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
     initialData,
     revalidateOnVisibleAfterMs: TRUST_CENTER_CACHE_SECONDS * 1000,
@@ -191,11 +194,6 @@ export function TrustCenterPage({
   const openRequest = useCallback((documentTitle: string | null) => setRequest({ open: true, documentTitle }), []);
   const closeRequest = useCallback(() => setRequest(current => ({ ...current, open: false })), []);
 
-  const backCfg =
-    backButton === false
-      ? undefined
-      : { label: backButton.label ?? 'Back to home', onClick: () => router.push(backButton.href ?? '/') };
-
   const hasGatedDocuments = data?.documents.some(document => document.access === 'request') ?? false;
   const actions = hasGatedDocuments
     ? [{ label: 'Request access', variant: 'accent' as const, onClick: () => openRequest(null) }]
@@ -205,19 +203,19 @@ export function TrustCenterPage({
   // sections show comes from `visibleSections` — this map only says what each renders.
   const views: Record<TrustCenterSectionId, TrustSectionView> = {
     ai: {
-      lead: 'How customer data is handled by the AI in our products.',
+      lead: TRUST_SECTION_LEADS.ai,
       render: d => <AiSection practices={d.aiPractices} />,
     },
     compliance: {
-      lead: 'Frameworks we are audited against, and what is next.',
+      lead: TRUST_SECTION_LEADS.compliance,
       render: d => <ComplianceSection frameworks={d.frameworks} />,
     },
     controls: {
-      lead: 'Security controls currently passing in continuous monitoring (via Vanta).',
+      lead: TRUST_SECTION_LEADS.controls,
       render: d => <ControlsSection endpoint={endpoint} seed={controlsSeed(d)} />,
     },
     documents: {
-      lead: 'Public documents open directly. Gated documents are shared under NDA after one short request.',
+      lead: TRUST_SECTION_LEADS.documents,
       render: d => (
         <DocumentsSection
           documents={d.documents}
@@ -227,7 +225,7 @@ export function TrustCenterPage({
       ),
     },
     subprocessors: {
-      lead: 'Third parties that process customer data on our behalf.',
+      lead: TRUST_SECTION_LEADS.subprocessors,
       render: d => <SubprocessorsSection subprocessors={d.subprocessors} />,
     },
     faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} /> },
@@ -243,7 +241,7 @@ export function TrustCenterPage({
     const status = monitoringStatus(data, hydrated, nowMs);
     body = (
       <>
-        <div className="flex flex-col gap-[var(--spacing-system-xs)] md:flex-row md:items-center md:justify-between">
+        <div className={TRUST_STATUS_ROW_CLASS}>
           <StatusIndicator status={status.status} label={status.label} />
           {data.connected ? (
             <DataAttribution
@@ -263,8 +261,8 @@ export function TrustCenterPage({
           ) : null}
         </div>
 
-        <div className="grid grid-cols-1 gap-[var(--spacing-system-xl)] lg:grid-cols-[minmax(0,1fr)_12rem]">
-          <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxl)]">
+        <div className={TRUST_BODY_GRID_CLASS}>
+          <div className={TRUST_SECTIONS_COLUMN_CLASS}>
             {sections.map(section => {
               const view = views[section.id];
               return (
@@ -296,6 +294,34 @@ export function TrustCenterPage({
     );
   }
 
+  return (
+    <TrustCenterChrome shell={shell} title={title} subtitle={subtitle} backButton={backButton} actions={actions}>
+      {body}
+    </TrustCenterChrome>
+  );
+}
+
+/**
+ * The page's chrome, ONE copy for the page and its skeleton: the standalone
+ * `PageShell` or the host's padded box (`shell`), and the frozen `PageLayout`
+ * header (title, subtitle, back button, actions).
+ */
+function TrustCenterChrome({
+  shell,
+  title,
+  subtitle,
+  backButton,
+  actions,
+  children,
+}: Required<Pick<TrustCenterPageProps, 'shell' | 'title' | 'subtitle' | 'backButton'>> & {
+  actions?: Array<{ label: string; variant: 'accent'; onClick: () => void }>;
+  children: ReactNode;
+}) {
+  const router = useRouter();
+  const backCfg =
+    backButton === false
+      ? undefined
+      : { label: backButton.label ?? 'Back to home', onClick: () => router.push(backButton.href ?? '/') };
   const inner = (
     <PageLayout
       title={title}
@@ -306,9 +332,26 @@ export function TrustCenterPage({
       actions={actions}
       actionsVariant="primary-buttons"
     >
-      {body}
+      {children}
     </PageLayout>
   );
-
   return shell ? <PageShell>{inner}</PageShell> : <div className="page-shell-content">{inner}</div>;
+}
+
+/**
+ * The whole page while a host loads the data itself (the hub's admin preview):
+ * the SAME chrome and the same body skeleton `TrustCenterPage` shows while it
+ * self-fetches. Pass the chrome props the page will get.
+ */
+export function TrustCenterPageSkeleton({
+  shell = true,
+  backButton = false,
+  title = TRUST_CENTER_TITLE,
+  subtitle = TRUST_CENTER_TAGLINE,
+}: Pick<TrustCenterPageProps, 'shell' | 'backButton' | 'title' | 'subtitle'>) {
+  return (
+    <TrustCenterChrome shell={shell} title={title} subtitle={subtitle} backButton={backButton}>
+      <TrustCenterSkeleton />
+    </TrustCenterChrome>
+  );
 }

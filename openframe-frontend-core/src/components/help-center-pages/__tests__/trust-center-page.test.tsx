@@ -14,7 +14,8 @@ import {
   type TrustCenterPublic,
 } from '../../../types/trust-center';
 import { TRUST_CENTER_FIXTURE_WINDOW_MS, makeTrustCenterData } from '../__fixtures__/trust-center';
-import { TrustCenterPage } from '../trust-center-page';
+import { TrustCenterPage, TrustCenterPageSkeleton } from '../trust-center-page';
+import { TRUST_SECTION_LEADS } from '../trust-center-sections';
 
 // The real ContactForm needs the endpoints + chat runtimes; the page only
 // decides WHAT it is handed, so a stub that echoes its props is the honest
@@ -112,6 +113,32 @@ describe('TrustCenterPage', () => {
     await screen.findByText('SOC 2 Type II');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toBe('/content/api/trust-center');
+  });
+
+  it('while it loads, the skeleton shows the real section headings and leads the content will fill', async () => {
+    let answer: (response: Response) => void = () => {};
+    fetchMock.mockReturnValueOnce(new Promise<Response>(resolve => (answer = resolve)));
+    render(<TrustCenterPage endpoint="/content/api/trust-center" />);
+    const loading = await screen.findByLabelText('Loading the trust center');
+    for (const [label, lead] of [
+      ['Compliance', TRUST_SECTION_LEADS.compliance],
+      ['Controls', TRUST_SECTION_LEADS.controls],
+      ['Documents', TRUST_SECTION_LEADS.documents],
+    ] as const) {
+      expect(within(loading).getByRole('heading', { level: 2, name: label, hidden: true })).toBeInTheDocument();
+      expect(within(loading).getByText(lead as string)).toBeInTheDocument();
+    }
+    act(() => answer(jsonResponse(makeData())));
+    expect(await screen.findByText('SOC 2 Type II')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Loading the trust center')).toBeNull();
+  });
+
+  it('TrustCenterPageSkeleton wears the page chrome it is given: no title and subtitle means no header at all', () => {
+    const { rerender } = render(<TrustCenterPageSkeleton shell={false} title="" subtitle="" />);
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    expect(screen.getByLabelText('Loading the trust center')).toBeInTheDocument();
+    rerender(<TrustCenterPageSkeleton shell={false} />);
+    expect(screen.getByRole('heading', { level: 1, name: TRUST_CENTER_TITLE })).toBeInTheDocument();
   });
 
   it('is ONE page: every section is an anchored h2, in reading order — AI & data use after Subprocessors, Contact before FAQ', () => {
