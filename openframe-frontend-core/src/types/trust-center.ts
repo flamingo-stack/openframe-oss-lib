@@ -19,12 +19,13 @@ import type { Faq } from './faq';
  * A framework's MONITORING state, from Vanta's live data — Vanta keeps no
  * certification status, so none is claimed. `monitored` always carries Vanta's
  * own completion (`percent`: controls completed / total, as Vanta's app shows
- * it); `not_monitored` is a framework Vanta does not monitor. Label, badge
- * colour and icon are owned HERE, once.
+ * it); `not_monitored` is a framework on the Trust Center that Vanta does not
+ * monitor yet, shown as "Planned". Label, badge colour and icon are owned
+ * HERE, once.
  */
 export const TRUST_FRAMEWORK_MONITORING = [
   { state: 'monitored', label: 'Monitored', color: 'cyan', icon: 'shield-check' },
-  { state: 'not_monitored', label: 'Not monitored yet', color: 'default', icon: 'file-shield' },
+  { state: 'not_monitored', label: 'Planned', color: 'pinkSoft', icon: 'file-shield' },
 ] as const;
 
 export type TrustFrameworkMonitoring = (typeof TRUST_FRAMEWORK_MONITORING)[number]['state'];
@@ -34,7 +35,7 @@ export function trustFrameworkMonitoringEntry(state: TrustFrameworkMonitoring): 
   return TRUST_FRAMEWORK_MONITORING.find(entry => entry.state === state) ?? TRUST_FRAMEWORK_MONITORING[1];
 }
 
-/** THE badge text of a framework: "16% complete" (Vanta's completion), else "Not monitored yet". */
+/** THE badge text of a framework: "16% complete" (Vanta's completion), else "Planned". */
 export function trustFrameworkBadge(framework: Pick<TrustCenterFramework, 'monitoring' | 'percent'>): string {
   return framework.monitoring === 'monitored' && typeof framework.percent === 'number'
     ? `${framework.percent}% complete`

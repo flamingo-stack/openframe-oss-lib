@@ -7,6 +7,7 @@ import {
 } from '../../utils/compliance-standards';
 import {
   AicpaSoc2LogoIcon,
+  CmmcLogoIcon,
   EuLogoIcon,
   HhsLogoIcon,
   IsoIecLogoIcon,
@@ -20,22 +21,24 @@ const COMPLIANCE_LOGOS: Record<ComplianceLogoKey, ComponentType<{ className?: st
   iso: IsoLogoIcon,
   'iso-iec': IsoIecLogoIcon,
   nist: NistLogoIcon,
+  cmmc: CmmcLogoIcon,
   eu: EuLogoIcon,
   hhs: HhsLogoIcon,
 };
 
-/** Font size of the badge's mark, by length, so "SOC 2" and "800-171" both fit the seal. */
+/** Font size of the badge's mark, by length, so "HIPAA" and "800-171" both fit inside the ring. */
 function markFontSize(mark: string): number {
-  if (mark.length <= 4) return 11;
-  if (mark.length <= 6) return 9;
-  return 7.5;
+  if (mark.length <= 4) return 10;
+  if (mark.length <= 5) return 8.5;
+  return 7;
 }
 
 /**
- * A compliance standard's badge: a seal with the issuing body on top and the
- * standard's mark in the middle ("AICPA · SOC 2", "ISO · 27001"), drawn in ODS
- * tokens so it reads on every theme. OUR mark naming the standard — never an
- * issuer's licensed seal.
+ * A compliance standard's badge, for a standard the icon set has no official
+ * mark for: the standard's mark ("CMMC", "FedRAMP") in a plain ring, drawn in
+ * ODS tokens so it reads on every theme. The issuing body rides the accessible
+ * name only — at 40px any second line is illegible. OUR mark naming the
+ * standard, never an imitation of an issuer's seal.
  */
 export function ComplianceBadge({ standard, className }: { standard: ComplianceStandard; className?: string }) {
   return (
@@ -49,27 +52,16 @@ export function ComplianceBadge({ standard, className }: { standard: ComplianceS
       <circle
         cx="20"
         cy="20"
-        r="19"
+        r="18.5"
         fill="var(--color-bg-card)"
-        stroke="var(--color-accent-primary)"
+        stroke="var(--color-text-secondary)"
         strokeWidth="1.5"
       />
-      <circle cx="20" cy="20" r="15.5" fill="none" stroke="var(--color-border-default)" strokeWidth="0.75" />
       <text
         x="20"
-        y="13.5"
+        y="20"
         textAnchor="middle"
-        fontSize="4.6"
-        letterSpacing="0.4"
-        fill="var(--color-text-secondary)"
-        style={{ fontFamily: 'var(--font-family-heading)' }}
-      >
-        {standard.body.toUpperCase()}
-      </text>
-      <text
-        x="20"
-        y="24.5"
-        textAnchor="middle"
+        dominantBaseline="central"
         fontSize={markFontSize(standard.mark)}
         fontWeight="700"
         fill="var(--color-text-primary)"

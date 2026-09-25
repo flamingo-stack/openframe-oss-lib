@@ -666,7 +666,7 @@ function GlyphChatCard({
 /** Framework status colour (a `StatusBadge` scheme) → the card pill's `Tag` variant. */
 const TRUST_STATUS_TAG_VARIANT: Record<TrustFrameworkMonitoringEntry['color'], MingoInfoCardStatus['variant']> = {
   cyan: 'selectedCyan',
-  default: 'grey',
+  pinkSoft: 'selected',
 };
 
 /** Trust center (single record: the whole public projection). Title + the

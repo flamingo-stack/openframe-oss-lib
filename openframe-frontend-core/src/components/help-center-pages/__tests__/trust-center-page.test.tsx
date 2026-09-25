@@ -142,7 +142,7 @@ describe('TrustCenterPage', () => {
     // Each framework's logo comes from its standard (`soc2` → the SOC 2 badge); an unknown one keeps the shield.
     expect(compliance.getByRole('img', { name: 'AICPA SOC 2' })).toBeInTheDocument();
     expect(compliance.getByRole('img', { name: 'ISO 27001' })).toBeInTheDocument();
-    expect(compliance.getByText('Not monitored yet')).toBeInTheDocument();
+    expect(compliance.getByText('Planned')).toBeInTheDocument();
     expect(compliance.queryByText(/Certified/)).toBeNull();
   });
 

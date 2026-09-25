@@ -144,7 +144,7 @@ export function AiSection({ practices }: { practices: TrustCenterAiPractice[] })
 /**
  * One row per framework, in the Vanta Trust Center's order: its name, its
  * Vanta description, and ONE badge: Vanta's completion ("16% complete") or
- * "Not monitored yet" — never a certification claim, which Vanta's API does
+ * "Planned" — never a certification claim, which Vanta's API does
  * not hold.
  */
 export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFramework[] }) {

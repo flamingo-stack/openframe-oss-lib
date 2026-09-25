@@ -6,16 +6,17 @@
  * editor may write "SOC 2 Type II"). Server-safe, no React.
  *
  * `logo` names the OFFICIAL mark shipped in the icon set
- * (`icons-v2/compliance-logos`, downloaded from Wikimedia Commons, public
- * domain): ISO's emblem, the ISO/IEC emblem of the joint standards, NIST, the
- * EU emblem for EU regulations, HHS for HIPAA; and the AICPA SOC 2 seal,
- * vectorised from the seal the company supplied. AICPA licenses that seal to
- * companies holding a SOC 2 report with an unqualified opinion. A standard
- * without a mark shows our drawn `ComplianceBadge` instead.
+ * (`icons-v2/compliance-logos`): ISO's emblem, the ISO/IEC emblem of the joint
+ * standards, the EU emblem for EU regulations and HHS for HIPAA (Wikimedia
+ * Commons, public domain); the AICPA SOC 2 seal, vectorised from the seal the
+ * company supplied (AICPA licenses it to companies holding a SOC 2 report with
+ * an unqualified opinion); and the NIST and CMMC round marks the company
+ * supplied, single-colour and drawn in the text colour. A standard without a
+ * mark shows our drawn `ComplianceBadge` instead.
  */
 
 /** The official marks the icon set ships (`icons-v2/compliance-logos`). */
-export type ComplianceLogoKey = 'aicpa-soc2' | 'iso' | 'iso-iec' | 'nist' | 'eu' | 'hhs';
+export type ComplianceLogoKey = 'aicpa-soc2' | 'iso' | 'iso-iec' | 'nist' | 'cmmc' | 'eu' | 'hhs';
 export interface ComplianceStandard {
   /** Stable key, e.g. `soc2`. */
   key: string;
@@ -49,7 +50,7 @@ export const COMPLIANCE_STANDARDS: readonly ComplianceStandard[] = [
   { key: 'nist80053', body: 'NIST', mark: '800-53', aliases: ['nist80053', 'nistsp80053'], logo: 'nist' },
   { key: 'nist800171', body: 'NIST', mark: '800-171', aliases: ['nist800171', 'nistsp800171'], logo: 'nist' },
   { key: 'fedramp', body: 'US GOV', mark: 'FedRAMP', aliases: ['fedramp'] },
-  { key: 'cmmc', body: 'DoD', mark: 'CMMC', aliases: ['cmmc'] },
+  { key: 'cmmc', body: 'DoD', mark: 'CMMC', aliases: ['cmmc'], logo: 'cmmc' },
   { key: 'ccpa', body: 'CA', mark: 'CCPA', aliases: ['ccpa', 'cpra'] },
   { key: 'hitrust', body: 'HITRUST', mark: 'CSF', aliases: ['hitrust'] },
   { key: 'csastar', body: 'CSA', mark: 'STAR', aliases: ['csastar', 'star'] },

@@ -17,6 +17,7 @@ export function EuLogoIcon({
             xmlnsXlink="http://www.w3.org/1999/xlink"
             width={size}
             height={size}
+            viewBox="0 0 900 600"
             className={className}
             {...props}
         >
