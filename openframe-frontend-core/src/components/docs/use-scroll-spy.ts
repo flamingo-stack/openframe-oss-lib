@@ -21,6 +21,24 @@ interface ScrollSpySection {
   level?: number;
 }
 
+export interface UseScrollSpyOptions {
+  /**
+   * Keep the URL's `#hash` on the section being read as the user SCROLLS
+   * (`replaceState`: no history entry, and no `hashchange`, so
+   * `useScrollToHash` never re-scrolls to it). Above the first section the hash
+   * is cleared. Only a scroll writes it — mounting a page never adds a hash.
+   */
+  syncHash?: boolean;
+}
+
+/** Point the URL's hash at `sectionId` (or clear it) without a history entry or a `hashchange`. */
+function replaceHash(sectionId: string | null): void {
+  const { pathname, search, hash } = window.location;
+  const next = sectionId ? `#${sectionId}` : '';
+  if (hash === next) return;
+  window.history.replaceState(window.history.state, '', `${pathname}${search}${next}`);
+}
+
 interface UseScrollSpyReturn {
   activeSection: string;
   handleSectionClick: (sectionId: string) => void;
@@ -30,7 +48,11 @@ interface UseScrollSpyReturn {
  * Shared scroll spy hook for tracking active section based on scroll position.
  * Used by DocViewer for sticky section navigation.
  */
-export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrollSpyReturn {
+export function useScrollSpy(
+  sections: ScrollSpySection[] | undefined,
+  options: UseScrollSpyOptions = {},
+): UseScrollSpyReturn {
+  const { syncHash = false } = options;
   const [activeSection, setActiveSection] = useState('');
   const isScrollingFromClick = useRef(false);
 
@@ -59,7 +81,8 @@ export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrol
     const sectionIds = sectionIdsKey === '' ? [] : sectionIdsKey.split(ID_SEPARATOR);
     if (sectionIds.length === 0) return undefined;
 
-    const handleScroll = () => {
+    // `fromScroll`: a real scroll settled (not the mount-time pass).
+    const handleScroll = (fromScroll = false) => {
       if (isScrollingFromClick.current) return;
 
       const scrollPosition = window.scrollY + SCROLL_OFFSET;
@@ -87,12 +110,19 @@ export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrol
       }
 
       setActiveSection(prev => (prev !== currentSection ? currentSection : prev));
+
+      if (syncHash && fromScroll) {
+        const first = document.getElementById(sectionIds[0] ?? '');
+        const aboveFirst =
+          !atBottom && first !== null && scrollPosition < first.getBoundingClientRect().top + window.scrollY;
+        replaceHash(aboveFirst ? null : currentSection);
+      }
     };
 
     let scrollTimer: ReturnType<typeof setTimeout>;
     const throttledScroll = () => {
       clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(handleScroll, 100);
+      scrollTimer = setTimeout(() => handleScroll(true), 100);
     };
 
     window.addEventListener('scroll', throttledScroll);
@@ -102,7 +132,7 @@ export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrol
       window.removeEventListener('scroll', throttledScroll);
       clearTimeout(scrollTimer);
     };
-  }, [sectionIdsKey]);
+  }, [sectionIdsKey, syncHash]);
 
   return { activeSection, handleSectionClick };
 }

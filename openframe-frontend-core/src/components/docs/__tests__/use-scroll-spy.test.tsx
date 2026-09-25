@@ -72,3 +72,38 @@ describe('useScrollSpy', () => {
     expect(result.current.activeSection).toBe('a');
   });
 });
+
+describe('useScrollSpy — syncHash', () => {
+  const sections = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  const urls = (spy: { mock: { calls: unknown[][] } }) => spy.mock.calls.map(call => call[2]);
+
+  it('as the user scrolls, the URL hash follows the section being read — replaceState only, never a hashchange', () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+    const hashchange = vi.fn();
+    window.addEventListener('hashchange', hashchange);
+    placeSections(0);
+    renderHook(() => useScrollSpy(sections, { syncHash: true }));
+    scrollTo(850);
+    scrollTo(1450);
+    expect(urls(replaceState)).toEqual(['/#b', '/#c']);
+    expect(hashchange).not.toHaveBeenCalled();
+    window.removeEventListener('hashchange', hashchange);
+  });
+
+  it('above the first section the hash is cleared; mounting alone writes nothing', () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+    placeSections(0);
+    renderHook(() => useScrollSpy(sections, { syncHash: true }));
+    expect(replaceState).not.toHaveBeenCalled();
+    scrollTo(50); // 150 < 300: above section a
+    expect(urls(replaceState)).toEqual(['/']);
+  });
+
+  it('off by default: scrolling never touches the URL', () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+    placeSections(0);
+    renderHook(() => useScrollSpy(sections));
+    scrollTo(850);
+    expect(replaceState).not.toHaveBeenCalled();
+  });
+});

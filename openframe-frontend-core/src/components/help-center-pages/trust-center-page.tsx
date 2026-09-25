@@ -178,8 +178,9 @@ export function TrustCenterPage({
   // A rail click puts `#section` in the URL (`replace`: the rail is a table of
   // contents, not a navigation step) and scrolls below the sticky header; a
   // visit that ARRIVES with `#section`, and back/forward, scroll there once the
-  // sections have rendered. The scroll spy only lights the rail.
-  const { activeSection } = useScrollSpy(sections);
+  // sections have rendered. The scroll spy lights the rail and, as the reader
+  // scrolls, keeps the URL's hash on the section in view (`syncHash`).
+  const { activeSection } = useScrollSpy(sections, { syncHash: true });
   const handleSectionClick = useCallback((sectionId: string) => {
     navigateSamePageHash(`#${sectionId}`, { headerOffset: STICKY_HEADER_OFFSET_PX, history: 'replace' });
   }, []);
