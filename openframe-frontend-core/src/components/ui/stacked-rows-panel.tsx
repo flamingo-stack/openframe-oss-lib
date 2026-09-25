@@ -31,8 +31,8 @@ export interface PanelColumn {
   content?: ReactNode;
   /** Primary value rendered in the ODS h4 style when `content` is not set. */
   value?: ReactNode;
-  /** Secondary label rendered under the value (ODS h6, secondary colour). */
-  label?: string;
+  /** Secondary label rendered under the value (ODS h6, secondary colour); a node for inline emphasis. */
+  label?: ReactNode;
   /** Icon shown before the value. */
   icon?: ReactNode;
   /** Icon shown before the whole value/label stack, vertically centered against

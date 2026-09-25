@@ -108,10 +108,10 @@ function visibleSections(data: TrustCenterPublic): Array<(typeof TRUST_CENTER_SE
   return TRUST_CENTER_SECTIONS.filter(section => hasContent[section.id]);
 }
 
-/** The status line: neutral before mount, then monitored / paused / not enabled. */
 /** How often an open page re-judges "monitored" against the clock. */
 const MONITORING_CLOCK_TICK_MS = 60_000;
 
+/** The status line: neutral before mount, then monitored / paused / not enabled. */
 function monitoringStatus(
   data: TrustCenterPublic,
   hydrated: boolean,

@@ -191,13 +191,13 @@ export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFrame
 // Controls
 // ---------------------------------------------------------------------------
 
-/** Client-side filter over control name + description. Exported for tests. */
 /** THE query matcher — search and `highlight` use the same one, so a row never matches without its highlight. */
 function queryMatcher(query: string): RegExp | null {
   const needle = query.trim();
   return needle ? new RegExp(escapeRegExp(needle), 'iu') : null;
 }
 
+/** Client-side filter over control name + description. Exported for tests. */
 export function filterControlDomains(domains: TrustCenterControlDomain[], query: string): TrustCenterControlDomain[] {
   const matcher = queryMatcher(query);
   if (!matcher) return domains;
@@ -240,7 +240,8 @@ function controlRows(controls: TrustCenterControl[], query = ''): PanelRow[] {
         key: 'control',
         leadingIcon: <CheckIcon className="text-ods-success" role="img" aria-label="Passing" />,
         value: highlight(control.name, query),
-        label: control.description ?? undefined,
+        // A description-only match is emphasised too: every kept row shows why it matched.
+        label: control.description ? highlight(control.description, query) : undefined,
       },
     ],
   }));

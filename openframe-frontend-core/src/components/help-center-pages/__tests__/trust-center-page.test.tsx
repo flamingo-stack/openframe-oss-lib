@@ -269,6 +269,18 @@ describe('TrustCenterPage', () => {
     }
   });
 
+  it('controls search: a match only in the description is highlighted in the description', () => {
+    const data = makeData();
+    data.controlDomains[0].controls[0] = {
+      id: 'c1',
+      name: 'Access reviewed',
+      description: 'Quarterly attestation by owners',
+    };
+    render(<TrustCenterPage initialData={data} />);
+    fireEvent.change(screen.getByPlaceholderText('Search controls'), { target: { value: 'attest' } });
+    expect(screen.getByText('attest', { selector: 'strong' })).toBeInTheDocument();
+  });
+
   it('controls drawer reads the CURRENT domains: a revalidation while open shows the new controls', async () => {
     const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
     fireEvent.click(screen.getByRole('button', { name: 'View all 4 Infrastructure security controls' }));
