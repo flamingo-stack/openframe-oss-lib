@@ -57,9 +57,6 @@ export const TRUST_CENTER_API_PATH = '/api/trust-center';
 /** How long a copy counts as fresh: the route's s-maxage AND the page's revalidate-on-visible. */
 export const TRUST_CENTER_CACHE_SECONDS = 300;
 
-/** Where the monitoring data is synced from (the page's `DataAttribution` line). */
-export const TRUST_CENTER_DATA_SOURCE = 'Vanta';
-
 /** The single chat card id (`[card://trust_center:main]`). */
 export const TRUST_CENTER_CARD_ID = 'main';
 
@@ -148,6 +145,14 @@ export interface TrustCenterPublic {
   monitoredWindowMs: number;
   /** False when Vanta is not connected / never synced — a config-only projection. */
   connected: boolean;
+  /** Where the monitoring data is synced from, for the page's `DataAttribution` line: named and pictured by the hub. */
+  dataSource: TrustCenterDataSource;
+}
+
+export interface TrustCenterDataSource {
+  name: string;
+  /** Its site's icon (the same lookup the subprocessor logos use), or null. */
+  logoUrl: string | null;
 }
 
 /** Client-side "monitored" rule (after mount only — never in SSR output). */

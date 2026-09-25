@@ -35,7 +35,6 @@ import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
   TRUST_CENTER_API_PATH,
   TRUST_CENTER_CACHE_SECONDS,
-  TRUST_CENTER_DATA_SOURCE,
   TRUST_CENTER_SEARCH_DEBOUNCE_MS,
   TRUST_CENTER_SECTIONS,
   TRUST_CENTER_TAGLINE,
@@ -51,11 +50,11 @@ import {
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection } from '../faq/faq-section';
-import { VantaIcon } from '../icons/vanta-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { DataAttribution } from '../ui/data-attribution';
+import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
 import { StatusIndicator } from '../ui/status-indicator';
 import {
@@ -248,8 +247,17 @@ export function TrustCenterPage({
           <StatusIndicator status={status.status} label={status.label} />
           {data.connected ? (
             <DataAttribution
-              icon={<VantaIcon className="h-4 w-auto" />}
-              source={TRUST_CENTER_DATA_SOURCE}
+              icon={
+                data.dataSource.logoUrl ? (
+                  <EntityImage
+                    src={data.dataSource.logoUrl}
+                    alt={data.dataSource.name}
+                    fallbackText={data.dataSource.name}
+                    sizeClassName="size-4"
+                  />
+                ) : undefined
+              }
+              source={data.dataSource.name}
               lastUpdated={data.syncedAt}
             />
           ) : null}

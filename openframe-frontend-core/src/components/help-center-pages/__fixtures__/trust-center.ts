@@ -67,6 +67,7 @@ export function makeTrustCenterData(overrides: Partial<TrustCenterPublic> = {}):
     syncedAt: new Date(now - 10 * 60 * 1000).toISOString(),
     monitoredWindowMs: TRUST_CENTER_FIXTURE_WINDOW_MS,
     connected: true,
+    dataSource: { name: 'Vanta', logoUrl: 'https://icons.example/vanta.com.png' },
     ...overrides,
   };
 }

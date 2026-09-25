@@ -242,7 +242,8 @@ describe('TrustCenterPage', () => {
     expect(screen.getByText('Controls continuously monitored')).toBeInTheDocument();
     // WHEN it was synced is the shared attribution line, not the status.
     expect(screen.getByText('Data synced from Vanta')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Vanta' })).toBeInTheDocument();
+    // The synced-from logo is the site icon the hub names — the llama, like the subprocessor list.
+    expect(screen.getByRole('img', { name: 'Vanta' })).toHaveAttribute('src', 'https://icons.example/vanta.com.png');
     expect(screen.getByText(/^Last updated: /)).toBeInTheDocument();
     unmount();
 

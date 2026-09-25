@@ -210,4 +210,3 @@ export { GetAppIcon } from './getapp-icon';
 // Financial platform icons
 export { CartaIcon } from './carta-icon';
 export { QuickBooksIcon } from './quickbooks-icon';
-export { VantaIcon } from './vanta-icon';
