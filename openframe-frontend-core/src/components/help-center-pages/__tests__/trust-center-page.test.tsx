@@ -140,15 +140,13 @@ describe('TrustCenterPage', () => {
     expect(await screen.findByTestId('contact-form')).toBeInTheDocument();
   });
 
-  it('controls browse: category cards show 3 controls, "View all" opens the full category in a drawer', async () => {
+  it('controls browse: EVERY control of every category is shown, always — no "View all", no drawer', () => {
     render(<TrustCenterPage initialData={makeData()} />);
     expect(screen.getByText('Encryption at rest')).toBeInTheDocument();
-    expect(screen.queryByText('Logging enabled')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'View all 4 Infrastructure security controls' }));
-    const drawer = await screen.findByRole('dialog');
-    expect(within(drawer).getByText('Infrastructure security')).toBeInTheDocument();
-    expect(within(drawer).getByText('Logging enabled')).toBeInTheDocument();
+    // The 4th control of a category is on the page from the start.
+    expect(screen.getByText('Logging enabled')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /View all/ })).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('controls search: ONE flat grouped list with every match visible, a count, and clearing restores the grid', async () => {
@@ -163,7 +161,6 @@ describe('TrustCenterPage', () => {
     expect(screen.getByText('Log', { selector: 'strong' })).toBeInTheDocument();
     expect(screen.getByText('ging enabled', { exact: false })).toBeInTheDocument();
     expect(screen.queryByText('Encryption at rest')).toBeNull();
-    expect(screen.queryByRole('button', { name: /View all/ })).toBeNull();
 
     typeSearch('every user');
     expect(await screen.findByText('Unique accounts')).toBeInTheDocument();
@@ -173,7 +170,7 @@ describe('TrustCenterPage', () => {
     expect(await screen.findByText('No matching controls')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Show all controls' }));
     expect(screen.getByText('Encryption at rest')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /View all/ })).toBeInTheDocument();
+    expect(screen.getByText('Logging enabled')).toBeInTheDocument();
   });
 
   it('ONE access request: the hero CTA asks for all gated documents, a row asks for its own; marketing fields hidden', async () => {
@@ -316,17 +313,13 @@ describe('TrustCenterPage', () => {
     expect(await screen.findByText('attest', { selector: 'strong' })).toBeInTheDocument();
   });
 
-  it('controls drawer reads the CURRENT domains: a revalidation while open shows the new controls', async () => {
+  it('controls follow the CURRENT data: a revalidated copy shows its new controls', () => {
     const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'View all 4 Infrastructure security controls' }));
-    let drawer = await screen.findByRole('dialog');
-    expect(within(drawer).queryByText('Backups tested')).toBeNull();
-
+    expect(screen.queryByText('Backups tested')).toBeNull();
     const fresh = makeData();
     fresh.controlDomains[0].controls.push({ id: 'c6', name: 'Backups tested', description: null });
     rerender(<TrustCenterPage initialData={fresh} />);
-    drawer = await screen.findByRole('dialog');
-    expect(within(drawer).getByText('Backups tested')).toBeInTheDocument();
+    expect(screen.getByText('Backups tested')).toBeInTheDocument();
   });
 
   it('controls search highlights on the ORIGINAL text, even after a character whose lowercase is longer', async () => {

@@ -9,12 +9,12 @@
  *
  * The layout follows 2026 trust-center practice (Anthropic, OpenAI, Vanta,
  * Linear, Cursor, ElevenLabs): ONE page with a section rail, AI & data use first,
- * certified proof above roadmap items, controls as a grid of category cards with
- * "View all" in a drawer, and a controls SEARCH that filters one flat, grouped,
- * counted list — never collapsible panels whose open state fights the query.
+ * certified proof above roadmap items, every control of every category always
+ * shown (no drawers, no "view all", no collapsing), and a controls SEARCH the
+ * server answers as one flat, grouped, counted list.
  */
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   TRUST_DOCUMENT_REQUEST_PREFIX,
   TRUST_FRAMEWORK_STATUSES,
@@ -41,10 +41,8 @@ import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { ListEmptyState } from '../list-empty-state';
 import { CardSkeletonGrid } from '../loading/card-skeleton';
 import { Button } from '../ui/button/button';
-import { Drawer, DrawerBody, DrawerContent, DrawerHeader, DrawerTitle } from '../ui/drawer';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
-import { FeatureList } from '../ui/feature-list';
 import { ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui/modal-v2';
 import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
 import { StatusBadge } from '../ui/status-badge';
@@ -55,9 +53,6 @@ const FRAMEWORK_ICONS: Record<TrustFrameworkStatusEntry['icon'], typeof ShieldCh
   'shield-check': ShieldCheckIcon,
   'file-shield': FileShieldIcon,
 };
-
-/** Controls shown per category card before "View all". */
-const CONTROLS_PER_CARD = 3;
 
 const STACK_CLASSES = 'flex flex-col gap-[var(--spacing-system-l)]';
 const TWO_COLUMN_GRID = 'grid grid-cols-1 gap-[var(--spacing-system-m)] md:grid-cols-2';
@@ -250,11 +245,6 @@ export function ControlsSection({
   search: ControlsSearchState;
   onQueryChange: (query: string) => void;
 }) {
-  // The drawer holds the category NAME and reads its controls from the current
-  // `domains`, so a revalidation while it is open shows the new data (and a
-  // category that disappeared simply closes it).
-  const [openDomainName, setOpenDomainName] = useState<string | null>(null);
-  const openDomain = openDomainName === null ? null : (domains.find(d => d.domain === openDomainName) ?? null);
   const searching = query.trim().length > 0;
   const results = search.results;
   const total = useMemo(() => domains.reduce((sum, domain) => sum + domain.controls.length, 0), [domains]);
@@ -297,52 +287,17 @@ export function ControlsSection({
           ))}
         </div>
       ) : (
-        // Browse: a grid of category cards, each with its first controls + "View all".
+        // Browse: every category with ALL its controls, always — nothing to expand.
         <div className={TWO_COLUMN_GRID}>
-          {domains.map(domain => {
-            const hidden = domain.controls.length - CONTROLS_PER_CARD;
-            return (
-              <div key={domain.domain} className="flex flex-col gap-[var(--spacing-system-xs)]">
-                <StackedRowsPanel
-                  title={`${domain.domain} · ${domain.controls.length}`}
-                  rows={controlRows(domain.controls.slice(0, CONTROLS_PER_CARD))}
-                />
-                {hidden > 0 ? (
-                  <Button
-                    variant="outline"
-                    size="small"
-                    onClick={() => setOpenDomainName(domain.domain)}
-                    className="self-start"
-                    aria-label={`View all ${domain.controls.length} ${domain.domain} controls`}
-                  >
-                    {`View all ${domain.controls.length} controls`}
-                  </Button>
-                ) : null}
-              </div>
-            );
-          })}
+          {domains.map(domain => (
+            <StackedRowsPanel
+              key={domain.domain}
+              title={`${domain.domain} · ${domain.controls.length}`}
+              rows={controlRows(domain.controls)}
+            />
+          ))}
         </div>
       )}
-
-      <Drawer open={openDomain !== null} onOpenChange={open => (open ? undefined : setOpenDomainName(null))}>
-        <DrawerContent side="right" size="medium" offsetHeader aria-describedby={undefined}>
-          <DrawerHeader>
-            <DrawerTitle>{openDomain?.domain ?? ''}</DrawerTitle>
-          </DrawerHeader>
-          <DrawerBody>
-            {openDomain ? (
-              <FeatureList
-                iconBoxSize={40}
-                items={openDomain.controls.map(control => ({
-                  icon: <CheckIcon className="text-ods-success" role="img" aria-label="Passing" />,
-                  title: control.name,
-                  description: control.description ?? '',
-                }))}
-              />
-            ) : null}
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
     </div>
   );
 }

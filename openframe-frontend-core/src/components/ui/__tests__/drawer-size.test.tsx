@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Drawer, DrawerContent, DrawerTitle } from '../drawer';
 
-function panelOf(props: { side?: 'right' | 'left' | 'top' | 'bottom'; size?: 'default' | 'medium' | 'wide' }) {
+function panelOf(props: { side?: 'right' | 'left' | 'top' | 'bottom'; size?: 'default' | 'wide' }) {
   render(
     <Drawer open>
       <DrawerContent {...props} aria-describedby={undefined}>
@@ -21,12 +21,6 @@ describe('DrawerContent size', () => {
 
   it('wide sets the height on a top or bottom drawer', () => {
     expect(panelOf({ side: 'bottom', size: 'wide' })).toHaveClass('h-[90vh]');
-  });
-
-  it('medium is a 32rem reading panel capped to the viewport (ODS gutters), on the slide axis', () => {
-    expect(panelOf({ side: 'right', size: 'medium' })).toHaveClass(
-      'w-[min(32rem,calc(100vw-2*var(--spacing-system-mf)))]',
-    );
   });
 
   it('default adds no size class', () => {
