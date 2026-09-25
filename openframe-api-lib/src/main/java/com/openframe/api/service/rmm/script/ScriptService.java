@@ -12,6 +12,8 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.ForbiddenException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.Script;
@@ -241,7 +243,7 @@ public class ScriptService {
 
     private static void requireUserScript(Script script) {
         if (script.getType() != ScriptType.USER) {
-            throw new IllegalArgumentException(
+            throw new ForbiddenException(ErrorCode.OPERATION_NOT_ALLOWED,
                     "Managed scripts (system / software) are provisioned by OpenFrame and cannot be modified or deleted");
         }
     }
