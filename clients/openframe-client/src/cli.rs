@@ -9,7 +9,7 @@ use tokio::runtime::Runtime;
 use tracing::{error, info};
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(name = "openframe-client", author, version = env!("OPENFRAME_VERSION"), about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
