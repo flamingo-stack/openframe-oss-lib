@@ -48,6 +48,7 @@ export {
   pick,
   NO_CLIENT_CACHE,
 } from './common';
+export { escapeRegExp } from './escape-regexp';
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title';
@@ -107,6 +108,7 @@ export * from './video-bite-id';
 export * from './os-utils';
 // Phone utilities
 export * from './country-phone-utils';
+export * from './compliance-standards';
 // Generic domain detection
 export * from './generic-domain-utils';
 
@@ -362,7 +364,7 @@ export {
   type ContentRefLayout,
   type ContentRefGridSize,
 } from './content-ref-groups';
-export { extractItems, extractItemId } from './extract-items';
+export { extractItems, extractItemId, extractCardItems } from './extract-items';
 export { FullscreenSwitchController, type FullscreenSwitchOptions } from './fullscreen-switch';
 export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url';
 
