@@ -108,7 +108,7 @@ pub(crate) fn reap_orphans(target_exe: &Path) -> usize {
         let Some(snapshot_start) = sys.process(sys_pid).map(|p| p.start_time()) else {
             continue;
         };
-        // Re-check identity right before the kill so a pid reused since the snapshot is never hit.
+        // Re-check identity before the kill; on Windows the snapshot handle pins the pid, on Unix a µs gap remains.
         if !sys.refresh_process(sys_pid) {
             continue;
         }
