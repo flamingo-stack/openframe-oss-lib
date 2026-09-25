@@ -104,10 +104,18 @@ describe('TrustCenterPage', () => {
     expect(screen.queryByRole('tab')).toBeNull();
   });
 
-  it('boxes the data-use commitment above the other AI practices', () => {
+  it('AI statements: each Vanta FAQ as question over answer, the first marked as the commitment', () => {
     render(<TrustCenterPage initialData={makeData()} />);
-    expect(screen.getByText('We never use customer data to train AI models')).toBeInTheDocument();
-    expect(screen.getByText('Model providers')).toBeInTheDocument();
+    const ai = within(screen.getByRole('region', { name: 'AI & data use' }));
+    expect(ai.getByText('Is customer data used to train AI models?')).toBeInTheDocument();
+    expect(ai.getByText('No. We never use customer data to train AI models.')).toBeInTheDocument();
+    expect(ai.getAllByRole('img', { name: 'Commitment' })).toHaveLength(1);
+    expect(ai.getByText('Which AI model providers do you use?')).toBeInTheDocument();
+  });
+
+  it('no AI statements from Vanta → no AI section at all', () => {
+    render(<TrustCenterPage initialData={makeData({ aiPractices: [] })} />);
+    expect(screen.queryByRole('region', { name: 'AI & data use' })).toBeNull();
   });
 
   it('compliance: one row per framework, proof before roadmap, the status ONCE as a badge, percent only when published', () => {
@@ -231,7 +239,10 @@ describe('TrustCenterPage', () => {
 
   it('monitoring: monitored → paused when syncedAt is older than the window (the status line is the only claim)', () => {
     const { unmount } = render(<TrustCenterPage initialData={makeData()} />);
-    expect(screen.getByText(/^Controls continuously monitored · updated/)).toBeInTheDocument();
+    expect(screen.getByText('Controls continuously monitored')).toBeInTheDocument();
+    // WHEN it was synced is the shared attribution line, not the status.
+    expect(screen.getByText('Data synced from Vanta')).toBeInTheDocument();
+    expect(screen.getByText(/^Last updated: /)).toBeInTheDocument();
     unmount();
 
     render(
@@ -246,6 +257,7 @@ describe('TrustCenterPage', () => {
     expect(screen.getByText('Live control monitoring is not enabled yet')).toBeInTheDocument();
     expect(screen.queryByText(/paused/)).toBeNull();
     expect(screen.queryByText(/continuously monitored/)).toBeNull();
+    expect(screen.queryByText('Data synced from Vanta')).toBeNull();
   });
   it('defaults to the brand-neutral title + tagline (a host adds its brand via props)', () => {
     render(<TrustCenterPage initialData={makeData()} />);

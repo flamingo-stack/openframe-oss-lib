@@ -54,11 +54,11 @@ export function makeTrustCenterData(overrides: Partial<TrustCenterPublic> = {}):
     subprocessors: [{ name: 'Google Cloud', purpose: 'Hosting', location: 'US', category: 'Infrastructure' }],
     aiPractices: [
       {
-        label: 'Customer data and model training',
-        value: 'We never use customer data to train AI models',
+        label: 'Is customer data used to train AI models?',
+        value: 'No. We never use customer data to train AI models.',
         commitment: true,
       },
-      { label: 'Model providers', value: 'Anthropic (Claude)' },
+      { label: 'Which AI model providers do you use?', value: 'Anthropic (Claude)' },
     ],
     faqs: [],
     checkedAt: new Date(now - 5 * 60 * 1000).toISOString(),

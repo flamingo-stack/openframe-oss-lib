@@ -24,8 +24,8 @@ const BASE = makeTrustCenterData({
   ],
   aiPractices: [
     {
-      label: 'Customer data and model training',
-      value: 'We never use customer data to train AI models',
+      label: 'Is customer data used to train AI models?',
+      value: 'No. We never use customer data to train AI models.',
       commitment: true,
     },
     { label: 'Providers', value: 'Anthropic, OpenAI' },

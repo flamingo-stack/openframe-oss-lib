@@ -108,29 +108,25 @@ export function TrustSection({
 // ---------------------------------------------------------------------------
 
 /**
- * The data-use commitment first (success shield), then the other practices —
- * the page's ONE row style (`StackedRowsPanel`), full sentences wrapped.
+ * The AI statements — the company's Vanta Trust Center FAQs in its AI category,
+ * in Vanta's order: the question as the row title, the answer beneath. The
+ * first is the commitment (success shield). The page's ONE row style.
  */
 export function AiSection({ practices }: { practices: TrustCenterAiPractice[] }) {
-  const ordered = [...practices].sort((a, b) => Number(Boolean(b.commitment)) - Number(Boolean(a.commitment)));
-  const rows: PanelRow[] = ordered.map(practice => ({
+  const rows: PanelRow[] = practices.map(practice => ({
     id: practice.label,
     columns: [
-      practice.commitment
-        ? {
-            key: 'practice',
-            leadingIcon: <ShieldCheckIcon className="text-ods-success" role="img" aria-label="Commitment" />,
-            value: practice.value,
-            label: practice.label,
-            wrap: true,
-          }
-        : {
-            key: 'practice',
-            leadingIcon: <BrainAIIcon aria-hidden="true" />,
-            value: practice.label,
-            label: practice.value,
-            wrap: true,
-          },
+      {
+        key: 'practice',
+        leadingIcon: practice.commitment ? (
+          <ShieldCheckIcon className="text-ods-success" role="img" aria-label="Commitment" />
+        ) : (
+          <BrainAIIcon aria-hidden="true" />
+        ),
+        value: practice.label,
+        label: practice.value,
+        wrap: true,
+      },
     ],
   }));
   return <StackedRowsPanel rows={rows} />;

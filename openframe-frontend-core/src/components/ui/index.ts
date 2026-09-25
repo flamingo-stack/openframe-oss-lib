@@ -103,6 +103,7 @@ export * from './info-card-row';
 export * from './device-card';
 export * from './device-card-compact';
 export * from './entity-image';
+export * from './data-attribution';
 export * from './feature-card';
 export * from './feature-list';
 export { FloatingTooltip } from './floating-tooltip';

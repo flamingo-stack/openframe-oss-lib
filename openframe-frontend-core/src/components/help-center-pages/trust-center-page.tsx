@@ -35,6 +35,7 @@ import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
   TRUST_CENTER_API_PATH,
   TRUST_CENTER_CACHE_SECONDS,
+  TRUST_CENTER_DATA_SOURCE,
   TRUST_CENTER_SEARCH_DEBOUNCE_MS,
   TRUST_CENTER_SECTIONS,
   TRUST_CENTER_TAGLINE,
@@ -47,13 +48,14 @@ import {
   type TrustCenterPublic,
   type TrustCenterSectionId,
 } from '../../types/trust-center';
-import { formatAbsoluteDate, formatRelativeTime } from '../../utils/date-utils';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection } from '../faq/faq-section';
+import { ShieldCheckIcon } from '../icons-v2-generated/security/shield-check-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
+import { DataAttribution } from '../ui/data-attribution';
 import { LoadError } from '../ui/error-state';
 import { StatusIndicator } from '../ui/status-indicator';
 import {
@@ -116,23 +118,21 @@ function visibleSections(data: TrustCenterPublic): Array<(typeof TRUST_CENTER_SE
 /** How often an open page re-judges "monitored" against the clock. */
 const MONITORING_CLOCK_TICK_MS = 60_000;
 
-/** The status line: neutral before mount, then monitored / paused / not enabled. */
+/**
+ * The monitoring claim: neutral before mount, then monitored / paused / not
+ * enabled. WHEN the data was last synced is the shared `DataAttribution` line
+ * beside it, not repeated here.
+ */
 function monitoringStatus(
   data: TrustCenterPublic,
   hydrated: boolean,
   nowMs: number,
 ): { status: 'success' | 'pending' | 'missing'; label: string } {
   if (!data.connected) return { status: 'missing', label: 'Live control monitoring is not enabled yet' };
-  if (!hydrated) {
-    return {
-      status: 'missing',
-      label: data.checkedAt ? `Controls last checked ${formatAbsoluteDate(data.checkedAt)}` : 'Controls monitored',
-    };
-  }
-  const checked = data.checkedAt ? ` · updated ${formatRelativeTime(data.checkedAt)}` : '';
+  if (!hydrated) return { status: 'missing', label: 'Controls monitored' };
   return isTrustCenterMonitored(data, nowMs)
-    ? { status: 'success', label: `Controls continuously monitored${checked}` }
-    : { status: 'pending', label: `Monitoring paused${checked}` };
+    ? { status: 'success', label: 'Controls continuously monitored' }
+    : { status: 'pending', label: 'Monitoring paused' };
 }
 
 export function TrustCenterPage({
@@ -244,7 +244,16 @@ export function TrustCenterPage({
     const status = monitoringStatus(data, hydrated, nowMs);
     body = (
       <>
-        <StatusIndicator status={status.status} label={status.label} />
+        <div className="flex flex-col gap-[var(--spacing-system-xs)] md:flex-row md:items-center md:justify-between">
+          <StatusIndicator status={status.status} label={status.label} />
+          {data.connected ? (
+            <DataAttribution
+              icon={<ShieldCheckIcon className="h-4 w-4" aria-hidden="true" />}
+              source={TRUST_CENTER_DATA_SOURCE}
+              lastUpdated={data.syncedAt}
+            />
+          ) : null}
+        </div>
 
         <div className="grid grid-cols-1 gap-[var(--spacing-system-xl)] lg:grid-cols-[minmax(0,1fr)_12rem]">
           <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxl)]">

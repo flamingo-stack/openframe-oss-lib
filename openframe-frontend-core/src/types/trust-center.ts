@@ -57,6 +57,9 @@ export const TRUST_CENTER_API_PATH = '/api/trust-center';
 /** How long a copy counts as fresh: the route's s-maxage AND the page's revalidate-on-visible. */
 export const TRUST_CENTER_CACHE_SECONDS = 300;
 
+/** Where the monitoring data is synced from (the page's `DataAttribution` line). */
+export const TRUST_CENTER_DATA_SOURCE = 'Vanta';
+
 /** The single chat card id (`[card://trust_center:main]`). */
 export const TRUST_CENTER_CARD_ID = 'main';
 
@@ -113,10 +116,13 @@ export interface TrustCenterSubprocessor {
   url?: string | null;
 }
 
+/** An AI statement: one FAQ of the company's Vanta Trust Center, in its AI category. */
 export interface TrustCenterAiPractice {
+  /** The FAQ question. */
   label: string;
+  /** The FAQ answer, as Vanta stores it. */
   value: string;
-  /** The headline data-use commitment ("We never train on customer data"), shown boxed above the rest. */
+  /** The first statement of the category — the headline data-use commitment, marked with the success shield. */
   commitment?: boolean;
 }
 
