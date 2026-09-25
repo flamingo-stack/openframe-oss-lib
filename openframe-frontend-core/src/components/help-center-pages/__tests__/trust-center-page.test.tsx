@@ -117,25 +117,14 @@ describe('TrustCenterPage', () => {
     expect(screen.queryByRole('region', { name: 'AI & data use' })).toBeNull();
   });
 
-  it('compliance: one row per Vanta framework with its description, and ONE monitoring badge — never a certification claim', () => {
-    const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
+  it("compliance: one row per Vanta framework with its description and Vanta's completion percentage — never a certification claim", () => {
+    render(<TrustCenterPage initialData={makeData()} />);
     const compliance = within(screen.getByRole('region', { name: 'Compliance' }));
     expect(compliance.getByText('SOC 2 Type II')).toBeInTheDocument();
     expect(compliance.getByText('Type II audit in progress')).toBeInTheDocument();
-    expect(compliance.getByText('Monitored')).toBeInTheDocument();
+    expect(compliance.getByText('16% complete')).toBeInTheDocument();
     expect(compliance.getByText('Not monitored yet')).toBeInTheDocument();
-    expect(compliance.queryByText(/Certified|passing/)).toBeNull();
-
-    rerender(
-      <TrustCenterPage
-        initialData={makeData({
-          frameworks: [
-            { id: 'fw-soc2', label: 'SOC 2 Type II', description: null, monitoring: 'passing', percent: 97 },
-          ],
-        })}
-      />,
-    );
-    expect(screen.getByText('97% passing')).toBeInTheDocument();
+    expect(compliance.queryByText(/Certified/)).toBeNull();
   });
 
   it('questions go through the request form: no security address, no vulnerability or disclosure wording', async () => {

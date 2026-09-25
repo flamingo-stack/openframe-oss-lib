@@ -28,7 +28,13 @@ export function makeTrustCenterData(overrides: Partial<TrustCenterPublic> = {}):
   const now = Date.now();
   return {
     frameworks: [
-      { id: 'fw-soc2', label: 'SOC 2 Type II', description: 'Type II audit in progress', monitoring: 'monitored' },
+      {
+        id: 'fw-soc2',
+        label: 'SOC 2 Type II',
+        description: 'Type II audit in progress',
+        monitoring: 'monitored',
+        percent: 16,
+      },
       { id: 'fw-iso27001', label: 'ISO 27001', description: null, monitoring: 'not_monitored' },
     ],
     controlDomains: [

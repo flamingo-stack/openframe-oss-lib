@@ -9,7 +9,13 @@ import { TrustCenterPage } from '../components/help-center-pages/trust-center-pa
 // computes its instants when called, so the "monitored" story stays inside its window.
 const BASE = makeTrustCenterData({
   frameworks: [
-    { id: 'fw-soc2', label: 'SOC 2 Type II', description: 'Type II audit in progress', monitoring: 'monitored' },
+    {
+      id: 'fw-soc2',
+      label: 'SOC 2 Type II',
+      description: 'Type II audit in progress',
+      monitoring: 'monitored',
+      percent: 16,
+    },
     { id: 'fw-iso27001', label: 'ISO 27001', description: null, monitoring: 'not_monitored' },
     { id: 'fw-iso42001', label: 'ISO 42001', description: 'AI management system', monitoring: 'not_monitored' },
   ],
@@ -90,10 +96,10 @@ export const CertifiedWithPercent: Story = {
           id: 'fw-soc2',
           label: 'SOC 2 Type II',
           description: 'Type II report available',
-          monitoring: 'passing',
+          monitoring: 'monitored',
           percent: 98,
         },
-        { id: 'fw-iso27001', label: 'ISO 27001', description: null, monitoring: 'monitored' },
+        { id: 'fw-iso27001', label: 'ISO 27001', description: null, monitoring: 'monitored', percent: 64 },
         { id: 'fw-iso42001', label: 'ISO 42001', description: null, monitoring: 'not_monitored' },
       ],
       policies: ['Information Security Policy', 'Acceptable Use Policy'],

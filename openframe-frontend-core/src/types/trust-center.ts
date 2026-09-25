@@ -16,14 +16,13 @@ import { escapeRegExp } from '../utils/escape-regexp';
 import type { Faq } from './faq';
 
 /**
- * A framework's MONITORING state, from Vanta's live control data — Vanta keeps
- * no certification status, so none is claimed. `passing` carries the share of
- * controls passing (published only at or above the hub's threshold);
- * `monitored` is a framework Vanta monitors below it; `not_monitored` one it
- * does not monitor. Label, badge colour and icon are owned HERE, once.
+ * A framework's MONITORING state, from Vanta's live data — Vanta keeps no
+ * certification status, so none is claimed. `monitored` always carries Vanta's
+ * own completion (`percent`: controls completed / total, as Vanta's app shows
+ * it); `not_monitored` is a framework Vanta does not monitor. Label, badge
+ * colour and icon are owned HERE, once.
  */
 export const TRUST_FRAMEWORK_MONITORING = [
-  { state: 'passing', label: 'Passing', color: 'success', icon: 'shield-check' },
   { state: 'monitored', label: 'Monitored', color: 'cyan', icon: 'shield-check' },
   { state: 'not_monitored', label: 'Not monitored yet', color: 'default', icon: 'file-shield' },
 ] as const;
@@ -32,13 +31,13 @@ export type TrustFrameworkMonitoring = (typeof TRUST_FRAMEWORK_MONITORING)[numbe
 export type TrustFrameworkMonitoringEntry = (typeof TRUST_FRAMEWORK_MONITORING)[number];
 
 export function trustFrameworkMonitoringEntry(state: TrustFrameworkMonitoring): TrustFrameworkMonitoringEntry {
-  return TRUST_FRAMEWORK_MONITORING.find(entry => entry.state === state) ?? TRUST_FRAMEWORK_MONITORING[2];
+  return TRUST_FRAMEWORK_MONITORING.find(entry => entry.state === state) ?? TRUST_FRAMEWORK_MONITORING[1];
 }
 
-/** THE badge text of a framework: "97% passing", "Monitored", "Not monitored yet". */
+/** THE badge text of a framework: "16% complete" (Vanta's completion), else "Not monitored yet". */
 export function trustFrameworkBadge(framework: Pick<TrustCenterFramework, 'monitoring' | 'percent'>): string {
-  return framework.monitoring === 'passing' && typeof framework.percent === 'number'
-    ? `${framework.percent}% passing`
+  return framework.monitoring === 'monitored' && typeof framework.percent === 'number'
+    ? `${framework.percent}% complete`
     : trustFrameworkMonitoringEntry(framework.monitoring).label;
 }
 
@@ -95,7 +94,7 @@ export interface TrustCenterFramework {
   /** The framework's description in the Vanta Trust Center. */
   description: string | null;
   monitoring: TrustFrameworkMonitoring;
-  /** Share of controls passing — present ONLY when `monitoring` is `passing` (at/above the hub threshold). */
+  /** Vanta's completion for the framework (controls completed / total, 0–100) — present when `monitoring` is `monitored`. */
   percent?: number;
 }
 
