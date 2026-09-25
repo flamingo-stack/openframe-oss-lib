@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setMockSearchParams } from '../../../../vitest.setup';
 import {
@@ -96,6 +97,12 @@ function typeSearch(value: string) {
 }
 
 describe('TrustCenterPage', () => {
+  it('before hydration the monitoring line claims nothing: neutral wording, never "monitored"', () => {
+    const html = renderToString(<TrustCenterPage initialData={makeData()} />);
+    expect(html).toContain('Checking monitoring status');
+    expect(html).not.toMatch(/Controls (continuously )?monitored/);
+  });
+
   it('does not fetch when initialData is given', () => {
     render(<TrustCenterPage initialData={makeData()} />);
     expect(fetchMock).not.toHaveBeenCalled();

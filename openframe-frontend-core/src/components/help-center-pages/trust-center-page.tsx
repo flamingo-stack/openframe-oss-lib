@@ -131,7 +131,8 @@ function monitoringStatus(
   nowMs: number,
 ): { status: 'success' | 'pending' | 'missing'; label: string } {
   if (!data.connected) return { status: 'missing', label: 'Live control monitoring is not enabled yet' };
-  if (!hydrated) return { status: 'missing', label: 'Controls monitored' };
+  // Before mount the clock is the server's, so the text claims nothing either way.
+  if (!hydrated) return { status: 'missing', label: 'Checking monitoring status' };
   return isTrustCenterMonitored(data, nowMs)
     ? { status: 'success', label: 'Controls continuously monitored' }
     : { status: 'pending', label: 'Monitoring paused' };
