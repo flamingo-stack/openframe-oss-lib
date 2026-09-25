@@ -196,6 +196,12 @@ public class TicketController {
     @Operation(summary = "Update a ticket",
             description = "Partially update title, description, linked device/customer, assignee and tags. " +
                     "Use the transition endpoint to change the status.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Ticket not found, or an assignee, device, customer or tag in the request does not exist",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "The device does not belong to the selected customer",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @PatchMapping("/{id}")
     @ResponseStatus(OK)
     public TicketResponse updateTicket(

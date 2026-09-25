@@ -117,11 +117,11 @@ public class KnowledgeBaseController {
     @Operation(summary = "Move an item to another folder",
             description = "Re-parent a folder or article. A folder cannot be moved into itself or its own descendant.")
     @ApiResponses({
-            @ApiResponse(responseCode = "400", description = "Target folder not found, or a folder moved into itself or its own descendant",
+            @ApiResponse(responseCode = "400", description = "An item moved onto itself",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "Target is an article, not a folder",
+            @ApiResponse(responseCode = "409", description = "Target is an article, not a folder, or a folder moved into its own descendant",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Item not found",
+            @ApiResponse(responseCode = "404", description = "Item or target folder not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/items/{id}/move")
@@ -190,7 +190,9 @@ public class KnowledgeBaseController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Folder created",
                     content = @Content(schema = @Schema(implementation = KnowledgeBaseItemResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Name is blank or the parent folder does not exist",
+            @ApiResponse(responseCode = "400", description = "Name is blank",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Parent folder not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "409", description = "Parent is an article, not a folder",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
@@ -228,9 +230,11 @@ public class KnowledgeBaseController {
                     "and deletes the sub-folders.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Folder deleted"),
-            @ApiResponse(responseCode = "400", description = "Folder has children and childrenAction is missing, or the move target is invalid",
+            @ApiResponse(responseCode = "400", description = "Folder has children and childrenAction is missing, or the move target is the folder being deleted",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Folder not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "The item is an article, not a folder, or the move target is inside the subtree being deleted",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/folders/{id}")
@@ -281,9 +285,9 @@ public class KnowledgeBaseController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Article created",
                     content = @Content(schema = @Schema(implementation = KnowledgeBaseItemResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Name is blank or the parent folder does not exist",
+            @ApiResponse(responseCode = "400", description = "Name is blank",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "A tag in tagIds does not exist (see /tags)",
+            @ApiResponse(responseCode = "404", description = "Parent folder not found, or a tag in tagIds does not exist (see /tags)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "409", description = "Parent is an article, not a folder",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
