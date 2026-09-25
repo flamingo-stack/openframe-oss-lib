@@ -6,7 +6,6 @@ import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.nats.mapper.DownloadConfigurationMapper;
 import com.openframe.data.nats.mapper.LocalFilenameConfigurationMapper;
 import com.openframe.data.nats.model.ToolInstallationMessage;
-import com.openframe.data.nats.publisher.NatsMessagePublisher;
 import com.openframe.delivery.spec.DeliveryRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +17,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,7 +29,6 @@ class ToolInstallationDeliverySpecTest {
     private static final String VERSION = "1.2.3";
     private static final List<String> INSTALL_ARGS = List.of("--silent");
 
-    @Mock private NatsMessagePublisher natsMessagePublisher;
     @Mock private DownloadConfigurationMapper downloadConfigurationMapper;
     @Mock private LocalFilenameConfigurationMapper localFilenameConfigurationMapper;
 
@@ -90,14 +87,11 @@ class ToolInstallationDeliverySpecTest {
     }
 
     @Test
-    void publish_payload_sentToMachineSubject() {
-        // setup
-        ToolInstallationMessage message = new ToolInstallationMessage();
-
+    void subject_machineId_machineToolInstallationSubject() {
         // execution
-        spec.publish(MACHINE_ID, message);
+        String subject = spec.subject(MACHINE_ID);
 
         // verifications
-        verify(natsMessagePublisher).publish("machine.mach-42.tool-installation", message);
+        assertThat(subject).isEqualTo("machine.mach-42.tool-installation");
     }
 }
