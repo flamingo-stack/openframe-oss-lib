@@ -359,8 +359,16 @@ describe('TrustCenterPage', () => {
               description: null,
               location: 'United States',
               url: null,
+              logoUrl: null,
             },
-            { name: 'Acme Analytics', purpose: 'Analytics', description: null, location: 'Atlantis', url: null },
+            {
+              name: 'Acme Analytics',
+              purpose: 'Analytics',
+              description: null,
+              location: 'Atlantis',
+              url: null,
+              logoUrl: null,
+            },
           ],
         })}
       />,
@@ -370,6 +378,52 @@ describe('TrustCenterPage', () => {
     expect(subprocessors.getByText('🇺🇸 United States')).toBeInTheDocument();
     // No brand mark and no known country: initials and the plain name.
     expect(subprocessors.getByText('Atlantis')).toBeInTheDocument();
+  });
+
+  it('subprocessors: the site icon from the website Vanta holds comes first, before any guess from the name', () => {
+    render(
+      <TrustCenterPage
+        initialData={makeData({
+          subprocessors: [
+            {
+              name: 'Google Cloud Platform',
+              purpose: 'Cloud provider',
+              description: null,
+              location: null,
+              url: 'https://cloud.google.com',
+              logoUrl: 'https://icons.example/cloud.google.com.png',
+            },
+          ],
+        })}
+      />,
+    );
+    const subprocessors = within(screen.getByRole('region', { name: 'Subprocessors' }));
+    expect(subprocessors.getByRole('img', { name: 'Google Cloud Platform' })).toHaveAttribute(
+      'src',
+      'https://icons.example/cloud.google.com.png',
+    );
+  });
+
+  it('subprocessors: no location column when Vanta holds no location for any of them', () => {
+    render(
+      <TrustCenterPage
+        initialData={makeData({
+          subprocessors: [
+            {
+              name: 'Vanta',
+              purpose: 'Security',
+              description: null,
+              location: null,
+              url: 'https://vanta.com',
+              logoUrl: null,
+            },
+          ],
+        })}
+      />,
+    );
+    const subprocessors = within(screen.getByRole('region', { name: 'Subprocessors' }));
+    expect(subprocessors.getByText('Vanta')).toBeInTheDocument();
+    expect(subprocessors.queryByText('Location')).toBeNull();
   });
 
   it('controls follow the CURRENT data: a revalidated copy shows its new controls', () => {

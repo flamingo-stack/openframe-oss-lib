@@ -117,6 +117,8 @@ export interface TrustCenterSubprocessor {
   /** Where it processes data, e.g. "United States" (the page adds the flag). */
   location: string | null;
   url: string | null;
+  /** Its site's icon, looked up by the hub from the `url` Vanta holds (Vanta's API carries no logo). */
+  logoUrl: string | null;
 }
 
 /** An AI statement: one FAQ of the company's Vanta Trust Center, in its AI category. */

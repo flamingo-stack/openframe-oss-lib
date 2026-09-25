@@ -19,8 +19,8 @@ const BASE = makeTrustCenterData({
     { title: 'Terms of service', kind: 'Policy', access: 'public', url: '/terms-of-service', legalDocType: 'terms' },
   ],
   subprocessors: [
-    { name: 'Google Cloud', purpose: 'Hosting', description: null, location: 'US', url: null },
-    { name: 'Anthropic', purpose: 'AI model provider', description: null, location: 'US', url: null },
+    { name: 'Google Cloud', purpose: 'Hosting', description: null, location: 'US', url: null, logoUrl: null },
+    { name: 'Anthropic', purpose: 'AI model provider', description: null, location: 'US', url: null, logoUrl: null },
   ],
   aiPractices: [
     {

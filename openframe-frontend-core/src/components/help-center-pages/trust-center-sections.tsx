@@ -481,8 +481,14 @@ export function DocumentRequestModal({
 // Subprocessors
 // ---------------------------------------------------------------------------
 
-/** A subprocessor's mark: its brand logo when the icon set has one (`brandLogoForName`), else initials. */
-function subprocessorMark(name: string): ReactNode {
+/**
+ * A subprocessor's mark, best source first: its own site's icon (the hub looks
+ * it up from the website Vanta holds), else the brand logo our icon set has for
+ * its name (`brandLogoForName`), else initials — which are also what a site
+ * icon that fails to load falls back to.
+ */
+function subprocessorMark({ name, logoUrl }: TrustCenterSubprocessor): ReactNode {
+  if (logoUrl) return <EntityImage src={logoUrl} alt={name} fallbackText={name} sizeClassName="size-6" />;
   const logo = brandLogoForName(name);
   return logo ? (
     <span role="img" aria-label={name} className="flex">
@@ -500,24 +506,30 @@ function countryWithFlag(country: string): string {
 }
 
 export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCenterSubprocessor[] }) {
+  // The location column exists only when Vanta holds a location for at least one of them.
+  const anyLocation = subprocessors.some(subprocessor => subprocessor.location);
   const rows: PanelRow[] = subprocessors.map(subprocessor => ({
     id: subprocessor.name,
     columns: [
       {
         key: 'name',
-        leadingIcon: subprocessorMark(subprocessor.name),
+        leadingIcon: subprocessorMark(subprocessor),
         value: subprocessor.name,
         label: subprocessor.purpose ?? subprocessor.description ?? undefined,
         href: subprocessor.url ?? undefined,
         wrap: true,
       },
-      {
-        key: 'location',
-        value: subprocessor.location ? countryWithFlag(subprocessor.location) : '—',
-        label: 'Location',
-        hideAt: 'md',
-        width: 'w-48 shrink-0',
-      },
+      ...(anyLocation
+        ? [
+            {
+              key: 'location',
+              value: subprocessor.location ? countryWithFlag(subprocessor.location) : '—',
+              label: 'Location',
+              hideAt: 'md' as const,
+              width: 'w-48 shrink-0',
+            },
+          ]
+        : []),
     ],
   }));
   return <StackedRowsPanel rows={rows} />;
