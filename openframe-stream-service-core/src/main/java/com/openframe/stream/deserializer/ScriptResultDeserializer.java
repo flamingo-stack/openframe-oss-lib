@@ -27,6 +27,7 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_SCRIPT_ID = "scriptId";
     private static final String FALLBACK_MESSAGE = "Script executed";
+    private static final String FALLBACK_FAILED_MESSAGE = "Script failed";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptRepository scriptRepository;
@@ -46,7 +47,7 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
 
     @Override
     protected Optional<String> getSourceEventType(JsonNode after) {
-        return Optional.of(SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED);
+        return Optional.of(isFailed(after) ? SourceEventTypes.Rmm.SCRIPT_RUN_FAILED : SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED);
     }
 
     @Override
@@ -65,34 +66,39 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
 
     @Override
     protected Optional<String> getMessage(JsonNode after) {
+        boolean failed = isFailed(after);
+        String fallback = failed ? FALLBACK_FAILED_MESSAGE : FALLBACK_MESSAGE;
         try {
             String tenantId = parseStringField(after, FIELD_TENANT_ID).orElse(null);
             if (tenantId == null) {
-                return Optional.of(FALLBACK_MESSAGE);
+                return Optional.of(fallback);
             }
             Optional<ScriptExecution> row = parseStringField(after, FIELD_EXECUTION_ID)
                     .flatMap(executionId -> scriptExecutionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId));
 
             Optional<String> packageMessage = row
                     .filter(r -> r.getPackageName() != null && !r.getPackageName().isBlank())
-                    .map(ScriptResultDeserializer::softwareMessage);
+                    .map(r -> softwareMessage(r, failed));
             if (packageMessage.isPresent()) {
                 return packageMessage;
             }
 
             String scriptName = resolveScriptName(after, tenantId, row.map(ScriptExecution::getScriptId).orElse(null));
             if (scriptName == null || scriptName.isBlank()) {
-                return Optional.of(FALLBACK_MESSAGE);
+                return Optional.of(fallback);
             }
-            return Optional.of("Script " + scriptName + " executed.");
+            return Optional.of("Script " + scriptName + (failed ? " failed." : " executed."));
         } catch (Exception e) {
             log.warn("Failed to build script-result message", e);
-            return Optional.of(FALLBACK_MESSAGE);
+            return Optional.of(fallback);
         }
     }
 
-    private static String softwareMessage(ScriptExecution row) {
-        String verb = row.getSoftwareAction() == SoftwareAction.UPDATE ? "Updated" : "Installed";
+    private static String softwareMessage(ScriptExecution row, boolean failed) {
+        boolean update = row.getSoftwareAction() == SoftwareAction.UPDATE;
+        String verb = failed
+                ? (update ? "Failed to update" : "Failed to install")
+                : (update ? "Updated" : "Installed");
         return verb + " " + row.getPackageName() + ".";
     }
 
