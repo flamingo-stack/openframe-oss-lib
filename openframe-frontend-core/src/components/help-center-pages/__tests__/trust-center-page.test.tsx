@@ -2,8 +2,12 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mockReplace, setMockSearchParams } from '../../../../vitest.setup';
-import { trustDocumentContactReason, type TrustCenterPublic } from '../../../types/trust-center';
+import { setMockSearchParams } from '../../../../vitest.setup';
+import {
+  TRUST_DOCUMENT_REQUEST_PREFIX,
+  trustDocumentContactReason,
+  type TrustCenterPublic,
+} from '../../../types/trust-center';
 import { TrustCenterPage } from '../trust-center-page';
 
 // The real ContactForm needs the endpoints + chat runtimes; the page only
@@ -11,14 +15,15 @@ import { TrustCenterPage } from '../trust-center-page';
 // seam for "the modal pre-fills the reason and stays on the page".
 vi.mock('../../contact/contact-form', () => ({
   ContactForm: (props: {
-    prefilledReason?: string;
-    helpCategoryOptions?: readonly string[];
+    defaultValues?: { helpCategory?: string; message?: string };
+    hideFields?: readonly string[];
     successRedirectUrl?: string;
     onSubmitSuccess?: () => void;
   }) => (
     <div data-testid="contact-form">
-      <span data-testid="reason">{props.prefilledReason}</span>
-      <span data-testid="options">{(props.helpCategoryOptions ?? []).join('|')}</span>
+      <span data-testid="reason">{props.defaultValues?.helpCategory}</span>
+      <span data-testid="message">{props.defaultValues?.message}</span>
+      <span data-testid="hidden">{(props.hideFields ?? []).join('|')}</span>
       <span data-testid="redirect">{JSON.stringify(props.successRedirectUrl)}</span>
       <button type="button" onClick={props.onSubmitSuccess}>
         stub-submit
@@ -41,6 +46,8 @@ function makeData(overrides: Partial<TrustCenterPublic> = {}): TrustCenterPublic
         controls: [
           { id: 'c1', name: 'Encryption at rest', description: 'Data stores are encrypted.' },
           { id: 'c2', name: 'MFA on infrastructure', description: null },
+          { id: 'c4', name: 'Firewalls configured', description: 'Network firewalls filter traffic.' },
+          { id: 'c5', name: 'Logging enabled', description: 'Production logs are retained.' },
         ],
       },
       {
@@ -54,7 +61,14 @@ function makeData(overrides: Partial<TrustCenterPublic> = {}): TrustCenterPublic
       { title: 'Privacy policy', kind: 'Policy', access: 'public', url: '/privacy-policy' },
     ],
     subprocessors: [{ name: 'Google Cloud', purpose: 'Hosting', location: 'US', category: 'Infrastructure' }],
-    aiPractices: [{ label: 'Training', value: 'No training on customer data' }],
+    aiPractices: [
+      {
+        label: 'Customer data and model training',
+        value: 'We never use customer data to train AI models',
+        commitment: true,
+      },
+      { label: 'Model providers', value: 'Anthropic (Claude)' },
+    ],
     faqs: [],
     contact: { securityEmail: 'security@example.com', statusPageUrl: 'https://status.example.com' },
     checkedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
@@ -85,7 +99,7 @@ describe('TrustCenterPage', () => {
   it('does not fetch when initialData is given', () => {
     render(<TrustCenterPage initialData={makeData()} />);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getAllByText('SOC 2 Type II').length).toBeGreaterThan(0);
+    expect(screen.getByText('SOC 2 Type II')).toBeInTheDocument();
   });
 
   it('fetches the configured endpoint when no initialData is given', async () => {
@@ -96,9 +110,26 @@ describe('TrustCenterPage', () => {
     expect(String(fetchMock.mock.calls[0][0])).toBe('/content/api/trust-center');
   });
 
-  it('shows the progress/percent only when percent is published', () => {
+  it('is ONE page: every section is an anchored h2, in reading order, AI first', () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+    expect(headings).toEqual(['AI & data use', 'Compliance', 'Controls', 'Documents', 'Subprocessors', 'Contact']);
+    // Each section is a labelled landmark (a deep-linkable `#id`).
+    expect(screen.getByRole('region', { name: 'Controls' })).toHaveAttribute('id', 'controls');
+    expect(screen.queryByRole('tab')).toBeNull();
+  });
+
+  it('boxes the data-use commitment above the other AI practices', () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    expect(screen.getByText('We never use customer data to train AI models')).toBeInTheDocument();
+    expect(screen.getByText('Model providers')).toBeInTheDocument();
+  });
+
+  it('compliance: the status is shown ONCE, planned frameworks are one roadmap line, percent only when published', () => {
     const { rerender } = render(<TrustCenterPage initialData={makeData()} />);
-    // No percent → no "(NN%)" (DashboardInfoCard renders the ring only with it).
+    expect(screen.getAllByText('In progress')).toHaveLength(1);
+    expect(screen.getByText('On our roadmap:')).toBeInTheDocument();
+    expect(screen.getByText('ISO 27001')).toBeInTheDocument();
     expect(screen.queryByText(/\(\d+%\)/)).toBeNull();
 
     rerender(
@@ -112,9 +143,70 @@ describe('TrustCenterPage', () => {
     );
     expect(screen.getByText('(97%)')).toBeInTheDocument();
     expect(screen.getByText('Jan–Jun 2026')).toBeInTheDocument();
+    expect(screen.queryByText('On our roadmap:')).toBeNull();
   });
 
-  it('hides empty sections (tabs, footer status card, request CTA)', () => {
+  it('controls browse: category cards show 3 controls, "View all" opens the full category in a drawer', async () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    expect(screen.getByText('Encryption at rest')).toBeInTheDocument();
+    expect(screen.queryByText('Logging enabled')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'View all 4 Infrastructure security controls' }));
+    const drawer = await screen.findByRole('dialog');
+    expect(within(drawer).getByText('Infrastructure security')).toBeInTheDocument();
+    expect(within(drawer).getByText('Logging enabled')).toBeInTheDocument();
+  });
+
+  it('controls search: ONE flat grouped list with every match visible, a count, and clearing restores the grid', () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    const search = screen.getByPlaceholderText('Search controls');
+
+    fireEvent.change(search, { target: { value: 'log' } });
+    // A match beyond the card's first 3 is shown directly — nothing to expand.
+    expect(screen.getByText(/1 of 5 controls match/)).toBeInTheDocument();
+    // The match is highlighted in its own <strong>; the rest of the name follows it.
+    expect(screen.getByText('Log', { selector: 'strong' })).toBeInTheDocument();
+    expect(screen.getByText('ging enabled', { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText('Encryption at rest')).toBeNull();
+    expect(screen.queryByRole('button', { name: /View all/ })).toBeNull();
+
+    fireEvent.change(search, { target: { value: 'every user' } });
+    expect(screen.getByText(/1 of 5 controls match/)).toBeInTheDocument();
+    expect(screen.getByText('Unique accounts')).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'zzz-nothing' } });
+    expect(screen.getByText('No matching controls')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all controls' }));
+    expect(screen.getByText('Encryption at rest')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /View all/ })).toBeInTheDocument();
+  });
+
+  it('ONE access request: the hero CTA asks for all gated documents, a row asks for its own; marketing fields hidden', async () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+
+    // PageLayout renders its actions once per breakpoint (desktop + mobile bar).
+    fireEvent.click(screen.getAllByRole('button', { name: 'Request access' })[0]);
+    let dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTestId('reason')).toHaveTextContent(TRUST_DOCUMENT_REQUEST_PREFIX);
+    expect(within(dialog).getByTestId('hidden')).toHaveTextContent('companySize|referralSource|helpCategory');
+    expect(within(dialog).getByTestId('redirect')).toHaveTextContent('""');
+    fireEvent.click(within(dialog).getByText('stub-submit'));
+    await waitFor(() => expect(screen.queryByTestId('contact-form')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Request SOC 2 report' }));
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTestId('reason')).toHaveTextContent(trustDocumentContactReason('SOC 2 report'));
+    expect(within(dialog).getByTestId('message')).toHaveTextContent('SOC 2 report');
+  });
+
+  it('public documents are a same-tab View link, no duplicate access label', () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    const view = screen.getByRole('link', { name: 'View Privacy policy' });
+    expect(view).toHaveAttribute('href', '/privacy-policy');
+    expect(view).not.toHaveAttribute('target', '_blank');
+  });
+
+  it('hides empty sections and the request CTA when nothing is gated', () => {
     render(
       <TrustCenterPage
         initialData={makeData({
@@ -127,59 +219,10 @@ describe('TrustCenterPage', () => {
         })}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Overview' })).toBeInTheDocument();
-    for (const label of ['Controls', 'Documents', 'Subprocessors', 'AI', 'FAQ']) {
-      expect(screen.queryByRole('button', { name: label })).toBeNull();
-    }
-    expect(screen.queryByRole('button', { name: 'Request documents' })).toBeNull();
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+    expect(headings).toEqual(['Compliance', 'Contact']);
+    expect(screen.queryByRole('button', { name: 'Request access' })).toBeNull();
     expect(screen.queryByText('System status')).toBeNull();
-    expect(screen.queryByText('Approved policies')).toBeNull();
-  });
-
-  it('shows approved policies on the overview only when present', () => {
-    render(<TrustCenterPage initialData={makeData({ policies: ['Information Security Policy'] })} />);
-    expect(screen.getByText('Approved policies')).toBeInTheDocument();
-    expect(screen.getByText('Information Security Policy')).toBeInTheDocument();
-  });
-
-  it('filters the controls by the search query and shows an empty state on no match', () => {
-    setMockSearchParams(new URLSearchParams('tab=controls'));
-    render(<TrustCenterPage initialData={makeData()} />);
-    const search = screen.getByPlaceholderText('Search controls');
-
-    fireEvent.change(search, { target: { value: 'encrypt' } });
-    expect(screen.getByText('Encryption at rest')).toBeInTheDocument();
-    expect(screen.queryByText('Unique accounts')).toBeNull();
-    expect(screen.queryByText('Identification & authentication (1)')).toBeNull();
-
-    fireEvent.change(search, { target: { value: 'every user' } });
-    expect(screen.getByText('Unique accounts')).toBeInTheDocument();
-    expect(screen.queryByText('Encryption at rest')).toBeNull();
-
-    fireEvent.change(search, { target: { value: 'zzz-nothing' } });
-    expect(screen.getByText('No matching controls')).toBeInTheDocument();
-  });
-
-  it('"Request documents" moves the URL to the documents tab', () => {
-    render(<TrustCenterPage initialData={makeData()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Request documents' }));
-    expect(mockReplace).toHaveBeenCalledWith('/?tab=documents', { scroll: false });
-  });
-
-  it('the request modal pre-fills the contact reason and stays on the page', async () => {
-    setMockSearchParams(new URLSearchParams('tab=documents'));
-    render(<TrustCenterPage initialData={makeData()} />);
-    expect(screen.getByText('Public')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Request access' }));
-    const dialog = await screen.findByRole('dialog');
-    const reason = trustDocumentContactReason('SOC 2 report');
-    expect(within(dialog).getByTestId('reason')).toHaveTextContent(reason);
-    expect(within(dialog).getByTestId('options')).toHaveTextContent(reason);
-    expect(within(dialog).getByTestId('redirect')).toHaveTextContent('""');
-
-    fireEvent.click(within(dialog).getByText('stub-submit'));
-    await waitFor(() => expect(screen.queryByTestId('contact-form')).toBeNull());
   });
 
   it('renders LoadError on a failed fetch and retries', async () => {
@@ -195,21 +238,23 @@ describe('TrustCenterPage', () => {
     consoleError.mockRestore();
   });
 
-  it('"monitored" flips when syncedAt is older than monitoredWindowMs', () => {
+  it('monitoring: monitored → paused when syncedAt is older than the window (the status line is the only claim)', () => {
     const { unmount } = render(<TrustCenterPage initialData={makeData()} />);
-    expect(screen.getByText(/^Continuously monitored · last checked/)).toBeInTheDocument();
+    expect(screen.getByText(/^Controls continuously monitored · updated/)).toBeInTheDocument();
     unmount();
 
     render(
       <TrustCenterPage initialData={makeData({ syncedAt: new Date(Date.now() - WINDOW_MS - 60_000).toISOString() })} />,
     );
-    expect(screen.getByText('Monitoring paused')).toBeInTheDocument();
-    expect(screen.queryByText(/Continuously monitored/)).toBeNull();
+    expect(screen.getByText(/^Monitoring paused/)).toBeInTheDocument();
+    expect(screen.queryByText(/continuously monitored/)).toBeNull();
   });
 
-  it('is never "monitored" when Vanta is not connected', () => {
+  it('not connected says so plainly — never "paused", never a monitoring claim', () => {
     render(<TrustCenterPage initialData={makeData({ connected: false, syncedAt: null })} />);
-    expect(screen.getByText('Monitoring paused')).toBeInTheDocument();
+    expect(screen.getByText('Live control monitoring is not enabled yet')).toBeInTheDocument();
+    expect(screen.queryByText(/paused/)).toBeNull();
+    expect(screen.queryByText(/continuously monitored/)).toBeNull();
   });
 });
 

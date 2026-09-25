@@ -29,17 +29,22 @@ export function trustFrameworkStatusEntry(status: TrustFrameworkStatus): TrustFr
   return TRUST_FRAMEWORK_STATUSES.find(entry => entry.status === status) ?? TRUST_FRAMEWORK_STATUSES[3];
 }
 
-/** Tabs of the page — the `?tab=` URL values. */
-export const TRUST_CENTER_TABS = [
-  { id: 'overview', label: 'Overview' },
+/**
+ * Sections of the page, in reading order — the anchor ids (`#controls`) and the
+ * sticky section rail. AI & data use comes first: it is an AI-native buyer's
+ * first question (2026 trust-center practice: Anthropic, OpenAI, ElevenLabs).
+ */
+export const TRUST_CENTER_SECTIONS = [
+  { id: 'ai', label: 'AI & data use' },
+  { id: 'compliance', label: 'Compliance' },
   { id: 'controls', label: 'Controls' },
   { id: 'documents', label: 'Documents' },
   { id: 'subprocessors', label: 'Subprocessors' },
-  { id: 'ai', label: 'AI' },
   { id: 'faq', label: 'FAQ' },
+  { id: 'contact', label: 'Contact' },
 ] as const;
 
-export type TrustCenterTabId = (typeof TRUST_CENTER_TABS)[number]['id'];
+export type TrustCenterSectionId = (typeof TRUST_CENTER_SECTIONS)[number]['id'];
 
 /** THE route path. The page default, chat card list-url and embed EPs all read it. */
 export const TRUST_CENTER_API_PATH = '/api/trust-center';
@@ -104,6 +109,8 @@ export interface TrustCenterSubprocessor {
 export interface TrustCenterAiPractice {
   label: string;
   value: string;
+  /** The headline data-use commitment ("We never train on customer data"), shown boxed above the rest. */
+  commitment?: boolean;
 }
 
 export interface TrustCenterContact {

@@ -37,7 +37,11 @@ const BASE: TrustCenterPublic = {
     { name: 'Anthropic', purpose: 'AI model provider', location: 'US', category: 'AI' },
   ],
   aiPractices: [
-    { label: 'Training', value: 'Customer data is never used to train models' },
+    {
+      label: 'Customer data and model training',
+      value: 'We never use customer data to train AI models',
+      commitment: true,
+    },
     { label: 'Providers', value: 'Anthropic, OpenAI' },
     { label: 'Retention', value: 'Prompts are not retained by providers beyond 30 days' },
     { label: 'Governance', value: 'ISO 42001 planned' },

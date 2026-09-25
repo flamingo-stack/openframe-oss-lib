@@ -65,11 +65,20 @@ export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrol
       const scrollPosition = window.scrollY + SCROLL_OFFSET;
       let currentSection = sectionIds[0] ?? '';
 
-      for (let i = sectionIds.length - 1; i >= 0; i--) {
-        const element = document.getElementById(sectionIds[i]);
-        if (element && scrollPosition >= element.offsetTop) {
-          currentSection = sectionIds[i];
-          break;
+      // At the bottom of the page the last sections can never reach the offset
+      // line, so they would never highlight: the last one wins there.
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atBottom) {
+        currentSection = sectionIds[sectionIds.length - 1] ?? currentSection;
+      } else {
+        for (let i = sectionIds.length - 1; i >= 0; i--) {
+          const element = document.getElementById(sectionIds[i]);
+          // Document-absolute top: `offsetTop` is relative to the nearest
+          // POSITIONED ancestor, which is not the document inside most layouts.
+          if (element && scrollPosition >= element.getBoundingClientRect().top + window.scrollY) {
+            currentSection = sectionIds[i];
+            break;
+          }
         }
       }
 
