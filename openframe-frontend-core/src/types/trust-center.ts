@@ -91,6 +91,8 @@ export function trustDocumentContactReason(title: string): string {
 export interface TrustCenterFramework {
   id: string;
   label: string;
+  /** Vanta's standard id (e.g. `soc2`), which picks the framework's logo (`complianceStandardForName`). */
+  standard: string | null;
   /** The framework's description in the Vanta Trust Center. */
   description: string | null;
   monitoring: TrustFrameworkMonitoring;

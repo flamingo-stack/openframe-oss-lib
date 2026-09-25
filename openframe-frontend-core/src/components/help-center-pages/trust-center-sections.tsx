@@ -44,6 +44,7 @@ import { ListEmptyState } from '../list-empty-state';
 import { CardSkeletonGrid } from '../loading/card-skeleton';
 import { TextSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
+import { ComplianceLogo } from '../ui/compliance-badge';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
 import { ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui/modal-v2';
@@ -150,7 +151,9 @@ export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFrame
       columns: [
         {
           key: 'framework',
-          leadingIcon: <Icon aria-hidden="true" />,
+          leadingIcon: (
+            <ComplianceLogo names={[framework.standard, framework.label]} fallback={<Icon aria-hidden="true" />} />
+          ),
           value: framework.label,
           label: framework.description ?? undefined,
           wrap: true,

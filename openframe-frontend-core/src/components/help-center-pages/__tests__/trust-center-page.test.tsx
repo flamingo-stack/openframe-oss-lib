@@ -123,6 +123,9 @@ describe('TrustCenterPage', () => {
     expect(compliance.getByText('SOC 2 Type II')).toBeInTheDocument();
     expect(compliance.getByText('Type II audit in progress')).toBeInTheDocument();
     expect(compliance.getByText('16% complete')).toBeInTheDocument();
+    // Each framework's logo comes from its standard (`soc2` → the SOC 2 badge); an unknown one keeps the shield.
+    expect(compliance.getByRole('img', { name: 'AICPA SOC 2' })).toBeInTheDocument();
+    expect(compliance.getByRole('img', { name: 'ISO 27001' })).toBeInTheDocument();
     expect(compliance.getByText('Not monitored yet')).toBeInTheDocument();
     expect(compliance.queryByText(/Certified/)).toBeNull();
   });

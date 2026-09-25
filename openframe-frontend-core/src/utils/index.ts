@@ -108,6 +108,7 @@ export * from './video-bite-id';
 export * from './os-utils';
 // Phone utilities
 export * from './country-phone-utils';
+export * from './compliance-standards';
 // Generic domain detection
 export * from './generic-domain-utils';
 
