@@ -158,6 +158,16 @@ class DeviceLogServiceTest {
     }
 
     @Test
+    void rejectsANullDeviceIdRatherThanWideningToTheWholeTenant() {
+        // singletonList(null) is not the null list that means "every device": the id is filtered out, the list is
+        // then empty, and an empty-but-present list is rejected
+        assertThatThrownBy(() -> service.queryDeviceLogs(null, window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one device");
+        verifyNoInteractions(lokiClient);
+    }
+
+    @Test
     void rejectsMoreThanFiftyDevices() {
         List<String> tooMany = java.util.stream.IntStream.range(0, 51).mapToObj(i -> "machine-" + i).toList();
 
