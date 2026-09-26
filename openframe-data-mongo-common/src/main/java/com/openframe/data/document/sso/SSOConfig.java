@@ -2,17 +2,21 @@ package com.openframe.data.document.sso;
 
 import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.List;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "sso_configs")
+@CompoundIndex(name = "tenantId_provider_unique_idx", def = "{'tenantId': 1, 'provider': 1}", unique = true)
 public class SSOConfig implements TenantScoped {
 
     /**
@@ -63,3 +67,4 @@ public class SSOConfig implements TenantScoped {
      */
     private List<String> allowedDomains;
 }
+
