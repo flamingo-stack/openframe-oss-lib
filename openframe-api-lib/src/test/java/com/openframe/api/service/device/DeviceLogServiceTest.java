@@ -26,11 +26,13 @@ import org.mockito.quality.Strictness;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -64,7 +66,8 @@ class DeviceLogServiceTest {
     @BeforeEach
     void setUp() {
         service = new DeviceLogService(lokiClient, deviceService, tenantIdProvider, tenantRepository);
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(mock(Machine.class)));
+        when(deviceService.findByMachineIds(anyCollection())).thenAnswer(invocation ->
+                invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceTest::machine).toList());
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(tenantRepository.findById(TENANT_ID))
                 .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).domain(TENANT_DOMAIN).build()));
@@ -107,10 +110,60 @@ class DeviceLogServiceTest {
 
     @Test
     void rejectsDevicesNotVisibleToTheTenant() {
-        when(deviceService.findByMachineId("other-tenant-machine")).thenReturn(Optional.empty());
+        when(deviceService.findByMachineIds(anyCollection())).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.queryDeviceLogs("other-tenant-machine", null, page(null, null)))
                 .isInstanceOf(DeviceNotFoundException.class);
+        verifyNoInteractions(lokiClient);
+    }
+
+    @Test
+    void rejectsTheWholeRequestWhenOneOfSeveralDevicesIsNotVisibleToTheTenant() {
+        when(deviceService.findByMachineIds(anyCollection())).thenReturn(List.of(machine(MACHINE_ID)));
+
+        assertThatThrownBy(() -> service.queryLogs(List.of(MACHINE_ID, "other-tenant-machine"), window(), page(null, null)))
+                .isInstanceOf(DeviceNotFoundException.class)
+                .hasMessageContaining("other-tenant-machine");
+        verifyNoInteractions(lokiClient);
+    }
+
+    @Test
+    void chainsSeveralDevicesWithOrAndKeepsASingleDeviceUnchanged() {
+        service.queryLogs(List.of(MACHINE_ID, "machine-2", MACHINE_ID), window(), page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}"
+                        + " | machine_id=\"machine-1\" or machine_id=\"machine-2\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD);
+    }
+
+    @Test
+    void queriesEveryDeviceOfTheTenantWithoutAMetadataFilterAndLooksBackOneDay() {
+        service.queryLogs(null, DeviceLogFilterCriteria.builder().to(TO).build(), page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}",
+                TO_NANOS - Duration.ofDays(1).toNanos(), TO_NANOS + 1, 101, LokiDirection.BACKWARD);
+        verifyNoInteractions(deviceService);
+    }
+
+    @Test
+    void rejectsAnEmptyDeviceListSoAHalfLoadedClientCannotQueryTheWholeTenant() {
+        assertThatThrownBy(() -> service.queryLogs(List.of(), window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one device");
+        assertThatThrownBy(() -> service.queryLogs(List.of(" "), window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(lokiClient);
+    }
+
+    @Test
+    void rejectsMoreThanFiftyDevices() {
+        List<String> tooMany = java.util.stream.IntStream.range(0, 51).mapToObj(i -> "machine-" + i).toList();
+
+        assertThatThrownBy(() -> service.queryLogs(tooMany, window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("50 devices");
         verifyNoInteractions(lokiClient);
     }
 
@@ -216,6 +269,7 @@ class DeviceLogServiceTest {
         when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD)))
                 .thenReturn(List.of(new LokiLogEntry(TO_NANOS + 35, "Control channel disconnected", Map.of(
                         "level", "ERROR",
+                        "machine_id", MACHINE_ID,
                         "hostname", "Mishas-MacBook-Pro.local",
                         "agent_ts", "2026-09-14T11:59:59.487Z",
                         "count", "2"))));
@@ -225,6 +279,7 @@ class DeviceLogServiceTest {
         assertThat(entry.getTimestamp()).isEqualTo(TO.plusNanos(35));
         assertThat(entry.getAgentTimestamp()).isEqualTo(Instant.parse("2026-09-14T11:59:59.487Z"));
         assertThat(entry.getLevel()).isEqualTo("ERROR");
+        assertThat(entry.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(entry.getHostname()).isEqualTo("Mishas-MacBook-Pro.local");
         assertThat(entry.getCount()).isEqualTo(2L);
     }
@@ -284,6 +339,12 @@ class DeviceLogServiceTest {
 
     private static DeviceLogFilterCriteria window() {
         return DeviceLogFilterCriteria.builder().from(FROM).to(TO).build();
+    }
+
+    private static Machine machine(String machineId) {
+        Machine machine = new Machine();
+        machine.setMachineId(machineId);
+        return machine;
     }
 
     private static CursorPaginationCriteria page(Integer limit, String rawCursor) {
