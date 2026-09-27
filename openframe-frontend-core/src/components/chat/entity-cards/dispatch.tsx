@@ -62,6 +62,7 @@ import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
 import { CodeSquareIcon } from '../../icons-v2-generated/coding/code-square-icon';
 import { CodingBranchIcon } from '../../icons-v2-generated/coding/coding-branch-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
+import { CodingMergeIcon } from '../../icons-v2-generated/coding/coding-merge-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
 import { PackageIcon } from '../../icons-v2-generated/coding/package-icon';
 import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
@@ -1429,6 +1430,9 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   code_symbol: { label: 'Code symbol', icon: () => <CodeSquareIcon size={24} /> },
   code_duplicate: { label: 'Duplicate code', icon: () => <Copy01Icon size={24} /> },
   code_impact: { label: 'Change impact', icon: () => <CodingPullRequestIcon size={24} /> },
+  // A change set: pull requests across repositories declared as one change, with the ClickUp tasks and design
+  // docs its pull requests are attached to. ONE card for it wherever a set is shown (chat, a design doc's page).
+  change_set: { label: 'Change set', icon: () => <CodingMergeIcon size={24} /> },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
