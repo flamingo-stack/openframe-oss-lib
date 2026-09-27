@@ -46,6 +46,11 @@ import {
   type TrustFrameworkMonitoringEntry,
 } from '../../../types/trust-center';
 import { formatDateShort } from '../../../utils/date-formatters';
+import {
+  DESIGN_DOC_READINESS_DISPLAY,
+  designDocReadiness,
+  formatCompletionLabel,
+} from '../../../utils/design-doc-readiness';
 import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
@@ -117,7 +122,7 @@ import { CaseStudyCardSkeleton } from './case-study-card';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
 import { CustomerInterviewCardSkeleton } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
-import { designDocMetaLine, designDocSignOffLabel, designDocSignOffStatus } from './design-doc-card';
+import { designDocMetaLine } from './design-doc-card';
 import {
   parseGithubTitle,
   formatActivityId,
@@ -1072,8 +1077,8 @@ function CustomerInterviewChatCard({
 }
 
 /**
- * Design doc → the doc glyph, its sign-off state as the pill (Ready / In review / Blocked, `designDocSignOffStatus`)
- * and "DRI · updated · n/m reviews signed off" under the title. The hub's card route attaches the doc's list row as
+ * Design doc → the doc glyph, its readiness as the pill (the hub's own wording: "Ready to build" / "Not ready",
+ * `design-doc-readiness`) and "DRI · updated · n/m reviews signed off" under the title. The hub's card route attaches the doc's list row as
  * `item.doc`; a row without it (an older hub) renders the ref's own title and preview.
  */
 function DesignDocChatCard({
@@ -1089,17 +1094,21 @@ function DesignDocChatCard({
 }) {
   const displayRef = fetchedItemDisplayRef(item, chatRef);
   const doc = item?.doc;
-  const status = doc ? designDocSignOffStatus(doc.completion) : null;
+  const readiness = doc ? DESIGN_DOC_READINESS_DISPLAY[designDocReadiness(doc.completion)] : null;
   return (
     <MingoInfoCard
       title={doc?.title ?? displayRef.title}
       description={
         doc
-          ? [designDocMetaLine(doc), designDocSignOffLabel(doc.completion)].join(' · ')
+          ? [designDocMetaLine(doc), formatCompletionLabel(doc.completion)].join(' · ')
           : (displayRef.preview ?? undefined)
       }
       icon={<FileContentIcon size={24} />}
-      status={status ? { label: status.label, variant: status.tag } : { label: 'Design doc', variant: 'grey' }}
+      status={
+        readiness
+          ? { label: readiness.label, variant: readiness.scheme === 'success' ? 'success' : 'grey' }
+          : { label: 'Design doc', variant: 'grey' }
+      }
       anchorProps={buildAnchorProps(displayRef.url, isNewTab)}
       menuGroups={cardMenuGroups(displayRef.url, discuss)}
       menuAriaLabel="Design doc actions"

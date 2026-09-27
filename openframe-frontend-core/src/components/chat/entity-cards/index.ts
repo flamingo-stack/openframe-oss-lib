@@ -74,8 +74,6 @@ export {
   DesignDocCardSkeleton,
   designDocMetaLine,
   designDocPeople,
-  designDocSignOffLabel,
-  designDocSignOffStatus,
   type DesignDocCardProps,
 } from './design-doc-card';
 export { RoadmapVoteButton, type RoadmapVoteButtonProps } from './roadmap-vote-button';

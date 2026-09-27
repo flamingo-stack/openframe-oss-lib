@@ -3,31 +3,20 @@
 /**
  * DesignDocCard (pure presentation) — a design doc as the entity card every surface shows it with: the full card
  * (`default`, the `RoadmapCard` layout without its image slot, since a doc has no image of its own and a constant glyph
- * says nothing: title, DRI and date, sign-off status, summary, sign-off count and the people) for admin surfaces, and the chat's compact card (`DesignDocChatCard` in `dispatch.tsx`, which reads
- * the same status and meta through the helpers below). The card writes no click logic beyond its `href` anchor.
+ * says nothing: title, DRI and date, readiness (the hub's own wording, `design-doc-readiness`), summary, sign-off caption and the people) for admin surfaces, and the chat's compact card (`DesignDocChatCard` in `dispatch.tsx`, which reads
+ * the same readiness and meta). The card writes no click logic beyond its `href` anchor.
  */
 
-import type { DesignDoc, DesignDocCompletion } from '../../../types/design-doc';
+import type { DesignDoc } from '../../../types/design-doc';
 import { formatDateShort } from '../../../utils/date-formatters';
+import {
+  DESIGN_DOC_READINESS_DISPLAY,
+  designDocReadiness,
+  formatCompletionLabelWithBlockers,
+} from '../../../utils/design-doc-readiness';
 import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
-import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
+import { StatusBadge } from '../../ui/status-badge';
 import { safeHref } from '../utils/compact-card-classes';
-
-/** A doc's sign-off state: ready (every section signed off), blocked (an open blocking comment or a blocked section), else in review. */
-export function designDocSignOffStatus(completion: DesignDocCompletion): {
-  label: string;
-  scheme: NonNullable<StatusBadgeProps['colorScheme']>;
-  tag: 'success' | 'error' | 'warning';
-} {
-  if (completion.isComplete) return { label: 'Ready', scheme: 'success', tag: 'success' };
-  if (completion.openBlocking > 0 || completion.blocked > 0) return { label: 'Blocked', scheme: 'error', tag: 'error' };
-  return { label: 'In review', scheme: 'warning', tag: 'warning' };
-}
-
-/** "3/4 reviews signed off" — the count the design-docs screen prints. */
-export function designDocSignOffLabel(completion: DesignDocCompletion): string {
-  return `${completion.completed}/${completion.total} review${completion.total === 1 ? '' : 's'} signed off`;
-}
 
 /** The people behind a doc: the DRI first, then the implementation owners (display only). */
 export function designDocPeople(doc: Pick<DesignDoc, 'author' | 'feature_leads'>): AvatarStackPerson[] {
@@ -77,7 +66,7 @@ export function DesignDocCardSkeleton() {
 }
 
 export function DesignDocCard({ doc, href, target, rel, className }: DesignDocCardProps) {
-  const status = designDocSignOffStatus(doc.completion);
+  const readiness = DESIGN_DOC_READINESS_DISPLAY[designDocReadiness(doc.completion)];
   const people = designDocPeople(doc);
   const link = safeHref(href ?? null);
   const body = (
@@ -92,24 +81,24 @@ export function DesignDocCard({ doc, href, target, rel, className }: DesignDocCa
           </div>
         </div>
         <StatusBadge
-          text={status.label.toUpperCase()}
-          colorScheme={status.scheme}
-          className="hidden border border-ods-border md:inline-flex"
+          text={readiness.label}
+          colorScheme={readiness.scheme}
+          variant="button"
+          singleLine
+          className="hidden md:inline-flex"
         />
       </div>
       <div className="md:hidden">
-        <StatusBadge
-          text={status.label.toUpperCase()}
-          colorScheme={status.scheme}
-          className="border border-ods-border"
-        />
+        <StatusBadge text={readiness.label} colorScheme={readiness.scheme} variant="button" singleLine />
       </div>
       <div className="flex min-h-[72px] items-center">
         <p className="line-clamp-3 text-ods-text-secondary text-h4">{doc.summary || ''}</p>
       </div>
       <div className="flex-1" />
       <div className="flex w-full items-center justify-between gap-2">
-        <span className="truncate text-ods-text-secondary text-h6">{designDocSignOffLabel(doc.completion)}</span>
+        <span className="truncate text-ods-text-secondary text-h6">
+          {formatCompletionLabelWithBlockers(doc.completion)}
+        </span>
         {people.length > 0 ? <AvatarStack size="xs" people={people} className="shrink-0" /> : null}
       </div>
     </>
