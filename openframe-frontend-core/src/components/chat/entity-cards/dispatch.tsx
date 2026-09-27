@@ -33,6 +33,7 @@ import React, { type ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
+import type { DesignDoc } from '../../../types/design-doc';
 import {
   TRUST_CENTER_DOCUMENT_TYPE,
   TRUST_CENTER_PAGE_PATH,
@@ -116,6 +117,7 @@ import { CaseStudyCardSkeleton } from './case-study-card';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
 import { CustomerInterviewCardSkeleton } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
+import { designDocMetaLine, designDocSignOffLabel, designDocSignOffStatus } from './design-doc-card';
 import {
   parseGithubTitle,
   formatActivityId,
@@ -1069,6 +1071,42 @@ function CustomerInterviewChatCard({
   );
 }
 
+/**
+ * Design doc → the doc glyph, its sign-off state as the pill (Ready / In review / Blocked, `designDocSignOffStatus`)
+ * and "DRI · updated · n/m reviews signed off" under the title. The hub's card route attaches the doc's list row as
+ * `item.doc`; a row without it (an older hub) renders the ref's own title and preview.
+ */
+function DesignDocChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  discuss,
+}: {
+  item: (ChatCardItem & { doc?: DesignDoc }) | undefined;
+  chatRef: ChatRef;
+  isNewTab: boolean;
+  discuss?: CardDiscussAction;
+}) {
+  const displayRef = fetchedItemDisplayRef(item, chatRef);
+  const doc = item?.doc;
+  const status = doc ? designDocSignOffStatus(doc.completion) : null;
+  return (
+    <MingoInfoCard
+      title={doc?.title ?? displayRef.title}
+      description={
+        doc
+          ? [designDocMetaLine(doc), designDocSignOffLabel(doc.completion)].join(' · ')
+          : (displayRef.preview ?? undefined)
+      }
+      icon={<FileContentIcon size={24} />}
+      status={status ? { label: status.label, variant: status.tag } : { label: 'Design doc', variant: 'grey' }}
+      anchorProps={buildAnchorProps(displayRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(displayRef.url, discuss)}
+      menuAriaLabel="Design doc actions"
+    />
+  );
+}
+
 /** Investor update → presentation icon + "Investor update" pill. Title falls
  *  back to "Update #N" when the row has no explicit title. */
 function InvestorUpdateChatCard({
@@ -1412,7 +1450,6 @@ interface GlyphCardConfig {
 /** The OpenFrame logo every OpenFrame surface uses (the `openframe` icon name). */
 const OpenFrameGlyph = resolveIcon('openframe');
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
-  design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
   openframe_tenant: { label: 'OpenFrame tenant', icon: () => <OpenFrameGlyph size={24} /> },
   prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
   // Code intelligence (product-hub internal): the review rules a repository is
@@ -1700,6 +1737,17 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         discuss={opts.discuss}
         ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
+    ),
+  },
+  design_doc: {
+    label: 'Design doc',
+    contentRefType: 'design_doc',
+    bareInline: true,
+    noComposedHref: true,
+    fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => (
+      <DesignDocChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
   },
   customer_interview: {
