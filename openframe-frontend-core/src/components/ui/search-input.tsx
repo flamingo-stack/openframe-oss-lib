@@ -51,7 +51,11 @@ export interface SearchInputProps {
   defaultValue?: string;
   /** Called when input value changes (raw, not debounced) */
   onChange?: (value: string) => void;
-  /** Called when user presses Enter */
+  /**
+   * Called when the user presses Enter, AND with `''` when the box is emptied (the clear button, or deleting the
+   * text): a search that was submitted must not stay applied after its text is gone. Read the argument, never the
+   * host's own state, which has not re-rendered yet when this fires.
+   */
   onSubmit?: (value: string) => void;
   /** Search results to display in the dropdown */
   results?: SearchResult[];
@@ -292,6 +296,7 @@ export function SearchInput({
     } else {
       setInternalValue(newVal);
     }
+    if (newVal === '' && currentValue !== '') onSubmit?.('');
     if (!isOpen) setIsOpen(true);
     setHighlightedIndex(-1);
   };
@@ -304,6 +309,7 @@ export function SearchInput({
     } else {
       setInternalValue('');
     }
+    if (currentValue !== '') onSubmit?.('');
     inputRef.current?.focus();
   };
 
