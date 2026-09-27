@@ -2,14 +2,13 @@
 
 /**
  * DesignDocCard (pure presentation) — a design doc as the entity card every surface shows it with: the full card
- * (`default`, the `RoadmapCard` layout: glyph slot, title, DRI and date, sign-off status, summary, sign-off count and
- * the people) for admin surfaces, and the chat's compact card (`DesignDocChatCard` in `dispatch.tsx`, which reads
+ * (`default`, the `RoadmapCard` layout without its image slot, since a doc has no image of its own and a constant glyph
+ * says nothing: title, DRI and date, sign-off status, summary, sign-off count and the people) for admin surfaces, and the chat's compact card (`DesignDocChatCard` in `dispatch.tsx`, which reads
  * the same status and meta through the helpers below). The card writes no click logic beyond its `href` anchor.
  */
 
 import type { DesignDoc, DesignDocCompletion } from '../../../types/design-doc';
 import { formatDateShort } from '../../../utils/date-formatters';
-import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon';
 import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
 import { safeHref } from '../utils/compact-card-classes';
@@ -66,7 +65,6 @@ export function DesignDocCardSkeleton() {
   return (
     <div className="flex h-full animate-pulse flex-col gap-[16px] rounded-[6px] border border-ods-border bg-ods-card p-[24px]">
       <div className="flex items-center gap-[16px]">
-        <div className="h-16 w-16 rounded-lg bg-ods-bg" />
         <div className="flex flex-1 flex-col gap-2">
           <div className="h-5 w-3/4 rounded bg-ods-bg" />
           <div className="h-4 w-1/3 rounded bg-ods-bg/70" />
@@ -85,9 +83,6 @@ export function DesignDocCard({ doc, href, target, rel, className }: DesignDocCa
   const body = (
     <>
       <div className="flex w-full items-center gap-[16px]">
-        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg text-ods-accent">
-          <FileContentIcon size={32} />
-        </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex min-h-[48px] items-center">
             <h3 className="line-clamp-2 flex-1 text-ods-text-primary text-h3">{doc.title || 'Untitled design doc'}</h3>
