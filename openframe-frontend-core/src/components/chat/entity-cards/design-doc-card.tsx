@@ -14,6 +14,7 @@ import {
   designDocReadiness,
   formatCompletionLabelWithBlockers,
 } from '../../../utils/design-doc-readiness';
+import { InteractiveSkeleton, MediaSkeleton, TextSkeleton } from '../../loading/unified-skeleton';
 import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { StatusBadge } from '../../ui/status-badge';
 import { safeHref } from '../utils/compact-card-classes';
@@ -50,17 +51,31 @@ export interface DesignDocCardProps {
   className?: string;
 }
 
+/** The card's loading state, built from the unified skeleton primitives inside the card's own frame. */
 export function DesignDocCardSkeleton() {
   return (
-    <div className="flex h-full animate-pulse flex-col gap-[16px] rounded-[6px] border border-ods-border bg-ods-card p-[24px]">
-      <div className="flex items-center gap-[16px]">
-        <div className="flex flex-1 flex-col gap-2">
-          <div className="h-5 w-3/4 rounded bg-ods-bg" />
-          <div className="h-4 w-1/3 rounded bg-ods-bg/70" />
+    <div
+      className="flex h-full flex-col gap-[16px] rounded-[6px] border border-ods-border bg-ods-card p-[24px]"
+      role="status"
+      aria-label="Loading design doc"
+    >
+      <div className="flex w-full items-center gap-[16px]">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <TextSkeleton.Subheading className="w-3/4" />
+          <TextSkeleton.Caption className="w-1/3" />
         </div>
+        <InteractiveSkeleton.Chip className="hidden w-24 md:block" />
       </div>
-      <div className="h-4 w-full rounded bg-ods-bg/60" />
-      <div className="h-4 w-5/6 rounded bg-ods-bg/60" />
+      <div className="flex min-h-[72px] flex-col justify-center gap-2">
+        <TextSkeleton.Body />
+        <TextSkeleton.Body />
+        <TextSkeleton.Body className="w-5/6" />
+      </div>
+      <div className="flex-1" />
+      <div className="flex w-full items-center justify-between gap-2">
+        <TextSkeleton.Caption className="w-1/3" />
+        <MediaSkeleton.Avatar size="sm" />
+      </div>
     </div>
   );
 }
