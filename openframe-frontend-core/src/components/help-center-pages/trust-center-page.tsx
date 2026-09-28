@@ -43,7 +43,7 @@ import {
   type TrustCenterPublic,
   type TrustCenterSectionId,
 } from '../../types/trust-center';
-import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
+import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
@@ -178,16 +178,20 @@ export function TrustCenterPage({
   });
 
   const sections = useMemo(() => (data ? visibleSections(data) : []), [data]);
-  // Anchors: the shared same-page hash navigation (the FAQ section's pattern).
-  // A rail click puts `#section` in the URL (`replace`: the rail is a table of
-  // contents, not a navigation step) and scrolls below the sticky header; a
-  // visit that ARRIVES with `#section`, and back/forward, scroll there once the
-  // sections have rendered. The scroll spy lights the rail and, as the reader
-  // scrolls, keeps the URL's hash on the section in view (`syncHash`).
-  const { activeSection } = useScrollSpy(sections, { syncHash: true });
-  const handleSectionClick = useCallback((sectionId: string) => {
-    navigateSamePageHash(`#${sectionId}`, { headerOffset: STICKY_HEADER_OFFSET_PX, history: 'replace' });
-  }, []);
+  // Anchors. The scroll spy lights the rail from whatever scrolls the sections
+  // (the window, or a host shell's `<main overflow-y-auto>` — OpenFrame's
+  // `AppLayout`) and keeps the URL's hash on the section in view (`syncHash`;
+  // `replace`: the rail is a table of contents, not a navigation step). A rail
+  // click goes through the spy too: it highlights the section at once, writes
+  // `#section` and scrolls it below the sticky header — the SAME offset the
+  // spy's detection line uses, so the highlight agrees with where the section
+  // landed. A visit that ARRIVES with `#section`, and back/forward, scroll
+  // there once the sections have rendered (`hashchange`, which `replaceState`
+  // never fires — so a click never re-scrolls through that path).
+  const { activeSection, handleSectionClick } = useScrollSpy(sections, {
+    syncHash: true,
+    headerOffset: STICKY_HEADER_OFFSET_PX,
+  });
   useScrollToHash(sections.length > 0 ? sections.map(section => section.id).join('|') : null, {
     headerOffset: STICKY_HEADER_OFFSET_PX,
   });

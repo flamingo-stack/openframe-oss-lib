@@ -62,10 +62,12 @@ public class MongoIndexConfig {
         dropStaleIndex("tags", "key_org_entity_idx");
 
         // Scripts: name uniqueness IGNORES soft-deleted rows so a user can
-        // reuse the name of a script they previously deleted. The legacy
-        // {tenantId, name} unique index (auto-named "tenantId_1_name_1") did
-        // not filter status — drop it and recreate as a PARTIAL unique index
-        // scoped to the non-deleted statuses.
+        // reuse the name of a script they previously deleted — a PARTIAL unique
+        // index scoped to the non-deleted statuses. The plain {tenantId, name}
+        // index from @CompoundIndex on Script (auto-named "tenantId_1_name_1")
+        // must NOT be dropped here: Spring recreates it at every boot, and on
+        // the shared 'scripts' collection a drop aborts the build another pod
+        // is running (IndexBuildAborted).
         //
         // NOTE: the filter is expressed as {status: {$in: [ACTIVE, ARCHIVED]}}
         // rather than {status: {$ne: DELETED}}. MongoDB partial indexes reject
@@ -73,7 +75,6 @@ public class MongoIndexConfig {
         // "Expression not supported in partial index: $not". $in is supported
         // (MongoDB 6.3+; server is 7.x). Keep this list in sync with every
         // non-DELETED value of ScriptStatus.
-        dropStaleIndex("scripts", "tenantId_1_name_1");
         mongoTemplate.indexOps("scripts").ensureIndex(
                 new Index().on("tenantId", Sort.Direction.ASC)
                         .on("name", Sort.Direction.ASC)

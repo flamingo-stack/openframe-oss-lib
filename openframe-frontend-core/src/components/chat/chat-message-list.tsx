@@ -1017,7 +1017,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                   // thread without any stays byte-identical to before.
                   if (!ownedContent) return row;
                   return (
-                    <div key={message.id} className="flex w-full min-w-0 flex-col">
+                    <div key={message.id} className="grid w-full min-w-0 grid-cols-1">
                       {row}
                       {ownedContent}
                     </div>

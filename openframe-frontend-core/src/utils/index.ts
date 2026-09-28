@@ -235,6 +235,8 @@ export {
 } from './sse-subscription';
 export {
   type EmbedProxyAuth,
+  type EmbedProxyOptionalField,
+  EMBED_PROXY_OPTIONAL_HEADERS,
   getEmbedProxyAuth,
   setEmbedProxyAuth,
   clearEmbedProxyAuth,
@@ -386,6 +388,11 @@ export {
 // decision fn the lib forms feed. Also exported via the granular subpath
 // `./utils/humanity-signals` for server-only consumers.
 export * from './humanity-signals';
+
+// Form rescue rules (allowlist, exclusions, caps, lifecycle) — pure + server-safe
+// so the host's draft endpoint re-applies the same filter the browser hook runs.
+// Also exported via the granular subpath `./utils/form-rescue`.
+export * from './form-rescue';
 
 // Doc-source viewer utilities (path parsing, tree building, section extraction,
 // embed-URL conversion) — single home for all doc-viewer pure helpers across
