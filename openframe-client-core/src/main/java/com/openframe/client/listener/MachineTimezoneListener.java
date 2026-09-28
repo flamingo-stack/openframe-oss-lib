@@ -1,5 +1,6 @@
 package com.openframe.client.listener;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.MachineTimezoneService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
@@ -79,6 +80,9 @@ public class MachineTimezoneListener extends AbstractJetStreamPushListener {
 
             message.ack();
             log.debug("Timezone update processed successfully and acked");
+        } catch (JsonProcessingException e) {
+            log.error("Malformed timezone message payload, acking to avoid redelivery loop: {}", payload, e);
+            message.ack();
         } catch (Exception e) {
             log.error("Unexpected error processing timezone update: {}", payload, e);
             // Leave unacked so JetStream redelivers.
