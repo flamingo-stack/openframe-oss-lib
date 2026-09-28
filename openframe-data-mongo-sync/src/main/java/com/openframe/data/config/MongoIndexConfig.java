@@ -15,16 +15,10 @@ import org.springframework.data.mongodb.core.query.Criteria;
 @Configuration
 public class MongoIndexConfig {
 
-    /**
-     * Partial-unique name index on {@code scripts}. Explicitly named so it
-     * survives redeploys and can be dropped/recreated cleanly.
-     */
+    // Explicitly named partial-unique index on scripts so it survives redeploys and can be dropped/recreated cleanly.
     private static final String SCRIPTS_NAME_UNIQUE_INDEX = "scripts_tenant_name_notDeleted_unique";
 
-    /**
-     * Partial-unique name index on {@code script_schedules}. Same rationale as
-     * {@link #SCRIPTS_NAME_UNIQUE_INDEX}: uniqueness ignores soft-deleted rows.
-     */
+    // Same rationale as SCRIPTS_NAME_UNIQUE_INDEX: uniqueness on script_schedules ignores soft-deleted rows.
     private static final String SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX = "script_schedules_tenant_name_notDeleted_unique";
 
     @Autowired
