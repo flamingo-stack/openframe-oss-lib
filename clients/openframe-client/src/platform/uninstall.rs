@@ -7,7 +7,6 @@ use crate::service_adapter::{CrossPlatformServiceManager, ServiceConfig};
 use crate::services::{
     AgentConfigurationService, DeregistrationService, InitialConfigurationService,
     InstalledToolsService, ToolCommandParamsResolver, ToolKillService, ToolUninstallService,
-    UpdateCleanupService,
 };
 
 const SERVICE_NAME: &str = "client";
@@ -82,11 +81,6 @@ pub fn remove_legacy_alias(install_path: &Path) {
         Ok(()) => info!("Removed legacy alias: {}", alias.display()),
         Err(e) => warn!("Failed to remove legacy alias {}: {}", alias.display(), e),
     }
-}
-
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-fn remove_update_temp_files(install_path: &Path) {
-    UpdateCleanupService::for_binary(install_path.to_path_buf()).sweep_temp_leftovers(None);
 }
 
 /// Spawn a detached `openframe-client uninstall` that survives this service being stopped.
@@ -509,7 +503,6 @@ pub async fn uninstall_windows(
     }
 
     remove_binary_siblings(install_path);
-    remove_update_temp_files(install_path);
 
     // Launch cleanup script to remove binary after process exit
     if install_path.exists() {
@@ -629,7 +622,6 @@ pub async fn uninstall_macos(
     }
 
     remove_binary_siblings(install_path);
-    remove_update_temp_files(install_path);
 
     // Final chance to report the uninstall now that the wipe is done.
     if let Some(deregistration_service) = &deregistration_service {
