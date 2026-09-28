@@ -9,6 +9,7 @@ import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.schema.GraphQLSchema;
@@ -73,6 +74,7 @@ class DeviceFiltersSelectionSetTest {
     @Mock private TagService tagService;
     @Mock private GraphQLDeviceMapper mapper;
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
 
     @Captor private ArgumentCaptor<Set<DeviceFilterFacet>> facetsCaptor;
 
@@ -80,7 +82,8 @@ class DeviceFiltersSelectionSetTest {
 
     @BeforeEach
     void setUp() {
-        DeviceDataFetcher dataFetcher = new DeviceDataFetcher(deviceService, deviceFilterService, tagService, fleetVulnerabilityStatusService, mapper);
+        DeviceDataFetcher dataFetcher = new DeviceDataFetcher(deviceService, deviceFilterService, tagService,
+                fleetVulnerabilityStatusService, mapper, packageManagerAvailability);
 
         TypeDefinitionRegistry registry = new SchemaParser().parse(SDL);
         RuntimeWiring wiring = RuntimeWiring.newRuntimeWiring()
