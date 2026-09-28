@@ -43,10 +43,19 @@ impl OpenFrameClientInfoService {
         let json_content = serde_json::to_string_pretty(info)
             .context("Failed to serialize OpenFrame client info to JSON")?;
 
-        fs::write(&self.info_file_path, json_content).with_context(|| {
+        let tmp_file_path = self.info_file_path.with_extension("json.tmp");
+
+        fs::write(&tmp_file_path, json_content).with_context(|| {
             format!(
-                "Failed to write client info file: {:?}",
-                self.info_file_path
+                "Failed to write temporary client info file: {:?}",
+                tmp_file_path
+            )
+        })?;
+
+        fs::rename(&tmp_file_path, &self.info_file_path).with_context(|| {
+            format!(
+                "Failed to atomically rename temporary client info file {:?} to {:?}",
+                tmp_file_path, self.info_file_path
             )
         })?;
 
