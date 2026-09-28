@@ -66,6 +66,9 @@ export function StickySectionNav({
           {/* Navigation button */}
           <button
             onClick={() => onSectionClick(section.id)}
+            // The ribbon is the visual; this is the same state for assistive
+            // tech (a table of contents marks the reader's current location).
+            aria-current={activeSection === section.id ? 'location' : undefined}
             className="relative flex flex-1 cursor-pointer items-center gap-2 px-3 py-2"
           >
             <span
