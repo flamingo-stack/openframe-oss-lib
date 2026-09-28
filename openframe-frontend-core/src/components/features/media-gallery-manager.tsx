@@ -38,6 +38,8 @@ export function MediaGalleryManager({
   onChange,
   onUpload,
   isUploading = false,
+  showInModal = false,
+  modalTitle,
   className = '',
 }: MediaGalleryManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -85,10 +87,13 @@ export function MediaGalleryManager({
   );
 
   const handleDeleteMedia = useCallback(
-    (index: number) => {
+    async (index: number) => {
       setDeletingIndex(index);
-      onChange(media.filter((_, i) => i !== index));
-      setDeletingIndex(null);
+      try {
+        await Promise.resolve(onChange(media.filter((_, i) => i !== index)));
+      } finally {
+        setDeletingIndex(null);
+      }
     },
     [media, onChange],
   );
@@ -193,6 +198,7 @@ export function MediaGalleryManager({
 
   const content = (
     <div className={`space-y-6 ${className}`}>
+      {showInModal && modalTitle && <h2 className="text-ods-text-primary text-h2">{modalTitle}</h2>}
       {/* Upload Section */}
       <div className="rounded-lg border-2 border-dashed border-ods-border p-6 text-center transition-colors hover:border-ods-accent/50">
         <div className="flex flex-col items-center gap-4">
@@ -253,3 +259,4 @@ export function MediaGalleryManager({
 
   return content;
 }
+
