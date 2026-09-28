@@ -81,6 +81,14 @@ export const FORM_RESCUE_RESUME_PARAM = 'resume';
 export const FORM_DRAFT_STATUSES = ['started', 'rescuable', 'rescued', 'submitted'] as const;
 export type FormDraftStatus = (typeof FORM_DRAFT_STATUSES)[number];
 
+/** Why a due draft was settled WITHOUT alerting the team (stored on the draft). */
+export const FORM_RESCUE_SKIP_REASONS = {
+  finishedElsewhere: 'finished_elsewhere',
+  alreadyRescued: 'already_rescued',
+  internal: 'internal_email',
+} as const;
+export type FormRescueSkipReason = (typeof FORM_RESCUE_SKIP_REASONS)[keyof typeof FORM_RESCUE_SKIP_REASONS];
+
 /** Same shape the host's `contact_submissions.email` check accepts. */
 const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 

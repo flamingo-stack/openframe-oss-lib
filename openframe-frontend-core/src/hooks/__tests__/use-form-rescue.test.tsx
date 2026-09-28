@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { EndpointsRuntimeContext, type EndpointsRuntime } from '../../contexts/endpoints-runtime-context';
 import { FORM_RESCUE_DEBOUNCE_MS } from '../../utils/form-rescue';
@@ -26,13 +26,15 @@ function wrapper({ children }: { children: ReactNode }) {
 
 const FIELDS = ['name', 'email', 'message'] as const;
 
-let fetchSpy: ReturnType<typeof vi.fn>;
+let fetchSpy: Mock<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>;
 let captures: Array<{ event: string; props: Record<string, unknown> }>;
 
 beforeEach(() => {
   vi.useFakeTimers();
   window.localStorage.clear();
-  fetchSpy = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ status: 'started' }), { status: 202 })));
+  fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+    Promise.resolve(new Response(JSON.stringify({ status: 'started' }), { status: 202 })),
+  );
   vi.stubGlobal('fetch', fetchSpy);
   captures = [];
   (window as unknown as { posthog: unknown }).posthog = {
@@ -46,10 +48,15 @@ afterEach(() => {
   delete (window as unknown as { posthog?: unknown }).posthog;
 });
 
-function sentBodies() {
+interface SentBody {
+  attempt_id: string;
+  [key: string]: unknown;
+}
+
+function sentBodies(): Array<{ url: string; body: SentBody }> {
   return fetchSpy.mock.calls
-    .filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST')
-    .map(([url, init]) => ({ url: String(url), body: JSON.parse(String((init as RequestInit).body)) }));
+    .filter(([, init]) => init?.method === 'POST')
+    .map(([url, init]) => ({ url: String(url), body: JSON.parse(String(init?.body)) as SentBody }));
 }
 
 describe('useFormRescue', () => {
@@ -174,9 +181,9 @@ describe('useFormRescue', () => {
     act(() => {
       window.dispatchEvent(new Event('pagehide'));
     });
-    const puts = fetchSpy.mock.calls.filter(([, init]) => (init as RequestInit)?.method === 'POST');
+    const puts = fetchSpy.mock.calls.filter(([, init]) => init?.method === 'POST');
     expect(puts).toHaveLength(1);
-    expect((puts[0][1] as RequestInit).keepalive).toBe(true);
+    expect(puts[0][1]?.keepalive).toBe(true);
     expect(captures.map(c => c.event)).toContain('form_abandoned');
   });
 });

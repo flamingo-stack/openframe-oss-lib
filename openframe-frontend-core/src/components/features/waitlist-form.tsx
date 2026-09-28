@@ -10,6 +10,7 @@ import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { useToast } from '../../hooks/use-toast';
 import { cn } from '../../utils/cn';
 import { formatPhoneE164 } from '../../utils/country-phone-utils';
+import type { FormRescueFormId } from '../../utils/form-rescue';
 import { hasGenericEmailDomain } from '../../utils/generic-domain-utils';
 import type { HumanitySignals } from '../../utils/humanity-signals';
 import { OpenFrameLogo } from '../icons';
@@ -65,6 +66,8 @@ export interface WaitlistFormProps {
   privacyPolicyUrl?: string;
   /** SMS consent text shown below the checkbox label */
   consentText?: string;
+  /** Form rescue (save a half-filled form for follow-up). OPT-IN: omitted or `null` saves nothing. */
+  rescueFormId?: FormRescueFormId | null;
 }
 
 /**
@@ -98,6 +101,7 @@ export function WaitlistForm({
   invalidPhoneHint = 'Invalid phone number format.',
   termsOfServiceUrl,
   privacyPolicyUrl,
+  rescueFormId = null,
   consentText = 'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply. Msg frequency varies. Reply HELP for help and STOP to cancel.',
 }: WaitlistFormProps) {
   const [email, setEmail] = useState(defaultEmail);
@@ -110,7 +114,7 @@ export function WaitlistForm({
   const [isPhoneInvalid, setIsPhoneInvalid] = useState(false);
   const [showConsentError, setShowConsentError] = useState(false);
   const rescue = useFormRescue({
-    formId: 'waitlist',
+    formId: rescueFormId,
     // The phone is reported as filled only; its value never leaves the form early.
     fieldNames: ['email', 'phone'],
     getSignals,

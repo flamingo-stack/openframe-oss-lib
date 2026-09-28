@@ -133,8 +133,8 @@ export interface ContactFormProps {
   successRedirectUrl?: string;
   successToastMessage?: string;
   /** Which public form this is, for form rescue (a half-filled form is saved so
-   *  the team can follow up). Defaults to `'contact'`; `null` turns it off for a
-   *  form that is not a lead (e.g. a signed-in ticket). */
+   *  the team can follow up). OPT-IN: omitted or `null` saves nothing, so a host
+   *  that has not chosen rescue never starts storing what visitors type. */
   rescueFormId?: FormRescueFormId | null;
 }
 
@@ -161,7 +161,7 @@ export function ContactForm({
   submitSuccessLabel = 'Message Sent!',
   successRedirectUrl = '/blog#community',
   successToastMessage = 'Redirecting you to join our community...',
-  rescueFormId = 'contact',
+  rescueFormId = null,
 }: ContactFormProps = {}) {
   // Attachments staging — same hook the chat composer + ticket
   // detail-drawer composer use. Files upload to Supabase as soon as

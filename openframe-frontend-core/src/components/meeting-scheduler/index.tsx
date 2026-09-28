@@ -56,6 +56,7 @@ import {
   type MeetingHost,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
+import type { FormRescueFormId } from '../../utils/form-rescue';
 import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
 import { BookingForm, BookingFormSkeleton, DEFAULT_SUBMIT_LABEL, type BookingFormProps } from './booking-form';
@@ -153,6 +154,9 @@ export interface HubSpotMeetingSchedulerProps {
    * can pass it across the RSC boundary where a component cannot.
    */
   detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent'>;
+  /** Form rescue (save the half-filled booking form for follow-up). OPT-IN:
+   *  omitted or `null` saves nothing. */
+  rescueFormId?: FormRescueFormId | null;
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
@@ -406,6 +410,7 @@ export function HubSpotMeetingScheduler({
   flow = DEFAULT_SCHEDULER_FLOW,
   detailsForm: DetailsForm = BookingForm,
   detailsFormProps,
+  rescueFormId = null,
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -507,7 +512,7 @@ export function HubSpotMeetingScheduler({
   );
   const [restored, setRestored] = useState<{ version: number; values: Record<string, unknown> } | null>(null);
   const rescue = useFormRescue({
-    formId: 'meeting_booking',
+    formId: rescueFormId,
     fieldNames: rescueFieldNames,
     getSignals,
     onRestore: values => {
