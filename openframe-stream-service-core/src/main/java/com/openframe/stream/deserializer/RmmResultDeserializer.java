@@ -100,17 +100,30 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
         }
     }
 
+    protected boolean isFailed(JsonNode after) {
+        return hasTimedOut(after) || hasNonZeroExitCode(after) || parseStringField(after, FIELD_ERROR).isPresent();
+    }
+
+    private boolean hasTimedOut(JsonNode after) {
+        return parseStringField(after, FIELD_TIMED_OUT).map(Boolean::parseBoolean).orElse(false);
+    }
+
+    private boolean hasNonZeroExitCode(JsonNode after) {
+        return parseStringField(after, FIELD_EXIT_CODE).map(RmmResultDeserializer::isNonZero).orElse(false);
+    }
+
+    private static boolean isNonZero(String exitCode) {
+        try {
+            return Integer.parseInt(exitCode) != 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
     @Override
     protected String getError(JsonNode after) {
-        boolean timedOut = parseStringField(after, FIELD_TIMED_OUT).map(Boolean::parseBoolean).orElse(false);
-        boolean failed = parseStringField(after, FIELD_EXIT_CODE)
-                .map(rc -> {
-                    try {
-                        return Integer.parseInt(rc) != 0;
-                    } catch (NumberFormatException e) {
-                        return false;
-                    }
-                }).orElse(false);
+        boolean timedOut = hasTimedOut(after);
+        boolean failed = hasNonZeroExitCode(after);
         Optional<String> stderr = parseStringField(after, FIELD_STDERR);
         Optional<String> error = parseStringField(after, FIELD_ERROR);
 

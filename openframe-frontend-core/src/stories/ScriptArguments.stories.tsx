@@ -208,7 +208,7 @@ export const Interactive: Story = {
     return (
       <div className="flex flex-col gap-4">
         <ScriptArguments arguments={args} onArgumentsChange={setArgs} titleLabel="Script Arguments" />
-        <div className="rounded-[6px] border border-[#3a3a3a] bg-[#1a1a1a] p-4">
+        <div className="rounded-[6px] border border-ods-border bg-ods-card p-4">
           <p className="mb-2 text-sm text-ods-text-secondary">Current State:</p>
           <pre className="overflow-auto text-xs text-ods-text-primary">{JSON.stringify(args, null, 2)}</pre>
         </div>

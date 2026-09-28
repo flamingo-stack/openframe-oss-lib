@@ -6,7 +6,7 @@ import lombok.Getter;
 
 @Getter
 @Builder
-public class DeliveryRequest<P> {
+public class DeliveryRequest<P extends DeliveryPayload> {
     private final DeliveryType type;
     private final String targetId;
     private final String machineId;

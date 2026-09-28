@@ -147,7 +147,15 @@ public class TicketsTest extends BaseTest {
         assertThat(ticket.getTicketNumber()).as("Created ticket should have ticketNumber").isNotNull();
         assertThat(ticket.getTitle()).as("Title should match").isEqualTo(input.getTitle());
         assertThat(ticket.getDescription()).as("Description should match").isEqualTo(input.getDescription());
-        assertThat(ticket.getStatus()).as("New ticket should be ACTIVE").isEqualTo("ACTIVE");
+        // Not a literal. #1983 replaced the legacy status with the custom-status lifecycle, so a new
+        // ticket opens in whatever kind that tenant's lifecycle starts at -- TECH_REQUIRED here,
+        // AI_ASSISTANCE where the assistant triages first. What is actually invariant is that a ticket
+        // nobody has touched is not already finished, which is the same test the resolve and archive
+        // cases below apply through firstTicketWithStatusKindNotIn.
+        assertThat(ticket.getStatusDefinition()).as("New ticket should resolve a status definition").isNotNull();
+        assertThat(ticket.getStatusDefinition().getKind())
+                .as("A new ticket should open in a live status, not a terminal one")
+                .isNotIn("RESOLVED", "ARCHIVED");
         assertThat(ticket.getOrganizationId()).as("organizationId should match").isEqualTo(input.getOrganizationId());
         assertThat(ticket.getDeviceId()).as("deviceId should match").isEqualTo(input.getDeviceId());
         assertThat(ticket.getAssignedTo()).as("assignedTo should match").isEqualTo(assigneeId);

@@ -59,6 +59,7 @@ type Machine implements Node {
     lastSeen: Instant
     organizationId: String
     organization: Organization
+    userId: String
     hostname: String
     displayName: String
     nickname: String

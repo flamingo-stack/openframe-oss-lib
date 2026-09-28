@@ -16,6 +16,73 @@ const DESCRIPTION: &str = "OpenFrame client service for remote management and mo
 /// CLI subcommand the detached process runs to remove the client.
 const UNINSTALL_SUBCOMMAND: &str = "uninstall";
 
+/// Removes the copies the update flow leaves next to the binary: `<exe>.lkg`,
+/// `<exe>.prev`, `<exe>.old`, `<exe>.bad`, `<exe>.bak`, `<exe>.backup.<ts>`.
+/// Matched by prefix on purpose: every sibling written next to the binary is
+/// an update artefact, and an enumerated list would leave the next suffix
+/// behind on uninstall again.
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn remove_binary_siblings(install_path: &Path) {
+    let Some(dir) = install_path.parent() else {
+        return;
+    };
+    let Some(exe_name) = install_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+    else {
+        return;
+    };
+    let prefix = format!("{exe_name}.");
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if !entry.file_name().to_string_lossy().starts_with(&prefix) {
+            continue;
+        }
+        let path = entry.path();
+        match std::fs::remove_file(&path) {
+            Ok(()) => info!("Removed update leftover: {}", path.display()),
+            Err(e) => warn!("Failed to remove update leftover {}: {}", path.display(), e),
+        }
+    }
+}
+
+/// Removes the `openframe` alias earlier versions created next to the binary, and
+/// only that: `openframe` is also the openframe-cli binary name, so a file that is
+/// not our symlink (unix) or shim (Windows) belongs to another tool and stays.
+pub fn remove_legacy_alias(install_path: &Path) {
+    let Some(dir) = install_path.parent() else {
+        return;
+    };
+
+    #[cfg(target_os = "windows")]
+    let (alias, ours) = {
+        let alias = dir.join("openframe.cmd");
+        let target = install_path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let shim = format!("@\"%~dp0{}\" %*\r\n", target);
+        let ours = std::fs::read_to_string(&alias).is_ok_and(|content| content == shim);
+        (alias, ours)
+    };
+    #[cfg(not(target_os = "windows"))]
+    let (alias, ours) = {
+        let alias = dir.join("openframe");
+        let ours = std::fs::read_link(&alias).is_ok_and(|target| target == install_path);
+        (alias, ours)
+    };
+
+    if !ours {
+        return;
+    }
+    match std::fs::remove_file(&alias) {
+        Ok(()) => info!("Removed legacy alias: {}", alias.display()),
+        Err(e) => warn!("Failed to remove legacy alias {}: {}", alias.display(), e),
+    }
+}
+
 /// Spawn a detached `openframe-client uninstall` that survives this service being stopped.
 /// Self-uninstall stops the `com.openframe.client` service (our own process), so it must run
 /// out-of-process. macOS + Windows only — Linux client self-uninstall is unsupported.
@@ -94,6 +161,18 @@ pub fn orbit_dir() -> std::path::PathBuf {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
         std::path::PathBuf::from("/opt/orbit")
+    }
+}
+
+/// Orbit's node key and osquery.db live here; left behind, a reinstall re-joins the old Fleet team.
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+async fn remove_orbit_dir(dir: &Path) {
+    if !dir.exists() {
+        return;
+    }
+    info!("Cleaning up Orbit directory: {}", dir.display());
+    if let Err(e) = remove_directory_with_retry(dir, 5).await {
+        warn!("Failed to remove Orbit directory: {}", e);
     }
 }
 
@@ -416,18 +495,14 @@ pub async fn uninstall_windows(
         }
     }
 
-    let orbit_dir = orbit_dir();
-    if orbit_dir.exists() {
-        info!("Cleaning up Orbit directory: {}", orbit_dir.display());
-        if let Err(e) = remove_directory_with_retry(&orbit_dir, 5).await {
-            warn!("Failed to remove Orbit directory: {}", e);
-        }
-    }
+    remove_orbit_dir(&orbit_dir()).await;
 
     // Final chance to report the uninstall, before the cleanup script starts waiting on our exit.
     if let Some(deregistration_service) = &deregistration_service {
         deregistration_service.retry_if_unreported().await;
     }
+
+    remove_binary_siblings(install_path);
 
     // Launch cleanup script to remove binary after process exit
     if install_path.exists() {
@@ -514,6 +589,8 @@ pub async fn uninstall_macos(
         }
     }
 
+    remove_orbit_dir(&orbit_dir()).await;
+
     if install_path.exists() {
         info!("Removing installed binary: {}", install_path.display());
 
@@ -544,6 +621,8 @@ pub async fn uninstall_macos(
         }
     }
 
+    remove_binary_siblings(install_path);
+
     // Final chance to report the uninstall now that the wipe is done.
     if let Some(deregistration_service) = &deregistration_service {
         deregistration_service.retry_if_unreported().await;
@@ -556,3 +635,7 @@ pub async fn uninstall_macos(
 
     Ok(())
 }
+
+#[cfg(all(test, any(target_os = "windows", target_os = "macos")))]
+#[path = "uninstall_tests.rs"]
+mod tests;

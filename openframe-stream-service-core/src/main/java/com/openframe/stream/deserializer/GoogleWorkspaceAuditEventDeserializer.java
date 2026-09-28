@@ -30,11 +30,14 @@ import java.util.Optional;
  * {@code organizationId}, {@code organizationName}) and multi-connection fields
  * ({@code connectionId}, {@code connectionName}) — hence
  * {@link com.openframe.data.model.enums.DataEnrichmentServiceType#PRE_ENRICHED}. {@code toolEventId}
- * is {@code uniqueQualifier + "-" + eventIndex + "-" + organizationId}: Reports API activities are
+ * is {@code uniqueQualifier + "-" + eventKey + "-" + organizationId}: Reports API activities are
  * uniquely identified by {@code uniqueQualifier}, a single activity can carry multiple events, and
  * one event fans out once per linked organization — the triple keeps replays idempotent per event
- * AND keeps the per-organization copies from colliding on the storage primary key. Events carry no
- * agent reference.
+ * AND keeps the per-organization copies from colliding on the storage primary key. {@code eventKey}
+ * ({@code eventName + "-" + same-name ordinal}) replaces the positional {@code eventIndex} because
+ * activities.watch pushes every event of a multi-event activity as its own single-event activity,
+ * so position is 0 for all of them; producers without {@code eventKey} (the write-audit publisher)
+ * fall back to {@code eventIndex}. Events carry no agent reference.
  * {@code connectionId}/{@code connectionName} (multi-connection orgs) are passed through into details.
  * <p>
  * {@code event.parameters[]} is an UNTOUCHED passthrough of the Reports API parameter union: each
@@ -112,8 +115,11 @@ public class GoogleWorkspaceAuditEventDeserializer implements KafkaMessageDeseri
     // primary key (organizationId is not) — bare ids would make per-organization copies overwrite
     // each other.
     private String buildToolEventId(JsonNode after) {
+        String eventKey = textField(after, "eventKey")
+                .or(() -> textField(after, "eventIndex"))
+                .orElse("0");
         String base = textField(after, "uniqueQualifier")
-                .map(uniqueQualifier -> uniqueQualifier + "-" + textField(after, "eventIndex").orElse("0"))
+                .map(uniqueQualifier -> uniqueQualifier + "-" + eventKey)
                 .orElse(null);
         if (base == null) {
             return null;

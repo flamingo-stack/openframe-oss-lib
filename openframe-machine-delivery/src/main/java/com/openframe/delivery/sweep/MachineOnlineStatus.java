@@ -15,7 +15,7 @@ import static java.util.stream.Collectors.toSet;
 
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = {"openframe.delivery.enabled", "openframe.delivery.sweep.enabled"}, havingValue = "true")
+@ConditionalOnProperty(name = "openframe.delivery.sweep.enabled", havingValue = "true")
 public class MachineOnlineStatus {
 
     private static final Set<DeviceStatus> GONE = EnumSet.of(

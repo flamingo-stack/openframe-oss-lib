@@ -67,6 +67,7 @@ const timeChip = async () => {
 };
 
 beforeEach(() => {
+  availability.formFields = [];
   hookState.isSubmitting = false;
   hookState.availabilityError = null;
   book.mockReset();
@@ -130,5 +131,37 @@ describe('HubSpotMeetingScheduler — details-first flow', () => {
     render(scheduler({ onStageChange }));
     await screen.findByText(/couldn't load available call times/);
     expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual(['unavailable']);
+  });
+});
+
+describe('HubSpotMeetingScheduler — which links fall back to HubSpot', () => {
+  const BOOKED_ON_HUBSPOT = 'This meeting type is booked directly on HubSpot.';
+
+  it('a required phone question (any HubSpot type) keeps the native form', async () => {
+    availability.formFields = [
+      { name: 'phone', label: 'Phone number', type: 'phonenumber', dataType: 'string', required: true },
+      { name: 'x', label: 'Brand new type', type: 'hologram', required: true },
+    ];
+    render(scheduler());
+    expect(await screen.findByLabelText(/^Phone number/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Brand new type/)).toBeInTheDocument();
+    expect(screen.queryByText(BOOKED_ON_HUBSPOT)).not.toBeInTheDocument();
+  });
+
+  it('only a REQUIRED question no control can answer shows the degraded card', async () => {
+    availability.formFields = [{ name: 'cv', label: 'Upload', type: 'file', required: true }];
+    const onStageChange = vi.fn<(stage: SchedulerStage) => void>();
+    render(scheduler({ onStageChange, fallbackUrl: 'https://meetings.hubspot.com/x' }));
+    expect(await screen.findByText(BOOKED_ON_HUBSPOT)).toBeInTheDocument();
+    expect(screen.getByText('Open in HubSpot')).toBeInTheDocument();
+    expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual(['unavailable']);
+  });
+
+  it('an OPTIONAL unanswerable question is skipped, not a reason to fall back', async () => {
+    availability.formFields = [{ name: 'cv', label: 'Upload', type: 'file', required: false }];
+    render(scheduler());
+    expect(await screen.findByLabelText(/^Email/)).toBeInTheDocument();
+    expect(screen.queryByText(BOOKED_ON_HUBSPOT)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Upload/)).not.toBeInTheDocument();
   });
 });

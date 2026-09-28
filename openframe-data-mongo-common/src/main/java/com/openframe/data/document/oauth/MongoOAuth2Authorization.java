@@ -1,6 +1,9 @@
 package com.openframe.data.document.oauth;
 import com.openframe.data.document.TenantScoped;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -10,6 +13,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "oauth2_authorizations")
 @CompoundIndex(def = "{'registeredClientId': 1, 'principalName': 1}")
 public class MongoOAuth2Authorization implements TenantScoped {
@@ -63,3 +69,4 @@ public class MongoOAuth2Authorization implements TenantScoped {
                 .orElse(null);
     }
 }
+

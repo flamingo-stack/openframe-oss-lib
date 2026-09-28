@@ -13,6 +13,7 @@ public interface SourceEventTypes {
 
         String CMD_RUN_FINISHED = "cmd_run.finished";
         String SCRIPT_RUN_FINISHED = "script_run.finished";
+        String SCRIPT_RUN_FAILED = "script_run.failed";
     }
 
     /**

@@ -4,14 +4,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import type { Control, UseFormRegister } from 'react-hook-form';
+import type { Control, Path, UseFormRegister } from 'react-hook-form';
+import { useRescuedForm } from '../../hooks/use-rescued-form';
 import {
   BUILT_IN_BOOKING_FIELDS,
   type BuiltInBookingFieldName,
   DECIMAL_LITERAL_RE,
   fieldTypeSpec,
   makeDeferredBookingSchema,
-  isSupportedFormField,
+  MULTI_VALUE_SEPARATOR,
+  normalizeFormFields,
+  splitMultiValue,
   type BuiltInBookingField,
   type MeetingAvailability,
   type SupportedFormFieldType,
@@ -20,6 +23,7 @@ import {
   type BookingFormValues,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
+import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import {
   Button,
@@ -151,6 +155,12 @@ interface ControlArgs {
 const placeholderFor = (field: ControlArgs['field']): string | undefined =>
   field.placeholder ?? fieldTypeSpec(field.type).placeholder?.(field);
 
+/** An option's display text: HubSpot's label when it differs from the submitted value. */
+const optionLabel = (field: ControlArgs['field'], value: string): string => field.optionLabels?.[value] ?? value;
+
+/** A free-text answer is sent without the whitespace a paste drags in. */
+const trimmed = (v: unknown): string => String(v ?? '').trim();
+
 /** `<input type="number">` accepts `1e3` and ` 12 `; the wire wants the
  *  decimal literal the validator checks. A value ALREADY in that shape passes
  *  verbatim (`007` included) — a long integer or a tiny decimal must not be
@@ -206,6 +216,28 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       {...register(registerName as never, { setValueAs: canonicalNumber })}
     />
   ),
+  phone: ({ field, id, registerName, error, register }) => (
+    <Input
+      id={id}
+      type="tel"
+      inputMode="tel"
+      autoComplete="tel"
+      required={field.required}
+      aria-invalid={Boolean(error)}
+      placeholder={placeholderFor(field)}
+      {...register(registerName as never, { setValueAs: trimmed })}
+    />
+  ),
+  date: ({ field, id, registerName, error, register }) => (
+    // The native picker emits exactly the wire shape (`YYYY-MM-DD`).
+    <Input
+      id={id}
+      type="date"
+      required={field.required}
+      aria-invalid={Boolean(error)}
+      {...register(registerName as never)}
+    />
+  ),
   select: ({ field, id, registerName, error, control }) => (
     <Controller
       control={control}
@@ -218,7 +250,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
           <SelectContent>
             {(field.options ?? []).map(opt => (
               <SelectItem key={opt} value={opt}>
-                {opt}
+                {optionLabel(field, opt)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -240,11 +272,41 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
           {(field.options ?? []).map(opt => (
             <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
               <RadioGroupItem id={`${id}-${opt}`} value={opt} />
-              <Label htmlFor={`${id}-${opt}`}>{opt}</Label>
+              <Label htmlFor={`${id}-${opt}`}>{optionLabel(field, opt)}</Label>
             </div>
           ))}
         </RadioGroup>
       )}
+    />
+  ),
+  multiselect: ({ field, id, registerName, error, control }) => (
+    // HubSpot's "multiple checkboxes": the answer is its `;`-joined value list,
+    // held in that wire shape so the validator and the POST see one string.
+    <Controller
+      control={control}
+      name={registerName as never}
+      render={({ field: rhf }) => {
+        const selected = splitMultiValue(rhf.value);
+        const toggle = (opt: string, on: boolean) => {
+          const next = (field.options ?? []).filter(o => (o === opt ? on : selected.includes(o)));
+          rhf.onChange(next.join(MULTI_VALUE_SEPARATOR));
+        };
+        return (
+          <div id={id} role="group" className="flex flex-col gap-[var(--spacing-system-xs)]">
+            {(field.options ?? []).map(opt => (
+              <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
+                <Checkbox
+                  id={`${id}-${opt}`}
+                  checked={selected.includes(opt)}
+                  onCheckedChange={v => toggle(opt, v === true)}
+                  aria-invalid={Boolean(error)}
+                />
+                <Label htmlFor={`${id}-${opt}`}>{optionLabel(field, opt)}</Label>
+              </div>
+            ))}
+          </div>
+        );
+      }}
     />
   ),
   checkbox: ({ field, id, registerName, error, control }) => (
@@ -310,6 +372,11 @@ export interface BookingFormProps {
   /** From useHumanitySignals — parent owns the instance so it can resetSignals(). */
   honeypotInputProps: { ref: Ref<HTMLInputElement>; name: string };
   getSignals: () => Record<string, string | number>;
+  /** Form rescue for this form (`RESCUE_FORMS.meetingBooking`); `null` or omitted saves nothing.
+   *  The attempt's keys ride the payload handed to `onSubmit`, so the parent closes it after
+   *  the booking commits (`completeFormRescue`), in details-first too, where this form has
+   *  unmounted by then. */
+  rescue?: FormRescueDefinition | null;
 }
 
 /**
@@ -342,9 +409,13 @@ export function BookingForm({
   onSubmit,
   honeypotInputProps,
   getSignals,
+  rescue = null,
 }: BookingFormProps) {
   const { formFields, legalConsent } = availability;
-  const supportedFields = useMemo(() => formFields.filter(isSupportedFormField), [formFields]);
+  // Every declared question resolved to a control (`resolveFormFieldControl`) —
+  // an unfamiliar HubSpot type is drawn as its nearest control, never dropped
+  // silently and never a reason to hide the form.
+  const supportedFields = useMemo(() => normalizeFormFields(formFields), [formFields]);
   // The DEFERRED schema in both flows: it is the wider of the two, and a strict
   // resolver is not assignable to `Resolver<BookingFormValues>`. The strict
   // schema is the server's contract — see `makeBookingSchema`'s docblock.
@@ -368,6 +439,7 @@ export function BookingForm({
     handleSubmit,
     setValue,
     getValues,
+    watch,
     formState: { errors },
   } = useForm<BookingFormValues>({
     resolver: zodResolver(schema),
@@ -416,6 +488,24 @@ export function BookingForm({
     );
   }, [consentDefaults, priorConsents, getValues, setValue]);
 
+  // Form rescue: the built-ins by name, the declared questions under `formFields.<name>`.
+  const rescueFields = useMemo(
+    () => [...BUILT_IN_BOOKING_FIELDS.map(field => field.name), ...supportedFields.map(field => field.name)],
+    [supportedFields],
+  );
+  const formRescue = useRescuedForm(
+    { watch, getValues, setValue },
+    {
+      rescue,
+      fields: rescueFields,
+      getSignals,
+      fieldPath: name =>
+        (BUILT_IN_BOOKING_FIELDS.some(field => field.name === name)
+          ? name
+          : `formFields.${name}`) as Path<BookingFormValues>,
+    },
+  );
+
   const submitValid = handleSubmit(async data => {
     if (consentMissing) return; // the error is already on screen — see `submit`
     if (deferSlot) {
@@ -423,7 +513,7 @@ export function BookingForm({
       // must do so synchronously in this call — this form and its honeypot are
       // still mounted here, and `getSignals()` reads a detached ref once they
       // unmount, which would silently disable the decoy.
-      await onSubmit({ ...data, meetingId, [HOST_CONSENT_KEY]: consented });
+      await onSubmit({ ...data, meetingId, [HOST_CONSENT_KEY]: consented, ...formRescue.submitFields() });
       return;
     }
     await onSubmit({
@@ -434,6 +524,7 @@ export function BookingForm({
       durationMs,
       timezone,
       ...getSignals(),
+      ...formRescue.submitFields(),
     });
   });
 

@@ -42,17 +42,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { completeFormRescue } from '../../hooks/use-form-rescue';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { BOOKING_IN_FLIGHT_MESSAGE, useMeetingBooking } from '../../hooks/use-meeting-booking';
 import { useToast } from '../../hooks/use-toast';
 import {
-  isSupportedFormField,
+  blocksNativeBooking,
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
   type MeetingHost,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
+import { FORM_RESCUE_ATTEMPT_FIELD, type FormRescueDefinition } from '../../utils/form-rescue';
 import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
 import { BookingForm, BookingFormSkeleton, DEFAULT_SUBMIT_LABEL, type BookingFormProps } from './booking-form';
@@ -150,6 +152,9 @@ export interface HubSpotMeetingSchedulerProps {
    * can pass it across the RSC boundary where a component cannot.
    */
   detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent'>;
+  /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
+   *  omitted or `null` saves nothing. */
+  rescue?: FormRescueDefinition | null;
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
@@ -369,13 +374,16 @@ export function SchedulerDegradedCard({
 }
 
 /**
- * Fail-closed gate: a link whose declared questions include an unsupported
- * type, or whose consent block is malformed, must NOT render a half-working
- * native form (a silently dropped required question or missing consent copy
- * is worse than no native form) — the escape hatch takes over.
+ * Fail-closed gate: a link with a REQUIRED question no control can answer (a
+ * file upload), or whose consent block is malformed, must NOT render a
+ * half-working native form (a silently dropped required question or missing
+ * consent copy is worse than no native form) — the escape hatch takes over.
+ * An unfamiliar question TYPE is not a reason: it resolves to the nearest
+ * control (`resolveFormFieldControl`), so one new HubSpot type can no longer
+ * take the whole booking form down.
  */
 function isNativelyBookable(availability: MeetingAvailability): boolean {
-  if (!availability.formFields.every(isSupportedFormField)) return false;
+  if (availability.formFields.some(blocksNativeBooking)) return false;
   const consent = availability.legalConsent;
   if (consent) {
     if (typeof consent.processingConsentText !== 'string') return false;
@@ -400,6 +408,7 @@ export function HubSpotMeetingScheduler({
   flow = DEFAULT_SCHEDULER_FLOW,
   detailsForm: DetailsForm = BookingForm,
   detailsFormProps,
+  rescue = null,
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -639,6 +648,8 @@ export function HubSpotMeetingScheduler({
         return;
       }
       if (result.ok && result.confirmation) {
+        // The details form may have unmounted (details-first); its attempt id rides the payload.
+        completeFormRescue(rescue, payload[FORM_RESCUE_ATTEMPT_FIELD]);
         setConfirmation(result.confirmation);
         setStep('confirmed');
         onBooked?.(result.confirmation);
@@ -678,7 +689,7 @@ export function HubSpotMeetingScheduler({
         });
       }
     },
-    [book, bookingError, detailsFirst, onBooked, refetchAvailability, resetSignals, toast],
+    [book, bookingError, detailsFirst, onBooked, refetchAvailability, rescue, resetSignals, toast],
   );
 
   const escapeHatch = fallbackUrl ? (
@@ -864,6 +875,7 @@ export function HubSpotMeetingScheduler({
                 onSubmit={detailsFirst ? stashDetails : handleSubmit}
                 honeypotInputProps={honeypotInputProps}
                 getSignals={getSignals}
+                rescue={rescue}
               />
             </div>
           ) : (

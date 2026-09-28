@@ -42,7 +42,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String DEFAULT_SORT_FIELD = "_id";
     private static final String AND_OPERATOR = "$and";
 
-    private static final String FIELD_STATUS = "status";
     private static final String FIELD_STATUS_ID = "statusId";
     private static final String FIELD_STATUS_KIND = "statusKind";
     private static final String FIELD_TICKET_NUMBER = "ticketNumber";
@@ -71,7 +70,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final List<String> SORTABLE_FIELDS = List.of(
             ID_FIELD,
             FIELD_TICKET_NUMBER,
-            FIELD_STATUS,
             FIELD_STATUS_KIND,
             FIELD_ORGANIZATION_NAME,
             FIELD_ASSIGNED_NAME,
@@ -319,7 +317,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private Object getSortFieldValue(Ticket ticket, String sortField) {
         return switch (sortField) {
             case FIELD_TICKET_NUMBER -> ticket.getTicketNumber();
-            case FIELD_STATUS -> ticket.getStatus() != null ? ticket.getStatus().name() : null;
             case FIELD_STATUS_KIND -> ticket.getStatusKind() != null ? ticket.getStatusKind().name() : null;
             case FIELD_ORGANIZATION_NAME -> ticket.getOrganizationName();
             case FIELD_ASSIGNED_NAME -> ticket.getAssignedName();

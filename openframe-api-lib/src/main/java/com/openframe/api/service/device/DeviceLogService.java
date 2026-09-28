@@ -8,6 +8,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.core.exception.InternalException;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.loki.client.LogQl;
 import com.openframe.data.loki.client.LokiClient;
@@ -25,11 +26,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 
 /**
  * Device agent logs, read from Loki where {@code openframe-saas-logs-stream} writes them as
@@ -43,7 +47,12 @@ import static java.util.stream.Collectors.joining;
 public class DeviceLogService {
 
     static final Duration DEFAULT_LOOKBACK = Duration.ofDays(7);
+    /**
+     * A whole tenant produces far more lines than one device, so an unbounded query defaults to a shorter window.
+     */
+    static final Duration DEFAULT_TENANT_LOOKBACK = Duration.ofDays(1);
     static final Duration MAX_RANGE = Duration.ofDays(30);
+    static final int MAX_DEVICES = 50;
     static final int MAX_SEARCH_LENGTH = 256;
     static final int MAX_SEARCH_TERMS = 5;
     static final int DEFAULT_PAGE_SIZE = 100;
@@ -62,16 +71,29 @@ public class DeviceLogService {
     private final Map<String, String> tenantDomains = new ConcurrentHashMap<>();
 
     /**
-     * Logs of one device, newest first.
-     * <p>
-     * Tenant isolation does not rely on anything in the request: the device must be visible to this tenant,
-     * and the stream selector is pinned to this tenant's own domain from the {@code tenants} collection.
+     * Logs of one device, newest first. Shorthand for {@link #queryLogs(List, DeviceLogFilterCriteria,
+     * CursorPaginationCriteria)} with a single device.
      */
     public GenericQueryResult<DeviceLogEntry> queryDeviceLogs(String machineId,
                                                               DeviceLogFilterCriteria filter,
                                                               CursorPaginationCriteria pagination) {
-        deviceService.findByMachineId(machineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
+        // singletonList, not List.of: a null id must reach validateDevices and come back as a 400, not an NPE
+        return queryLogs(Collections.singletonList(machineId), filter, pagination);
+    }
+
+    /**
+     * Agent logs of this tenant, newest first, narrowed to {@code machineIds} or covering every device when that
+     * list is null.
+     * <p>
+     * Tenant isolation does not rely on anything in the request: every named device must be visible to this tenant,
+     * and the stream selector is pinned to this tenant's own domain from the {@code tenants} collection. Whether a
+     * device is named only adds a metadata filter on top of that selector, so it can never widen the scope.
+     */
+    public GenericQueryResult<DeviceLogEntry> queryLogs(List<String> machineIds,
+                                                        DeviceLogFilterCriteria filter,
+                                                        CursorPaginationCriteria pagination) {
+        List<String> devices = validateDevices(machineIds);
+        verifyDevicesExist(devices);
 
         DeviceLogFilterCriteria criteria = filter != null ? filter : new DeviceLogFilterCriteria();
         CursorPaginationCriteria page = pagination != null ? pagination : new CursorPaginationCriteria();
@@ -79,7 +101,8 @@ public class DeviceLogService {
         validateSearch(criteria);
 
         Instant to = criteria.getTo() != null ? criteria.getTo() : Instant.now();
-        Instant from = criteria.getFrom() != null ? criteria.getFrom() : to.minus(DEFAULT_LOOKBACK);
+        Duration lookback = devices.isEmpty() ? DEFAULT_TENANT_LOOKBACK : DEFAULT_LOOKBACK;
+        Instant from = criteria.getFrom() != null ? criteria.getFrom() : to.minus(lookback);
         validateRange(from, to);
 
         long startNanos = toNanos(from);
@@ -93,9 +116,9 @@ public class DeviceLogService {
             endNanos = Math.min(endNanos, after.timestampNanos());
         }
 
-        String query = buildQuery(resolveTenantDomain(), machineId, criteria);
+        String query = buildQuery(resolveTenantDomain(), devices, criteria);
         int pageSize = pageSize(page.getLimit());
-        log.debug("Querying device logs for machineId: {}, query: {}, start: {}, end: {}", machineId, query, startNanos, endNanos);
+        log.debug("Querying device logs for machineIds: {}, query: {}, start: {}, end: {}", devices, query, startNanos, endNanos);
 
         // One extra line tells whether there is a next page
         int queryLimit = pageSize + 1;
@@ -108,7 +131,7 @@ public class DeviceLogService {
         return result(items, hasNextPage, hasPreviousPage);
     }
 
-    static String buildQuery(String tenantDomain, String machineId, DeviceLogFilterCriteria criteria) {
+    static String buildQuery(String tenantDomain, List<String> machineIds, DeviceLogFilterCriteria criteria) {
         StringBuilder query = new StringBuilder("{job=").append(LogQl.quote(AGENT_LOGS_JOB))
                 .append(", tenant_domain=").append(LogQl.quote(tenantDomain));
         List<DeviceLogLevel> levels = criteria.getLevels();
@@ -120,7 +143,63 @@ public class DeviceLogService {
         // Line filters before the metadata filter: the cheapest stage runs first
         appendTermFilters(query, " |~ ", criteria.getContains());
         appendTermFilters(query, " !~ ", criteria.getExcludes());
-        return query.append(" | machine_id=").append(LogQl.quote(machineId)).toString();
+        appendDeviceFilter(query, machineIds);
+        return query.toString();
+    }
+
+    /**
+     * {@code machine_id} is structured metadata rather than a stream label, so the selector above already spans every
+     * device of the tenant and naming devices only drops lines from the result. An empty list therefore needs no
+     * filter at all. Several devices chain with {@code or} instead of a regex alternation: no escaping, and no
+     * dependence on how Loki anchors a label-filter regex.
+     */
+    private static void appendDeviceFilter(StringBuilder query, List<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return;
+        }
+        query.append(" | ");
+        for (int i = 0; i < machineIds.size(); i++) {
+            if (i > 0) {
+                query.append(" or ");
+            }
+            query.append("machine_id=").append(LogQl.quote(machineIds.get(i)));
+        }
+    }
+
+    /**
+     * A null list means every device of the tenant. A list that is present but holds no usable id is rejected instead:
+     * it is far more likely a client that failed to load its device picker than a deliberate tenant-wide query.
+     */
+    private static List<String> validateDevices(List<String> machineIds) {
+        if (machineIds == null) {
+            return List.of();
+        }
+        List<String> devices = machineIds.stream().filter(StringUtils::hasText).distinct().toList();
+        if (devices.isEmpty()) {
+            throw new IllegalArgumentException("machineIds must name at least one device; omit it to query every device");
+        }
+        if (devices.size() > MAX_DEVICES) {
+            throw new IllegalArgumentException("Cannot query more than " + MAX_DEVICES + " devices at once");
+        }
+        return devices;
+    }
+
+    /**
+     * One lookup for the whole set. Tenant isolation does not depend on this check - the stream selector does that -
+     * but it turns a typo into a 404 instead of an empty page.
+     */
+    private void verifyDevicesExist(List<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return;
+        }
+        Set<String> found = deviceService.findByMachineIds(machineIds).stream()
+                .map(Machine::getMachineId)
+                .collect(toSet());
+        for (String machineId : machineIds) {
+            if (!found.contains(machineId)) {
+                throw new DeviceNotFoundException("Machine not found: " + machineId);
+            }
+        }
     }
 
     /**
@@ -186,6 +265,7 @@ public class DeviceLogService {
                     .agentTimestamp(parseInstant(entry.labels().get("agent_ts")))
                     .level(entry.labels().get("level"))
                     .message(entry.line())
+                    .machineId(entry.labels().get("machine_id"))
                     .hostname(entry.labels().get("hostname"))
                     .count(parseLong(entry.labels().get("count")))
                     .cursor(new DeviceLogCursor(entry.timestampNanos()).encode())

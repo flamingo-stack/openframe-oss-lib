@@ -33,7 +33,24 @@ import React, { type ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
+import type { DesignDoc } from '../../../types/design-doc';
+import {
+  TRUST_CENTER_DOCUMENT_TYPE,
+  TRUST_CENTER_PAGE_PATH,
+  TRUST_CENTER_TAGLINE,
+  TRUST_CENTER_TITLE,
+  trustFrameworkBadge,
+  trustFrameworkMonitoringEntry,
+  trustFrameworksSummary,
+  type TrustCenterPublic,
+  type TrustFrameworkMonitoringEntry,
+} from '../../../types/trust-center';
 import { formatDateShort } from '../../../utils/date-formatters';
+import {
+  DESIGN_DOC_READINESS_DISPLAY,
+  designDocReadiness,
+  formatCompletionLabel,
+} from '../../../utils/design-doc-readiness';
 import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
@@ -51,6 +68,7 @@ import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
 import { CodeSquareIcon } from '../../icons-v2-generated/coding/code-square-icon';
 import { CodingBranchIcon } from '../../icons-v2-generated/coding/coding-branch-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
+import { CodingMergeIcon } from '../../icons-v2-generated/coding/coding-merge-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
 import { PackageIcon } from '../../icons-v2-generated/coding/package-icon';
 import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
@@ -69,6 +87,7 @@ import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-tria
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon';
 import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon';
 import { MapIcon } from '../../icons-v2-generated/map-and-travel/map-icon';
+import { ShieldCheckIcon } from '../../icons-v2-generated/security/shield-check-icon';
 import { Megaphone01Icon } from '../../icons-v2-generated/shopping/megaphone-01-icon';
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon';
 import { CheckSquareIcon } from '../../icons-v2-generated/signs-and-symbols/check-square-icon';
@@ -103,6 +122,7 @@ import { CaseStudyCardSkeleton } from './case-study-card';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
 import { CustomerInterviewCardSkeleton } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
+import { designDocMetaLine } from './design-doc-card';
 import {
   parseGithubTitle,
   formatActivityId,
@@ -651,6 +671,54 @@ function GlyphChatCard({
   );
 }
 
+/** Framework status colour (a `StatusBadge` scheme) → the card pill's `Tag` variant. */
+const TRUST_STATUS_TAG_VARIANT: Record<TrustFrameworkMonitoringEntry['color'], MingoInfoCardStatus['variant']> = {
+  cyan: 'selectedCyan',
+  pinkSoft: 'selected',
+};
+
+/** Trust center (single record: the whole public projection). Title + the
+ *  frameworks with their monitoring badges; the lead framework's badge is the pill;
+ *  "View trust center" opens the page. Defensive reads — the row is unvalidated. */
+function TrustCenterChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  discuss,
+}: {
+  item: unknown;
+  chatRef: ChatRef;
+  isNewTab: boolean;
+  discuss?: CardDiscussAction;
+}) {
+  const raw = (item as { frameworks?: unknown } | undefined)?.frameworks;
+  const frameworks: TrustCenterPublic['frameworks'] = Array.isArray(raw)
+    ? (raw as TrustCenterPublic['frameworks'])
+    : [];
+  const summary = trustFrameworksSummary(frameworks);
+  const leadFramework = frameworks[0];
+  const lead = leadFramework
+    ? {
+        label: trustFrameworkBadge(leadFramework),
+        color: trustFrameworkMonitoringEntry(leadFramework.monitoring).color,
+      }
+    : undefined;
+  return (
+    <MingoInfoCard
+      title={TRUST_CENTER_TITLE}
+      description={summary || TRUST_CENTER_TAGLINE}
+      icon={<ShieldCheckIcon size={24} />}
+      status={lead ? { label: lead.label, variant: TRUST_STATUS_TAG_VARIANT[lead.color] } : undefined}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss, {
+        label: 'View trust center',
+        icon: <ShieldCheckIcon size={20} />,
+      })}
+      menuAriaLabel="Trust center actions"
+    />
+  );
+}
+
 function DataRoomDocChatCard({
   chatRef,
   isNewTab,
@@ -1008,6 +1076,46 @@ function CustomerInterviewChatCard({
   );
 }
 
+/**
+ * Design doc → the doc glyph, its readiness as the pill (the hub's own wording: "Ready to build" / "Not ready",
+ * `design-doc-readiness`) and "DRI · updated · n/m reviews signed off" under the title. The hub's card route attaches the doc's list row as
+ * `item.doc`; a row without it (an older hub) renders the ref's own title and preview.
+ */
+function DesignDocChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  discuss,
+}: {
+  item: (ChatCardItem & { doc?: DesignDoc }) | undefined;
+  chatRef: ChatRef;
+  isNewTab: boolean;
+  discuss?: CardDiscussAction;
+}) {
+  const displayRef = fetchedItemDisplayRef(item, chatRef);
+  const doc = item?.doc;
+  const readiness = doc ? DESIGN_DOC_READINESS_DISPLAY[designDocReadiness(doc.completion)] : null;
+  return (
+    <MingoInfoCard
+      title={doc?.title ?? displayRef.title}
+      description={
+        doc
+          ? [designDocMetaLine(doc), formatCompletionLabel(doc.completion)].join(' · ')
+          : (displayRef.preview ?? undefined)
+      }
+      icon={<FileContentIcon size={24} />}
+      status={
+        readiness
+          ? { label: readiness.label, variant: readiness.scheme === 'success' ? 'success' : 'grey' }
+          : { label: 'Design doc', variant: 'grey' }
+      }
+      anchorProps={buildAnchorProps(displayRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(displayRef.url, discuss)}
+      menuAriaLabel="Design doc actions"
+    />
+  );
+}
+
 /** Investor update → presentation icon + "Investor update" pill. Title falls
  *  back to "Update #N" when the row has no explicit title. */
 function InvestorUpdateChatCard({
@@ -1351,7 +1459,6 @@ interface GlyphCardConfig {
 /** The OpenFrame logo every OpenFrame surface uses (the `openframe` icon name). */
 const OpenFrameGlyph = resolveIcon('openframe');
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
-  design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
   openframe_tenant: { label: 'OpenFrame tenant', icon: () => <OpenFrameGlyph size={24} /> },
   prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
   // Code intelligence (product-hub internal): the review rules a repository is
@@ -1369,6 +1476,9 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   code_symbol: { label: 'Code symbol', icon: () => <CodeSquareIcon size={24} /> },
   code_duplicate: { label: 'Duplicate code', icon: () => <Copy01Icon size={24} /> },
   code_impact: { label: 'Change impact', icon: () => <CodingPullRequestIcon size={24} /> },
+  // A change set: pull requests across repositories declared as one change, with the ClickUp tasks and design
+  // docs its pull requests are attached to. ONE card for it wherever a set is shown (chat, a design doc's page).
+  change_set: { label: 'Change set', icon: () => <CodingMergeIcon size={24} /> },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
@@ -1563,6 +1673,21 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
       <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
   },
+  // Trust center — ONE record (`[card://trust_center:main]`) from the public
+  // projection route; `extractCardItems` turns its object payload into the
+  // single matched row. Destination is the public page unless the host
+  // re-homes the type (`composeContentUrl` override).
+  [TRUST_CENTER_DOCUMENT_TYPE]: {
+    label: 'Trust center',
+    bareInline: true,
+    contentRefType: TRUST_CENTER_DOCUMENT_TYPE,
+    noComposedHref: true,
+    fallbackHref: () => TRUST_CENTER_PAGE_PATH,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => (
+      <TrustCenterChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    ),
+  },
   hubspot_ticket: refHydratedEntry('hubspot_ticket', 'HubSpot ticket', (displayRef, opts) => (
     <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
   )),
@@ -1621,6 +1746,17 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         discuss={opts.discuss}
         ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
+    ),
+  },
+  design_doc: {
+    label: 'Design doc',
+    contentRefType: 'design_doc',
+    bareInline: true,
+    noComposedHref: true,
+    fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => (
+      <DesignDocChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
   },
   customer_interview: {
@@ -2067,7 +2203,7 @@ export function ChatCardLoader({
       // Same 12px rhythm as the message renderer's block-sibling wrapper
       // (`my-3` in chat-message-enhanced) so card→player spacing matches
       // the spacing between any two hoisted blocks.
-      <div className="flex min-w-0 flex-col gap-3">
+      <div className="grid min-w-0 grid-cols-1 gap-3">
         {finish(entry.render(item, finalChatRef, renderOpts))}
         <ChatVideoEntityCard chatRef={videoRef} />
       </div>

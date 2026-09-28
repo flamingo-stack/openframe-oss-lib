@@ -4,7 +4,7 @@ import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 
-public interface DeliverySpec<S extends DeliverySeed, P> {
+public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload> {
 
     DeliveryType getType();
 
@@ -12,7 +12,7 @@ public interface DeliverySpec<S extends DeliverySeed, P> {
 
     DeliveryRequest<P> request(S seed);
 
-    void publish(String machineId, P payload);
+    String subject(String machineId);
 
     void onFailed(MachineDelivery delivery, DeliveryFailure failure);
 }

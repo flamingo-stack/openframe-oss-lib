@@ -49,9 +49,9 @@ export interface FetchDialogsResult {
  * or adapter-owned (`UnifiedChatState.dialogCapabilities`).
  */
 export interface ChatDialogCapabilities {
-  /** Show "Rename chat" in the row ⋯ menu and the conversation header. */
+  /** Show "Rename Chat" in the row ⋯ menu and the conversation header. */
   canRename?: boolean;
-  /** Show "Archive chat" in the row ⋯ menu and the conversation header. */
+  /** Show "Archive Chat" in the row ⋯ menu and the conversation header. */
   canArchive?: boolean;
   /** Pages archived dialogs — presence gates the archive page + header button. */
   fetchArchivedDialogs?: (params: FetchDialogsParams) => Promise<FetchDialogsResult>;
@@ -61,8 +61,14 @@ export interface ChatDialogCapabilities {
   searchQuery?: string;
   /** Presence wires the header magnifier + the rail's search field. */
   onSearchChange?: (query: string) => void;
-  /** "Copy chat link" — the owner of the URL shape + clipboard write. */
+  /** "Copy Chat Link" — the owner of the URL shape + clipboard write. */
   onCopyLink?: (dialog: DialogItem) => void;
+  /**
+   * "Compact Chat Memory" — summarizes the dialog's AI context on demand. The
+   * host owns the request and its feedback; the compaction itself streams into
+   * the thread as the usual context-compaction message.
+   */
+  compactDialog?: (dialog: DialogItem) => void;
   /**
    * When the list has settled EMPTY and is unsearched, land on the composer
    * instead of an empty "Current Chats" screen.

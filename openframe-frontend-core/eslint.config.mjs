@@ -176,6 +176,13 @@ export default defineConfig([
       // is under test is its display mode — `contents` versus a positioned box —
       // which no `screen` query can reach, so the test walks up from the control.
       'src/components/ui/__tests__/field-wrapper-error-slot.test.tsx',
+      // The store badges paint through <linearGradient>/<clipPath> elements addressed
+      // by id, and the contract is that those ids are unique PER INSTANCE — two badge
+      // rows on one page must not resolve each other's <defs>. A <defs> child has no
+      // role, no name and no text, so `screen` cannot see it at all; the test collects
+      // every `[id]` in the container and asserts the set size, which is the only
+      // formulation of that claim.
+      'src/components/ui/__tests__/store-badges.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',

@@ -52,8 +52,56 @@ class ScriptResultDeserializerTest {
     @Test
     @DisplayName("sourceEventType is script_run.finished — distinct from the command's cmd_run.finished so EventTypeMapper maps it to the user-facing SCRIPT_EXECUTED")
     void sourceEventTypeIsScriptRunFinished() {
-        assertThat(deserializer.getSourceEventType(mapper.createObjectNode()))
+        assertThat(deserializer.getSourceEventType(mapper.createObjectNode().put("exitCode", 0)))
                 .contains(SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED);
+    }
+
+    @Test
+    void sourceEventType_nonZeroExitCode_isScriptRunFailed() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 1);
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FAILED);
+    }
+
+    @Test
+    void sourceEventType_timedOut_isScriptRunFailed() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 0).put("timedOut", true);
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FAILED);
+    }
+
+    @Test
+    void sourceEventType_agentErrorWithoutExitCode_isScriptRunFailed() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("error", "binary not found");
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FAILED);
+    }
+
+    @Test
+    void sourceEventType_stderrOnlyWithZeroExitCode_staysFinished() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 0).put("stderr", "warning: deprecated flag");
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED);
     }
 
     @Test
@@ -115,8 +163,8 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("getMessage: succeeds even when the script run FAILED (exitCode != 0) — message is about \"a script ran\", status lives elsewhere")
-    void getMessage_alsoForFailedRuns() {
+    void getMessage_failedRun_saysTheScriptFailed() {
+        // setup
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 1);
         when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
@@ -124,8 +172,24 @@ class ScriptResultDeserializerTest {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(scriptWithName("disk usage")));
 
-        // Format is invariant of outcome — the user-visible status badge is rendered separately.
-        assertThat(deserializer.getMessage(after)).contains("Script disk usage executed.");
+        // execution
+        Optional<String> message = deserializer.getMessage(after);
+
+        // verifications
+        assertThat(message).contains("Script disk usage failed.");
+    }
+
+    @Test
+    void getMessage_failedRunWithoutIdentifiers_fallsBackToScriptFailed() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 1);
+
+        // execution
+        Optional<String> message = deserializer.getMessage(after);
+
+        // verifications
+        assertThat(message).contains("Script failed");
+        verifyNoInteractions(scriptExecutionRepository);
     }
 
     @Test
@@ -221,6 +285,37 @@ class ScriptResultDeserializerTest {
 
         assertThat(deserializer.getMessage(after)).contains("Updated Mozilla.Firefox.");
         verifyNoInteractions(scriptRepository);
+    }
+
+    @Test
+    void getMessage_softwareInstallFailed_labeledFailedToInstall() {
+        // setup
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 1);
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(softwareExecution("presentify", SoftwareAction.INSTALL)));
+
+        // execution
+        Optional<String> message = deserializer.getMessage(after);
+
+        // verifications
+        assertThat(message).contains("Failed to install presentify.");
+        verifyNoInteractions(scriptRepository);
+    }
+
+    @Test
+    void getMessage_softwareUpdateTimedOut_labeledFailedToUpdate() {
+        // setup
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0).put("timedOut", true);
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(softwareExecution("Mozilla.Firefox", SoftwareAction.UPDATE)));
+
+        // execution
+        Optional<String> message = deserializer.getMessage(after);
+
+        // verifications
+        assertThat(message).contains("Failed to update Mozilla.Firefox.");
     }
 
     private static ScriptExecution executionWithScriptId(String scriptId) {

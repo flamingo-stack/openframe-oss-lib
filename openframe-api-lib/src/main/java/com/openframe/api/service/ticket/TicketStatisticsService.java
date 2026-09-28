@@ -2,6 +2,7 @@ package com.openframe.api.service.ticket;
 
 import com.openframe.api.dto.ticket.TicketStatistics;
 import com.openframe.api.dto.ticket.TicketStatusCount;
+import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.api.dto.ticket.TicketStatusDefinitionCount;
 import com.openframe.api.service.ticket.spi.TicketRatingProvider;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -14,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
@@ -50,13 +53,34 @@ public class TicketStatisticsService {
 
         return TicketStatistics.builder()
                 .totalCount((int) totalCount)
-                .statusCounts(List.of())
+                .statusCounts(foldToLegacyCounts(statusDefinitionCounts))
                 .statusDefinitionCounts(statusDefinitionCounts)
                 .averageResolutionTimeFormatted(formattedTime)
                 .averageRating(averageRating)
                 .build();
     }
 
+
+    /**
+     * The same totals keyed by the legacy enum, for clients built before the lifecycle rollout —
+     * the mobile and desktop shells ship a frozen web bundle. Custom columns have no legacy
+     * counterpart, so they land in the bucket their kind maps to; empty buckets are left out, the
+     * way the enum-era counts behaved.
+     * TODO(lifecycle-rollout): drop once no released shell reads statusCounts.
+     */
+    private List<TicketStatusCount> foldToLegacyCounts(List<TicketStatusDefinitionCount> counts) {
+        Map<TicketStatus, Integer> folded = new EnumMap<>(TicketStatus.class);
+        for (TicketStatusDefinitionCount count : counts) {
+            if (count.getCount() == null || count.getCount() == 0) {
+                continue;
+            }
+            TicketStatus legacy = TicketStatus.fromKind(count.getStatus().getKind());
+            folded.merge(legacy, count.getCount(), Integer::sum);
+        }
+        return folded.entrySet().stream()
+                .map(e -> TicketStatusCount.builder().status(e.getKey()).count(e.getValue()).build())
+                .toList();
+    }
 
     private List<TicketStatusDefinitionCount> countByStatusDefinition() {
         return ticketStatusService.list().stream()

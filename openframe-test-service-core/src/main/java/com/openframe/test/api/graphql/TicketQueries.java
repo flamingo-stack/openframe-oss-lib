@@ -389,6 +389,7 @@ public class TicketQueries {
                         title
                         description
                         status
+                        statusDefinition { id name kind }
                         owner {
                             ... on ClientTicketOwner { type machineId }
                             ... on AdminTicketOwner { type userId }

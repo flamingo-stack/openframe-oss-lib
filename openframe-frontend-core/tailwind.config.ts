@@ -167,6 +167,8 @@ const config: Config = {
           'bg-surface': 'var(--color-bg-surface)',
           'bg-surface-hover': 'var(--color-bg-surface-hover)',
           'bg-surface-active': 'var(--color-bg-surface-active)',
+          // Light surface on a dark UI — the semantic token existed with no utility.
+          'bg-inverted': 'var(--color-bg-inverted)',
           'card-hover': 'var(--color-bg-hover)',
           divider: 'var(--color-divider)',
 

@@ -69,6 +69,7 @@ export * from './slack-channel-chip';
 export * from './status-badge';
 export * from './palette-badge';
 export * from './department-badge';
+export * from './store-badges';
 export * from './status-indicator';
 export * from './toaster';
 // TODO: Add other UI components as they are moved to ui-kit
@@ -102,6 +103,8 @@ export * from './info-card-row';
 export * from './device-card';
 export * from './device-card-compact';
 export * from './entity-image';
+export * from './data-attribution';
+export * from './compliance-badge';
 export * from './feature-card';
 export * from './feature-list';
 export { FloatingTooltip } from './floating-tooltip';
