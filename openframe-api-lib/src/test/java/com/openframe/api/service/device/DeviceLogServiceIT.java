@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,7 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -207,6 +208,48 @@ class DeviceLogServiceIT {
         assertThat(polled).extracting(DeviceLogEntry::getMessage).containsExactly("poll-new-2", "poll-new-1", "poll-seen");
     }
 
+    private static Machine machine(String machineId) {
+        Machine machine = new Machine();
+        machine.setMachineId(machineId);
+        return machine;
+    }
+
+    @Test
+    void namingSeveralDevicesReturnsExactlyThoseAndNamingNoneReturnsTheWholeTenant() {
+        List<DeviceLogEntry> single = walkDevices(List.of(MACHINE_ID), window(), 250);
+        List<DeviceLogEntry> both = walkDevices(List.of(MACHINE_ID, OTHER_MACHINE_ID), window(), 250);
+        List<DeviceLogEntry> wholeTenant = walkDevices(null, window(), 250);
+
+        assertThat(both).hasSizeGreaterThan(single.size());
+        assertThat(both).extracting(DeviceLogEntry::getMachineId).containsOnly(MACHINE_ID, OTHER_MACHINE_ID);
+        assertThat(both).extracting(DeviceLogEntry::getMessage).noneMatch(message -> message.startsWith("other-tenant"));
+        assertThat(both).extracting(DeviceLogEntry::getTimestamp).isSortedAccordingTo(Comparator.reverseOrder());
+        assertThat(both).extracting(DeviceLogServiceIT::key).doesNotHaveDuplicates();
+
+        // No device filter at all: everything the named devices returned, still nothing from another tenant.
+        // A superset rather than an exact size, because other tests of this class seed devices of their own.
+        assertThat(wholeTenant).extracting(DeviceLogServiceIT::key)
+                .containsAll(both.stream().map(DeviceLogServiceIT::key).toList());
+        assertThat(wholeTenant).extracting(DeviceLogEntry::getMessage)
+                .noneMatch(message -> message.startsWith("other-tenant"));
+        assertThat(wholeTenant).extracting(DeviceLogEntry::getTimestamp).isSortedAccordingTo(Comparator.reverseOrder());
+        assertThat(wholeTenant).extracting(DeviceLogServiceIT::key).doesNotHaveDuplicates();
+    }
+
+    private static List<DeviceLogEntry> walkDevices(List<String> machineIds, DeviceLogFilterCriteria filter, int pageSize) {
+        List<DeviceLogEntry> lines = new ArrayList<>();
+        String rawCursor = null;
+        for (int pages = 0; pages < 1000; pages++) {
+            GenericQueryResult<DeviceLogEntry> result = service.queryLogs(machineIds, filter, page(pageSize, rawCursor));
+            lines.addAll(result.getItems());
+            if (!result.getPageInfo().isHasNextPage()) {
+                return lines;
+            }
+            rawCursor = CursorCodec.decode(result.getPageInfo().getEndCursor());
+        }
+        throw new AssertionError("Paging did not finish within 1000 pages");
+    }
+
     private static List<DeviceLogEntry> walk(String machineId, DeviceLogFilterCriteria filter, int pageSize) {
         List<DeviceLogEntry> lines = new ArrayList<>();
         String rawCursor = null;
@@ -235,7 +278,8 @@ class DeviceLogServiceIT {
 
     private static DeviceLogService newService() {
         DeviceService deviceService = mock(DeviceService.class);
-        when(deviceService.findByMachineId(anyString())).thenReturn(Optional.of(mock(Machine.class)));
+        when(deviceService.findByMachineIds(anyCollection())).thenAnswer(invocation ->
+                invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceIT::machine).toList());
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         TenantRepository tenantRepository = mock(TenantRepository.class);
@@ -245,7 +289,7 @@ class DeviceLogServiceIT {
     }
 
     private static void awaitLines(String machineId, int expected) throws InterruptedException {
-        String query = DeviceLogService.buildQuery(TENANT_DOMAIN, machineId, new DeviceLogFilterCriteria());
+        String query = DeviceLogService.buildQuery(TENANT_DOMAIN, List.of(machineId), new DeviceLogFilterCriteria());
         for (int attempt = 0; attempt < 50; attempt++) {
             int found = lokiClient.queryRange(query, toNanos(FROM), toNanos(Instant.now()) + 1, expected + 1,
                     LokiDirection.BACKWARD).size();
