@@ -16,6 +16,19 @@ export const processShortcodes = (content: string): string => {
   const escapeAttr = (value: string) =>
     value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+  // A value that already looks like a URL (starts with a scheme) MUST resolve
+  // to http(s) before it reaches embedDiv. Without this, `{{reddit:javascript://x}}`
+  // or `{{tweet:data:text/html,...}}` would pass their raw scheme straight into
+  // a `data-*` attribute that embed-overrides components later consume as a URL.
+  const isSafeHttpUrl = (value: string) => {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   /**
    * Emit one shortcode-expanded embed div. Every `embed-overrides.tsx` branch
    * REQUIRES its payload attribute — a div that lost it renders as an empty
@@ -71,6 +84,10 @@ export const processShortcodes = (content: string): string => {
       // `https://reddit.com/r/`, i.e. a guaranteed-broken embed.
       if (!postUrl) return match;
       const fullUrl = postUrl.startsWith('http') ? postUrl : `https://reddit.com/r/${postUrl}`;
+      // A payload that looks like a URL (starts with 'http') but isn't a
+      // genuine http(s) URL (e.g. `javascript://...`) must be rejected here —
+      // this is the single point before the value reaches an embed attribute.
+      if (postUrl.startsWith('http') && !isSafeHttpUrl(fullUrl)) return match;
       return embedDiv('reddit-embed', 'data-post-url', fullUrl);
     })
     // Twitter/X embeds: {{tweet:TWEET_URL}} or {{twitter:TWEET_URL}}
@@ -79,6 +96,9 @@ export const processShortcodes = (content: string): string => {
       // Same as reddit: a blank payload built `…/status/` with no id.
       if (!tweetInput) return match;
       const tweetUrl = tweetInput.startsWith('http') ? tweetInput : `https://twitter.com/twitter/status/${tweetInput}`;
+      // Reject non-http(s) schemes smuggled in behind a leading 'http', e.g.
+      // `javascript://` or `data:` payloads, before they reach the attribute.
+      if (tweetInput.startsWith('http') && !isSafeHttpUrl(tweetUrl)) return match;
       return embedDiv('tweet-embed', 'data-tweet-url', tweetUrl);
     })
     // Figma by file key (spec grammar): {{figma:FILE_KEY[:NODE_ID]}} → rewritten to the
@@ -93,7 +113,9 @@ export const processShortcodes = (content: string): string => {
     // Figma embeds: {{figma:URL}}
     .replace(/\{\{figma:([^}]+)\}\}/g, (match: string, url: string) => {
       const figmaUrl = url.trim();
-      return figmaUrl ? embedDiv('figma-embed', 'data-figma-url', figmaUrl) : match;
+      if (!figmaUrl) return match;
+      if (figmaUrl.startsWith('http') && !isSafeHttpUrl(figmaUrl)) return match;
+      return embedDiv('figma-embed', 'data-figma-url', figmaUrl);
     })
     // Claude artifact / Claude Design: {{claude-artifact:URL}} / {{claude-design:URL}}
     // — the same shape as figma, so a Claude link is a markdown BLOCK wherever
@@ -104,20 +126,26 @@ export const processShortcodes = (content: string): string => {
     .replace(
       /\{\{claude-(artifact|design):([^|}]+)(?:\|([^}]*))?\}\}/g,
       (match: string, kind: string, url: string, title: string | undefined) => {
+        const trimmedUrl = url.trim();
+        if (trimmedUrl.startsWith('http') && !isSafeHttpUrl(trimmedUrl)) return match;
         const name = title?.trim();
         const titleAttr = name ? ` data-title="${escapeAttr(name)}"` : '';
-        return `\n\n<div class="claude-embed" data-url="${escapeAttr(url.trim())}" data-kind="${kind}"${titleAttr}></div>\n\n`;
+        return `\n\n<div class="claude-embed" data-url="${escapeAttr(trimmedUrl)}" data-kind="${kind}"${titleAttr}></div>\n\n`;
       },
     )
     // LinkedIn embeds: {{linkedin:POST_URL}}
     .replace(/\{\{linkedin:([^}]+)\}\}/g, (match: string, url: string) => {
       const postUrl = url.trim();
-      return postUrl ? embedDiv('linkedin-embed', 'data-post-url', postUrl) : match;
+      if (!postUrl) return match;
+      if (postUrl.startsWith('http') && !isSafeHttpUrl(postUrl)) return match;
+      return embedDiv('linkedin-embed', 'data-post-url', postUrl);
     })
     // Link previews: {{link:URL}}
     .replace(/\{\{link:([^}]+)\}\}/g, (match: string, url: string) => {
       const previewUrl = url.trim();
-      return previewUrl ? embedDiv('link-preview', 'data-url', previewUrl) : match;
+      if (!previewUrl) return match;
+      if (previewUrl.startsWith('http') && !isSafeHttpUrl(previewUrl)) return match;
+      return embedDiv('link-preview', 'data-url', previewUrl);
     });
 
   // Next, auto-detect standalone URLs (but NOT those already in markdown links or code blocks)
