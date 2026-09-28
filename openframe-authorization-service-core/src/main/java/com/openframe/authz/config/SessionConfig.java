@@ -3,8 +3,8 @@ package com.openframe.authz.config;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.session.DefaultCookieSerializerCustomizer;
+import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.serializer.JdkSerializationRedisSerializer;
@@ -42,7 +42,8 @@ public class SessionConfig {
      * /oauth2/* requests; a session created there would get a cookie the browser never sends back to /sas.
      */
     @Bean
-    public DefaultCookieSerializerCustomizer sessionCookieCustomizer(@Value("${server.servlet.context-path:}") String contextPath) {
+    public DefaultCookieSerializerCustomizer sessionCookieCustomizer(ServerProperties serverProperties) {
+        String contextPath = serverProperties.getServlet().getContextPath();
         String cookiePath = StringUtils.hasText(contextPath) ? contextPath : "/";
         return serializer -> {
             serializer.setCookieName(JSESSIONID);

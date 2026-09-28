@@ -5,6 +5,7 @@ import com.openframe.data.redis.OpenframeRedisProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.serializer.RedisSerializer;
@@ -76,7 +77,9 @@ class SessionConfigTest {
 
     private String writeSessionCookie(String contextPath, MockHttpServletRequest request) {
         DefaultCookieSerializer serializer = new DefaultCookieSerializer();
-        config.sessionCookieCustomizer(contextPath).customize(serializer);
+        ServerProperties serverProperties = new ServerProperties();
+        serverProperties.getServlet().setContextPath(contextPath);
+        config.sessionCookieCustomizer(serverProperties).customize(serializer);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         serializer.writeCookieValue(new CookieValue(request, response, "session-id"));
