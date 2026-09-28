@@ -164,4 +164,25 @@ describe('HubSpotMeetingScheduler — which links fall back to HubSpot', () => {
     expect(screen.queryByText(BOOKED_ON_HUBSPOT)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Upload/)).not.toBeInTheDocument();
   });
+  it('fieldCopy replaces a field label and placeholder, and derives the one it is not given', async () => {
+    availability.formFields = [];
+    render(
+      scheduler({
+        detailsFormProps: {
+          fieldCopy: {
+            email: { label: 'Business Email', placeholder: 'username@company.com' },
+            firstName: { label: 'Given Name' },
+          },
+        },
+      }),
+    );
+    const email = await screen.findByLabelText(/^Business Email/);
+    expect(email).toHaveAttribute('placeholder', 'username@company.com');
+    // A label alone still moves the placeholder the TYPE derives from it.
+    expect(screen.getByLabelText(/^Given Name/)).toHaveAttribute('placeholder', 'Enter Given Name');
+    // The overridden field keeps everything else: its own label is gone, and the
+    // untouched one is drawn exactly as the widget declares it.
+    expect(screen.queryByLabelText(/^Email/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Last Name/)).toHaveAttribute('placeholder', 'Enter Last Name');
+  });
 });

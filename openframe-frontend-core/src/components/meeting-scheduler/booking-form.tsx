@@ -61,6 +61,21 @@ export type BookingFieldSpan = keyof typeof SPAN_CLASS;
 export type BookingFieldRow = BookingFieldSlot[];
 
 /**
+ * Display copy a HOST overrides for ONE field, keyed by its name — a built-in
+ * (`email`) or a HubSpot-declared question. It replaces what is DRAWN and
+ * nothing else: the name the answer rides under, the validation and the
+ * schema's own messages are untouched, so a campaign page can ask for a
+ * "Business Email" without owning a second email rule.
+ *
+ * An overridden `label` also feeds the type's derived placeholder
+ * (`Enter <label>`), so overriding the label alone keeps the pair consistent.
+ */
+export interface BookingFieldCopy {
+  label?: string;
+  placeholder?: string;
+}
+
+/**
  * A HOST-supplied consent row — the block the waitlist form draws for its SMS
  * consent, here for "I agree to the Privacy Policy and to be contacted". It is
  * the host's copy and the host's link, so it is a prop, not HubSpot metadata;
@@ -365,6 +380,8 @@ export interface BookingFormProps {
    * appended full width. Both are deliberate — see `slotNode`/`unplacedFields`.
    */
   fieldRows?: BookingFieldRow[];
+  /** Per-field display overrides, keyed by field name — see `BookingFieldCopy`. */
+  fieldCopy?: Record<string, BookingFieldCopy>;
   /** Host-supplied consent row, rendered after the fields — see `BookingFormConsent`. */
   consent?: BookingFormConsent;
   isSubmitting: boolean;
@@ -404,6 +421,7 @@ export function BookingForm({
   submitLabel,
   footerNote,
   fieldRows,
+  fieldCopy,
   consent,
   isSubmitting,
   onSubmit,
@@ -546,18 +564,32 @@ export function BookingForm({
   const renderField = (
     field: ControlArgs['field'],
     where: { id: string; registerName: string; error?: string },
-  ): ReactNode => (
-    <FieldWrapper key={field.name} label={field.label} htmlFor={where.id} required={field.required} error={where.error}>
-      {FIELD_CONTROLS[field.type]({
-        field,
-        id: where.id,
-        registerName: where.registerName,
-        error: where.error,
-        register,
-        control,
-      })}
-    </FieldWrapper>
-  );
+  ): ReactNode => {
+    // DISPLAY only: the host's copy replaces what this control draws, never the
+    // name the answer registers under, the validation, or the schema's messages.
+    const copy = fieldCopy?.[field.name];
+    const shown = copy
+      ? { ...field, label: copy.label ?? field.label, placeholder: copy.placeholder ?? field.placeholder }
+      : field;
+    return (
+      <FieldWrapper
+        key={shown.name}
+        label={shown.label}
+        htmlFor={where.id}
+        required={shown.required}
+        error={where.error}
+      >
+        {FIELD_CONTROLS[shown.type]({
+          field: shown,
+          id: where.id,
+          registerName: where.registerName,
+          error: where.error,
+          register,
+          control,
+        })}
+      </FieldWrapper>
+    );
+  };
 
   const builtInFields: Record<string, ReactNode> = Object.fromEntries(
     BUILT_IN_BOOKING_FIELDS.map(field => [

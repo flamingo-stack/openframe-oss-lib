@@ -147,11 +147,12 @@ export interface HubSpotMeetingSchedulerProps {
    */
   detailsForm?: ComponentType<BookingFormProps>;
   /**
-   * The DATA form of the same override: `fieldRows` and a host consent row,
-   * spread onto whichever form renders. Serialisable, so a Server Component
-   * can pass it across the RSC boundary where a component cannot.
+   * The DATA form of the same override: `fieldRows`, a host consent row and
+   * per-field display copy, spread onto whichever form renders. Serialisable,
+   * so a Server Component can pass it across the RSC boundary where a component
+   * cannot.
    */
-  detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent'>;
+  detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent' | 'fieldCopy'>;
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
   rescue?: FormRescueDefinition | null;
@@ -986,6 +987,7 @@ export {
   type BookingFormProps,
   type BookingFieldRow,
   type BookingFieldSlot,
+  type BookingFieldCopy,
   type BookingFormConsent,
 } from './booking-form';
 
