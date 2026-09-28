@@ -27,8 +27,18 @@ runs:
             - 'pom.xml'
             - '.trivyignore'
             - '.github/steps/trivy/**'
-            - '${{ inputs.path }}/**'
-            ${{ inputs.skip-dirs && format('- ''!{0}/{1}/**''', inputs.path, inputs.skip-dirs) || '' }}
+            - '.mvn/**'
+            - '${{ inputs.path }}/**/pom.xml'
+            - '${{ inputs.path }}/**/package.json'
+            - '${{ inputs.path }}/**/package-lock.json'
+            - '${{ inputs.path }}/**/yarn.lock'
+            - '${{ inputs.path }}/**/pnpm-lock.yaml'
+            - '${{ inputs.path }}/**/go.mod'
+            - '${{ inputs.path }}/**/go.sum'
+            - '${{ inputs.path }}/**/Cargo.toml'
+            - '${{ inputs.path }}/**/Cargo.lock'
+            - '${{ inputs.path }}/**/Dockerfile*'
+            ${{ inputs.skip-dirs && format('- ''!{0}/{{{1},}}/**''', inputs.path, inputs.skip-dirs) || '' }}
 
     - name: Install Trivy
       if: steps.should_run.outputs.changed != 'false'
@@ -36,6 +46,14 @@ runs:
       with:
         version: v0.74.0
         cache: true
+
+    - name: Checkout base
+      if: inputs.scan == 'code' && steps.should_run.outputs.changed != 'false'
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+        path: .trivy-base
+        persist-credentials: false
 
     - name: Resolve Maven dependencies
       if: inputs.scan == 'code' && steps.should_run.outputs.changed != 'false'
@@ -47,13 +65,32 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
       run: |
         set -euo pipefail
-        poms=$([ -f "$SCAN_DIR/pom.xml" ] && echo "$SCAN_DIR/pom.xml" || find "$SCAN_DIR" -maxdepth 2 -name pom.xml)
-        [ -n "$poms" ] || exit 0
         mvn_args=(-B -q -fn -DskipTests -gs "$ACTION_PATH/central-mirror.xml")
         [ -f .mvn/settings.xml ] && mvn_args+=(-s .mvn/settings.xml)
-        for pom in $poms; do mvn "${mvn_args[@]}" -f "$pom" dependency:go-offline | tee -a /tmp/mvn.log || true; done
-        ! grep -q '\[ERROR\]' /tmp/mvn.log ||
+        for dir in "$SCAN_DIR" ".trivy-base/$SCAN_DIR"; do
+          [ -d "$dir" ] || continue
+          poms=$([ -f "$dir/pom.xml" ] && echo "$dir/pom.xml" || find "$dir" -maxdepth 2 -name pom.xml -not -path '*/.trivy-base/*')
+          for pom in $poms; do mvn "${mvn_args[@]}" -f "$pom" dependency:go-offline | tee -a /tmp/mvn.log || true; done
+        done
+        ! grep -qs '\[ERROR\]' /tmp/mvn.log ||
           echo "::warning::Some Maven dependencies could not be resolved; scan depth may be reduced"
+
+    - name: Resolve npm dependencies
+      if: inputs.scan == 'code' && steps.should_run.outputs.changed != 'false'
+      shell: bash
+      env:
+        SCAN_DIR: ${{ inputs.path }}
+        SKIP_DIRS: ${{ inputs.skip-dirs }}
+      run: |
+        set -euo pipefail
+        find_args=(-maxdepth 2 -name package.json -not -path '*/node_modules/*' -not -path '*/.trivy-base/*')
+        for dir in ${SKIP_DIRS//,/ }; do find_args+=(-not -path "*/$dir/*" -not -path "$dir/*"); done
+        for pkg in $(find "$SCAN_DIR" ".trivy-base/$SCAN_DIR" "${find_args[@]}" 2>/dev/null); do
+          dir=$(dirname "$pkg")
+          [ -e "$dir/package-lock.json" ] || [ -e "$dir/yarn.lock" ] || [ -e "$dir/pnpm-lock.yaml" ] ||
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps --prefix "$dir" ||
+            echo "::warning::npm dependencies in $dir could not be resolved; they were NOT scanned"
+        done
 
     - name: Scan dependencies
       if: inputs.scan == 'code' && steps.should_run.outputs.changed != 'false'
@@ -65,11 +102,13 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
       run: |
         set -euo pipefail
-        args=(--no-progress --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --offline-scan --format json)
+        args=(--no-progress --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --offline-scan --format json --skip-dirs .trivy-base)
         [ -n "$SKIP_DIRS" ] && args+=(--skip-dirs "$SKIP_DIRS")
         [ -n "$SKIP_FILES" ] && args+=(--skip-files "$SKIP_FILES")
         report="trivy-${GITHUB_REPOSITORY##*/}-code-report.tsv"
-        trivy fs "${args[@]}" "$SCAN_DIR" | jq -r --arg src "" -f "$ACTION_PATH/to-tsv.jq" | sort -u > "$report"
+        scan() { trivy fs "${args[@]}" "$1" | jq -r --arg src "" -f "$ACTION_PATH/to-tsv.jq" | sort -u; }
+        scan "$SCAN_DIR" > "$report"
+        scan ".trivy-base/$SCAN_DIR" > /tmp/on-base.tsv || : > /tmp/on-base.tsv
         while IFS=$'\t' read -r severity pkg installed fixed cve target; do
           origin="-"
           if [[ "$target" == *pom.xml ]]; then
@@ -77,6 +116,8 @@ runs:
           fi
           printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$severity" "$pkg" "$installed" "$fixed" "$cve" "$target" "$origin"
         done < "$report" > "$report.tmp" && mv "$report.tmp" "$report"
+        awk -F'\t' -v OFS='\t' 'FILENAME == ARGV[1] { seen[$2 FS $5]; next } { print $0, (($2 FS $5) in seen ? "existing" : "new") }' \
+          /tmp/on-base.tsv "$report" > "$report.tmp" && mv "$report.tmp" "$report"
 
     - name: Scan Dockerfile base images
       if: inputs.scan == 'code' && steps.should_run.outputs.changed != 'false'
@@ -87,11 +128,15 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
       run: |
         set -euo pipefail
-        find_args=(-name 'Dockerfile*' -not -path '*/.git/*' -not -path '*/node_modules/*')
+        find_args=(-name 'Dockerfile*' -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/.trivy-base/*')
         for dir in ${SKIP_DIRS//,/ }; do find_args+=(-not -path "*/$dir/*" -not -path "$dir/*"); done
-        find "$SCAN_DIR" "${find_args[@]}" -print0 |
-          xargs -0 -r awk 'toupper($1)=="FROM" { img=$2; if (img ~ /^--/) img=$3; print img; if (toupper($3)=="AS") print "~"$4; if (toupper($4)=="AS") print "~"$5 }' |
-          sort -u > /tmp/base-images.txt
+        images() {
+          find "$1" "${find_args[@]}" -print0 2>/dev/null |
+            xargs -0 -r awk 'toupper($1)=="FROM" { img=$2; if (img ~ /^--/) img=$3; print img; if (toupper($3)=="AS") print "~"$4; if (toupper($4)=="AS") print "~"$5 }' |
+            sort -u
+        }
+        images "$SCAN_DIR" > /tmp/base-images.txt
+        images ".trivy-base/$SCAN_DIR" > /tmp/base-images-on-base.txt || :
         report="trivy-${GITHUB_REPOSITORY##*/}-docker-report.tsv"
         : > "$report"
         while read -r img; do
@@ -101,7 +146,8 @@ runs:
             jq -r --arg src "$img" -f "$ACTION_PATH/to-tsv.jq" >> "$report" ||
             echo "::warning::Base image $img could not be scanned (pull/scan error); it was NOT checked"
         done < /tmp/base-images.txt
-        sort -u "$report" -o "$report"
+        awk -F'\t' -v OFS='\t' 'FILENAME == ARGV[1] { seen[$1]; next } { print $0, ($6 in seen ? "existing" : "new") }' \
+          /tmp/base-images-on-base.txt "$report" | sort -u > "$report.tmp" && mv "$report.tmp" "$report"
         find . -maxdepth 1 -name 'trivy-*.tsv' -empty -delete
 
     - name: Scan built image
@@ -147,6 +193,11 @@ runs:
         files=$(ls trivy-*.tsv 2>/dev/null) || { echo "No vulnerabilities found."; report_status success "No HIGH/CRITICAL vulnerabilities found"; exit 0; }
         column -t -s "$(printf '\t')" $files
         unique=$(cut -f1,2,5 $files | sort -u | wc -l | tr -d ' ')
-        report_status failure "$unique HIGH/CRITICAL vulnerabilities — full report in the $ARTIFACT artifact"
-        echo "::error::Trivy found $unique unique HIGH/CRITICAL vulnerabilities ($(cat $files | wc -l | tr -d ' ') occurrences across modules) — full report in the ${ARTIFACT} artifact"
+        new=$(awk -F'\t' '$NF != "existing"' $files | cut -f1,2,5 | sort -u | wc -l | tr -d ' ')
+        if [ "$new" = 0 ]; then
+          echo "::warning::$unique HIGH/CRITICAL vulnerabilities already exist on the base branch; this PR adds none — full report in the ${ARTIFACT} artifact"
+          exit 0
+        fi
+        report_status failure "$new new HIGH/CRITICAL vulnerabilities — full report in the $ARTIFACT artifact"
+        echo "::error::This PR adds $new HIGH/CRITICAL vulnerabilities ($unique in total, the rest already exist on the base branch) — full report in the ${ARTIFACT} artifact"
         exit 1
