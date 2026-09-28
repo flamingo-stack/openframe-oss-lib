@@ -21,9 +21,12 @@ try {
   Install-ChocolateyZipPackage @packageArgs
 
   $exe = Join-Path $temp 'openframe-client.exe'
-  & $exe install
-  if ($LASTEXITCODE -ne 0) {
-    throw "openframe-client install failed with exit code $LASTEXITCODE"
+  $ErrorActionPreference = 'Continue'
+  & $exe install 2>&1 | ForEach-Object { "$_" }
+  $exitCode = $LASTEXITCODE
+  $ErrorActionPreference = 'Stop'
+  if ($exitCode -ne 0) {
+    throw "openframe-client install failed with exit code $exitCode"
   }
 }
 finally {

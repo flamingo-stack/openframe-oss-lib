@@ -3,9 +3,12 @@
 $exe = Join-Path $env:ProgramFiles 'OpenFrame\bin\openframe-client.exe'
 
 if (Test-Path $exe) {
-  & $exe uninstall
-  if ($LASTEXITCODE -ne 0) {
-    Write-Warning "openframe-client uninstall exited with code $LASTEXITCODE"
+  $ErrorActionPreference = 'Continue'
+  & $exe uninstall 2>&1 | ForEach-Object { "$_" }
+  $exitCode = $LASTEXITCODE
+  $ErrorActionPreference = 'Stop'
+  if ($exitCode -ne 0) {
+    Write-Warning "openframe-client uninstall exited with code $exitCode"
   }
 }
 else {
