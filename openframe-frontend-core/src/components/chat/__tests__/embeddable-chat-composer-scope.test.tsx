@@ -98,7 +98,7 @@ function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
     ],
     activeDialogId: null,
     selectDialog: noop,
-    startNewDialog: async () => null,
+    startNewDialog: () => Promise.resolve(null),
     deleteDialog: asyncNoop,
     renameDialog: asyncNoop,
     archiveDialog: asyncNoop,
@@ -223,6 +223,7 @@ describe('EmbeddableChat — the composer belongs to the conversation on screen'
 
     await act(async () => {
       settleSend();
+      await Promise.resolve();
     });
     expect(editor()).toHaveTextContent('and also');
 
