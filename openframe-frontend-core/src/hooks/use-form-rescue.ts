@@ -12,6 +12,7 @@ import {
   FORM_RESCUE_RESUME_PARAM,
   filledRescueFields,
   isFormAttemptId,
+  isResumeToken,
   isRescueEmail,
   rescueCompletionPct,
   sanitizeRescueFieldName,
@@ -214,7 +215,7 @@ export function useFormRescue({ form, fieldNames, onRestore, getSignals }: UseFo
       if (Object.keys(local.values).length) onRestoreRef.current?.(local.values);
     };
 
-    if (token && draftsUrl && /^[A-Za-z0-9_-]{16,128}$/.test(token)) {
+    if (isResumeToken(token) && draftsUrl) {
       contentFetch(`${draftsUrl}/resume/${encodeURIComponent(token)}`)
         .then(async res => (res.ok ? ((await res.json()) as FormDraftResumeResponse) : null))
         .then(data => {

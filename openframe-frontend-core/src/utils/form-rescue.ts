@@ -115,6 +115,13 @@ export const FORM_RESCUE_SUBMIT_KEYS = [FORM_RESCUE_ATTEMPT_FIELD, FORM_RESCUE_R
 /** Query parameter a resume link carries. */
 export const FORM_RESCUE_RESUME_PARAM = 'resume';
 
+/** A resume token's shape (base64url, as the host mints it). THE check for every reader of one. */
+const RESUME_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+
+export function isResumeToken(value: unknown): value is string {
+  return typeof value === 'string' && RESUME_TOKEN_PATTERN.test(value);
+}
+
 /** Draft lifecycle. `submitted` is final; `rescued` can still become `submitted`. */
 export const FORM_DRAFT_STATUSES = ['started', 'rescuable', 'rescued', 'submitted'] as const;
 export type FormDraftStatus = (typeof FORM_DRAFT_STATUSES)[number];
@@ -204,6 +211,55 @@ export interface FormDraftSaveRequest extends FormDraftProgress {
   /** Set when the visitor came back through a resume link: the host saves onto
    *  THAT draft, so one person's return never starts a second draft. */
   resume_token?: string;
+}
+
+const UTM_KEYS = ['source', 'medium', 'campaign', 'content', 'term'] as const;
+
+/** Longest source path a draft keeps. */
+const MAX_SOURCE_PATH_CHARS = 500;
+
+/**
+ * THE server-side read of a draft save: turns an untrusted body into a
+ * `FormDraftSaveRequest` with every rule re-applied (known form, uuid attempt,
+ * allowlisted and capped values, bounded field names, a same-site path, capped
+ * UTM), or null when the form or attempt is unknown. `dropped` names the value
+ * keys the allowlist removed, for a log line that never carries a value.
+ */
+export function parseFormDraftSaveRequest(
+  body: Record<string, unknown>,
+): { request: FormDraftSaveRequest; dropped: string[] } | null {
+  const form = getRescueForm(body.form_id);
+  if (!isFormAttemptId(body.attempt_id) || !form) return null;
+
+  const rawValues = body.values && typeof body.values === 'object' ? (body.values as Record<string, unknown>) : {};
+  const values = sanitizeRescueValues(rawValues);
+  const fieldsFilled = (Array.isArray(body.fields_filled) ? body.fields_filled : [])
+    .map(sanitizeRescueFieldName)
+    .filter((name): name is string => name !== null)
+    .slice(0, FORM_RESCUE_MAX_FIELDS);
+  const path = typeof body.source_path === 'string' ? body.source_path : '';
+  const utmIn = body.utm && typeof body.utm === 'object' ? (body.utm as Record<string, unknown>) : {};
+  const utm: NonNullable<FormDraftSaveRequest['utm']> = {};
+  for (const key of UTM_KEYS) {
+    const value = utmIn[key];
+    if (typeof value === 'string' && value.trim()) utm[key] = value.trim().slice(0, FORM_RESCUE_MAX_VALUE_CHARS);
+  }
+
+  return {
+    request: {
+      attempt_id: body.attempt_id,
+      form_id: form.id,
+      values,
+      fields_filled: fieldsFilled,
+      last_field: sanitizeRescueFieldName(body.last_field),
+      completion_pct: typeof body.completion_pct === 'number' ? rescueCompletionPct(body.completion_pct, 100) : 0,
+      // Same-site only: a path, never a scheme-relative or absolute URL.
+      source_path: path.startsWith('/') && !path.startsWith('//') ? path.slice(0, MAX_SOURCE_PATH_CHARS) : '',
+      ...(Object.keys(utm).length ? { utm } : {}),
+      ...(isResumeToken(body.resume_token) ? { resume_token: body.resume_token } : {}),
+    },
+    dropped: Object.keys(rawValues).filter(key => !(key in values)),
+  };
 }
 
 /** What the host answers a resume link with: the allowlisted values, nothing internal. */

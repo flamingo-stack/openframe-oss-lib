@@ -12,6 +12,8 @@ import {
   defineRescueForm,
   getRescueForm,
   listRescueForms,
+  isResumeToken,
+  parseFormDraftSaveRequest,
 } from '../form-rescue';
 
 /**
@@ -120,5 +122,45 @@ describe('rescue form definitions', () => {
     expect(defineRescueForm({ id: 'contact', label: 'Contact form' })).toBe(RESCUE_FORMS.contact);
     expect(() => defineRescueForm({ id: 'contact', label: 'Something else' })).toThrow(/already defined/);
     expect(() => defineRescueForm({ id: 'Bad Id!', label: 'x' })).toThrow(/invalid form id/);
+  });
+});
+
+describe('parseFormDraftSaveRequest (the host-side read of a save)', () => {
+  const base = { attempt_id: '6f1c2a7e-3b9d-4e21-9a4f-0c8d5e7b1a22', form_id: 'contact' };
+
+  it('refuses an unknown form or a non-uuid attempt', () => {
+    expect(parseFormDraftSaveRequest({ ...base, form_id: 'nope' })).toBeNull();
+    expect(parseFormDraftSaveRequest({ ...base, attempt_id: 'x' })).toBeNull();
+  });
+
+  it('re-applies every rule and names what it dropped', () => {
+    const parsed = parseFormDraftSaveRequest({
+      ...base,
+      values: { email: 'alex@northwind-it.com', password: 'hunter2', message: 'hi' },
+      fields_filled: ['email', 'password', '<bad>'],
+      last_field: 'email',
+      completion_pct: 250,
+      source_path: '//evil.example/x',
+      utm: { source: ' linkedin ', bogus: 'x' },
+      resume_token: 'k3Xq9vT2mB7wYp1sLr8dQa',
+    });
+    expect(parsed?.request).toEqual({
+      attempt_id: base.attempt_id,
+      form_id: 'contact',
+      values: { email: 'alex@northwind-it.com' },
+      fields_filled: ['email'],
+      last_field: 'email',
+      completion_pct: 100,
+      source_path: '',
+      utm: { source: 'linkedin' },
+      resume_token: 'k3Xq9vT2mB7wYp1sLr8dQa',
+    });
+    expect(parsed?.dropped).toEqual(['password', 'message']);
+  });
+
+  it('checks resume tokens by one rule', () => {
+    expect(isResumeToken('k3Xq9vT2mB7wYp1sLr8dQa')).toBe(true);
+    expect(isResumeToken('short')).toBe(false);
+    expect(isResumeToken('has spaces in it ok?')).toBe(false);
   });
 });
