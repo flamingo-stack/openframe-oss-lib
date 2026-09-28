@@ -85,8 +85,13 @@ const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
 /** Nearest ancestor that is a *real* scroll container, or `null` when the
  *  window/document is the scroller. Only `auto | scroll | overlay` count —
  *  `clip` / `hidden` are intentionally excluded (a wrapper using `overflow-clip`
- *  purely to round corners must let the scroll bubble to the page). */
-function getScrollableAncestor(el: HTMLElement): HTMLElement | null {
+ *  purely to round corners must let the scroll bubble to the page).
+ *
+ *  THE one rule for "what scrolls this element": `useScrollSpy` resolves the
+ *  scroller it listens to with it, so the section a spy highlights is the
+ *  section this helper scrolls to — inside a `<main overflow-y-auto>` shell as
+ *  much as on a window-scrolled page. */
+export function getScrollableAncestor(el: HTMLElement): HTMLElement | null {
   for (let node = el.parentElement; node; node = node.parentElement) {
     const overflowY = getComputedStyle(node).overflowY;
     if (
