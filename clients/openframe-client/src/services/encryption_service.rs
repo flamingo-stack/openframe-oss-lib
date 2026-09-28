@@ -7,9 +7,15 @@ use aes_gcm::{
 };
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
+use keyring::Entry;
+
+const KEYRING_SERVICE: &str = "openframe-client";
+const KEYRING_USERNAME: &str = "encryption-key";
 
 #[derive(Clone)]
-pub struct EncryptionService;
+pub struct EncryptionService {
+    key: [u8; 32],
+}
 
 impl Default for EncryptionService {
     fn default() -> Self {
@@ -18,15 +24,48 @@ impl Default for EncryptionService {
 }
 
 impl EncryptionService {
-    // TODO: use generated key
-    const KEY: &'static str = "12345678901234567890123456789012";
-
     pub fn new() -> Self {
-        Self
+        let key = Self::load_or_generate_key().unwrap_or_else(|_| {
+            // Fall back to an in-memory random key if secure storage is unavailable,
+            // so encryption still uses a per-instance random key rather than a
+            // hardcoded constant.
+            let mut fallback = [0u8; 32];
+            OsRng.fill_bytes(&mut fallback);
+            fallback
+        });
+        Self { key }
+    }
+
+    fn load_or_generate_key() -> Result<[u8; 32]> {
+        let entry = Entry::new(KEYRING_SERVICE, KEYRING_USERNAME)
+            .map_err(|e| anyhow::anyhow!("Failed to access keyring entry: {}", e))?;
+
+        match entry.get_password() {
+            Ok(existing) => {
+                let decoded = general_purpose::STANDARD
+                    .decode(existing)
+                    .map_err(|e| anyhow::anyhow!("Failed to decode stored key: {}", e))?;
+                if decoded.len() != 32 {
+                    return Err(anyhow::anyhow!("Stored key has invalid length"));
+                }
+                let mut key = [0u8; 32];
+                key.copy_from_slice(&decoded);
+                Ok(key)
+            }
+            Err(_) => {
+                let mut key = [0u8; 32];
+                OsRng.fill_bytes(&mut key);
+                let encoded = general_purpose::STANDARD.encode(key);
+                entry
+                    .set_password(&encoded)
+                    .map_err(|e| anyhow::anyhow!("Failed to store generated key: {}", e))?;
+                Ok(key)
+            }
+        }
     }
 
     pub fn encrypt(&self, data: &str) -> Result<String> {
-        let key = Aes256Gcm::new_from_slice(Self::KEY.as_bytes())
+        let key = Aes256Gcm::new_from_slice(&self.key)
             .map_err(|e| anyhow::anyhow!("Failed to create encryption key: {}", e))?;
 
         let mut nonce_bytes = [0u8; 12];
