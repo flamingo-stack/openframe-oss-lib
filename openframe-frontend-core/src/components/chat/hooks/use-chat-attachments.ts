@@ -204,7 +204,10 @@ export function useChatAttachments(): UseChatAttachmentsApi {
   const clear = useCallback(() => {
     for (const ctrl of controllersRef.current.values()) ctrl.abort();
     controllersRef.current.clear();
-    setAttachments([]);
+    // Same array back when there is nothing staged, so React bails out of the
+    // update: the composer-scope effect calls this on mount and on every
+    // conversation switch, and an empty strip must not cost a render.
+    setAttachments(prev => (prev.length === 0 ? prev : []));
   }, []);
 
   const uploadOne = useCallback(
