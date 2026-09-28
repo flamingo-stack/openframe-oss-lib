@@ -562,6 +562,12 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let package_manager_report_run_manager =
+            PackageManagerReportRunManager::new(PackageManagerReportPublisher::new(
+                nats_message_publisher.clone(),
+                config_service.clone(),
+            ));
+
         let script_bootstrap_execution_listener = ExecutionListener::<BootstrapScriptMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
@@ -569,7 +575,8 @@ impl Client {
             config_service.clone(),
             result_store.clone(),
             flush_notify.clone(),
-        );
+        )
+        .on_message_handled(package_manager_report_run_manager.wake_handle());
         let software_execution_listener = ExecutionListener::<SoftwareScriptMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
@@ -594,11 +601,6 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
-        let package_manager_report_run_manager =
-            PackageManagerReportRunManager::new(PackageManagerReportPublisher::new(
-                nats_message_publisher.clone(),
-                config_service.clone(),
-            ));
         let package_manager_update_run_manager = PackageManagerUpdateRunManager::new();
 
         let hostname_report_publisher = HostnameReportPublisher::new(
@@ -715,8 +717,6 @@ impl Client {
 
         self.package_manager_update_run_manager.start();
 
-        self.package_manager_report_run_manager.start();
-
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
 
@@ -759,6 +759,8 @@ impl Client {
         info!("Starting script schedule execution listener...");
         self.script_schedule_execution_listener.start().await?;
         info!("Script schedule execution listener started");
+
+        self.package_manager_report_run_manager.start();
 
         if let Err(e) = self.tool_run_manager.run().await {
             error!("Failed to start tool run manager: {:#}", e);

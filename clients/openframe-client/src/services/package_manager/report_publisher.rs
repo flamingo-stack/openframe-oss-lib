@@ -11,14 +11,8 @@ const PACKAGE_MANAGERS_SUBJECT: &str = "package-managers";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ManagerStatus {
-    state: ManagerState,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 struct PackageManagerReport {
-    package_managers: BTreeMap<ManagerId, ManagerStatus>,
+    package_managers: BTreeMap<ManagerId, ManagerState>,
 }
 
 #[derive(Clone)]
@@ -45,12 +39,7 @@ impl PackageManagerReportPublisher {
         let mut package_managers = BTreeMap::new();
 
         for id in ManagerId::ALL {
-            package_managers.insert(
-                *id,
-                ManagerStatus {
-                    state: state_of(*id).await,
-                },
-            );
+            package_managers.insert(*id, state_of(*id).await);
         }
 
         info!(report = ?package_managers, "Reporting package manager state");

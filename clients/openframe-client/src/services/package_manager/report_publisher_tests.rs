@@ -2,20 +2,17 @@ use super::*;
 
 #[test]
 fn report_serialises_to_the_agreed_wire_shape() {
-    let mut package_managers = BTreeMap::new();
-    for (id, state) in [
+    let package_managers = BTreeMap::from([
         (ManagerId::Brew, ManagerState::Present),
         (ManagerId::Choco, ManagerState::Unsupported),
         (ManagerId::Winget, ManagerState::Missing),
-    ] {
-        package_managers.insert(id, ManagerStatus { state });
-    }
+    ]);
 
     let json = serde_json::to_string(&PackageManagerReport { package_managers }).unwrap();
 
     assert_eq!(
         json,
-        r#"{"packageManagers":{"BREW":{"state":"PRESENT"},"CHOCO":{"state":"UNSUPPORTED"},"WINGET":{"state":"MISSING"}}}"#
+        r#"{"packageManagers":{"BREW":"PRESENT","CHOCO":"UNSUPPORTED","WINGET":"MISSING"}}"#
     );
 }
 
