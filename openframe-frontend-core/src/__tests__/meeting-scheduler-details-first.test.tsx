@@ -197,6 +197,9 @@ describe('HubSpotMeetingScheduler — which links fall back to HubSpot', () => {
     // (Back exists on the calendar step only).
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    // …and once at the button, where a visitor whose address LOOKS answered is
+    // looking when nothing happens.
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ description: message, variant: 'error' }));
     // A work address passes the same form.
     typeInto(screen.getByLabelText(/^Email/), 'ada@acmecorp.com');
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));

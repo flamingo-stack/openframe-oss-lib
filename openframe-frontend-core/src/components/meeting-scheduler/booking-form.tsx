@@ -6,6 +6,7 @@ import type { FormEvent, ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import type { Control, Path, UseFormRegister } from 'react-hook-form';
 import { useRescuedForm } from '../../hooks/use-rescued-form';
+import { useToast } from '../../hooks/use-toast';
 import {
   BUILT_IN_BOOKING_FIELDS,
   type BuiltInBookingFieldName,
@@ -13,6 +14,7 @@ import {
   fieldTypeSpec,
   makeDeferredBookingSchema,
   withDeniedEmailDomains,
+  emailDomainDenied,
   type DeniedEmailDomains,
   MULTI_VALUE_SEPARATOR,
   normalizeFormFields,
@@ -530,6 +532,28 @@ export function BookingForm({
     },
   );
 
+  const { toast } = useToast();
+
+  /**
+   * A refused submit already reports itself under each field, and the button
+   * stays live — pressing it is how a visitor asks what is wrong.
+   *
+   * The denied-domain rule is the one they cannot see coming: the address is
+   * well formed and the control looks answered, so the inline line under a
+   * filled-in field is easy to miss. That one is ALSO said at the button.
+   * Nothing else toasts — a toast per empty field would bury the messages the
+   * fields already carry.
+   */
+  const onInvalid = () => {
+    if (deniedEmailDomains && emailDomainDenied(getValues('email'), deniedEmailDomains)) {
+      toast({
+        variant: 'error',
+        title: 'Check your email address',
+        description: deniedEmailDomains.message,
+      });
+    }
+  };
+
   const submitValid = handleSubmit(async data => {
     if (consentMissing) return; // the error is already on screen — see `submit`
     if (deferSlot) {
@@ -550,7 +574,7 @@ export function BookingForm({
       ...getSignals(),
       ...formRescue.submitFields(),
     });
-  });
+  }, onInvalid);
 
   // Consent is checked BEFORE the resolver runs, not inside the valid branch,
   // so an unticked box and an empty field are reported together rather than
