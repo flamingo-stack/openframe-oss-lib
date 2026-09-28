@@ -41,7 +41,8 @@ public class BrewCatalogFetcher {
         });
         List<BrewCaskJson> casks = fetchJson("/api/cask.json", new TypeReference<>() {
         });
-        Map<String, Integer> formulaInstalls = fetchAnalytics("/api/analytics/install/30d.json", "formula");
+        // install-on-request excludes dependency pulls; plain install ranks openssl/xz/pcre2 above every app
+        Map<String, Integer> formulaInstalls = fetchAnalytics("/api/analytics/install-on-request/30d.json", "formula");
         Map<String, Integer> caskInstalls = fetchAnalytics("/api/analytics/cask-install/30d.json", "cask");
 
         List<PackageCatalogEntry> entries = new ArrayList<>();

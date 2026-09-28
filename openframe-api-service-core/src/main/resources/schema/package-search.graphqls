@@ -62,7 +62,7 @@ type PackageSearchItem {
     installCommand: String!
     "BREW only — pass it back to packageDetails to open exactly this package, not its twin of the other type."
     packageType: BrewPackageType
-    "Install/download count where the source publishes one: brew 30-day installs, Chocolatey total downloads."
+    "Install/download count where the source publishes one: brew 30-day on-request installs, Chocolatey total downloads."
     popularity: Int
     packageManager: PackageManagerType!
 }
