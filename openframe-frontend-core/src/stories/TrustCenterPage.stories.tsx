@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from 'storybook/test';
 import {
   TRUST_CENTER_FIXTURE_FAQ,
   makeTrustCenterData,
 } from '../components/help-center-pages/__fixtures__/trust-center';
 import { TrustCenterPage } from '../components/help-center-pages/trust-center-page';
+import { ChartDonutIcon, QuestionCircleIcon } from '../components/icons-v2-generated';
+import { AppLayout } from '../components/navigation/app-layout';
 
 // Stories pass `initialData`, so the page never fetches. The shared fixture
 // computes its instants when called, so the "monitored" story stays inside its window.
@@ -91,6 +94,41 @@ export const NotConnected: Story = {
       connected: false,
     },
   },
+};
+
+/**
+ * Embedded in an app shell (OpenFrame's `AppLayout`), where the page content
+ * scrolls inside a fixed-height `<main overflow-y-auto>` and the window never
+ * scrolls. The section rail must still follow the reader: the scroll spy
+ * listens to that container, not the window.
+ */
+export const InAppShell: Story = {
+  args: { shell: false, backButton: { label: 'Back to Help Center', href: '/help-center' } },
+  render: args => (
+    <AppLayout
+      sidebarConfig={{
+        items: [
+          { id: 'dashboard', label: 'Dashboard', icon: <ChartDonutIcon size={24} />, path: '/dashboard' },
+          {
+            id: 'help-center',
+            label: 'Help Center',
+            icon: <QuestionCircleIcon size={24} />,
+            path: '/help-center',
+            section: 'secondary',
+            isActive: true,
+          },
+        ],
+        onNavigate: fn(),
+        onToggleMinimized: fn(),
+      }}
+      headerProps={{ showUser: true, userName: 'Alex Developer', userEmail: 'alex@openframe.dev' }}
+      mobileBurgerMenuProps={{ user: { userName: 'Alex Developer', userEmail: 'alex@openframe.dev' } }}
+    >
+      <div className="page-shell-content">
+        <TrustCenterPage {...args} />
+      </div>
+    </AppLayout>
+  ),
 };
 
 /** Certified framework with a published percent (progress ring + report period). */

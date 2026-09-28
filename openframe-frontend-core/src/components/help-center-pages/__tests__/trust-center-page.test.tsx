@@ -397,7 +397,7 @@ describe('TrustCenterPage', () => {
     expect(subprocessors.queryByText('Location')).toBeNull();
   });
 
-  it('anchors: a rail click puts #section in the URL through the shared same-page hash navigation (replace, not push)', () => {
+  it('anchors: a rail click highlights the section at once and puts #section in the URL (replace, not push)', () => {
     // The shared setup stubs `window.location` without an origin; give it one for this navigation.
     const stubbed = window.location;
     Object.defineProperty(window, 'location', {
@@ -417,6 +417,10 @@ describe('TrustCenterPage', () => {
       render(<TrustCenterPage initialData={makeData()} />);
       const rail = within(screen.getByRole('complementary', { name: 'Trust center sections' }));
       fireEvent.click(rail.getByRole('button', { name: 'Documents' }));
+      // The click IS the reader's position: the rail says so before any scroll
+      // event lands (inside a `<main overflow-y-auto>` shell none ever did).
+      expect(rail.getByRole('button', { name: 'Documents' })).toHaveAttribute('aria-current', 'location');
+      expect(rail.getByRole('button', { name: 'Compliance' })).not.toHaveAttribute('aria-current');
       expect(replaceState).toHaveBeenCalledWith(null, '', '/trust-center#documents');
       expect(pushState).not.toHaveBeenCalled();
     } finally {

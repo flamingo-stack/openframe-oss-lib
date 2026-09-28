@@ -91,6 +91,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'code-symbols': 'box',
   'code-duplicates': 'search',
   'code-impact': 'activity',
+  'change-sets': 'coding-branch',
 };
 
 /** Lookup an icon name by RagTableConfig.id. Returns undefined when
@@ -185,6 +186,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   'code-symbols': 'Code Symbols',
   'code-duplicates': 'Duplicates',
   'code-impact': 'Change Impact',
+  'change-sets': 'Change Sets',
 };
 
 /** Lookup a human-readable label by RagTableConfig.id. Falls back
@@ -281,6 +283,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   code_symbol: 'code-symbols',
   code_duplicate: 'code-duplicates',
   code_impact: 'code-impact',
+  change_set: 'change-sets',
 };
 
 /**

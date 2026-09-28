@@ -128,6 +128,7 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   code_symbol: (ids, b) => `${b}/api/code-graph/symbols?ids=${ids.join(',')}`,
   code_duplicate: (ids, b) => `${b}/api/code-graph/duplicates?ids=${ids.join(',')}`,
   code_impact: (ids, b) => `${b}/api/code-graph/impacts?ids=${ids.join(',')}`,
+  change_set: (ids, b) => `${b}/api/code-graph/change-sets?ids=${ids.join(',')}`,
   // Single-record live source: the route ignores `?ids=` and returns the ONE
   // `TrustCenterPublic` object (card id `TRUST_CENTER_CARD_ID`); see
   // `extractCardItems` for how the loader matches it back.

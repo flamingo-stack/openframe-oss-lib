@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { RESCUE_FORMS } from '../../utils/form-rescue';
 import { ContactForm, type ContactFormProps } from '../contact';
 import { G2Icon, CapterraIcon, TrustpilotIcon, GetAppIcon } from '../icons';
 import { BenefitCard, BenefitCardGrid } from '../ui';
@@ -93,6 +94,7 @@ const DEFAULT_CONTACT_FORM_PROPS = {
   buttonVariant: 'outline' as ContactFormProps['buttonVariant'],
   buttonClassName: 'w-full',
   successToastMessage: "Thank you! We'll reach out to schedule your case study.",
+  rescue: RESCUE_FORMS.caseStudyPitch,
 } satisfies Partial<ContactFormProps>;
 
 export function ShareExperienceSection({

@@ -57,6 +57,7 @@ export { SEO_DESCRIPTION_MAX_LENGTH } from './seo-description';
 // Brand silhouette SVG registry (CSS mask-image tinting) — centralized so
 // consumers (e.g. company-hub deck) don't ship their own copies of the marks.
 export * from './brand-marks';
+export * from './design-doc-readiness';
 export * from './platform-config';
 export * from './os-platforms';
 export * from './access-code-client';
@@ -385,6 +386,11 @@ export {
 // decision fn the lib forms feed. Also exported via the granular subpath
 // `./utils/humanity-signals` for server-only consumers.
 export * from './humanity-signals';
+
+// Form rescue rules (allowlist, exclusions, caps, lifecycle) — pure + server-safe
+// so the host's draft endpoint re-applies the same filter the browser hook runs.
+// Also exported via the granular subpath `./utils/form-rescue`.
+export * from './form-rescue';
 
 // Doc-source viewer utilities (path parsing, tree building, section extraction,
 // embed-URL conversion) — single home for all doc-viewer pure helpers across
