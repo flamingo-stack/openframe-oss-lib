@@ -69,6 +69,13 @@ export {
   type OnboardingGuideCardProps,
 } from './onboarding-guide-card';
 export { RoadmapCard, RoadmapCardSkeleton, type RoadmapCardProps, type VoteType } from './roadmap-card';
+export {
+  DesignDocCard,
+  DesignDocCardSkeleton,
+  designDocMetaLine,
+  designDocPeople,
+  type DesignDocCardProps,
+} from './design-doc-card';
 export { RoadmapVoteButton, type RoadmapVoteButtonProps } from './roadmap-vote-button';
 export { TaskTypeIcon, type TaskTypeIconProps } from './task-type-icon';
 export {
