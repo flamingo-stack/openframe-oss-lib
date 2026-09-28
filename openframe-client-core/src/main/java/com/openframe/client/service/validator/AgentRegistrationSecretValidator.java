@@ -9,6 +9,9 @@ import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
@@ -27,9 +30,13 @@ public class AgentRegistrationSecretValidator {
                 .orElseThrow(() -> new AgentRegistrationSecretValidationErrorException("No active agent secret found"));
 
         String decryptedSecretKey = encryptionService.decrypt(secret.getSecretKey());
-        if (!decryptedSecretKey.equals(initialKey)) {
+        boolean matches = MessageDigest.isEqual(
+                decryptedSecretKey.getBytes(StandardCharsets.UTF_8),
+                initialKey.getBytes(StandardCharsets.UTF_8));
+        if (!matches) {
             throw new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_INVALID, "Invalid initial key");
         }
     }
 
 }
+

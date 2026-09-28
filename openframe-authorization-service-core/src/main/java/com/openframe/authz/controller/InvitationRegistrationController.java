@@ -1,10 +1,11 @@
 package com.openframe.authz.controller;
 
+import com.openframe.core.constants.SsoFlowCookieNames;
+
 import com.openframe.authz.dto.InvitationRegistrationRequest;
 import com.openframe.authz.dto.SsoInvitationAcceptRequest;
 import com.openframe.authz.security.SsoFlowCookies;
 import com.openframe.authz.web.AuthErrorResponder;
-import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.service.sso.SsoAuthorizeData;
 import com.openframe.authz.service.sso.SsoInvitationService;
 import com.openframe.authz.service.user.InvitationRegistrationService;
@@ -46,9 +47,9 @@ public class InvitationRegistrationController {
                              HttpServletResponse httpResponse) throws Exception {
         try {
             clearAuthState(httpRequest, httpResponse);
-            clearOtherSsoFlowCookies(httpResponse, SsoRegistrationConstants.COOKIE_SSO_INVITE);
+            clearOtherSsoFlowCookies(httpResponse, SsoFlowCookieNames.OF_SSO_INVITE);
             SsoAuthorizeData init = ssoInvitationService.startAccept(request);
-            ssoFlowCookies.write(httpResponse, SsoRegistrationConstants.COOKIE_SSO_INVITE,
+            ssoFlowCookies.write(httpResponse, SsoFlowCookieNames.OF_SSO_INVITE,
                     init.cookieValue(), init.cookieTtlSeconds());
 
             seeOther(httpResponse, init.redirectPath());

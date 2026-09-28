@@ -18,6 +18,7 @@ public class CachedMachineInfo implements Serializable {
     
     private String machineId;
     private String hostname;
+    private String nickname;
     private String organizationId;
 }
 

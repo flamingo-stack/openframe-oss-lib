@@ -1,11 +1,7 @@
-'use client'
+'use client';
 
-import { useCallback, useRef } from 'react'
-import {
-  HONEYPOT_FIELD,
-  ELAPSED_MS_FIELD,
-  type HumanitySignals,
-} from '../utils/humanity-signals'
+import { useCallback, useRef, useState } from 'react';
+import { HONEYPOT_FIELD, ELAPSED_MS_FIELD, type HumanitySignals } from '../utils/humanity-signals';
 
 /**
  * useHumanitySignals — client primitive backing the invisible bot-protection
@@ -24,24 +20,31 @@ import {
  * working when the form is embedded behind a reverse-proxy / prefixed URL.
  */
 export function useHumanitySignals() {
-  const ref = useRef<HTMLInputElement>(null)
+  const ref = useRef<HTMLInputElement>(null);
   // performance.now() is monotonic (immune to wall-clock skew). SSR-guarded
   // even though the hook only executes on the client.
-  const mountedAt = useRef<number>(typeof performance !== 'undefined' ? performance.now() : 0)
+  //
+  // Sampled in a lazy `useState` initialiser, then copied into a ref. Not
+  // `useRef(performance.now())`: that argument is re-evaluated on EVERY render
+  // even though only the first call uses it, so the component would read the
+  // clock during render forever. And not state alone: `resetSignals` restarts
+  // the window after a successful submit, which through state would re-render
+  // the whole form for a value nothing renders.
+  const [mountedAt] = useState(() => (typeof performance !== 'undefined' ? performance.now() : 0));
+  const startedAtRef = useRef<number>(mountedAt);
 
   const getSignals = useCallback(
     (): HumanitySignals => ({
       [HONEYPOT_FIELD]: ref.current?.value ?? '',
-      [ELAPSED_MS_FIELD]:
-        typeof performance !== 'undefined' ? Math.round(performance.now() - mountedAt.current) : 0,
+      [ELAPSED_MS_FIELD]: typeof performance !== 'undefined' ? Math.round(performance.now() - startedAtRef.current) : 0,
     }),
     [],
-  )
+  );
 
   const resetSignals = useCallback(() => {
-    if (ref.current) ref.current.value = ''
-    if (typeof performance !== 'undefined') mountedAt.current = performance.now()
-  }, [])
+    if (ref.current) ref.current.value = '';
+    if (typeof performance !== 'undefined') startedAtRef.current = performance.now();
+  }, []);
 
-  return { honeypotInputProps: { ref, name: HONEYPOT_FIELD }, getSignals, resetSignals } as const
+  return { honeypotInputProps: { ref, name: HONEYPOT_FIELD }, getSignals, resetSignals } as const;
 }

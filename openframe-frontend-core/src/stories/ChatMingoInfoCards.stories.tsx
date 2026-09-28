@@ -1,33 +1,33 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import type { ReactNode } from 'react'
-import { MingoInfoCard } from '../components/chat/mingo-info-card'
-import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator'
-import { MingoIcon } from '../components/icons'
-import { EyeIcon } from '../components/icons-v2-generated/interface/eye-icon'
-import { ArrowRightUpIcon } from '../components/icons-v2-generated/arrows/arrow-right-up-icon'
-import { TagIcon } from '../components/icons-v2-generated/shopping/tag-icon'
-import { CodingCommitIcon } from '../components/icons-v2-generated/coding/coding-commit-icon'
-import { CodingPullRequestIcon } from '../components/icons-v2-generated/coding/coding-pull-request-icon'
-import { CodeIcon } from '../components/icons-v2-generated/coding/code-icon'
-import { SlackLogoGreyIcon } from '../components/icons-v2-generated/brand-logos/slack-logo-grey-icon'
-import { FileContentIcon } from '../components/icons-v2-generated/documents/file-content-icon'
-import { ChartBar01VerIcon } from '../components/icons-v2-generated/charts/chart-bar-01-ver-icon'
-import { ChartPieIcon } from '../components/icons-v2-generated/charts/chart-pie-icon'
-import { MoneyBillDollarIcon } from '../components/icons-v2-generated/finance/money-bill-dollar-icon'
-import { BankIcon } from '../components/icons-v2-generated/finance/bank-icon'
-import { CoinsExchangeCurrencyIcon } from '../components/icons-v2-generated/finance/coins-exchange-currency-icon'
-import { NewspaperIcon } from '../components/icons-v2-generated/documents/newspaper-icon'
-import { TrophyIcon } from '../components/icons-v2-generated/sport/trophy-icon'
-import { MicrophoneIcon } from '../components/icons-v2-generated/household/microphone-icon'
-import { Rocket02Icon } from '../components/icons-v2-generated/vehicles-and-delivery/rocket-02-icon'
-import { TruckFastIcon } from '../components/icons-v2-generated/vehicles-and-delivery/truck-fast-icon'
-import { PresentationBarIcon } from '../components/icons-v2-generated/charts/presentation-bar-icon'
-import { PresentationLineIcon } from '../components/icons-v2-generated/charts/presentation-line-icon'
-import { CalendarIcon } from '../components/icons-v2-generated/date-and-time/calendar-icon'
-import { CompassIcon } from '../components/icons-v2-generated/map-and-travel/compass-icon'
-import { MapIcon } from '../components/icons-v2-generated/map-and-travel/map-icon'
-import { CheckSquareIcon } from '../components/icons-v2-generated/signs-and-symbols/check-square-icon'
-import { Megaphone01Icon } from '../components/icons-v2-generated/shopping/megaphone-01-icon'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { ReactNode } from 'react';
+import { MingoInfoCard } from '../components/chat/mingo-info-card';
+import { MingoIcon } from '../components/icons';
+import { ArrowRightUpIcon } from '../components/icons-v2-generated/arrows/arrow-right-up-icon';
+import { SlackLogoGreyIcon } from '../components/icons-v2-generated/brand-logos/slack-logo-grey-icon';
+import { ChartBar01VerIcon } from '../components/icons-v2-generated/charts/chart-bar-01-ver-icon';
+import { ChartPieIcon } from '../components/icons-v2-generated/charts/chart-pie-icon';
+import { PresentationBarIcon } from '../components/icons-v2-generated/charts/presentation-bar-icon';
+import { PresentationLineIcon } from '../components/icons-v2-generated/charts/presentation-line-icon';
+import { CodeIcon } from '../components/icons-v2-generated/coding/code-icon';
+import { CodingCommitIcon } from '../components/icons-v2-generated/coding/coding-commit-icon';
+import { CodingPullRequestIcon } from '../components/icons-v2-generated/coding/coding-pull-request-icon';
+import { CalendarIcon } from '../components/icons-v2-generated/date-and-time/calendar-icon';
+import { FileContentIcon } from '../components/icons-v2-generated/documents/file-content-icon';
+import { NewspaperIcon } from '../components/icons-v2-generated/documents/newspaper-icon';
+import { BankIcon } from '../components/icons-v2-generated/finance/bank-icon';
+import { CoinsExchangeCurrencyIcon } from '../components/icons-v2-generated/finance/coins-exchange-currency-icon';
+import { MoneyBillDollarIcon } from '../components/icons-v2-generated/finance/money-bill-dollar-icon';
+import { MicrophoneIcon } from '../components/icons-v2-generated/household/microphone-icon';
+import { EyeIcon } from '../components/icons-v2-generated/interface/eye-icon';
+import { CompassIcon } from '../components/icons-v2-generated/map-and-travel/compass-icon';
+import { MapIcon } from '../components/icons-v2-generated/map-and-travel/map-icon';
+import { Megaphone01Icon } from '../components/icons-v2-generated/shopping/megaphone-01-icon';
+import { TagIcon } from '../components/icons-v2-generated/shopping/tag-icon';
+import { CheckSquareIcon } from '../components/icons-v2-generated/signs-and-symbols/check-square-icon';
+import { TrophyIcon } from '../components/icons-v2-generated/sport/trophy-icon';
+import { Rocket02Icon } from '../components/icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
+import { TruckFastIcon } from '../components/icons-v2-generated/vehicles-and-delivery/truck-fast-icon';
+import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator';
 
 /**
  * Chat entity-cards re-skinned with `MingoInfoCard`.
@@ -54,24 +54,21 @@ const meta: Meta<typeof MingoInfoCard> = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <ChatColumnDecorator>
         <Story />
       </ChatColumnDecorator>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /** Shared "⋯" overflow menu (Figma `7740:55075`): "Ask Mingo" (Mingo logo)
  *  followed by "Open Details" (eye) with a trailing ↗ open-in-new-tab side
  *  button. */
-const openMenu = (
-  href: string,
-  openDetails?: { label: string; icon: ReactNode },
-) => [
+const openMenu = (href: string, openDetails?: { label: string; icon: ReactNode }) => [
   {
     items: [
       {
@@ -86,8 +83,7 @@ const openMenu = (
           />
         ),
         onClick: () => {
-          // eslint-disable-next-line no-console
-          console.log('[story] ask mingo', href)
+          console.log('[story] ask mingo', href);
         },
       },
       {
@@ -95,21 +91,19 @@ const openMenu = (
         label: openDetails?.label ?? 'Open Details',
         icon: openDetails?.icon ?? <EyeIcon size={20} />,
         onClick: () => {
-          // eslint-disable-next-line no-console
-          console.log('[story] open details', href)
+          console.log('[story] open details', href);
         },
         iconAction: {
           icon: <ArrowRightUpIcon size={20} />,
           'aria-label': 'Open in new tab',
           onClick: () => {
-            // eslint-disable-next-line no-console
-            console.log('[story] open in new tab', href)
+            console.log('[story] open in new tab', href);
           },
         },
       },
     ],
   },
-]
+];
 
 // =============================================================================
 // HubSpot ticket — icon: HubSpot grey logo · status: ticket state · desc: preview
@@ -125,7 +119,7 @@ export const HubspotTicket: Story = {
     },
   },
   render: () => {
-    const HREF = 'https://app.hubspot.com/contacts/0/ticket/123'
+    const HREF = 'https://app.hubspot.com/contacts/0/ticket/123';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -175,9 +169,9 @@ export const HubspotTicket: Story = {
           menuAriaLabel="Ticket actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // GitHub activity — icon per kind · status: review state or activity type ·
@@ -194,7 +188,7 @@ export const GithubActivity: Story = {
     },
   },
   render: () => {
-    const HREF = 'https://github.com/flamingo/openframe/commit/a1b2c3d'
+    const HREF = 'https://github.com/flamingo/openframe/commit/a1b2c3d';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -243,9 +237,9 @@ export const GithubActivity: Story = {
           menuAriaLabel="Activity actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Slack message — icon: Slack grey logo · no pill · description: message text
@@ -261,7 +255,7 @@ export const SlackMessage: Story = {
     },
   },
   render: () => {
-    const HREF = 'https://flamingo.slack.com/archives/C12345/p1700000000'
+    const HREF = 'https://flamingo.slack.com/archives/C12345/p1700000000';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -288,9 +282,9 @@ export const SlackMessage: Story = {
           menuAriaLabel="Message actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Data-room doc / markdown — icon: FileContent · status: source badge ·
@@ -307,7 +301,7 @@ export const DataRoomDoc: Story = {
     },
   },
   render: () => {
-    const HREF = 'https://hub.flamingo.cx/docs/openframe/getting-started'
+    const HREF = 'https://hub.flamingo.cx/docs/openframe/getting-started';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -338,9 +332,9 @@ export const DataRoomDoc: Story = {
           menuAriaLabel="Document actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Financial — distinct icon per type · no pill · description: subtitle
@@ -356,7 +350,7 @@ export const Financial: Story = {
     },
   },
   render: () => {
-    const HREF = 'https://hub.flamingo.cx/data-room/financials'
+    const HREF = 'https://hub.flamingo.cx/data-room/financials';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -400,9 +394,9 @@ export const Financial: Story = {
           menuAriaLabel="Document actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Blog post — media: cover image (newspaper-icon fallback) · pill: category ·
@@ -419,7 +413,7 @@ export const BlogPost: Story = {
     },
   },
   render: () => {
-    const HREF = 'https://openmsp.com/blog/rmm-buyers-guide'
+    const HREF = 'https://openmsp.com/blog/rmm-buyers-guide';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -454,9 +448,9 @@ export const BlogPost: Story = {
           menuAriaLabel="Article actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Case study — trophy fallback icon · "Case study" pill · cover image
@@ -464,7 +458,7 @@ export const BlogPost: Story = {
 
 export const CaseStudy: Story = {
   render: () => {
-    const HREF = 'https://openmsp.com/case-studies/acme-it'
+    const HREF = 'https://openmsp.com/case-studies/acme-it';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -488,9 +482,9 @@ export const CaseStudy: Story = {
           menuAriaLabel="Case study actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Customer interview — microphone fallback · "Interview" pill
@@ -498,7 +492,7 @@ export const CaseStudy: Story = {
 
 export const CustomerInterview: Story = {
   render: () => {
-    const HREF = 'https://openmsp.com/interviews/jamie-fox'
+    const HREF = 'https://openmsp.com/interviews/jamie-fox';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -513,9 +507,9 @@ export const CustomerInterview: Story = {
           menuAriaLabel="Interview actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Product release — rocket fallback · version pill · description: summary/date
@@ -523,7 +517,7 @@ export const CustomerInterview: Story = {
 
 export const ProductRelease: Story = {
   render: () => {
-    const HREF = 'https://openframe.org/releases/2-14-0'
+    const HREF = 'https://openframe.org/releases/2-14-0';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -547,9 +541,9 @@ export const ProductRelease: Story = {
           menuAriaLabel="Release actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Programs — podcast / webinar / event, distinct icon + type pill
@@ -557,7 +551,7 @@ export const ProductRelease: Story = {
 
 export const Programs: Story = {
   render: () => {
-    const HREF = 'https://openmsp.com/podcasts/ep-42'
+    const HREF = 'https://openmsp.com/podcasts/ep-42';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -590,9 +584,9 @@ export const Programs: Story = {
           menuAriaLabel="Event actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Investor update — presentation fallback · "Investor update" pill
@@ -600,7 +594,7 @@ export const Programs: Story = {
 
 export const InvestorUpdate: Story = {
   render: () => {
-    const HREF = 'https://hub.flamingo.cx/investor-updates/2026-q1'
+    const HREF = 'https://hub.flamingo.cx/investor-updates/2026-q1';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -624,9 +618,9 @@ export const InvestorUpdate: Story = {
           menuAriaLabel="Update actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Onboarding guide — compass fallback · "Guide" pill
@@ -634,7 +628,7 @@ export const InvestorUpdate: Story = {
 
 export const OnboardingGuide: Story = {
   render: () => {
-    const HREF = 'https://hub.flamingo.cx/guides/first-device'
+    const HREF = 'https://hub.flamingo.cx/guides/first-device';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -649,9 +643,9 @@ export const OnboardingGuide: Story = {
           menuAriaLabel="Guide actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Roadmap / delivery / task — per-type icon · coloured status pill · no image
@@ -667,19 +661,13 @@ export const Roadmap: Story = {
     },
   },
   render: () => {
-    const HREF = 'https://hub.flamingo.cx/roadmap/RM-128'
+    const HREF = 'https://hub.flamingo.cx/roadmap/RM-128';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
           title="Per-tenant audit log export"
           description="Server integration logo (e.g. ClickUp) shown contained in the box."
-          icon={
-            <img
-              src="https://picsum.photos/seed/clickuplogo/48"
-              alt=""
-              className="size-6 object-contain"
-            />
-          }
+          icon={<img src="https://picsum.photos/seed/clickuplogo/48" alt="" className="size-6 object-contain" />}
           status={{ label: 'In Progress', variant: 'warning' }}
           anchorProps={makeAnchorProps(HREF)}
           menuGroups={openMenu(HREF)}
@@ -713,9 +701,9 @@ export const Roadmap: Story = {
           menuAriaLabel="Roadmap actions"
         />
       </div>
-    )
+    );
   },
-}
+};
 
 // =============================================================================
 // Marketing campaign — megaphone icon · coloured status pill
@@ -723,7 +711,7 @@ export const Roadmap: Story = {
 
 export const MarketingCampaign: Story = {
   render: () => {
-    const HREF = 'https://hub.flamingo.cx/admin/campaigns/c-91'
+    const HREF = 'https://hub.flamingo.cx/admin/campaigns/c-91';
     return (
       <div className="flex flex-col gap-3">
         <MingoInfoCard
@@ -743,6 +731,6 @@ export const MarketingCampaign: Story = {
           menuAriaLabel="Campaign actions"
         />
       </div>
-    )
+    );
   },
-}
+};

@@ -23,24 +23,19 @@
  */
 
 export interface ReleaseCoverSource {
-  featured_image?: string | null
-  highlight_video_thumbnail?: string | null
-  main_video_thumbnail?: string | null
-  og_image_url?: string | null
+  featured_image?: string | null;
+  highlight_video_thumbnail?: string | null;
+  main_video_thumbnail?: string | null;
+  og_image_url?: string | null;
 }
 
 export interface ReleaseCoverResult {
-  cover: string | null
-  hasVideoCover: boolean
+  cover: string | null;
+  hasVideoCover: boolean;
 }
 
 export function resolveReleaseCover(r: ReleaseCoverSource): ReleaseCoverResult {
-  const cover =
-    r.featured_image ||
-    r.highlight_video_thumbnail ||
-    r.main_video_thumbnail ||
-    r.og_image_url ||
-    null
-  const hasVideoCover = !r.featured_image && !!(r.highlight_video_thumbnail || r.main_video_thumbnail)
-  return { cover, hasVideoCover }
+  const cover = r.featured_image || r.highlight_video_thumbnail || r.main_video_thumbnail || r.og_image_url || null;
+  const hasVideoCover = !r.featured_image && !!(r.highlight_video_thumbnail || r.main_video_thumbnail);
+  return { cover, hasVideoCover };
 }

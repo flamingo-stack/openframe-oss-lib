@@ -4,74 +4,142 @@
  */
 
 export function toGoogleSheetsEmbedUrl(url: string): string {
-  if (url.includes('/htmlembed')) return url
+  if (url.includes('/htmlembed')) return url;
 
-  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
-  if (!match) return url
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) return url;
 
-  const gidMatch = url.match(/[#?&]gid=(\d+)/)
-  const gid = gidMatch ? gidMatch[1] : '0'
+  const gidMatch = url.match(/[#?&]gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : '0';
 
-  return `https://docs.google.com/spreadsheets/d/${match[1]}/htmlembed?widget=true&chrome=false&headers=false&gid=${gid}`
+  return `https://docs.google.com/spreadsheets/d/${match[1]}/htmlembed?widget=true&chrome=false&headers=false&gid=${gid}`;
 }
 
 export function toGoogleSheetsOriginalUrl(url: string): string {
-  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
-  if (!match) return url
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) return url;
 
-  const gidMatch = url.match(/[#?&]gid=(\d+)/)
-  const gid = gidMatch ? gidMatch[1] : '0'
+  const gidMatch = url.match(/[#?&]gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : '0';
 
-  return `https://docs.google.com/spreadsheets/d/${match[1]}/edit#gid=${gid}`
+  return `https://docs.google.com/spreadsheets/d/${match[1]}/edit#gid=${gid}`;
 }
 
 /**
  * Convert a Figma URL to an embeddable URL.
  * Slides/deck URLs map to `deck` (present) by default; `slidesView: 'browse'` switches to `slides` (browse).
  */
-export function toFigmaEmbedUrl(
-  url: string,
-  opts?: { slidesView?: 'present' | 'browse' }
-): string {
-  if (url.includes('embed.figma.com')) return url
-  if (url.includes('figma.com/embed')) return url
+export function toFigmaEmbedUrl(url: string, opts?: { slidesView?: 'present' | 'browse' }): string {
+  if (url.includes('embed.figma.com')) return url;
+  if (url.includes('figma.com/embed')) return url;
 
-  const match = url.match(
-    /figma\.com\/(design|file|proto|board|slides|deck)\/([a-zA-Z0-9]+)(?:\/([^?]*))?(\?.*)?$/
-  )
+  const match = url.match(/figma\.com\/(design|file|proto|board|slides|deck)\/([a-zA-Z0-9]+)(?:\/([^?]*))?(\?.*)?$/);
 
   if (match) {
-    const [, urlType, fileKey, titleSlug, queryString] = match
-    const isSlides = urlType === 'slides' || urlType === 'deck'
+    const [, urlType, fileKey, titleSlug, queryString] = match;
+    const isSlides = urlType === 'slides' || urlType === 'deck';
     const embedType =
-      urlType === 'proto' ? 'proto'
-      : isSlides ? (opts?.slidesView === 'browse' ? 'slides' : 'deck')
-      : 'design'
-    const pathSuffix = titleSlug ? `/${titleSlug}` : ''
+      urlType === 'proto' ? 'proto' : isSlides ? (opts?.slidesView === 'browse' ? 'slides' : 'deck') : 'design';
+    const pathSuffix = titleSlug ? `/${titleSlug}` : '';
 
-    const params = new URLSearchParams(queryString?.replace(/^\?/, '') || '')
+    const params = new URLSearchParams(queryString?.replace(/^\?/, '') || '');
     if (!params.has('embed-host')) {
-      params.set('embed-host', 'flamingo')
+      params.set('embed-host', 'flamingo');
     }
-    const clientId = process.env.NEXT_PUBLIC_FIGMA_CLIENT_ID
+    const clientId = process.env.NEXT_PUBLIC_FIGMA_CLIENT_ID;
     if (clientId && !params.has('client-id')) {
-      params.set('client-id', clientId)
+      params.set('client-id', clientId);
     }
 
-    return `https://embed.figma.com/${embedType}/${fileKey}${pathSuffix}?${params.toString()}`
+    return `https://embed.figma.com/${embedType}/${fileKey}${pathSuffix}?${params.toString()}`;
   }
 
-  return `https://www.figma.com/embed?embed-host=flamingo&url=${encodeURIComponent(url)}`
+  return `https://www.figma.com/embed?embed-host=flamingo&url=${encodeURIComponent(url)}`;
 }
 
 export function isFigmaSlidesUrl(url: string): boolean {
-  if (!url) return false
-  return /(?:www\.|embed\.)?figma\.com\/(?:slides|deck)\/[a-zA-Z0-9]+/.test(url)
+  if (!url) return false;
+  return /(?:www\.|embed\.)?figma\.com\/(?:slides|deck)\/[a-zA-Z0-9]+/.test(url);
 }
 
 export function toFigmaOriginalUrl(url: string): string {
   if (url.includes('embed.figma.com')) {
-    return url.replace('embed.figma.com', 'www.figma.com').replace(/\?.*$/, '')
+    return url.replace('embed.figma.com', 'www.figma.com').replace(/\?.*$/, '');
   }
-  return url.replace(/\?.*$/, '')
+  return url.replace(/\?.*$/, '');
+}
+
+/**
+ * The self-hosted MIRROR url for a claude artifact url — the whole
+ * mirror mechanism is UNDER THE HOOD: the viewer detects a claude url,
+ * DERIVES the mirror location from the artifact's own id under the
+ * host's configured storage-view proxy base, and frames the downloaded
+ * copy from there. No per-link data, no props, no shortcode changes —
+ * 100% transparent to every consumer.
+ *
+ * `storageViewBaseUrl` comes from `EndpointsRuntime` — the SAME
+ * host-overridable proxy-path mechanism every other lib→API call uses
+ * (a reverse-proxied embedder remaps it; a host without the proxy omits
+ * it and gets `null` here, i.e. no mirror leg at all).
+ *
+ * `null` when the base is absent or the url carries no artifact id. The
+ * derived url is the configured base + a validated uuid — safe as a
+ * frame source without further checks. KEEP THE OBJECT NAMING IN SYNC
+ * with the hub's `lib/data/design-brief-mirror.cjs` (bucket +
+ * `<uuid>.html`) — that module owns the ingest/audit half.
+ */
+export function toClaudeMirrorPath(
+  url: string | null | undefined,
+  storageViewBaseUrl: string | null | undefined,
+): string | null {
+  if (!url || !storageViewBaseUrl) return null;
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    const id =
+      (host === 'claude.ai' &&
+        /^\/(?:code\/artifact|public\/artifacts)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i.exec(
+          u.pathname,
+        )?.[1]) ||
+      (host === 'claude.site' &&
+        /^\/artifacts\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i.exec(
+          u.pathname,
+        )?.[1]) ||
+      null;
+    return id ? `${storageViewBaseUrl.replace(/\/$/, '')}/design-briefs/${id.toLowerCase()}.html` : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The EMBED url for a published Claude artifact, or `null` when the link is not
+ * one we can frame — the Claude counterpart of `toFigmaEmbedUrl`.
+ *
+ * claude.ai serves `frame-ancestors 'self'` on the artifact page itself, but a
+ * PUBLISHED artifact also has an `/embed` route whose `frame-ancestors` carries
+ * the domains its author allow-listed under "Get embed code → Allowed domains".
+ * That is Anthropic's supported way to put an artifact on another site, so that
+ * is what the iframe points at.
+ *
+ * Returns `null` for everything else, including a Claude CODE url
+ * (`claude.ai/code/artifact/…`), whose Share dialog exposes no Embed settings
+ * and whose `/embed` path answers `frame-ancestors 'self'` (verified against
+ * real artifacts, 2026-08). A trailing `/embed` is accepted because that is the
+ * url "Get embed code" hands the author.
+ */
+export function toClaudeEmbedUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    // `claude.site/artifacts/<id>` 308-redirects to the claude.ai public url.
+    const publicId =
+      (host === 'claude.ai' && /^\/public\/artifacts\/([\w-]+)(?:\/embed)?\/?$/.exec(u.pathname)?.[1]) ||
+      (host === 'claude.site' && /^\/artifacts\/([\w-]+)(?:\/embed)?\/?$/.exec(u.pathname)?.[1]) ||
+      null;
+    return publicId ? `https://claude.ai/public/artifacts/${publicId}/embed` : null;
+  } catch {
+    return null;
+  }
 }

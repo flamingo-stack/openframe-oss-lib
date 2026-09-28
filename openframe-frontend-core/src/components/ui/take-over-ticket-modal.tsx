@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import { type ReactNode, useState } from 'react';
 import { CheckIcon } from '../icons-v2-generated';
 import { Autocomplete, type AutocompleteOption } from './autocomplete';
 import { Button } from './button';
@@ -44,11 +44,11 @@ export interface TakeOverTicketModalProps {
 
 /** Status row with color swatch — shared by the ticket lifecycle modals
  *  (Take Over / Reopen), which present the same Status + Assigned pair. */
-export function renderTicketStatusOption(option: AutocompleteOption, isSelected: boolean): React.ReactNode {
+export function renderTicketStatusOption(option: AutocompleteOption, isSelected: boolean): ReactNode {
   const { label, color } = option as TakeOverStatusOption;
   return (
-    <div className="flex items-center justify-between w-full min-w-0 gap-[var(--spacing-system-xs)]">
-      <div className="flex items-center gap-[var(--spacing-system-xs)] min-w-0">
+    <div className="flex w-full min-w-0 items-center justify-between gap-[var(--spacing-system-xs)]">
+      <div className="flex min-w-0 items-center gap-[var(--spacing-system-xs)]">
         <ColorSwatch color={color} />
         <div className="min-w-0">
           <TruncateText className="text-inherit">{label}</TruncateText>
@@ -60,11 +60,11 @@ export function renderTicketStatusOption(option: AutocompleteOption, isSelected:
 }
 
 /** Assignee row with round avatar — shared by the ticket lifecycle modals. */
-export function renderTicketAssigneeOption(option: AutocompleteOption, isSelected: boolean): React.ReactNode {
+export function renderTicketAssigneeOption(option: AutocompleteOption, isSelected: boolean): ReactNode {
   const { label, imageUrl } = option as TakeOverAssigneeOption;
   return (
-    <div className="flex items-center justify-between w-full min-w-0 gap-[var(--spacing-system-xs)]">
-      <div className="flex items-center gap-[var(--spacing-system-xs)] min-w-0">
+    <div className="flex w-full min-w-0 items-center justify-between gap-[var(--spacing-system-xs)]">
+      <div className="flex min-w-0 items-center gap-[var(--spacing-system-xs)]">
         <SquareAvatar src={imageUrl} alt={label} fallback={label} size="sm" variant="round" />
         <div className="min-w-0">
           <TruncateText className="text-inherit">{label}</TruncateText>
@@ -98,15 +98,26 @@ export function TakeOverTicketModal({
   isPending = false,
   onConfirm,
 }: TakeOverTicketModalProps) {
-  const [statusId, setStatusId] = React.useState<string | null>(null);
-  const [assigneeId, setAssigneeId] = React.useState<string | null>(null);
+  const [statusId, setStatusId] = useState<string | null>(initialStatusId ?? null);
+  const [assigneeId, setAssigneeId] = useState<string | null>(initialAssigneeId ?? null);
 
-  // Re-seed the selections every time the modal opens.
-  React.useEffect(() => {
-    if (!isOpen) return;
-    setStatusId(initialStatusId ?? null);
-    setAssigneeId(initialAssigneeId ?? null);
-  }, [isOpen, initialStatusId, initialAssigneeId]);
+  // Re-seed the selections every time the modal opens. Adjusted while
+  // rendering, not from an effect: the modal does not unmount when it closes,
+  // so an effect painted the OPENING frame with the previous session's status
+  // and assignee still selected before replacing them. The mount case is
+  // covered by the initialisers above, exactly as the effect's first run was.
+  const [seededWith, setSeededWith] = useState({ isOpen, initialStatusId, initialAssigneeId });
+  if (
+    seededWith.isOpen !== isOpen ||
+    seededWith.initialStatusId !== initialStatusId ||
+    seededWith.initialAssigneeId !== initialAssigneeId
+  ) {
+    setSeededWith({ isOpen, initialStatusId, initialAssigneeId });
+    if (isOpen) {
+      setStatusId(initialStatusId ?? null);
+      setAssigneeId(initialAssigneeId ?? null);
+    }
+  }
 
   const selectedStatusId = statusId ?? statusOptions[0]?.value ?? null;
   const selectedStatus = statusOptions.find(o => o.value === selectedStatusId);
@@ -123,14 +134,14 @@ export function TakeOverTicketModal({
         <ModalV2Title>Take Over Ticket</ModalV2Title>
       </ModalV2Header>
 
-      <p className="text-h4 text-ods-text-primary">
+      <p className="text-ods-text-primary text-h4">
         The ticket <span className="text-ods-accent">{ticketRef}</span> will move to the selected status and be assigned
         to the technician. A direct chat with the user will start, and the AI assistant will stop working on this
         ticket.
       </p>
 
-      <div className="flex flex-col md:flex-row gap-[var(--spacing-system-l)] w-full">
-        <div className="flex-1 min-w-0">
+      <div className="flex w-full flex-col gap-[var(--spacing-system-l)] md:flex-row">
+        <div className="min-w-0 flex-1">
           <Autocomplete
             label="Status"
             options={statusOptions}
@@ -141,7 +152,7 @@ export function TakeOverTicketModal({
             renderOption={renderTicketStatusOption}
           />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <Autocomplete
             label="Assigned"
             options={assigneeOptions}
@@ -169,7 +180,7 @@ export function TakeOverTicketModal({
         <Button type="button" variant="outline" onClick={onClose} disabled={isPending} className="flex-1 md:hidden">
           Cancel
         </Button>
-        <div className="hidden md:block flex-1" />
+        <div className="hidden flex-1 md:block" />
         <Button
           type="button"
           variant="accent"

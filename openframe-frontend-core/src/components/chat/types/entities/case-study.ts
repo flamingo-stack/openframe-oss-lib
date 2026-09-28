@@ -7,8 +7,4 @@
  * chat entities barrel.
  */
 
-export type {
-  CaseStudy,
-  CaseStudyFilters,
-  CaseStudyListResponse,
-} from '@/types/case-study';
+export type { CaseStudy, CaseStudyFilters, CaseStudyListResponse } from '@/types/case-study';

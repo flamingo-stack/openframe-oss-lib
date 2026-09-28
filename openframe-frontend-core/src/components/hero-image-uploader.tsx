@@ -1,9 +1,12 @@
-"use client";
+'use client';
 
-import { useRef, useState } from 'react';
 import { Loader2, Image as ImageIcon, Upload, X } from 'lucide-react';
-import { Button } from "./ui/button";
-import { useToast } from "../hooks/use-toast";
+import { useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
+import Image from '../embed-shims/next-image';
+import { useToast } from '../hooks/use-toast';
+import { errorMessage } from '../utils/common';
+import { Button } from './ui/button';
 
 interface HeroImageUploaderProps {
   /** Current image URL if one already exists */
@@ -27,10 +30,44 @@ interface HeroImageUploaderProps {
 }
 
 /**
+ * Pull the stored URL out of an upload response.
+ *
+ * `uploadEndpoint` is caller-supplied, and the three endpoints in the fleet
+ * answer with three different envelopes — `{ data: { url } }` (the hub's
+ * media routes), `{ url }` (the blob upload proxy) and `{ file_url }` (the
+ * legacy supabase route). Returns null when none of them is a usable string,
+ * which the caller reports as "Invalid upload response".
+ */
+function readUploadedUrl(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+
+  if ('data' in payload) {
+    const nested = payload.data;
+    if (typeof nested === 'object' && nested !== null && 'url' in nested) {
+      if (typeof nested.url === 'string' && nested.url) return nested.url;
+    }
+  }
+  if ('url' in payload && typeof payload.url === 'string' && payload.url) return payload.url;
+  if ('file_url' in payload && typeof payload.file_url === 'string' && payload.file_url) return payload.file_url;
+
+  return null;
+}
+
+/**
  * Reusable dashed hero-style image uploader identical to Blog Editor's hero picker.
  * Handles client-side validation (JPEG/PNG/WebP/GIF up to 5 MB), upload, preview & removal.
  */
-export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height = 300, objectFit = 'cover', showReplaceButton = true, deferUpload = false, onUpload, onDelete }: HeroImageUploaderProps) {
+export function HeroImageUploader({
+  imageUrl,
+  onChange,
+  uploadEndpoint,
+  height = 300,
+  objectFit = 'cover',
+  showReplaceButton = true,
+  deferUpload = false,
+  onUpload,
+  onDelete,
+}: HeroImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -66,8 +103,12 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
           setUploading(false);
         };
         reader.readAsDataURL(file);
-      } catch (err: any) {
-        toast({ title: 'File error', description: err.message || 'Failed to process image', variant: 'destructive' });
+      } catch (err) {
+        toast({
+          title: 'File error',
+          description: errorMessage(err, 'Failed to process image'),
+          variant: 'destructive',
+        });
         setUploading(false);
       } finally {
         if (inputRef.current) inputRef.current.value = '';
@@ -79,7 +120,7 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
     setUploading(true);
     try {
       let uploadedUrl: string;
-      
+
       if (onUpload) {
         // Use custom upload handler (e.g., for authenticated uploads)
         uploadedUrl = await onUpload(file);
@@ -89,29 +130,31 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
         fd.append('file', file);
         const res = await fetch(uploadEndpoint, { method: 'POST', body: fd });
         if (!res.ok) throw new Error('Upload failed');
-        const json = await res.json();
-        uploadedUrl = (json.data && json.data.url) || json.url || json.file_url;
-        if (!uploadedUrl) throw new Error('Invalid upload response');
+        const json: unknown = await res.json();
+        const url = readUploadedUrl(json);
+        if (!url) throw new Error('Invalid upload response');
+        uploadedUrl = url;
       }
-      
+
       onChange(uploadedUrl);
-    } catch (err: any) {
-      toast({ title: 'Upload error', description: err.message || 'Failed to upload', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Upload error', description: errorMessage(err, 'Failed to upload'), variant: 'destructive' });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
     }
   }
 
-  const handleSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleFile(e.target.files?.[0]);
+  const handleSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    // `handleFile` never rejects — it toasts failures and resets in `finally`.
+    void handleFile(e.target.files?.[0]);
   };
 
   const handleRemove = async () => {
     if (onDelete) {
       try {
         await onDelete();
-      } catch (error) {
+      } catch {
         // onDelete handler should handle its own error reporting
         return;
       }
@@ -122,17 +165,20 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
   const heightStyle = typeof height === 'number' ? `${height}px` : height;
 
   return (
-    <div className="w-full h-full max-h-full space-y-2 min-h-[300px]">
+    <div className="h-full max-h-full min-h-[300px] w-full space-y-2">
       {imageUrl ? (
-        <div className="relative group w-full aspect-square md:aspect-auto h-auto md:h-full flex items-center justify-center overflow-hidden" style={{ height: heightStyle }}>
-          <img src={imageUrl} className={`absolute inset-0 w-full h-full object-${objectFit}`} alt="Cover" />
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-4 transition-opacity rounded-lg">
+        <div
+          className="group relative flex aspect-square h-auto w-full items-center justify-center overflow-hidden md:aspect-auto md:h-full"
+          style={{ height: heightStyle }}
+        >
+          <Image src={imageUrl} className={`object-${objectFit}`} alt="Cover" fill sizes="100vw" unoptimized />
+          <div className="absolute inset-0 flex items-center justify-center gap-4 rounded-lg bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
             {showReplaceButton && (
               <Button
                 variant="outline"
                 size="icon"
                 onClick={openDialog}
-                className="bg-white text-black hover:bg-gray-100 rounded-full w-12 h-12"
+                className="h-12 w-12 rounded-full bg-white text-black hover:bg-gray-100"
               >
                 <Upload className="h-5 w-5" />
               </Button>
@@ -141,7 +187,7 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
               variant="outline"
               size="icon"
               onClick={() => handleRemove()}
-              className="bg-white text-black hover:bg-gray-100 rounded-full w-12 h-12"
+              className="h-12 w-12 rounded-full bg-white text-black hover:bg-gray-100"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -149,7 +195,7 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
         </div>
       ) : (
         <div
-          className={`w-full h-full border-2 border-dashed ${uploading ? 'border-ods-accent' : 'border-ods-border hover:border-ods-accent'} rounded-lg flex flex-col items-center justify-center cursor-pointer bg-ods-bg`}
+          className={`h-full w-full border-2 border-dashed ${uploading ? 'border-ods-accent' : 'border-ods-border hover:border-ods-accent'} flex cursor-pointer flex-col items-center justify-center rounded-lg bg-ods-bg`}
           style={{ height: heightStyle }}
           onClick={openDialog}
         >
@@ -158,8 +204,8 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
           ) : (
             <>
               <ImageIcon className="h-12 w-12 text-ods-text-secondary" />
-              <span className="text-ods-text-primary text-h6 mt-2">Upload cover image</span>
-              <span className="text-ods-text-secondary text-h6 mt-1">Click to upload or drag and drop</span>
+              <span className="mt-2 text-ods-text-primary text-h6">Upload cover image</span>
+              <span className="mt-1 text-ods-text-secondary text-h6">Click to upload or drag and drop</span>
               <span className="text-ods-text-secondary text-h6">PNG, JPEG, WebP, GIF up to 5MB</span>
             </>
           )}
@@ -170,4 +216,4 @@ export function HeroImageUploader({ imageUrl, onChange, uploadEndpoint, height =
       <input ref={inputRef} type="file" accept="image/*" onChange={handleSelect} className="hidden" />
     </div>
   );
-} 
+}

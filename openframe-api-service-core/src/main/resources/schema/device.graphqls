@@ -59,6 +59,7 @@ type Machine implements Node {
     lastSeen: Instant
     organizationId: String
     organization: Organization
+    userId: String
     hostname: String
     displayName: String
     nickname: String
@@ -124,6 +125,7 @@ type ToolConnection implements Node {
     metadata: String
     connectedAt: Instant
     lastSyncAt: Instant
+    vulnerabilitiesUpdatedAt: Instant
     disconnectedAt: Instant
 }
 

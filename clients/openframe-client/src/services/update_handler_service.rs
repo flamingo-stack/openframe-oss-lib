@@ -161,6 +161,7 @@ impl UpdateHandlerService {
                 state.target_version, e
             ),
         }
+        self.cleanup_service.remove_pre_swap_copy();
 
         if let Err(e) = self
             .client_info_service
@@ -193,10 +194,15 @@ impl UpdateHandlerService {
         Ok(())
     }
 
-    async fn handle_failure(&self, state: UpdateState) -> Result<()> {
-        info!(
-            "Update to {} failed (phase: {:?}; binary restore is owned by the updater script)",
-            state.target_version, state.phase
+    pub async fn handle_failure(&self, state: UpdateState) -> Result<()> {
+        warn!(
+            "Update to {} failed (phase: {:?}): {}",
+            state.target_version,
+            state.phase,
+            state
+                .last_error
+                .as_deref()
+                .unwrap_or("no reason recorded, see the updater transcript in the logs directory")
         );
 
         if let Err(e) = self
@@ -216,7 +222,7 @@ impl UpdateHandlerService {
             .await;
         self.state_service.clear().await?;
 
-        info!("Update marked as failed, NATS will retry");
+        info!("Update marked as failed");
         Ok(())
     }
 

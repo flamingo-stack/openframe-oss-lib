@@ -41,6 +41,11 @@ impl InitialConfigurationService {
         Ok(config.org_id.clone())
     }
 
+    pub fn get_user_id(&self) -> Result<String> {
+        let config = self.get()?;
+        Ok(config.user_id.clone())
+    }
+
     pub fn get_local_ca_cert_path(&self) -> Result<String> {
         let config = self.get()?;
         Ok(config.local_ca_cert_path.clone())
@@ -49,6 +54,15 @@ impl InitialConfigurationService {
     pub fn get_tags(&self) -> Result<Vec<DeviceTag>> {
         let config = self.get()?;
         Ok(config.tags)
+    }
+
+    /// True once a usable configuration exists on disk — the awaiting-auth gate's
+    /// release condition. Requires a parseable file with a non-empty server host
+    /// so a partially written file cannot release the gate.
+    pub fn is_configured(&self) -> bool {
+        self.get()
+            .map(|config| !config.server_host.trim().is_empty())
+            .unwrap_or(false)
     }
 
     fn get(&self) -> Result<InitialConfiguration> {
@@ -93,7 +107,7 @@ impl InitialConfigurationService {
     pub fn save(&self, config: &InitialConfiguration) -> Result<()> {
         let config_json = serde_json::to_string_pretty(config)
             .context("Failed to serialize initial configuration to JSON")?;
-        fs::write(&self.config_file_path, config_json).with_context(|| {
+        crate::utils::fs::atomic_write(&self.config_file_path, config_json).with_context(|| {
             format!(
                 "Failed to write initial configuration file: {:?}",
                 self.config_file_path
@@ -102,3 +116,7 @@ impl InitialConfigurationService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "initial_configuration_service_tests.rs"]
+mod tests;

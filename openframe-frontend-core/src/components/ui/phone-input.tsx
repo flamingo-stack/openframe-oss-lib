@@ -1,20 +1,21 @@
-"use client"
+'use client';
 
-import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "./select"
-import { Input } from "./input"
-import type { CountryCode } from 'libphonenumber-js'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getCountryPhoneData, validatePhoneNumber, type CountryPhoneData } from '../../utils/country-phone-utils'
+import type { CountryCode } from 'libphonenumber-js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
+import { getCountryPhoneData, validatePhoneNumber, type CountryPhoneData } from '../../utils/country-phone-utils';
+import { Input } from './input';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from './select';
 
 export interface PhoneInputProps {
-  value: string
-  countryCode: CountryCode
-  onPhoneChange: (phone: string) => void
-  onCountryChange: (country: CountryCode) => void
-  onValidationChange?: (isInvalid: boolean) => void
-  disabled?: boolean
-  placeholder?: string
-  onKeyDown?: (e: React.KeyboardEvent) => void
+  value: string;
+  countryCode: CountryCode;
+  onPhoneChange: (phone: string) => void;
+  onCountryChange: (country: CountryCode) => void;
+  onValidationChange?: (isInvalid: boolean) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  onKeyDown?: (e: KeyboardEvent) => void;
 }
 
 export function PhoneInput({
@@ -24,48 +25,56 @@ export function PhoneInput({
   onCountryChange,
   onValidationChange,
   disabled,
-  placeholder = "Phone Number (optional)",
+  placeholder = 'Phone Number (optional)',
   onKeyDown,
 }: PhoneInputProps) {
-  const { priority, others } = useMemo(() => getCountryPhoneData(), [])
+  const { priority, others } = useMemo(() => getCountryPhoneData(), []);
   const selectedCountry = useMemo(
     () => [...priority, ...others].find(c => c.code === countryCode),
-    [countryCode, priority, others]
-  )
+    [countryCode, priority, others],
+  );
 
-  const [isInvalid, setIsInvalid] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const [isInvalid, setIsInvalid] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  const digitCount = useCallback((val: string) => val.replace(/[^0-9]/g, '').length, [])
+  const digitCount = useCallback((val: string) => val.replace(/[^0-9]/g, '').length, []);
 
-  const runValidation = useCallback((phone: string) => {
-    if (!phone || digitCount(phone) === 0) {
-      setIsInvalid(false)
-      onValidationChange?.(false)
-      return
-    }
-    const invalid = !validatePhoneNumber(phone, countryCode)
-    setIsInvalid(invalid)
-    onValidationChange?.(invalid)
-  }, [countryCode, digitCount, onValidationChange])
+  const runValidation = useCallback(
+    (phone: string) => {
+      if (!phone || digitCount(phone) === 0) {
+        setIsInvalid(false);
+        onValidationChange?.(false);
+        return;
+      }
+      const invalid = !validatePhoneNumber(phone, countryCode);
+      setIsInvalid(invalid);
+      onValidationChange?.(invalid);
+    },
+    [countryCode, digitCount, onValidationChange],
+  );
 
-  const debouncedValidation = useCallback((phone: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => runValidation(phone), 300)
-  }, [runValidation])
+  const debouncedValidation = useCallback(
+    (phone: string) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => runValidation(phone), 300);
+    },
+    [runValidation],
+  );
 
   useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [])
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   return (
-    <div className="flex gap-2 w-full min-w-0">
+    <div className="flex w-full min-w-0 gap-2">
       <Select
         value={countryCode}
-        onValueChange={(val) => {
-          onCountryChange(val as CountryCode)
+        onValueChange={val => {
+          onCountryChange(val as CountryCode);
           if (value) {
-            debouncedValidation(value)
+            debouncedValidation(value);
           }
         }}
         disabled={disabled}
@@ -82,13 +91,13 @@ export function PhoneInput({
         </SelectTrigger>
         <SelectContent className="max-h-[300px] !w-[280px]">
           <SelectGroup>
-            {priority.map((country) => (
+            {priority.map(country => (
               <CountryOption key={country.code} country={country} />
             ))}
           </SelectGroup>
           <SelectSeparator />
           <SelectGroup>
-            {others.map((country) => (
+            {others.map(country => (
               <CountryOption key={country.code} country={country} />
             ))}
           </SelectGroup>
@@ -98,15 +107,15 @@ export function PhoneInput({
       <Input
         type="tel"
         value={value}
-        onChange={(e) => {
-          const val = e.target.value
+        onChange={e => {
+          const val = e.target.value;
           if (val === '' || /^[0-9\-() ]*$/.test(val)) {
-            onPhoneChange(val)
+            onPhoneChange(val);
             if (digitCount(val) > 4) {
-              debouncedValidation(val)
+              debouncedValidation(val);
             } else if (digitCount(val) === 0) {
-              setIsInvalid(false)
-              onValidationChange?.(false)
+              setIsInvalid(false);
+              onValidationChange?.(false);
             }
           }
         }}
@@ -117,7 +126,7 @@ export function PhoneInput({
         className={`min-w-0 flex-1 ${isInvalid ? '!border-ods-warning' : ''}`}
       />
     </div>
-  )
+  );
 }
 
 function CountryOption({ country }: { country: CountryPhoneData }) {
@@ -126,8 +135,10 @@ function CountryOption({ country }: { country: CountryPhoneData }) {
       <span className="flex items-center gap-2">
         <span className="shrink-0">{country.flag}</span>
         <span className="shrink-0 text-ods-text-secondary">{country.dialCode}</span>
-        <span className="overflow-hidden text-ellipsis whitespace-nowrap max-w-[140px] inline-block">{country.name}</span>
+        <span className="inline-block max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap">
+          {country.name}
+        </span>
       </span>
     </SelectItem>
-  )
+  );
 }

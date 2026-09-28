@@ -1,26 +1,26 @@
-'use client'
+'use client';
 
-import { cn } from '../../../utils/cn'
-import { FiltersDropdown, type FilterSection } from '../../features'
-import { Filter02Icon } from '../../icons-v2-generated'
-import type { FilterOption, TableFilters } from './types'
+import { cn } from '../../../utils/cn';
+import { FiltersDropdown } from '../../features';
+import { Filter02Icon } from '../../icons-v2-generated';
+import type { FilterOption, TableFilters } from './types';
 
 /** @deprecated Use `DataTableColumnFilter` from `data-table` instead. */
 export interface TableColumnFilterDropdownProps {
   /** Column key used for filter state */
-  columnKey: string
+  columnKey: string;
   /** Column label for display and accessibility */
-  columnLabel: string
+  columnLabel: string;
   /** Available filter options for the column */
-  filterOptions: FilterOption[]
+  filterOptions: FilterOption[];
   /** Current filter state for all columns */
-  filters?: TableFilters
+  filters?: TableFilters;
   /** Called when filters change */
-  onFilterChange: (filters: TableFilters) => void
+  onFilterChange: (filters: TableFilters) => void;
   /** Dropdown placement */
-  placement?: 'bottom-start' | 'bottom-end' | 'bottom'
+  placement?: 'bottom-start' | 'bottom-end' | 'bottom';
   /** Additional class for the dropdown */
-  dropdownClassName?: string
+  dropdownClassName?: string;
 }
 
 /** @deprecated Use `DataTableColumnFilter` from `data-table` instead. */
@@ -33,25 +33,18 @@ export function TableColumnFilterDropdown({
   placement = 'bottom-start',
   dropdownClassName = 'min-w-[240px]',
 }: TableColumnFilterDropdownProps) {
-  const activeCount = filters?.[columnKey]?.length || 0
+  const activeCount = filters?.[columnKey]?.length || 0;
 
   return (
     <FiltersDropdown
       triggerElement={
         <div
-          className="flex items-center gap-1.5 rounded px-1 py-0.5 cursor-pointer hover:bg-ods-bg-active transition-all duration-200"
+          className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-0.5 transition-all duration-200 hover:bg-ods-bg-active"
           aria-label={`Filter by ${columnLabel}`}
         >
-          <span className="text-h5 text-ods-text-secondary select-none">
-            {columnLabel}
-          </span>
+          <span className="select-none text-ods-text-secondary text-h5">{columnLabel}</span>
           <Filter02Icon
-            className={cn(
-              'w-4 h-4 transition-colors',
-              activeCount > 0
-                ? 'text-ods-accent'
-                : 'text-ods-text-secondary',
-            )}
+            className={cn('h-4 w-4 transition-colors', activeCount > 0 ? 'text-ods-accent' : 'text-ods-text-secondary')}
           />
         </div>
       }
@@ -62,22 +55,22 @@ export function TableColumnFilterDropdown({
           type: 'checkbox',
           options: filterOptions,
           allowSelectAll: true,
-        } as FilterSection,
+        },
       ]}
-      onApply={(appliedFilters) => {
+      onApply={appliedFilters => {
         onFilterChange({
           ...filters,
           [columnKey]: appliedFilters[columnKey] || [],
-        })
+        });
       }}
       onReset={() => {
-        const newFilters = { ...filters }
-        delete newFilters[columnKey]
-        onFilterChange(newFilters)
+        const newFilters = { ...filters };
+        delete newFilters[columnKey];
+        onFilterChange(newFilters);
       }}
       currentFilters={{ [columnKey]: filters?.[columnKey] || [] }}
       placement={placement}
       dropdownClassName={dropdownClassName}
     />
-  )
+  );
 }

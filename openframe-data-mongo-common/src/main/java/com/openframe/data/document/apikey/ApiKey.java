@@ -35,9 +35,16 @@ public class ApiKey implements TenantScoped {
 
     // Metadata
     private boolean enabled = true;
+    private Instant expiresAt;
+
+    // Audit: timestamps are set explicitly by ApiKeyService (keyId is assigned before the first save,
+    // so Spring Data auditing would not treat the document as new). createdBy/updatedBy hold the
+    // id of the user who performed the write; automated maintenance (expiry) leaves updatedBy as the
+    // last user who changed the key.
     private Instant createdAt;
     private Instant updatedAt;
-    private Instant expiresAt;
+    private String createdBy;
+    private String updatedBy;
 
     /**
      * Check if the API key is expired

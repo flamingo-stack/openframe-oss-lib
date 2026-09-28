@@ -1,17 +1,17 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { Info } from 'lucide-react'
-import { Button } from './button'
-import { FloatingTooltip } from './floating-tooltip'
-import { cn } from '../../utils/cn'
+import { Info } from 'lucide-react';
+import { type ReactNode, useId } from 'react';
+import { cn } from '../../utils/cn';
+import { Button } from './button';
+import { FloatingTooltip } from './floating-tooltip';
 
 export interface InfoHintProps {
-  children: React.ReactNode
+  children: ReactNode;
   /** What this hint is ABOUT — 15 buttons all named "More information" name nothing. */
-  label?: string
-  side?: 'top' | 'right' | 'bottom' | 'left'
-  className?: string
+  label?: string;
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  className?: string;
 }
 
 /**
@@ -28,7 +28,7 @@ export interface InfoHintProps {
  * same. All the hover/portal/placement behaviour is the shared component's.
  */
 export function InfoHint({ children, label, side = 'top', className }: InfoHintProps) {
-  const describedById = React.useId()
+  const describedById = useId();
   return (
     <span className={cn('inline-flex shrink-0 items-center', className)}>
       <FloatingTooltip
@@ -53,7 +53,7 @@ export function InfoHint({ children, label, side = 'top', className }: InfoHintP
           // A hint lives inside interactive rows (e.g. a role="checkbox" rule
           // row): asking "what does this mean?" must never toggle the row it
           // sits in.
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
           aria-label={label ? `About ${label}` : 'More information'}
           aria-describedby={describedById}
           className="text-ods-text-secondary hover:text-ods-text-primary"
@@ -72,5 +72,5 @@ export function InfoHint({ children, label, side = 'top', className }: InfoHintP
         {children}
       </span>
     </span>
-  )
+  );
 }

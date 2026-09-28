@@ -1,9 +1,10 @@
 package com.openframe.data.nats.publisher;
 
 import com.openframe.core.exception.NatsException;
-import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationSeverity;
+import com.openframe.data.nats.model.NotificationEventType;
 import com.openframe.data.nats.model.NotificationMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -94,7 +95,7 @@ class NotificationNatsPublisherTest {
         Notification unpersisted = Notification.builder()
                 .title("Test")
                 .createdAt(Instant.now())
-                .context(GenericContext.builder().type("welcome").build())
+                .type("welcome")
                 .build();
 
         assertThatThrownBy(() -> publisher.publishToUser("user-1", unpersisted, NotificationCategory.GENERIC))
@@ -130,12 +131,41 @@ class NotificationNatsPublisherTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    @DisplayName("Given a stored notification, when it is published, then the live payload carries every displayed field verbatim — a live popup must match what a later query returns")
+    void live_payload_matches_the_stored_record_field_for_field() {
+        Notification stored = Notification.builder()
+                .id("notif-parity")
+                .severity(NotificationSeverity.WARNING)
+                .title("Ticket #1234 — Printer offline at front desk")
+                .description("Escalated by the user - waiting for a technician")
+                .createdAt(Instant.parse("2026-08-11T09:15:30Z"))
+                .type("TICKET_ESCALATED_BY_USER")
+                .attributes(java.util.Map.of("ticketId", "t-1"))
+                .build();
+
+        publisher.publishToUser("user-42", stored, NotificationCategory.TICKETS);
+
+        ArgumentCaptor<NotificationMessage> message = ArgumentCaptor.forClass(NotificationMessage.class);
+        verify(messagePublisher).publish(anyString(), message.capture());
+        NotificationMessage published = message.getValue();
+        assertThat(published.getId()).isEqualTo(stored.getId());
+        assertThat(published.getTitle()).isEqualTo(stored.getTitle());
+        assertThat(published.getDescription()).isEqualTo(stored.getDescription());
+        assertThat(published.getCreatedAt()).isEqualTo(stored.getCreatedAt());
+        assertThat(published.getSeverity()).isEqualTo(stored.getSeverity());
+        assertThat(published.getType()).isEqualTo(stored.getType());
+        assertThat(published.getAttributes()).isSameAs(stored.getAttributes());
+        assertThat(published.getCategory()).isEqualTo(NotificationCategory.TICKETS);
+        assertThat(published.getEventType()).isEqualTo(NotificationEventType.CREATED);
+    }
+
     private static Notification persistedNotification() {
         return Notification.builder()
                 .id("notif-" + System.nanoTime())
                 .title("Hello")
                 .createdAt(Instant.now())
-                .context(GenericContext.builder().type("welcome").build())
+                .type("welcome")
                 .build();
     }
 }

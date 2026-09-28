@@ -119,6 +119,7 @@ fn load_credentials(config_service: &AgentConfigurationService) -> Option<Persis
             return Some(PersistedMachineInfo {
                 machine_id,
                 client_secret,
+                user_id: None,
             });
         }
         Ok(_) => {}

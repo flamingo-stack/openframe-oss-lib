@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Set;
 
 /**
  * Filter criteria for organization queries.
@@ -23,4 +24,5 @@ public class OrganizationQueryFilter {
     private String status;
     private Instant lastActivityFrom;
     private Instant lastActivityTo;
+    private Set<String> excludeOrganizationIds;
 }

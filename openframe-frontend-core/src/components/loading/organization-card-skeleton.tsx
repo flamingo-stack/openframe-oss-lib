@@ -1,26 +1,25 @@
-import type React from "react"
-import { cn } from "../../utils/cn"
-import { OrganizationIconSkeleton } from "./organization-icon-skeleton"
-import { TextSkeleton, MediaSkeleton, InteractiveSkeleton } from "./unified-skeleton"
+import { cn } from '../../utils/cn';
+import { OrganizationIconSkeleton } from './organization-icon-skeleton';
+import { TextSkeleton, MediaSkeleton } from './unified-skeleton';
 
 export interface OrganizationCardSkeletonProps {
   /**
    * Additional CSS classes
    */
-  className?: string
+  className?: string;
 
   /**
    * Show footer stats area
    */
-  showFooter?: boolean
+  showFooter?: boolean;
 
   /**
    * Show description area
    */
-  showDescription?: boolean
+  showDescription?: boolean;
 
   /** Optional tailwind classes to override the card container background & border */
-  containerClassName?: string
+  containerClassName?: string;
 }
 
 /**
@@ -39,31 +38,31 @@ export function OrganizationCardSkeleton({
   className,
   containerClassName,
   showFooter = true,
-  showDescription = true
+  showDescription = true,
 }: OrganizationCardSkeletonProps) {
   return (
     <div
       className={cn(
-        containerClassName || "bg-ods-card border border-ods-border",
-        "rounded-lg overflow-hidden h-full flex flex-col",
-        className
+        containerClassName || 'border border-ods-border bg-ods-card',
+        'flex h-full flex-col overflow-hidden rounded-lg',
+        className,
       )}
       role="status"
       aria-label="Loading organization card"
     >
-      <div className="p-4 gap-3 flex flex-col">
+      <div className="flex flex-col gap-3 p-4">
         {/* Header Section - Row layout matching OrganizationCard/VendorCard */}
-        <div className="flex items-start gap-3 w-full">
+        <div className="flex w-full items-start gap-3">
           {/* Logo Frame - 60px width fixed, matching actual structure */}
           <OrganizationIconSkeleton
             size="xl"
             backgroundStyle="dark"
             showBackground={true}
-            className="w-[60px] h-[60px]"
+            className="h-[60px] w-[60px]"
           />
 
           {/* Text Container - Column layout, matching actual structure */}
-          <div className="flex-1 flex flex-col justify-center py-2 min-w-0 space-y-1">
+          <div className="flex min-w-0 flex-1 flex-col justify-center space-y-1 py-2">
             {/* Title - Single line with proper width */}
             <TextSkeleton.Subheading className="w-3/4" />
             {/* Subtitle (industry/tier) - Single line, shorter */}
@@ -73,8 +72,8 @@ export function OrganizationCardSkeleton({
 
         {/* Description Section - Fixed 48px height matching VendorCard */}
         {showDescription && (
-          <div className="w-full h-12 overflow-hidden flex items-center">
-            <div className="space-y-1 w-full">
+          <div className="flex h-12 w-full items-center overflow-hidden">
+            <div className="w-full space-y-1">
               <TextSkeleton.Body className="w-full" />
               <TextSkeleton.Body className="w-2/3" />
             </div>
@@ -83,27 +82,27 @@ export function OrganizationCardSkeleton({
 
         {/* Footer Section - Stats display */}
         {showFooter && (
-          <div className="flex items-center justify-between gap-2 w-full min-w-0">
+          <div className="flex w-full min-w-0 items-center justify-between gap-2">
             {/* Stats Container */}
-            <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-shrink">
+            <div className="flex min-w-0 flex-shrink items-center gap-3 md:gap-4">
               {/* Stat 1 */}
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <MediaSkeleton.Icon size="sm" className="w-5 h-5" />
+              <div className="flex flex-shrink-0 items-center gap-1">
+                <MediaSkeleton.Icon size="sm" className="h-5 w-5" />
                 <TextSkeleton.Caption className="w-8" />
               </div>
 
               {/* Stat 2 */}
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <MediaSkeleton.Icon size="sm" className="w-5 h-5" />
+              <div className="flex flex-shrink-0 items-center gap-1">
+                <MediaSkeleton.Icon size="sm" className="h-5 w-5" />
                 <TextSkeleton.Caption className="w-10" />
               </div>
             </div>
 
             {/* Tag/Badge Section */}
             <div className="flex-shrink-0">
-              <div className="flex items-center gap-1.5 bg-ods-bg border border-ods-border rounded px-2.5 py-1.5">
-                <div className="w-4 h-4 bg-ods-border rounded-sm flex items-center justify-center flex-shrink-0">
-                  <MediaSkeleton.Icon size="sm" className="w-2.5 h-2.5" />
+              <div className="flex items-center gap-1.5 rounded border border-ods-border bg-ods-bg px-2.5 py-1.5">
+                <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
+                  <MediaSkeleton.Icon size="sm" className="h-2.5 w-2.5" />
                 </div>
                 <TextSkeleton.Caption className="w-16" />
               </div>
@@ -112,7 +111,7 @@ export function OrganizationCardSkeleton({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -128,20 +127,17 @@ export function OrganizationCardSkeletonGrid({
   className,
   containerClassName,
   showFooter = true,
-  showDescription = true
+  showDescription = true,
 }: {
-  count?: number
-  className?: string
-  containerClassName?: string
-  showFooter?: boolean
-  showDescription?: boolean
+  count?: number;
+  className?: string;
+  containerClassName?: string;
+  showFooter?: boolean;
+  showDescription?: boolean;
 }) {
   return (
     <div
-      className={cn(
-        "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6",
-        className
-      )}
+      className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3', className)}
       role="status"
       aria-label={`Loading ${count} organization cards`}
     >
@@ -154,5 +150,5 @@ export function OrganizationCardSkeletonGrid({
         />
       ))}
     </div>
-  )
+  );
 }

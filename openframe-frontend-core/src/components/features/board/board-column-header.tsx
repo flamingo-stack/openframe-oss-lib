@@ -1,16 +1,18 @@
-'use client'
+'use client';
 
-import { Button } from '../../ui/button/button'
-import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag'
-import { Arrow02LeftIcon, Arrow02RightIcon, BoxArchiveIcon, PlusIcon } from '../../icons-v2-generated'
-import type { BoardColumnDef } from './types'
+import { Arrow02LeftIcon, Arrow02RightIcon, BoxArchiveIcon, InfoCircleIcon, PlusIcon } from '../../icons-v2-generated';
+import { Button } from '../../ui/button/button';
+import { TicketStatusTag, resolveTicketStatus } from '../../ui/ticket-status-tag';
+import { TouchFriendlyTooltip } from '../../ui/touch-friendly-tooltip';
+import type { BoardColumnDef } from './types';
 
 export interface BoardColumnHeaderProps {
-  column: BoardColumnDef
-  collapsed?: boolean
-  onToggleCollapse: () => void
-  onAddTicket?: () => void
-  onArchive?: () => void
+  column: BoardColumnDef;
+  collapsed?: boolean;
+  /** Absent = the column cannot collapse, and no collapse arrow is rendered. */
+  onToggleCollapse?: () => void;
+  onAddTicket?: () => void;
+  onArchive?: () => void;
 }
 
 export function BoardColumnHeader({
@@ -20,24 +22,29 @@ export function BoardColumnHeader({
   onAddTicket,
   onArchive,
 }: BoardColumnHeaderProps) {
-  const count = column.total ?? column.tickets.length
-  const tagStatus = column.statusKey ?? column.id
+  const count = column.total ?? column.tickets.length;
+  const tagStatus = column.statusKey ?? column.id;
   // Known statuses (ACTIVE, RESOLVED, …) render with their canonical Tag
   // variant/icon; only unrecognized ids (custom-status UUIDs) fall back to `color`.
-  const useStatusVariant = resolveTicketStatus(tagStatus) !== null
+  const useStatusVariant = resolveTicketStatus(tagStatus) !== null;
+  // The dense header size on every input mode — the mobile mock keeps the
+  // lane's info/collapse buttons small, same as desktop.
+  const actionClass = 'h-8 w-8 p-0 md:h-8 md:w-8';
 
   if (collapsed) {
     return (
       <div className="flex h-full flex-col items-center gap-[var(--spacing-system-xsf)]">
-        <Button
-          variant="transparent"
-          size="icon"
-          className="h-8 w-8 md:h-8 md:w-8 p-0"
-          onClick={onToggleCollapse}
-          aria-label="Expand column"
-        >
-          <Arrow02RightIcon className="h-6 w-6 text-ods-text-secondary" />
-        </Button>
+        {onToggleCollapse && (
+          <Button
+            variant="transparent"
+            size="icon"
+            className={actionClass}
+            onClick={onToggleCollapse}
+            aria-label="Expand column"
+          >
+            <Arrow02RightIcon className="h-6 w-6 text-ods-text-secondary" />
+          </Button>
+        )}
         <TicketStatusTag
           status={tagStatus}
           label={column.label}
@@ -48,39 +55,41 @@ export function BoardColumnHeader({
           {count}
         </span>
       </div>
-    )
+    );
   }
 
   return (
     <div className="flex items-center gap-[var(--spacing-system-xsf)]">
       <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]">
-        <TicketStatusTag
-          status={tagStatus}
-          label={column.label}
-          color={useStatusVariant ? undefined : column.color}
-        />
-        <span
-          className="text-h5"
-          style={useStatusVariant ? undefined : { color: column.color }}
-        >
+        <TicketStatusTag status={tagStatus} label={column.label} color={useStatusVariant ? undefined : column.color} />
+        <span className="text-h5" style={useStatusVariant ? undefined : { color: column.color }}>
           {count}
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-[var(--spacing-system-xxs)]">
-        <Button
-          variant="transparent"
-          size="icon"
-          className="h-8 w-8 md:h-8 md:w-8 p-0"
-          onClick={onToggleCollapse}
-          aria-label="Collapse column"
-        >
-          <Arrow02LeftIcon className="h-6 w-6 text-ods-text-secondary" />
-        </Button>
+        {column.tooltip && (
+          <TouchFriendlyTooltip content={column.tooltip} side="bottom">
+            <Button variant="transparent" size="icon" className={actionClass} aria-label={column.tooltip}>
+              <InfoCircleIcon className="h-6 w-6 text-ods-text-secondary" />
+            </Button>
+          </TouchFriendlyTooltip>
+        )}
+        {onToggleCollapse && (
+          <Button
+            variant="transparent"
+            size="icon"
+            className={actionClass}
+            onClick={onToggleCollapse}
+            aria-label="Collapse column"
+          >
+            <Arrow02LeftIcon className="h-6 w-6 text-ods-text-secondary" />
+          </Button>
+        )}
         {onArchive && (
           <Button
             variant="transparent"
             size="icon"
-            className="h-8 w-8 md:h-8 md:w-8 p-0"
+            className={actionClass}
             onClick={onArchive}
             aria-label="Archive resolved tickets"
           >
@@ -91,7 +100,7 @@ export function BoardColumnHeader({
           <Button
             variant="transparent"
             size="icon"
-            className="h-8 w-8 md:h-8 md:w-8 p-0"
+            className={actionClass}
             onClick={onAddTicket}
             aria-label="Add ticket"
           >
@@ -100,5 +109,5 @@ export function BoardColumnHeader({
         )}
       </div>
     </div>
-  )
+  );
 }

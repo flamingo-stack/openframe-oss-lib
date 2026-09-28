@@ -336,7 +336,7 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
         String userId = HOT_USER_PREFIX + 100_000;
 
         long wallMs = MeasurementStats.timeMillis(() -> {
-            long modified = readStateRepository.markAllAsRead(userId, RecipientType.USER);
+            long modified = readStateRepository.markAllAsRead(userId, RecipientType.USER, List.of(ReadStatus.UNREAD));
             assertThat(modified).isEqualTo(100_000L);
         });
         assertThat(wallMs).isLessThan(WRITE_BUDGET_MS);

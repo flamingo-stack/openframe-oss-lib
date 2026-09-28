@@ -9,17 +9,17 @@
 
 /** Shape every matcher/stamper here operates on — the identity-relevant subset of VideoTeaser. */
 export interface BiteIdentity {
-  id?: string
-  url: string
-  source_url?: string
+  id?: string;
+  url: string;
+  source_url?: string;
 }
 
 /** 8 lowercase hex chars. Collision-safe within one array (n≤~100 → p≈1e-6); identity is always scoped to (table, row, column). */
-export const BITE_ID_RE = /^[0-9a-f]{8}$/
+export const BITE_ID_RE = /^[0-9a-f]{8}$/;
 
 /** Generate a new 8-hex bite element id. */
 export function generateBiteId(): string {
-  return crypto.randomUUID().replace(/-/g, '').slice(0, 8)
+  return crypto.randomUUID().replace(/-/g, '').slice(0, 8);
 }
 
 /**
@@ -28,21 +28,21 @@ export function generateBiteId(): string {
  * skip persistence (`changed === false` ⇒ no write needed).
  */
 export function ensureBiteIds<T extends { id?: string }>(bites: readonly T[]): { bites: T[]; changed: boolean } {
-  const seen = new Set<string>()
-  let changed = false
+  const seen = new Set<string>();
+  let changed = false;
   const out = bites.map(bite => {
-    const valid = typeof bite.id === 'string' && BITE_ID_RE.test(bite.id) && !seen.has(bite.id)
+    const valid = typeof bite.id === 'string' && BITE_ID_RE.test(bite.id) && !seen.has(bite.id);
     if (valid) {
-      seen.add(bite.id as string)
-      return bite
+      seen.add(bite.id as string);
+      return bite;
     }
-    changed = true
-    let id = generateBiteId()
-    while (seen.has(id)) id = generateBiteId()
-    seen.add(id)
-    return { ...bite, id }
-  })
-  return changed ? { bites: out, changed } : { bites: bites as T[], changed }
+    changed = true;
+    let id = generateBiteId();
+    while (seen.has(id)) id = generateBiteId();
+    seen.add(id);
+    return { ...bite, id };
+  });
+  return changed ? { bites: out, changed } : { bites: bites as T[], changed };
 }
 
 /**
@@ -61,8 +61,8 @@ export function ensureBiteIds<T extends { id?: string }>(bites: readonly T[]): {
  * incoming urls must not all bind to one element and clone its id.
  */
 export function matchBiteElement(existing: BiteIdentity, incoming: BiteIdentity): boolean {
-  if (existing.id && incoming.id && existing.id === incoming.id) return true
-  if (incoming.url === existing.url) return true
-  if (existing.source_url && incoming.url === existing.source_url) return true
-  return false
+  if (existing.id && incoming.id && existing.id === incoming.id) return true;
+  if (incoming.url === existing.url) return true;
+  if (existing.source_url && incoming.url === existing.source_url) return true;
+  return false;
 }

@@ -48,6 +48,7 @@ interface AssignableTarget {
 enum AssignmentItemType {
     TICKET
     KNOWLEDGE_ARTICLE
+    INSIGHT
 }
 
 enum AssignmentTargetType {

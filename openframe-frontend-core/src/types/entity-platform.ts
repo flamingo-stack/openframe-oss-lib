@@ -7,15 +7,15 @@
  * all reference it so the shape can never drift per entity.
  */
 export interface EntityPlatformAssoc {
-  platform_id: string
-  is_featured: boolean
-  featured_order?: number | null
+  platform_id: string;
+  is_featured: boolean;
+  featured_order?: number | null;
   /** Platform name — spread from the platform record. Feeds platform-aware
    *  URL composition (composeContentUrlFromPlatforms) without casts. */
-  name?: string
-  display_name?: string
+  name?: string;
+  display_name?: string;
   /** Alias some admin fetches add (e.g. getCaseStudyForAdmin). */
-  platform_name?: string
-  id?: string
-  created_at?: string
+  platform_name?: string;
+  id?: string;
+  created_at?: string;
 }

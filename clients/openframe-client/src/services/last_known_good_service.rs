@@ -135,10 +135,10 @@ impl LastKnownGoodService {
             }
             Some(anchor_version) => {
                 warn!(
-                    "Rollback protection degraded: reserve missing, running {} below anchor {} — rebuilding reserve from running binary, anchor unchanged",
+                    "Rollback protection degraded: reserve missing and running {} does not match anchor {} — leaving the reserve unset for a verified update to rebuild",
                     running_version, anchor_version
                 );
-                self.copy_running_to_reserve()
+                Ok(())
             }
             None => {
                 info!(

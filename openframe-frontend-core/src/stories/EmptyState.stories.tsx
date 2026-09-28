@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Database, FileText, Inbox, Plus, Search, Settings, Sparkles, Upload, Zap } from 'lucide-react';
-import React from 'react';
 import { MingoIcon } from '../components/icons';
 import { Button } from '../components/ui/button';
 import { NoData, NoDataAction, NoDataActions, NoDataMessage } from '../components/ui/no-data';
@@ -136,8 +135,12 @@ export const CustomButton: Story = {
     // `button` is the escape hatch — pass any node.
     button: (
       <div className="flex gap-2">
-        <Button variant="outline" leftIcon={<Plus />}>Connect source</Button>
-        <Button variant="transparent" leftIcon={<FileText />}>View docs</Button>
+        <Button variant="outline" leftIcon={<Plus />}>
+          Connect source
+        </Button>
+        <Button variant="transparent" leftIcon={<FileText />}>
+          View docs
+        </Button>
       </div>
     ),
   },
@@ -158,13 +161,7 @@ export const StandaloneActions: Story = {
 
 export const StandaloneMessage: Story = {
   args: { title: '' },
-  render: () => (
-    <NoDataMessage
-      icon={<Search />}
-      title="No results found"
-      description="Try adjusting your filters"
-    />
-  ),
+  render: () => <NoDataMessage icon={<Search />} title="No results found" description="Try adjusting your filters" />,
 };
 
 // === Showcase ===

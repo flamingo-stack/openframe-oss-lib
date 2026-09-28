@@ -28,9 +28,9 @@
  *   also server-bundle, also imported by route-page `metadata` exports).
  */
 
-import { Map as MapIcon, Wrench, Rocket, GraduationCap, LifeBuoy, type LucideIcon } from 'lucide-react'
-import { releaseStatusOptions } from '../../types'
-import { DEV_SECTION_PARAM_KEYS, TICKET_OPEN_PARAM } from './dev-section-param-keys'
+import { Map as MapIcon, Wrench, Rocket, GraduationCap, LifeBuoy, type LucideIcon } from 'lucide-react';
+import { releaseStatusOptions } from '../../types';
+import { DEV_SECTION_PARAM_KEYS, TICKET_OPEN_PARAM } from './dev-section-param-keys';
 
 // Roadmap status options — `as const` preserves readonly tuple typing
 // across the registry boundary.
@@ -38,7 +38,7 @@ export const ROADMAP_STATUS_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'completed', label: 'Completed' },
   { value: 'in_progress', label: 'In Progress' },
-] as const
+] as const;
 
 // Delivery (ClickUp custom item type) filter options. `Bug` and `Request`
 // are the ClickUp `custom_item_id` labels — 1008 / 1009.
@@ -46,7 +46,7 @@ export const DELIVERY_TASK_TYPE_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'Bug', label: 'Bug-fix' },
   { value: 'Request', label: 'Enhancement' },
-] as const
+] as const;
 
 // Ticket status filter for the Help Center. Lowercase wire values
 // match what `/api/chat/agent/find-ticket` accepts in `body.status`
@@ -56,47 +56,47 @@ export const TICKET_STATUS_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'open', label: 'Open' },
   { value: 'closed', label: 'Closed' },
-] as const
+] as const;
 
 export interface OpenframeDevSection {
   /** Route href the navigator card and any internal cross-link composes. */
-  href: string
-  icon: LucideIcon
+  href: string;
+  icon: LucideIcon;
   /** Brief copy for the homepage navigator card (≈50 char teaser). */
   navigator: {
-    title: string
-    description: string
-  }
+    title: string;
+    description: string;
+  };
   /** Longer copy for the destination page hero (≈120-150 char marketing paragraph). */
   hero: {
-    title: string
-    description: string
-  }
+    title: string;
+    description: string;
+  };
   /** Inline search bar configuration. */
   search: {
     /** Placeholder text shown in the search input. */
-    placeholder: string
+    placeholder: string;
     /** URL search param the input writes on submit and the list reads on fetch. */
-    paramKey: string
+    paramKey: string;
     /** Companion URL params torn down whenever the search commits EMPTY.
      *  For params that deep-links set TOGETHER with the search (e.g. the
      *  tickets `?ticket=<id>&search=<id>` pair from chat cards) — clearing
      *  the search must clear the whole linked context, not leave a stale
      *  companion param filtering the view. */
-    clearParamKeys?: readonly string[]
-  } | null
+    clearParamKeys?: readonly string[];
+  } | null;
   /** Filter pill row configuration. `null` when the section has no filter (e.g. onboarding-guides). */
   filter: {
-    label: string
+    label: string;
     /** URL search param the pills write and the list reads. */
-    paramKey: string
+    paramKey: string;
     /** The option value that maps to "no filter applied". When selected,
      *  the URL param is removed instead of being set. Defaults to the
      *  first option's value if omitted — explicit field guards against
      *  brittleness if `options` is later reordered. */
-    defaultValue: string
-    options: readonly { value: string; label: string }[]
-  } | null
+    defaultValue: string;
+    options: readonly { value: string; label: string }[];
+  } | null;
 }
 
 export const OPENFRAME_DEV_SECTIONS = {
@@ -113,7 +113,12 @@ export const OPENFRAME_DEV_SECTIONS = {
         "See what's in flight, what's planned, and what's up for community vote. The entire OpenFrame roadmap is public.",
     },
     search: { placeholder: 'Search roadmap items...', paramKey: DEV_SECTION_PARAM_KEYS.search },
-    filter: { label: 'Status', paramKey: DEV_SECTION_PARAM_KEYS.status, defaultValue: 'all', options: ROADMAP_STATUS_OPTIONS },
+    filter: {
+      label: 'Status',
+      paramKey: DEV_SECTION_PARAM_KEYS.status,
+      defaultValue: 'all',
+      options: ROADMAP_STATUS_OPTIONS,
+    },
   },
   delivery: {
     href: '/bug-fixes-and-enhancements',
@@ -128,7 +133,12 @@ export const OPENFRAME_DEV_SECTIONS = {
         'A running log of fixes and improvements shipping into OpenFrame — recently completed and actively in progress.',
     },
     search: { placeholder: 'Search tasks...', paramKey: DEV_SECTION_PARAM_KEYS.search },
-    filter: { label: 'Type', paramKey: DEV_SECTION_PARAM_KEYS.deliveryTaskType, defaultValue: 'all', options: DELIVERY_TASK_TYPE_OPTIONS },
+    filter: {
+      label: 'Type',
+      paramKey: DEV_SECTION_PARAM_KEYS.deliveryTaskType,
+      defaultValue: 'all',
+      options: DELIVERY_TASK_TYPE_OPTIONS,
+    },
   },
   releases: {
     href: '/releases',
@@ -143,7 +153,12 @@ export const OPENFRAME_DEV_SECTIONS = {
         'Version notes, change summaries, and stability tier (alpha / beta / stable) for every OpenFrame release.',
     },
     search: { placeholder: 'Search releases...', paramKey: DEV_SECTION_PARAM_KEYS.search },
-    filter: { label: 'Status', paramKey: DEV_SECTION_PARAM_KEYS.releaseStatus, defaultValue: 'all', options: releaseStatusOptions },
+    filter: {
+      label: 'Status',
+      paramKey: DEV_SECTION_PARAM_KEYS.releaseStatus,
+      defaultValue: 'all',
+      options: releaseStatusOptions,
+    },
   },
   onboarding: {
     href: '/onboarding-guides',
@@ -194,6 +209,6 @@ export const OPENFRAME_DEV_SECTIONS = {
       options: TICKET_STATUS_OPTIONS,
     },
   },
-} as const satisfies Record<string, OpenframeDevSection>
+} as const satisfies Record<string, OpenframeDevSection>;
 
-export type OpenframeDevSectionKey = keyof typeof OPENFRAME_DEV_SECTIONS
+export type OpenframeDevSectionKey = keyof typeof OPENFRAME_DEV_SECTIONS;

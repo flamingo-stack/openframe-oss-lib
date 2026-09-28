@@ -1,69 +1,66 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { Copy01Icon } from '../icons-v2-generated/documents'
-import { CheckIcon } from '../icons-v2-generated'
-import { useCopyToClipboard } from '../../hooks'
-import { ProgressBar } from './progress-bar'
+import React from 'react';
+import { useCopyToClipboard } from '../../hooks';
+import { cn } from '../../utils/cn';
+import { CheckIcon } from '../icons-v2-generated';
+import { Copy01Icon } from '../icons-v2-generated/documents';
+import { ProgressBar } from './progress-bar';
 
 export interface InfoCardFooterData {
   /** Leading icon next to the text, expected at 24x24 (e.g. <ShieldCheckIcon size={24} />) */
-  icon?: React.ReactNode
-  text: string
+  icon?: React.ReactNode;
+  text: string;
   /** Trailing icon/logo aligned to the right edge, expected at 24x24 */
-  logo?: React.ReactNode
+  logo?: React.ReactNode;
   /** External resource link rendered below the text row */
   link?: {
-    href: string
+    href: string;
     /** Defaults to href without the protocol */
-    label?: string
-  }
+    label?: string;
+  };
 }
 
 export interface InfoCardData {
-  title?: string
-  subtitle?: string
-  icon?: React.ReactNode
+  title?: string;
+  subtitle?: string;
+  icon?: React.ReactNode;
   items: Array<{
-    label?: string
-    value: string | string[]
-    copyable?: boolean
+    label?: string;
+    value: string | string[];
+    copyable?: boolean;
     /** Optional trailing icon/logo (e.g. an SVG) rendered next to the value */
-    icon?: React.ReactNode
-  }>
+    icon?: React.ReactNode;
+  }>;
   progress?: {
-    value: number
-    warningThreshold?: number
-    criticalThreshold?: number
-    inverted?: boolean  // if true, high values are good (green), low values are bad (red)
-  }
+    value: number;
+    warningThreshold?: number;
+    criticalThreshold?: number;
+    inverted?: boolean; // if true, high values are good (green), low values are bad (red)
+  };
   /** Optional footer rendered below the content, separated by a divider line */
-  footer?: InfoCardFooterData
+  footer?: InfoCardFooterData;
 }
 
 interface InfoCardProps {
-  data: InfoCardData
-  className?: string
+  data: InfoCardData;
+  className?: string;
 }
 
 export function InfoCard({ data, className = '' }: InfoCardProps) {
   return (
     <div
-      className={cn(
-        'bg-ods-card border border-ods-border rounded-md overflow-hidden flex flex-col w-full',
-        className,
-      )}
+      className={cn('flex w-full flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card', className)}
     >
       {/* Header (title + subtitle) and body (rows + progress) are two groups separated by
           `gap-l`; the title/subtitle stack tightly and the rows use `gap-xs` — matching the ODS
           "Info-card" design. With no title/subtitle, the body is the only group. */}
-      <div className="p-[var(--spacing-system-m)] flex flex-col gap-[var(--spacing-system-l)] items-start w-full">
+      <div className="flex w-full flex-col items-start gap-[var(--spacing-system-l)] p-[var(--spacing-system-m)]">
         {(data.title || data.subtitle) && (
-          <div className="flex flex-col items-start self-stretch w-full">
+          <div className="flex w-full flex-col items-start self-stretch">
             {data.title && (
               <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch">
-                <span className="text-h4 text-ods-text-primary truncate min-w-0" title={data.title}>
+                <span className="min-w-0 truncate text-ods-text-primary text-h4" title={data.title}>
                   {data.title}
                 </span>
                 {data.icon}
@@ -71,7 +68,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
             )}
             {data.subtitle && (
               <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch">
-                <span className="text-h4 text-ods-text-secondary truncate min-w-0" title={data.subtitle}>
+                <span className="min-w-0 truncate text-ods-text-secondary text-h4" title={data.subtitle}>
                   {data.subtitle}
                 </span>
                 {/* Icon lives with the title when present; otherwise it falls to the subtitle so
@@ -83,10 +80,10 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
         )}
 
         {(data.items.length > 0 || data.progress) && (
-          <div className="flex flex-col gap-[var(--spacing-system-xs)] items-start self-stretch w-full">
+          <div className="flex w-full flex-col items-start gap-[var(--spacing-system-xs)] self-stretch">
             {/* Info items */}
             {data.items.map((item, index) => {
-              const values = Array.isArray(item.value) ? item.value : [item.value]
+              const values = Array.isArray(item.value) ? item.value : [item.value];
 
               return (
                 <React.Fragment key={index}>
@@ -102,7 +99,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
                     />
                   ))}
                 </React.Fragment>
-              )
+              );
             })}
 
             {/* Progress bar */}
@@ -121,16 +118,16 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
       {/* Footer */}
       {data.footer && <InfoCardFooter footer={data.footer} />}
     </div>
-  )
+  );
 }
 
 function InfoCardFooter({ footer }: { footer: InfoCardFooterData }) {
   return (
-    <div className="mt-auto border-t border-ods-border p-[var(--spacing-system-m)] flex flex-col w-full">
-      <div className="flex items-center justify-between gap-1 w-full">
+    <div className="mt-auto flex w-full flex-col border-t border-ods-border p-[var(--spacing-system-m)]">
+      <div className="flex w-full items-center justify-between gap-1">
         <div className="flex items-center gap-1">
           {footer.icon}
-          <span className="text-h4 text-ods-text-primary">{footer.text}</span>
+          <span className="text-ods-text-primary text-h4">{footer.text}</span>
         </div>
         {footer.logo}
       </div>
@@ -139,38 +136,33 @@ function InfoCardFooter({ footer }: { footer: InfoCardFooterData }) {
           href={footer.link.href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-h6 text-ods-text-secondary underline truncate hover:text-ods-text-primary"
+          className="truncate text-ods-text-secondary underline text-h6 hover:text-ods-text-primary"
         >
           {footer.link.label ?? footer.link.href.replace(/^https?:\/\//, '')}
         </a>
       )}
     </div>
-  )
+  );
 }
 
 interface InfoCardValueRowProps {
-  label?: string
-  value: string
-  showLabel: boolean
-  copyable?: boolean
-  icon?: React.ReactNode
-  copyAriaLabel: string
+  label?: string;
+  value: string;
+  showLabel: boolean;
+  copyable?: boolean;
+  icon?: React.ReactNode;
+  copyAriaLabel: string;
 }
 
 function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLabel }: InfoCardValueRowProps) {
-  const { copy, copied } = useCopyToClipboard()
+  const { copy, copied } = useCopyToClipboard();
 
   return (
-    <div className="flex h-6 items-center gap-[var(--spacing-system-xs)] self-stretch w-full">
-      <span className="text-h4 text-ods-text-primary whitespace-nowrap">
-        {showLabel ? label : ''}
-      </span>
-      <div className="flex-1 h-px bg-ods-divider" />
-      <div className="flex items-center gap-[var(--spacing-system-xsf)] max-w-[60%]">
-        <span
-          className="text-h4 text-ods-text-primary truncate select-text"
-          title={value}
-        >
+    <div className="flex h-6 w-full items-center gap-[var(--spacing-system-xs)] self-stretch">
+      <span className="whitespace-nowrap text-ods-text-primary text-h4">{showLabel ? label : ''}</span>
+      <div className="h-px flex-1 bg-ods-divider" />
+      <div className="flex max-w-[60%] items-center gap-[var(--spacing-system-xsf)]">
+        <span className="select-text truncate text-ods-text-primary text-h4" title={value}>
           {value}
         </span>
         {icon}
@@ -189,5 +181,5 @@ function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLab
         )}
       </div>
     </div>
-  )
+  );
 }

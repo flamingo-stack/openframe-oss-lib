@@ -1,0 +1,532 @@
+package com.openframe.api.service.ticket;
+
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.dto.ticket.CreateTicketInput;
+import com.openframe.api.dto.ticket.ReorderTicketInput;
+import com.openframe.api.dto.ticket.TicketFilterInput;
+import com.openframe.api.dto.ticket.UpdateTicketInput;
+import com.openframe.api.service.AssignmentService;
+import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.data.document.assignment.AssignmentItemType;
+import com.openframe.data.document.assignment.AssignmentTargetType;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.ticket.AdminTicketOwner;
+import com.openframe.data.document.ticket.ClientTicketOwner;
+import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.ticket.TicketCreationSource;
+import com.openframe.data.document.ticket.TicketOwner;
+import com.openframe.data.document.ticket.TicketStatusKind;
+import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.document.user.User;
+import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.ticket.TicketRepository;
+import com.openframe.data.repository.user.UserRepository;
+import com.openframe.security.authentication.AuthPrincipal;
+import jakarta.validation.constraints.NotBlank;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
+
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+import static com.openframe.api.util.AuthPrincipalUtils.*;
+import static org.springframework.util.StringUtils.hasText;
+
+/**
+ * Ticket domain core: querying, creation, field updates, assignment and the legacy (lifecycle-off)
+ * status machine. Shared by the dashboard GraphQL API (AI Agent) and the external REST API; side
+ * effects that belong to other subsystems are published through {@link TicketEventListener}.
+ */
+@Service
+@Slf4j
+@Validated
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class TicketService {
+
+    public static final String ESCALATION_TRANSITION_REASON =
+            "Escalated to a human technician at the user's request.";
+
+    private final TicketRepository ticketRepository;
+    private final TicketNumberService ticketNumberService;
+    private final TicketTagService ticketTagService;
+    private final TicketIdsForFilter ticketIdsForFilter;
+    private final TicketStalenessResolver ticketStalenessResolver;
+    private final MachineRepository machineRepository;
+    private final OrganizationRepository organizationRepository;
+    private final UserRepository userRepository;
+    private final AssignmentService assignmentService;
+    private final TicketLifecycleService ticketLifecycleService;
+    private final TicketResolverStamp ticketResolverStamp;
+    private final List<TicketEventListener> listeners;
+
+    /**
+     * Cursor-paginated ticket listing. Cursors are raw ticket ids. AGENT principals only see the
+     * tickets owned by their machine.
+     */
+    public CountedGenericQueryResult<Ticket> getTickets(AuthPrincipal principal,
+                                                        TicketFilterInput filter,
+                                                        CursorPaginationCriteria pagination,
+                                                        String search,
+                                                        SortInput sort) {
+        String ownerMachineId = isAgent(principal) ? principal.getMachineId() : null;
+
+        log.debug("Querying tickets for {} with filter: {}, pagination: {}, search: '{}', sort: {}",
+                principal.getActorType(), filter, pagination, search, sort);
+
+        CursorPaginationCriteria paging = (pagination != null ? pagination : new CursorPaginationCriteria()).normalize();
+        Query query = buildTicketQuery(principal, filter, search, ownerMachineId);
+        long filteredCount = ticketRepository.countTickets(query);
+
+        String sortField = validateSortField(sort);
+        String sortDirection = sort != null && sort.getDirection() != null
+                ? sort.getDirection().name()
+                : SortDirection.DESC.name();
+        int limit = paging.getLimit();
+        List<Ticket> raw = ticketRepository.findTicketsWithCursor(
+                query, paging.getCursor(), limit + 1, sortField, sortDirection);
+        boolean hasNextPage = raw.size() > limit;
+        List<Ticket> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
+
+        return CountedGenericQueryResult.<Ticket>builder()
+                .items(pageItems)
+                .pageInfo(buildPageInfo(pageItems, hasNextPage, paging.hasCursor()))
+                .filteredCount((int) filteredCount)
+                .build();
+    }
+
+    public Optional<Ticket> getTicket(AuthPrincipal principal, @NotBlank String ticketId) {
+        log.debug("Getting ticket: {} for {}", ticketId, principal.getActorType());
+
+        if (isAgent(principal)) {
+            return ticketRepository.findByIdAndOwnerMachineId(ticketId, principal.getMachineId());
+        }
+        return ticketRepository.findById(ticketId);
+    }
+
+    public Optional<Ticket> getTicketByNumber(AuthPrincipal principal, Integer ticketNumber) {
+        log.debug("Getting ticket #{} for {}", ticketNumber, principal.getActorType());
+
+        if (isAgent(principal)) {
+            return ticketRepository.findByTicketNumberAndOwnerMachineId(ticketNumber, principal.getMachineId());
+        }
+        return ticketRepository.findByTicketNumber(ticketNumber);
+    }
+
+    public Optional<Ticket> findByIdOrNumber(AuthPrincipal principal, String ticketId, Integer ticketNumber) {
+        if (hasText(ticketId)) {
+            return getTicket(principal, ticketId);
+        }
+        if (ticketNumber == null) {
+            throw new IllegalArgumentException("ticketId or ticketNumber is required");
+        }
+        return getTicketByNumber(principal, ticketNumber);
+    }
+
+    @Transactional
+    public Ticket createTicket(AuthPrincipal principal, CreateTicketInput input) {
+        log.info("Creating ticket by {} {}", principal.getActorType(), principal.getDisplayName());
+
+        boolean isAgentCreated = isAgent(principal);
+
+        Ticket ticket = Ticket.builder()
+                .ticketNumber(ticketNumberService.getNextTicketNumber())
+                .title(input.getTitle())
+                .description(input.getDescription())
+                .creationSource(isAgentCreated ? TicketCreationSource.FAE_FORM : TicketCreationSource.ADMIN_DASHBOARD)
+                .owner(buildTicketOwner(principal))
+                .build();
+
+        if (isAgentCreated) {
+            populateDeviceFromPrincipal(ticket, principal);
+            applyInitialStatus(ticket, TicketStatusKind.TECH_REQUIRED);
+        } else {
+            populateAdminFields(ticket, input);
+            // Manually (admin) created tickets pick a custom status (default: first custom),
+            // never AI_ASSISTANCE which is reserved for the AI assistant.
+            applyManualStatusIfLifecycle(ticket, input.getStatusId());
+        }
+
+        ticket.setOrder(computeTopOrder(ticket));
+
+        Ticket savedTicket = ticketRepository.save(ticket);
+        log.info("Created ticket #{} with ID: {}", savedTicket.getTicketNumber(), savedTicket.getId());
+
+        if (isAdmin(principal)) {
+            String ticketId = savedTicket.getId();
+            ticketTagService.createTagAssignments(savedTicket.getId(), input.getTagIds());
+            createAssignments(ticketId, AssignmentTargetType.ORGANIZATION, input.getAssignedOrganizationIds());
+            createAssignments(ticketId, AssignmentTargetType.DEVICE, input.getAssignedDeviceIds());
+            createAssignments(ticketId, AssignmentTargetType.TICKET, input.getAssignedTicketIds());
+            createAssignments(ticketId, AssignmentTargetType.KNOWLEDGE_ARTICLE, input.getAssignedKnowledgeArticleIds());
+            linkInsight(input.getInsightId(), ticketId);
+        }
+
+        listeners.forEach(listener -> listener.onTicketCreated(savedTicket, input, principal));
+        return savedTicket;
+    }
+
+    /**
+     * Creates a ticket for a client conversation started without a form. Title is null initially
+     * (set later by the conversational layer) and status is ACTIVE because the AI handles it.
+     */
+    @Transactional
+    public Ticket createTicketFromDialog(AuthPrincipal principal) {
+        log.info("Creating ticket from dialog for {}", principal.getDisplayName());
+
+        Ticket ticket = Ticket.builder()
+                .ticketNumber(ticketNumberService.getNextTicketNumber())
+                .creationSource(TicketCreationSource.FAE_DIALOG)
+                .owner(buildTicketOwner(principal))
+                .build();
+
+        populateDeviceFromPrincipal(ticket, principal);
+        applyInitialStatus(ticket, TicketStatusKind.AI_ASSISTANCE);
+
+        ticket.setOrder(computeTopOrder(ticket));
+
+        Ticket savedTicket = ticketRepository.save(ticket);
+        log.info("Created ticket #{} from dialog", savedTicket.getTicketNumber());
+
+        return savedTicket;
+    }
+
+    /**
+     * Creates a dialog-originated escalation ticket already in the TECH_REQUIRED bucket.
+     * Stamps FAE_DIALOG provenance and applies the lifecycle status when enabled.
+     */
+    @Transactional
+    public Ticket createEscalationTicket(AuthPrincipal principal, String title, String description) {
+        log.info("Creating escalation ticket from dialog for {}", principal.getDisplayName());
+
+        Ticket ticket = Ticket.builder()
+                .ticketNumber(ticketNumberService.getNextTicketNumber())
+                .title(title)
+                .description(description)
+                .creationSource(TicketCreationSource.FAE_DIALOG)
+                .owner(buildTicketOwner(principal))
+                .build();
+
+        populateDeviceFromPrincipal(ticket, principal);
+        applyInitialStatus(ticket, TicketStatusKind.TECH_REQUIRED);
+
+        ticket.setOrder(computeTopOrder(ticket));
+
+        Ticket savedTicket = ticketRepository.save(ticket);
+        log.info("Created escalation ticket #{}", savedTicket.getTicketNumber());
+
+        return savedTicket;
+    }
+
+    /**
+     * Moves the dialog's existing ticket into TECH_REQUIRED, returning empty when it cannot legally get
+     * there so the caller opens a fresh ticket. On lifecycle-off tenants the move is applied by the
+     * dialog status sync; on lifecycle-on tenants only an AI_ASSISTANCE ticket may transition (an
+     * already-TECH_REQUIRED one is a no-op).
+     *
+     * <p>Re-ranked to the top of the column on transition, same as a freshly created escalation
+     * ticket ({@code computeTopOrder} below) — {@code transition()} only moves statusId/statusKind
+     * and never touches order, so without this a reused ticket (the common case: a dialog almost
+     * always already has one) kept its position from whenever it was originally created, making
+     * "just escalated" tickets sort oldest-first among themselves on the board.
+     */
+    @Transactional
+    public Optional<Ticket> moveExistingTicketToTechRequired(AuthPrincipal principal, Ticket ticket, String reason) {
+        TicketStatusKind currentKind = ticket.getStatusKind();
+        if (currentKind == TicketStatusKind.TECH_REQUIRED) {
+            return Optional.of(ticket);
+        }
+        if (currentKind != TicketStatusKind.AI_ASSISTANCE) {
+            return Optional.empty();
+        }
+        Ticket transitioned = ticketLifecycleService.transitionToKind(
+                principal, ticket.getId(), TicketStatusKind.TECH_REQUIRED, reason);
+        transitioned.setOrder(computeTopOrder(transitioned));
+        return Optional.of(ticketRepository.save(transitioned));
+    }
+
+    @Transactional
+    public Ticket updateTicket(AuthPrincipal principal, @NotBlank String ticketId, UpdateTicketInput input) {
+        validateAdminAccess(principal);
+        log.info("Updating ticket {} by user: {}", ticketId, principal.getDisplayName());
+
+        Ticket ticket = getById(ticketId);
+
+        if (input.getTitle() != null) {
+            ticket.setTitle(input.getTitle());
+        }
+        if (input.getDescription() != null) {
+            ticket.setDescription(input.getDescription());
+        }
+        if (input.getDeviceId() != null || input.getOrganizationId() != null) {
+            populateDeviceAndOrganization(ticket, input.getDeviceId(), input.getOrganizationId());
+        }
+        if (input.getAssigneeId() != null) {
+            populateAssignee(ticket, input.getAssigneeId());
+        }
+
+        Ticket savedTicket = ticketRepository.save(ticket);
+
+        ticketTagService.syncTagAssignments(savedTicket.getId(), input.getTagIds());
+
+        listeners.forEach(listener -> listener.onTicketUpdated(savedTicket, input, principal));
+        return savedTicket;
+    }
+
+    @Transactional
+    public Ticket assignTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String assigneeId) {
+        validateAdminAccess(principal);
+        log.info("Assigning ticket {} to user {} by: {}", ticketId, assigneeId, principal.getDisplayName());
+
+        Ticket ticket = getById(ticketId);
+        populateAssignee(ticket, assigneeId);
+        Ticket savedTicket = ticketRepository.save(ticket);
+        listeners.forEach(listener -> listener.onTicketAssigned(savedTicket, principal));
+        return savedTicket;
+    }
+
+    @Transactional
+    public void autoAssignToSelfIfUnassigned(AuthPrincipal principal, @NotBlank String ticketId) {
+        validateAdminAccess(principal);
+
+        Ticket ticket = getById(ticketId);
+        if (hasAssignee(ticket)) {
+            log.debug("Ticket {} already assigned to {} — skipping auto-assign on direct chat start",
+                    ticketId, ticket.getAssignedTo());
+            return;
+        }
+
+        String adminId = principal.getId();
+        populateAssignee(ticket, adminId);
+        ticketRepository.save(ticket);
+        log.info("Auto-assigned ticket {} to admin {} on direct chat start", ticketId, adminId);
+    }
+
+    @Transactional
+    public Ticket unassignTicket(AuthPrincipal principal, @NotBlank String ticketId) {
+        validateAdminAccess(principal);
+        log.info("Unassigning ticket {} by: {}", ticketId, principal.getDisplayName());
+
+        Ticket ticket = getById(ticketId);
+        ticket.setAssignedTo(null);
+        ticket.setAssignedName(null);
+
+        return ticketRepository.save(ticket);
+    }
+
+    @Transactional
+    public Ticket unlinkDeviceFromTicket(AuthPrincipal principal, @NotBlank String ticketId) {
+        validateAdminAccess(principal);
+        log.info("Unlinking device from ticket {} by: {}", ticketId, principal.getDisplayName());
+
+        Ticket ticket = getById(ticketId);
+        ticket.setDeviceId(null);
+        ticket.setDeviceHostname(null);
+
+        return ticketRepository.save(ticket);
+    }
+
+    @Transactional
+    public Ticket unlinkOrganizationFromTicket(AuthPrincipal principal, @NotBlank String ticketId) {
+        validateAdminAccess(principal);
+        log.info("Unlinking organization from ticket {} by: {}", ticketId, principal.getDisplayName());
+
+        Ticket ticket = getById(ticketId);
+        ticket.setOrganizationId(null);
+        ticket.setOrganizationName(null);
+        // Cascade: device cannot exist without organization
+        ticket.setDeviceId(null);
+        ticket.setDeviceHostname(null);
+
+        return ticketRepository.save(ticket);
+    }
+
+    @Transactional
+    public Ticket reorderTicket(AuthPrincipal principal, ReorderTicketInput input) {
+        validateAdminAccess(principal);
+        return ticketLifecycleService.reorderTicket(principal, input);
+    }
+
+    @Transactional
+    public int archiveResolvedTickets(AuthPrincipal principal, TicketFilterInput filter) {
+        validateAdminAccess(principal);
+        log.info("Archiving resolved tickets by: {}, filter: {}", principal.getDisplayName(), filter);
+
+        List<String> archivedIds = ticketLifecycleService.archiveResolvedTickets(principal, filter);
+        listeners.forEach(listener -> listener.onTicketsArchived(archivedIds, principal));
+        log.info("Archived {} resolved tickets", archivedIds.size());
+        return archivedIds.size();
+    }
+
+    // ---------- internals ----------
+
+    // Columns are grouped by statusId, so a new ticket's top rank is computed against its statusId
+    // column. Requires the lifecycle status to be applied beforehand.
+    private String computeTopOrder(Ticket ticket) {
+        return ticketLifecycleService.computeRankAtTop(ticket.getStatusId());
+    }
+
+    private void applyInitialStatus(Ticket ticket, TicketStatusKind kind) {
+        ticketLifecycleService.applyInitialStatus(ticket, kind);
+    }
+
+    private void applyManualStatusIfLifecycle(Ticket ticket, String requestedStatusId) {
+        ticketLifecycleService.applyManualInitialStatus(ticket, requestedStatusId);
+    }
+
+    private Ticket getById(String ticketId) {
+        return ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new IllegalArgumentException("Ticket not found: " + ticketId));
+    }
+
+    private TicketOwner buildTicketOwner(AuthPrincipal principal) {
+        return switch (principal.getActorType()) {
+            case AGENT -> new ClientTicketOwner(principal.getMachineId());
+            case ADMIN -> new AdminTicketOwner(principal.getId());
+        };
+    }
+
+    private Query buildTicketQuery(AuthPrincipal principal, TicketFilterInput filter,
+                                   String search, String ownerMachineId) {
+        TicketQueryFilter queryFilter = toQueryFilter(filter);
+        List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filter);
+        return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
+    }
+
+    private TicketQueryFilter toQueryFilter(TicketFilterInput filter) {
+        if (filter == null) {
+            return new TicketQueryFilter();
+        }
+        return TicketQueryFilter.builder()
+                .statusIds(filter.getStatusIds())
+                .organizationIds(filter.getOrganizationIds())
+                .assigneeIds(filter.getAssigneeIds())
+                .activity(ticketStalenessResolver.resolve(filter.getActivity()))
+                .build();
+    }
+
+    private PageInfo buildPageInfo(List<Ticket> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
+        String startCursor = pageItems.isEmpty() ? null : pageItems.getFirst().getId();
+        String endCursor = pageItems.isEmpty() ? null : pageItems.getLast().getId();
+
+        return PageInfo.builder()
+                .hasNextPage(hasNextPage)
+                .hasPreviousPage(hasPreviousPage)
+                .startCursor(startCursor)
+                .endCursor(endCursor)
+                .build();
+    }
+
+    private String validateSortField(SortInput sort) {
+        String field = sort != null ? sort.getField() : null;
+        if (field == null || field.trim().isEmpty()) {
+            return ticketRepository.getDefaultSortField();
+        }
+        String trimmedField = field.trim();
+        if (!ticketRepository.isSortableField(trimmedField)) {
+            log.warn("Invalid sort field requested: {}, using default", field);
+            return ticketRepository.getDefaultSortField();
+        }
+        return trimmedField;
+    }
+
+    private void populateDeviceFromPrincipal(Ticket ticket, AuthPrincipal principal) {
+        String machineId = principal.getMachineId();
+        if (machineId == null || machineId.isBlank()) {
+            log.warn("AGENT token missing machineId for ticket creation");
+            return;
+        }
+
+        Machine device = requireMachine(machineId);
+        ticket.setDeviceId(device.getMachineId());
+        ticket.setDeviceHostname(device.getHostname());
+
+        if (device.getOrganizationId() != null) {
+            Organization org = requireOrganization(device.getOrganizationId());
+            ticket.setOrganizationId(org.getOrganizationId());
+            ticket.setOrganizationName(org.getName());
+        }
+        log.debug("Auto-populated device {} and org {} for AGENT ticket",
+                device.getHostname(), ticket.getOrganizationName());
+    }
+
+    private void populateAdminFields(Ticket ticket, CreateTicketInput input) {
+        populateDeviceAndOrganization(ticket, input.getDeviceId(), input.getOrganizationId());
+
+        if (input.getAssigneeId() != null) {
+            populateAssignee(ticket, input.getAssigneeId());
+        }
+    }
+
+    private void populateDeviceAndOrganization(Ticket ticket, String deviceId, String organizationId) {
+        String resolvedOrgId = organizationId;
+        if (deviceId != null) {
+            Machine device = requireMachine(deviceId);
+            ticket.setDeviceId(device.getMachineId());
+            ticket.setDeviceHostname(device.getHostname());
+            if (resolvedOrgId == null) {
+                resolvedOrgId = device.getOrganizationId();
+            } else if (!resolvedOrgId.equals(device.getOrganizationId())) {
+                throw new IllegalArgumentException("Device doesn't belong to selected organization");
+            }
+        }
+
+        if (resolvedOrgId != null) {
+            Organization org = requireOrganization(resolvedOrgId);
+            ticket.setOrganizationId(org.getOrganizationId());
+            ticket.setOrganizationName(org.getName());
+        }
+    }
+
+    private void populateAssignee(Ticket ticket, String assigneeId) {
+        User user = userRepository.findById(assigneeId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + assigneeId));
+        ticket.setAssignedTo(user.getId());
+        ticket.setAssignedName(TicketUserNames.displayName(user));
+    }
+
+    private Machine requireMachine(String machineId) {
+        return machineRepository.findByMachineId(machineId)
+                .orElseThrow(() -> new IllegalArgumentException("Device not found by machineId: " + machineId));
+    }
+
+    private Organization requireOrganization(String organizationId) {
+        return organizationRepository.findByOrganizationId(organizationId)
+                .orElseThrow(() -> new IllegalArgumentException("Organization not found by organizationId: " + organizationId));
+    }
+
+    private boolean hasAssignee(Ticket ticket) {
+        return hasText(ticket.getAssignedTo());
+    }
+
+    // TODO: insight is a SaaS concept and should not be named here.
+    // The insight is the item and the ticket its target, the other way round from the assignments
+    // above: an insight can be filed as several tickets over time.
+    private void linkInsight(String insightId, String ticketId) {
+        if (!hasText(insightId)) {
+            return;
+        }
+        assignmentService.assignItem(insightId, AssignmentItemType.INSIGHT, AssignmentTargetType.TICKET, ticketId);
+    }
+
+    private void createAssignments(String ticketId, AssignmentTargetType targetType, List<String> targetIds) {
+        if (targetIds == null || targetIds.isEmpty()) {
+            return;
+        }
+        targetIds.forEach(targetId -> assignmentService.assignItem(ticketId, AssignmentItemType.TICKET, targetType, targetId));
+    }
+}

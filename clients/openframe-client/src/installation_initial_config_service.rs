@@ -17,8 +17,27 @@ pub struct InstallConfigParams {
     pub server_url: Option<String>,
     pub initial_key: Option<String>,
     pub org_id: Option<String>,
+    pub user_id: Option<String>,
     pub local_mode: bool,
     pub tags: Vec<String>,
+}
+
+impl InstallConfigParams {
+    /// True when the install was invoked with no arguments at all — the two-step
+    /// flow where configuration arrives later via `auth`. Any provided argument
+    /// (even a partial set) means a parameterized install, which keeps failing
+    /// validation so a mangled command is caught instead of silently deferred.
+    pub fn is_parameterless(&self) -> bool {
+        fn blank(v: &Option<String>) -> bool {
+            v.as_ref().is_none_or(|s| s.trim().is_empty())
+        }
+        blank(&self.server_url)
+            && blank(&self.initial_key)
+            && blank(&self.org_id)
+            && blank(&self.user_id)
+            && !self.local_mode
+            && self.tags.is_empty()
+    }
 }
 
 impl InstallationInitialConfigService {
@@ -48,6 +67,7 @@ impl InstallationInitialConfigService {
             server_host: server_url,
             initial_key,
             org_id,
+            user_id: params.user_id.clone().unwrap_or_default(),
             local_mode: params.local_mode,
             tags: DeviceTag::parse_from_cli(params.tags.clone()),
             ..Default::default()
@@ -97,3 +117,7 @@ impl InstallationInitialConfigService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "installation_initial_config_service_tests.rs"]
+mod tests;

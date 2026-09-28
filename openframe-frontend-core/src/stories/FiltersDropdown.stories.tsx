@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
-import { Button } from '../components/ui/button'
-import { FiltersDropdown, type FilterSection } from '../components/features/filters-dropdown'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
+import { FiltersDropdown, type FilterSection } from '../components/features/filters-dropdown';
+import { Button } from '../components/ui/button';
 
 const meta = {
   title: 'Features/FiltersDropdown',
@@ -26,10 +26,10 @@ const meta = {
     },
     responsive: { control: 'boolean', description: 'Enable responsive mobile behavior' },
   },
-} satisfies Meta<typeof FiltersDropdown>
+} satisfies Meta<typeof FiltersDropdown>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 const statusSections: FilterSection[] = [
   {
@@ -44,7 +44,7 @@ const statusSections: FilterSection[] = [
     ],
     allowSelectAll: true,
   },
-]
+];
 
 /**
  * Default dropdown with a single checkbox section.
@@ -57,7 +57,7 @@ export const Default: Story = {
     onReset: fn(),
     currentFilters: { status: ['active', 'inactive'] },
   },
-}
+};
 
 /**
  * Multiple filter sections.
@@ -84,7 +84,7 @@ export const MultipleSections: Story = {
     onReset: fn(),
     currentFilters: { status: ['active'], type: ['desktop'] },
   },
-}
+};
 
 /**
  * Radio section — single selection.
@@ -109,7 +109,7 @@ export const RadioSection: Story = {
     onReset: fn(),
     currentFilters: { sort: ['name'] },
   },
-}
+};
 
 /**
  * With a separator between option groups.
@@ -134,7 +134,7 @@ export const WithSeparator: Story = {
     onApply: fn(),
     onReset: fn(),
   },
-}
+};
 
 /**
  * Custom trigger element instead of default text button.
@@ -151,15 +151,15 @@ export const CustomTrigger: Story = {
     onReset: fn(),
     currentFilters: { status: ['active'] },
   },
-}
+};
 
 /**
  * Placement variants — bottom-end alignment.
  */
 export const PlacementBottomEnd: Story = {
   decorators: [
-    (Story) => (
-      <div className="flex justify-end w-[500px]">
+    Story => (
+      <div className="flex w-[500px] justify-end">
         <Story />
       </div>
     ),
@@ -171,7 +171,7 @@ export const PlacementBottomEnd: Story = {
     onReset: fn(),
     placement: 'bottom-end',
   },
-}
+};
 
 /**
  * Empty state — no active filters.
@@ -184,7 +184,7 @@ export const NoActiveFilters: Story = {
     onReset: fn(),
     currentFilters: {},
   },
-}
+};
 
 /**
  * Many options — demonstrates scrollable dropdown when content exceeds max height.
@@ -253,7 +253,7 @@ export const ManyOptions: Story = {
     onReset: fn(),
     currentFilters: { country: ['us', 'uk'], department: ['engineering'] },
   },
-}
+};
 
 /**
  * Interactive example with state management.
@@ -262,9 +262,9 @@ export const Interactive: Story = {
   render: function InteractiveStory() {
     const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({
       status: ['active'],
-    })
+    });
 
-    const activeCount = Object.values(appliedFilters).flat().length
+    const activeCount = Object.values(appliedFilters).flat().length;
 
     return (
       <div className="flex flex-col items-center gap-4">
@@ -275,14 +275,12 @@ export const Interactive: Story = {
           onReset={() => setAppliedFilters({})}
           currentFilters={appliedFilters}
         />
-        <div className="text-xs text-ods-text-secondary">
-          Applied: {JSON.stringify(appliedFilters)}
-        </div>
+        <div className="text-xs text-ods-text-secondary">Applied: {JSON.stringify(appliedFilters)}</div>
       </div>
-    )
+    );
   },
   args: {
     sections: statusSections,
     onApply: fn(),
   },
-}
+};

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import { TagSearchInput, TagSearchOption } from '../components/ui/tag-search-input';
+import { TagSearchInput, type TagSearchOption } from '../components/ui/tag-search-input';
 
 const meta: Meta = {
   title: 'UI/TagSearchInput',
@@ -64,8 +64,11 @@ export const WithTags: Story = {
           tags={tags}
           searchValue={search}
           onSearchChange={setSearch}
-          onTagRemove={(val) => setTags((t) => t.filter((x) => x.value !== val))}
-          onClearAll={() => { setTags([]); setSearch(''); }}
+          onTagRemove={val => setTags(t => t.filter(x => x.value !== val))}
+          onClearAll={() => {
+            setTags([]);
+            setSearch('');
+          }}
         />
       </div>
     );
@@ -85,8 +88,11 @@ export const OverflowWithBadge: Story = {
           tags={tags}
           searchValue={search}
           onSearchChange={setSearch}
-          onTagRemove={(val) => setTags((t) => t.filter((x) => x.value !== val))}
-          onClearAll={() => { setTags([]); setSearch(''); }}
+          onTagRemove={val => setTags(t => t.filter(x => x.value !== val))}
+          onClearAll={() => {
+            setTags([]);
+            setSearch('');
+          }}
         />
       </div>
     );
@@ -112,15 +118,16 @@ export const Resizable: Story = {
           padding: 8,
         }}
       >
-        <p className="text-ods-text-secondary text-sm mb-2">
-          Drag the bottom-right corner to resize
-        </p>
+        <p className="mb-2 text-sm text-ods-text-secondary">Drag the bottom-right corner to resize</p>
         <TagSearchInput
           tags={tags}
           searchValue={search}
           onSearchChange={setSearch}
-          onTagRemove={(val) => setTags((t) => t.filter((x) => x.value !== val))}
-          onClearAll={() => { setTags([]); setSearch(''); }}
+          onTagRemove={val => setTags(t => t.filter(x => x.value !== val))}
+          onClearAll={() => {
+            setTags([]);
+            setSearch('');
+          }}
         />
       </div>
     );
@@ -140,8 +147,11 @@ export const NarrowContainer: Story = {
           tags={tags}
           searchValue={search}
           onSearchChange={setSearch}
-          onTagRemove={(val) => setTags((t) => t.filter((x) => x.value !== val))}
-          onClearAll={() => { setTags([]); setSearch(''); }}
+          onTagRemove={val => setTags(t => t.filter(x => x.value !== val))}
+          onClearAll={() => {
+            setTags([]);
+            setSearch('');
+          }}
         />
       </div>
     );
@@ -155,13 +165,7 @@ export const Disabled: Story = {
   render: function Render() {
     return (
       <div style={{ width: 600 }}>
-        <TagSearchInput
-          tags={sampleTags}
-          searchValue=""
-          onSearchChange={() => {}}
-          onTagRemove={() => {}}
-          disabled
-        />
+        <TagSearchInput tags={sampleTags} searchValue="" onSearchChange={() => {}} onTagRemove={() => {}} disabled />
       </div>
     );
   },
@@ -176,18 +180,19 @@ export const WithSubmit: Story = {
     const [search, setSearch] = useState('');
     return (
       <div style={{ width: 600 }}>
-        <p className="text-ods-text-secondary text-sm mb-2">
-          Type a value and press Enter to add it as a tag
-        </p>
+        <p className="mb-2 text-sm text-ods-text-secondary">Type a value and press Enter to add it as a tag</p>
         <TagSearchInput
           tags={tags}
           searchValue={search}
           onSearchChange={setSearch}
-          onTagRemove={(val) => setTags((t) => t.filter((x) => x.value !== val))}
-          onClearAll={() => { setTags([]); setSearch(''); }}
-          onSubmit={(val) => {
+          onTagRemove={val => setTags(t => t.filter(x => x.value !== val))}
+          onClearAll={() => {
+            setTags([]);
+            setSearch('');
+          }}
+          onSubmit={val => {
             if (val.trim()) {
-              setTags((t) => [...t, { label: val.trim(), value: val.trim() }]);
+              setTags(t => [...t, { label: val.trim(), value: val.trim() }]);
               setSearch('');
             }
           }}
@@ -211,8 +216,11 @@ export const LimitTags: Story = {
           tags={tags}
           searchValue={search}
           onSearchChange={setSearch}
-          onTagRemove={(val) => setTags((t) => t.filter((x) => x.value !== val))}
-          onClearAll={() => { setTags([]); setSearch(''); }}
+          onTagRemove={val => setTags(t => t.filter(x => x.value !== val))}
+          onClearAll={() => {
+            setTags([]);
+            setSearch('');
+          }}
           limitTags={2}
         />
       </div>
@@ -233,7 +241,7 @@ export const NoClearAll: Story = {
           tags={tags}
           searchValue={search}
           onSearchChange={setSearch}
-          onTagRemove={(val) => setTags((t) => t.filter((x) => x.value !== val))}
+          onTagRemove={val => setTags(t => t.filter(x => x.value !== val))}
           showClearAll={false}
         />
       </div>
@@ -256,48 +264,51 @@ export const AllVariants: Story = {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div>
-          <p className="text-ods-text-secondary text-sm mb-1">Empty</p>
+          <p className="mb-1 text-sm text-ods-text-secondary">Empty</p>
           <TagSearchInput
             tags={tags1}
             searchValue={search1}
             onSearchChange={setSearch1}
-            onTagRemove={(val) => setTags1((t) => t.filter((x) => x.value !== val))}
-            onClearAll={() => { setTags1([]); setSearch1(''); }}
+            onTagRemove={val => setTags1(t => t.filter(x => x.value !== val))}
+            onClearAll={() => {
+              setTags1([]);
+              setSearch1('');
+            }}
             placeholder="Search devices..."
           />
         </div>
         <div>
-          <p className="text-ods-text-secondary text-sm mb-1">Few tags</p>
+          <p className="mb-1 text-sm text-ods-text-secondary">Few tags</p>
           <TagSearchInput
             tags={tags2}
             searchValue={search2}
             onSearchChange={setSearch2}
-            onTagRemove={(val) => setTags2((t) => t.filter((x) => x.value !== val))}
-            onClearAll={() => { setTags2([]); setSearch2(''); }}
+            onTagRemove={val => setTags2(t => t.filter(x => x.value !== val))}
+            onClearAll={() => {
+              setTags2([]);
+              setSearch2('');
+            }}
           />
         </div>
         <div>
-          <p className="text-ods-text-secondary text-sm mb-1">Many tags (overflow)</p>
+          <p className="mb-1 text-sm text-ods-text-secondary">Many tags (overflow)</p>
           <TagSearchInput
             tags={tags3}
             searchValue={search3}
             onSearchChange={setSearch3}
-            onTagRemove={(val) => setTags3((t) => t.filter((x) => x.value !== val))}
-            onClearAll={() => { setTags3([]); setSearch3(''); }}
+            onTagRemove={val => setTags3(t => t.filter(x => x.value !== val))}
+            onClearAll={() => {
+              setTags3([]);
+              setSearch3('');
+            }}
           />
         </div>
         <div>
-          <p className="text-ods-text-secondary text-sm mb-1">Disabled</p>
-          <TagSearchInput
-            tags={sampleTags}
-            searchValue=""
-            onSearchChange={() => {}}
-            onTagRemove={() => {}}
-            disabled
-          />
+          <p className="mb-1 text-sm text-ods-text-secondary">Disabled</p>
+          <TagSearchInput tags={sampleTags} searchValue="" onSearchChange={() => {}} onTagRemove={() => {}} disabled />
         </div>
         <div>
-          <p className="text-ods-text-secondary text-sm mb-1">Limit Tags</p>
+          <p className="mb-1 text-sm text-ods-text-secondary">Limit Tags</p>
           <TagSearchInput
             tags={sampleTags}
             searchValue=""
@@ -306,7 +317,6 @@ export const AllVariants: Story = {
             limitTags={2}
           />
         </div>
-
       </div>
     );
   },

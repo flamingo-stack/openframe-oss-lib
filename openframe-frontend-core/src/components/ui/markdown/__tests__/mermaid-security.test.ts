@@ -22,24 +22,25 @@
  * artifact of jsdom having no layout — it is NOT a confirmed browser DoS. The
  * component wraps its render in a timeout regardless.
  */
-import { beforeAll, describe, expect, it } from 'vitest'
-import { MERMAID_SECURITY_OPTIONS } from '../mermaid-diagram'
+import { beforeAll, describe, expect, it } from 'vitest';
+import { MERMAID_SECURITY_OPTIONS } from '../mermaid-diagram';
 
 // jsdom implements no SVG layout, and mermaid's dagre pass measures text.
 // These stubs are only about making the renderer RUN; they do not touch the
 // sanitization path under test.
 function installSvgLayoutStubs(): void {
-  const proto = (globalThis as unknown as { SVGElement?: { prototype: Record<string, unknown> } }).SVGElement?.prototype
-  if (!proto) return
+  const proto = (globalThis as unknown as { SVGElement?: { prototype: Record<string, unknown> } }).SVGElement
+    ?.prototype;
+  if (!proto) return;
   proto.getBBox = function getBBox() {
-    return { x: 0, y: 0, width: 100, height: 20 }
-  }
+    return { x: 0, y: 0, width: 100, height: 20 };
+  };
   proto.getComputedTextLength = function getComputedTextLength() {
-    return 100
-  }
+    return 100;
+  };
   proto.getScreenCTM = function getScreenCTM() {
-    return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }) }
-  }
+    return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }) };
+  };
 }
 
 // Second tuple slot: text that MUST be present in the rendered output — a
@@ -52,22 +53,13 @@ const HOSTILE_LABELS: ReadonlyArray<readonly [chart: string, expectedText: strin
   ['graph TD\n  A["<script>alert(1)</script>"] --> B["ok"]', 'ok'],
   // A `%%{init}%%` directive trying to unlock the two knobs. Both keys are in
   // `secure`, so the override is rejected and the payload stays escaped.
-  [
-    '%%{init:{"securityLevel":"loose"}}%%\ngraph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]',
-    '<img',
-  ],
-  [
-    '%%{init:{"htmlLabels":true}}%%\ngraph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]',
-    '<img',
-  ],
+  ['%%{init:{"securityLevel":"loose"}}%%\ngraph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]', '<img'],
+  ['%%{init:{"htmlLabels":true}}%%\ngraph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]', '<img'],
   // YAML front-matter config — the other in-source config channel.
-  [
-    '---\nconfig:\n  securityLevel: loose\n---\ngraph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]',
-    '<img',
-  ],
+  ['---\nconfig:\n  securityLevel: loose\n---\ngraph TD\n  A["<img src=x onerror=alert(1)>"] --> B["ok"]', '<img'],
   // `click` interaction directive: disabled outright by 'strict'.
   ['graph TD\n  A["ok"] --> B["b"]\n  click A "javascript:alert(1)"', 'ok'],
-]
+];
 
 /** Initialize with the COMPONENT's security options — imported, never
  *  re-typed — so the fixture cannot drift from the renderer. */
@@ -77,42 +69,42 @@ function initializeLikeComponent(mermaid: { initialize: (c: Record<string, unkno
     theme: 'dark',
     flowchart: { useMaxWidth: true },
     ...MERMAID_SECURITY_OPTIONS,
-  })
+  });
 }
 
 describe('mermaid hostile-label hardening', () => {
   beforeAll(() => {
-    installSvgLayoutStubs()
-  })
+    installSvgLayoutStubs();
+  });
 
   it.each(HOSTILE_LABELS)('does not emit live HTML for %j', async (chart, expectedText) => {
-    const { default: mermaid } = await import('mermaid')
+    const { default: mermaid } = await import('mermaid');
 
-    initializeLikeComponent(mermaid)
+    initializeLikeComponent(mermaid);
 
-    const { svg } = await mermaid.render(`mermaid-security-${Math.random().toString(36).slice(2)}`, chart)
+    const { svg } = await mermaid.render(`mermaid-security-${Math.random().toString(36).slice(2)}`, chart);
 
     // No live element, and no event-handler attribute, anywhere in the output.
-    expect(svg).not.toMatch(/<img[\s>]/i)
-    expect(svg).not.toMatch(/<script[\s>]/i)
-    expect(svg).not.toMatch(/\son[a-z]+\s*=/i)
+    expect(svg).not.toMatch(/<img[\s>]/i);
+    expect(svg).not.toMatch(/<script[\s>]/i);
+    expect(svg).not.toMatch(/\son[a-z]+\s*=/i);
     // `htmlLabels: false` means no HTML subtree is minted for labels at all.
-    expect(svg).not.toMatch(/<foreignObject/i)
+    expect(svg).not.toMatch(/<foreignObject/i);
     // 'strict' drops `click` bindings, so no javascript: URL is ever emitted.
-    expect(svg).not.toMatch(/javascript:/i)
+    expect(svg).not.toMatch(/javascript:/i);
 
     // And it stays inert once parsed as HTML: the hostile markup must appear
     // as TEXT (escaped), never as an element node.
-    const host = document.createElement('div')
-    host.innerHTML = svg
-    expect(host.querySelector('img')).toBeNull()
-    expect(host.querySelector('script')).toBeNull()
-    const text = host.textContent ?? ''
-    expect(text).toContain(expectedText)
+    const host = document.createElement('div');
+    host.innerHTML = svg;
+    expect(host.querySelector('img')).toBeNull();
+    expect(host.querySelector('script')).toBeNull();
+    const text = host.textContent ?? '';
+    expect(text).toContain(expectedText);
     // The script payload never survives in any form.
-    expect(text).not.toContain('alert(1)')
-  })
-})
+    expect(text).not.toContain('alert(1)');
+  });
+});
 
 /**
  * CSS is the OTHER injection surface, and the HTML hardening above does not
@@ -146,31 +138,28 @@ const HOSTILE_THEME_CSS: ReadonlyArray<readonly [label: string, chart: string]> 
     'the YAML front-matter config channel',
     '---\nconfig:\n  themeCSS: "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647"\n---\ngraph TD\n  A["ok"] --> B["b"]',
   ],
-]
+];
 
 describe('mermaid themeCSS hardening', () => {
   beforeAll(() => {
-    installSvgLayoutStubs()
-  })
+    installSvgLayoutStubs();
+  });
 
   it.each(HOSTILE_THEME_CSS)('rejects a themeCSS override — %s', async (_label, chart) => {
-    const { default: mermaid } = await import('mermaid')
+    const { default: mermaid } = await import('mermaid');
 
-    initializeLikeComponent(mermaid)
+    initializeLikeComponent(mermaid);
 
-    const { svg } = await mermaid.render(
-      `mermaid-themecss-${Math.random().toString(36).slice(2)}`,
-      chart,
-    )
+    const { svg } = await mermaid.render(`mermaid-themecss-${Math.random().toString(36).slice(2)}`, chart);
 
-    expect(svg).not.toMatch(/position\s*:\s*fixed/i)
-    expect(svg).not.toContain('2147483647')
-    expect(svg).not.toMatch(/@font-face/i)
-    expect(svg).not.toContain('evil.example')
+    expect(svg).not.toMatch(/position\s*:\s*fixed/i);
+    expect(svg).not.toContain('2147483647');
+    expect(svg).not.toMatch(/@font-face/i);
+    expect(svg).not.toContain('evil.example');
     // Positive control: the diagram still rendered, so the assertions above
     // cannot be passing on empty output.
-    const host = document.createElement('div')
-    host.innerHTML = svg
-    expect(host.textContent ?? '').toContain('ok')
-  })
-})
+    const host = document.createElement('div');
+    host.innerHTML = svg;
+    expect(host.textContent ?? '').toContain('ok');
+  });
+});

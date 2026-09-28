@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import React, { ReactNode } from 'react';
 import { Sparkles, Upload } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
-import { AIEnrichSection } from './ai-enrich';
-import { HighlightConfigSection } from './highlight-config-section';
-import { SubtitlesEditor } from './subtitles-editor';
-import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { Label } from '../ui/label';
+import { AIEnrichSection } from './ai-enrich';
 import type { AIRequiredField } from './ai-enrich';
+import { HighlightConfigSection } from './highlight-config-section';
+import { SubtitlesEditor } from './subtitles-editor';
 
 export interface HighlightVideoCombinedSectionProps {
   // ===== HighlightConfigSection Props =====
@@ -115,15 +115,15 @@ export function HighlightVideoCombinedSection({
   requiredFields,
   status,
   statusMessage,
-  disabledMessage = "Upload a video and run transcription first",
+  disabledMessage = 'Upload a video and run transcription first',
   showCancel = true,
   onCancel,
   isCancelling = false,
   hasResult = false,
-  title = "Highlight Video",
+  title = 'Highlight Video',
   description,
   buttonLabel,
-  loadingLabel = "Generating highlight...",
+  loadingLabel = 'Generating highlight...',
   // Preview props
   highlightVideoUrl,
   highlightVideoThumbnail,
@@ -132,8 +132,8 @@ export function HighlightVideoCombinedSection({
   onUpload,
   onDelete,
   isUploading = false,
-  previewLabel = "Highlight Video",
-  emptyMessage = "No highlight video yet. Use AI generation above or upload manually.",
+  previewLabel = 'Highlight Video',
+  emptyMessage = 'No highlight video yet. Use AI generation above or upload manually.',
   uploadProgressComponent,
   // Highlight subtitles props
   subtitles,
@@ -143,7 +143,7 @@ export function HighlightVideoCombinedSection({
   // Common
   className = '',
 }: HighlightVideoCombinedSectionProps) {
-  const defaultButtonLabel = hasResult ? "Regenerate Highlight" : "Generate Highlight";
+  const defaultButtonLabel = hasResult ? 'Regenerate Highlight' : 'Generate Highlight';
   const defaultDescription = `Generate a ${Math.floor(targetDurationSeconds / 60)}-minute summary video using Claude AI + Shotstack`;
 
   const formatDuration = (ms: number) => {
@@ -195,12 +195,10 @@ export function HighlightVideoCombinedSection({
 
       {/* 3. Preview + Manual Upload Section */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Label>{previewLabel}</Label>
-            {highlightVideoSource === 'ai_generated' && (
-              <AIGeneratedBadge />
-            )}
+            {highlightVideoSource === 'ai_generated' && <AIGeneratedBadge />}
             {highlightVideoDurationMs && (
               <Badge variant="outline" className="text-h6">
                 {formatDuration(highlightVideoDurationMs)}
@@ -229,9 +227,7 @@ export function HighlightVideoCombinedSection({
             onDelete,
           })
         ) : (
-          <p className="text-h6 text-ods-text-secondary italic">
-            {emptyMessage}
-          </p>
+          <p className="italic text-ods-text-secondary text-h6">{emptyMessage}</p>
         )}
       </div>
 

@@ -1,11 +1,12 @@
-"use client";
+'use client';
 
-import React, { ReactNode } from 'react';
-import { Upload, Sparkles } from 'lucide-react';
+import { Upload } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { formatDuration } from '../../utils/format-duration';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
-import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { Label } from '../ui/label';
 
 export interface HighlightVideoPreviewProps {
   /** Highlight video URL */
@@ -51,8 +52,8 @@ export function HighlightVideoPreview({
   onUpload,
   onDelete,
   isUploading = false,
-  label = "Highlight Video",
-  emptyMessage = "No highlight video yet. Use AI generation above or upload manually.",
+  label = 'Highlight Video',
+  emptyMessage = 'No highlight video yet. Use AI generation above or upload manually.',
   uploadProgressComponent,
   renderVideoPreview,
 }: HighlightVideoPreviewProps) {
@@ -69,20 +70,12 @@ export function HighlightVideoPreview({
     input.click();
   };
 
-  const formatDuration = (ms: number) => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${String(seconds).padStart(2, '0')}`;
-  };
-
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Label>{label}</Label>
-          {highlightVideoSource === 'ai_generated' && (
-            <AIGeneratedBadge />
-          )}
+          {highlightVideoSource === 'ai_generated' && <AIGeneratedBadge />}
           {highlightVideoDurationMs && (
             <Badge variant="outline" className="text-h6">
               {formatDuration(highlightVideoDurationMs)}
@@ -111,9 +104,7 @@ export function HighlightVideoPreview({
           onDelete,
         })
       ) : (
-        <p className="text-h6 text-ods-text-secondary italic">
-          {emptyMessage}
-        </p>
+        <p className="italic text-ods-text-secondary text-h6">{emptyMessage}</p>
       )}
     </div>
   );

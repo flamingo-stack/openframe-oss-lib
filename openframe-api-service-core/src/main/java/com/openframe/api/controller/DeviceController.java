@@ -1,7 +1,8 @@
 package com.openframe.api.controller;
 
-import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.dto.device.UpdateDeviceStatusRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -18,7 +19,7 @@ public class DeviceController {
 	@PatchMapping("/{machineId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void updateDeviceStatus(@PathVariable String machineId,
-	                               @RequestBody UpdateDeviceStatusRequest request) {
+	                               @Valid @RequestBody UpdateDeviceStatusRequest request) {
 		log.info("Internal API: Update device status {} -> {}", machineId, request.status());
 		deviceService.updateStatusByMachineId(machineId, request.status());
 	}

@@ -26,10 +26,10 @@ import java.time.Instant;
 @Document(collection = "tickets")
 @CompoundIndexes({
         @CompoundIndex(name = "tenant_ticketNumber_idx", def = "{'tenantId':1,'ticketNumber':1}", unique = true),
-        // TODO(lifecycle-rollout): drop legacy status_order index after `status` field removal
-        @CompoundIndex(name = "status_order", def = "{'status': 1, 'order': 1}"),
         @CompoundIndex(name = "status_kind", def = "{'statusKind': 1}"),
-        @CompoundIndex(name = "status_id_order", def = "{'statusId': 1, 'order': 1}")
+        @CompoundIndex(name = "status_id_order", def = "{'statusId': 1, 'order': 1}"),
+        // Board activity filter: per-column staleness scan. Never edit a live index def in place.
+        @CompoundIndex(name = "tenant_status_activity", def = "{'tenantId': 1, 'statusId': 1, 'lastActivityAt': 1}")
 })
 public class Ticket implements TenantScoped {
     @Id
@@ -38,8 +38,6 @@ public class Ticket implements TenantScoped {
     private Integer ticketNumber;
     private String title;
     private String description;
-    // TODO(lifecycle-rollout): drop legacy status field once all reads/writes use statusKind/statusId
-    private TicketStatus status;
     private String statusId;
     private TicketStatusKind statusKind;
     private TicketCreationSource creationSource;
@@ -62,10 +60,17 @@ public class Ticket implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;
     private Instant resolvedAt;
+    private Instant lastActivityAt;
+    private Instant awaitingClientSince;
     private TicketResolver resolvedBy;
     private String resolvedById;
     private String resolvedByName;
     private Integer reopenCount;
+
+    public Instant effectiveLastActivityAt() {
+        return lastActivityAt != null ? lastActivityAt : createdAt;
+    }
+
     public boolean isAiDisabled() {
         return statusKind != null && statusKind != TicketStatusKind.AI_ASSISTANCE;
     }

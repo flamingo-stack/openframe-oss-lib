@@ -1,5 +1,5 @@
-import React from 'react';
 import { Menu } from 'lucide-react';
+import type React from 'react';
 
 interface MenuIconProps {
   className?: string;
@@ -8,16 +8,6 @@ interface MenuIconProps {
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export const MenuIcon: React.FC<MenuIconProps> = ({ 
-  className = "", 
-  width = 24, 
-  height = 24 
-}) => {
-  return (
-    <Menu 
-      width={width} 
-      height={height} 
-      className={className}
-    />
-  );
-}; 
+export const MenuIcon: React.FC<MenuIconProps> = ({ className = '', width = 24, height = 24 }) => {
+  return <Menu width={width} height={height} className={className} />;
+};

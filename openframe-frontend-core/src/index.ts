@@ -1,22 +1,22 @@
 // Main export file for @flamingo/ui-kit
-export * from './components/ui'
-export * from './components/features'
-export * from './components/icons'
-export * from './components/navigation'
-export * from './components/platform'
+export * from './components/ui';
+export * from './components/features';
+export * from './components/icons';
+export * from './components/navigation';
+export * from './components/platform';
 // Chat exports
-export * from './components/chat'
+export * from './components/chat';
 // Onboarding exports
-export * from './components/shared/onboarding'
+export * from './components/shared/onboarding';
 // Logs components
-export { LogsList } from './components/logs-list'
-export { LogSeverityDot } from './components/log-severity-dot'
-export { ToolIcon } from './components/tool-icon'
-export * from './types/logs.types'
-export * from './hooks'
-export * from './utils'
-export * from './types'
-export * from './assets'
+export { LogsList } from './components/logs-list';
+export { LogSeverityDot } from './components/log-severity-dot';
+export { ToolIcon } from './components/tool-icon';
+export * from './types/logs.types';
+export * from './hooks';
+export * from './utils';
+export * from './types';
+export * from './assets';
 
 // Disambiguation: these names are star-exported by BOTH './components/chat'
 // (chat entity-card payload types) and './types' (CMS domain types). With two
@@ -44,4 +44,4 @@ export type {
   CustomerInterviewConfig,
   CustomerInterviewFilters,
   CustomerInterviewListResponse,
-} from './types'
+} from './types';

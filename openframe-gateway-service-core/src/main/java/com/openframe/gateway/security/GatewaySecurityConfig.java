@@ -24,7 +24,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 
@@ -64,6 +68,24 @@ public class GatewaySecurityConfig {
         jwtAuthenticationConverter.setPrincipalClaimName("sub");
 
         return jwtAuthenticationConverter;
+    }
+
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    @ConditionalOnProperty(name = "openframe.gateway.security.auth-skip-paths")
+    public SecurityWebFilterChain authSkipFilterChain(
+            ServerHttpSecurity http,
+            @Value("${openframe.gateway.security.auth-skip-paths}") String[] authSkipPaths
+    ) {
+        log.info("Auth-skip gateway paths (upstream-authenticated proxies): {}", (Object) authSkipPaths);
+        return http
+                .securityMatcher(ServerWebExchangeMatchers.pathMatchers(authSkipPaths))
+                .csrf(CsrfSpec::disable)
+                .cors(CorsSpec::disable)
+                .httpBasic(HttpBasicSpec::disable)
+                .formLogin(FormLoginSpec::disable)
+                .authorizeExchange(exchanges -> exchanges.anyExchange().permitAll())
+                .build();
     }
 
     @Bean

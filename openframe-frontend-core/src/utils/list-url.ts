@@ -28,6 +28,8 @@
  * mappers can import it from `@flamingo-stack/openframe-frontend-core/utils`.
  */
 
+import { TRUST_CENTER_API_PATH, TRUST_CENTER_DOCUMENT_TYPE } from '../types/trust-center';
+
 /**
  * Legacy ContentRef aliases that predate the RAG `documentType`
  * unification — direct lib/embedder callers (e.g. the chat dispatcher's
@@ -35,7 +37,7 @@
  * hub's own `LEGACY_TYPE_ALIASES` (`lib/utils/entity-list-api.ts`); both
  * entry points un-alias to the canonical `documentType` before lookup.
  */
-const ALIASES: Record<string, string> = { blog_post_existing: 'blog_post' }
+const ALIASES: Record<string, string> = { blog_post_existing: 'blog_post' };
 
 /** Resolve a ContentRef rail-vocab type to its canonical `documentType`
  *  (registry vocabulary) — `blog_post_existing` → `blog_post`, everything
@@ -46,9 +48,7 @@ export function canonicalContentRefType(contentRefType: string): string {
   // `hasOwnProperty` guard, same as `buildListUrl` below: a bare index read
   // resolves prototype keys, so `canonicalContentRefType('constructor')`
   // returned `Object` itself — which then got interpolated into a URL path.
-  return Object.prototype.hasOwnProperty.call(ALIASES, contentRefType)
-    ? ALIASES[contentRefType]
-    : contentRefType
+  return Object.prototype.hasOwnProperty.call(ALIASES, contentRefType) ? ALIASES[contentRefType] : contentRefType;
 }
 
 /**
@@ -106,7 +106,34 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   profit_loss: (ids, b) => `${b}/api/financials/profit-loss?ids=${ids.join(',')}`,
   balance_sheet: (ids, b) => `${b}/api/financials/balance-sheet?ids=${ids.join(',')}`,
   cash_flow: (ids, b) => `${b}/api/financials/cash-flow?ids=${ids.join(',')}`,
-}
+  // People-hub employee feeds — their EXISTING list APIs (`?ids=`, also feeding
+  // the related-content rail + author page), entry-shaped rows.
+  what_i_shipped: (ids, b) => `${b}/api/what-i-shipped?ids=${ids.join(',')}&limit=${ids.length}`,
+  how_i_work: (ids, b) => `${b}/api/how-i-work?ids=${ids.join(',')}&limit=${ids.length}`,
+  ai_prompt: (ids, b) => `${b}/api/prompts?ids=${ids.join(',')}&limit=${ids.length}`,
+  // Product-hub internal objects — per-object card-hydration routes
+  // (ChatRef-shaped items, `handleEntityCardList`), like github / slack.
+  design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
+  openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
+  prospect_call: (ids, b) => `${b}/api/prospect-calls?ids=${ids.join(',')}`,
+  // Code intelligence — per-object card hydration, same `handleEntityCardList`
+  // shape as the internal objects above.
+  code_rule: (ids, b) => `${b}/api/code-rules/cards?ids=${ids.join(',')}`,
+  code_repo: (ids, b) => `${b}/api/code-graph/repos?ids=${ids.join(',')}`,
+  code_deployment: (ids, b) => `${b}/api/code-graph/deployments?ids=${ids.join(',')}`,
+  code_file: (ids, b) => `${b}/api/code-graph/files?ids=${ids.join(',')}`,
+  // `code_symbol` / `code_duplicate` ids are SYMBOL KEYS with their member
+  // separator re-spelled `~` (`codeGraphCardId`), because the ids are joined
+  // RAW here and the hub's `?ids=` reader refuses `#`.
+  code_symbol: (ids, b) => `${b}/api/code-graph/symbols?ids=${ids.join(',')}`,
+  code_duplicate: (ids, b) => `${b}/api/code-graph/duplicates?ids=${ids.join(',')}`,
+  code_impact: (ids, b) => `${b}/api/code-graph/impacts?ids=${ids.join(',')}`,
+  change_set: (ids, b) => `${b}/api/code-graph/change-sets?ids=${ids.join(',')}`,
+  // Single-record live source: the route ignores `?ids=` and returns the ONE
+  // `TrustCenterPublic` object (card id `TRUST_CENTER_CARD_ID`); see
+  // `extractCardItems` for how the loader matches it back.
+  [TRUST_CENTER_DOCUMENT_TYPE]: (ids, b) => `${b}${TRUST_CENTER_API_PATH}?ids=${ids.join(',')}`,
+};
 
 /**
  * Build a list-API URL that returns full rows for the given ids, or `null`
@@ -124,16 +151,16 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
  * can't hit `/api/admin` through their proxy anyway.
  */
 export function buildListUrl(contentRefType: string, ids: string[], base = ''): string | null {
-  if (ids.length === 0) return null
-  const key = ALIASES[contentRefType] ?? contentRefType
+  if (ids.length === 0) return null;
+  const key = ALIASES[contentRefType] ?? contentRefType;
   if (key === 'marketing_campaign') {
     // Keep this URL in sync with the hub's `entity-list-api.ts` buildNonRagListUrl
     // — an intentional dual literal (a static branch in each) so CodeQL can prove
     // no user-controlled dynamic dispatch reaches `/api/admin`.
-    return `${base}/api/admin/marketing/campaigns?ids=${ids.join(',')}&pageSize=${ids.length}`
+    return `${base}/api/admin/marketing/campaigns?ids=${ids.join(',')}&pageSize=${ids.length}`;
   }
   // `hasOwnProperty` guard so a prototype key (`constructor`, `__proto__`)
   // can't dispatch to a non-builder — absent key ⇒ null.
-  const fn = Object.prototype.hasOwnProperty.call(BUILDERS, key) ? BUILDERS[key] : undefined
-  return fn ? fn(ids, base) : null
+  const fn = Object.prototype.hasOwnProperty.call(BUILDERS, key) ? BUILDERS[key] : undefined;
+  return fn ? fn(ids, base) : null;
 }

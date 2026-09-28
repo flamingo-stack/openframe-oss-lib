@@ -4,19 +4,18 @@ import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
-import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.Script;
-import com.openframe.data.document.rmm.ScriptEnvVar;
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScriptShell;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static com.openframe.data.document.rmm.ScriptStatus.ACTIVE;
-import static com.openframe.data.document.rmm.ScriptStatus.ARCHIVED;
+import static com.openframe.data.document.rmm.script.ScriptStatus.ACTIVE;
+import static com.openframe.data.document.rmm.script.ScriptStatus.ARCHIVED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -147,6 +146,77 @@ class ScriptMapperTest {
         assertThat(existing.getDefaultArgs()).isEmpty();
         assertThat(existing.getSupportedPlatforms()).isEmpty();
         assertThat(existing.getEnvVars()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("updateEntity: a secret input with a null value falls back to the previously stored value — the FE can round-trip masked env vars without re-typing every secret")
+    void updateEntity_secretWithNullValue_keepsStoredValue() {
+        Script existing = fullyPopulated();
+        existing.setEnvVars(List.of(
+                ScriptEnvVar.builder().name("PLAIN").value("prod").secret(false).build(),
+                ScriptEnvVar.builder().name("TOKEN").value("stored-secret").secret(true).build()));
+
+        UpdateScriptInput input = new UpdateScriptInput();
+        input.setEnvVars(List.of(
+                // FE re-sends PLAIN with a new value; TOKEN comes back masked (value=null).
+                ScriptEnvVarInput.builder().name("PLAIN").value("staging").secret(false).build(),
+                ScriptEnvVarInput.builder().name("TOKEN").value(null).secret(true).build()));
+
+        mapper.updateEntity(existing, input);
+
+        assertThat(existing.getEnvVars())
+                .extracting(ScriptEnvVar::getName, ScriptEnvVar::getValue, ScriptEnvVar::isSecret)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("PLAIN", "staging", false),
+                        org.assertj.core.groups.Tuple.tuple("TOKEN", "stored-secret", true));
+    }
+
+    @Test
+    @DisplayName("updateEntity: a secret input with an explicit new value replaces the stored value — 'Replace value' flow")
+    void updateEntity_secretWithNewValue_replacesStoredValue() {
+        Script existing = fullyPopulated();
+        existing.setEnvVars(List.of(
+                ScriptEnvVar.builder().name("TOKEN").value("old-secret").secret(true).build()));
+
+        UpdateScriptInput input = new UpdateScriptInput();
+        input.setEnvVars(List.of(
+                ScriptEnvVarInput.builder().name("TOKEN").value("new-secret").secret(true).build()));
+
+        mapper.updateEntity(existing, input);
+
+        assertThat(existing.getEnvVars())
+                .singleElement()
+                .extracting(ScriptEnvVar::getValue)
+                .isEqualTo("new-secret");
+    }
+
+    @Test
+    @DisplayName("updateEntity: a NON-secret input with a null value is rejected — non-secret vars must always carry a value")
+    void updateEntity_nonSecretWithNullValue_rejected() {
+        Script existing = fullyPopulated();
+
+        UpdateScriptInput input = new UpdateScriptInput();
+        input.setEnvVars(List.of(
+                ScriptEnvVarInput.builder().name("PLAIN").value(null).secret(false).build()));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.updateEntity(existing, input))
+                .isInstanceOf(com.openframe.core.exception.BadRequestException.class)
+                .hasMessageContaining("PLAIN");
+    }
+
+    @Test
+    @DisplayName("updateEntity: a secret input with a null value and no stored value is rejected — nothing to fall back to")
+    void updateEntity_secretWithNullValueAndNoStore_rejected() {
+        Script existing = fullyPopulated();
+        existing.setEnvVars(List.of());   // no prior TOKEN to keep
+
+        UpdateScriptInput input = new UpdateScriptInput();
+        input.setEnvVars(List.of(
+                ScriptEnvVarInput.builder().name("TOKEN").value(null).secret(true).build()));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> mapper.updateEntity(existing, input))
+                .isInstanceOf(com.openframe.core.exception.BadRequestException.class)
+                .hasMessageContaining("TOKEN");
     }
 
     @Test

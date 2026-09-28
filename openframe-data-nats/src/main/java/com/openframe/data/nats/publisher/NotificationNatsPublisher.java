@@ -104,7 +104,8 @@ public class NotificationNatsPublisher {
                 .description(notification.getDescription())
                 .createdAt(notification.getCreatedAt())
                 .category(category)
-                .context(notification.getContext())
+                .type(notification.getType())
+                .attributes(notification.getAttributes())
                 .eventType(eventType)
                 .build();
     }

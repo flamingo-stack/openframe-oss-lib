@@ -1,40 +1,40 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import type { NatsClient, NatsStatus } from './nats'
+import { type ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { NatsClient, NatsStatus } from './nats';
 import {
   acquireClient,
   releaseClient,
   startConnectionLifecycle,
   type AcquireClientOptions,
   type NatsReconnectionBackoff,
-} from './shared-connection'
+} from './shared-connection';
 
-export type { NatsReconnectionBackoff } from './shared-connection'
+export type { NatsReconnectionBackoff } from './shared-connection';
 
 export interface NatsProviderProps {
-  children: React.ReactNode
+  children: ReactNode;
   /** Return the current NATS WebSocket URL (or null when not yet available, e.g. unauthenticated). */
-  getWsUrl: () => string | null
+  getWsUrl: () => string | null;
   /** Called before each reconnect attempt. */
-  onBeforeReconnect?: () => Promise<void> | void
-  clientConfig?: AcquireClientOptions
-  reconnectionBackoff?: NatsReconnectionBackoff
+  onBeforeReconnect?: () => Promise<void> | void;
+  clientConfig?: AcquireClientOptions;
+  reconnectionBackoff?: NatsReconnectionBackoff;
   /**
    * Bump this to force re-evaluating `getWsUrl()` (e.g. when auth state flips).
    * Provider does not subscribe to external auth state by itself.
    */
-  urlRevision?: unknown
+  urlRevision?: unknown;
 }
 
 export interface NatsContextValue {
-  client: NatsClient | null
-  status: NatsStatus
-  isReady: boolean
-  reconnectionCount: number
+  client: NatsClient | null;
+  status: NatsStatus;
+  isReady: boolean;
+  reconnectionCount: number;
 }
 
-const NatsContext = React.createContext<NatsContextValue | null>(null)
+const NatsContext = createContext<NatsContextValue | null>(null);
 
 export function NatsProvider({
   children,
@@ -44,55 +44,55 @@ export function NatsProvider({
   reconnectionBackoff,
   urlRevision,
 }: NatsProviderProps) {
-  const [client, setClient] = React.useState<NatsClient | null>(null)
-  const [status, setStatus] = React.useState<NatsStatus>('closed')
-  const [reconnectionCount, setReconnectionCount] = React.useState(0)
+  const [client, setClient] = useState<NatsClient | null>(null);
+  const [status, setStatus] = useState<NatsStatus>('closed');
+  const [reconnectionCount, setReconnectionCount] = useState(0);
 
-  const getWsUrlRef = React.useRef(getWsUrl)
-  React.useEffect(() => {
-    getWsUrlRef.current = getWsUrl
-  }, [getWsUrl])
+  const getWsUrlRef = useRef(getWsUrl);
+  useEffect(() => {
+    getWsUrlRef.current = getWsUrl;
+  }, [getWsUrl]);
 
-  const onBeforeReconnectRef = React.useRef(onBeforeReconnect)
-  React.useEffect(() => {
-    onBeforeReconnectRef.current = onBeforeReconnect
-  }, [onBeforeReconnect])
+  const onBeforeReconnectRef = useRef(onBeforeReconnect);
+  useEffect(() => {
+    onBeforeReconnectRef.current = onBeforeReconnect;
+  }, [onBeforeReconnect]);
 
-  const reconnectionBackoffRef = React.useRef(reconnectionBackoff)
-  React.useEffect(() => {
-    reconnectionBackoffRef.current = reconnectionBackoff
-  }, [reconnectionBackoff])
+  const reconnectionBackoffRef = useRef(reconnectionBackoff);
+  useEffect(() => {
+    reconnectionBackoffRef.current = reconnectionBackoff;
+  }, [reconnectionBackoff]);
 
-  const clientConfigRef = React.useRef(clientConfig)
-  React.useEffect(() => {
-    clientConfigRef.current = clientConfig
-  }, [clientConfig])
+  const clientConfigRef = useRef(clientConfig);
+  useEffect(() => {
+    clientConfigRef.current = clientConfig;
+  }, [clientConfig]);
 
-  const heldUrlRef = React.useRef<string | null>(null)
-  const hadConnectionBeforeRef = React.useRef(false)
+  const heldUrlRef = useRef<string | null>(null);
+  const hadConnectionBeforeRef = useRef(false);
 
-  React.useEffect(() => {
-    const wsUrl = getWsUrlRef.current()
+  useEffect(() => {
+    const wsUrl = getWsUrlRef.current();
 
     if (!wsUrl) {
       if (heldUrlRef.current) {
-        releaseClient(heldUrlRef.current)
-        heldUrlRef.current = null
-        setClient(null)
-        setStatus('closed')
+        releaseClient(heldUrlRef.current);
+        heldUrlRef.current = null;
+        setClient(null);
+        setStatus('closed');
       }
-      return
+      return undefined;
     }
 
     if (heldUrlRef.current && heldUrlRef.current !== wsUrl) {
-      releaseClient(heldUrlRef.current)
-      heldUrlRef.current = null
+      releaseClient(heldUrlRef.current);
+      heldUrlRef.current = null;
     }
 
-    const conn = acquireClient(wsUrl, clientConfigRef.current)
-    heldUrlRef.current = wsUrl
-    setClient(conn.client)
-    setStatus(conn.client.isConnected() ? 'connected' : 'connecting')
+    const conn = acquireClient(wsUrl, clientConfigRef.current);
+    heldUrlRef.current = wsUrl;
+    setClient(conn.client);
+    setStatus(conn.client.isConnected() ? 'connected' : 'connecting');
 
     const lifecycle = startConnectionLifecycle({
       conn,
@@ -100,30 +100,30 @@ export function NatsProvider({
       onBeforeReconnect: () => onBeforeReconnectRef.current?.(),
       backoff: reconnectionBackoffRef.current,
       getFreshUrl: () => getWsUrlRef.current(),
-      onStatusChange: (newStatus) => {
-        if (newStatus === 'error') return
-        setStatus(newStatus)
+      onStatusChange: newStatus => {
+        if (newStatus === 'error') return;
+        setStatus(newStatus);
         if (newStatus === 'connected') {
           if (hadConnectionBeforeRef.current) {
-            setReconnectionCount((c) => c + 1)
+            setReconnectionCount(c => c + 1);
           }
-          hadConnectionBeforeRef.current = true
+          hadConnectionBeforeRef.current = true;
         }
       },
-    })
+    });
 
     return () => {
-      lifecycle.stop()
+      lifecycle.stop();
       if (heldUrlRef.current) {
-        releaseClient(heldUrlRef.current)
-        heldUrlRef.current = null
+        releaseClient(heldUrlRef.current);
+        heldUrlRef.current = null;
       }
-      setClient(null)
-      setStatus('closed')
-    }
-  }, [urlRevision])
+      setClient(null);
+      setStatus('closed');
+    };
+  }, [urlRevision]);
 
-  const value = React.useMemo<NatsContextValue>(
+  const value = useMemo<NatsContextValue>(
     () => ({
       client,
       status,
@@ -131,17 +131,17 @@ export function NatsProvider({
       reconnectionCount,
     }),
     [client, status, reconnectionCount],
-  )
+  );
 
-  return <NatsContext.Provider value={value}>{children}</NatsContext.Provider>
+  return <NatsContext.Provider value={value}>{children}</NatsContext.Provider>;
 }
 
 export function useNats(): NatsContextValue {
-  const ctx = React.useContext(NatsContext)
-  if (!ctx) throw new Error('useNats must be used inside <NatsProvider>')
-  return ctx
+  const ctx = useContext(NatsContext);
+  if (!ctx) throw new Error('useNats must be used inside <NatsProvider>');
+  return ctx;
 }
 
 export function useOptionalNats(): NatsContextValue | null {
-  return React.useContext(NatsContext)
+  return useContext(NatsContext);
 }

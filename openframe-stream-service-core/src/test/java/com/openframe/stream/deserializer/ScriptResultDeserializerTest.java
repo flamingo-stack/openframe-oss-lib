@@ -3,8 +3,9 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.openframe.data.document.rmm.ScriptExecution;
-import com.openframe.data.document.rmm.Script;
+import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -22,17 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * {@link ScriptResultDeserializer} is the saved-script binding of the shared
- * {@link RmmResultDeserializer}: it differs from {@link CommandResultDeserializer}
- * in the bound {@link MessageType} AND in {@code getMessage}, which produces a
- * human-readable {@code "Script <name> executed."} summary instead of the base
- * "Command finished/timed out" template.
- *
- * <p>The script name is NOT snapshotted on the Execution row — it is resolved at
- * read time: the result's {@code (tenantId, executionId)} → the Execution row's
- * {@code scriptId} → the {@link Script} document's name.
- */
 @ExtendWith(MockitoExtension.class)
 class ScriptResultDeserializerTest {
 
@@ -62,8 +52,88 @@ class ScriptResultDeserializerTest {
     @Test
     @DisplayName("sourceEventType is script_run.finished — distinct from the command's cmd_run.finished so EventTypeMapper maps it to the user-facing SCRIPT_EXECUTED")
     void sourceEventTypeIsScriptRunFinished() {
-        assertThat(deserializer.getSourceEventType(mapper.createObjectNode()))
+        assertThat(deserializer.getSourceEventType(mapper.createObjectNode().put("exitCode", 0)))
                 .contains(SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED);
+    }
+
+    @Test
+    void sourceEventType_nonZeroExitCode_isScriptRunFailed() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 1);
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FAILED);
+    }
+
+    @Test
+    void sourceEventType_timedOut_isScriptRunFailed() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 0).put("timedOut", true);
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FAILED);
+    }
+
+    @Test
+    void sourceEventType_agentErrorWithoutExitCode_isScriptRunFailed() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("error", "binary not found");
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FAILED);
+    }
+
+    @Test
+    void sourceEventType_stderrOnlyWithZeroExitCode_staysFinished() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 0).put("stderr", "warning: deprecated flag");
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED);
+    }
+
+    @Test
+    @DisplayName("getEventToolId: appends scriptId so two scripts of one schedule run (shared executionId+machineId) get DISTINCT ids — the fix for the Cassandra/Pinot tool_event_id collision")
+    void getEventToolId_appendsScriptId_distinguishesScriptsOfOneScheduleRun() {
+        ObjectNode scriptA = mapper.createObjectNode()
+                .put("executionId", EXECUTION_ID).put("machineId", "m-1").put("scriptId", "script-A");
+        ObjectNode scriptB = mapper.createObjectNode()
+                .put("executionId", EXECUTION_ID).put("machineId", "m-1").put("scriptId", "script-B");
+
+        assertThat(deserializer.getEventToolId(scriptA)).contains(EXECUTION_ID + ":m-1:script-A");
+        assertThat(deserializer.getEventToolId(scriptB)).contains(EXECUTION_ID + ":m-1:script-B");
+        assertThat(deserializer.getEventToolId(scriptA)).isNotEqualTo(deserializer.getEventToolId(scriptB));
+    }
+
+    @Test
+    @DisplayName("getEventToolId: no executionId AND no machineId → empty, so the base uses its content-hash fallback (distinct per event) rather than a shared \"::\" id Pinot would collapse across tenants")
+    void getEventToolId_noExecutionIdentity_isEmptyForHashFallback() {
+        // Even a lone scriptId is not an execution identity — must still defer to the hash fallback.
+        ObjectNode scriptOnly = mapper.createObjectNode().put("scriptId", "script-A");
+
+        assertThat(deserializer.getEventToolId(scriptOnly)).isEmpty();
+        assertThat(deserializer.getEventToolId(mapper.createObjectNode())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getEventToolId: an agent that does not echo scriptId still keys on exec:machine: — execution identity is preserved (trailing empty component), no collapse to the hash fallback")
+    void getEventToolId_missingScriptId_keepsExecMachineComposite() {
+        ObjectNode after = mapper.createObjectNode()
+                .put("executionId", EXECUTION_ID).put("machineId", "m-1");
+
+        assertThat(deserializer.getEventToolId(after)).contains(EXECUTION_ID + ":m-1:");
     }
 
     @Test
@@ -93,8 +163,8 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("getMessage: succeeds even when the script run FAILED (exitCode != 0) — message is about \"a script ran\", status lives elsewhere")
-    void getMessage_alsoForFailedRuns() {
+    void getMessage_failedRun_saysTheScriptFailed() {
+        // setup
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 1);
         when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
@@ -102,8 +172,24 @@ class ScriptResultDeserializerTest {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(scriptWithName("disk usage")));
 
-        // Format is invariant of outcome — the user-visible status badge is rendered separately.
-        assertThat(deserializer.getMessage(after)).contains("Script disk usage executed.");
+        // execution
+        Optional<String> message = deserializer.getMessage(after);
+
+        // verifications
+        assertThat(message).contains("Script disk usage failed.");
+    }
+
+    @Test
+    void getMessage_failedRunWithoutIdentifiers_fallsBackToScriptFailed() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 1);
+
+        // execution
+        Optional<String> message = deserializer.getMessage(after);
+
+        // verifications
+        assertThat(message).contains("Script failed");
+        verifyNoInteractions(scriptExecutionRepository);
     }
 
     @Test
@@ -177,8 +263,71 @@ class ScriptResultDeserializerTest {
         verifyNoInteractions(scriptRepository);
     }
 
+    @Test
+    @DisplayName("getMessage: a software install row is labeled by its package (\"Installed slack.\"), not by the shared generic script")
+    void getMessage_softwareInstall_labeledByPackage() {
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0);
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(softwareExecution("slack", SoftwareAction.INSTALL)));
+
+        assertThat(deserializer.getMessage(after)).contains("Installed slack.");
+        verifyNoInteractions(scriptRepository);
+    }
+
+    @Test
+    @DisplayName("getMessage: a software update row reads \"Updated <package>.\"")
+    void getMessage_softwareUpdate_labeledByPackage() {
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0);
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(softwareExecution("Mozilla.Firefox", SoftwareAction.UPDATE)));
+
+        assertThat(deserializer.getMessage(after)).contains("Updated Mozilla.Firefox.");
+        verifyNoInteractions(scriptRepository);
+    }
+
+    @Test
+    void getMessage_softwareInstallFailed_labeledFailedToInstall() {
+        // setup
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 1);
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(softwareExecution("presentify", SoftwareAction.INSTALL)));
+
+        // execution
+        Optional<String> message = deserializer.getMessage(after);
+
+        // verifications
+        assertThat(message).contains("Failed to install presentify.");
+        verifyNoInteractions(scriptRepository);
+    }
+
+    @Test
+    void getMessage_softwareUpdateTimedOut_labeledFailedToUpdate() {
+        // setup
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0).put("timedOut", true);
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(softwareExecution("Mozilla.Firefox", SoftwareAction.UPDATE)));
+
+        // execution
+        Optional<String> message = deserializer.getMessage(after);
+
+        // verifications
+        assertThat(message).contains("Failed to update Mozilla.Firefox.");
+    }
+
     private static ScriptExecution executionWithScriptId(String scriptId) {
         return ScriptExecution.builder().scriptId(scriptId).build();
+    }
+
+    private static ScriptExecution softwareExecution(String packageName, SoftwareAction action) {
+        return ScriptExecution.builder()
+                .scriptId("generic-software-script")
+                .packageName(packageName)
+                .softwareAction(action)
+                .build();
     }
 
     private static Script scriptWithName(String name) {

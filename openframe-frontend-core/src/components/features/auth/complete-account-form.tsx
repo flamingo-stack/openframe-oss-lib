@@ -1,49 +1,48 @@
-'use client'
+'use client';
 
-import type * as React from 'react'
-import { cn } from '../../../utils/cn'
-import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
-import { Button } from '../../ui/button'
-import { Input } from '../../ui/input'
-import { PasswordInput } from '../../ui/password-input'
-import type { AuthSsoProvider } from './sso-providers'
-import { SsoProviderButtons } from './sso-providers'
+import type { KeyboardEvent, ReactNode } from 'react';
+import { cn } from '../../../utils/cn';
+import { Button } from '../../ui/button';
+import { AccountDetailsFields } from './account-details-fields';
+import { LabeledDivider } from './labeled-divider';
+import type { AuthSsoProvider } from './sso-providers';
+import { SsoProviderButtons } from './sso-providers';
 
 export interface CompleteAccountFormProps {
   /** Controlled field values */
-  firstName: string
-  lastName: string
-  password: string
-  confirmPassword: string
-  onFirstNameChange: (value: string) => void
-  onLastNameChange: (value: string) => void
-  onPasswordChange: (value: string) => void
-  onConfirmPasswordChange: (value: string) => void
+  firstName: string;
+  lastName: string;
+  password: string;
+  confirmPassword: string;
+  onFirstNameChange: (value: string) => void;
+  onLastNameChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
   /** Primary submit ("Start Free Trial") */
-  onSubmit: () => void
+  onSubmit: () => void;
   /** Secondary action rendered left of the submit (e.g. "Back to Organization"). */
-  onBack?: () => void
+  onBack?: () => void;
   /** SSO alternatives offered above the fields ("Continue with …"). */
-  ssoProviders?: AuthSsoProvider[]
-  onSsoClick?: (provider: AuthSsoProvider) => void
-  title?: string
-  subtitle?: string
-  dividerLabel?: string
-  submitLabel?: string
-  backLabel?: string
-  ssoActionLabel?: string
-  submitDisabled?: boolean
-  loading?: boolean
-  disabled?: boolean
+  ssoProviders?: AuthSsoProvider[];
+  onSsoClick?: (provider: AuthSsoProvider) => void;
+  title?: string;
+  subtitle?: string;
+  dividerLabel?: string;
+  submitLabel?: string;
+  backLabel?: string;
+  ssoActionLabel?: string;
+  submitDisabled?: boolean;
+  loading?: boolean;
+  disabled?: boolean;
   errors?: {
-    firstName?: string
-    lastName?: string
-    password?: string
-    confirmPassword?: string
-  }
-  className?: string
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    confirmPassword?: string;
+  };
+  className?: string;
   /** Extra consumer-provided fields rendered below the built-in fields, above the actions. */
-  children?: React.ReactNode
+  children?: ReactNode;
 }
 
 /**
@@ -77,19 +76,13 @@ export function CompleteAccountForm({
   className,
   children,
 }: CompleteAccountFormProps) {
-  const fieldsDisabled = disabled || loading
+  const fieldsDisabled = disabled || loading;
 
-  // Validation messages are deferred while the user is typing (shown on blur or after a pause).
-  const firstNameErr = useDeferredError(errors?.firstName, firstName)
-  const lastNameErr = useDeferredError(errors?.lastName, lastName)
-  const passwordErr = useDeferredError(errors?.password, password)
-  const confirmErr = useDeferredError(errors?.confirmPassword, confirmPassword)
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled && !submitDisabled) {
-      onSubmit()
+      onSubmit();
     }
-  }
+  };
 
   return (
     <div
@@ -100,8 +93,8 @@ export function CompleteAccountForm({
     >
       {/* Header */}
       <div className="flex flex-col">
-        <h1 className="text-h2 text-ods-text-primary tracking-[-0.64px]">{title}</h1>
-        <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
+        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
+        <p className="text-ods-text-secondary text-h4">{subtitle}</p>
       </div>
 
       {/* SSO shortcuts + divider */}
@@ -113,53 +106,21 @@ export function CompleteAccountForm({
             actionLabel={ssoActionLabel}
             disabled={fieldsDisabled}
           />
-          <div className="flex items-center gap-[var(--spacing-system-s)]">
-            <div className="h-px flex-1 bg-ods-border" />
-            <span className="text-h6 text-ods-text-secondary">{dividerLabel}</span>
-            <div className="h-px flex-1 bg-ods-border" />
-          </div>
+          <LabeledDivider label={dividerLabel} />
         </>
       )}
 
-      {/* Name + password fields — single column on every breakpoint */}
-      <Input
-        label="First Name"
-        placeholder="Enter First Name"
-        value={firstName}
-        error={firstNameErr.error}
+      <AccountDetailsFields
+        firstName={firstName}
+        lastName={lastName}
+        password={password}
+        confirmPassword={confirmPassword}
+        onFirstNameChange={onFirstNameChange}
+        onLastNameChange={onLastNameChange}
+        onPasswordChange={onPasswordChange}
+        onConfirmPasswordChange={onConfirmPasswordChange}
+        errors={errors}
         disabled={fieldsDisabled}
-        onBlur={firstNameErr.onBlur}
-        onChange={(event) => onFirstNameChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <Input
-        label="Last Name"
-        placeholder="Enter Last Name"
-        value={lastName}
-        error={lastNameErr.error}
-        disabled={fieldsDisabled}
-        onBlur={lastNameErr.onBlur}
-        onChange={(event) => onLastNameChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <PasswordInput
-        label="Password"
-        placeholder="Enter Password"
-        value={password}
-        error={passwordErr.error}
-        disabled={fieldsDisabled}
-        onBlur={passwordErr.onBlur}
-        onChange={(event) => onPasswordChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <PasswordInput
-        label="Confirm Password"
-        placeholder="Confirm Password"
-        value={confirmPassword}
-        error={confirmErr.error}
-        disabled={fieldsDisabled}
-        onBlur={confirmErr.onBlur}
-        onChange={(event) => onConfirmPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
@@ -195,5 +156,5 @@ export function CompleteAccountForm({
         </Button>
       </div>
     </div>
-  )
+  );
 }

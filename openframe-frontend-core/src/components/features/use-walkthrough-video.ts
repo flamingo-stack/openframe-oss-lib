@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * useWalkthroughVideo — client read hook for the per-platform walkthrough video.
@@ -17,8 +17,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import type { WalkthroughVideoData } from './floating-walkthrough-video';
 import { useCaptions } from './use-captions';
+import type { WalkthroughVideoData } from './walkthrough-video';
 
 export interface UseWalkthroughVideoOptions {
   /** Absolute or proxied URL of the public GET route. */
@@ -66,7 +66,7 @@ export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkth
     // over `initialData`, so the SSR seed is rewritten too. Keeping the proxy
     // rewrite here (not in queryFn) means a second consumer of the same
     // endpoint can't inherit this observer's proxied captionsUrl from the cache.
-    select: (video) => {
+    select: video => {
       if (!video?.captionsUrl) return video;
       if (transformCaptionsUrl && video.captionsUrl.startsWith('/')) {
         return { ...video, captionsUrl: transformCaptionsUrl(video.captionsUrl) };
@@ -74,7 +74,7 @@ export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkth
       // Default: rebase onto the configured captions base. Same-origin hosts
       // leave it unset and get the URL back unchanged — a no-op for them.
       const rebased = captions.rebase(video.captionsUrl);
-      return rebased === video.captionsUrl ? video : { ...video, captionsUrl: rebased as string };
+      return rebased === video.captionsUrl ? video : { ...video, captionsUrl: rebased };
     },
   });
 

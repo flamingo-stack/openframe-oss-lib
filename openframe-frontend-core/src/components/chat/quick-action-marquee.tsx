@@ -1,9 +1,9 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import type { MarqueeSyncController } from '../ui/marquee-wall'
-import type { QuickActionIconSpec, QuickActionChip } from './quick-action-chip'
-import { QuickActionWall } from './quick-action-wall'
+import { type ReactNode, useMemo } from 'react';
+import type { MarqueeSyncController } from '../ui/marquee-wall';
+import type { QuickActionIconSpec, QuickActionChip } from './quick-action-chip';
+import { QuickActionWall } from './quick-action-wall';
 
 // =============================================================================
 // Types
@@ -11,36 +11,36 @@ import { QuickActionWall } from './quick-action-wall'
 
 export interface QuickActionMarqueeItem {
   /** Stable key (suffixed per track copy internally). */
-  id: string
-  label: string
-  icon?: React.ReactNode | QuickActionIconSpec
+  id: string;
+  label: string;
+  icon?: ReactNode | QuickActionIconSpec;
 }
 
 export interface QuickActionMarqueeProps {
-  items: ReadonlyArray<QuickActionMarqueeItem>
+  items: ReadonlyArray<QuickActionMarqueeItem>;
   /** `'animated'` (default): endless scroll. `'plain'`: a static chip row —
    *  the consumer's opt-out of the marquee (no motion, no track padding
    *  effects beyond the plain layout). */
-  mode?: 'animated' | 'plain'
+  mode?: 'animated' | 'plain';
   /** Scroll direction. `'right'` reverses the travel. Default `'left'`. */
-  direction?: 'left' | 'right'
+  direction?: 'left' | 'right';
   /** Scroll speed in px/s — the shared marquee unit (CardsStrip cruises at
    *  60). Default 40: on-screen speed stays constant no matter how many quick
    *  actions an agent has (the engine is position-based, not loop-based). */
-  speed?: number
+  speed?: number;
   /** Pause the scroll while hovered. Default true. */
-  pauseOnHover?: boolean
+  pauseOnHover?: boolean;
   /** When provided chips are interactive buttons; omitted → decorative tags. */
-  onSelect?: (item: QuickActionMarqueeItem) => void
+  onSelect?: (item: QuickActionMarqueeItem) => void;
   /** Repeat-pad the track to at least this many chips so one copy overflows
    *  the widest container this strip can get (the loop only engages on
    *  overflow). Default 12 ≈ 2600px+, enough for a full-bleed max-w-[1920px]
    *  section. */
-  minChips?: number
+  minChips?: number;
   /** Pair with a sibling marquee under ONE position driver (the resolve
    *  strips' pending/resolved copies stay pixel-locked). */
-  sync?: MarqueeSyncController
-  className?: string
+  sync?: MarqueeSyncController;
+  className?: string;
 }
 
 // =============================================================================
@@ -65,7 +65,7 @@ export function QuickActionMarquee({
   sync,
   className,
 }: QuickActionMarqueeProps) {
-  const chips = React.useMemo<QuickActionChip[]>(
+  const chips = useMemo<QuickActionChip[]>(
     () =>
       items.map(item => ({
         id: item.id,
@@ -74,9 +74,9 @@ export function QuickActionMarquee({
         onSelect: onSelect ? () => onSelect(item) : undefined,
       })),
     [items, onSelect],
-  )
+  );
 
-  if (items.length === 0) return null
+  if (items.length === 0) return null;
 
   return (
     <QuickActionWall
@@ -94,5 +94,5 @@ export function QuickActionMarquee({
       contentClassName="flex-nowrap items-center"
       sync={sync}
     />
-  )
+  );
 }

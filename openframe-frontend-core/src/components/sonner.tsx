@@ -1,8 +1,9 @@
-"use client"
+'use client';
 
-import { Toaster as Sonner } from "sonner"
+import type { ComponentProps } from 'react';
+import { Toaster as Sonner } from 'sonner';
 
-type ToasterProps = React.ComponentProps<typeof Sonner>
+type ToasterProps = ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
@@ -13,19 +14,19 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-ods-card group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-ods-text-secondary",
-          actionButton:
-            "group-[.toast]:bg-ods-accent group-[.toast]:text-ods-text-on-accent",
-          cancelButton:
-            "group-[.toast]:bg-ods-bg-surface group-[.toast]:text-ods-text-secondary",
-          error: "group-[.toaster]:bg-ods-error-secondary group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-error",
-          success: "group-[.toaster]:bg-ods-success-secondary group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-success",
+            'group toast group-[.toaster]:bg-ods-card group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-border group-[.toaster]:shadow-lg',
+          description: 'group-[.toast]:text-ods-text-secondary',
+          actionButton: 'group-[.toast]:bg-ods-accent group-[.toast]:text-ods-text-on-accent',
+          cancelButton: 'group-[.toast]:bg-ods-bg-surface group-[.toast]:text-ods-text-secondary',
+          error:
+            'group-[.toaster]:bg-ods-error-secondary group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-error',
+          success:
+            'group-[.toaster]:bg-ods-success-secondary group-[.toaster]:text-ods-text-primary group-[.toaster]:border-ods-success',
         },
       }}
       {...props}
     />
-  )
-}
+  );
+};
 
-export { Toaster }
+export { Toaster };

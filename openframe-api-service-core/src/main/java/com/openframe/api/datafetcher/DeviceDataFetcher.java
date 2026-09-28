@@ -6,20 +6,21 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
-import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
-import com.openframe.api.service.DeviceFilterService;
-import com.openframe.api.service.DeviceService;
+import com.openframe.api.service.device.DeviceFilterService;
+import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
@@ -27,6 +28,7 @@ import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
+import com.openframe.data.document.tool.ToolType;
 import graphql.relay.Relay;
 import graphql.schema.DataFetchingFieldSelectionSet;
 import jakarta.validation.Valid;
@@ -36,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dataloader.DataLoader;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -52,6 +55,7 @@ public class DeviceDataFetcher {
     private final DeviceService deviceService;
     private final DeviceFilterService deviceFilterService;
     private final TagService tagService;
+    private final FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     private final GraphQLDeviceMapper mapper;
 
     @DgsQuery
@@ -140,6 +144,15 @@ public class DeviceDataFetcher {
         return RELAY.toGlobalId("ToolConnection", tc.getId());
     }
 
+    @DgsData(parentType = "ToolConnection", field = "vulnerabilitiesUpdatedAt")
+    public Instant toolConnectionVulnerabilitiesUpdatedAt(DgsDataFetchingEnvironment dfe) {
+        ToolConnection tc = dfe.getSource();
+        if (tc.getToolType() != ToolType.FLEET_MDM) {
+            return null;
+        }
+        return fleetVulnerabilityStatusService.getLastCompletedVulnerabilityRunAt();
+    }
+
     @DgsData(parentType = "InstalledAgent", field = "id")
     public String installedAgentNodeId(DgsDataFetchingEnvironment dfe) {
         InstalledAgent agent = dfe.getSource();
@@ -169,7 +182,7 @@ public class DeviceDataFetcher {
 
     @DgsData(parentType = "Machine")
     public CompletableFuture<Organization> organization(DgsDataFetchingEnvironment dfe) {
-        DataLoader<String, Organization> dataLoader = dfe.getDataLoader("organizationDataLoader");
+        DataLoader<String, Organization> dataLoader = dfe.getDataLoader(OrganizationDataLoader.NAME);
         Machine machine = dfe.getSource();
         String organizationId = machine.getOrganizationId();
         

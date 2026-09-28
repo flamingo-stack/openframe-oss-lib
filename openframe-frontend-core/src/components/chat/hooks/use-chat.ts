@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * @deprecated Phase 3 of the chat unification moved the SSE adapter off this
@@ -8,34 +8,55 @@
  * consumers until Phase 4 migrates them, then get deleted (Phase 6).
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { useSSE, type StreamFn, type StreamFnExtraOptions } from './use-sse'
-import type {
-  Message,
-  MessageSegment,
-  ToolExecutionData,
-} from '../types/message.types'
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type { ApprovalRequestSegment, Message, MessageSegment, ToolExecutionData } from '../types/message.types';
+import { useSSE, type StreamFn, type StreamFnExtraOptions } from './use-sse';
 
-export type { Message } from '../types/message.types'
-export type { StreamFnExtraOptions } from './use-sse'
+export type { Message } from '../types/message.types';
+export type { StreamFnExtraOptions } from './use-sse';
 
 interface UseChatOptions {
-  useMock?: boolean
-  debugMode?: boolean
-  assistantName?: string
-  assistantAvatar?: string
+  useMock?: boolean;
+  debugMode?: boolean;
+  assistantName?: string;
+  assistantAvatar?: string;
   /** Custom stream function — bypasses mock/SSE service when provided */
-  streamFn?: StreamFn
+  streamFn?: StreamFn;
   /** Initial messages (e.g., restored from localStorage). Evaluated once on mount. */
-  initialMessages?: Message[]
+  initialMessages?: Message[];
   /** Called whenever the messages array changes — use for persistence. */
-  onMessagesChange?: (messages: Message[]) => void
+  onMessagesChange?: (messages: Message[]) => void;
 }
 
-function isToolSegment(
-  segment: MessageSegment,
-): segment is { type: 'tool_execution'; data: ToolExecutionData } {
-  return segment.type === 'tool_execution'
+function isToolSegment(segment: MessageSegment): segment is { type: 'tool_execution'; data: ToolExecutionData } {
+  return segment.type === 'tool_execution';
+}
+
+/**
+ * Control frame emitted by `/api/chat/agent/confirm-tool` on the same SSE
+ * stream as the renderable segments. NOT a `MessageSegment` — it is consumed
+ * by the loop below (status flip + receipt append) and never stored on a
+ * message, so it deliberately stays out of the `MessageSegment` union.
+ */
+interface DecisionResolvedFrame {
+  type: 'decision_resolved';
+  proposalId?: string;
+  action: 'approved' | 'rejected';
+  ok: boolean;
+  toolName?: string;
+  result?: { ticket_id?: string; status?: string | null };
+  /** Server-rendered receipt copy. Computed by the per-source
+   *  `strategy.tools.receiptRenderer(...)`. */
+  receiptText?: string;
+  /** True when the server WILL stream an auto-continuation Sonnet turn
+   *  after this frame. */
+  willAutoContinue?: boolean;
+}
+
+/** Widen a streamed segment to the frames the stream ACTUALLY carries —
+ *  `StreamFn`'s declared yield type covers only the renderable ones. */
+function asStreamFrame(segment: MessageSegment): MessageSegment | DecisionResolvedFrame {
+  return segment;
 }
 
 export function useChat({
@@ -47,16 +68,21 @@ export function useChat({
   initialMessages,
   onMessagesChange,
 }: UseChatOptions = {}) {
-  const [messages, setMessages] = useState<Message[]>(() => initialMessages ?? [])
-  const [isTyping, setIsTyping] = useState(false)
-  const currentAssistantSegmentsRef = useRef<MessageSegment[]>([])
+  const [messages, setMessages] = useState<Message[]>(() => initialMessages ?? []);
+  const [isTyping, setIsTyping] = useState(false);
+  const currentAssistantSegmentsRef = useRef<MessageSegment[]>([]);
 
   // Notify the host whenever messages change so it can persist them.
-  const onMessagesChangeRef = useRef(onMessagesChange)
-  onMessagesChangeRef.current = onMessagesChange
+  // Republished in an unconditional effect declared BEFORE the notifier, so it
+  // is refreshed first in the same flush. Writing it in the render body would
+  // install a callback from a render attempt React may have discarded.
+  const onMessagesChangeRef = useRef(onMessagesChange);
   useEffect(() => {
-    onMessagesChangeRef.current?.(messages)
-  }, [messages])
+    onMessagesChangeRef.current = onMessagesChange;
+  });
+  useEffect(() => {
+    onMessagesChangeRef.current?.(messages);
+  }, [messages]);
 
   const {
     streamMessage,
@@ -68,25 +94,25 @@ export function useChat({
     useMock,
     debugMode,
     streamFn,
-  })
+  });
 
   const addMessage = useCallback((message: Message) => {
-    setMessages((prev) => [...prev, message])
-  }, [])
+    setMessages(prev => [...prev, message]);
+  }, []);
 
   const updateLastAssistantMessage = useCallback((segments: MessageSegment[]) => {
-    setMessages((prev) => {
-      const newMessages = [...prev]
-      const lastMessage = newMessages[newMessages.length - 1]
+    setMessages(prev => {
+      const newMessages = [...prev];
+      const lastMessage = newMessages[newMessages.length - 1];
       if (lastMessage && lastMessage.role === 'assistant') {
         newMessages[newMessages.length - 1] = {
           ...lastMessage,
           content: segments.length > 0 ? segments : '',
-        }
+        };
       }
-      return newMessages
-    })
-  }, [])
+      return newMessages;
+    });
+  }, []);
 
   const sendMessage = useCallback(
     async (
@@ -107,11 +133,11 @@ export function useChat({
         content: text,
         timestamp: new Date(),
         ...(options?.hidden ? { hidden: true } : {}),
-      }
-      addMessage(userMessage)
+      };
+      addMessage(userMessage);
 
-      setIsTyping(true)
-      currentAssistantSegmentsRef.current = []
+      setIsTyping(true);
+      currentAssistantSegmentsRef.current = [];
 
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
@@ -120,14 +146,20 @@ export function useChat({
         content: [],
         timestamp: new Date(),
         avatar: assistantAvatar,
-      }
-      addMessage(assistantMessage)
+      };
+      addMessage(assistantMessage);
 
       try {
-        let receivedFirstTextChunk = false
-        let currentTextSegment = ''
+        let receivedFirstTextChunk = false;
+        let currentTextSegment = '';
 
-        for await (const segment of streamMessage(text, extra)) {
+        for await (const rawSegment of streamMessage(text, extra)) {
+          // The stream also carries CONTROL frames that are not renderable
+          // segments (`decision_resolved` from
+          // `/api/chat/agent/confirm-tool`). Widening once here lets the
+          // dispatch below discriminate on `type` without casts; control
+          // frames are consumed and never pushed into a message.
+          const segment = asStreamFrame(rawSegment);
           // Flip isTyping=false ONLY when the first TEXT segment arrives — NOT
           // on a leading thinking-delta. Reason: <ThinkingDisplay> computes
           // `isStreaming = (index === segments.length - 1 && isTyping)` and
@@ -137,28 +169,25 @@ export function useChat({
           // even while the model is still actively thinking. Holding isTyping
           // true until real text starts keeps the live "Thinking…" UX correct.
           if (!receivedFirstTextChunk && segment.type === 'text') {
-            setIsTyping(false)
-            receivedFirstTextChunk = true
+            setIsTyping(false);
+            receivedFirstTextChunk = true;
           }
 
           if (segment.type === 'text') {
-            currentTextSegment += segment.text
-            const updatedSegments = [...currentAssistantSegmentsRef.current]
+            currentTextSegment += segment.text;
+            const updatedSegments = [...currentAssistantSegmentsRef.current];
 
-            if (
-              updatedSegments.length > 0 &&
-              updatedSegments[updatedSegments.length - 1].type === 'text'
-            ) {
+            if (updatedSegments.length > 0 && updatedSegments[updatedSegments.length - 1].type === 'text') {
               updatedSegments[updatedSegments.length - 1] = {
                 type: 'text',
                 text: currentTextSegment,
-              }
+              };
             } else {
-              updatedSegments.push({ type: 'text', text: currentTextSegment })
+              updatedSegments.push({ type: 'text', text: currentTextSegment });
             }
 
-            currentAssistantSegmentsRef.current = updatedSegments
-            updateLastAssistantMessage(updatedSegments)
+            currentAssistantSegmentsRef.current = updatedSegments;
+            updateLastAssistantMessage(updatedSegments);
           } else if (segment.type === 'thinking') {
             // Adaptive-thinking content from the model. Stash as a single
             // 'thinking' segment at the front of the message; if the segment
@@ -166,22 +195,20 @@ export function useChat({
             // leading-frame loop), replace its text. Order matters: thinking
             // ALWAYS precedes the answer text so the OSS-lib renders the
             // ThinkingDisplay card above the answer body.
-            const updatedSegments = [...currentAssistantSegmentsRef.current]
-            const existingThinkingIdx = updatedSegments.findIndex(
-              (s) => s.type === 'thinking',
-            )
+            const updatedSegments = [...currentAssistantSegmentsRef.current];
+            const existingThinkingIdx = updatedSegments.findIndex(s => s.type === 'thinking');
             if (existingThinkingIdx !== -1) {
               updatedSegments[existingThinkingIdx] = {
                 type: 'thinking',
                 text: segment.text,
-              }
+              };
             } else {
               // Insert at the FRONT so it renders before any text accumulated.
-              updatedSegments.unshift({ type: 'thinking', text: segment.text })
+              updatedSegments.unshift({ type: 'thinking', text: segment.text });
             }
-            currentAssistantSegmentsRef.current = updatedSegments
-            updateLastAssistantMessage(updatedSegments)
-          } else if ((segment as any).type === 'approval_request') {
+            currentAssistantSegmentsRef.current = updatedSegments;
+            updateLastAssistantMessage(updatedSegments);
+          } else if (segment.type === 'approval_request') {
             // Tool proposal from the server. The streamFn pre-wired
             // `onApprove`/`onReject` so they POST to
             // `/api/chat/agent/confirm-tool` with the same proxy auth the
@@ -190,46 +217,16 @@ export function useChat({
             // and (2) append a follow-up TEXT segment so the user sees a
             // concrete confirmation of what happened.
             if (currentTextSegment) {
-              const updated = [...currentAssistantSegmentsRef.current]
+              const updated = [...currentAssistantSegmentsRef.current];
               if (updated.length > 0 && updated[updated.length - 1].type === 'text') {
-                updated[updated.length - 1] = { type: 'text', text: currentTextSegment }
+                updated[updated.length - 1] = { type: 'text', text: currentTextSegment };
               } else {
-                updated.push({ type: 'text', text: currentTextSegment })
+                updated.push({ type: 'text', text: currentTextSegment });
               }
-              currentAssistantSegmentsRef.current = updated
-              currentTextSegment = ''
+              currentAssistantSegmentsRef.current = updated;
+              currentTextSegment = '';
             }
-            const seg = segment as any
-            const proposalId: string = seg.data?.requestId
-            // Locate the assistant message that hosts this approval
-            // segment and apply a transform — INDEPENDENT of
-            // `currentAssistantSegmentsRef`, which the SSE `finally`
-            // resets to `[]` the moment the stream ends. If we mutated
-            // the ref then re-rendered `updateLastAssistantMessage([])`
-            // (the empty ref's snapshot), we'd wipe the assistant
-            // message's content the instant the user clicks Approve.
-            const updateApprovalMessage = (
-              transform: (segments: MessageSegment[]) => MessageSegment[],
-            ) => {
-              setMessages((prev) => {
-                for (let i = prev.length - 1; i >= 0; i--) {
-                  const m = prev[i]
-                  if (m.role !== 'assistant') continue
-                  if (!Array.isArray(m.content)) continue
-                  const segments = m.content as MessageSegment[]
-                  const hasMatch = segments.some(
-                    (s) =>
-                      (s as any).type === 'approval_request' &&
-                      (s as any).data?.requestId === proposalId,
-                  )
-                  if (!hasMatch) continue
-                  const next = [...prev]
-                  next[i] = { ...m, content: transform(segments) }
-                  return next
-                }
-                return prev
-              })
-            }
+            const seg = segment;
             // Server-driven post-approve flow: wrappedApprove/Reject just
             // fire a new chat turn with `approvalAction` set. The streamFn
             // routes that turn to `/api/chat/agent/confirm-tool` which
@@ -239,28 +236,20 @@ export function useChat({
             // approval card via `requestId` and applies status flip +
             // receipt append. NO client-side orchestration.
             const wrappedApprove = async (reqId?: string) => {
-              if (!reqId) return
-              await sendMessage(
-                '',
-                { approvalAction: { proposalId: reqId, action: 'approve' } },
-                { hidden: true },
-              )
-            }
+              if (!reqId) return;
+              await sendMessage('', { approvalAction: { proposalId: reqId, action: 'approve' } }, { hidden: true });
+            };
             const wrappedReject = async (reqId?: string) => {
-              if (!reqId) return
-              await sendMessage(
-                '',
-                { approvalAction: { proposalId: reqId, action: 'reject' } },
-                { hidden: true },
-              )
-            }
+              if (!reqId) return;
+              await sendMessage('', { approvalAction: { proposalId: reqId, action: 'reject' } }, { hidden: true });
+            };
             currentAssistantSegmentsRef.current.push({
               ...seg,
               onApprove: wrappedApprove,
               onReject: wrappedReject,
-            })
-            updateLastAssistantMessage([...currentAssistantSegmentsRef.current])
-          } else if ((segment as any).type === 'decision_resolved') {
+            });
+            updateLastAssistantMessage([...currentAssistantSegmentsRef.current]);
+          } else if (segment.type === 'decision_resolved') {
             // Server-driven decision frame from /api/chat/agent/confirm-tool.
             //
             // Two side-effects:
@@ -276,91 +265,72 @@ export function useChat({
             //
             // For reject, no auto-continuation text follows — the new
             // turn carries only the receipt.
-            const decision = segment as unknown as {
-              type: 'decision_resolved'
-              proposalId?: string
-              action: 'approved' | 'rejected'
-              ok: boolean
-              toolName?: string
-              result?: { ticket_id?: string; status?: string | null }
-              /** Server-rendered receipt copy. Computed by the per-source
-               *  `strategy.tools.receiptRenderer(...)`. */
-              receiptText?: string
-              /** True when the server WILL stream an auto-continuation
-               *  Sonnet turn after this frame. */
-              willAutoContinue?: boolean
-            }
-            if (!decision.proposalId) continue
+            const decision = segment;
+            if (!decision.proposalId) continue;
             // Step 1 — flip the source card's status.
-            setMessages((prev) => {
+            //
+            // Goes through `setMessages` and locates the host message by
+            // `requestId` — INDEPENDENT of `currentAssistantSegmentsRef`,
+            // which the SSE `finally` resets to `[]` the moment the stream
+            // ends. Mutating the ref and re-rendering from its (empty)
+            // snapshot would wipe the assistant message's content the instant
+            // the user clicks Approve.
+            setMessages(prev => {
               for (let i = prev.length - 1; i >= 0; i--) {
-                const m = prev[i]
-                if (m.role !== 'assistant') continue
-                if (!Array.isArray(m.content)) continue
-                const segments = m.content as MessageSegment[]
-                const hasMatch = segments.some(
-                  (s) =>
-                    (s as any).type === 'approval_request' &&
-                    (s as any).data?.requestId === decision.proposalId,
-                )
-                if (!hasMatch) continue
-                const flipped = segments.map((s) =>
-                  (s as any).type === 'approval_request' &&
-                  (s as any).data?.requestId === decision.proposalId
-                    ? ({ ...(s as any), status: decision.action } as MessageSegment)
-                    : s,
-                )
-                const next = [...prev]
-                next[i] = { ...m, content: flipped }
-                return next
+                const m = prev[i];
+                if (m.role !== 'assistant') continue;
+                if (!Array.isArray(m.content)) continue;
+                const segments = m.content;
+                const isMatch = (s: MessageSegment): s is ApprovalRequestSegment =>
+                  s.type === 'approval_request' && s.data.requestId === decision.proposalId;
+                const hasMatch = segments.some(isMatch);
+                if (!hasMatch) continue;
+                const flipped = segments.map(s => (isMatch(s) ? { ...s, status: decision.action } : s));
+                const next = [...prev];
+                next[i] = { ...m, content: flipped };
+                return next;
               }
-              return prev
-            })
+              return prev;
+            });
             // Step 2 — receipt text into the CURRENT message.
             // SERVER-RENDERED. The per-source strategy
             // (`strategy.tools.receiptRenderer(...)`) computed the copy
             // and shipped it on the SSE frame as `receiptText`. The
             // chat-shell is source-agnostic — it just appends the string.
-            const receipt = decision.receiptText ?? null
+            const receipt = decision.receiptText ?? null;
             if (receipt === null) {
               // No server-provided copy → don't fabricate a fallback.
-              continue
+              continue;
             }
-            currentTextSegment = receipt + '\n\n'
-            const updatedSegments = [...currentAssistantSegmentsRef.current]
-            if (
-              updatedSegments.length > 0 &&
-              updatedSegments[updatedSegments.length - 1].type === 'text'
-            ) {
+            currentTextSegment = receipt + '\n\n';
+            const updatedSegments = [...currentAssistantSegmentsRef.current];
+            if (updatedSegments.length > 0 && updatedSegments[updatedSegments.length - 1].type === 'text') {
               updatedSegments[updatedSegments.length - 1] = {
                 type: 'text',
                 text: currentTextSegment,
-              }
+              };
             } else {
-              updatedSegments.push({ type: 'text', text: currentTextSegment })
+              updatedSegments.push({ type: 'text', text: currentTextSegment });
             }
-            currentAssistantSegmentsRef.current = updatedSegments
+            currentAssistantSegmentsRef.current = updatedSegments;
             // The receipt's `[card://<type>:<id>]` marker resolves via the
             // card fetch path (hydrate-by-id) — no ref stamping needed.
-            updateLastAssistantMessage(updatedSegments)
+            updateLastAssistantMessage(updatedSegments);
           } else if (segment.type === 'tool_execution') {
             if (currentTextSegment) {
-              const updatedSegments = [...currentAssistantSegmentsRef.current]
+              const updatedSegments = [...currentAssistantSegmentsRef.current];
 
-              if (
-                updatedSegments.length > 0 &&
-                updatedSegments[updatedSegments.length - 1].type === 'text'
-              ) {
+              if (updatedSegments.length > 0 && updatedSegments[updatedSegments.length - 1].type === 'text') {
                 updatedSegments[updatedSegments.length - 1] = {
                   type: 'text',
                   text: currentTextSegment,
-                }
+                };
               } else {
-                updatedSegments.push({ type: 'text', text: currentTextSegment })
+                updatedSegments.push({ type: 'text', text: currentTextSegment });
               }
 
-              currentAssistantSegmentsRef.current = updatedSegments
-              currentTextSegment = ''
+              currentAssistantSegmentsRef.current = updatedSegments;
+              currentTextSegment = '';
             }
 
             const existingToolIndex = currentAssistantSegmentsRef.current.findIndex(
@@ -369,76 +339,73 @@ export function useChat({
                 s.data.type === 'EXECUTING_TOOL' &&
                 s.data.integratedToolType === segment.data.integratedToolType &&
                 s.data.toolFunction === segment.data.toolFunction,
-            )
+            );
 
             if (existingToolIndex !== -1 && segment.data.type === 'EXECUTED_TOOL') {
               const existingTool = currentAssistantSegmentsRef.current[existingToolIndex] as {
-                type: 'tool_execution'
-                data: ToolExecutionData
-              }
+                type: 'tool_execution';
+                data: ToolExecutionData;
+              };
               currentAssistantSegmentsRef.current[existingToolIndex] = {
                 ...segment,
                 data: {
                   ...segment.data,
                   parameters: segment.data.parameters || existingTool.data.parameters,
                 },
-              }
+              };
             } else {
-              currentAssistantSegmentsRef.current.push(segment)
+              currentAssistantSegmentsRef.current.push(segment);
             }
 
-            updateLastAssistantMessage([...currentAssistantSegmentsRef.current])
+            updateLastAssistantMessage([...currentAssistantSegmentsRef.current]);
           }
         }
       } catch (err) {
         const errorMessage: Message = {
           id: `error-${Date.now()}`,
           role: 'error',
-          content:
-            err instanceof Error
-              ? err.message
-              : 'An error occurred while processing your request.',
+          content: err instanceof Error ? err.message : 'An error occurred while processing your request.',
           timestamp: new Date(),
-        }
-        setMessages((prev) => [...prev.slice(0, -1), errorMessage])
+        };
+        setMessages(prev => [...prev.slice(0, -1), errorMessage]);
       } finally {
-        setIsTyping(false)
+        setIsTyping(false);
         // Reject-path on confirm-tool emits ONLY a `decision_resolved`
         // leading frame and closes — no text segments stream in, so the
         // placeholder assistant message added by addMessage above would
         // render as a blank bubble. Remove the trailing assistant message
         // if it still has no segments.
         const trailingIsEmpty =
-          Array.isArray(currentAssistantSegmentsRef.current) &&
-          currentAssistantSegmentsRef.current.length === 0
+          Array.isArray(currentAssistantSegmentsRef.current) && currentAssistantSegmentsRef.current.length === 0;
         if (trailingIsEmpty) {
-          setMessages((prev) => {
-            if (prev.length === 0) return prev
-            const last = prev[prev.length - 1]
-            if (last.role !== 'assistant') return prev
-            if (Array.isArray(last.content) && last.content.length > 0) return prev
-            if (typeof last.content === 'string' && last.content.length > 0) return prev
-            return prev.slice(0, -1)
-          })
+          setMessages(prev => {
+            if (prev.length === 0) return prev;
+            const last = prev[prev.length - 1];
+            if (last.role !== 'assistant') return prev;
+            if (Array.isArray(last.content) && last.content.length > 0) return prev;
+            if (typeof last.content === 'string' && last.content.length > 0) return prev;
+            return prev.slice(0, -1);
+          });
         }
-        currentAssistantSegmentsRef.current = []
+        currentAssistantSegmentsRef.current = [];
       }
     },
     [streamMessage, addMessage, updateLastAssistantMessage, assistantName, assistantAvatar],
-  )
+  );
 
   const handleQuickAction = useCallback(
     (actionText: string) => {
-      sendMessage(actionText)
+      // `sendMessage` never rejects — it renders failures as an `error` row.
+      void sendMessage(actionText);
     },
     [sendMessage],
-  )
+  );
 
   const clearMessages = useCallback(() => {
-    setMessages([])
-    setIsTyping(false)
-    reset()
-  }, [reset])
+    setMessages([]);
+    setIsTyping(false);
+    reset();
+  }, [reset]);
 
   /**
    * Replace-or-prepend server-hydrated history. Called once by the SSE
@@ -448,8 +415,8 @@ export function useChat({
    * the server resolves LLM history from its own store, not from this state.
    */
   const hydrateMessages = useCallback((history: Message[]) => {
-    setMessages((prev) => (prev.length === 0 ? history : [...history, ...prev]))
-  }, [])
+    setMessages(prev => (prev.length === 0 ? history : [...history, ...prev]));
+  }, []);
 
   /**
    * Abort the in-flight streamed message. The fetch's AbortSignal terminates
@@ -458,9 +425,9 @@ export function useChat({
    * the partial assistant response visible to the user.
    */
   const stopMessage = useCallback(() => {
-    abort()
-    setIsTyping(false)
-  }, [abort])
+    abort();
+    setIsTyping(false);
+  }, [abort]);
 
   return {
     messages,
@@ -473,5 +440,5 @@ export function useChat({
     clearMessages,
     hydrateMessages,
     hasMessages: messages.length > 0,
-  }
+  };
 }

@@ -22,7 +22,7 @@ class DeviceRemoteTest extends BaseUITest {
 
     @BeforeEach
     public void openDeviceDetails() {
-        deviceDetailsPage = navigationSidebar.goToDevices().openDevice("vm115982");
+        deviceDetailsPage = navigationSidebar.goToDevices().openOnlineDevice("vm115982");
         deviceDetailsPage.clickTab("Agents");
     }
 

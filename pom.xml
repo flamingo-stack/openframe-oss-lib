@@ -21,7 +21,7 @@
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>
-        <revision>6.25.22</revision>
+        <revision>6.32.0</revision>
         <java.version>21</java.version>
         <lombok.version>1.18.30</lombok.version>
         <spring-data-mongodb.version>4.2.0</spring-data-mongodb.version>
@@ -44,14 +44,17 @@
         <module>openframe-core-crypto</module>
         <module>openframe-data-mongo-common</module>
         <module>openframe-data-mongo-sync</module>
+        <module>openframe-machine-delivery</module>
         <module>openframe-data-mongo-reactive</module>
         <module>openframe-data-redis</module>
         <module>openframe-presence</module>
         <module>openframe-notification-mail</module>
+        <module>openframe-notification-core</module>
         <module>openframe-data-kafka</module>
         <module>openframe-api-lib</module>
         <module>openframe-data-cassandra</module>
         <module>openframe-data-pinot</module>
+        <module>openframe-data-loki</module>
         <module>openframe-data-nats</module>
         <module>openframe-data-device-aspect</module>
         <module>openframe-data-timeentry-aspect</module>
@@ -138,6 +141,16 @@
             </dependency>
             <dependency>
                 <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-notification-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-machine-delivery</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-data-kafka</artifactId>
                 <version>${revision}</version>
             </dependency>
@@ -154,6 +167,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-data-pinot</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-data-loki</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

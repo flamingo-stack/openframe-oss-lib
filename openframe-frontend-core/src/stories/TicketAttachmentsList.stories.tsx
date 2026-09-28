@@ -14,7 +14,7 @@ const meta = {
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '600px' }}>
         <Story />
       </div>
@@ -37,17 +37,13 @@ export const Default: Story = {
 
 export const SingleFile: Story = {
   args: {
-    attachments: [
-      { id: '1', fileName: 'report.pdf', fileSize: '2.3 MB', onDownload: () => {} },
-    ],
+    attachments: [{ id: '1', fileName: 'report.pdf', fileSize: '2.3 MB', onDownload: () => {} }],
   },
 };
 
 export const NoDownload: Story = {
   args: {
-    attachments: [
-      { id: '1', fileName: 'readonly-file.txt', fileSize: '128 KB' },
-    ],
+    attachments: [{ id: '1', fileName: 'readonly-file.txt', fileSize: '128 KB' }],
   },
 };
 

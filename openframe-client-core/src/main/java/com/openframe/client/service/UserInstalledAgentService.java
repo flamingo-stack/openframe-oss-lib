@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
+import static org.springframework.util.StringUtils.hasText;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -72,13 +74,13 @@ public class UserInstalledAgentService {
     }
 
     private void validateUserId(String userId) {
-        if (userId == null || userId.trim().isEmpty()) {
+        if (!hasText(userId)) {
             throw new IllegalArgumentException("User ID cannot be empty");
         }
     }
 
     private void validateAgentType(String agentType) {
-        if (agentType == null || agentType.trim().isEmpty()) {
+        if (!hasText(agentType)) {
             throw new IllegalArgumentException("Agent type cannot be empty");
         }
     }

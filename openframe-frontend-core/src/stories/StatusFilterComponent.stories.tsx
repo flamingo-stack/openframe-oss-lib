@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { StatusFilterComponent } from '../components/features/status-filter-component'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { StatusFilterComponent } from '../components/features/status-filter-component';
 
 const meta: Meta<typeof StatusFilterComponent> = {
   title: 'Features/StatusFilterComponent',
@@ -14,15 +14,15 @@ const meta: Meta<typeof StatusFilterComponent> = {
       },
     },
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /** Default label. Interactive — pills toggle the selection. */
 export const Status: Story = {
   render: function StatusStory() {
-    const [status, setStatus] = useState('all')
+    const [status, setStatus] = useState('all');
     return (
       <StatusFilterComponent
         selectedStatus={status}
@@ -33,15 +33,15 @@ export const Status: Story = {
           { value: 'archived', label: 'Archived (1)' },
         ]}
       />
-    )
+    );
   },
-}
+};
 
 /** Relabeled: the same row serving a data-derived Discipline facet, counts in
  *  the labels — how the people-hub How I Work dashboard uses it. */
 export const RelabeledFacet: Story = {
   render: function DisciplineStory() {
-    const [discipline, setDiscipline] = useState('all')
+    const [discipline, setDiscipline] = useState('all');
     return (
       <StatusFilterComponent
         label="Discipline"
@@ -53,9 +53,9 @@ export const RelabeledFacet: Story = {
           { value: 'sales', label: 'Sales (0)' },
         ]}
       />
-    )
+    );
   },
-}
+};
 
 /** Viewer may see every option but select only one (people-hub "Everyone" view
  *  for non-management: pinned to Published, the rest visible but disabled). */
@@ -71,13 +71,13 @@ export const DisabledValues: Story = {
     ],
     disabledValues: ['all', 'draft', 'archived'],
   },
-}
+};
 
 /** View-toggle mode: `showAll={false}` for facets with no all-of-them state —
  *  one option is always selected (Everyone / My Sessions). */
 export const ViewToggleNoAll: Story = {
   render: function ViewStory() {
-    const [view, setView] = useState('everyone')
+    const [view, setView] = useState('everyone');
     return (
       <StatusFilterComponent
         label="View"
@@ -89,6 +89,6 @@ export const ViewToggleNoAll: Story = {
           { value: 'mine', label: 'My Sessions' },
         ]}
       />
-    )
+    );
   },
-}
+};

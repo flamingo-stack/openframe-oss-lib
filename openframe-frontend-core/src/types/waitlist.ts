@@ -88,4 +88,4 @@ export interface WaitlistResponse {
   success: boolean;
   data?: WaitlistEntry;
   error?: string;
-} 
+}

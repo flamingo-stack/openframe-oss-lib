@@ -19,46 +19,45 @@
  * Lib internals import this shim directly (relative path); hub-side
  * code goes through the barrel (`@flamingo-stack/.../embed-shims`).
  */
-'use client'
-import {
-  forwardRef,
-  type AnchorHTMLAttributes,
-  type ComponentType,
-  type ReactNode,
-} from 'react'
+'use client';
+import { forwardRef, type AnchorHTMLAttributes, type ComponentType, type ReactNode, type Ref } from 'react';
 
 type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
-  href?: string | { pathname?: string; query?: Record<string, string> }
-  prefetch?: boolean | null
-  replace?: boolean
-  scroll?: boolean
-  shallow?: boolean
-  passHref?: boolean
-  legacyBehavior?: boolean
-  locale?: string | false
-  children?: ReactNode
-}
+  href?: string | { pathname?: string; query?: Record<string, string> };
+  prefetch?: boolean | null;
+  replace?: boolean;
+  scroll?: boolean;
+  shallow?: boolean;
+  passHref?: boolean;
+  legacyBehavior?: boolean;
+  locale?: string | false;
+  children?: ReactNode;
+};
 
-let impl: ComponentType<any> | null = null
+/** What the shim renders once a host has registered `next/link`. */
+type RegisteredLink = ComponentType<LinkProps & { ref?: Ref<HTMLAnchorElement> }>;
+
+let impl: RegisteredLink | null = null;
 
 /**
  * Register the real `next/link` so this shim delegates to it instead
  * of rendering a plain `<a>`. Call ONCE at app init in a Next.js host.
  */
-export function registerLink(component: ComponentType<any>): void {
-  impl = component
+export function registerLink<P>(component: ComponentType<P>): void {
+  // The registration contract IS the assertion: the host states that its
+  // component handles the props this shim forwards (`next/link` does). One
+  // narrow assertion here, instead of `any` on the slot and on this
+  // signature, which erased the type for every caller.
+  impl = component as RegisteredLink;
 }
 
-const Link = forwardRef<HTMLAnchorElement, LinkProps>(function NextLinkShim(
-  props,
-  ref,
-) {
+const Link = forwardRef<HTMLAnchorElement, LinkProps>(function NextLinkShim(props, ref) {
   // Real impl path — registered by the host. Hand off untouched so
   // every Next-specific prop (prefetch, replace, scroll, locale…)
   // reaches the real component intact.
   if (impl) {
-    const Real = impl
-    return <Real ref={ref} {...props} />
+    const Real = impl;
+    return <Real ref={ref} {...props} />;
   }
 
   // Fallback path — plain <a>. Drops Next-only props and reduces
@@ -74,18 +73,13 @@ const Link = forwardRef<HTMLAnchorElement, LinkProps>(function NextLinkShim(
     legacyBehavior: _legacyBehavior,
     locale: _locale,
     ...rest
-  } = props
-  const hrefStr =
-    typeof href === 'string'
-      ? href
-      : href?.pathname
-        ? href.pathname
-        : undefined
+  } = props;
+  const hrefStr = typeof href === 'string' ? href : href?.pathname ? href.pathname : undefined;
   return (
     <a ref={ref} href={hrefStr} {...rest}>
       {children}
     </a>
-  )
-})
+  );
+});
 
-export default Link
+export default Link;

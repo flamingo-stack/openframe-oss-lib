@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `contentFetch` — the fetch the lib's SELF-FETCHING content surfaces use:
@@ -18,13 +18,12 @@
  * no content-specific fetcher to configure.
  */
 
-import { embedAuthedFetch, hasEmbedAuthAdapter } from './embed-authed-fetch'
+import { embedAuthedFetch, hasEmbedAuthAdapter } from './embed-authed-fetch';
 
 export const contentFetch: typeof fetch = (input, init) => {
-  if (!hasEmbedAuthAdapter()) return fetch(input, init)
+  if (!hasEmbedAuthAdapter()) return fetch(input, init);
   // embedAuthedFetch takes a string url; coerce the broader `fetch` input shape
   // (content surfaces always pass strings, but handle URL/Request defensively).
-  const url =
-    typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
-  return embedAuthedFetch(url, init)
-}
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  return embedAuthedFetch(url, init);
+};

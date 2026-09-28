@@ -21,6 +21,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -175,8 +176,58 @@ class PinotClientLogRepositoryTest {
         @Test
         @DisplayName("findLogs maps ResultSet rows to LogProjection objects")
         void mapsLogProjection() {
-            // 12 columns as declared in findLogs: toolEventId, ingestDay, toolType, eventType,
-            // severity, userId, deviceId, hostname, organizationId, organizationName, summary, eventTimestamp
+            // 13 columns as declared in findLogs: toolEventId, ingestDay, toolType, eventType, severity,
+            // userId, deviceId, hostname, nickname, organizationId, organizationName, summary, eventTimestamp
+            when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
+            when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
+            when(resultSet.getRowCount()).thenReturn(1);
+            when(resultSet.getColumnCount()).thenReturn(13);
+            when(resultSet.getColumnName(0)).thenReturn("toolEventId");
+            when(resultSet.getColumnName(1)).thenReturn("ingestDay");
+            when(resultSet.getColumnName(2)).thenReturn("toolType");
+            when(resultSet.getColumnName(3)).thenReturn("eventType");
+            when(resultSet.getColumnName(4)).thenReturn("severity");
+            when(resultSet.getColumnName(5)).thenReturn("userId");
+            when(resultSet.getColumnName(6)).thenReturn("deviceId");
+            when(resultSet.getColumnName(7)).thenReturn("hostname");
+            when(resultSet.getColumnName(8)).thenReturn("nickname");
+            when(resultSet.getColumnName(9)).thenReturn("organizationId");
+            when(resultSet.getColumnName(10)).thenReturn("organizationName");
+            when(resultSet.getColumnName(11)).thenReturn("summary");
+            when(resultSet.getColumnName(12)).thenReturn("eventTimestamp");
+
+            when(resultSet.getString(0, 0)).thenReturn("evt-1");
+            when(resultSet.getString(0, 1)).thenReturn("2026-01-15");
+            when(resultSet.getString(0, 2)).thenReturn("FLEET_MDM");
+            when(resultSet.getString(0, 3)).thenReturn("DEVICE_ONLINE");
+            when(resultSet.getString(0, 4)).thenReturn("INFO");
+            when(resultSet.getString(0, 5)).thenReturn("user-1");
+            when(resultSet.getString(0, 6)).thenReturn("dev-1");
+            when(resultSet.getString(0, 7)).thenReturn("host-1");
+            when(resultSet.getString(0, 8)).thenReturn("Reception iMac");
+            when(resultSet.getString(0, 9)).thenReturn("org-1");
+            when(resultSet.getString(0, 10)).thenReturn("Org One");
+            when(resultSet.getString(0, 11)).thenReturn("Device came online");
+            when(resultSet.getLong(0, 12)).thenReturn(1700000000000L);
+
+            List<LogProjection> result = repository.findLogs(TENANT_ID, START, END, null, null, List.of(), List.of(),
+                    List.of(), List.of(), null, null, 100, "eventTimestamp", "DESC");
+
+            assertEquals(1, result.size());
+            LogProjection p = result.get(0);
+            assertEquals("evt-1", p.toolEventId);
+            assertEquals("FLEET_MDM", p.toolType);
+            assertEquals("INFO", p.severity);
+            assertEquals("host-1", p.hostname);
+            assertEquals("Reception iMac", p.nickname);
+            assertEquals("Org One", p.organizationName);
+            assertNotNull(p.eventTimestamp);
+        }
+
+        @Test
+        @DisplayName("a column missing from the result set degrades to null instead of failing the whole page")
+        void missingColumnDoesNotBreakMapping() {
+            // Pinot schema not yet caught up with the deployed code: nickname is selected but absent.
             when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
             when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
             when(resultSet.getRowCount()).thenReturn(1);
@@ -194,17 +245,17 @@ class PinotClientLogRepositoryTest {
             when(resultSet.getColumnName(10)).thenReturn("summary");
             when(resultSet.getColumnName(11)).thenReturn("eventTimestamp");
 
-            when(resultSet.getString(0, 0)).thenReturn("evt-1");
-            when(resultSet.getString(0, 1)).thenReturn("2026-01-15");
-            when(resultSet.getString(0, 2)).thenReturn("FLEET_MDM");
-            when(resultSet.getString(0, 3)).thenReturn("DEVICE_ONLINE");
-            when(resultSet.getString(0, 4)).thenReturn("INFO");
-            when(resultSet.getString(0, 5)).thenReturn("user-1");
-            when(resultSet.getString(0, 6)).thenReturn("dev-1");
+            when(resultSet.getString(0, 0)).thenReturn("toolEventId-v");
+            when(resultSet.getString(0, 1)).thenReturn("ingestDay-v");
+            when(resultSet.getString(0, 2)).thenReturn("toolType-v");
+            when(resultSet.getString(0, 3)).thenReturn("eventType-v");
+            when(resultSet.getString(0, 4)).thenReturn("severity-v");
+            when(resultSet.getString(0, 5)).thenReturn("userId-v");
+            when(resultSet.getString(0, 6)).thenReturn("deviceId-v");
             when(resultSet.getString(0, 7)).thenReturn("host-1");
-            when(resultSet.getString(0, 8)).thenReturn("org-1");
-            when(resultSet.getString(0, 9)).thenReturn("Org One");
-            when(resultSet.getString(0, 10)).thenReturn("Device came online");
+            when(resultSet.getString(0, 8)).thenReturn("organizationId-v");
+            when(resultSet.getString(0, 9)).thenReturn("organizationName-v");
+            when(resultSet.getString(0, 10)).thenReturn("summary-v");
             when(resultSet.getLong(0, 11)).thenReturn(1700000000000L);
 
             List<LogProjection> result = repository.findLogs(TENANT_ID, START, END, null, null, List.of(), List.of(),
@@ -212,11 +263,50 @@ class PinotClientLogRepositoryTest {
 
             assertEquals(1, result.size());
             LogProjection p = result.get(0);
-            assertEquals("evt-1", p.toolEventId);
-            assertEquals("FLEET_MDM", p.toolType);
-            assertEquals("INFO", p.severity);
-            assertEquals("Org One", p.organizationName);
-            assertNotNull(p.eventTimestamp);
+            assertEquals("host-1", p.hostname);
+            assertNull(p.nickname);
+        }
+
+        @Test
+        @DisplayName("an empty nickname (the Pinot schema default) maps to null, not an empty string")
+        void emptyNicknameMapsToNull() {
+            when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
+            when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
+            when(resultSet.getRowCount()).thenReturn(1);
+            when(resultSet.getColumnCount()).thenReturn(13);
+            when(resultSet.getColumnName(0)).thenReturn("toolEventId");
+            when(resultSet.getColumnName(1)).thenReturn("ingestDay");
+            when(resultSet.getColumnName(2)).thenReturn("toolType");
+            when(resultSet.getColumnName(3)).thenReturn("eventType");
+            when(resultSet.getColumnName(4)).thenReturn("severity");
+            when(resultSet.getColumnName(5)).thenReturn("userId");
+            when(resultSet.getColumnName(6)).thenReturn("deviceId");
+            when(resultSet.getColumnName(7)).thenReturn("hostname");
+            when(resultSet.getColumnName(8)).thenReturn("nickname");
+            when(resultSet.getColumnName(9)).thenReturn("organizationId");
+            when(resultSet.getColumnName(10)).thenReturn("organizationName");
+            when(resultSet.getColumnName(11)).thenReturn("summary");
+            when(resultSet.getColumnName(12)).thenReturn("eventTimestamp");
+
+            when(resultSet.getString(0, 0)).thenReturn("toolEventId-v");
+            when(resultSet.getString(0, 1)).thenReturn("ingestDay-v");
+            when(resultSet.getString(0, 2)).thenReturn("toolType-v");
+            when(resultSet.getString(0, 3)).thenReturn("eventType-v");
+            when(resultSet.getString(0, 4)).thenReturn("severity-v");
+            when(resultSet.getString(0, 5)).thenReturn("userId-v");
+            when(resultSet.getString(0, 6)).thenReturn("deviceId-v");
+            when(resultSet.getString(0, 7)).thenReturn("host-1");
+            when(resultSet.getString(0, 8)).thenReturn("");
+            when(resultSet.getString(0, 9)).thenReturn("organizationId-v");
+            when(resultSet.getString(0, 10)).thenReturn("organizationName-v");
+            when(resultSet.getString(0, 11)).thenReturn("summary-v");
+            when(resultSet.getLong(0, 12)).thenReturn(1700000000000L);
+
+            List<LogProjection> result = repository.findLogs(TENANT_ID, START, END, null, null, List.of(), List.of(),
+                    List.of(), List.of(), null, null, 100, "eventTimestamp", "DESC");
+
+            assertEquals("host-1", result.get(0).hostname);
+            assertNull(result.get(0).nickname);
         }
 
         @Test

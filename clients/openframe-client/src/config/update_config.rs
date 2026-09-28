@@ -5,6 +5,7 @@ pub const MIN_BINARY_SIZE_BYTES: u64 = 1024 * 100; // 100 KB
 
 // HTTP client timeouts
 pub const HTTP_CLIENT_TIMEOUT_SECS: u64 = 120; // control-plane (auth, registration, heartbeat, key fetch)
+pub const AWAITING_AUTH_POLL_SECS: u64 = 15; // unauthenticated service polling for the config `auth` writes
 pub const DOWNLOAD_CLIENT_TIMEOUT_SECS: u64 = 300; // binary downloads (GitHub, Artifactory, tool API)
 
 // Consumer retry
@@ -20,6 +21,12 @@ pub const RECONNECTION_DELAY_MS: u64 = 5000; // 5 seconds
 pub const OUTBOX_MAX_ENTRIES: usize = 500;
 pub const OUTBOX_FLUSH_INTERVAL_SECS: u64 = 30;
 pub const FLUSH_PUBLISH_TIMEOUT_SECS: u64 = 30;
+// In-memory retry when the durable store is unavailable (redb failed to open).
+pub const FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS: u64 = 1000;
+pub const FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS: u64 = 30000;
+// Bounded so a permanent publish failure (e.g. missing stream) cannot pile up
+// detached tasks; ~8 min of retrying with the backoff above.
+pub const FALLBACK_PUBLISH_MAX_RETRIES: u32 = 20;
 
 pub const NATS_PAYLOAD_FALLBACK_BYTES: usize = 5 * 1024 * 1024;
 pub const NATS_PAYLOAD_HEADROOM_BYTES: usize = 64 * 1024;
@@ -29,7 +36,7 @@ pub const NATS_PAYLOAD_HEADROOM_BYTES: usize = 64 * 1024;
 pub const BOOT_MARKER_WAIT_SECS: u64 = 90;
 /// Unverified boots tolerated before an update is treated as failed.
 pub const CRASH_LOOP_MAX_BOOT_ATTEMPTS: u32 = 3;
-/// Refuse update messages below the LKG anchor (flip to force a downgrade).
+/// Refuse client updates below the LKG anchor and tool updates below the installed version (flip to force a downgrade).
 pub const ALLOW_DOWNGRADE: bool = false;
 /// Updater transcripts kept after pruning; one is written per update attempt.
 pub const UPDATER_TRANSCRIPTS_KEPT: usize = 5;

@@ -10,7 +10,7 @@ import type { HeaderConfig } from '../types/navigation';
 const flamingoLogo = (
   <div className="flex items-center gap-2">
     <FlamingoLogo className="h-8 w-8" />
-    <span className="font-['DM_Sans'] font-bold text-[18px] text-ods-text-primary">Flamingo</span>
+    <span className="font-['DM_Sans'] text-[18px] font-bold text-ods-text-primary">Flamingo</span>
   </div>
 );
 

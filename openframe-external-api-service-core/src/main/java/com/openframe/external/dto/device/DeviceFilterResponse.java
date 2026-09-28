@@ -24,8 +24,8 @@ public class DeviceFilterResponse {
     @Schema(description = "Available OS types with counts")
     private List<DeviceFilterItem> osTypes;
 
-    @Schema(description = "Available organization IDs with counts")
-    private List<DeviceFilterItem> organizationIds;
+    @Schema(description = "Available customer ids with counts")
+    private List<DeviceFilterItem> customerIds;
 
     @Schema(description = "Available tag keys with counts")
     private List<TagFilterItem> tagKeys;

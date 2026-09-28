@@ -1,28 +1,32 @@
-"use client"
+'use client';
 
-import { Mail } from 'lucide-react';
+import { Mail, Music } from 'lucide-react';
+import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-platforms';
+import {
+  GitHubIcon,
+  RedditIcon,
+  XLogo,
+  LinkedInIcon,
+  LumaIcon,
+  WhatsAppIcon,
+  GlobeIcon,
+  MessageCircleIcon,
+  TelegramIcon,
+  YouTubeIcon,
+  InstagramIcon,
+  FacebookIcon,
+  SlackIcon,
+  CopyIcon,
+} from './icons';
 import { Button } from './ui/button';
-import { GitHubIcon, RedditIcon, XLogo, LinkedInIcon, LumaIcon, WhatsAppIcon, GlobeIcon, MessageCircleIcon, TelegramIcon, YouTubeIcon, InstagramIcon, FacebookIcon, SlackIcon, CopyIcon } from './icons';
 
-/** Exactly ONE of `href` (anchor, target _blank) or `onClick` (action
- *  button — share popups via window.open inside the click gesture,
- *  copy-to-clipboard) — the discriminated union makes a dead no-action
- *  entry unrepresentable. */
-type SocialLink = {
-  platform: string;
-  label?: string;
-  /** `internal` links are only ever shown on surfaces that opt in (and must be
-   *  gated server-side); with `groupByVisibility` they render after a divider. */
-  visibility?: "external" | "internal";
-} & (
-  | { href: string; onClick?: never }
-  | { onClick: () => void; href?: never }
-);
+/** Re-exported for call sites that already import the link type from this module. */
+export type { SocialIconLink };
 
 interface SocialIconRowProps {
   className?: string;
-  links?: SocialLink[];
-  variant?: "accent" | "outline" | "transparent" | "destructive" | null | undefined;
+  links?: SocialIconLink[];
+  variant?: 'accent' | 'outline' | 'transparent' | 'destructive' | null | undefined;
   /** Quiet metadata row for page-level identity/share slots: 32px ghost
    *  icon buttons (size="icon-sm", 16px glyphs), gap-2, w-fit container,
    *  variant defaulting to "transparent" (an explicit `variant` still wins).
@@ -36,63 +40,59 @@ interface SocialIconRowProps {
   groupByVisibility?: boolean;
 }
 
-const defaultLinks: SocialLink[] = [
+const defaultLinks: SocialIconLink[] = [
   { platform: 'github', href: 'https://github.com/flamingo-stack', label: 'GitHub' },
   { platform: 'linkedin', href: 'https://linkedin.com/company/flamingo.run', label: 'LinkedIn' },
-  { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' }
+  { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' },
 ];
 
-function renderSocialIcon(platform: string) {
-  const normalizedPlatform = platform.toLowerCase().trim();
+type SocialIconComponent = (props: { className?: string }) => React.ReactElement;
 
-  switch (normalizedPlatform) {
-    case 'github':
-      return <GitHubIcon className="w-5 h-5" />;
-    case 'twitter':
-    case 'x':
-      return <XLogo className="w-5 h-5" />;
-    case 'reddit':
-      return <RedditIcon className="w-5 h-5" variant="white" />;
-    case 'linkedin':
-      return <LinkedInIcon className="w-5 h-5" />;
-    case 'luma':
-      return <LumaIcon className="w-5 h-5" />;
-    case 'whatsapp':
-      return <WhatsAppIcon className="w-5 h-5" />;
-    case 'email':
-    case 'mail':
-      return <Mail className="w-5 h-5" />;
-    case 'website':
-    case 'web':
-    case 'url':
-      return <GlobeIcon className="w-5 h-5" />;
-    case 'slack':
-      return <SlackIcon className="w-5 h-5" injectedColor="white" />;
-    case 'discord':
-      return <MessageCircleIcon className="w-5 h-5" />;
-    case 'telegram':
-      return <TelegramIcon className="w-5 h-5" />;
-    case 'youtube':
-    case 'yt':
-      return <YouTubeIcon className="w-5 h-5" />;
-    case 'instagram':
-    case 'ig':
-      return <InstagramIcon className="w-5 h-5" />;
-    case 'facebook':
-    case 'fb':
-      return <FacebookIcon className="w-5 h-5" />;
-    case 'copy':
-      // CopyIcon's default fill is grey and would mismatch its row-mates —
-      // force the themed foreground via the ODS token (white on the dark
-      // theme, tracking the theme unlike the literal the reddit/slack cases
-      // still carry).
-      return <CopyIcon className="w-5 h-5" color="var(--color-text-primary)" />;
-    default:
-      return <GlobeIcon className="w-5 h-5" />;
-  }
+/**
+ * Platform name → glyph. The ONLY thing about a social platform that lives in
+ * code, because an icon is a component and a table cannot hold one; the DB
+ * names the glyph it wants through `social_platforms.icon_name`.
+ *
+ * Deliberately an OPEN record, not `satisfies Record<SomeUnion, …>`: the set of
+ * platforms is the `social_platforms` table's to decide, and a row added there
+ * must render — with the globe, until somebody adds art for it — rather than
+ * fail to type-check against a list in this file.
+ */
+export const SOCIAL_ICON_COMPONENTS: Record<string, SocialIconComponent> = {
+  github: props => <GitHubIcon {...props} />,
+  twitter: props => <XLogo {...props} />,
+  reddit: props => <RedditIcon {...props} variant="white" />,
+  linkedin: props => <LinkedInIcon {...props} />,
+  luma: props => <LumaIcon {...props} />,
+  whatsapp: props => <WhatsAppIcon {...props} />,
+  email: props => <Mail {...props} />,
+  website: props => <GlobeIcon {...props} />,
+  slack: props => <SlackIcon {...props} injectedColor="white" />,
+  discord: props => <MessageCircleIcon {...props} />,
+  telegram: props => <TelegramIcon {...props} />,
+  youtube: props => <YouTubeIcon {...props} />,
+  instagram: props => <InstagramIcon {...props} />,
+  facebook: props => <FacebookIcon {...props} />,
+  tiktok: props => <Music {...props} />,
+  // CopyIcon's default fill is grey and would mismatch its row-mates — force the
+  // themed foreground via the ODS token (tracks the theme).
+  copy: props => <CopyIcon {...props} color="var(--color-text-primary)" />,
+};
+
+/** The globe stands in for any platform with no art yet — never a blank slot. */
+function renderSocialIcon(platform: string) {
+  const key = normalizeSocialPlatform(platform) ?? 'website';
+  const Icon = SOCIAL_ICON_COMPONENTS[key] ?? SOCIAL_ICON_COMPONENTS.website;
+  return <Icon className="h-5 w-5" />;
 }
 
-export function SocialIconRow({ className = '', links = defaultLinks, variant, compact = false, groupByVisibility = false }: SocialIconRowProps) {
+export function SocialIconRow({
+  className = '',
+  links = defaultLinks,
+  variant,
+  compact = false,
+  groupByVisibility = false,
+}: SocialIconRowProps) {
   // ── Compact design rationale ──────────────────────────────────────────
   // Page-level identity/share rows read as METADATA, not CTAs. The major
   // design systems converge on one recipe for this slot: a ~32px ghost icon
@@ -107,9 +107,9 @@ export function SocialIconRow({ className = '', links = defaultLinks, variant, c
   // currentColor. An explicit `variant` prop still wins (e.g. outline
   // chips). Non-compact keeps the legacy outline default + full-width
   // stretch untouched.
-  const resolvedVariant = variant !== undefined ? variant : (compact ? 'transparent' : 'outline');
+  const resolvedVariant = variant !== undefined ? variant : compact ? 'transparent' : 'outline';
 
-  const renderButton = (link: SocialLink, index: number) => {
+  const renderButton = (link: SocialIconLink, index: number) => {
     const ariaLabel = link.label || link.platform;
     return link.onClick ? (
       <Button
@@ -146,13 +146,13 @@ export function SocialIconRow({ className = '', links = defaultLinks, variant, c
   // Two-group mode: external links, a thin divider, then internal links — but only
   // when both groups are present (otherwise it's just a flat row, no stray divider).
   if (groupByVisibility) {
-    const external = links.filter((l) => l.visibility !== 'internal');
-    const internal = links.filter((l) => l.visibility === 'internal');
+    const external = links.filter(l => l.visibility !== 'internal');
+    const internal = links.filter(l => l.visibility === 'internal');
     if (external.length > 0 && internal.length > 0) {
       return (
         <div className={rowClass}>
           {external.map((l, i) => renderButton(l, i))}
-          <span aria-hidden className="self-stretch w-px my-1 bg-ods-border shrink-0" />
+          <span aria-hidden className="my-1 w-px shrink-0 self-stretch bg-ods-border" />
           {internal.map((l, i) => renderButton(l, external.length + i))}
         </div>
       );

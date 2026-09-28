@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import * as React from 'react'
+import { createContext, useContext } from 'react';
 
 /**
  * The DOM node that Radix overlays (dropdown menus, tooltips) should portal
@@ -18,13 +18,11 @@ import * as React from 'react'
  * Default `null` → Radix falls back to `document.body` (unchanged behaviour
  * everywhere a provider isn't present).
  */
-export const PortalContainerContext = React.createContext<HTMLElement | null>(
-  null,
-)
+export const PortalContainerContext = createContext<HTMLElement | null>(null);
 
 /** Read the active portal container (or `null` to use `document.body`). */
 export function usePortalContainer(): HTMLElement | null {
-  return React.useContext(PortalContainerContext)
+  return useContext(PortalContainerContext);
 }
 
 /**
@@ -45,15 +43,13 @@ export function usePortalContainer(): HTMLElement | null {
  * Default `null` → viewport, i.e. Radix's own default, unchanged everywhere a
  * provider isn't present.
  */
-export const CollisionBoundaryContext = React.createContext<HTMLElement | null>(
-  null,
-)
+export const CollisionBoundaryContext = createContext<HTMLElement | null>(null);
 
 /** Read the active collision boundary (or `null` for the viewport). */
 export function useCollisionBoundary(): HTMLElement | null {
-  return React.useContext(CollisionBoundaryContext)
+  return useContext(CollisionBoundaryContext);
 }
 
 /** Padding (px) kept between an overlay and its boundary edge. Matches the
  *  panel's own gutter so a shifted menu never sits flush against the edge. */
-export const COLLISION_PADDING_PX = 8
+export const COLLISION_PADDING_PX = 8;

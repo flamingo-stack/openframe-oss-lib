@@ -1,29 +1,29 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { ExternalLinkIcon } from '../icons-v2-generated'
-import { Button } from '../ui/button'
-import { SquareAvatar } from '../ui/square-avatar'
+import type { ReactNode } from 'react';
+import { cn } from '../../utils/cn';
+import { ExternalLinkIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
+import { SquareAvatar } from '../ui/square-avatar';
 
 export interface MspOrganizationCardProps {
   /** MSP/organization name. Woven into the default title: "Your IT is managed by {name}". */
-  name: string
+  name: string;
   /** Organization website shown beneath the title (e.g. "www.techflow.com"). */
-  website?: string
+  website?: string;
   /** Organization logo URL. Falls back to initials derived from `name` when absent. */
-  logoUrl?: string
+  logoUrl?: string;
   /** Full title override. Defaults to `Your IT is managed by {name}`. */
-  title?: React.ReactNode
+  title?: ReactNode;
   /**
    * Website link. When set, the trailing action renders as an anchor
    * (`<a href target="_blank">`). Takes precedence over `onOpenWebsite`.
    */
-  href?: string
+  href?: string;
   /** Click handler for the trailing action (used when `href` is not set). */
-  onOpenWebsite?: () => void
+  onOpenWebsite?: () => void;
   /** Appended to the root element. */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -46,7 +46,7 @@ export function MspOrganizationCard({
   onOpenWebsite,
   className,
 }: MspOrganizationCardProps) {
-  const actionLabel = website ? `Open ${website}` : 'Open organization website'
+  const actionLabel = website ? `Open ${website}` : 'Open organization website';
 
   return (
     <div
@@ -61,8 +61,8 @@ export function MspOrganizationCard({
       <SquareAvatar src={logoUrl} alt={name} fallback={name} size="lg" variant="square" />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-h3 text-ods-text-primary">{title ?? `Your IT is managed by ${name}`}</span>
-        {website ? <span className="truncate text-h4 text-ods-text-secondary">{website}</span> : null}
+        <span className="truncate text-ods-text-primary text-h3">{title ?? `Your IT is managed by ${name}`}</span>
+        {website ? <span className="truncate text-ods-text-secondary text-h4">{website}</span> : null}
       </div>
 
       {href ? (
@@ -77,5 +77,5 @@ export function MspOrganizationCard({
         </Button>
       ) : null}
     </div>
-  )
+  );
 }

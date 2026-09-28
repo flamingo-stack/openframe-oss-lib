@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
-import { Button } from "../ui/button";
-import { MicrosoftIcon, GoogleLogo, SlackIcon, GitHubIcon, AppleIcon } from "../icons";
+import type { MouseEvent } from 'react';
+import { MicrosoftIcon, GoogleLogo, SlackIcon, GitHubIcon, AppleIcon } from '../icons';
+import { Button } from '../ui/button';
 
 interface ProviderButtonProps {
   provider: 'microsoft' | 'google' | 'slack' | 'github' | 'apple';
@@ -42,7 +43,7 @@ export function ProviderButton({ provider, onClick, disabled = false, loading = 
   // Use external loading state if provided, otherwise use internal state
   const isLoading = loading || internalLoading;
 
-  const handleClick = async (e: React.MouseEvent) => {
+  const handleClick = async (e: MouseEvent) => {
     // Prevent the click from bubbling up to parent elements (like modal backdrop)
     e.stopPropagation();
     e.preventDefault();
@@ -73,13 +74,8 @@ export function ProviderButton({ provider, onClick, disabled = false, loading = 
       disabled={disabled || isLoading}
       variant="outline"
       size="default"
-      leftIcon={isLoading ? null : <IconComponent className="w-5 h-5" />}
-      className={`
-        w-full md:!w-full h-[56px] 
-        !text-h6 !font-bold
-        hover:bg-ods-bg-hover
-        ${isLoading ? 'cursor-wait' : 'cursor-pointer'}
-      `}
+      leftIcon={isLoading ? null : <IconComponent className="h-5 w-5" />}
+      className={`h-[56px] w-full !font-bold !text-h6 hover:bg-ods-bg-hover md:!w-full ${isLoading ? 'cursor-wait' : 'cursor-pointer'} `}
       aria-label={config.displayName}
     >
       {isLoading ? 'Signing in...' : config.displayName}

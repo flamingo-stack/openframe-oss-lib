@@ -20,9 +20,9 @@
  * suggestion-fill instead.
  */
 
+import { useRouter } from '../../embed-shims/next-navigation';
 import type { Faq } from '../../types/faq';
 import { PageShell, PageLayout } from '../ui';
-import { useRouter } from '../../embed-shims/next-navigation';
 import { FaqSection } from './faq-section';
 import type { FaqSchemaOptions } from './json-ld';
 

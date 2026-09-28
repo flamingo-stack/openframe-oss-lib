@@ -16,6 +16,10 @@
     <dependencies>
         <dependency>
             <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-mongo-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-core</artifactId>
         </dependency>
         <dependency>
@@ -29,6 +33,10 @@
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-notification-mail</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-notification-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>

@@ -48,6 +48,16 @@ public class OrganizationsTest extends BaseTest {
                 .isEqualTo(request);
 
         // Publish the created org so the pipeline installs the device into it and archives it last.
+        //
+        // Only when a later phase will actually consume it. This org is empty until the pipeline's
+        // install step enrols a device into it, and BaseTest.pipelineScoped narrows every later device
+        // lookup to whatever is published here — so in a flat run, where nothing installs anything,
+        // publishing it strands every device case that follows in an org that will never have devices.
+        if (!PipelineContext.publishesToLaterPhase()) {
+            log.info("Standalone run: keeping org {} out of PipelineContext so later device lookups stay "
+                    + "tenant-wide", organization.getOrganizationId());
+            return;
+        }
         PipelineContext.setOrgId(organization.getOrganizationId());
         // Also capture this tenant's active agent registration secret so the pipeline's device
         // install uses the right --initialKey (best-effort; the install falls back to its default).
@@ -161,5 +171,21 @@ public class OrganizationsTest extends BaseTest {
         assertThat(lastActivity).allSatisfy(timestamp ->
                 assertThat(timestamp).as("Organization lastActivityAt should be within the inclusive range")
                         .isBetween(from, to));
+    }
+
+    @Tag("feature")
+    @Tag("saas")
+    @Test
+    @DisplayName("Check whether an organization can be archived")
+    public void testCanArchiveOrganization() {
+        Organization organization = OrganizationApi.createOrganization(OrganizationGenerator.createOrganizationRequest(true));
+        try {
+            assertThat(OrganizationApi.canArchiveOrganization(organization.getOrganizationId()))
+                    .as("An organization with no devices can be archived").isTrue();
+        } finally {
+            OrganizationApi.archiveOrganization(organization);
+        }
+        Organization archived = OrganizationApi.retrieveOrganizationByOrganizationId(organization.getOrganizationId());
+        assertThat(archived.getStatus()).as("The organization is archived afterwards").isEqualTo("ARCHIVED");
     }
 }

@@ -1,9 +1,9 @@
 'use client';
 
-import { useRouter } from '../embed-shims/next-navigation';
-import { useChatRuntime } from '../contexts/chat-runtime-context';
-import { executeNavigationImperative } from './chat/utils/execute-navigation';
 import { useCallback } from 'react';
+import { useChatRuntime } from '../contexts/chat-runtime-context';
+import { useRouter } from '../embed-shims/next-navigation';
+import { executeNavigationImperative } from './chat/utils/execute-navigation';
 import { OpenFrameLogo } from './icons';
 import { Button } from './ui/button';
 
@@ -46,12 +46,8 @@ export function FooterWaitlistButton({ className }: FooterWaitlistButtonProps) {
   }, [router, runtime]);
 
   return (
-    <Button 
-      onClick={handleClick} 
-      className={className}
-      leftIcon={<OpenFrameLogo />}
-    >
+    <Button onClick={handleClick} className={className} leftIcon={<OpenFrameLogo />}>
       Join Waitlist
     </Button>
   );
-} 
+}

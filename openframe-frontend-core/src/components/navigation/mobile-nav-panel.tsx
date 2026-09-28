@@ -1,47 +1,48 @@
-"use client"
+'use client';
 
-import React, { useRef } from 'react'
-import { usePreventScroll } from '@react-aria/overlays'
-import { cn } from '../../utils'
-import { MobileNavConfig, NavigationItem } from '../../types/navigation'
-import { Button } from '../ui/button'
-import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer'
-import { useFocusTrap } from '../../hooks/ui/use-focus-trap'
-import { useHeaderHeight } from '../../hooks/ui/use-header-height'
-import { X } from 'lucide-react'
+import { usePreventScroll } from '@react-aria/overlays';
+import { X } from 'lucide-react';
+import type React from 'react';
+import { useRef } from 'react';
+import { useFocusTrap } from '../../hooks/ui/use-focus-trap';
+import { useHeaderHeight } from '../../hooks/ui/use-header-height';
+import type { MobileNavConfig, NavigationItem } from '../../types/navigation';
+import { cn } from '../../utils';
+import { Button } from '../ui/button';
+import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer';
 
 /** DOM id of the panel — referenced by the header hamburger's `aria-controls`. */
-export const MOBILE_NAV_PANEL_ID = 'mobile-nav-panel'
+export const MOBILE_NAV_PANEL_ID = 'mobile-nav-panel';
 
 export interface MobileNavPanelProps {
-  isOpen: boolean
-  config: MobileNavConfig
+  isOpen: boolean;
+  config: MobileNavConfig;
 }
 
 export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Shared ref-counted, iOS-aware scroll lock (react-aria) — one counter with
   // the modals and chat overlays, restores prior styles on release.
-  usePreventScroll({ isDisabled: !isOpen })
+  usePreventScroll({ isDisabled: !isOpen });
   // Initial focus, Tab containment, Escape-to-close, guarded focus restore.
-  useFocusTrap(panelRef, isOpen, { onEscape: config.onClose })
+  useFocusTrap(panelRef, isOpen, { onEscape: config.onClose });
   // The panel is layout-mounted on every page — observers only while open.
-  const headerHeight = useHeaderHeight(64, { enabled: isOpen })
+  const headerHeight = useHeaderHeight(64, { enabled: isOpen });
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   const renderNavigationItem = (item: NavigationItem) => {
     if (item.element) {
-      return <div key={item.id}>{item.element}</div>
+      return <div key={item.id}>{item.element}</div>;
     }
 
     const handleClick = () => {
       if (item.onClick) {
-        item.onClick()
+        item.onClick();
       }
-      config.onClose?.()
-    }
+      config.onClose?.();
+    };
 
     if (item.href) {
       return (
@@ -54,13 +55,13 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
           leftIcon={item.icon}
           rightIcon={item.badge}
           className={cn(
-            "justify-start h-12 px-4 bg-transparent border-none text-ods-text-primary hover:bg-ods-bg-hover gap-3 rounded-md transition-colors",
-            item.isActive ? "bg-ods-bg-hover" : ""
+            'h-12 justify-start gap-3 rounded-md border-none bg-transparent px-4 text-ods-text-primary transition-colors hover:bg-ods-bg-hover',
+            item.isActive ? 'bg-ods-bg-hover' : '',
           )}
         >
           {item.label}
         </Button>
-      )
+      );
     }
 
     return (
@@ -71,25 +72,20 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
         onClick={handleClick}
         leftIcon={item.icon}
         className={cn(
-          "justify-start h-12 px-4 bg-transparent border-none text-ods-text-primary hover:bg-ods-bg-hover gap-3 rounded-md transition-colors",
-          item.isActive ? "bg-ods-bg-hover" : ""
+          'h-12 justify-start gap-3 rounded-md border-none bg-transparent px-4 text-ods-text-primary transition-colors hover:bg-ods-bg-hover',
+          item.isActive ? 'bg-ods-bg-hover' : '',
         )}
       >
         <span className="flex-1 text-left">{item.label}</span>
-        {item.badge !== undefined && (
-          <span className="ml-auto">{item.badge}</span>
-        )}
+        {item.badge !== undefined && <span className="ml-auto">{item.badge}</span>}
       </Button>
-    )
-  }
+    );
+  };
 
   return (
     <>
       {/* Backdrop - closes nav when clicked outside */}
-      <div
-        className={cn("fixed inset-0 z-[9998]", OVERLAY_BACKDROP_CLASS)}
-        onClick={config.onClose}
-      />
+      <div className={cn('fixed inset-0 z-[9998]', OVERLAY_BACKDROP_CLASS)} onClick={config.onClose} />
 
       {/* Navigation Panel - top-anchored floating card */}
       <div
@@ -101,31 +97,31 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
         tabIndex={-1}
         style={{ '--mobile-nav-top': `${headerHeight + 16}px` } as React.CSSProperties}
         className={cn(
-          "fixed z-[9999] rounded-lg shadow-xl",
-          config.className ? "" : "bg-ods-card border border-ods-border",
+          'fixed z-[9999] rounded-lg shadow-xl',
+          config.className ? '' : 'border border-ods-border bg-ods-card',
           // Responsive positioning and sizing — LEFT-anchored from md, flush
           // under the burger cell at the left edge of the unified
           // top-navigation (a larger inset read as a stray gap between the
           // burger and its panel).
-          "right-2 left-2 md:right-auto",
-          "md:left-2 md:w-[400px] md:max-w-[calc(100vw-1rem)]",
+          'left-2 right-2 md:right-auto',
+          'md:left-2 md:w-[400px] md:max-w-[calc(100vw-1rem)]',
           // Small-viewport (svh) sizing anchored below the measured header —
           // 100vh overflowed under mobile browser chrome, leaving the bottom
           // entries and footer unreachable while the body was scroll-locked.
-          "top-[var(--mobile-nav-top)]",
-          "max-h-[calc(100svh-var(--mobile-nav-top)-50px)] md:max-h-[calc(100svh-var(--mobile-nav-top)-8px)]",
-          "flex flex-col",
-          config.className || ""
+          'top-[var(--mobile-nav-top)]',
+          'max-h-[calc(100svh-var(--mobile-nav-top)-50px)] md:max-h-[calc(100svh-var(--mobile-nav-top)-8px)]',
+          'flex flex-col',
+          config.className || '',
         )}
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside nav
+        onClick={e => e.stopPropagation()} // Prevent closing when clicking inside nav
       >
         {/* Header with close button - fixed at top */}
-        <div className="flex justify-end p-2 border-b border-ods-border flex-shrink-0">
+        <div className="flex flex-shrink-0 justify-end border-b border-ods-border p-2">
           <Button
             aria-label="Close menu"
             size="icon"
             variant="transparent"
-            leftIcon={<X className="w-4 h-4 text-ods-text-primary" />}
+            leftIcon={<X className="h-4 w-4 text-ods-text-primary" />}
             onClick={config.onClose}
             className="hover:bg-ods-bg-hover"
           />
@@ -137,13 +133,11 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
             {config.sections.map((section, index) => (
               <div key={index}>
                 {section.title && (
-                  <div className="px-4 pt-2 pb-1 text-h6 font-semibold uppercase text-ods-text-secondary">
+                  <div className="px-4 pb-1 pt-2 font-semibold uppercase text-ods-text-secondary text-h6">
                     {section.title}
                   </div>
                 )}
-                <div className="flex flex-col gap-1">
-                  {section.items.map(renderNavigationItem)}
-                </div>
+                <div className="flex flex-col gap-1">{section.items.map(renderNavigationItem)}</div>
               </div>
             ))}
           </div>
@@ -151,11 +145,11 @@ export function MobileNavPanel({ isOpen, config }: MobileNavPanelProps) {
 
         {/* Footer with action button - fixed at bottom, clears the iOS home indicator */}
         {config.footer && (
-          <div className="border-t border-ods-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex-shrink-0">
+          <div className="flex-shrink-0 border-t border-ods-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {config.footer}
           </div>
         )}
       </div>
     </>
-  )
+  );
 }

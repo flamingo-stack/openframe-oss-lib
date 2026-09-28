@@ -2,21 +2,15 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import { CONTENT_PREFIX } from './proxy/content-prefix.mjs'
-import { hubTarget, rewrite, injectHeaders } from './proxy/inject.mjs'
+import { hubTarget, rewrite } from './proxy/inject.mjs'
 
-// The dev server + `vite preview` both proxy /content (and the two documented bare-/api
-// exceptions) to the hub, injecting the chat secret + fixed identity headers server-side.
-// Secrets come from loadEnv with prefix '' (ALL vars) — these run in Node config, never in the bundle.
+// The dev server + `vite preview` both proxy /content (and the documented bare-/api
+// exception) to the hub. CREDENTIAL-FREE: auth headers come from the client
+// (the /debug page's localStorage creds) and are forwarded untouched.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const target = hubTarget(env)
-  const inject = {
-    target,
-    changeOrigin: true,
-    configure: (proxy: { on: (e: string, cb: (preq: { setHeader: (k: string, v: string) => void }) => void) => void }) => {
-      proxy.on('proxyReq', (proxyReq) => injectHeaders(proxyReq, env))
-    },
-  }
+  const inject = { target, changeOrigin: true }
   const proxy = {
     // Canonical namespace: /content/api/* → ${HUB_ORIGIN}/api/* .
     [CONTENT_PREFIX]: { ...inject, rewrite },

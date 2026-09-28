@@ -1,0 +1,53 @@
+/* Open Design System – Effects (glows and glyph shadows)
+
+   THE ONE HOME for every glow in the system. A glow is spelled here as a CSS
+   variable and exposed as a utility class; consumers use the class (or the
+   variable inside an inline `filter`/`background`), never a `drop-shadow(...)`
+   or `radial-gradient(...)` literal of their own. Colour rides ODS tokens or
+   `currentColor`, so theming and renames land in one file.
+
+   Measured values come from the design file, not from taste:
+   - `--ods-glow-icon`: Figma etEsOUsmdzjqnIbSH4kULB · 4904:40461 ("How It
+     Works" icon panels). The icon effect exports as ONE drop shadow — offset
+     0, Gaussian stdDeviation 24 (Figma "blur 48"), 100% of the glyph's own
+     colour. CSS `drop-shadow()` takes the blur RADIUS (= 2 × stdDeviation),
+     so 48px reproduces the export exactly.
+   ------------------------------------------------------------------------- */
+
+:root {
+  /* A brand-accented glyph glowing in its own colour (set the colour on the element). */
+  --ods-glow-icon: drop-shadow(0 0 48px currentColor);
+
+  /* The ambient glow behind a hero brand mark: the OpenFrame yellow at 30%, 50px. */
+  --ods-glow-brand: drop-shadow(0 0 50px color-mix(in srgb, var(--ods-open-yellow-base) 30%, transparent));
+
+  /* The same brand glow as a wide backdrop (800px disc behind the hero mark): three opacities of the yellow. */
+  --ods-glow-brand-backdrop: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--ods-open-yellow-base) 12%, transparent) 0%,
+    color-mix(in srgb, var(--ods-open-yellow-base) 4%, transparent) 30%,
+    color-mix(in srgb, var(--ods-open-yellow-base) 0%, transparent) 70%
+  );
+
+  /* A cyan tag lifted off its card: a soft downward cyan shadow at 8%. */
+  --ods-glow-tag-cyan: drop-shadow(0 16px 16px color-mix(in srgb, var(--ods-flamingo-cyan-base) 8%, transparent));
+
+  /* Legibility shadow under a bare glyph drawn over media (no backdrop disc). */
+  --ods-shadow-glyph: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
+}
+
+.ods-glow-icon {
+  filter: var(--ods-glow-icon);
+}
+.ods-glow-brand {
+  filter: var(--ods-glow-brand);
+}
+.ods-glow-brand-backdrop {
+  background: var(--ods-glow-brand-backdrop);
+}
+.ods-glow-tag-cyan {
+  filter: var(--ods-glow-tag-cyan);
+}
+.ods-shadow-glyph {
+  filter: var(--ods-shadow-glyph);
+}

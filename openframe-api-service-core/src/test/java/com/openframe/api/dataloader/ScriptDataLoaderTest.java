@@ -1,7 +1,7 @@
 package com.openframe.api.dataloader;
 
 import com.openframe.api.dto.rmm.script.ScriptResponse;
-import com.openframe.api.service.rmm.ScriptService;
+import com.openframe.api.service.rmm.script.ScriptService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

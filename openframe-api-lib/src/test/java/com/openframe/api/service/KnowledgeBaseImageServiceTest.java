@@ -3,6 +3,7 @@ package com.openframe.api.service;
 import com.openframe.api.config.KnowledgeBaseImageProperties;
 import com.openframe.api.config.KnowledgeBaseImageProperties.AllowedType;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseImageUpload;
+import com.openframe.api.service.knowledgebase.KnowledgeBaseImageService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseImage;

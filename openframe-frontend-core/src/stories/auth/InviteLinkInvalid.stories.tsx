@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { InviteLinkInvalidModal } from '../../components/features/auth'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { InviteLinkInvalidModal } from '../../components/features/auth';
 
 const meta = {
   title: 'Auth/Invite Link Invalid',
@@ -13,11 +13,11 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof InviteLinkInvalidModal>
+} satisfies Meta<typeof InviteLinkInvalidModal>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: () => <InviteLinkInvalidModal onBackToLogin={() => {}} />,
-}
+};

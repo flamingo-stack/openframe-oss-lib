@@ -3,15 +3,15 @@
  * Contains types for NATS, WebSocket, and network configuration
  */
 
-import type { ChatType } from './chat.types'
+import type { ChatType } from './chat.types';
 
 // ========== NATS Types ==========
 
-export type NatsMessageType = 'message' | 'admin-message'
+export type NatsMessageType = 'message' | 'admin-message';
 
-export type NatsConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'closed' | 'error'
+export type NatsConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'closed' | 'error';
 
-export type NatsConnectionSource = 'client' | 'agent' | 'dashboard'
+export type NatsConnectionSource = 'client' | 'agent' | 'dashboard';
 
 // ========== Network Configuration ==========
 
@@ -26,78 +26,80 @@ export const NETWORK_CONFIG = {
   RETRY_INITIAL_DELAY_MS: 1000,
   RETRY_MAX_DELAY_MS: 30_000,
   RETRY_BACKOFF_MULTIPLIER: 2,
-} as const
+} as const;
 
-export type NetworkConfig = typeof NETWORK_CONFIG
+export type NetworkConfig = typeof NETWORK_CONFIG;
 
 // ========== Chunk Data Types ==========
 
 export interface ChunkData {
-  sequenceId?: number
+  sequenceId?: number;
   /** JetStream stream sequence, populated from JsMsg.info.streamSequence when delivered via JetStream. */
-  streamSeq?: number
+  streamSeq?: number;
   /** Authoritative dialog streaming state at the time this chunk was emitted; consumers should mirror it into their dialog cache. */
-  streamState?: 'IDLE' | 'STREAMING'
-  type: string
-  text?: string
-  integratedToolType?: string
-  toolFunction?: string
+  streamState?: 'IDLE' | 'STREAMING';
+  type: string;
+  text?: string;
+  integratedToolType?: string;
+  toolFunction?: string;
   /** Execution chunks carry the human-readable title as `title`. */
-  title?: string
+  title?: string;
   /** EXECUTING_TOOL chunks carry the tool's human-readable explanation (what/why). */
-  toolExplanation?: string
-  parameters?: Record<string, any>
-  result?: string
-  success?: boolean
-  toolExecutionRequestId?: string
-  error?: string
-  details?: string
-  approvalRequestId?: string
-  approval_request_id?: string
-  approvalType?: string
-  command?: string
-  explanation?: string
-  approved?: boolean
+  toolExplanation?: string;
+  parameters?: Record<string, unknown>;
+  result?: string;
+  success?: boolean;
+  toolExecutionRequestId?: string;
+  error?: string;
+  details?: string;
+  approvalRequestId?: string;
+  approval_request_id?: string;
+  approvalType?: string;
+  command?: string;
+  explanation?: string;
+  approved?: boolean;
   /** On APPROVAL_RESULT chunks: display name of the user who resolved the request. */
-  resolvedByName?: string
-  toolCalls?: any[]
-  /** On GUIDE chunks: a Product Guide frame the agent re-streamed verbatim from
-   *  the hub, instead of the answer text `text` carries. Decoded by
-   *  `decodeNatsChunk` through the shared leading-frame table. */
-  payload?: Record<string, unknown>
-  modelName?: string
-  providerName?: string
-  provider?: string
-  contextWindow?: number
-  ownerType?: string
-  displayName?: string
-  [key: string]: any
+  resolvedByName?: string;
+  /** Batch-approval rows. Coerced by `normalizeToolCalls` in the NATS decoder
+   *  — the wire shape is per-backend, so entries stay opaque here. */
+  toolCalls?: unknown[];
+  /** Opaque per-chunk payload some backends attach beside `text`. */
+  payload?: Record<string, unknown>;
+  modelName?: string;
+  providerName?: string;
+  provider?: string;
+  contextWindow?: number;
+  ownerType?: string;
+  displayName?: string;
+  /** Chunk kinds this lib does not model yet — decoders read them through
+   *  their own typeof gates. */
+  [key: string]: unknown;
 }
 
 export interface BufferedChunk {
-  chunk: ChunkData
-  messageType: NatsMessageType
+  chunk: ChunkData;
+  messageType: NatsMessageType;
 }
 
 // ========== WebSocket Types ==========
 
 export interface WebSocketMessage {
-  type: string
-  payload: any
-  timestamp?: string
-  id?: string
+  type: string;
+  payload: unknown;
+  timestamp?: string;
+  id?: string;
 }
 
 export interface WebSocketConfig {
-  url: string
-  protocols?: string | string[]
-  reconnect?: boolean
-  reconnectInterval?: number
-  maxReconnectAttempts?: number
-  onOpen?: (event: Event) => void
-  onClose?: (event: CloseEvent) => void
-  onError?: (event: Event) => void
-  onMessage?: (event: MessageEvent) => void
+  url: string;
+  protocols?: string | string[];
+  reconnect?: boolean;
+  reconnectInterval?: number;
+  maxReconnectAttempts?: number;
+  onOpen?: (event: Event) => void;
+  onClose?: (event: CloseEvent) => void;
+  onError?: (event: Event) => void;
+  onMessage?: (event: MessageEvent) => void;
 }
 
 // ========== Fetch Functions ==========
@@ -105,30 +107,30 @@ export interface WebSocketConfig {
 export type FetchChunksFunction = (
   dialogId: string,
   chatType: ChatType,
-  fromSequenceId?: number | null
-) => Promise<ChunkData[]>
+  fromSequenceId?: number | null,
+) => Promise<ChunkData[]>;
 
 // ========== Network Response Types ==========
 
-export interface NetworkResponse<T = any> {
-  success: boolean
-  data?: T
-  error?: string
-  message?: string
+export interface NetworkResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
 }
 
-export interface PaginatedResponse<T = any> extends NetworkResponse<T> {
-  page: number
-  pageSize: number
-  totalCount: number
-  totalPages: number
+export interface PaginatedResponse<T = unknown> extends NetworkResponse<T> {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
 }
 
 // ========== API Error Types ==========
 
 export interface NetworkError {
-  code: string
-  message: string
-  details?: any
-  timestamp: string
+  code: string;
+  message: string;
+  details?: unknown;
+  timestamp: string;
 }

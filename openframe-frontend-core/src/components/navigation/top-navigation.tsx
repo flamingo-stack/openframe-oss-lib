@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import type React from 'react';
 import { cn } from '../../utils/cn';
 
 export type TopNavigationCenterBreakpoint = 'md' | 'lg';
@@ -116,7 +116,7 @@ export function TopNavigation({
           className={cn(
             'flex h-full min-w-0 items-center',
             LOGO_GROW[centerBreakpoint],
-            'p-[var(--spacing-system-m)] md:py-0 md:pr-0 md:pl-[var(--spacing-system-l)] lg:pl-[var(--spacing-system-xxl)]',
+            'p-[var(--spacing-system-m)] md:py-0 md:pl-[var(--spacing-system-l)] md:pr-0 lg:pl-[var(--spacing-system-xxl)]',
             logoClassName,
           )}
         >

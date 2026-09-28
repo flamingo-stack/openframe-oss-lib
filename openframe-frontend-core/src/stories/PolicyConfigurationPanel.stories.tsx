@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
-import { PolicyConfigurationPanel } from '../components/features/policy-configuration-panel'
-import type { ApprovalLevel, PermissionCategory } from '../types/permissions'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
+import { PolicyConfigurationPanel } from '../components/features/policy-configuration-panel';
+import type { ApprovalLevel, PermissionCategory } from '../types/permissions';
 
 const meta = {
   title: 'Features/PolicyConfigurationPanel',
@@ -26,16 +26,16 @@ const meta = {
     editMode: { control: 'boolean' },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ maxWidth: '960px' }}>
         <Story />
       </div>
     ),
   ],
-} satisfies Meta<typeof PolicyConfigurationPanel>
+} satisfies Meta<typeof PolicyConfigurationPanel>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 const deviceCategories: PermissionCategory[] = [
   {
@@ -112,7 +112,7 @@ const deviceCategories: PermissionCategory[] = [
       },
     ],
   },
-]
+];
 
 const dataCategories: PermissionCategory[] = [
   {
@@ -137,7 +137,7 @@ const dataCategories: PermissionCategory[] = [
       },
     ],
   },
-]
+];
 
 /** Applies a level to one policy; mirrors what the guardrails editor hook does. */
 const applyPolicyLevel = (
@@ -155,7 +155,7 @@ const applyPolicyLevel = (
             policy.id === policyId ? { ...policy, approvalLevel: level } : policy,
           ),
         },
-  )
+  );
 
 /** Bulk-applies a level to every policy in a category. */
 const applyCategoryLevel = (
@@ -167,7 +167,7 @@ const applyCategoryLevel = (
     category.id !== categoryId
       ? category
       : { ...category, policies: category.policies.map(policy => ({ ...policy, approvalLevel: level })) },
-  )
+  );
 
 /** Read-only view: approval levels render as text, no bulk dropdowns. */
 export const ReadOnly: Story = {
@@ -177,7 +177,7 @@ export const ReadOnly: Story = {
     onPolicyPermissionChange: fn(),
     onCategoryPermissionChange: fn(),
   },
-}
+};
 
 /**
  * Interactive edit mode: per-policy dropdowns plus a bulk "global permission"
@@ -192,24 +192,24 @@ export const EditMode: Story = {
     onCategoryPermissionChange: fn(),
   },
   render: args => {
-    const [categories, setCategories] = useState(args.categories)
+    const [categories, setCategories] = useState(args.categories);
 
     return (
       <PolicyConfigurationPanel
         {...args}
         categories={categories}
         onPolicyPermissionChange={(categoryId, policyId, level) => {
-          args.onPolicyPermissionChange(categoryId, policyId, level)
-          setCategories(prev => applyPolicyLevel(prev, categoryId, policyId, level))
+          args.onPolicyPermissionChange(categoryId, policyId, level);
+          setCategories(prev => applyPolicyLevel(prev, categoryId, policyId, level));
         }}
         onCategoryPermissionChange={(categoryId, level) => {
-          args.onCategoryPermissionChange(categoryId, level)
-          setCategories(prev => applyCategoryLevel(prev, categoryId, level))
+          args.onCategoryPermissionChange(categoryId, level);
+          setCategories(prev => applyCategoryLevel(prev, categoryId, level));
         }}
       />
-    )
+    );
   },
-}
+};
 
 /**
  * How the guardrails tab composes the panel: one panel per policy group, each
@@ -226,31 +226,31 @@ export const GroupedPolicySections: Story = {
     const [groups, setGroups] = useState<Record<string, PermissionCategory[]>>({
       'Device Management': deviceCategories,
       'Data Access': dataCategories,
-    })
+    });
 
     const updateGroup = (groupName: string, next: (categories: PermissionCategory[]) => PermissionCategory[]) =>
-      setGroups(prev => ({ ...prev, [groupName]: next(prev[groupName]) }))
+      setGroups(prev => ({ ...prev, [groupName]: next(prev[groupName]) }));
 
     return (
       <div className="flex flex-col gap-[var(--spacing-system-l)]">
         {Object.entries(groups).map(([groupName, categories]) => (
           <div key={groupName} className="flex flex-col gap-[var(--spacing-system-xxs)]">
-            <p className="text-h5 text-ods-text-secondary truncate">{groupName}</p>
+            <p className="truncate text-ods-text-secondary text-h5">{groupName}</p>
             <PolicyConfigurationPanel
               categories={categories}
               editMode={args.editMode}
               onPolicyPermissionChange={(categoryId, policyId, level) => {
-                args.onPolicyPermissionChange(categoryId, policyId, level)
-                updateGroup(groupName, prev => applyPolicyLevel(prev, categoryId, policyId, level))
+                args.onPolicyPermissionChange(categoryId, policyId, level);
+                updateGroup(groupName, prev => applyPolicyLevel(prev, categoryId, policyId, level));
               }}
               onCategoryPermissionChange={(categoryId, level) => {
-                args.onCategoryPermissionChange(categoryId, level)
-                updateGroup(groupName, prev => applyCategoryLevel(prev, categoryId, level))
+                args.onCategoryPermissionChange(categoryId, level);
+                updateGroup(groupName, prev => applyCategoryLevel(prev, categoryId, level));
               }}
             />
           </div>
         ))}
       </div>
-    )
+    );
   },
-}
+};

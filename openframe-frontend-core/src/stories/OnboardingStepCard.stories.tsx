@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { OnboardingStepCard } from '../components/shared/onboarding/onboarding-step-card'
-import { UserPlusIcon } from '../components/icons-v2-generated/users/user-plus-icon'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { UserPlusIcon } from '../components/icons-v2-generated/users/user-plus-icon';
+import { OnboardingStepCard } from '../components/shared/onboarding/onboarding-step-card';
 
 const baseStep = {
   id: 'invite-users',
@@ -11,7 +11,7 @@ const baseStep = {
   completedText: 'Manage Users',
   onAction: () => console.log('action'),
   onSkip: () => console.log('skip'),
-}
+};
 
 const meta = {
   title: 'Shared/OnboardingStepCard',
@@ -26,10 +26,10 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof OnboardingStepCard>
+} satisfies Meta<typeof OnboardingStepCard>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Pending step — shows Skip Step + the primary action button.
@@ -43,7 +43,7 @@ export const Default: Story = {
     onAction: () => console.log('action'),
     onSkip: () => console.log('skip'),
   },
-}
+};
 
 /**
  * Completed step — shows the success badge and a "Manage" button.
@@ -53,7 +53,7 @@ export const Completed: Story = {
     ...Default.args,
     isCompleted: true,
   },
-}
+};
 
 /**
  * Skipped step — shows only the SKIPPED badge.
@@ -63,7 +63,7 @@ export const Skipped: Story = {
     ...Default.args,
     isSkipped: true,
   },
-}
+};
 
 /**
  * Loading state while completion status is being checked.
@@ -73,7 +73,7 @@ export const CheckingCompletion: Story = {
     ...Default.args,
     isCheckingCompletion: true,
   },
-}
+};
 
 /**
  * Full list rendered the way it appears on the Get Started page.
@@ -119,11 +119,11 @@ export const List: Story = {
         description: 'Access documentation and learning resources',
         completed: false,
       },
-    ]
+    ];
 
     return (
       <div className="flex flex-col gap-3">
-        {steps.map((s) => (
+        {steps.map(s => (
           <OnboardingStepCard
             key={s.id}
             step={s}
@@ -135,6 +135,6 @@ export const List: Story = {
           />
         ))}
       </div>
-    )
+    );
   },
-}
+};

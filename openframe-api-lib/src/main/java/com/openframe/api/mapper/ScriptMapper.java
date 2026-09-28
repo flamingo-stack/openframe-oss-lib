@@ -4,11 +4,10 @@ import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
-import com.openframe.data.document.rmm.PrivilegeLevel;
-import com.openframe.data.document.rmm.Script;
-import com.openframe.data.document.rmm.ScriptEnvVar;
-import com.openframe.data.document.rmm.OsType;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -48,7 +47,7 @@ public class ScriptMapper {
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
         existing.setDefaultArgs(input.getDefaultArgs());
-        existing.setEnvVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()));
+        existing.setEnvVars(ScriptEnvVarMapper.toEntity(input.getEnvVars(), existing.getEnvVars()));
     }
 
     public ScriptResponse toResponse(Script entity) {

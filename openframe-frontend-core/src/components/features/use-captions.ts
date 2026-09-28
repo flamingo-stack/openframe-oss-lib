@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * useCaptions — THE captions configurer.
@@ -14,33 +14,33 @@
  * server-import-safe); this hook only binds it to the ambient runtime.
  */
 
-import { useMemo } from 'react'
-import { useChatRuntime } from '../../contexts/chat-runtime-context'
+import { useMemo } from 'react';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import {
   getEntityCaptionUrls,
   getEntityCaptionUrlsById,
   rebaseCaptionsUrl,
   type CaptionSrtFields,
   type EntityCaptionUrls,
-} from './captions-url'
+} from './captions-url';
 
 export interface CaptionsApi {
   /** Both track URLs from an entity row's SRT columns (presence-gated). */
-  forEntity: (entityType: string, entity: CaptionSrtFields | null | undefined) => EntityCaptionUrls
+  forEntity: (entityType: string, entity: CaptionSrtFields | null | undefined) => EntityCaptionUrls;
   /** Both track URLs from entity identity alone (no SRT knowledge — chat cards). */
-  forEntityId: (entityType: string, entityId: string | number) => Required<EntityCaptionUrls>
+  forEntityId: (entityType: string, entityId: string | number) => Required<EntityCaptionUrls>;
   /** Rebase an already-built relative `/api/captions/...` URL onto the host base. */
-  rebase: <T extends string | null | undefined>(url: T) => T | string
+  rebase: <T extends string | null | undefined>(url: T) => T | string;
 }
 
 export function useCaptions(): CaptionsApi {
-  const endpoints = useChatRuntime()?.endpoints ?? null
+  const endpoints = useChatRuntime()?.endpoints ?? null;
   return useMemo(
     () => ({
       forEntity: (entityType, entity) => getEntityCaptionUrls(endpoints, entityType, entity),
       forEntityId: (entityType, entityId) => getEntityCaptionUrlsById(endpoints, entityType, entityId),
-      rebase: (url) => rebaseCaptionsUrl(endpoints, url),
+      rebase: url => rebaseCaptionsUrl(endpoints, url),
     }),
     [endpoints],
-  )
+  );
 }

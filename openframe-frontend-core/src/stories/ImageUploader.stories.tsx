@@ -2,8 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { ImageUploader } from '../components/ui/image-uploader';
 
-const SAMPLE_IMAGE =
-  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80';
+const SAMPLE_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80';
 
 const meta = {
   title: 'UI/ImageUploader',
@@ -19,7 +18,7 @@ const meta = {
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '600px' }}>
         <Story />
       </div>
@@ -43,12 +42,13 @@ export const AllStates: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'All four states from Figma (default, hover, action, uploaded). Hover/action states are static visual representations driven by CSS classes — interact with the Default story to see real hover/drag behavior.',
+        story:
+          'All four states from Figma (default, hover, action, uploaded). Hover/action states are static visual representations driven by CSS classes — interact with the Default story to see real hover/drag behavior.',
       },
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '100%', maxWidth: '1400px' }}>
         <Story />
       </div>
@@ -118,7 +118,7 @@ export const SquareAspectRatio: Story = {
     onRemove: () => {},
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '320px' }}>
         <Story />
       </div>
@@ -207,15 +207,8 @@ export const Interactive: Story = {
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <ImageUploader
-          value={preview}
-          onChange={handleChange}
-          onRemove={handleRemove}
-          fieldLabel="Cover image"
-        />
-        <p style={{ color: '#888', fontSize: '14px' }}>
-          {fileName ? `Selected: ${fileName}` : 'No image selected'}
-        </p>
+        <ImageUploader value={preview} onChange={handleChange} onRemove={handleRemove} fieldLabel="Cover image" />
+        <p style={{ color: '#888', fontSize: '14px' }}>{fileName ? `Selected: ${fileName}` : 'No image selected'}</p>
       </div>
     );
   },

@@ -6,6 +6,10 @@
 # ScheduleRunDataFetcher; tenant scoping is implicit via TenantIdProvider.
 
 extend type Query {
+    """A single schedule fire by its Relay id. Typed refetch — the alternative to node(id).
+    Throws (not null) if the id is absent or in another tenant."""
+    scheduleRun(id: ID!): ScheduleRun!
+
     """Cursor-paginated list of individual schedule fires (Schedule Runs tab).
     Each row is one dispatch of the schedule to its assigned devices. Newest first
     by dispatchedAt (default). Optional statuses filter + case-insensitive substring

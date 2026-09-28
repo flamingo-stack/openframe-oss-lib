@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { ArrayEntryManager } from './array-entry-manager';
 import { ExternalLink } from 'lucide-react';
+import { ArrayEntryManager } from './array-entry-manager';
 
 export interface GitHubReleaseLink {
   github_release_url: string; // Full GitHub release URL
@@ -14,11 +14,7 @@ interface GitHubReleasesManagerProps {
   className?: string;
 }
 
-export function GitHubReleasesManager({
-  releases,
-  onChange,
-  className = ''
-}: GitHubReleasesManagerProps) {
+export function GitHubReleasesManager({ releases, onChange, className = '' }: GitHubReleasesManagerProps) {
   return (
     <ArrayEntryManager
       title="GitHub Releases"
@@ -28,7 +24,7 @@ export function GitHubReleasesManager({
       placeholder="https://github.com/org/repo/releases/tag/v2.0.0"
       emptyMessage='No GitHub releases linked. Click "Add Release" to link releases.'
       addButtonText="Add Release"
-      icon={<ExternalLink className="w-5 h-5 text-ods-text-secondary" />}
+      icon={<ExternalLink className="h-5 w-5 text-ods-text-secondary" />}
       className={className}
     />
   );

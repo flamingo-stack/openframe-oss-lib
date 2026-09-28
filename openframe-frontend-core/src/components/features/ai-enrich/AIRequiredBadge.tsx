@@ -1,35 +1,32 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { SparklesIcon } from '../../icons/sparkles-icon'
-import { cn } from '../../../utils/cn'
+import type React from 'react';
+import { cn } from '../../../utils/cn';
+import { SparklesIcon } from '../../icons/sparkles-icon';
 
 export interface AIRequiredBadgeProps {
-  className?: string
+  className?: string;
   /** Show a smaller inline variant */
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md';
 }
 
 /**
  * Badge component to indicate a field is required for AI enrichment.
  * Uses ODS cyan color with sparkles icon.
  */
-export const AIRequiredBadge: React.FC<AIRequiredBadgeProps> = ({
-  className,
-  size = 'sm'
-}) => {
+export const AIRequiredBadge: React.FC<AIRequiredBadgeProps> = ({ className, size = 'sm' }) => {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 text-h6 rounded-full',
+        'inline-flex items-center gap-1 rounded-full text-h6',
         'bg-ods-flamingo-cyan/10 text-ods-flamingo-cyan',
         size === 'sm' && 'ml-2 px-2 py-0.5',
         size === 'md' && 'ml-2 px-2.5 py-1',
-        className
+        className,
       )}
     >
       <SparklesIcon size={size === 'sm' ? 12 : 14} color="var(--ods-flamingo-cyan-base)" />
       <span className="font-body">AI-required</span>
     </span>
-  )
-}
+  );
+};

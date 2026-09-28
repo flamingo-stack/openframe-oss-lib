@@ -1,13 +1,13 @@
-'use client'
+'use client';
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react';
 
 // Every focusable a clone might contain — matched so it can be pulled out of the
 // keyboard tab order (see useSuppressCloneFocus). `[contenteditable]:not(
 // [contenteditable="false"])` catches the empty/`"true"`/`"plaintext-only"`
 // editable forms; `summary` is focusable inside a <details>.
 const CLONE_FOCUSABLE_SELECTOR =
-  'a[href],button,input,select,textarea,iframe,summary,audio[controls],video[controls],[tabindex],[contenteditable]:not([contenteditable="false"])'
+  'a[href],button,input,select,textarea,iframe,summary,audio[controls],video[controls],[tabindex],[contenteditable]:not([contenteditable="false"])';
 
 /**
  * Keep a marquee clone's content pointer-CLICKABLE while taking it out of the
@@ -32,30 +32,30 @@ const CLONE_FOCUSABLE_SELECTOR =
  * Swiper/Splide.
  */
 export function useSuppressCloneFocus(active: boolean) {
-  const ref = useRef<HTMLDivElement | null>(null)
+  const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const root = ref.current
-    if (!root || !active) return
+    const root = ref.current;
+    if (!root || !active) return undefined;
     const suppress = () => {
       root.querySelectorAll<HTMLElement>(CLONE_FOCUSABLE_SELECTOR).forEach(el => {
         // Only stamp the ones not already stamped — avoids touching the DOM (and
         // clobbering an intentional tabindex) on every mutation.
-        if (el.getAttribute('tabindex') !== '-1') el.setAttribute('tabindex', '-1')
-      })
-    }
-    suppress()
+        if (el.getAttribute('tabindex') !== '-1') el.setAttribute('tabindex', '-1');
+      });
+    };
+    suppress();
     // Watch structure AND the attributes that can turn a descendant tabbable
     // (an anchor gaining `href`, React restoring `tabindex="0"`, an element
     // becoming editable, media gaining `controls`). The `!== '-1'` guard above
     // makes our own tabindex writes a no-op, so the observer never loops.
-    const mo = new MutationObserver(suppress)
+    const mo = new MutationObserver(suppress);
     mo.observe(root, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: ['href', 'tabindex', 'contenteditable', 'controls'],
-    })
-    return () => mo.disconnect()
-  }, [active])
-  return ref
+    });
+    return () => mo.disconnect();
+  }, [active]);
+  return ref;
 }

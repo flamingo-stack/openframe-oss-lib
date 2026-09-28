@@ -13,7 +13,7 @@ import static com.openframe.data.document.ticket.TicketStatusKind.TECH_REQUIRED;
 
 public final class TicketStatusSeedCatalog {
 
-    public static final String NAME_AI_ASSISTANCE = "AI Assistance";
+    public static final String NAME_AI_ASSISTANCE = "AI Handling";
     public static final String NAME_TECH_REQUIRED = "Tech Required";
     public static final String NAME_RESOLVED = "Resolved";
     public static final String NAME_ARCHIVED = "Archived";

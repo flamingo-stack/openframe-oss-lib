@@ -1,7 +1,7 @@
 package com.openframe.api.controller;
 
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseImageUpload;
-import com.openframe.api.service.KnowledgeBaseImageService;
+import com.openframe.api.service.knowledgebase.KnowledgeBaseImageService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.BaseGlobalExceptionHandler;
 import com.openframe.core.exception.NotFoundException;

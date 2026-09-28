@@ -1,14 +1,10 @@
-import React from 'react';
-
 interface YouTubeIconProps {
   color?: string;
   className?: string;
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function YouTubeIcon({ className ,
-  color = 'white'
-}:  YouTubeIconProps) {
+export function YouTubeIcon({ className, color = 'white' }: YouTubeIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

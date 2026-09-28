@@ -5,10 +5,12 @@ pub mod agent_token_response;
 pub mod device_tag;
 pub mod download_configuration;
 pub mod execution;
+pub mod hostname_report_message;
 pub mod initial_configuration;
 pub mod installed_agent_message;
 pub mod installed_tool;
 pub mod machine_heartbeat_message;
+pub mod machine_timezone_message;
 pub mod openframe_client_info;
 pub mod openframe_client_update_message;
 pub mod tool_agent_update_message;
@@ -22,9 +24,11 @@ pub mod tool_version_overrides;
 pub mod update_state;
 
 pub use execution::{
-    CommandMessage, ExecutionMessage, ExecutionRequest, PrivilegeLevel, RmmResult, ScriptEnvVar,
-    ScriptMessage, ScriptScheduleExecutionItem, ScriptScheduleExecutionMessage, ScriptShell,
-    ScriptSpec,
+    is_ack_subject, BootstrapRoute, BootstrapScriptMessage, CommandMessage, ExecutionAck,
+    ExecutionMessage, ExecutionRequest, PrivilegeLevel, PrivilegePolicy, RmmResult,
+    RoutedScriptMessage, ScriptEnvVar, ScriptMessage, ScriptRoute, ScriptScheduleExecutionItem,
+    ScriptScheduleExecutionMessage, ScriptShell, ScriptSpec, SoftwareRoute, SoftwareScriptMessage,
+    EXECUTION_ACK_KIND,
 };
 
 pub use agent_configuration::AgentConfiguration;
@@ -33,10 +37,12 @@ pub use agent_registration_response::AgentRegistrationResponse;
 pub use agent_token_response::AgentTokenResponse;
 pub use device_tag::DeviceTag;
 pub use download_configuration::{DownloadConfiguration, InstallationType};
+pub use hostname_report_message::HostnameReportMessage;
 pub use initial_configuration::InitialConfiguration;
 pub use installed_agent_message::InstalledAgentMessage;
 pub use installed_tool::{Installation, InstalledAsset, InstalledTool, ToolRecordState};
 pub use machine_heartbeat_message::MachineHeartbeatMessage;
+pub use machine_timezone_message::MachineTimezoneMessage;
 pub use openframe_client_info::OpenFrameClientInfo;
 pub use openframe_client_update_message::OpenFrameClientUpdateMessage;
 pub use tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};

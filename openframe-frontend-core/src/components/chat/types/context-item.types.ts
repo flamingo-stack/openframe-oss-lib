@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Context-item types for the chat composer's entity-context picker
@@ -16,7 +16,7 @@
  * modes. The picker is inert unless `contextPicker` is supplied.
  */
 
-import type * as React from 'react'
+import type { ReactNode } from 'react';
 
 /**
  * A selectable entity TYPE shown in the first-level picker list
@@ -28,16 +28,16 @@ import type * as React from 'react'
 export interface ChatContextEntityType {
   /** Backend discriminator, echoed verbatim onto every `ChatContextItem.type`
    *  produced for this entity (e.g. `'DEVICE'`). */
-  type: string
+  type: string;
   /** Display label for the type row, e.g. `'Device'`. */
-  label: string
+  label: string;
   /** Optional icon element rendered at the row lead (host-supplied). */
-  icon?: React.ReactNode
+  icon?: ReactNode;
   /** Optional backend mention marker — the SHORT token used for the committed
    *  inline `@marker:id` reference (e.g. `'device'`, `'kb'`). When omitted the
    *  composer falls back to a lowercased `type`. Lets the host map each kind to
    *  the backend's exact mention vocabulary without the lib knowing it. */
-  marker?: string
+  marker?: string;
 }
 
 /**
@@ -47,13 +47,13 @@ export interface ChatContextEntityType {
  */
 export interface ChatContextItem {
   /** Type discriminator — matches a `ChatContextEntityType.type`. */
-  type: string
+  type: string;
   /** Stable backend id, sent in the payload. */
-  id: string
+  id: string;
   /** Primary display label (chip + list row title), e.g. `'ELK-PROD-07'`. */
-  label: string
+  label: string;
   /** Optional secondary line in the list row (email, path, status, …). */
-  description?: string
+  description?: string;
 }
 
 /**
@@ -65,15 +65,15 @@ export interface ChatContextItem {
  */
 export interface ContextItemsRenderArgs {
   /** Active entity type discriminator (e.g. `'DEVICE'`). */
-  type: string
+  type: string;
   /** Debounced search text from the picker's search field (`''` = unfiltered). */
-  query: string
+  query: string;
   /** Selected item keys (`${type}:${id}`) — drives the ✓ state. */
-  selectedKeys: Set<string>
+  selectedKeys: Set<string>;
   /** Toggle an item in/out of the selection. */
-  onToggle: (item: ChatContextItem) => void
+  onToggle: (item: ChatContextItem) => void;
   /** True when the selection cap is reached (non-selected rows are disabled). */
-  atLimit: boolean
+  atLimit: boolean;
 }
 
 /**
@@ -88,17 +88,17 @@ export interface ContextItemsRenderArgs {
  */
 export interface ChatContextPickerConfig {
   /** Entity types shown in the first-level list, in display order. */
-  entityTypes: ChatContextEntityType[]
+  entityTypes: ChatContextEntityType[];
   /**
    * Render the items list for the active type. The host fetches with its own
    * hooks and returns a `<ContextItemsList>` (or any node). Called inside the
    * picker's `<Suspense>` + error boundary, so it may suspend on initial load.
    */
-  renderItems: (args: ContextItemsRenderArgs) => React.ReactNode
+  renderItems: (args: ContextItemsRenderArgs) => ReactNode;
   /** Max selectable items. Defaults to 10. */
-  maxItems?: number
+  maxItems?: number;
   /** Optional "Upload File" entry in the `+` menu. When omitted, the menu
    *  collapses to the single "Assign Item" action (or, if attachments are
    *  also off, the `+` button opens the picker directly). */
-  onUploadFile?: () => void
+  onUploadFile?: () => void;
 }

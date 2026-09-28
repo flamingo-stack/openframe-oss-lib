@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import { useState } from 'react';
 import { Button } from './button';
 import { CheckboxBlock } from './checkbox-block';
 import { ModalV2, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
@@ -48,15 +48,21 @@ export function ReopenTicketRequestModal({
   isPending = false,
   onConfirm,
 }: ReopenTicketRequestModalProps) {
-  const [reason, setReason] = React.useState('');
-  const [handoff, setHandoff] = React.useState(false);
+  const [reason, setReason] = useState('');
+  const [handoff, setHandoff] = useState(false);
 
-  // Re-seed the inputs every time the modal opens.
-  React.useEffect(() => {
-    if (!isOpen) return;
-    setReason('');
-    setHandoff(false);
-  }, [isOpen]);
+  // Re-seed the inputs every time the modal opens. Adjusted while rendering,
+  // not from an effect: the modal does not unmount when it closes, so an effect
+  // painted the OPENING frame with the previous session's reason still typed in
+  // before clearing it.
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setReason('');
+      setHandoff(false);
+    }
+  }
 
   const handleConfirm = () => {
     if (isPending) return;
@@ -73,7 +79,7 @@ export function ReopenTicketRequestModal({
         <ModalV2Title>Reopen Ticket</ModalV2Title>
       </ModalV2Header>
 
-      <p className="text-h4 text-ods-text-primary">
+      <p className="text-ods-text-primary text-h4">
         This ticket will be reopened and the AI assistant will continue helping you.
       </p>
 

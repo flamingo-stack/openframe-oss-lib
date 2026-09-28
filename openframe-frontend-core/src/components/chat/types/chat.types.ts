@@ -7,9 +7,9 @@
 export const CHAT_TYPE = {
   CLIENT: 'CLIENT_CHAT',
   ADMIN: 'ADMIN_AI_CHAT',
-} as const
+} as const;
 
-export type ChatType = typeof CHAT_TYPE[keyof typeof CHAT_TYPE]
+export type ChatType = (typeof CHAT_TYPE)[keyof typeof CHAT_TYPE];
 
 // ========== Owner Type Definitions ==========
 
@@ -17,9 +17,9 @@ export const OWNER_TYPE = {
   CLIENT: 'CLIENT',
   ADMIN: 'ADMIN',
   ASSISTANT: 'ASSISTANT',
-} as const
+} as const;
 
-export type OwnerType = typeof OWNER_TYPE[keyof typeof OWNER_TYPE]
+export type OwnerType = (typeof OWNER_TYPE)[keyof typeof OWNER_TYPE];
 
 // ========== Role Definitions ==========
 
@@ -28,18 +28,18 @@ export const MESSAGE_ROLE = {
   ASSISTANT: 'assistant',
   ERROR: 'error',
   SYSTEM: 'system',
-} as const
+} as const;
 
-export type MessageRole = typeof MESSAGE_ROLE[keyof typeof MESSAGE_ROLE]
+export type MessageRole = (typeof MESSAGE_ROLE)[keyof typeof MESSAGE_ROLE];
 
 // ========== Assistant Type Definitions ==========
 
 export const ASSISTANT_TYPE = {
   FAE: 'fae',
   MINGO: 'mingo',
-} as const
+} as const;
 
-export type AssistantType = typeof ASSISTANT_TYPE[keyof typeof ASSISTANT_TYPE]
+export type AssistantType = (typeof ASSISTANT_TYPE)[keyof typeof ASSISTANT_TYPE];
 
 // ========== Author Type Definitions ==========
 
@@ -49,9 +49,9 @@ export const AUTHOR_TYPE = {
   FAE: 'fae',
   MINGO: 'mingo',
   SYSTEM: 'system',
-} as const
+} as const;
 
-export type AuthorType = typeof AUTHOR_TYPE[keyof typeof AUTHOR_TYPE]
+export type AuthorType = (typeof AUTHOR_TYPE)[keyof typeof AUTHOR_TYPE];
 
 // ========== Approval Status Definitions ==========
 
@@ -60,9 +60,9 @@ export const APPROVAL_STATUS = {
   APPROVED: 'approved',
   REJECTED: 'rejected',
   CANCELLED: 'cancelled',
-} as const
+} as const;
 
-export type ChatApprovalStatus = typeof APPROVAL_STATUS[keyof typeof APPROVAL_STATUS]
+export type ChatApprovalStatus = (typeof APPROVAL_STATUS)[keyof typeof APPROVAL_STATUS];
 
 // ========== Approval Block Variant Definitions ==========
 
@@ -77,9 +77,9 @@ export type ChatApprovalStatus = typeof APPROVAL_STATUS[keyof typeof APPROVAL_ST
 export const APPROVAL_BLOCK_VARIANT = {
   ADMIN: 'admin',
   CLIENT: 'client',
-} as const
+} as const;
 
-export type ApprovalBlockVariant = typeof APPROVAL_BLOCK_VARIANT[keyof typeof APPROVAL_BLOCK_VARIANT]
+export type ApprovalBlockVariant = (typeof APPROVAL_BLOCK_VARIANT)[keyof typeof APPROVAL_BLOCK_VARIANT];
 
 // ========== Connection Status Definitions ==========
 
@@ -90,66 +90,66 @@ export const CONNECTION_STATUS = {
   RECONNECTING: 'reconnecting',
   CLOSED: 'closed',
   ERROR: 'error',
-} as const
+} as const;
 
-export type ConnectionStatus = typeof CONNECTION_STATUS[keyof typeof CONNECTION_STATUS]
+export type ConnectionStatus = (typeof CONNECTION_STATUS)[keyof typeof CONNECTION_STATUS];
 
 // ========== Message Owner Interface ==========
 
 export interface MessageOwner {
-  type: OwnerType
-  machineId?: string
-  userId?: string
-  model?: string
+  type: OwnerType;
+  machineId?: string;
+  userId?: string;
+  model?: string;
   user?: {
-    id: string
-    firstName?: string
-    lastName?: string
+    id: string;
+    firstName?: string;
+    lastName?: string;
     /** Optional author avatar. Host queries it on the message owner (e.g.
      *  GraphQL `User.image`); `imageUrl` may be relative — the host is
      *  responsible for resolving it to an absolute/proxied URL. */
-    image?: { imageUrl?: string | null } | null
-  }
+    image?: { imageUrl?: string | null } | null;
+  };
 }
 
 // ========== Content-shape helpers ==========
 
-import type { MessageContent, MessageSegment } from './message.types'
+import type { MessageContent, MessageSegment } from './message.types';
 
 /** Helper function to check if content is structured (segment array). */
 export function isStructuredContent(content: MessageContent): content is MessageSegment[] {
-  return Array.isArray(content)
+  return Array.isArray(content);
 }
 
 /** Normalize either a string or segment array into a uniform segment array. */
 export function normalizeContent(content: MessageContent): MessageSegment[] {
   if (typeof content === 'string') {
-    return content ? [{ type: 'text', text: content }] : []
+    return content ? [{ type: 'text', text: content }] : [];
   }
-  return content
+  return content;
 }
 
 // ========== SSE event data shapes (wire shapes) ==========
 
 export interface TextEventData {
-  type: 'TEXT'
-  text: string
+  type: 'TEXT';
+  text: string;
 }
 
 export interface ToolExecutionEventData {
-  type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL'
-  integratedToolType: string
-  toolFunction: string
-  parameters?: Record<string, any>
-  result?: string
-  success?: boolean
+  type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL';
+  integratedToolType: string;
+  toolFunction: string;
+  parameters?: Record<string, unknown>;
+  result?: string;
+  success?: boolean;
 }
 
-export type SSEEventData = TextEventData | ToolExecutionEventData
+export type SSEEventData = TextEventData | ToolExecutionEventData;
 
 // ========== Quick-action chip shape ==========
 
 export interface QuickAction {
-  id: string
-  text: string
+  id: string;
+  text: string;
 }

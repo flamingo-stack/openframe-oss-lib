@@ -18,10 +18,12 @@ const NAV = [
   { to: '/releases', label: 'Releases' },
   { to: '/authors', label: 'Authors' },
   { to: '/faqs', label: 'FAQ' },
+  { to: '/trust-center', label: 'Trust' },
   { to: '/legal/privacy', label: 'Legal' },
   { to: '/contact', label: 'Contact' },
   { to: '/schedule-a-call', label: 'Schedule' },
   { to: '/tickets', label: 'Tickets' },
+  { to: '/mcp', label: 'MCP' },
 ] as const
 
 export function AppShell() {

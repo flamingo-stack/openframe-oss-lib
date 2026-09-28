@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+use std::process::ExitStatus;
+use tokio::task::JoinHandle;
 
 /// Parameters needed to launch the updater
 pub struct UpdaterParams {
@@ -11,6 +13,12 @@ pub struct UpdaterParams {
     pub lkg_path: PathBuf,
     pub transcript_path: PathBuf,
     pub rollback_only: bool,
+}
+
+/// Handle to a launched updater
+pub struct LaunchedUpdater {
+    /// Exit status if the updater exits while this process is alive (None: the wait failed); absent where it cannot be watched.
+    pub exit_watch: Option<JoinHandle<Option<ExitStatus>>>,
 }
 
 #[cfg(windows)]

@@ -16,19 +16,15 @@ public abstract class DebeziumMessageHandler<T, U extends DeserializedDebeziumMe
     protected OperationType getOperationType(DeserializedDebeziumMessage message) {
         OperationType operationType = null;
         if (message != null && message.getPayload().getOperation() != null) {
-            try {
-                String operation = message.getPayload().getOperation();
+            String operation = message.getPayload().getOperation();
 
-                operationType = switch (operation) {
-                    case "c" -> OperationType.CREATE;
-                    case "r" -> OperationType.READ;
-                    case "u" -> OperationType.UPDATE;
-                    case "d" -> OperationType.DELETE;
-                    default -> null;
-                };
-            } catch (Exception e) {
-                log.error("Failed to process tag message", e);
-            }
+            operationType = switch (operation) {
+                case "c" -> OperationType.CREATE;
+                case "r" -> OperationType.READ;
+                case "u" -> OperationType.UPDATE;
+                case "d" -> OperationType.DELETE;
+                default -> null;
+            };
         }
         return operationType;
     }

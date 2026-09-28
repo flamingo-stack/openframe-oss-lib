@@ -6,6 +6,9 @@ import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.WaitForSelectorState;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Page Object for the Devices list page.
  * URL: /devices/
@@ -75,6 +78,14 @@ public class DevicesPage {
 
     // Status badge: <span class="truncate"> (values: "ONLINE", "OFFLINE", "ARCHIVED")
     private static final String ROW_STATUS = "span.truncate";
+
+    public static final String STATUS_ONLINE = "ONLINE";
+
+    // A row matching a name AND carrying an exact-match status badge.
+    // :text-is() is exact, so "ONLINE" cannot also match a longer status; without
+    // that, a substring match would be satisfied by any badge containing the word.
+    private static final String DEVICE_ROW_BY_NAME_AND_STATUS =
+            DEVICE_ROW + ":has-text('%s'):has(" + ROW_STATUS + ":text-is('%s'))";
 
     // Last-seen timestamp: <span class="text-h6 text-ods-text-secondary hidden md:flex">
     private static final String ROW_LAST_SEEN =
@@ -226,6 +237,28 @@ public class DevicesPage {
      */
     public Locator deviceRowByName(String name) {
         return page.locator(DEVICE_ROW + ":has-text('" + name + "')").first();
+    }
+
+    /**
+     * All rows matching a name, in render order — the raw set {@link #deviceRowByName}
+     * takes its {@code .first()} from. Exposed so a caller can see how many there are
+     * and what statuses they carry.
+     */
+    public Locator deviceRowsByName(String name) {
+        return page.locator(DEVICE_ROW + ":has-text('" + name + "')");
+    }
+
+    /**
+     * The first row matching a name whose status badge reads exactly {@code status}.
+     *
+     * <p>A hostname is not unique in the devices list: a machine that was re-registered
+     * leaves its earlier records behind, so the QA tenant carries three rows named
+     * {@code vm115982} — one ONLINE and two PENDING_DELETION. {@link #deviceRowByName}
+     * takes whichever of those renders first, which is why a caller that needs the live
+     * record has to say so.
+     */
+    public Locator deviceRowByNameAndStatus(String name, String status) {
+        return page.locator(String.format(DEVICE_ROW_BY_NAME_AND_STATUS, name, status)).first();
     }
 
     /**
@@ -513,9 +546,41 @@ public class DevicesPage {
     /**
      * Clicks a device row by name and waits for the detail page to load.
      *
+     * <p>Takes the first row matching the name. Hostnames are <em>not</em> unique in this
+     * list, so on a tenant holding stale records for a re-registered machine this can open
+     * a dead one — see {@link #openOnlineDevice} for the status-aware form.
+     *
      * @return the resulting {@link DeviceDetailsPage}
      */
     public DeviceDetailsPage openDevice(String deviceName) {
+        return openDeviceRow(deviceName, deviceRowByName(deviceName), null);
+    }
+
+    /**
+     * Narrows the list to rows whose status badge reads ONLINE, then opens the one
+     * matching the name.
+     *
+     * <p>For cases that act on a live machine. The QA tenant carries three rows named
+     * {@code vm115982} — one ONLINE and two PENDING_DELETION — and plain name matching
+     * took a PENDING_DELETION one, whose MeshCentral agent is of course not connected.
+     * That surfaced as {@code [Expect Mesh ONLINE]} failing against a machine that was
+     * online the whole time, which is a considerably worse failure than not finding a row:
+     * it reads as a product defect.
+     *
+     * @return the resulting {@link DeviceDetailsPage}
+     */
+    public DeviceDetailsPage openOnlineDevice(String deviceName) {
+        return openDeviceRow(deviceName,
+                deviceRowByNameAndStatus(deviceName, STATUS_ONLINE), STATUS_ONLINE);
+    }
+
+    /**
+     * Shared body of the open-a-row actions.
+     *
+     * @param requiredStatus the status {@code row} was narrowed to, or {@code null} if it was
+     *                       not narrowed; used only to explain a failure to find the row
+     */
+    private DeviceDetailsPage openDeviceRow(String deviceName, Locator row, String requiredStatus) {
         // The list can hold many devices (and only renders a subset at a time),
         // so narrow it down via the search box before clicking the row.
         searchInput().fill(deviceName);
@@ -523,10 +588,13 @@ public class DevicesPage {
         // the click lands on the settled row and not a node about to be
         // replaced (which would swallow the SPA navigation).
         page.waitForLoadState(LoadState.NETWORKIDLE);
-        Locator row = deviceRowByName(deviceName);
-        row.waitFor(new Locator.WaitForOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(15_000));
+        try {
+            row.waitFor(new Locator.WaitForOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(15_000));
+        } catch (TimeoutError noSuchRow) {
+            throw new AssertionError(describeMissingRow(deviceName, requiredStatus), noSuchRow);
+        }
         row.click();
         try {
             page.waitForURL(
@@ -543,6 +611,38 @@ public class DevicesPage {
         DeviceDetailsPage deviceDetailsPage = new DeviceDetailsPage(page);
         page.waitForCondition(deviceDetailsPage::isLoaded);
         return deviceDetailsPage;
+    }
+
+    /**
+     * Explains why no row was found, by reporting what the name <em>did</em> match.
+     *
+     * <p>"no ONLINE row" and "no row at all" are different faults with different owners —
+     * the first is the tenant's device state, the second a bad name or a broken list — and
+     * a bare Playwright timeout distinguishes neither. Listing the statuses present turns
+     * both into a one-line diagnosis.
+     */
+    private String describeMissingRow(String deviceName, String requiredStatus) {
+        List<String> statuses = statusesOfRowsNamed(deviceName);
+        if (requiredStatus == null) {
+            return String.format("No device row named '%s' in the list", deviceName);
+        }
+        if (statuses.isEmpty()) {
+            return String.format(
+                    "No device row named '%s' at all, so none with status %s", deviceName, requiredStatus);
+        }
+        return String.format("No device row named '%s' with status %s; the %d row(s) with that name are %s",
+                deviceName, requiredStatus, statuses.size(), statuses);
+    }
+
+    /** Status badge text of every row matching the name, in render order. */
+    public List<String> statusesOfRowsNamed(String deviceName) {
+        Locator rows = deviceRowsByName(deviceName);
+        List<String> statuses = new ArrayList<>();
+        for (int i = 0; i < rows.count(); i++) {
+            Locator badge = rows.nth(i).locator(ROW_STATUS).first();
+            statuses.add(badge.count() == 0 ? "<no status badge>" : badge.innerText().trim());
+        }
+        return statuses;
     }
 
     /**

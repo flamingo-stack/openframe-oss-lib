@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
-import { TableColumnFilterDropdown } from '../components/ui/table/table-column-filter-dropdown'
-import type { FilterOption, TableFilters } from '../components/ui/table/types'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
+import { TableColumnFilterDropdown } from '../components/ui/table/table-column-filter-dropdown';
+import type { FilterOption, TableFilters } from '../components/ui/table/types';
 
 const meta = {
   title: 'UI/Table/TableColumnFilterDropdown',
@@ -23,17 +23,17 @@ const meta = {
       options: ['bottom-start', 'bottom-end', 'bottom'],
     },
   },
-} satisfies Meta<typeof TableColumnFilterDropdown>
+} satisfies Meta<typeof TableColumnFilterDropdown>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 const statusOptions: FilterOption[] = [
   { id: 'active', label: 'Active', value: 'active' },
   { id: 'inactive', label: 'Inactive', value: 'inactive' },
   { id: 'maintenance', label: 'Maintenance', value: 'maintenance' },
   { id: 'decommissioned', label: 'Decommissioned', value: 'decommissioned' },
-]
+];
 
 /**
  * Default state — no active filters. Icon is subtle.
@@ -46,7 +46,7 @@ export const Default: Story = {
     filters: {},
     onFilterChange: fn(),
   },
-}
+};
 
 /**
  * With active filters — icon is highlighted with accent color.
@@ -59,18 +59,16 @@ export const WithActiveFilters: Story = {
     filters: { status: ['active', 'inactive'] },
     onFilterChange: fn(),
   },
-}
+};
 
 /**
  * Simulates placement inside a table header row.
  */
 export const InTableHeaderContext: Story = {
   decorators: [
-    (Story) => (
-      <div className="flex items-center gap-4 px-4 py-3 bg-ods-bg border-b border-ods-border">
-        <span className="font-medium text-[12px] leading-[16px] text-ods-text-secondary uppercase">
-          Status
-        </span>
+    Story => (
+      <div className="flex items-center gap-4 border-b border-ods-border bg-ods-bg px-4 py-3">
+        <span className="text-[12px] font-medium uppercase leading-[16px] text-ods-text-secondary">Status</span>
         <Story />
       </div>
     ),
@@ -82,7 +80,7 @@ export const InTableHeaderContext: Story = {
     filters: { status: ['active'] },
     onFilterChange: fn(),
   },
-}
+};
 
 /**
  * Multiple columns side by side, as in a real table header.
@@ -91,18 +89,18 @@ export const MultipleColumns: Story = {
   render: function MultipleColumnsStory() {
     const [filters, setFilters] = useState<TableFilters>({
       status: ['active'],
-    })
+    });
 
     const typeOptions: FilterOption[] = [
       { id: 'desktop', label: 'Desktop', value: 'desktop' },
       { id: 'laptop', label: 'Laptop', value: 'laptop' },
       { id: 'mobile', label: 'Mobile', value: 'mobile' },
-    ]
+    ];
 
     return (
-      <div className="flex items-center gap-8 px-4 py-3 bg-ods-bg border-b border-ods-border rounded">
+      <div className="flex items-center gap-8 rounded border-b border-ods-border bg-ods-bg px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-[12px] text-ods-text-secondary uppercase">Status</span>
+          <span className="text-[12px] font-medium uppercase text-ods-text-secondary">Status</span>
           <TableColumnFilterDropdown
             columnKey="status"
             columnLabel="Status"
@@ -112,7 +110,7 @@ export const MultipleColumns: Story = {
           />
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-medium text-[12px] text-ods-text-secondary uppercase">Type</span>
+          <span className="text-[12px] font-medium uppercase text-ods-text-secondary">Type</span>
           <TableColumnFilterDropdown
             columnKey="type"
             columnLabel="Type"
@@ -121,11 +119,9 @@ export const MultipleColumns: Story = {
             onFilterChange={setFilters}
           />
         </div>
-        <div className="ml-auto text-xs text-ods-text-secondary">
-          Active filters: {JSON.stringify(filters)}
-        </div>
+        <div className="ml-auto text-xs text-ods-text-secondary">Active filters: {JSON.stringify(filters)}</div>
       </div>
-    )
+    );
   },
   args: {
     columnKey: 'status',
@@ -133,19 +129,19 @@ export const MultipleColumns: Story = {
     filterOptions: statusOptions,
     onFilterChange: fn(),
   },
-}
+};
 
 /**
  * Interactive — full state management.
  */
 export const Interactive: Story = {
   render: function InteractiveStory() {
-    const [filters, setFilters] = useState<TableFilters>({})
+    const [filters, setFilters] = useState<TableFilters>({});
 
     return (
       <div className="flex flex-col items-center gap-4">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-[12px] text-ods-text-secondary uppercase">Status</span>
+          <span className="text-[12px] font-medium uppercase text-ods-text-secondary">Status</span>
           <TableColumnFilterDropdown
             columnKey="status"
             columnLabel="Status"
@@ -155,12 +151,10 @@ export const Interactive: Story = {
           />
         </div>
         <div className="text-xs text-ods-text-secondary">
-          {filters.status?.length
-            ? `Filtered by: ${filters.status.join(', ')}`
-            : 'No filters applied'}
+          {filters.status?.length ? `Filtered by: ${filters.status.join(', ')}` : 'No filters applied'}
         </div>
       </div>
-    )
+    );
   },
   args: {
     columnKey: 'status',
@@ -168,4 +162,4 @@ export const Interactive: Story = {
     filterOptions: statusOptions,
     onFilterChange: fn(),
   },
-}
+};

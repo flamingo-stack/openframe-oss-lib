@@ -1,7 +1,7 @@
-'use client'
+'use client';
 // compact-size support added for the ticket-drawer reply composer.
 
-import { formatFileSize } from '../../utils/format'
+import { useEffect, useMemo, useRef } from 'react';
 
 /**
  * Chat-attachment UI primitives.
@@ -31,17 +31,17 @@ import { formatFileSize } from '../../utils/format'
  *     force camera-only mode and disable file picking.
  */
 
-import { useEffect, useRef, useState } from 'react'
-import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon'
-import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon'
-import { Button } from '../ui/button'
-import { cn } from '../../utils/cn'
-import { ANTHROPIC_SUPPORTED_IMAGE_MIME } from './utils/chat-attachment-markdown'
+import { cn } from '../../utils/cn';
+import { formatFileSize } from '../../utils/format';
+import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
+import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { Button } from '../ui/button';
+import { ANTHROPIC_SUPPORTED_IMAGE_MIME } from './utils/chat-attachment-markdown';
 
 /** Chip strip / chip density. `compact` shrinks the thumbnail, padding, text
  *  and max-width for narrow surfaces (e.g. the ticket-drawer reply composer);
  *  `default` is the global Ask-AI chat sizing. */
-export type ChatAttachmentSize = 'default' | 'compact'
+export type ChatAttachmentSize = 'default' | 'compact';
 
 // ===========================================================================
 // CONSTANTS & TYPES — inlined from hub `lib/config/chat-attachment-config.ts`
@@ -57,30 +57,30 @@ export const CHAT_ATTACHMENT_MIME_TYPES = [
   'video/mp4',
   'video/webm',
   'video/quicktime',
-] as const
+] as const;
 
 /** Client-side cap on `addFiles` (the upload hook rejects 6+ files in a
  *  single selection). Server-side is per-IP-rate-limit; this is a UX
  *  hint more than a security boundary. */
-export const CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER = 5
+export const CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER = 5;
 
-type Status = 'sniffing' | 'uploading' | 'ready' | 'error'
+type Status = 'sniffing' | 'uploading' | 'ready' | 'error';
 
 /** Staged-attachment shape consumed by the chip strip. Mirrors the hub
  *  `StagedAttachment` produced by `useChatAttachments`. */
 export interface StagedAttachment {
   /** Stable client-side id; survives across re-renders. */
-  id: string
-  file: File
-  status: Status
+  id: string;
+  file: File;
+  status: Status;
   /** Set when `status === 'ready'`. Server-issued. */
-  storagePath?: string
+  storagePath?: string;
   /** Set when `status === 'ready'`. Server-issued HMAC view token. */
-  viewToken?: string
+  viewToken?: string;
   /** 0-100 during 'uploading'. */
-  progress: number
+  progress: number;
   /** Set when `status === 'error'`. */
-  errorMessage?: string
+  errorMessage?: string;
 }
 
 // ===========================================================================
@@ -91,15 +91,15 @@ export interface ChatAttachmentAddButtonProps {
   /** Auth-gate flag. Hub passes `useChatIdentity().attachmentsEnabled`;
    *  embedders supply their own boolean. Disabled state collapses the
    *  button to a layout-reserving invisible placeholder. */
-  attachmentsEnabled: boolean
+  attachmentsEnabled: boolean;
   /** Current attachment count — drives the limit-reached disabled state. */
-  attachmentsCount: number
-  onAddFiles: (files: FileList | File[]) => void
+  attachmentsCount: number;
+  onAddFiles: (files: FileList | File[]) => void;
   /** External disable (e.g. while chat is streaming). */
-  disabled?: boolean
+  disabled?: boolean;
   /** Density. `compact` renders a smaller 24×24 button for narrow surfaces
    *  (ticket-drawer composer); `default` is the 28×28 global-chat button. */
-  size?: ChatAttachmentSize
+  size?: ChatAttachmentSize;
 }
 
 /**
@@ -125,26 +125,23 @@ export function ChatAttachmentAddButton({
   disabled = false,
   size = 'default',
 }: ChatAttachmentAddButtonProps) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const compact = size === 'compact'
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const compact = size === 'compact';
   // Keep the placeholder footprint in lockstep with the real button size so
   // there's zero layout shift when `attachmentsEnabled` resolves.
-  const boxClass = compact ? 'h-6 w-6' : 'h-7 w-7'
+  const boxClass = compact ? 'h-6 w-6' : 'h-7 w-7';
 
   if (!attachmentsEnabled) {
-    return <span aria-hidden="true" className={cn('inline-block shrink-0', boxClass)} />
+    return <span aria-hidden="true" className={cn('inline-block shrink-0', boxClass)} />;
   }
 
-  const slotsAvailable = Math.max(
-    0,
-    CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER - attachmentsCount,
-  )
-  const canAddMore = slotsAvailable > 0 && !disabled
+  const slotsAvailable = Math.max(0, CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER - attachmentsCount);
+  const canAddMore = slotsAvailable > 0 && !disabled;
 
   const handlePick = () => {
-    if (!canAddMore) return
-    fileInputRef.current?.click()
-  }
+    if (!canAddMore) return;
+    fileInputRef.current?.click();
+  };
 
   return (
     <>
@@ -154,14 +151,15 @@ export function ChatAttachmentAddButton({
         multiple
         accept={CHAT_ATTACHMENT_MIME_TYPES.join(',')}
         className="hidden"
-        onChange={(e) => {
-          const files = e.target.files
+        onChange={e => {
+          const input = e.target;
+          const files = input.files;
           if (files && files.length > 0) {
-            onAddFiles(files)
+            onAddFiles(files);
           }
           // Reset so picking the same file twice in a row works
           // (browsers don't refire change on identical selection).
-          e.target.value = ''
+          input.value = '';
         }}
       />
       <Button
@@ -171,16 +169,15 @@ export function ChatAttachmentAddButton({
         onClick={handlePick}
         disabled={!canAddMore}
         aria-label={canAddMore ? 'Add attachments' : 'Attachment limit reached'}
-        title={
-          canAddMore
-            ? 'Add attachments'
-            : `Limit reached (${CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER})`
-        }
+        title={canAddMore ? 'Add attachments' : `Limit reached (${CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER})`}
         leftIcon={<PlusIcon className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />}
-        className={cn('!p-0 shrink-0 text-ods-text-muted hover:text-ods-text-primary', compact ? '!h-6 !w-6' : '!h-7 !w-7')}
+        className={cn(
+          'shrink-0 !p-0 text-ods-text-muted hover:text-ods-text-primary',
+          compact ? '!h-6 !w-6' : '!h-7 !w-7',
+        )}
       />
     </>
-  )
+  );
 }
 
 // ===========================================================================
@@ -188,14 +185,14 @@ export function ChatAttachmentAddButton({
 // ===========================================================================
 
 export interface ChatAttachmentChipStripProps {
-  attachments: StagedAttachment[]
-  onRemove: (id: string) => void
+  attachments: StagedAttachment[];
+  onRemove: (id: string) => void;
   /** External disable (e.g. while chat is streaming). */
-  disabled?: boolean
+  disabled?: boolean;
   /** Density. `compact` (smaller thumbnail/padding/text, narrower chips) suits
    *  narrow surfaces like the ticket-drawer reply composer; `default` is the
    *  global Ask-AI chat sizing. */
-  size?: ChatAttachmentSize
+  size?: ChatAttachmentSize;
 }
 
 /**
@@ -209,12 +206,12 @@ export function ChatAttachmentChipStrip({
   disabled = false,
   size = 'default',
 }: ChatAttachmentChipStripProps) {
-  if (attachments.length === 0) return null
-  const compact = size === 'compact'
+  if (attachments.length === 0) return null;
+  const compact = size === 'compact';
   return (
     <div className={cn('flex-shrink-0', compact ? 'px-3 pb-1.5' : 'px-5 pb-2')}>
-      <div className={cn('flex items-center flex-wrap', compact ? 'gap-1.5' : 'gap-2')}>
-        {attachments.map((att) => (
+      <div className={cn('flex flex-wrap items-center', compact ? 'gap-1.5' : 'gap-2')}>
+        {attachments.map(att => (
           <AttachmentChip
             key={att.id}
             attachment={att}
@@ -225,7 +222,7 @@ export function ChatAttachmentChipStrip({
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -233,55 +230,51 @@ export function ChatAttachmentChipStrip({
 // ---------------------------------------------------------------------------
 
 interface AttachmentChipProps {
-  attachment: StagedAttachment
-  onRemove: () => void
-  disabled: boolean
-  size?: ChatAttachmentSize
+  attachment: StagedAttachment;
+  onRemove: () => void;
+  disabled: boolean;
+  size?: ChatAttachmentSize;
 }
 
 function AttachmentChip({ attachment, onRemove, disabled, size = 'default' }: AttachmentChipProps) {
-  const { file, status, progress, errorMessage } = attachment
-  const isImage = (ANTHROPIC_SUPPORTED_IMAGE_MIME as readonly string[]).includes(file.type)
-  const compact = size === 'compact'
+  const { file, status, progress, errorMessage } = attachment;
+  const isImage = (ANTHROPIC_SUPPORTED_IMAGE_MIME as readonly string[]).includes(file.type);
+  const compact = size === 'compact';
 
   // Inline thumbnail for images during STAGING (pre-upload-complete).
   // Local `URL.createObjectURL` blob — the user sees their image
   // immediately, no waiting on the upload to finish.
-  const blobUrl = useObjectUrl(isImage ? file : null)
+  const blobUrl = useObjectUrl(isImage ? file : null);
 
   return (
     <div
       className={cn(
         'flex items-center rounded-md border border-ods-border bg-ods-card',
-        compact ? 'gap-1.5 px-1.5 py-1 max-w-[180px]' : 'gap-2 px-2 py-1.5 max-w-[240px]',
+        compact ? 'max-w-[180px] gap-1.5 px-1.5 py-1' : 'max-w-[240px] gap-2 px-2 py-1.5',
       )}
       role="group"
       aria-label={`Attachment ${file.name}`}
     >
       {/* Thumbnail OR file-type initials */}
-      <div
-        className={cn(
-          'relative shrink-0 overflow-hidden rounded bg-ods-bg',
-          compact ? 'h-6 w-6' : 'h-8 w-8',
-        )}
-      >
+      <div className={cn('relative shrink-0 overflow-hidden rounded bg-ods-bg', compact ? 'h-6 w-6' : 'h-8 w-8')}>
         {isImage && blobUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- blob: URLs
           //  cannot go through next/image; this is a transient pre-upload
           //  preview, NOT the chat-history render path.
           <img src={blobUrl} alt={file.name} className="h-full w-full object-cover" />
         ) : (
-          <div className={cn('flex h-full w-full items-center justify-center font-mono uppercase text-ods-text-muted', compact ? 'text-[9px]' : 'text-[10px]')}>
+          <div
+            className={cn(
+              'flex h-full w-full items-center justify-center font-mono uppercase text-ods-text-muted',
+              compact ? 'text-[9px]' : 'text-[10px]',
+            )}
+          >
             {extLabel(file.name)}
           </div>
         )}
         {/* Progress overlay during 'uploading' state */}
         {status === 'uploading' && (
           <div className="absolute inset-x-0 bottom-0 h-1 bg-ods-bg">
-            <div
-              className="h-full bg-ods-accent transition-[width]"
-              style={{ width: `${progress}%` }}
-            />
+            <div className="h-full bg-ods-accent transition-[width]" style={{ width: `${progress}%` }} />
           </div>
         )}
       </div>
@@ -316,10 +309,13 @@ function AttachmentChip({ attachment, onRemove, disabled, size = 'default' }: At
         disabled={disabled}
         aria-label={`Remove ${file.name}`}
         leftIcon={<XmarkIcon className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />}
-        className={cn('!p-0 shrink-0 text-ods-text-muted hover:text-ods-text-primary', compact ? '!h-4 !w-4' : '!h-5 !w-5')}
+        className={cn(
+          'shrink-0 !p-0 text-ods-text-muted hover:text-ods-text-primary',
+          compact ? '!h-4 !w-4' : '!h-5 !w-5',
+        )}
       />
     </div>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -331,24 +327,46 @@ function AttachmentChip({ attachment, onRemove, disabled, size = 'default' }: At
 // Imported at the top of this file.
 
 function extLabel(fileName: string): string {
-  const dot = fileName.lastIndexOf('.')
-  if (dot === -1 || dot === fileName.length - 1) return '?'
-  return fileName.slice(dot + 1, dot + 4).toLowerCase()
+  const dot = fileName.lastIndexOf('.');
+  if (dot === -1 || dot === fileName.length - 1) return '?';
+  return fileName.slice(dot + 1, dot + 4).toLowerCase();
 }
+
+/** One blob URL per `File`, so a render React discards (StrictMode's double
+ *  invoke, a suspended tree) reuses the allocation instead of leaking a fresh
+ *  one. The entry is dropped again by the revoke below. */
+const objectUrlByFile = new WeakMap<File, string>();
 
 /** Manage an `URL.createObjectURL` blob URL for the lifetime of the
  *  component. Returns null when `file` is null or during SSR.
- *  Revokes on unmount AND when `file` changes. */
+ *  Revokes on unmount AND when `file` changes.
+ *
+ *  Allocated during render rather than published into state from an effect: the
+ *  url is a pure function of the `File` (memoised per file above, so allocating
+ *  it is idempotent), and holding it in state meant every newly attached file
+ *  cost a second render pass and showed an empty preview tile in between. The
+ *  effect is left owning only the revoke — the half that genuinely belongs to
+ *  the commit lifecycle. */
 function useObjectUrl(file: File | null): string | null {
-  const [url, setUrl] = useState<string | null>(null)
-  useEffect(() => {
-    if (!file) {
-      setUrl(null)
-      return
+  const url = useMemo(() => {
+    // `File` only ever exists after a user interaction, so this is null on the
+    // server AND on the hydration render — no mismatch.
+    if (!file || typeof window === 'undefined') return null;
+    let existing = objectUrlByFile.get(file);
+    if (!existing) {
+      existing = URL.createObjectURL(file);
+      objectUrlByFile.set(file, existing);
     }
-    const next = URL.createObjectURL(file)
-    setUrl(next)
-    return () => URL.revokeObjectURL(next)
-  }, [file])
-  return url
+    return existing;
+  }, [file]);
+
+  useEffect(() => {
+    if (!file || !url) return undefined;
+    return () => {
+      objectUrlByFile.delete(file);
+      URL.revokeObjectURL(url);
+    };
+  }, [file, url]);
+
+  return url;
 }

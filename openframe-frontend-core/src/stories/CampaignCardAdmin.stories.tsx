@@ -1,10 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { CampaignCardAdmin } from '../components/chat/entity-cards'
-import {
-  ChatColumnDecorator,
-  makeAnchorProps,
-} from './__fixtures__/chat-card-decorator'
-import { campaignItem } from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { CampaignCardAdmin } from '../components/chat/entity-cards';
+import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-decorator';
+import { campaignItem } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof CampaignCardAdmin> = {
   title: 'Chat/EntityCards/CampaignCardAdmin',
@@ -18,18 +15,24 @@ const meta: Meta<typeof CampaignCardAdmin> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
     campaign: campaignItem,
     anchorProps: makeAnchorProps('/admin/campaigns/' + campaignItem.id),
   },
-}
+};
 
 export const NoDescription: Story = {
   args: {
@@ -39,7 +42,7 @@ export const NoDescription: Story = {
     },
     anchorProps: makeAnchorProps('/admin/campaigns/' + campaignItem.id),
   },
-}
+};
 
 export const NoGoals: Story = {
   args: {
@@ -49,4 +52,4 @@ export const NoGoals: Story = {
     },
     anchorProps: makeAnchorProps('/admin/campaigns/' + campaignItem.id),
   },
-}
+};

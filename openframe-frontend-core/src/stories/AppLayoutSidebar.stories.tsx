@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
 
 import {
   BracketCurlyIcon,
@@ -8,7 +8,7 @@ import {
   IdCardIcon,
   MonitorIcon,
   Settings02Icon,
-} from '../components/icons-v2-generated'
+} from '../components/icons-v2-generated';
 import {
   AppLayout,
   AppLayoutDrawer,
@@ -17,8 +17,8 @@ import {
   AppLayoutDrawerDescription,
   AppLayoutDrawerHeader,
   AppLayoutDrawerTitle,
-} from '../components/navigation'
-import { NavigationSidebarConfig } from '../types/navigation'
+} from '../components/navigation';
+import type { NavigationSidebarConfig } from '../types/navigation';
 
 const navigationItems: NavigationSidebarConfig['items'] = [
   { id: 'dashboard', label: 'Dashboard', icon: <ChartDonutIcon size={24} />, path: '/dashboard', isActive: true },
@@ -26,7 +26,7 @@ const navigationItems: NavigationSidebarConfig['items'] = [
   { id: 'devices', label: 'Devices', icon: <MonitorIcon size={24} />, path: '/devices' },
   { id: 'scripts', label: 'Scripts', icon: <BracketCurlyIcon size={24} />, path: '/scripts' },
   { id: 'settings', label: 'Settings', icon: <Settings02Icon size={24} />, path: '/settings', section: 'secondary' },
-]
+];
 
 const meta = {
   title: 'Navigation/AppLayoutSidebar',
@@ -55,35 +55,36 @@ sidebar is persistent: clicks on the header/sidebar/overlay do not close it
     headerProps: {},
     mobileBurgerMenuProps: {},
   },
-} satisfies Meta<typeof AppLayout>
+} satisfies Meta<typeof AppLayout>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 function DashboardChildren() {
   return (
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-semibold text-ods-text-primary">Devices Overview</h1>
-        <p className="text-ods-text-secondary mt-1">8,250 Devices in Total</p>
+        <p className="mt-1 text-ods-text-secondary">8,250 Devices in Total</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {[
           { label: 'Active Devices', value: '6,930' },
           { label: 'Active Tickets', value: '136' },
           { label: 'Resolved Tickets', value: '825' },
-        ].map((stat) => (
-          <div key={stat.label} className="p-4 bg-ods-card rounded-lg border border-ods-border">
+        ].map(stat => (
+          <div key={stat.label} className="rounded-lg border border-ods-border bg-ods-card p-4">
             <p className="text-sm text-ods-text-secondary">{stat.label}</p>
-            <p className="text-2xl font-semibold text-ods-text-primary mt-1">{stat.value}</p>
+            <p className="mt-1 text-2xl font-semibold text-ods-text-primary">{stat.value}</p>
           </div>
         ))}
       </div>
       <p className="text-ods-text-secondary">
-        Click <span className="font-medium text-ods-text-primary">Mingo AI</span> in the header to open the chat sidebar.
+        Click <span className="font-medium text-ods-text-primary">Mingo AI</span> in the header to open the chat
+        sidebar.
       </p>
     </div>
-  )
+  );
 }
 
 /**
@@ -91,14 +92,14 @@ function DashboardChildren() {
  */
 export const Default: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
     return (
       <AppLayout
         sidebarConfig={{ items: navigationItems, onNavigate: fn(), onToggleMinimized: fn() }}
         headerProps={{
           showNotifications: true,
           showMingoAI: true,
-          onMingoAI: () => setOpen((prev) => !prev),
+          onMingoAI: () => setOpen(prev => !prev),
           isMingoAIActive: open,
           showUser: true,
           userName: 'Alex Developer',
@@ -131,23 +132,23 @@ export const Default: Story = {
       >
         <DashboardChildren />
       </AppLayout>
-    )
+    );
   },
-}
+};
 
 /**
  * Resizable chat sidebar — drag the inside edge to resize. Starts open.
  */
 export const Resizable: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(true)
+    const [open, setOpen] = useState(true);
     return (
       <AppLayout
         sidebarConfig={{ items: navigationItems, onNavigate: fn(), onToggleMinimized: fn() }}
         headerProps={{
           showNotifications: true,
           showMingoAI: true,
-          onMingoAI: () => setOpen((prev) => !prev),
+          onMingoAI: () => setOpen(prev => !prev),
           isMingoAIActive: open,
           showUser: true,
           userName: 'Alex Developer',
@@ -185,6 +186,6 @@ export const Resizable: Story = {
       >
         <DashboardChildren />
       </AppLayout>
-    )
+    );
   },
-}
+};

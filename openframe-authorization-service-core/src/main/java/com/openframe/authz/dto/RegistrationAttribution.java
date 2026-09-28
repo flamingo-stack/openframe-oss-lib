@@ -39,9 +39,11 @@ public class RegistrationAttribution {
 
     private String eventId;
 
+    private String ref;
+
     public int totalLength() {
         return Stream.of(fbc, fbclid, fbp, hutk, gclid, rdtCid, liFatId,
-                        utmSource, utmMedium, utmCampaign, utmContent, utmTerm, eventId)
+                        utmSource, utmMedium, utmCampaign, utmContent, utmTerm, eventId, ref)
                 .filter(Objects::nonNull)
                 .mapToInt(String::length)
                 .sum();

@@ -53,6 +53,7 @@ export { ModemIcon } from './modem-icon';
 export { MonitorAltIcon } from './monitor-alt-icon';
 export { MonitorIcon } from './monitor-icon';
 export { MonitorOffIcon } from './monitor-off-icon';
+export { MonitorShieldIcon } from './monitor-shield-icon';
 export { OfficePhoneIcon } from './office-phone-icon';
 export { PcIcon } from './pc-icon';
 export { PowerCircleIcon } from './power-circle-icon';

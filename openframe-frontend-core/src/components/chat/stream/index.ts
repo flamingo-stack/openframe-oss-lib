@@ -23,7 +23,7 @@ export {
   type EscalatedApprovalData,
   type InitializeExtras,
   type PendingEcho,
-} from './chat-stream-reducer'
+} from './chat-stream-reducer';
 
 export {
   createChatDialogStore,
@@ -34,7 +34,7 @@ export {
   type ChatDialogStore,
   type CreateChatDialogStoreOptions,
   type EvictedReducerState,
-} from './chat-dialog-store'
+} from './chat-dialog-store';
 
 // Framework-free delta batching — shared with NON-React hosts that drive a
 // reducer straight from a transport (they must NOT re-implement it).
@@ -46,10 +46,10 @@ export {
   type CreateDeltaBatcherOptions,
   type DeltaBatcher,
   type DeltaEvent,
-} from './delta-batcher'
+} from './delta-batcher';
 
 export {
   useChatStreamReducer,
   type UseChatStreamReducerOptions,
   type UseChatStreamReducerReturn,
-} from './use-chat-stream-reducer'
+} from './use-chat-stream-reducer';

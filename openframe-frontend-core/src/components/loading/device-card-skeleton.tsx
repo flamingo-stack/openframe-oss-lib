@@ -1,12 +1,11 @@
-import type React from "react"
-import { cn } from "../../utils/cn"
-import { OrganizationIconSkeleton } from "./organization-icon-skeleton"
+import { cn } from '../../utils/cn';
+import { OrganizationIconSkeleton } from './organization-icon-skeleton';
 
 export interface DeviceCardSkeletonProps {
   /**
    * Additional CSS classes
    */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -22,55 +21,52 @@ export interface DeviceCardSkeletonProps {
 export function DeviceCardSkeleton({ className }: DeviceCardSkeletonProps) {
   return (
     <div
-      className={cn(
-        "bg-ods-card rounded-[6px] border border-ods-border h-full",
-        className
-      )}
+      className={cn('h-full rounded-[6px] border border-ods-border bg-ods-card', className)}
       role="status"
       aria-label="Loading device card"
     >
       {/* Row 1: Device icon + Device name + More button */}
-      <div className="flex gap-4 items-center px-4 py-3">
+      <div className="flex items-center gap-4 px-4 py-3">
         {/* Device type icon (8x8 container) */}
-        <div className="w-8 h-8 bg-ods-bg border border-ods-border rounded-[6px] flex items-center justify-center flex-shrink-0">
-          <div className="w-4 h-4 bg-ods-border rounded animate-pulse" />
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[6px] border border-ods-border bg-ods-bg">
+          <div className="h-4 w-4 animate-pulse rounded bg-ods-border" />
         </div>
 
         {/* Device name */}
-        <div className="flex-1 min-w-0">
-          <div className="h-6 w-3/4 bg-ods-border rounded animate-pulse" />
+        <div className="min-w-0 flex-1">
+          <div className="h-6 w-3/4 animate-pulse rounded bg-ods-border" />
         </div>
 
         {/* More button */}
-        <div className="w-12 h-12 bg-ods-border rounded-[6px] flex-shrink-0 animate-pulse" />
+        <div className="h-12 w-12 flex-shrink-0 animate-pulse rounded-[6px] bg-ods-border" />
       </div>
 
       {/* Row 2: OS badge + Organization */}
-      <div className="flex gap-4 items-center px-4 py-2">
+      <div className="flex items-center gap-4 px-4 py-2">
         {/* OS badge */}
-        <div className="w-24 h-6 bg-ods-border rounded flex-shrink-0 animate-pulse" />
+        <div className="h-6 w-24 flex-shrink-0 animate-pulse rounded bg-ods-border" />
 
         {/* Organization icon */}
         <OrganizationIconSkeleton size="sm" />
 
         {/* Organization name */}
-        <div className="flex-1 min-w-0">
-          <div className="h-5 w-1/2 bg-ods-border rounded animate-pulse" />
+        <div className="min-w-0 flex-1">
+          <div className="h-5 w-1/2 animate-pulse rounded bg-ods-border" />
         </div>
       </div>
 
       {/* Row 3: Status badge + Last seen */}
-      <div className="flex gap-4 items-center px-4 py-2">
+      <div className="flex items-center gap-4 px-4 py-2">
         {/* Status badge */}
-        <div className="w-20 h-6 bg-ods-border rounded-full flex-shrink-0 animate-pulse" />
+        <div className="h-6 w-20 flex-shrink-0 animate-pulse rounded-full bg-ods-border" />
 
         {/* Last seen */}
         <div className="flex-1">
-          <div className="h-5 w-40 bg-ods-border rounded animate-pulse" />
+          <div className="h-5 w-40 animate-pulse rounded bg-ods-border" />
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -82,19 +78,10 @@ export function DeviceCardSkeleton({ className }: DeviceCardSkeletonProps) {
  * - Desktop (lg): 3 columns
  * - Large (xl): 4 columns
  */
-export function DeviceCardSkeletonGrid({
-  count = 12,
-  className
-}: {
-  count?: number
-  className?: string
-}) {
+export function DeviceCardSkeletonGrid({ count = 12, className }: { count?: number; className?: string }) {
   return (
     <div
-      className={cn(
-        "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4",
-        className
-      )}
+      className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4', className)}
       role="status"
       aria-label={`Loading ${count} device cards`}
     >
@@ -102,5 +89,5 @@ export function DeviceCardSkeletonGrid({
         <DeviceCardSkeleton key={index} />
       ))}
     </div>
-  )
+  );
 }

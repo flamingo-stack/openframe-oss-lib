@@ -1,11 +1,16 @@
 package com.openframe.authz.config.oidc;
 
+import com.openframe.authz.service.sso.DefaultProviderConfig;
 import lombok.Data;
 
 import java.util.List;
 
 @Data
-public abstract class AbstractOidcProviderProperties {
+public abstract class AbstractOidcProviderProperties implements DefaultProviderConfig {
+
+    /** The provider id these defaults belong to — the strategy key in {@link DefaultProviderConfig}. */
+    @Override
+    public abstract String providerId();
 
     private String registrationRedirectUri;
     private String loginRedirectUri;

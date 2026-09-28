@@ -1,6 +1,6 @@
 package com.openframe.data.document.device;
 import com.openframe.data.document.TenantScoped;
-import com.openframe.data.document.rmm.OsType;
+import com.openframe.data.document.rmm.script.OsType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import org.springframework.data.annotation.CreatedDate;
@@ -19,6 +19,7 @@ public class Machine implements TenantScoped {
     @Indexed
     private String tenantId;
     @NotBlank
+    @Indexed
     private String machineId;   // Same as in OAuthClient, used for authentication and as primary ID
     private String ip;
     private String macAddress;
@@ -29,6 +30,7 @@ public class Machine implements TenantScoped {
     private Instant lastSeen;
     @Indexed
     private String organizationId;
+    private String userId;      // User who installed the agent; optional, absent for older registrations
     private String hostname;
     private String displayName;
     private String nickname;

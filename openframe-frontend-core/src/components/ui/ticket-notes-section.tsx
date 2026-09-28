@@ -1,19 +1,19 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Send03Icon } from "../icons-v2-generated"
-import { cn } from "../../utils/cn"
-import { Input } from "./input"
-import { type TicketNote, TicketNoteCard } from "./ticket-note-card"
+import { type KeyboardEvent, useState } from 'react';
+import { cn } from '../../utils/cn';
+import { Send03Icon } from '../icons-v2-generated';
+import { Input } from './input';
+import { type TicketNote, TicketNoteCard } from './ticket-note-card';
 
 export interface TicketNotesSectionProps {
-  notes: TicketNote[]
-  onAddNote?: (text: string) => void
-  onEditNote?: (id: string, text: string) => void
-  onDeleteNote?: (id: string) => void
+  notes: TicketNote[];
+  onAddNote?: (text: string) => void;
+  onEditNote?: (id: string, text: string) => void;
+  onDeleteNote?: (id: string) => void;
   /** Disables the input and send button while a note is being added */
-  isAddingNote?: boolean
-  className?: string
+  isAddingNote?: boolean;
+  className?: string;
 }
 
 export function TicketNotesSection({
@@ -24,31 +24,26 @@ export function TicketNotesSection({
   isAddingNote,
   className,
 }: TicketNotesSectionProps) {
-  const [noteText, setNoteText] = React.useState("")
+  const [noteText, setNoteText] = useState('');
 
   const handleSend = () => {
-    const trimmed = noteText.trim()
-    if (!trimmed || !onAddNote || isAddingNote) return
-    onAddNote(trimmed)
-    setNoteText("")
-  }
+    const trimmed = noteText.trim();
+    if (!trimmed || !onAddNote || isAddingNote) return;
+    onAddNote(trimmed);
+    setNoteText('');
+  };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
-  }
+  };
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
+    <div className={cn('flex flex-col gap-2', className)}>
       {notes.map(note => (
-        <TicketNoteCard
-          key={note.id}
-          note={note}
-          onEdit={onEditNote}
-          onDelete={onDeleteNote}
-        />
+        <TicketNoteCard key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} />
       ))}
 
       {onAddNote && (
@@ -67,10 +62,10 @@ export function TicketNotesSection({
             onClick={handleSend}
             disabled={!noteText.trim() || isAddingNote}
             className={cn(
-              "shrink-0 flex items-center justify-center w-11 h-11 md:w-12 md:h-12 rounded-[6px]",
-              "bg-ods-card border border-ods-border",
-              "hover:bg-ods-bg-hover transition-colors",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
+              'flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] md:h-12 md:w-12',
+              'border border-ods-border bg-ods-card',
+              'transition-colors hover:bg-ods-bg-hover',
+              'disabled:cursor-not-allowed disabled:opacity-50',
             )}
             aria-label="Send note"
           >
@@ -79,5 +74,5 @@ export function TicketNotesSection({
         </div>
       )}
     </div>
-  )
+  );
 }

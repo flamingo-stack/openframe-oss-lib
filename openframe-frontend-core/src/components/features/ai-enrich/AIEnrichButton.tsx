@@ -1,32 +1,32 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { Button } from '../../ui/button'
-import { SparklesIcon } from '../../icons/sparkles-icon'
-import { cn } from '../../../utils/cn'
+import type React from 'react';
+import { cn } from '../../../utils/cn';
+import { SparklesIcon } from '../../icons/sparkles-icon';
+import { Button } from '../../ui/button';
 
 export interface AIEnrichButtonProps {
-  onClick: () => void
-  disabled?: boolean
-  loading?: boolean
-  label?: string
-  loadingLabel?: string
-  size?: 'sm' | 'md' | 'lg'
-  variant?: 'primary' | 'secondary' | 'outline'
-  className?: string
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  label?: string;
+  loadingLabel?: string;
+  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary' | 'outline';
+  className?: string;
 }
 
 const sizeMap = {
   sm: 'small-legacy' as const,
   md: 'default' as const,
   lg: 'default' as const,
-}
+};
 
 const variantMap = {
   primary: 'accent' as const,
   secondary: 'outline' as const,
   outline: 'outline' as const,
-}
+};
 
 export const AIEnrichButton: React.FC<AIEnrichButtonProps> = ({
   onClick,
@@ -51,5 +51,5 @@ export const AIEnrichButton: React.FC<AIEnrichButtonProps> = ({
     >
       {loading ? loadingLabel : label}
     </Button>
-  )
-}
+  );
+};

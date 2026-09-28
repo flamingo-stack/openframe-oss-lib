@@ -115,4 +115,13 @@ public class OrganizationApi {
                 .patch(ARCHIVE_ORGANIZATION)
                 .then().statusCode(204);
     }
+
+    /** GET /organizations/{id}/can-archive: true when no active device is linked to the organization. */
+    public static boolean canArchiveOrganization(String organizationId) {
+        final String CAN_ARCHIVE = ORGANIZATIONS.concat("/").concat(organizationId).concat("/can-archive");
+        return given(RequestSpecHelper.getAuthorizedSpec())
+                .get(CAN_ARCHIVE)
+                .then().statusCode(200)
+                .extract().as(Boolean.class);
+    }
 }

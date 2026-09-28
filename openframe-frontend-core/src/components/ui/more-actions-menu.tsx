@@ -1,16 +1,11 @@
-'use client'
+'use client';
 
-import React from 'react'
-import Link from '../../embed-shims/next-link'
-import { cn } from '../../utils/cn'
-import { Ellipsis01Icon } from '../icons-v2-generated'
-import { Button } from './button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from './dropdown-menu'
+import type React from 'react';
+import Link from '../../embed-shims/next-link';
+import { cn } from '../../utils/cn';
+import { Ellipsis01Icon } from '../icons-v2-generated';
+import { Button } from './button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu';
 
 /**
  * @deprecated Use `ActionsMenuItem` from `./actions-menu` with
@@ -18,41 +13,41 @@ import {
  * of the `ActionsMenu*` family.
  */
 export type MoreActionsItem = {
-  label: string
+  label: string;
   /** Click handler. Optional when `href` is provided. */
-  onClick?: () => void
+  onClick?: () => void;
   /** If set, the item renders as a Next.js Link (real <a href> in the DOM). */
-  href?: string
+  href?: string;
   /** Only relevant with `href` — opens the link in a new tab. */
-  openInNewTab?: boolean
-  icon?: React.ReactNode
-  disabled?: boolean
-  danger?: boolean
-}
+  openInNewTab?: boolean;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+  danger?: boolean;
+};
 
 /**
  * @deprecated Use `ActionsMenuDropdownProps` from `./actions-menu` instead.
  */
 export interface MoreActionsMenuProps {
-  items: MoreActionsItem[]
-  align?: 'start' | 'center' | 'end'
-  side?: 'top' | 'right' | 'bottom' | 'left'
-  sideOffset?: number
-  className?: string
+  items: MoreActionsItem[];
+  align?: 'start' | 'center' | 'end';
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  sideOffset?: number;
+  className?: string;
   /** Appended to the dropdown content. To render the menu above a high-z
    *  surface (drawer, modal), prefer wrapping that surface in a
    *  `PortalContainerContext` provider rather than escalating z-index here. */
-  contentClassName?: string
-  ariaLabel?: string
+  contentClassName?: string;
+  ariaLabel?: string;
   /** Custom trigger element. When provided, replaces the default ellipsis icon button. */
-  trigger?: React.ReactNode
+  trigger?: React.ReactNode;
   /** Controlled open state. */
-  open?: boolean
+  open?: boolean;
   /** Called when the open state changes — use together with `open`. */
-  onOpenChange?: (open: boolean) => void
+  onOpenChange?: (open: boolean) => void;
   /** Forwarded to the dropdown content. Call `e.preventDefault()` to stop
    *  Radix returning focus (and its focus ring) to the trigger on close. */
-  onCloseAutoFocus?: (event: Event) => void
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 /**
@@ -75,7 +70,7 @@ export function MoreActionsMenu({
   trigger,
   open,
   onOpenChange,
-  onCloseAutoFocus
+  onCloseAutoFocus,
 }: MoreActionsMenuProps) {
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
@@ -84,7 +79,9 @@ export function MoreActionsMenu({
           <Button
             variant="outline"
             size="icon"
-            className={className || 'bg-ods-card border-ods-border hover:bg-ods-bg-hover flex items-center justify-center'}
+            className={
+              className || 'flex items-center justify-center border-ods-border bg-ods-card hover:bg-ods-bg-hover'
+            }
             aria-label={ariaLabel}
           >
             <Ellipsis01Icon size={24} className="text-ods-text-primary" />
@@ -96,61 +93,56 @@ export function MoreActionsMenu({
         side={side}
         sideOffset={sideOffset}
         onCloseAutoFocus={onCloseAutoFocus}
-        className={cn(
-          'bg-ods-card border border-ods-border p-0 rounded-[4px] min-w-[200px]',
-          contentClassName,
-        )}
+        className={cn('min-w-[200px] rounded-[4px] border border-ods-border bg-ods-card p-0', contentClassName)}
       >
         {items.map((item, idx) => {
           const itemClassName =
-            'flex items-center gap-2 px-4 py-3 bg-ods-bg hover:bg-ods-bg-hover focus:bg-ods-bg-hover border-b border-ods-border last:border-b-0 rounded-none cursor-pointer data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed'
+            'flex items-center gap-2 px-4 py-3 bg-ods-bg hover:bg-ods-bg-hover focus:bg-ods-bg-hover border-b border-ods-border last:border-b-0 rounded-none cursor-pointer data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed';
 
           const content = (
             <>
               {item.icon && (
-                <div className={cn(item.danger ? 'text-ods-error' : 'text-ods-text-secondary', '[&_svg]:size-6 [&_svg]:shrink-0')}>
+                <div
+                  className={cn(
+                    item.danger ? 'text-ods-error' : 'text-ods-text-secondary',
+                    '[&_svg]:size-6 [&_svg]:shrink-0',
+                  )}
+                >
                   {item.icon}
                 </div>
               )}
-              <span className="text-h4 text-ods-text-primary">
-                {item.label}
-              </span>
+              <span className="text-ods-text-primary text-h4">{item.label}</span>
             </>
-          )
+          );
 
           const handleActivate = (e: React.SyntheticEvent) => {
-            e.stopPropagation()
-            if (!item.disabled) item.onClick?.()
-          }
+            e.stopPropagation();
+            if (!item.disabled) item.onClick?.();
+          };
 
           // Link variant — real <a href> in the DOM, visible to crawlers
           if (item.href) {
             return (
-              <DropdownMenuItem
-                key={`${item.label}-${idx}`}
-                asChild
-                disabled={item.disabled}
-                className={itemClassName}
-              >
+              <DropdownMenuItem key={`${item.label}-${idx}`} asChild disabled={item.disabled} className={itemClassName}>
                 <Link
                   href={item.href}
                   target={item.openInNewTab ? '_blank' : undefined}
                   rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
                   aria-disabled={item.disabled || undefined}
                   tabIndex={item.disabled ? -1 : undefined}
-                  onClick={(e) => {
+                  onClick={e => {
                     if (item.disabled) {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      return
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return;
                     }
-                    if (item.onClick) handleActivate(e)
+                    if (item.onClick) handleActivate(e);
                   }}
                 >
                   {content}
                 </Link>
               </DropdownMenuItem>
-            )
+            );
           }
 
           // Button variant — onClick only
@@ -163,11 +155,9 @@ export function MoreActionsMenu({
             >
               {content}
             </DropdownMenuItem>
-          )
+          );
         })}
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }
-
-

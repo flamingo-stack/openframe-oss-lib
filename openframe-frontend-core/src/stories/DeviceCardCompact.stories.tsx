@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { DeviceCardCompact } from '../components/ui/device-card-compact'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { DeviceCardCompact } from '../components/ui/device-card-compact';
 
 const meta = {
   title: 'UI/DeviceCardCompact',
@@ -8,7 +8,8 @@ const meta = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Compact device card variant for table cells. Shows device name and organization in a stacked layout.',
+        component:
+          'Compact device card variant for table cells. Shows device name and organization in a stacked layout.',
       },
     },
   },
@@ -24,16 +25,16 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '300px' }}>
         <Story />
       </div>
     ),
   ],
-} satisfies Meta<typeof DeviceCardCompact>
+} satisfies Meta<typeof DeviceCardCompact>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default compact card with both name and organization.
@@ -43,7 +44,7 @@ export const Default: Story = {
     deviceName: 'MacBook Pro',
     organization: 'Engineering Team',
   },
-}
+};
 
 /**
  * Card showing only the device name.
@@ -52,7 +53,7 @@ export const NameOnly: Story = {
   args: {
     deviceName: 'Dell XPS 15',
   },
-}
+};
 
 /**
  * Card showing only the organization.
@@ -61,14 +62,14 @@ export const OrganizationOnly: Story = {
   args: {
     organization: 'Infrastructure Team',
   },
-}
+};
 
 /**
  * Returns empty fragment when both values are missing.
  */
 export const Empty: Story = {
   args: {},
-}
+};
 
 /**
  * Returns empty fragment for null values.
@@ -78,7 +79,7 @@ export const NullValues: Story = {
     deviceName: null,
     organization: null,
   },
-}
+};
 
 /**
  * Returns empty fragment for dash placeholder values.
@@ -88,7 +89,7 @@ export const DashValues: Story = {
     deviceName: '-',
     organization: '-',
   },
-}
+};
 
 /**
  * Returns empty fragment for string 'null' values.
@@ -98,7 +99,7 @@ export const StringNullValues: Story = {
     deviceName: 'null',
     organization: 'null',
   },
-}
+};
 
 /**
  * Device with a long name that truncates.
@@ -108,7 +109,7 @@ export const LongName: Story = {
     deviceName: 'Production Server US-East-1 Region Primary Database Host',
     organization: 'Cloud Infrastructure & Platform Engineering',
   },
-}
+};
 
 /**
  * Multiple compact cards as they would appear in a table.
@@ -120,7 +121,14 @@ export const InTableContext: Story = {
   },
   decorators: [
     () => (
-      <div style={{ width: '400px', display: 'flex', flexDirection: 'column', border: '1px solid var(--ods-border, #e5e7eb)' }}>
+      <div
+        style={{
+          width: '400px',
+          display: 'flex',
+          flexDirection: 'column',
+          border: '1px solid var(--ods-border, #e5e7eb)',
+        }}
+      >
         <div style={{ padding: '0 16px', borderBottom: '1px solid var(--ods-border, #e5e7eb)' }}>
           <DeviceCardCompact deviceName="MacBook Pro" organization="Engineering" />
         </div>
@@ -136,4 +144,4 @@ export const InTableContext: Story = {
       </div>
     ),
   ],
-}
+};

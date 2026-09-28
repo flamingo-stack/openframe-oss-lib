@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * TicketAlertsButton — the unified header affordance for support-ticket
@@ -28,13 +28,12 @@
  * this dedicated cell, not the bell.
  */
 
-import React from 'react'
-import { cn } from '../../utils/cn'
-import { LifeBuoyIcon } from '../icons-v2-generated/interface/life-buoy-icon'
-import { useOptionalTicketLive } from '../tickets/ticket-live-provider'
-import { buildTicketOpenHref } from '../tickets/types'
-import { HeaderButton } from './header-button'
-import { UnreadCountBadge } from './unread-dot'
+import { cn } from '../../utils/cn';
+import { LifeBuoyIcon } from '../icons-v2-generated/interface/life-buoy-icon';
+import { useOptionalTicketLive } from '../tickets/ticket-live-provider';
+import { buildTicketOpenHref } from '../tickets/types';
+import { HeaderButton } from './header-button';
+import { UnreadCountBadge } from './unread-dot';
 
 export interface TicketAlertsButtonProps {
   /** BASE path of the host's tickets surface — may carry ANY nesting
@@ -43,26 +42,26 @@ export interface TicketAlertsButtonProps {
    *  the SSOT `buildTicketOpenHref` (`<base>?ticket=<id>` — the same
    *  param `HelpCenterList` derives its drawer state from; opening the
    *  drawer also smooth-scrolls the row). */
-  href: string
+  href: string;
   /** Host navigation (router push) — receives the FULL computed href.
    *  Defaults to `window.location.assign`. */
-  onNavigate?: (href: string) => void
-  disabled?: boolean
-  className?: string
+  onNavigate?: (href: string) => void;
+  disabled?: boolean;
+  className?: string;
 }
 
 export function TicketAlertsButton({ href, onNavigate, disabled, className }: TicketAlertsButtonProps) {
-  const live = useOptionalTicketLive()
+  const live = useOptionalTicketLive();
   // Attention-only: no provider, signed out, or nothing unread → no cell.
-  if (!live || !live.authed || live.unreadTotal === 0) return null
+  if (!live || !live.authed || live.unreadTotal === 0) return null;
 
-  const targetId = live.nextUnreadTicketId
-  const target = targetId ? buildTicketOpenHref(href, targetId) : href
+  const targetId = live.nextUnreadTicketId;
+  const target = targetId ? buildTicketOpenHref(href, targetId) : href;
 
   const handleClick = () => {
-    if (onNavigate) onNavigate(target)
-    else window.location.assign(target)
-  }
+    if (onNavigate) onNavigate(target);
+    else window.location.assign(target);
+  };
 
   return (
     <HeaderButton
@@ -73,7 +72,7 @@ export function TicketAlertsButton({ href, onNavigate, disabled, className }: Ti
         // count pill (sidebar count-pill precedent) and by the cell only
         // existing while updates are unread — never by tinting the glyph.
         <span className="relative inline-flex">
-          <LifeBuoyIcon className="w-6 h-6" />
+          <LifeBuoyIcon className="h-6 w-6" />
           <UnreadCountBadge count={live.unreadTotal} />
         </span>
       }
@@ -82,7 +81,7 @@ export function TicketAlertsButton({ href, onNavigate, disabled, className }: Ti
       disabled={disabled}
       className={cn(className)}
     />
-  )
+  );
 }
 
-export default TicketAlertsButton
+export default TicketAlertsButton;

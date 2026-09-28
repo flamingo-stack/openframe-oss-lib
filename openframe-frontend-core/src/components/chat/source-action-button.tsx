@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * One-component-fits-all "Ask" affordance shared across the three
@@ -18,29 +18,29 @@
  * semantics are identical across all three.
  */
 
-import React from 'react'
-import { MessageSquare, FileText } from 'lucide-react'
-import { Button } from '../ui/button'
-import type { ChatRef } from './chat-ref.types'
+import { MessageSquare, FileText } from 'lucide-react';
+import type React from 'react';
+import { Button } from '../ui/button';
+import type { ChatRef } from './chat-ref.types';
 
-export type SourceActionDensity = 'inline' | 'card' | 'list-row'
+export type SourceActionDensity = 'inline' | 'card' | 'list-row';
 
 export interface SourceActionButtonProps {
   /** The row to drill into when clicked. The button is HIDDEN when this
    *  is null (e.g. row has no primary key — Ask can't fire). */
-  chatRef: ChatRef | null
+  chatRef: ChatRef | null;
   /** Click handler. Receives the chatRef. When undefined the button is
    *  hidden — same as null chatRef. */
-  onDiscuss?: (ref: ChatRef) => void
+  onDiscuss?: (ref: ChatRef) => void;
   /** Visual density / layout. Defaults to `'inline'`. */
-  density?: SourceActionDensity
+  density?: SourceActionDensity;
   /** Optional className appended to the outer element. */
-  className?: string
+  className?: string;
   /** Button text label override. Defaults to `'Ask'`. The Display variant
    *  on inline cards passes `'Display'` here. Density `'inline'` shows
    *  the icon only — the label is used for aria-label / title even when
    *  it doesn't render visibly. */
-  label?: string
+  label?: string;
 }
 
 // Per-density styling lives in one map so the three call sites share the
@@ -49,10 +49,10 @@ export interface SourceActionButtonProps {
 const DENSITY_STYLES: Record<
   SourceActionDensity,
   {
-    size: 'small' | 'icon'
-    showLabel: boolean
-    iconSize: string
-    className: string
+    size: 'small' | 'icon';
+    showLabel: boolean;
+    iconSize: string;
+    className: string;
   }
 > = {
   inline: {
@@ -76,7 +76,7 @@ const DENSITY_STYLES: Record<
     className:
       '!h-auto !px-1.5 !py-0.5 text-h6 font-normal text-ods-text-secondary opacity-60 hover:opacity-100 hover:text-ods-text-primary hover:bg-ods-accent/10',
   },
-}
+};
 
 export function SourceActionButton({
   chatRef,
@@ -85,24 +85,22 @@ export function SourceActionButton({
   className,
   label = 'Ask',
 }: SourceActionButtonProps): React.ReactElement | null {
-  if (!chatRef || !onDiscuss) return null
+  if (!chatRef || !onDiscuss) return null;
 
   // Label-driven icon. "Display" reads as a verbatim-content action so a
   // FileText icon reinforces "show me the body" semantics; the default
   // "Ask" stays MessageSquare for the conversational connotation. Any
   // future label adds an entry to this map.
-  const isDisplay = label === 'Display'
-  const verbLabel = isDisplay
-    ? `Display ${chatRef.title || 'this item'}`
-    : `Ask about ${chatRef.title || 'this item'}`
+  const isDisplay = label === 'Display';
+  const verbLabel = isDisplay ? `Display ${chatRef.title || 'this item'}` : `Ask about ${chatRef.title || 'this item'}`;
   const handle = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onDiscuss(chatRef)
-  }
-  const styles = DENSITY_STYLES[density]
-  const IconComponent = isDisplay ? FileText : MessageSquare
-  const icon = <IconComponent className={styles.iconSize} />
+    e.preventDefault();
+    e.stopPropagation();
+    onDiscuss(chatRef);
+  };
+  const styles = DENSITY_STYLES[density];
+  const IconComponent = isDisplay ? FileText : MessageSquare;
+  const icon = <IconComponent className={styles.iconSize} />;
 
   return (
     <Button
@@ -116,5 +114,5 @@ export function SourceActionButton({
     >
       {styles.showLabel ? label : icon}
     </Button>
-  )
+  );
 }

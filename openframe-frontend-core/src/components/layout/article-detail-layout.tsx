@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 import { cn } from '../../utils/cn';
 
 /**
@@ -44,9 +44,7 @@ export function PageShell({ children, schemas, contentClassName }: LayoutProps) 
   return (
     <main className="bg-ods-bg">
       {schemas}
-      <div className={cn('page-shell-content max-w-[1920px] mx-auto', contentClassName)}>
-        {children}
-      </div>
+      <div className={cn('page-shell-content mx-auto max-w-[1920px]', contentClassName)}>{children}</div>
     </main>
   );
 }
@@ -62,9 +60,7 @@ export function ArticleDetailLayout({ children, schemas, contentClassName }: Lay
   return (
     <main className="bg-ods-bg">
       {schemas}
-      <div className={cn('max-w-[1280px] mx-auto px-6 md:px-20 py-6 md:py-10', contentClassName)}>
-        {children}
-      </div>
+      <div className={cn('mx-auto max-w-[1280px] px-6 py-6 md:px-20 md:py-10', contentClassName)}>{children}</div>
     </main>
   );
 }

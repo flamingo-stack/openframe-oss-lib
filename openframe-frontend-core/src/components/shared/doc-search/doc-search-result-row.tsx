@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * Single row in the `<SearchInput>` dropdown — the standard layout
@@ -13,8 +13,8 @@
  * chat card surfaces — no cross-surface drift.
  */
 
-import { resolveSourceIcon } from '../../chat/utils/source-row-cta'
-import { formatRelativePath } from './format-relative-path'
+import { resolveSourceIcon } from '../../chat/utils/source-row-cta';
+import { formatRelativePath } from './format-relative-path';
 
 /**
  * Minimal result shape this row renders. Compatible with any
@@ -24,50 +24,38 @@ import { formatRelativePath } from './format-relative-path'
  * `useDocSearch` hook result.
  */
 export interface DocSearchResultRowEntry {
-  title?: string
-  path?: string
-  metadata?: Record<string, unknown>
+  title?: string;
+  path?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DocSearchResultRowProps {
-  result: DocSearchResultRowEntry
-  isHighlighted: boolean
+  result: DocSearchResultRowEntry;
+  isHighlighted: boolean;
 }
 
-export function DocSearchResultRow({
-  result,
-  isHighlighted,
-}: DocSearchResultRowProps) {
-  const docType = (result.metadata?.documentType as string) || undefined
-  const sourceRepo = (result.metadata?.sourceRepo as string) || undefined
+export function DocSearchResultRow({ result, isHighlighted }: DocSearchResultRowProps) {
+  const docType = (result.metadata?.documentType as string) || undefined;
+  const sourceRepo = (result.metadata?.sourceRepo as string) || undefined;
   const { Icon: SourceIcon, label: iconLabel } = resolveSourceIcon({
     sourceRepo,
     documentType: docType,
-  })
-  const isGroup = result.metadata?.isGroup as boolean | undefined
+  });
+  const isGroup = result.metadata?.isGroup as boolean | undefined;
 
   return (
-    <div className="flex items-center gap-3 w-full min-w-0">
-      <span
-        className="flex-shrink-0 text-ods-text-secondary"
-        title={iconLabel}
-      >
+    <div className="flex w-full min-w-0 items-center gap-3">
+      <span className="flex-shrink-0 text-ods-text-secondary" title={iconLabel}>
         <SourceIcon className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <div
-          className={`text-h6 truncate ${
-            isHighlighted ? 'text-ods-accent' : 'text-ods-text-primary'
-          }`}
-        >
+        <div className={`truncate text-h6 ${isHighlighted ? 'text-ods-accent' : 'text-ods-text-primary'}`}>
           {result.title || result.path}
         </div>
         {!isGroup && result.path?.includes('/') && (
-          <div className="text-h6 text-ods-text-secondary truncate mt-0.5">
-            {formatRelativePath(result.path)}
-          </div>
+          <div className="mt-0.5 truncate text-ods-text-secondary text-h6">{formatRelativePath(result.path)}</div>
         )}
       </div>
     </div>
-  )
+  );
 }

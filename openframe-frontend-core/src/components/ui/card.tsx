@@ -1,86 +1,52 @@
-"use client"
+'use client';
 
-import * as React from "react"
+import { type HTMLAttributes, type ReactNode, forwardRef } from 'react';
 
-import { cn } from "../../utils/cn"
+import { cn } from '../../utils/cn';
 
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
-      className
+      // `border` with NO color token resolves to `currentColor` — on a dark card
+      // with light text that paints a WHITE outline. Every ODS surface borders
+      // on `--color-border`; say so.
+      'rounded-lg border border-ods-border bg-card text-card-foreground shadow-sm',
+      className,
     )}
     {...props}
   />
-))
-Card.displayName = "Card"
+));
+Card.displayName = 'Card';
 
-const CardHeader = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
-    {...props}
-  />
-))
-CardHeader.displayName = "CardHeader"
+const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn('flex flex-col space-y-1.5 p-6', className)} {...props} />
+));
+CardHeader.displayName = 'CardHeader';
 
-const CardTitle = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "text-h2",
-      className
-    )}
-    {...props}
-  />
-))
-CardTitle.displayName = "CardTitle"
+const CardTitle = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn('text-h2', className)} {...props} />
+));
+CardTitle.displayName = 'CardTitle';
 
-const CardDescription = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("text-h6 text-muted-foreground", className)}
-    {...props}
-  />
-))
-CardDescription.displayName = "CardDescription"
+const CardDescription = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn('text-muted-foreground text-h6', className)} {...props} />
+));
+CardDescription.displayName = 'CardDescription';
 
-const CardContent = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
-))
-CardContent.displayName = "CardContent"
+const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn('p-6 pt-0', className)} {...props} />
+));
+CardContent.displayName = 'CardContent';
 
-const CardFooter = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("flex items-center p-6 pt-0", className)}
-    {...props}
-  />
-))
-CardFooter.displayName = "CardFooter"
+const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn('flex items-center p-6 pt-0', className)} {...props} />
+));
+CardFooter.displayName = 'CardFooter';
 
 // Unified horizontal card for homepage category section
 interface CardHorizontalProps {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   description: string;
   className?: string;
@@ -91,18 +57,18 @@ export function CardHorizontal({ icon, title, description, className = '', borde
   return (
     <div
       className={cn(
-        'w-full flex flex-row items-center gap-3 md:gap-4 bg-ods-card p-4 md:p-6 min-h-[80px]',
+        'flex min-h-[80px] w-full flex-row items-center gap-3 bg-ods-card p-4 md:gap-4 md:p-6',
         borderLeft ? 'border-l border-ods-border' : '',
-        className
+        className,
       )}
     >
-      <div className="w-5 h-5 flex-shrink-0">{icon}</div>
-      <div className="flex flex-col min-w-0">
-        <span className="text-h6 text-ods-text-primary mb-0.5 text-left">{title}</span>
-        <span className="text-h6 text-ods-text-secondary text-left">{description}</span>
+      <div className="h-5 w-5 flex-shrink-0">{icon}</div>
+      <div className="flex min-w-0 flex-col">
+        <span className="mb-0.5 text-left text-ods-text-primary text-h6">{title}</span>
+        <span className="text-left text-ods-text-secondary text-h6">{description}</span>
       </div>
     </div>
   );
 }
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };

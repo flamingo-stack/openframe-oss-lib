@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
+import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import org.junit.jupiter.api.Test;

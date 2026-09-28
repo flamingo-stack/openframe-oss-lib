@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `useVideoWarmup` — single-source-of-truth hook for warming the
@@ -35,18 +35,18 @@
  * and the IO-gated preload semantics are byte-equivalent.
  */
 
-import { useEffect } from 'react'
-import ReactDOM from 'react-dom'
-import { useNearViewport } from '../../hooks/use-near-viewport'
-import { useChatRuntime } from '../../contexts/chat-runtime-context'
+import { useEffect } from 'react';
+import ReactDOM from 'react-dom';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
+import { useNearViewport } from '../../hooks/use-near-viewport';
 // Re-export from the server-safe `mux-origins.ts` module so the
 // constants are NOT bound to this `'use client'` file. See the
 // JSDoc in `mux-origins.ts` for the bug history. Backward-compat:
 // existing imports that read `MUX_STREAM_ORIGIN` from
 // `@flamingo-stack/openframe-frontend-core/components/features`
 // continue to resolve through this re-export.
-export { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins'
-import { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins'
+export { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins';
+import { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins';
 
 /**
  * Save-Data detection — the ONE source of truth for "is this a metered
@@ -54,10 +54,10 @@ import { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins'
  * default `preload` policy. SSR-safe (returns false on the server).
  */
 export function saveDataEnabled(): boolean {
-  if (typeof navigator === 'undefined') return false
-  type Connection = { saveData?: boolean }
-  const conn = (navigator as Navigator & { connection?: Connection }).connection
-  return conn?.saveData === true
+  if (typeof navigator === 'undefined') return false;
+  type Connection = { saveData?: boolean };
+  const conn = (navigator as Navigator & { connection?: Connection }).connection;
+  return conn?.saveData === true;
 }
 
 /**
@@ -87,22 +87,18 @@ export function saveDataEnabled(): boolean {
  * crossOrigin="anonymous"). A change to the origin list here must be
  * mirrored there.
  */
-export function useVideoOriginPreconnect({
-  supabaseStorageOrigin,
-}: { supabaseStorageOrigin?: string } = {}): void {
-  const runtime = useChatRuntime()
-  const resolvedOrigin =
-    supabaseStorageOrigin ?? runtime?.endpoints.supabaseStorageOrigin
+export function useVideoOriginPreconnect({ supabaseStorageOrigin }: { supabaseStorageOrigin?: string } = {}): void {
+  const runtime = useChatRuntime();
+  const resolvedOrigin = supabaseStorageOrigin ?? runtime?.endpoints.supabaseStorageOrigin;
   try {
-    ReactDOM.preconnect(MUX_STREAM_ORIGIN, { crossOrigin: 'anonymous' })
-    ReactDOM.preconnect(MUX_IMAGE_ORIGIN, { crossOrigin: 'anonymous' })
+    ReactDOM.preconnect(MUX_STREAM_ORIGIN, { crossOrigin: 'anonymous' });
+    ReactDOM.preconnect(MUX_IMAGE_ORIGIN, { crossOrigin: 'anonymous' });
     if (resolvedOrigin) {
-      ReactDOM.preconnect(resolvedOrigin, { crossOrigin: 'anonymous' })
+      ReactDOM.preconnect(resolvedOrigin, { crossOrigin: 'anonymous' });
     }
   } catch (err) {
     if (process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
-      console.warn('[useVideoOriginPreconnect] preconnect failed:', err)
+      console.warn('[useVideoOriginPreconnect] preconnect failed:', err);
     }
   }
 }
@@ -114,7 +110,7 @@ interface UseVideoWarmupOptions {
    * `supabaseStorageOrigin` are preloaded — Mux HLS and YouTube are
    * no-ops on the preload side.
    */
-  videoUrl?: string | null
+  videoUrl?: string | null;
   /**
    * Supabase storage origin (e.g. `https://xyz.supabase.co`). When
    * omitted, falls back to `ChatRuntime.endpoints.supabaseStorageOrigin`
@@ -122,17 +118,17 @@ interface UseVideoWarmupOptions {
    * provider) get the origin automatically. When neither is set, the
    * preload step is skipped (preconnect to Mux still fires).
    */
-  supabaseStorageOrigin?: string
+  supabaseStorageOrigin?: string;
   /**
    * IO root margin gate for the preload step. Default `'1000px'` —
    * about one viewport's worth of lookahead on desktop.
    */
-  nearMargin?: string
+  nearMargin?: string;
 }
 
 export interface UseVideoWarmupResult<T extends Element = HTMLDivElement> {
-  ref: (node: T | null) => void
-  isNear: boolean
+  ref: (node: T | null) => void;
+  isNear: boolean;
 }
 
 export function useVideoWarmup<T extends Element = HTMLDivElement>({
@@ -142,51 +138,50 @@ export function useVideoWarmup<T extends Element = HTMLDivElement>({
 }: UseVideoWarmupOptions = {}): UseVideoWarmupResult<T> {
   // Resolve origin once — runtime fallback so callers in hosts that
   // mount `HubRuntimeProvider` don't need to thread it themselves.
-  const runtime = useChatRuntime()
-  const resolvedOrigin =
-    supabaseStorageOrigin ?? runtime?.endpoints.supabaseStorageOrigin
+  const runtime = useChatRuntime();
+  const resolvedOrigin = supabaseStorageOrigin ?? runtime?.endpoints.supabaseStorageOrigin;
 
   // Preconnect on every render — React 19 dedupes. Delegates to the
   // shared preconnect-only variant so the origin list is a single
   // source of truth.
-  useVideoOriginPreconnect({ supabaseStorageOrigin: resolvedOrigin })
+  useVideoOriginPreconnect({ supabaseStorageOrigin: resolvedOrigin });
 
-  const { ref, isNear } = useNearViewport<T>(nearMargin)
+  const { ref, isNear } = useNearViewport<T>(nearMargin);
 
   useEffect(() => {
-    if (!isNear || !videoUrl || !resolvedOrigin) return
+    if (!isNear || !videoUrl || !resolvedOrigin) return undefined;
 
     // Save-Data gate — metered connections skip preload.
-    if (saveDataEnabled()) return
+    if (saveDataEnabled()) return undefined;
 
     // Origin gate: only preload Supabase-hosted MP4s. Mux HLS warms
     // via the manifest fetch when MuxPlayer mounts; YouTube has no
     // preload benefit.
-    let videoOrigin: string
+    let videoOrigin: string;
     try {
-      videoOrigin = new URL(videoUrl, 'http://placeholder.local').origin
+      videoOrigin = new URL(videoUrl, 'http://placeholder.local').origin;
     } catch {
-      return
+      return undefined;
     }
-    if (videoOrigin !== resolvedOrigin) return
+    if (videoOrigin !== resolvedOrigin) return undefined;
 
-    const link = document.createElement('link')
-    link.rel = 'preload'
-    link.as = 'video'
-    link.href = videoUrl
-    link.crossOrigin = 'anonymous'
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'video';
+    link.href = videoUrl;
+    link.crossOrigin = 'anonymous';
     // `fetchPriority='low'` matches the plan — the hint should not
     // steal network from the LCP image; the click→first-frame win is
     // in milliseconds, not the first paint.
     if ('fetchPriority' in link) {
-      ;(link as HTMLLinkElement & { fetchPriority?: string }).fetchPriority = 'low'
+      (link as HTMLLinkElement & { fetchPriority?: string }).fetchPriority = 'low';
     }
-    document.head.appendChild(link)
+    document.head.appendChild(link);
 
     return () => {
-      link.remove()
-    }
-  }, [isNear, videoUrl, resolvedOrigin])
+      link.remove();
+    };
+  }, [isNear, videoUrl, resolvedOrigin]);
 
-  return { ref, isNear }
+  return { ref, isNear };
 }

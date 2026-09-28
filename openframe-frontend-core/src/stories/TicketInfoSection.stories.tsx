@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useState } from 'react';
 import { Monitor } from 'lucide-react';
+import { useState } from 'react';
 import { TicketInfoSection } from '../components/ui/ticket-info-section';
 
 const meta = {
@@ -10,13 +10,14 @@ const meta = {
     layout: 'padded',
     docs: {
       description: {
-        component: 'Collapsible ticket info bar showing organization, user, device, status, and expanded details including description, attachments, tags, knowledge base articles, and notes.',
+        component:
+          'Collapsible ticket info bar showing organization, user, device, status, and expanded details including description, attachments, tags, knowledge base articles, and notes.',
       },
     },
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ width: '900px' }}>
         <Story />
       </div>
@@ -86,10 +87,11 @@ export const Expanded: Story = {
         { value: 'u1', label: 'Roman Smith' },
         { value: 'u2', label: 'John Doe' },
       ],
-      onAssign: (userId) => alert(`Assign: ${userId}`),
+      onAssign: userId => alert(`Assign: ${userId}`),
     },
     createdAt: '2025/07/12, 22:27',
-    description: 'Goal: Reduce new client onboarding from 4 weeks to 10 days while maintaining 95% satisfaction.\n\nCore Activities:\n- Platform setup and configuration\n- Data migration and SSO integration\n- Team training and certification\n- Go-live support',
+    description:
+      'Goal: Reduce new client onboarding from 4 weeks to 10 days while maintaining 95% satisfaction.\n\nCore Activities:\n- Platform setup and configuration\n- Data migration and SSO integration\n- Team training and certification\n- Go-live support',
     attachments: mockAttachments,
     tags: ['Client-onboarding', 'Process-management', 'Project-template'],
     notes: mockNotes,
@@ -122,16 +124,16 @@ export const Interactive: Story = {
             { value: 'u1', label: 'Roman Smith' },
             { value: 'u2', label: 'John Doe' },
           ],
-          onAssign: (userId) => alert(`Assign: ${userId}`),
+          onAssign: userId => alert(`Assign: ${userId}`),
         }}
         createdAt="2025/07/12, 22:27"
         description="This is a sample ticket description with **markdown** content."
         attachments={mockAttachments}
         tags={['Linux', 'Production', 'High-Risk']}
         notes={mockNotes}
-        onAddNote={(text) => alert(`Add note: ${text}`)}
-        onEditNote={(id) => alert(`Edit note: ${id}`)}
-        onDeleteNote={(id) => alert(`Delete note: ${id}`)}
+        onAddNote={text => alert(`Add note: ${text}`)}
+        onEditNote={id => alert(`Edit note: ${id}`)}
+        onDeleteNote={id => alert(`Delete note: ${id}`)}
       />
     );
   },
@@ -152,7 +154,7 @@ export const Minimal: Story = {
         { value: 'u1', label: 'Roman Smith' },
         { value: 'u2', label: 'John Doe' },
       ],
-      onAssign: (userId) => alert(`Assign: ${userId}`),
+      onAssign: userId => alert(`Assign: ${userId}`),
     },
     createdAt: '2025/01/01, 00:00',
   },

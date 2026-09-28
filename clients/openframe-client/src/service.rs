@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 use tokio::runtime::Runtime;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::installation_initial_config_service::{
     InstallConfigParams, InstallationInitialConfigService,
@@ -83,14 +83,22 @@ fn windows_service_main(_args: Vec<std::ffi::OsString>) {
     };
 
     // Report that the service is running
-    let _ = set_service_status(&status_handle, ServiceState::Running);
+    let _ = set_service_status(
+        &status_handle,
+        ServiceState::Running,
+        ServiceExitCode::Win32(0),
+    );
 
     // Create a Tokio runtime and run the service core
     let rt = match Runtime::new() {
         Ok(runtime) => runtime,
         Err(e) => {
             eprintln!("Failed to create Tokio runtime: {:?}", e);
-            let _ = set_service_status(&status_handle, ServiceState::Stopped);
+            let _ = set_service_status(
+                &status_handle,
+                ServiceState::Stopped,
+                ServiceExitCode::ServiceSpecific(1),
+            );
             return;
         }
     };
@@ -114,17 +122,29 @@ fn windows_service_main(_args: Vec<std::ffi::OsString>) {
     });
 
     if let Err(e) = result {
-        eprintln!("Service core failed: {:?}", e);
-        let _ = set_service_status(&status_handle, ServiceState::Stopped);
+        error!("Service core failed: {:#}", e);
+        let _ = set_service_status(
+            &status_handle,
+            ServiceState::Stopped,
+            ServiceExitCode::ServiceSpecific(1),
+        );
     } else {
         info!("Service stopped gracefully");
-        let _ = set_service_status(&status_handle, ServiceState::Stopped);
+        let _ = set_service_status(
+            &status_handle,
+            ServiceState::Stopped,
+            ServiceExitCode::Win32(0),
+        );
     }
 }
 
 /// Helper function to set service status
 #[cfg(windows)]
-fn set_service_status(status_handle: &ServiceStatusHandle, state: ServiceState) -> Result<()> {
+fn set_service_status(
+    status_handle: &ServiceStatusHandle,
+    state: ServiceState,
+    exit_code: ServiceExitCode,
+) -> Result<()> {
     let status = ServiceStatus {
         service_type: ServiceType::OWN_PROCESS,
         current_state: state,
@@ -133,7 +153,7 @@ fn set_service_status(status_handle: &ServiceStatusHandle, state: ServiceState) 
         } else {
             ServiceControlAccept::empty()
         },
-        exit_code: ServiceExitCode::Win32(0),
+        exit_code,
         checkpoint: 0,
         wait_hint: std::time::Duration::from_secs(5),
         process_id: None,
@@ -212,6 +232,7 @@ impl Service {
                         let machine_info = PersistedMachineInfo {
                             machine_id,
                             client_secret,
+                            user_id: None,
                         };
                         match machine_info_persistence::write(&machine_info) {
                             Ok(()) => info!("Machine info persisted successfully"),
@@ -282,9 +303,13 @@ impl Service {
             InstallationInitialConfigService::new(dir_manager.clone())
                 .context("Failed to initialize InstallationInitialConfigService")?;
 
-        installation_initial_config_service
-            .build_and_save(params)
-            .context("Failed to process initial configuration during service installation")?;
+        if params.is_parameterless() {
+            info!("Parameterless install — configuration deferred to 'openframe-client auth'");
+        } else {
+            installation_initial_config_service
+                .build_and_save(params)
+                .context("Failed to process initial configuration during service installation")?;
+        }
 
         // Get the current executable path
         let current_exe_path =
@@ -363,23 +388,23 @@ impl Service {
             }
 
             info!(
-                "Binary installed successfully. You can now use 'openframe' command from anywhere."
+                "Binary installed successfully. You can now use 'openframe-client' command from anywhere."
             );
-
-            #[cfg(target_os = "windows")]
-            {
-                if let Some(bin_dir) = install_path.parent() {
-                    info!("Adding {} to system PATH", bin_dir.display());
-                    Self::add_to_windows_path(bin_dir).context("Failed to add to PATH")?;
-
-                    info!("⚠️  Please restart your terminal to use 'openframe-client' command");
-                }
-            }
         } else {
             info!(
                 "Binary is already in the standard location: {}",
                 install_path.display()
             );
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(bin_dir) = install_path.parent() {
+                info!("Adding {} to system PATH", bin_dir.display());
+                Self::add_to_windows_path(bin_dir).context("Failed to add to PATH")?;
+
+                info!("⚠️  Please restart your terminal to use 'openframe-client' command");
+            }
         }
 
         // Use the installation path for the service registration
@@ -512,6 +537,8 @@ impl Service {
                 .ok()
         };
 
+        crate::platform::uninstall::remove_legacy_alias(&install_path);
+
         // Call platform-specific uninstall implementation
         #[cfg(target_os = "windows")]
         {
@@ -565,11 +592,64 @@ impl Service {
         #[cfg(target_os = "windows")]
         crate::platform::windows_path_migration::run();
 
+        crate::platform::uninstall::remove_legacy_alias(&Self::get_install_location());
+
+        // Awaiting-auth gate: after a parameterless install there is no initial
+        // configuration yet, and constructing the client without one would fail and
+        // crash-loop the service. Idle here until `openframe-client auth` writes it.
+        let initial_config_service =
+            crate::services::InitialConfigurationService::new(dir_manager.clone())
+                .context("Failed to initialize initial configuration service")?;
+        if !initial_config_service.is_configured() {
+            info!(
+                "Not authenticated yet — waiting for configuration (run 'openframe-client auth' with your tenant parameters)"
+            );
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(
+                    crate::config::update_config::AWAITING_AUTH_POLL_SECS,
+                ))
+                .await;
+                if initial_config_service.is_configured() {
+                    info!("Configuration detected — starting the client");
+                    break;
+                }
+            }
+        }
+
         // Initialize the client
         let client = Client::new()?;
 
         // Start the client
         client.start().await
+    }
+
+    /// Restart the service so a freshly written configuration is picked up now.
+    /// Needed for more than speed: the configuration is read once, when the client is
+    /// constructed, so re-running `auth` on an already-running client would otherwise
+    /// have no effect until the next restart.
+    ///
+    /// Errors only when the service was stopped and could not be started again — nothing
+    /// restarts an explicitly stopped service, so that case has to reach the operator.
+    pub async fn nudge_restart() -> Result<()> {
+        if !Self::is_installed() {
+            return Ok(());
+        }
+
+        // Only start what we actually stopped: if the stop fails the service is still
+        // running, and the awaiting-auth poll picks the configuration up on its own.
+        if let Err(e) =
+            crate::platform::system_service::stop_service(FULL_SERVICE_NAME, false).await
+        {
+            debug!(
+                "Could not stop the service to apply configuration, leaving it running: {:#}",
+                e
+            );
+            return Ok(());
+        }
+
+        crate::platform::system_service::start_service(FULL_SERVICE_NAME)
+            .await
+            .context("Failed to start the service after saving the configuration")
     }
 
     /// Get the standard installation location for the OpenFrame binary
@@ -731,8 +811,10 @@ impl Service {
     fn reg_value_to_string(raw: &winreg::RegValue) -> String {
         String::from_utf16_lossy(
             &raw.bytes
-                .chunks_exact(2)
-                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| u16::from_le_bytes(*c))
                 .collect::<Vec<u16>>(),
         )
         .trim_end_matches('\0')

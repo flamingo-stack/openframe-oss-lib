@@ -1,58 +1,53 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { cn } from '../../utils/cn'
-import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade'
-import { ChatTicketItem, type ChatTicketItemData } from './entity-cards/chat-ticket-item'
+import { type HTMLAttributes, forwardRef } from 'react';
+import { cn } from '../../utils/cn';
+import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
+import { ChatTicketItem, type ChatTicketItemData } from './entity-cards/chat-ticket-item';
 
-export interface ChatTicketListProps extends React.HTMLAttributes<HTMLDivElement> {
-  tickets: ChatTicketItemData[]
-  onTicketClick?: (ticketId: string) => void
+export interface ChatTicketListProps extends HTMLAttributes<HTMLDivElement> {
+  tickets: ChatTicketItemData[];
+  onTicketClick?: (ticketId: string) => void;
   /** Show skeleton placeholder rows instead of tickets while loading. */
-  isLoading?: boolean
+  isLoading?: boolean;
   /** Number of skeleton rows rendered while `isLoading`. Defaults to 5. */
-  skeletonCount?: number
+  skeletonCount?: number;
 }
 
-const ChatTicketList = React.forwardRef<HTMLDivElement, ChatTicketListProps>(
+const ChatTicketList = forwardRef<HTMLDivElement, ChatTicketListProps>(
   ({ className, tickets, onTicketClick, isLoading = false, skeletonCount = 5, ...props }, ref) => {
     // Shared scroll-shadow tracking (ui/scroll-fade) — re-measures on resize
     // and content changes, so no manual ticket-count effect is needed.
-    const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>()
+    const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>();
 
     if (isLoading) {
       return (
-        <div ref={ref} className={cn("flex flex-col gap-2 min-h-0", className)} {...props}>
-          <p className="text-h5 text-ods-text-secondary shrink-0">Your Chats:</p>
-          <div className="border border-ods-border rounded-md flex-1 min-h-0 overflow-hidden">
+        <div ref={ref} className={cn('flex min-h-0 flex-col gap-2', className)} {...props}>
+          <p className="shrink-0 text-ods-text-secondary text-h5">Your Chats:</p>
+          <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-ods-border">
             {Array.from({ length: skeletonCount }).map((_, i) => (
-              // eslint-disable-next-line react/no-array-index-key
               <ChatTicketItem key={i} isLoading />
             ))}
           </div>
         </div>
-      )
+      );
     }
 
-    if (tickets.length === 0) return null
+    if (tickets.length === 0) return null;
 
     return (
-      <div ref={ref} className={cn("flex flex-col gap-2 min-h-0", className)} {...props}>
-        <p className="text-h5 text-ods-text-secondary shrink-0">Your Chats:</p>
+      <div ref={ref} className={cn('flex min-h-0 flex-col gap-2', className)} {...props}>
+        <p className="shrink-0 text-ods-text-secondary text-h5">Your Chats:</p>
         <div
           className={cn(
-            "relative border-x border-ods-border flex-1 min-h-0 overflow-hidden",
-            !fadeTop && "border-t rounded-t-md",
-            !fadeBottom && "border-b rounded-b-md",
+            'relative min-h-0 flex-1 overflow-hidden border-x border-ods-border',
+            !fadeTop && 'rounded-t-md border-t',
+            !fadeBottom && 'rounded-b-md border-b',
           )}
         >
-          <div ref={scrollRef} className="overflow-y-auto overscroll-contain h-full" onScroll={updateFade}>
-            {tickets.map((ticket) => (
-              <ChatTicketItem
-                key={ticket.id}
-                ticket={ticket}
-                onClick={onTicketClick}
-              />
+          <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain" onScroll={updateFade}>
+            {tickets.map(ticket => (
+              <ChatTicketItem key={ticket.id} ticket={ticket} onClick={onTicketClick} />
             ))}
           </div>
 
@@ -63,11 +58,11 @@ const ChatTicketList = React.forwardRef<HTMLDivElement, ChatTicketListProps>(
           <ScrollFadeOverlay edge="bottom" visible={fadeBottom} />
         </div>
       </div>
-    )
+    );
   },
-)
+);
 
-ChatTicketList.displayName = 'ChatTicketList'
+ChatTicketList.displayName = 'ChatTicketList';
 
-export { ChatTicketList }
-export type { ChatTicketItemData }
+export { ChatTicketList };
+export type { ChatTicketItemData };

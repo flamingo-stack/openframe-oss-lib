@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
+import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -17,6 +18,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.ticket.TicketStatus;
 import graphql.relay.Relay;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -106,12 +108,33 @@ public class AssignmentDataFetcher {
         return RELAY.toGlobalId("ItemAssignment", assignment.getId());
     }
 
+    // Ticket declares Node here like Organization and Machine do, and the assignment mutations take
+    // global ids — without this the raw id a client reads back cannot be passed to unassignItem.
+    @DgsData(parentType = "Ticket", field = "id")
+    public String ticketNodeId(DgsDataFetchingEnvironment dfe) {
+        Ticket ticket = dfe.getSource();
+        String ticketId = ticket.getId();
+        return RELAY.toGlobalId("Ticket", ticketId);
+    }
+
+    /**
+     * The legacy status, kept for clients built before the lifecycle rollout — the mobile and
+     * desktop shells ship a frozen web bundle. Nothing stores it any more, so it is derived from
+     * the lifecycle kind; this schema exposes no kind of its own.
+     * TODO(lifecycle-rollout): drop once no released shell reads it.
+     */
+    @DgsData(parentType = "Ticket", field = "status")
+    public String ticketLegacyStatus(DgsDataFetchingEnvironment dfe) {
+        Ticket ticket = dfe.getSource();
+        return TicketStatus.fromKind(ticket.getStatusKind()).name();
+    }
+
     @DgsData(parentType = "ItemAssignment", field = "target")
     public CompletableFuture<?> resolveTarget(DgsDataFetchingEnvironment dfe) {
         ItemAssignment assignment = dfe.getSource();
         String targetId = assignment.getTargetId();
         return switch (assignment.getTargetType()) {
-            case ORGANIZATION -> dfe.<String, Organization>getDataLoader("organizationDataLoader").load(targetId);
+            case ORGANIZATION -> dfe.<String, Organization>getDataLoader(OrganizationDataLoader.NAME).load(targetId);
             case DEVICE -> dfe.<String, Machine>getDataLoader("machineDataLoader").load(targetId);
             case TICKET -> dfe.<String, Ticket>getDataLoader("ticketDataLoader").load(targetId);
             case KNOWLEDGE_ARTICLE -> dfe.<String, KnowledgeBaseItem>getDataLoader("knowledgeBaseItemDataLoader").load(targetId);

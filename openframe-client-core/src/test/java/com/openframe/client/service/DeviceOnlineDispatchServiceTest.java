@@ -4,11 +4,11 @@ import com.openframe.client.service.rmm.DeviceOnlineDispatchService;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.DeviceFirstOnlineDispatch;
-import com.openframe.data.document.rmm.DeviceOnlineDispatchStatus;
-import com.openframe.data.document.rmm.ScriptSchedule;
-import com.openframe.data.document.rmm.ScriptScheduleTrigger;
-import com.openframe.data.document.rmm.ScriptStatus;
+import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
+import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
@@ -62,7 +62,7 @@ class DeviceOnlineDispatchServiceTest {
     @DisplayName("NEW row + online machine + ACTIVE schedule → fires that scheduleId, row bulk-marked DISPATCHED")
     void online_firesRowSchedule() {
         DeviceFirstOnlineDispatch row = newRow(ROW_ID, MACHINE, SCHEDULE);
-        ScriptSchedule s = schedule(SCHEDULE);
+        ScheduleScript s = schedule(SCHEDULE);
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
         stubTenant(TENANT, List.of(onlineMachine(MACHINE)), List.of(s));
 
@@ -118,8 +118,8 @@ class DeviceOnlineDispatchServiceTest {
     void firesPerRowSchedule() {
         DeviceFirstOnlineDispatch r1 = newRow("row-a", MACHINE, "s-a");
         DeviceFirstOnlineDispatch r2 = newRow("row-b", MACHINE, "s-b");
-        ScriptSchedule sa = schedule("s-a");
-        ScriptSchedule sb = schedule("s-b");
+        ScheduleScript sa = schedule("s-a");
+        ScheduleScript sb = schedule("s-b");
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(r1, r2));
         stubTenant(TENANT, List.of(onlineMachine(MACHINE)), List.of(sa, sb));
 
@@ -135,8 +135,8 @@ class DeviceOnlineDispatchServiceTest {
     void dispatchFailure_isolatesFailingRow() {
         DeviceFirstOnlineDispatch bad = newRow("row-bad", "m-bad", "s-bad");
         DeviceFirstOnlineDispatch ok = newRow("row-ok", "m-ok", "s-ok");
-        ScriptSchedule sBad = schedule("s-bad");
-        ScriptSchedule sOk = schedule("s-ok");
+        ScheduleScript sBad = schedule("s-bad");
+        ScheduleScript sOk = schedule("s-ok");
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(bad, ok));
         stubTenant(TENANT, List.of(onlineMachine("m-bad"), onlineMachine("m-ok")), List.of(sBad, sOk));
         doThrow(new RuntimeException("nats down"))
@@ -146,6 +146,41 @@ class DeviceOnlineDispatchServiceTest {
 
         verify(fireDispatcher).dispatch(eq(sOk), eq(List.of("m-ok")), any(Instant.class));
         assertThat(savedDispatchedIds()).containsExactly("row-ok");
+    }
+
+    @Test
+    @DisplayName("reconnect-retry: NEW row past expiresAt → marked EXPIRED, not fired (even with an online machine + schedule)")
+    void retryExpired_marksExpiredNotFired() {
+        DeviceFirstOnlineDispatch row = newRow(ROW_ID, MACHINE, SCHEDULE);
+        row.setExpiresAt(Instant.now().minusSeconds(60));   // reconnect window already elapsed
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
+        stubTenant(TENANT, List.of(onlineMachine(MACHINE)), List.of(schedule(SCHEDULE)));
+
+        service.processDevicesBecameOnline();
+
+        verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
+        ArgumentCaptor<Iterable<DeviceFirstOnlineDispatch>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(dispatchRepository).saveAll(captor.capture());
+        DeviceFirstOnlineDispatch saved = captor.getValue().iterator().next();
+        assertThat(saved.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.EXPIRED);
+        assertThat(saved.getId()).isEqualTo(ROW_ID);
+    }
+
+    @Test
+    @DisplayName("reconnect-retry: NEW row within window + online → fires the DATE_TIME schedule (loaded by id, not gated to DEVICE_ONLINE)")
+    void retryWithinWindow_firesDateTimeSchedule() {
+        DeviceFirstOnlineDispatch row = newRow(ROW_ID, MACHINE, SCHEDULE);
+        row.setExpiresAt(Instant.now().plusSeconds(3600));
+        ScheduleScript dateTime = ScheduleScript.builder()
+                .id(SCHEDULE).tenantId(TENANT).status(ScriptStatus.ACTIVE)
+                .trigger(ScheduleScriptTrigger.DATE_TIME).build();
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
+        stubTenant(TENANT, List.of(onlineMachine(MACHINE)), List.of(dateTime));
+
+        service.processDevicesBecameOnline();
+
+        verify(fireDispatcher).dispatch(eq(dateTime), eq(List.of(MACHINE)), any(Instant.class));
+        assertThat(savedDispatchedIds()).containsExactly(ROW_ID);
     }
 
     @Test
@@ -194,16 +229,13 @@ class DeviceOnlineDispatchServiceTest {
         assertThat(savedDispatchedIds()).containsExactlyInAnyOrder("row-a", "row-b");
     }
 
-    private void stubTenant(String tenantId, List<Machine> machines, List<ScriptSchedule> schedules) {
+    private void stubTenant(String tenantId, List<Machine> machines, List<ScheduleScript> schedules) {
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(tenantId), any())).thenReturn(machines);
-        when(scheduleRepository.findByTenantIdAndTriggerAndStatus(tenantId, ScriptScheduleTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
-                .thenReturn(schedules);
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(tenantId), any())).thenReturn(schedules);
     }
 
     private void assertNothingDispatched() {
-        ArgumentCaptor<Iterable<DeviceFirstOnlineDispatch>> captor = ArgumentCaptor.forClass(Iterable.class);
-        verify(dispatchRepository).saveAll(captor.capture());
-        assertThat(captor.getValue()).isEmpty();
+        verify(dispatchRepository, never()).saveAll(any());
     }
 
     private List<String> savedDispatchedIds() {
@@ -222,8 +254,8 @@ class DeviceOnlineDispatchServiceTest {
                 .status(DeviceOnlineDispatchStatus.NEW).firstSeenAt(Instant.EPOCH).build();
     }
 
-    private static ScriptSchedule schedule(String id) {
-        return ScriptSchedule.builder().id(id).tenantId(TENANT).build();
+    private static ScheduleScript schedule(String id) {
+        return ScheduleScript.builder().id(id).tenantId(TENANT).status(ScriptStatus.ACTIVE).build();
     }
 
     private static Machine onlineMachine(String machineId) {

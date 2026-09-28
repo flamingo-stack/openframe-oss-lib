@@ -1,35 +1,31 @@
-'use client'
+'use client';
+
+import { PolicyLink } from '../../ui/policy-link';
 
 export interface TermsAgreementLabelProps {
-  termsUrl?: string
-  privacyPolicyUrl?: string
+  termsUrl?: string;
+  privacyPolicyUrl?: string;
+  /** The words after the links, leading space included. */
+  suffix?: string;
 }
 
 /** "Agree to Terms & Privacy Policy by signing up." — shared checkbox label. */
-export function TermsAgreementLabel({ termsUrl = '#', privacyPolicyUrl = '#' }: TermsAgreementLabelProps) {
+export function TermsAgreementLabel({
+  termsUrl = '#',
+  privacyPolicyUrl = '#',
+  suffix = ' by signing up.',
+}: TermsAgreementLabelProps) {
   return (
-    <span className="text-h4 text-ods-text-primary">
+    <span className="text-ods-text-primary text-h4">
       {'Agree to '}
-      <a
-        href={termsUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-ods-text-secondary underline"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <PolicyLink href={termsUrl} tone="secondary">
         Terms
-      </a>
+      </PolicyLink>
       {' & '}
-      <a
-        href={privacyPolicyUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-ods-text-secondary underline"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <PolicyLink href={privacyPolicyUrl} tone="secondary">
         Privacy Policy
-      </a>
-      {' by signing up.'}
+      </PolicyLink>
+      {suffix}
     </span>
-  )
+  );
 }

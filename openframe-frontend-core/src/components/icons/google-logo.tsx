@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 /** @deprecated Use icons from icons-v2-generated instead. */
 export const GoogleLogo = ({ className, ...props }: { className?: string } & React.SVGProps<SVGSVGElement>) => (
@@ -30,4 +30,4 @@ export const GoogleLogo = ({ className, ...props }: { className?: string } & Rea
       />
     </g>
   </svg>
-); 
+);

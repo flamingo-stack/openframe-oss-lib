@@ -16,7 +16,10 @@ import { ScheduleACallPage } from './pages/schedule-a-call'
 import { SingleLinkEmbedPage } from './pages/single-link-embed'
 import { AuthorsPage } from './pages/authors'
 import { FaqsPage } from './pages/faqs'
+import { TrustCenterPage } from './pages/trust-center'
 import { KnowledgeBasePage } from './pages/knowledge-base'
+import { McpPlaygroundPage } from './pages/mcp-playground'
+import { DebugPage } from './pages/debug'
 import { DOCS_BASE_ROUTE } from './config/content'
 
 // react-router patterns are relative (no leading slash); strip it once.
@@ -30,12 +33,14 @@ export function AppRoutes() {
         <Route index element={<HomePage />} />
         <Route path="onboarding-guides" element={<OnboardingCatalogPage />} />
         <Route path="onboarding-guides/:slug" element={<OnboardingDetailPage />} />
+        <Route path="debug" element={<DebugPage />} />
         <Route path="roadmap" element={<RoadmapPage />} />
         <Route path="delivery" element={<DeliveryPage />} />
         <Route path="releases" element={<ReleasesPage />} />
         <Route path="releases/:slug" element={<ReleaseDetailRoute />} />
         <Route path="authors" element={<AuthorsPage />} />
         <Route path="faqs" element={<FaqsPage />} />
+        <Route path="trust-center" element={<TrustCenterPage />} />
         <Route path="legal/:docType" element={<LegalPage />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="case-studies" element={<CaseStudiesPage />} />
@@ -43,6 +48,7 @@ export function AppRoutes() {
         <Route path="schedule-a-call" element={<ScheduleACallPage />} />
         <Route path="schedule-a-call/*" element={<ScheduleACallPage />} />
         <Route path="single-link-embed" element={<SingleLinkEmbedPage />} />
+        <Route path="mcp" element={<McpPlaygroundPage />} />
         {/* DocsHubPage embed proof — same component the hub mounts at
          *  flamingo.so/knowledge-base and openframe.so/knowledge-base.
          *  Path read from `DOCS_BASE_ROUTE` so `ask-ai.tsx`'s chat baseRoute

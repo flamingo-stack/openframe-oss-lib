@@ -5,7 +5,7 @@ mod tempfile;
 #[cfg(unix)]
 mod unix;
 #[cfg(windows)]
-mod windows;
+pub(crate) mod windows;
 
 #[cfg(unix)]
 pub use unix::execute_script;
@@ -16,6 +16,8 @@ pub use windows::execute_script;
 pub enum Privilege {
     Agent,
     User,
+    #[cfg(windows)]
+    ElevatedUser,
 }
 
 pub struct ScriptParams<'a> {

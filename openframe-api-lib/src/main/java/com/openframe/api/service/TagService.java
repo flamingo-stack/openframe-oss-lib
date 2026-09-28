@@ -281,6 +281,7 @@ public class TagService {
                 .values(assignment.getValues() != null ? assignment.getValues() : List.of())
                 .entityType(tag.getEntityType())
                 .createdAt(assignment.getTaggedAt())
+                .createdBy(assignment.getTaggedBy())
                 .build();
     }
 }

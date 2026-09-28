@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react';
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -9,20 +9,20 @@ const FOCUSABLE_SELECTOR = [
   'select:not([disabled])',
   'textarea:not([disabled])',
   '[tabindex]:not([tabindex="-1"])',
-].join(', ')
+].join(', ');
 
 export interface UseFocusTrapOptions {
   /** Called when Escape is pressed while focus is inside the container.
    *  When omitted, Escape passes through untouched so document-level
    *  listeners still fire. */
-  onEscape?: () => void
+  onEscape?: () => void;
   /**
    * When false, Tab/Shift+Tab are NOT cycled within the container — for
    * non-modal dialogs (e.g. SlidingSidebar, whose z-50 header stays clickable
    * above the open drawer). Escape / initial focus / guarded restore still apply.
    * @default true
    */
-  contain?: boolean
+  contain?: boolean;
 }
 
 /**
@@ -44,67 +44,73 @@ export interface UseFocusTrapOptions {
 export function useFocusTrap(
   containerRef: RefObject<HTMLElement | null>,
   active: boolean,
-  { onEscape, contain = true }: UseFocusTrapOptions = {}
+  { onEscape, contain = true }: UseFocusTrapOptions = {},
 ): void {
   // Latest-ref so unstable inline callbacks never tear the trap down and
   // re-yank focus — same stable-callback discipline as `useCloseOnNavigation`.
-  const onEscapeRef = useRef(onEscape)
-  onEscapeRef.current = onEscape
+  // Refreshed after every commit, declared before the trap effect so it wins
+  // the same flush. Not in the render body: the reader is a keydown listener,
+  // which cannot fire before a commit.
+  const onEscapeRef = useRef(onEscape);
+  useEffect(() => {
+    onEscapeRef.current = onEscape;
+  });
 
   useEffect(() => {
-    if (!active) return
-    const container = containerRef.current
-    if (!container) return
+    if (!active) return undefined;
+    const container = containerRef.current;
+    if (!container) return undefined;
 
-    const previouslyFocused = document.activeElement as HTMLElement | null
+    const previouslyFocused = document.activeElement as HTMLElement | null;
 
     const focusables = () =>
-      Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-        .filter((el) => el.getClientRects().length > 0)
+      Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        el => el.getClientRects().length > 0,
+      );
 
-    const first = focusables()[0]
-    ;(first ?? container).focus({ preventScroll: true })
+    const first = focusables()[0];
+    (first ?? container).focus({ preventScroll: true });
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         // No preventDefault/stopPropagation — pass-through by design.
-        onEscapeRef.current?.()
-        return
+        onEscapeRef.current?.();
+        return;
       }
-      if (e.key !== 'Tab' || !contain) return
-      const items = focusables()
+      if (e.key !== 'Tab' || !contain) return;
+      const items = focusables();
       if (items.length === 0) {
-        e.preventDefault()
-        container.focus({ preventScroll: true })
-        return
+        e.preventDefault();
+        container.focus({ preventScroll: true });
+        return;
       }
-      const firstEl = items[0]
-      const lastEl = items[items.length - 1]
-      const current = document.activeElement
+      const firstEl = items[0];
+      const lastEl = items[items.length - 1];
+      const current = document.activeElement;
       if (e.shiftKey && (current === firstEl || current === container)) {
-        e.preventDefault()
-        lastEl.focus({ preventScroll: true })
+        e.preventDefault();
+        lastEl.focus({ preventScroll: true });
       } else if (!e.shiftKey && current === lastEl) {
-        e.preventDefault()
-        firstEl.focus({ preventScroll: true })
+        e.preventDefault();
+        firstEl.focus({ preventScroll: true });
       }
-    }
+    };
 
-    container.addEventListener('keydown', handleKeyDown)
+    container.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      container.removeEventListener('keydown', handleKeyDown)
+      container.removeEventListener('keydown', handleKeyDown);
       // Guarded restore: only when focus is still inside the surface (or fell
       // to body because the surface unmounted) — never steal focus from a
       // dialog that opened meanwhile (e.g. the nav-footer → SSO modal flow).
-      const current = document.activeElement
+      const current = document.activeElement;
       if (
         previouslyFocused &&
         previouslyFocused.isConnected &&
         (current === null || current === document.body || container.contains(current))
       ) {
-        previouslyFocused.focus({ preventScroll: true })
+        previouslyFocused.focus({ preventScroll: true });
       }
-    }
-  }, [containerRef, active, contain])
+    };
+  }, [containerRef, active, contain]);
 }

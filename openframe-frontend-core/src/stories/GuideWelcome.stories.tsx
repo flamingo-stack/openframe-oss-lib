@@ -1,18 +1,14 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { GuideWelcome } from '../components/chat/guide-welcome'
-import { GuideModeBanner } from '../components/chat/guide-mode-banner'
-import { MingoOnboardingCard } from '../components/chat/mingo-onboarding-card'
-import {
-  Rocket01Icon,
-  CompassIcon,
-  NewspaperIcon,
-} from '../components/icons-v2-generated'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { GuideModeBanner } from '../components/chat/guide-mode-banner';
+import { GuideWelcome } from '../components/chat/guide-welcome';
+import { MingoOnboardingCard } from '../components/chat/mingo-onboarding-card';
+import { Rocket01Icon, CompassIcon, NewspaperIcon } from '../components/icons-v2-generated';
 
 const ACTIONS = [
   { id: 'recent', label: 'Recent', onClick: () => console.log('recent') },
   { id: 'search', label: 'Search', onClick: () => console.log('search') },
   { id: 'find', label: 'Find', onClick: () => console.log('find') },
-]
+];
 
 // Quick actions are caller-provided (GuideWelcome ships no defaults); these
 // demonstrate the inline chips + the "⋯" overflow menu.
@@ -24,7 +20,7 @@ const SAMPLE_QUICK_ACTIONS = [
   { id: 'run-scripts', label: 'Run scripts' },
   { id: 'device-software', label: 'Device software' },
   { id: 'bulk-update', label: 'Bulk update' },
-]
+];
 
 const SAMPLE_LIST = (
   <div className="shrink-0 overflow-hidden rounded-md border border-ods-border">
@@ -50,7 +46,7 @@ const SAMPLE_LIST = (
       actions={ACTIONS}
     />
   </div>
-)
+);
 
 const meta: Meta<typeof GuideWelcome> = {
   title: 'Chat/GuideWelcome',
@@ -72,45 +68,45 @@ const meta: Meta<typeof GuideWelcome> = {
     children: { control: false },
   },
   decorators: [
-    (Story) => (
+    Story => (
       // Mimic the narrow drawer panel: dark `ods-bg` surface (the guide content
       // background), banner pinned at the top.
       <div className="flex h-[760px] w-[440px] flex-col overflow-hidden rounded-md border border-ods-border bg-ods-bg">
         <GuideModeBanner />
-        <div className="flex flex-1 min-h-0 flex-col p-4">
+        <div className="flex min-h-0 flex-1 flex-col p-4">
           <Story />
         </div>
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof GuideWelcome>
+export default meta;
+type Story = StoryObj<typeof GuideWelcome>;
 
 /** Full guide-mode empty state with the slash-command list and quick actions. */
 export const Default: Story = {
   args: {
     quickActions: SAMPLE_QUICK_ACTIONS,
-    onQuickAction: (a) => console.log('quick action', a.id),
+    onQuickAction: a => console.log('quick action', a.id),
     children: SAMPLE_LIST,
   },
-}
+};
 
 /** No slash commands available yet — greeting + quick actions only. */
 export const NoCommands: Story = {
   args: {
     quickActions: SAMPLE_QUICK_ACTIONS,
-    onQuickAction: (a) => console.log('quick action', a.id),
+    onQuickAction: a => console.log('quick action', a.id),
   },
-}
+};
 
 /** No quick actions supplied (the default) — the chip row is omitted entirely. */
 export const NoQuickActions: Story = {
   args: {
     children: SAMPLE_LIST,
   },
-}
+};
 
 /** Custom greeting copy. */
 export const CustomCopy: Story = {
@@ -118,7 +114,7 @@ export const CustomCopy: Story = {
     title: 'Ask the Guide',
     subtitle: 'A temporary session for exploring docs and tickets.',
     quickActions: SAMPLE_QUICK_ACTIONS,
-    onQuickAction: (a) => console.log('quick action', a.id),
+    onQuickAction: a => console.log('quick action', a.id),
     children: SAMPLE_LIST,
   },
-}
+};

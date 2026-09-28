@@ -67,6 +67,9 @@ public class Query {
     @JsonProperty("hosts_include_any")
     private List<AssignedHost> hostsIncludeAny;
 
+    @JsonProperty("openframe_managed")
+    private Boolean openframeManaged;
+
     public Long getId() {
         return id;
     }
@@ -233,6 +236,14 @@ public class Query {
 
     public void setHostsIncludeAny(List<AssignedHost> hostsIncludeAny) {
         this.hostsIncludeAny = hostsIncludeAny;
+    }
+
+    public Boolean getOpenframeManaged() {
+        return openframeManaged;
+    }
+
+    public void setOpenframeManaged(Boolean openframeManaged) {
+        this.openframeManaged = openframeManaged;
     }
 
     /**

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Client-side hook + helper for the per-platform chat empty-state config.
@@ -13,8 +13,8 @@
  * URL, exactly like `fetchSlashCommands`.
  */
 
-import { useQuery } from "@tanstack/react-query";
-import { embedAuthedFetch } from "../../../utils/embed-authed-fetch";
+import { useQuery } from '@tanstack/react-query';
+import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 
 /** A structured empty-state quick-action chip — `{ id, label, prompt }` plus an
  *  optional icon (library-glyph name, uploaded URL, or icon props). Mirrors the
@@ -116,8 +116,8 @@ export async function fetchEmptyStateConfig(
     // it as cancelled. Every OTHER failure (network down, proxy reject, non-JSON
     // body) degrades to the neutral fallback so a flaky empty-state endpoint can
     // NEVER break the chat — the empty state just renders the in-code defaults.
-    if ((err as Error)?.name === "AbortError") throw err;
-    console.warn("[chat] empty-state config fetch failed, using neutral defaults:", err);
+    if ((err as Error)?.name === 'AbortError') throw err;
+    console.warn('[chat] empty-state config fetch failed, using neutral defaults:', err);
     return EMPTY_STATE_FALLBACK;
   }
 }
@@ -141,7 +141,7 @@ export function useEmptyStateConfig(
 ): { config: EmptyStateConfig; loading: boolean; loaded: boolean } {
   const enabled = (options?.enabled ?? true) && !!emptyStateUrl;
   const query = useQuery({
-    queryKey: ["chat-empty-state", emptyStateUrl],
+    queryKey: ['chat-empty-state', emptyStateUrl],
     queryFn: ({ signal }) => fetchEmptyStateConfig(signal, emptyStateUrl as string),
     enabled,
     staleTime: Infinity,

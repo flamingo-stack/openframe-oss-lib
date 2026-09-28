@@ -4,7 +4,9 @@ export interface DynamicThemeContext {
   theme: string;
   setTheme: (theme: string) => void;
   isDark: boolean;
-  themeState: any;
+  /** Opaque host-supplied theme state — the stub returns an empty object and
+   *  nothing in this lib reads inside it. */
+  themeState: Record<string, unknown>;
   applyContextualColor: (color: string) => string;
   animateAccentColor: (color: string) => void;
   generateThemeGradient: (baseColor: string) => string;
@@ -22,6 +24,6 @@ export function useDynamicThemeContext(): DynamicThemeContext {
     animateAccentColor: () => {},
     generateThemeGradient: (baseColor: string) => baseColor,
     getOptimalTextColor: () => '#000000',
-    transitionToPlatform: () => {}
+    transitionToPlatform: () => {},
   };
 }

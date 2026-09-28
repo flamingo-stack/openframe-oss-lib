@@ -3,7 +3,6 @@ package com.openframe.api.relay;
 public enum NodeType {
     MACHINE("Machine"),
     ORGANIZATION("Organization"),
-    EVENT("Event"),
     INTEGRATED_TOOL("IntegratedTool"),
     TENANT("Tenant"),
     DIALOG("Dialog"),
@@ -16,7 +15,8 @@ public enum NodeType {
     SCRIPT("Script"),
     SCRIPT_EXECUTION("ScriptExecution"),
     SCRIPT_SCHEDULE("ScriptSchedule"),
-    SCHEDULE_RUN("ScheduleRun");
+    SCHEDULE_RUN("ScheduleRun"),
+    SOFTWARE_BUNDLE("SoftwareBundle");
 
     private final String graphqlTypeName;
 

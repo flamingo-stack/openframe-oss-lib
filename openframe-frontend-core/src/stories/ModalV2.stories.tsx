@@ -134,7 +134,7 @@ const ACTIVITY_ROWS: { title: string; meta: string; body: string }[] = [
 function VendorFields({ count = VENDOR_FIELDS.length }: { count?: number }) {
   return (
     <>
-      <p className="text-h5 text-ods-text-secondary">Vendor profile</p>
+      <p className="text-ods-text-secondary text-h5">Vendor profile</p>
       {VENDOR_FIELDS.slice(0, count).map(field => (
         <Input key={field.label} label={field.label} defaultValue={field.value} className="w-full" />
       ))}
@@ -150,14 +150,14 @@ function VendorFields({ count = VENDOR_FIELDS.length }: { count?: number }) {
 function ActivityRows({ count = ACTIVITY_ROWS.length }: { count?: number }) {
   return (
     <>
-      <p className="text-h5 text-ods-text-secondary">Recent activity</p>
+      <p className="text-ods-text-secondary text-h5">Recent activity</p>
       {ACTIVITY_ROWS.slice(0, count).map(row => (
         <div key={row.title} className="rounded-md border border-ods-border p-[var(--spacing-system-mf)]">
           <div className="flex items-baseline justify-between gap-[var(--spacing-system-xsf)]">
-            <span className="text-h3 text-ods-text-primary">{row.title}</span>
-            <span className="text-h6 text-ods-text-tertiary">{row.meta}</span>
+            <span className="text-ods-text-primary text-h3">{row.title}</span>
+            <span className="text-ods-text-tertiary text-h6">{row.meta}</span>
           </div>
-          <p className="mt-[var(--spacing-system-xs)] text-h6 text-ods-text-secondary">{row.body}</p>
+          <p className="mt-[var(--spacing-system-xs)] text-ods-text-secondary text-h6">{row.body}</p>
         </div>
       ))}
     </>
@@ -188,7 +188,7 @@ export const Default: Story = {
             <ModalV2Title>Archive vendor</ModalV2Title>
           </ModalV2Header>
           <ModalV2Content>
-            <p className="text-h6 text-ods-text-secondary">
+            <p className="text-ods-text-secondary text-h6">
               Acme Endpoint Security will stop appearing in comparisons and search. Existing references keep working and
               you can restore it at any time.
             </p>
@@ -271,7 +271,7 @@ export const Wide: Story = {
             <ModalV2Title>Vendor loading</ModalV2Title>
           </ModalV2Header>
           <ModalV2Content>
-            <p className="text-h6 text-ods-text-secondary">
+            <p className="text-ods-text-secondary text-h6">
               Two fields of content in a panel that keeps its full height. Compare with the medium story above, which
               shrinks to fit its content.
             </p>
@@ -316,7 +316,7 @@ export const WideTwoColumn: Story = {
         <ModalV2 isOpen={isOpen} onClose={() => setIsOpen(false)} size={args.size}>
           <ModalV2Header>
             <ModalV2Title>Acme Endpoint Security</ModalV2Title>
-            <p className="text-h6 text-ods-text-secondary">
+            <p className="text-ods-text-secondary text-h6">
               16 fields on the left, 10 activity entries on the right. Each side scrolls on its own at desktop widths.
             </p>
           </ModalV2Header>
@@ -359,7 +359,7 @@ export const TwoColumnUnequalColumns: Story = {
         <ModalV2 isOpen={isOpen} onClose={() => setIsOpen(false)} size={args.size}>
           <ModalV2Header>
             <ModalV2Title>Lopsided columns</ModalV2Title>
-            <p className="text-h6 text-ods-text-secondary">
+            <p className="text-ods-text-secondary text-h6">
               Scroll the left column to its last field — the panel does not grow and nothing is clipped.
             </p>
           </ModalV2Header>
@@ -399,14 +399,14 @@ export const PinnedHeaderAndFooter: Story = {
         <ModalV2 isOpen={isOpen} onClose={() => setIsOpen(false)} size={args.size}>
           <ModalV2Header className="border-b border-ods-border pb-[var(--spacing-system-mf)]">
             <ModalV2Title>Pinned chrome</ModalV2Title>
-            <p className="text-h6 text-ods-text-secondary">
+            <p className="text-ods-text-secondary text-h6">
               Scroll either column to its end — this header and the footer below stay put, and the close button stays
               reachable the whole time.
             </p>
           </ModalV2Header>
           <ModalV2TwoColumn left={<VendorFields />} right={<ActivityRows count={6} />} />
           <ModalV2Footer className="items-center justify-between border-t border-ods-border pt-[var(--spacing-system-mf)]">
-            <span className="text-h6 text-ods-text-secondary">Last saved 4 minutes ago</span>
+            <span className="text-ods-text-secondary text-h6">Last saved 4 minutes ago</span>
             <div className="flex gap-[var(--spacing-system-mf)]">
               <Button variant="outline" onClick={() => setIsOpen(false)}>
                 Cancel

@@ -1,10 +1,10 @@
-'use client'
+'use client';
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react';
 
 export interface UseIsTruncatedOptions {
   /** Measure vertical clipping (`line-clamp-N`) instead of the single-line ellipsis. */
-  multiline?: boolean
+  multiline?: boolean;
 }
 
 /**
@@ -32,35 +32,33 @@ export interface UseIsTruncatedOptions {
  * ```
  */
 export function useIsTruncated<T extends HTMLElement>(value: unknown, options?: UseIsTruncatedOptions) {
-  const multiline = options?.multiline ?? false
-  const [element, setElement] = useState<T | null>(null)
-  const [isTruncated, setIsTruncated] = useState(false)
+  const multiline = options?.multiline ?? false;
+  const [element, setElement] = useState<T | null>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
 
   // Wrapped so the identity stays stable across renders: passing the raw
   // `useState` setter as a ref would be stable too, but this keeps the public
   // shape a plain `RefCallback<T>` instead of a state dispatcher.
-  const ref = useCallback((node: T | null) => setElement(node), [])
+  const ref = useCallback((node: T | null) => setElement(node), []);
 
   useEffect(() => {
-    if (!element) {
-      setIsTruncated(false)
-      return
-    }
+    if (!element) return undefined;
     // The 1px tolerance absorbs sub-pixel layout rounding, which otherwise
     // reports a permanent fractional "overflow" at some zoom levels / DPRs and
     // leaves a tooltip armed on text that is fully visible.
     const check = () => {
       setIsTruncated(
-        multiline
-          ? element.scrollHeight > element.clientHeight + 1
-          : element.scrollWidth > element.clientWidth + 1,
-      )
-    }
-    check()
-    const observer = new ResizeObserver(check)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [element, value, multiline])
+        multiline ? element.scrollHeight > element.clientHeight + 1 : element.scrollWidth > element.clientWidth + 1,
+      );
+    };
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [element, value, multiline]);
 
-  return { ref, isTruncated }
+  // Masked rather than reset from the effect: with no element there is nothing
+  // to clip, and deriving that during render avoids a second render pass every
+  // time the measured node unmounts.
+  return { ref, isTruncated: element ? isTruncated : false };
 }

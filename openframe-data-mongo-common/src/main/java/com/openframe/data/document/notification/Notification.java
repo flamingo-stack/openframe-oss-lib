@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.Map;
 
 @Document(collection = "notifications")
 @Data
@@ -31,11 +32,15 @@ public class Notification implements TenantScoped {
 
     private String description;
 
+    private String type;
+
+    private Map<String, String> attributes;
+
+    private String applePushCategory;
+
     @CreatedDate
     @Indexed(expireAfterSeconds = NotificationRetention.HISTORY_TTL_SECONDS) // 30-day notifications-history retention
     private Instant createdAt;
-
-    private NotificationContext context;
 
     /**
      * Optional source-event correlation key (e.g. an approval-request id) used to locate and

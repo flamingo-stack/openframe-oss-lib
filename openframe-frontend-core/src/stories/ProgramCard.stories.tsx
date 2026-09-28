@@ -1,12 +1,8 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { ProgramCard } from '../components/chat/entity-cards'
-import { DEFAULT_PROGRAM_CONFIGS } from '../components/chat/entity-cards/program-card-defaults'
-import { ChatColumnDecorator } from './__fixtures__/chat-card-decorator'
-import {
-  podcastItem,
-  webinarItem,
-  eventItem,
-} from './__fixtures__/chat-cards'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { ProgramCard } from '../components/chat/entity-cards';
+import { DEFAULT_PROGRAM_CONFIGS } from '../components/chat/entity-cards/program-card-defaults';
+import { ChatColumnDecorator } from './__fixtures__/chat-card-decorator';
+import { podcastItem, webinarItem, eventItem } from './__fixtures__/chat-cards';
 
 const meta: Meta<typeof ProgramCard> = {
   title: 'Chat/EntityCards/ProgramCard',
@@ -20,11 +16,17 @@ const meta: Meta<typeof ProgramCard> = {
       },
     },
   },
-  decorators: [(Story) => <ChatColumnDecorator><Story /></ChatColumnDecorator>],
-}
+  decorators: [
+    Story => (
+      <ChatColumnDecorator>
+        <Story />
+      </ChatColumnDecorator>
+    ),
+  ],
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const PodcastSm: Story = {
   args: {
@@ -35,7 +37,7 @@ export const PodcastSm: Story = {
     target: '_blank',
     rel: 'noopener noreferrer',
   },
-}
+};
 
 export const WebinarSm: Story = {
   args: {
@@ -46,7 +48,7 @@ export const WebinarSm: Story = {
     target: '_blank',
     rel: 'noopener noreferrer',
   },
-}
+};
 
 export const EventSm: Story = {
   args: {
@@ -57,7 +59,7 @@ export const EventSm: Story = {
     target: '_blank',
     rel: 'noopener noreferrer',
   },
-}
+};
 
 export const PodcastDefault: Story = {
   args: {
@@ -71,9 +73,8 @@ export const PodcastDefault: Story = {
   parameters: {
     docs: {
       description: {
-        story:
-          'Full default density. Not used inline in chat but rendered on the podcast catalog page.',
+        story: 'Full default density. Not used inline in chat but rendered on the podcast catalog page.',
       },
     },
   },
-}
+};

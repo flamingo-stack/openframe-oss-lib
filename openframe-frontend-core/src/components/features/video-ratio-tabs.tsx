@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Aspect-ratio tab + grouping primitives for video surfaces.
@@ -11,13 +11,9 @@
  * admin editors share the ratio primitives, and the lib is the SSoT.
  */
 
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from '../ui/tabs';
+import type { ReactNode } from 'react';
 import type { VideoTeaser } from '../../types/video-processing';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 
 /**
  * Vizard clip extraction aspect ratios. Mirrors `lib/types/aspect-ratio.ts`
@@ -65,7 +61,7 @@ const RATIO_TAB_CONFIG: { key: RatioCategory; label: string }[] = [
 ];
 
 interface RatioTabsProps {
-  groups: Record<RatioCategory, { count: number; render: () => React.ReactNode }>;
+  groups: Record<RatioCategory, { count: number; render: () => ReactNode }>;
   defaultTab?: RatioCategory;
   className?: string;
 }
@@ -76,11 +72,7 @@ interface RatioTabsProps {
  * Only renders tabs that have content. `forceMount` + `data-[state=inactive]:hidden`
  * keeps inactive tabs in the DOM so switching back doesn't scroll-jump.
  */
-export function RatioTabs({
-  groups,
-  defaultTab,
-  className = '',
-}: RatioTabsProps) {
+export function RatioTabs({ groups, defaultTab, className = '' }: RatioTabsProps) {
   const activeTabs = RATIO_TAB_CONFIG.filter(t => groups[t.key].count > 0);
 
   // If only one tab has content, don't show tabs.
@@ -89,12 +81,11 @@ export function RatioTabs({
     return active ? <>{groups[active.key].render()}</> : null;
   }
 
-  const firstTab =
-    defaultTab && groups[defaultTab].count > 0 ? defaultTab : activeTabs[0].key;
+  const firstTab = defaultTab && groups[defaultTab].count > 0 ? defaultTab : activeTabs[0].key;
 
   return (
     <Tabs defaultValue={firstTab} className={`w-full ${className}`}>
-      <TabsList className="inline-flex justify-start rounded-none bg-transparent h-auto p-0 gap-0 mb-2">
+      <TabsList className="mb-2 inline-flex h-auto justify-start gap-0 rounded-none bg-transparent p-0">
         {activeTabs.map(t => (
           <TabsTrigger key={t.key} value={t.key} className={TAB_TRIGGER_CLASS}>
             {t.label} ({groups[t.key].count})
@@ -102,12 +93,7 @@ export function RatioTabs({
         ))}
       </TabsList>
       {activeTabs.map(t => (
-        <TabsContent
-          key={t.key}
-          value={t.key}
-          forceMount
-          className="data-[state=inactive]:hidden"
-        >
+        <TabsContent key={t.key} value={t.key} forceMount className="data-[state=inactive]:hidden">
           {groups[t.key].render()}
         </TabsContent>
       ))}
@@ -120,11 +106,7 @@ export function RatioTabs({
  * inferring from width/height if the string is missing or unknown.
  * Default: portrait (`'9:16'`).
  */
-export function detectAspectRatio(
-  ratioString?: string,
-  width?: number,
-  height?: number,
-): VizardAspectRatio {
+export function detectAspectRatio(ratioString?: string, width?: number, height?: number): VizardAspectRatio {
   if (ratioString === '16:9') return '16:9';
   if (ratioString === '1:1') return '1:1';
   if (ratioString === '9:16') return '9:16';

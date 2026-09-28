@@ -3,7 +3,6 @@ import type { Preview } from '@storybook/nextjs-vite';
 import '../src/styles/storybook-fonts.css';
 import '../src/styles/index.css';
 
-
 const preview: Preview = {
   // Toolbar toggle to flip ODS tokens via `data-theme` on <html> (dark is the
   // default `:root`; light is `[data-theme="light"]`).
@@ -34,8 +33,8 @@ const preview: Preview = {
   parameters: {
     controls: {
       matchers: {
-       color: /(background|color)$/i,
-       date: /Date$/i,
+        color: /(background|color)$/i,
+        date: /Date$/i,
       },
     },
     nextjs: {

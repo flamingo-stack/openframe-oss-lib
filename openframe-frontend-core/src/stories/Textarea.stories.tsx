@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { Textarea } from '../components/ui/textarea'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Textarea } from '../components/ui/textarea';
 
 const meta = {
   title: 'UI/Textarea',
@@ -27,16 +27,16 @@ const meta = {
     },
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ padding: '2rem', backgroundColor: 'var(--ods-bg)', maxWidth: '480px' }}>
         <Story />
       </div>
     ),
   ],
-} satisfies Meta<typeof Textarea>
+} satisfies Meta<typeof Textarea>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /**
  * Default textarea with placeholder.
@@ -45,16 +45,17 @@ export const Default: Story = {
   args: {
     placeholder: 'Enter description...',
   },
-}
+};
 
 /**
  * Textarea with a pre-filled value.
  */
 export const WithValue: Story = {
   args: {
-    defaultValue: 'Comprehensive Linux system backup script supporting full, home, and system configuration backups with automated cleanup.',
+    defaultValue:
+      'Comprehensive Linux system backup script supporting full, home, and system configuration backups with automated cleanup.',
   },
-}
+};
 
 /**
  * Disabled textarea.
@@ -64,7 +65,7 @@ export const Disabled: Story = {
     placeholder: 'Cannot edit...',
     disabled: true,
   },
-}
+};
 
 /**
  * Disabled textarea with value.
@@ -74,7 +75,7 @@ export const DisabledWithValue: Story = {
     defaultValue: 'This content is read-only.',
     disabled: true,
   },
-}
+};
 
 /**
  * Textarea with custom row count.
@@ -84,7 +85,7 @@ export const CustomRows: Story = {
     placeholder: 'Write your notes here...',
     rows: 8,
   },
-}
+};
 
 /**
  * Textarea with resize disabled.
@@ -94,7 +95,7 @@ export const NoResize: Story = {
     placeholder: 'Fixed height textarea...',
     className: '!resize-none',
   },
-}
+};
 
 /**
  * Textarea in invalid/error state.
@@ -104,7 +105,7 @@ export const Invalid: Story = {
     placeholder: 'Enter description...',
     invalid: true,
   },
-}
+};
 
 /**
  * Textarea with label.
@@ -114,7 +115,7 @@ export const WithLabel: Story = {
     placeholder: 'Enter description...',
     label: 'Description',
   },
-}
+};
 
 /**
  * Textarea with label and error message.
@@ -125,7 +126,7 @@ export const WithLabelAndError: Story = {
     label: 'Description',
     error: 'Description is required',
   },
-}
+};
 
 /**
  * Textarea with label and value.
@@ -135,7 +136,7 @@ export const WithLabelAndValue: Story = {
     label: 'Notes',
     defaultValue: 'Comprehensive Linux system backup script.',
   },
-}
+};
 
 /**
  * Textarea with error only (no label).
@@ -145,7 +146,7 @@ export const WithErrorOnly: Story = {
     placeholder: 'Enter description...',
     error: 'Field cannot be empty',
   },
-}
+};
 
 /**
  * All textarea variants displayed together for comparison.
@@ -167,4 +168,4 @@ export const AllVariants: Story = {
       <Textarea label="Valid Value" defaultValue="Some text content" />
     </div>
   ),
-}
+};

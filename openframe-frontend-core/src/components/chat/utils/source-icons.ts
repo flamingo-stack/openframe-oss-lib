@@ -11,4 +11,4 @@ export {
   getSourceLabel,
   DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID,
   defaultTableIdForDocumentType,
-} from '../../../utils/source-icons'
+} from '../../../utils/source-icons';

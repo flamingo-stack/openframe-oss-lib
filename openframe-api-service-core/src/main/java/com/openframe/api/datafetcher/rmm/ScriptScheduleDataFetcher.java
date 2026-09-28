@@ -29,15 +29,16 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.mapper.GraphQLScriptScheduleMapper;
-import com.openframe.api.service.DeviceService;
-import com.openframe.api.service.rmm.ScriptDispatchService;
-import com.openframe.api.service.rmm.ScriptScheduleDeviceService;
-import com.openframe.api.service.rmm.ScriptScheduleFilterService;
-import com.openframe.api.service.rmm.ScriptScheduleService;
-import com.openframe.api.service.rmm.ScriptService;
+import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.rmm.script.ScriptDispatchService;
+import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
+import com.openframe.api.service.rmm.schedule.ScheduleScriptFilterService;
+import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
+import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.ScheduleDeviceCriteria;
-import com.openframe.data.document.rmm.ScheduledScriptCustomParams;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -62,7 +63,7 @@ import java.util.stream.Collectors;
 
 /**
  * GraphQL resolver for RMM script-schedule CRUD. Pure passthrough to
- * {@link ScriptScheduleService} — tenant scoping is resolved inside the service
+ * {@link ScheduleScriptService} — tenant scoping is resolved inside the service
  * via {@code TenantIdProvider}. Mirrors {@code ScriptDataFetcher} (minus
  * run/dispatch/tags).
  */
@@ -74,10 +75,10 @@ public class ScriptScheduleDataFetcher {
 
     private static final Relay RELAY = new Relay();
 
-    private final ScriptScheduleService scheduleService;
-    private final ScriptScheduleFilterService scheduleFilterService;
+    private final ScheduleScriptService scheduleService;
+    private final ScheduleScriptFilterService scheduleFilterService;
     private final ScriptService scriptService;
-    private final ScriptScheduleDeviceService scheduleDeviceService;
+    private final ScheduleScriptDeviceService scheduleDeviceService;
     private final ScriptDispatchService scriptDispatchService;
     private final GraphQLScriptScheduleMapper scheduleMapper;
     private final DeviceService deviceService;
@@ -276,9 +277,29 @@ public class ScriptScheduleDataFetcher {
                 .map(p -> ScheduledScriptCustomParams.builder()
                         .scriptId(RELAY.toGlobalId("Script", p.getScriptId()))
                         .args(p.getArgs())
-                        .envVars(p.getEnvVars())
+                        .envVars(maskEnvVars(p.getEnvVars()))
                         .build())
                 .toList();
+    }
+
+    private static List<ScriptEnvVar> maskEnvVars(List<ScriptEnvVar> envVars) {
+        if (envVars == null) {
+            return null;
+        }
+        return envVars.stream()
+                .map(ScriptScheduleDataFetcher::maskSingleEnvVar)
+                .toList();
+    }
+
+    private static ScriptEnvVar maskSingleEnvVar(ScriptEnvVar v) {
+        String name = v.getName();
+        boolean secret = v.isSecret();
+        String value = secret ? null : v.getValue();
+        return ScriptEnvVar.builder()
+                .name(name)
+                .value(value)
+                .secret(secret)
+                .build();
     }
 
     /**

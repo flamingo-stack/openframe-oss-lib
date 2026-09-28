@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMdUp } from '../../hooks';
 
 type ProgressBarProps = {
@@ -34,7 +35,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   const [segmentCount, setSegmentCount] = useState(0);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) return undefined;
 
     const resizeObserver = new ResizeObserver(() => {
       if (containerRef.current) {
@@ -56,24 +57,20 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     if (inverted) {
       // Inverted: high values = good (green), low values = bad (red)
       // For battery health: 100% = green, <30% = red
-      if (progress >= criticalThreshold) return "var(--color-success)"; // high = green
-      if (progress >= warningThreshold) return "var(--color-warning)"; // medium = warning
-      return "var(--color-error)"; // low = red
+      if (progress >= criticalThreshold) return 'var(--color-success)'; // high = green
+      if (progress >= warningThreshold) return 'var(--color-warning)'; // medium = warning
+      return 'var(--color-error)'; // low = red
     } else {
       // Normal: high values = bad (red), low values = good (green)
       // For disk usage: 100% = red, <70% = green
-      if (progress >= criticalThreshold) return "var(--color-error)"; // critical red
-      if (progress >= warningThreshold) return "var(--color-warning)"; // warning yellow
-      return "var(--color-success)"; // base green
+      if (progress >= criticalThreshold) return 'var(--color-error)'; // critical red
+      if (progress >= warningThreshold) return 'var(--color-warning)'; // warning yellow
+      return 'var(--color-success)'; // base green
     }
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full flex"
-      style={{ gap: `${segmentGap}px` }}
-    >
+    <div ref={containerRef} className="flex w-full" style={{ gap: `${segmentGap}px` }}>
       {Array.from({ length: segmentCount }).map((_, i) => (
         <div
           key={i}
@@ -82,9 +79,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
             width: `${effectiveSegmentWidth}px`,
             height: `${effectiveHeight}px`,
             backgroundColor:
-              i < Math.round((progress / 100) * segmentCount)
-                ? getColor()
-                : "var(--color-bg-surface-active)", // unfilled segments
+              i < Math.round((progress / 100) * segmentCount) ? getColor() : 'var(--color-bg-surface-active)', // unfilled segments
           }}
         />
       ))}

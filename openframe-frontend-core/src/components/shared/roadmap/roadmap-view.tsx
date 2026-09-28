@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<RoadmapView />` — the SELF-CONTAINED roadmap LIST surface.
@@ -10,42 +10,42 @@
  * vote endpoint via `votingOptions`. Optional `initialItems` hydrates SSR.
  */
 
-import { useMemo } from 'react'
+import { useMemo } from 'react';
 
-import { useSearchParams } from '../../../embed-shims'
-import { LoadError } from '../../ui/error-state'
-import { useSelfFetch } from '../../../hooks/use-self-fetch'
-import { useScrollToHash } from '../../../hooks/use-scroll-to-hash'
-import type { RoadmapItem } from '../../chat/types/entities/roadmap-item'
-import { RoadmapGrid } from './roadmap-grid'
-import { RoadmapGridSkeleton } from './roadmap-grid-skeleton'
-import type { UseRoadmapVotingOptions } from './use-roadmap-voting'
-import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys'
-import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav'
+import { useSearchParams } from '../../../embed-shims';
+import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
+import { useSelfFetch } from '../../../hooks/use-self-fetch';
+import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
+import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
+import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
+import { LoadError } from '../../ui/error-state';
+import { RoadmapGrid } from './roadmap-grid';
+import { RoadmapGridSkeleton } from './roadmap-grid-skeleton';
+import type { UseRoadmapVotingOptions } from './use-roadmap-voting';
 
-const DEFAULT_ENDPOINT = '/api/roadmap'
+const DEFAULT_ENDPOINT = '/api/roadmap';
 // Defaults sourced from the ONE param-key registry the chrome (OPENFRAME_DEV_SECTIONS) also
 // reads, so the chrome's written `?key=` and this view's read can't silently diverge.
-const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search
-const DEFAULT_STATUS_PARAM_KEY = DEV_SECTION_PARAM_KEYS.status
+const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search;
+const DEFAULT_STATUS_PARAM_KEY = DEV_SECTION_PARAM_KEYS.status;
 
 export interface RoadmapViewProps {
   /** GET list endpoint (the api route). Returns `{ items }`. Default
    *  `/api/roadmap`. */
-  endpoint?: string
+  endpoint?: string;
   /** Optional SSR hydrate — skips the initial client fetch. */
-  initialItems?: RoadmapItem[]
-  showLeftMargin?: boolean
+  initialItems?: RoadmapItem[];
+  showLeftMargin?: boolean;
   /** Per-task refresh URL builder (after a vote). Default `/api/roadmap/<id>`. */
-  buildRefreshUrl?: (taskId: string) => string
+  buildRefreshUrl?: (taskId: string) => string;
   /** Voting hook options (vote endpoint + storage key). */
-  votingOptions?: UseRoadmapVotingOptions
+  votingOptions?: UseRoadmapVotingOptions;
   /** URL param key for the search input — MUST match the section chrome
    *  (`DevSectionView`) that writes it. Default `'search'`. */
-  searchParamKey?: string
+  searchParamKey?: string;
   /** URL param key for the status filter. Default `'status'` (the roadmap
    *  section's `filter.paramKey`). `'all'` means no filter. */
-  statusParamKey?: string
+  statusParamKey?: string;
 }
 
 export function RoadmapView({
@@ -60,24 +60,21 @@ export function RoadmapView({
   // Read the search + status params the section chrome (`DevSectionView`) writes
   // and fold them INTO the fetch url so the url IS the cache key — the list
   // refetches filtered whenever the controls change. Mirrors `ProductReleasesView`.
-  const searchParams = useSearchParams()
-  const search = searchParams.get(searchParamKey) || ''
-  const status = searchParams.get(statusParamKey) || 'all'
-  const listParams = new URLSearchParams()
-  if (search) listParams.set(searchParamKey, search)
-  if (status && status !== 'all') listParams.set(statusParamKey, status)
-  const qs = listParams.toString()
-  const url = qs ? `${endpoint}?${qs}` : endpoint
+  const searchParams = useSearchParams();
+  const search = searchParams.get(searchParamKey) || '';
+  const status = searchParams.get(statusParamKey) || 'all';
+  const listParams = new URLSearchParams();
+  if (search) listParams.set(searchParamKey, search);
+  if (status && status !== 'all') listParams.set(statusParamKey, status);
+  const qs = listParams.toString();
+  const url = qs ? `${endpoint}?${qs}` : endpoint;
 
   // Memoize so the SSR `initialItems` wrapper keeps a STABLE identity — else the
   // hook's initialData re-sync effect fires every render and clobbers the
   // optimistic vote patch below.
-  const initialData = useMemo(() => (initialItems ? { items: initialItems } : undefined), [initialItems])
-  const { data, setData, isLoading, error, reload } = useSelfFetch<{ items?: RoadmapItem[] }>(
-    url,
-    { initialData },
-  )
-  const items = data?.items ?? []
+  const initialData = useMemo(() => (initialItems ? { items: initialItems } : undefined), [initialItems]);
+  const { data, setData, isLoading, error, reload } = useSelfFetch<{ items?: RoadmapItem[] }>(url, { initialData });
+  const items = data?.items ?? [];
 
   // Deep-link hash dispatch — `?search=<id>#roadmap-<id>` from a chat card.
   // Shared hook owns the poll-until-mount + hashchange-listener wiring
@@ -86,15 +83,15 @@ export function RoadmapView({
   // every quarter is collapsed; an effect in `roadmap-grid.tsx` expands
   // them when `hasActiveFilters` is true (chat URL carries `?search=<id>`).
   // The card mounts one tick after `data` lands; the hook waits.
-  useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX })
+  useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX });
 
   if (error) {
-    return <LoadError message="Failed to load roadmap." onRetry={reload} />
+    return <LoadError message="Failed to load roadmap." onRetry={reload} />;
   }
   // Skeleton only while the FIRST fetch is in flight (no data yet) — a malformed
   // body lacking `items` renders the grid (empty), never a stuck skeleton.
   if (isLoading && !data) {
-    return <RoadmapGridSkeleton showLeftMargin={showLeftMargin} />
+    return <RoadmapGridSkeleton showLeftMargin={showLeftMargin} />;
   }
 
   return (
@@ -110,13 +107,11 @@ export function RoadmapView({
       hasActiveFilters={search !== '' || status !== 'all'}
       // After a vote refreshes a single task, patch it into the fetched list so
       // the displayed counts stay live.
-      onItemUpdate={(updated) =>
-        setData((prev) =>
-          prev
-            ? { ...prev, items: (prev.items ?? []).map((it) => (it.id === updated.id ? updated : it)) }
-            : prev,
+      onItemUpdate={updated =>
+        setData(prev =>
+          prev ? { ...prev, items: (prev.items ?? []).map(it => (it.id === updated.id ? updated : it)) } : prev,
         )
       }
     />
-  )
+  );
 }

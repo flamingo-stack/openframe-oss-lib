@@ -15,16 +15,16 @@ public class PublishState {
     private int attempts;
 
     public static PublishState pending() {
-        return new PublishState(false, 0);
+        return PublishState.builder().published(false).attempts(0).build();
     }
 
     public static PublishState nonPublished(PublishState current) {
         int previousAttempts = current == null ? 0 : current.getAttempts();
         int nextAttempts = previousAttempts + 1;
-        return new PublishState(false, nextAttempts);
+        return PublishState.builder().published(false).attempts(nextAttempts).build();
     }
 
     public static PublishState published() {
-        return new PublishState(true, 0);
+        return PublishState.builder().published(true).attempts(0).build();
     }
 }

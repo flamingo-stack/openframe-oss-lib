@@ -1,10 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { SlashCommandSuggestions } from '../components/chat/slash-command-suggestions'
-import type {
-  SlashCommandActionId,
-  SlashCommandSummary,
-} from '../components/chat/types'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { SlashCommandSuggestions } from '../components/chat/slash-command-suggestions';
+import type { SlashCommandActionId, SlashCommandSummary } from '../components/chat/types';
 
 const meta: Meta<typeof SlashCommandSuggestions> = {
   title: 'Chat/SlashCommandSuggestions',
@@ -25,24 +22,24 @@ const meta: Meta<typeof SlashCommandSuggestions> = {
     resolveSourceIcon: { control: false },
   },
   decorators: [
-    (Story) => (
-      <div className="w-[640px] bg-ods-bg p-6 rounded-md border border-ods-border">
+    Story => (
+      <div className="w-[640px] rounded-md border border-ods-border bg-ods-bg p-6">
         {/* Mock input row so the dropdown's `absolute bottom-full`
             positioning has something to anchor against, exactly like
             inside ChatInput. */}
         <div className="relative">
           <Story />
-          <div className="h-12 rounded-md border border-ods-border bg-ods-card flex items-center px-4 text-ods-text-muted text-sm">
+          <div className="flex h-12 items-center rounded-md border border-ods-border bg-ods-card px-4 text-sm text-ods-text-muted">
             /
           </div>
         </div>
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 // =============================================================================
 // Sample commands — keys match the live `/api/docs/commands` contract
@@ -83,8 +80,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'commits',
     label: 'OpenFrame Commits',
-    description:
-      'Browse default-branch commits -- bare for the latest list, with sha or headline to drill into one',
+    description: 'Browse default-branch commits -- bare for the latest list, with sha or headline to drill into one',
     iconName: 'github',
     primarySourceId: 'github-commits-public',
     argumentHint: '[sha or headline]',
@@ -98,8 +94,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'pull-requests',
     label: 'OpenFrame Pull Requests',
-    description:
-      'Browse pull requests -- bare for the latest list, with title or external id to drill into one',
+    description: 'Browse pull requests -- bare for the latest list, with title or external id to drill into one',
     iconName: 'github',
     primarySourceId: 'github-pull-requests-public',
     argumentHint: '[title or external id]',
@@ -113,8 +108,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'pr-reviews',
     label: 'OpenFrame PR Reviews',
-    description:
-      'Browse pull-request reviews -- bare for the latest list, with reviewer or topic to drill into one',
+    description: 'Browse pull-request reviews -- bare for the latest list, with reviewer or topic to drill into one',
     iconName: 'github',
     primarySourceId: 'github-pr-reviews-public',
     argumentHint: '[reviewer or topic]',
@@ -128,8 +122,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'slack',
     label: 'OpenMSP Community',
-    description:
-      'Browse OpenMSP community Slack messages -- bare for recent, with message id to drill into one',
+    description: 'Browse OpenMSP community Slack messages -- bare for recent, with message id to drill into one',
     iconName: 'slack',
     primarySourceId: 'slack-messages',
     argumentHint: '[message id or topic]',
@@ -143,8 +136,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'docs',
     label: 'OpenFrame Docs',
-    description:
-      'Browse OpenFrame documentation -- bare for an index, with path or name to drill into one',
+    description: 'Browse OpenFrame documentation -- bare for an index, with path or name to drill into one',
     iconName: 'openframe',
     primarySourceId: 'openframe-docs',
     argumentHint: '[path or topic]',
@@ -158,8 +150,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'blogs',
     label: 'Blog Posts',
-    description:
-      'Browse blog posts -- bare for the latest list, with title or slug to drill into one',
+    description: 'Browse blog posts -- bare for the latest list, with title or slug to drill into one',
     iconName: 'newspaper',
     primarySourceId: 'blog-posts',
     argumentHint: '[title or slug]',
@@ -173,8 +164,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'releases',
     label: 'Product Releases',
-    description:
-      'Browse product releases -- bare for the latest list, with title, slug, or version to drill into one',
+    description: 'Browse product releases -- bare for the latest list, with title, slug, or version to drill into one',
     iconName: 'rocket',
     primarySourceId: 'product-releases',
     argumentHint: '[title, slug, or version]',
@@ -188,8 +178,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'case-studies',
     label: 'Case Studies',
-    description:
-      'Browse customer case studies -- bare for the list, with title or slug to drill into one',
+    description: 'Browse customer case studies -- bare for the list, with title or slug to drill into one',
     iconName: 'briefcase',
     primarySourceId: 'case-studies',
     argumentHint: '[customer or title]',
@@ -218,8 +207,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'webinars',
     label: 'Webinars',
-    description:
-      'Browse webinars -- bare for the upcoming/recent list, with title or id to drill into one',
+    description: 'Browse webinars -- bare for the upcoming/recent list, with title or id to drill into one',
     iconName: 'video',
     primarySourceId: 'webinars',
     argumentHint: '[title or id]',
@@ -248,8 +236,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
   {
     id: 'podcasts',
     label: 'Podcasts',
-    description:
-      'Browse podcast episodes -- bare for the latest list, with title or id to drill into one',
+    description: 'Browse podcast episodes -- bare for the latest list, with title or id to drill into one',
     iconName: 'headphones',
     primarySourceId: 'podcasts',
     argumentHint: '[title or id]',
@@ -260,7 +247,7 @@ const SAMPLE_COMMANDS: SlashCommandSummary[] = [
     ],
     displayOrder: 56,
   },
-]
+];
 
 // =============================================================================
 // Stories
@@ -272,41 +259,37 @@ export const Default: Story = {
     commands: SAMPLE_COMMANDS,
     highlightedIdx: 0,
     onHover: () => {},
-    onSelect: (cmd) => {
-      // eslint-disable-next-line no-console
-      console.log('[story] select', cmd.id)
+    onSelect: cmd => {
+      console.log('[story] select', cmd.id);
     },
     onAction: (cmd, actionId: SlashCommandActionId) => {
-      // eslint-disable-next-line no-console
-      console.log('[story] action', cmd.id, actionId)
+      console.log('[story] action', cmd.id, actionId);
     },
   },
-}
+};
 
 /** Interactive — hovered/clicked rows update local state so you can
  *  drive the keyboard-style highlight by hovering. */
 export const Interactive: Story = {
-  render: (args) => {
-    const [idx, setIdx] = useState(0)
+  render: args => {
+    const [idx, setIdx] = useState(0);
     return (
       <SlashCommandSuggestions
         {...args}
         commands={SAMPLE_COMMANDS}
         highlightedIdx={idx}
         onHover={setIdx}
-        onSelect={(cmd) => {
-          // eslint-disable-next-line no-console
-          console.log('[story] select', cmd.id)
+        onSelect={cmd => {
+          console.log('[story] select', cmd.id);
         }}
         onAction={(cmd, actionId) => {
-          // eslint-disable-next-line no-console
-          console.log('[story] action', cmd.id, actionId)
+          console.log('[story] action', cmd.id, actionId);
         }}
       />
-    )
+    );
   },
   args: {},
-}
+};
 
 /** Single match — narrow result set, mimics typing `/road` to filter. */
 export const FilteredSingle: Story = {
@@ -317,7 +300,7 @@ export const FilteredSingle: Story = {
     onSelect: () => {},
     onAction: () => {},
   },
-}
+};
 
 /** No actions — `onAction` undefined; the row's chip rail collapses
  *  and the row is click-only (default-select behavior). */
@@ -329,4 +312,4 @@ export const NoActions: Story = {
     onSelect: () => {},
     onAction: undefined,
   },
-}
+};

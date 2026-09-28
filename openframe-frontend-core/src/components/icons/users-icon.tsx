@@ -1,4 +1,4 @@
-import React from "react"
+import type React from 'react';
 
 /** @deprecated Use icons from icons-v2-generated instead. */
 export interface UsersIconProps extends React.SVGProps<SVGSVGElement> {
@@ -6,7 +6,7 @@ export interface UsersIconProps extends React.SVGProps<SVGSVGElement> {
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export function UsersIcon({ className = "h-6 w-6", color = 'white', ...props }: UsersIconProps) {
+export function UsersIcon({ className = 'h-6 w-6', color = 'white', ...props }: UsersIconProps) {
   return (
     <svg
       width="24"
@@ -46,5 +46,5 @@ export function UsersIcon({ className = "h-6 w-6", color = 'white', ...props }: 
         strokeLinejoin="round"
       />
     </svg>
-  )
+  );
 }

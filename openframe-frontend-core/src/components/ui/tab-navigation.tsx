@@ -1,42 +1,74 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect, useLayoutEffect, useDeferredValue, useMemo, useRef, useCallback, memo, startTransition } from 'react'
-import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation'
-import { cn } from '../../utils/cn'
+import type React from 'react';
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useCallback,
+  memo,
+  startTransition,
+} from 'react';
+import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation';
+import { cn } from '../../utils/cn';
 
 export interface TabItem {
-  id: string
-  label: string
+  id: string;
+  label: string;
   /** Optional — text-only tabs (e.g. the homepage content-strip switcher) omit it. */
-  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>
-  component?: React.ComponentType<any>
-  indicator?: 'success' | 'warning' | 'error'
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  /**
+   * The tab's panel. Its props come from the caller's shared `componentProps`
+   * bag (see `<TabContent>`, which IS generic over that bag) — but a
+   * heterogeneous tab LIST cannot name it, and the two live usage patterns
+   * demand OPPOSITE defaults, so no single non-`any` type serves both:
+   *
+   *   a) panels WITH required props — `TabItem[]` holding
+   *      `ComponentType<{ scheduleId: string }>` (openframe-oss-frontend's
+   *      schedule / script detail tabs). Needs a default assignable INTO every
+   *      concrete panel, i.e. `never`.
+   *   b) panels rendered straight from `getTabComponent(...)` as
+   *      `<TabComponent />` with no props (openframe-oss-frontend's customers /
+   *      settings / scripts pages). Needs a default the empty prop bag
+   *      satisfies, i.e. `Record<string, never>`.
+   *
+   * Verified with a generic `TabItem<P extends object = …>` against both
+   * patterns: `Record<string, never>` rejects (a) (TS2322 — "Property
+   * 'scheduleId' is missing"), `never` rejects (b) (TS2769/TS2786 — "'C' cannot
+   * be used as a JSX component"). Typing this therefore means migrating the
+   * consumers to `TabItem<TheirProps>`, not changing this line.
+   */
+  component?: React.ComponentType<any>;
+  indicator?: 'success' | 'warning' | 'error';
 }
 
 export interface TabNavigationUrlSyncOptions {
-  paramName?: string       // Default: 'tab'
-  replaceState?: boolean   // Default: true (use replace instead of push)
+  paramName?: string; // Default: 'tab'
+  replaceState?: boolean; // Default: true (use replace instead of push)
 }
 
 interface TabNavigationProps {
   // Legacy controlled mode (when urlSync is disabled)
-  activeTab?: string
-  onTabChange?: (tabId: string) => void
+  activeTab?: string;
+  onTabChange?: (tabId: string) => void;
 
-  tabs: TabItem[]
-  className?: string
-  shadowClassName?: string // Tailwind class for shadow gradient color, e.g. "from-black" or "from-red-500"
+  tabs: TabItem[];
+  className?: string;
+  shadowClassName?: string; // Tailwind class for shadow gradient color, e.g. "from-black" or "from-red-500"
   /** Force the right-edge gradient to always render, independent of scroll state. */
-  showRightGradient?: boolean
+  showRightGradient?: boolean;
   /** Force the left-edge gradient to always render, independent of scroll state. */
-  showLeftGradient?: boolean
+  showLeftGradient?: boolean;
   /** Tabs grow to share the bar's full width equally (Figma segmented-underline
    *  look, e.g. the 480px homepage strip switcher). Default: natural width. */
-  stretchTabs?: boolean
+  stretchTabs?: boolean;
 
   // URL sync mode
-  urlSync?: boolean | TabNavigationUrlSyncOptions
-  defaultTab?: string  // Fallback when no valid tab in URL or initial value
+  urlSync?: boolean | TabNavigationUrlSyncOptions;
+  defaultTab?: string; // Fallback when no valid tab in URL or initial value
 
   /**
    * Render prop for the tab BODY. Receives the tab to render and, additively,
@@ -45,36 +77,38 @@ interface TabNavigationProps {
    * below). Use it to dim the body or show a pending hint; without it a slow
    * tab looks like a tab that simply did nothing.
    */
-  children?: (activeTab: string, state: { isStale: boolean }) => React.ReactNode
+  children?: (activeTab: string, state: { isStale: boolean }) => React.ReactNode;
 }
 
 /** Where the underline sits, in the strip's own coordinates. */
 interface IndicatorRect {
-  left: number
-  width: number
+  left: number;
+  width: number;
 }
 
-const HIDDEN_INDICATOR: IndicatorRect = { left: 0, width: 0 }
+const HIDDEN_INDICATOR: IndicatorRect = { left: 0, width: 0 };
 
 const StatusDot = ({ indicator, className }: { indicator: NonNullable<TabItem['indicator']>; className?: string }) => (
-  <div className={cn(
-    "w-3 h-3 rounded-full border-2 border-ods-bg",
-    indicator === 'error' && 'bg-ods-error',
-    indicator === 'warning' && 'bg-ods-accent',
-    indicator === 'success' && 'bg-ods-success',
-    className
-  )} />
-)
+  <div
+    className={cn(
+      'h-3 w-3 rounded-full border-2 border-ods-bg',
+      indicator === 'error' && 'bg-ods-error',
+      indicator === 'warning' && 'bg-ods-accent',
+      indicator === 'success' && 'bg-ods-success',
+      className,
+    )}
+  />
+);
 
 interface TabBarProps {
-  tabs: TabItem[]
-  activeTab: string
-  onTabChange: (tabId: string) => void
-  className?: string
-  shadowClassName?: string
-  showLeftGradient: boolean
-  showRightGradient: boolean
-  stretchTabs: boolean
+  tabs: TabItem[];
+  activeTab: string;
+  onTabChange: (tabId: string) => void;
+  className?: string;
+  shadowClassName?: string;
+  showLeftGradient: boolean;
+  showRightGradient: boolean;
+  stretchTabs: boolean;
 }
 
 /**
@@ -89,7 +123,7 @@ interface TabBarProps {
  * Down here it re-renders only the bar; `TabNavigation` — and the body — never
  * hear about it.
  */
-const TabBar = memo(function TabBar({
+const TabBar = memo(function TabBarImpl({
   tabs,
   activeTab,
   onTabChange,
@@ -99,54 +133,63 @@ const TabBar = memo(function TabBar({
   showRightGradient,
   stretchTabs,
 }: TabBarProps) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const activeTabRef = useRef<HTMLButtonElement>(null)
-  const isFirstActiveScrollRef = useRef(true)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+  const isFirstActiveScrollRef = useRef(true);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   // The underline is ONE element that slides, not a div mounted under whichever
   // tab is active — that version could only ever pop from tab to tab. Position
   // is measured rather than derived from CSS because the tabs are natural-width
   // (label-dependent) and live in a scroll container, so nothing but layout
   // knows where the active one actually is.
-  const [indicator, setIndicator] = useState<IndicatorRect>(HIDDEN_INDICATOR)
+  const [indicator, setIndicator] = useState<IndicatorRect>(HIDDEN_INDICATOR);
   // Suppresses the slide for the FIRST placement: a deep link landing on the
   // third tab should not open with the underline gliding in from the left edge.
-  const hasPlacedIndicatorRef = useRef(false)
+  //
+  // It must only become true one render AFTER the underline first gets a real
+  // position. Flipping it in the SAME render would put the transition class on
+  // the element for the very paint where width and opacity jump off zero, and
+  // the browser would animate exactly the entrance this exists to suppress.
+  //
+  // Tracked as state adjusted while rendering rather than a ref written in a
+  // layout effect: it drives a className, i.e. rendered output, and output must
+  // not depend on a value React is not tracking. `measureIndicator` keeps
+  // `indicator`'s identity stable when the measurement is unchanged, so
+  // comparing by identity is what "the position moved" means. Once
+  // `placedOnce` is true nothing here writes again.
+  const [placement, setPlacement] = useState<{ indicator: IndicatorRect; placedOnce: boolean }>({
+    indicator: HIDDEN_INDICATOR,
+    placedOnce: false,
+  });
 
   const measureIndicator = useCallback(() => {
-    const active = activeTabRef.current
+    const active = activeTabRef.current;
     // No active tab (unknown id, or an empty tabs array) → collapse it away
     // rather than leaving it under whichever tab it last sat on.
-    const next = active ? { left: active.offsetLeft, width: active.offsetWidth } : HIDDEN_INDICATOR
-    setIndicator(prev => (prev.left === next.left && prev.width === next.width ? prev : next))
-  }, [])
+    const next = active ? { left: active.offsetLeft, width: active.offsetWidth } : HIDDEN_INDICATOR;
+    setIndicator(prev => (prev.left === next.left && prev.width === next.width ? prev : next));
+  }, []);
 
   const updateScrollShadows = useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 0)
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
-  }, [])
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
 
   // Layout effect: the underline's first frame must already be under the right
   // tab. In a passive effect it would paint at the previous position first.
   useLayoutEffect(() => {
-    measureIndicator()
-  }, [measureIndicator, activeTab, tabs])
-
-  // Flipped only AFTER a real position has been committed, so the transition
-  // class is absent for that first paint and present from the next change on.
-  useLayoutEffect(() => {
-    if (indicator.width > 0) hasPlacedIndicatorRef.current = true
-  }, [indicator])
+    measureIndicator();
+  }, [measureIndicator, activeTab, tabs]);
 
   useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
+    const el = scrollRef.current;
+    if (!el) return undefined;
 
-    updateScrollShadows()
+    updateScrollShadows();
 
     // Translate a vertical mouse wheel into horizontal scroll. macOS mice emit
     // only deltaY, which the browser won't apply to a horizontal-only overflow
@@ -155,41 +198,45 @@ const TabBar = memo(function TabBar({
     const onWheel = (e: WheelEvent) => {
       // A trackpad's horizontal gesture (deltaX) already scrolls natively; a
       // pinch-zoom arrives as wheel+ctrlKey — leave both untouched.
-      if (e.deltaX !== 0 || e.ctrlKey) return
-      if (el.scrollWidth <= el.clientWidth) return
+      if (e.deltaX !== 0 || e.ctrlKey) return;
+      if (el.scrollWidth <= el.clientWidth) return;
       // deltaY isn't always pixels: Firefox mice report lines (deltaMode 1),
       // some devices pages (mode 2). Normalize so the scroll isn't a no-op.
-      const delta = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * el.clientWidth : e.deltaY
+      const delta = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * el.clientWidth : e.deltaY;
       // Only consume the event while there's room to scroll in that direction;
       // at either edge, let it bubble so the page scrolls (native chaining).
-      const canGoRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
-      const canGoLeft = el.scrollLeft > 0
-      if ((delta > 0 && !canGoRight) || (delta < 0 && !canGoLeft)) return
-      el.scrollLeft += delta
-      e.preventDefault()
-    }
+      const canGoRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      const canGoLeft = el.scrollLeft > 0;
+      if ((delta > 0 && !canGoRight) || (delta < 0 && !canGoLeft)) return;
+      el.scrollLeft += delta;
+      e.preventDefault();
+    };
 
     // Scrolling moves the viewport, not the content — `offsetLeft` is unchanged,
     // so only the fades need recomputing. A resize moves both.
-    el.addEventListener('scroll', updateScrollShadows, { passive: true })
-    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('scroll', updateScrollShadows, { passive: true });
+    el.addEventListener('wheel', onWheel, { passive: false });
     const ro = new ResizeObserver(() => {
-      updateScrollShadows()
-      measureIndicator()
-    })
-    ro.observe(el)
+      updateScrollShadows();
+      measureIndicator();
+    });
+    ro.observe(el);
     // Web fonts land after first paint and change every label's width, which
     // moves every tab but fires no resize on the strip itself.
-    let cancelled = false
-    document.fonts?.ready.then(() => { if (!cancelled) measureIndicator() }).catch(() => {})
+    let cancelled = false;
+    document.fonts?.ready
+      .then(() => {
+        if (!cancelled) measureIndicator();
+      })
+      .catch(() => {});
 
     return () => {
-      cancelled = true
-      el.removeEventListener('scroll', updateScrollShadows)
-      el.removeEventListener('wheel', onWheel)
-      ro.disconnect()
-    }
-  }, [updateScrollShadows, measureIndicator])
+      cancelled = true;
+      el.removeEventListener('scroll', updateScrollShadows);
+      el.removeEventListener('wheel', onWheel);
+      ro.disconnect();
+    };
+  }, [updateScrollShadows, measureIndicator]);
 
   // Bring the active tab into view when it changes (e.g. clicking a partly
   // off-screen tab, or a URL-driven change). Uses the browser's own smooth
@@ -197,39 +244,41 @@ const TabBar = memo(function TabBar({
   // to reveal the tab on whichever edge it's clipped. Complements the native
   // trackpad / Shift+wheel / mouse-wheel scrolling rather than fighting it.
   useEffect(() => {
-    const el = scrollRef.current
-    const active = activeTabRef.current
-    if (!el || !active) return
+    const el = scrollRef.current;
+    const active = activeTabRef.current;
+    if (!el || !active) return;
     // On mount (e.g. a deep link landing on an off-screen tab, such as
     // `?tab=software` as the last of many), snap instantly instead of visibly
     // sliding right after first paint — smooth is reserved for later tab changes.
-    const behavior = isFirstActiveScrollRef.current ? 'auto' : 'smooth'
-    isFirstActiveScrollRef.current = false
-    const elRect = el.getBoundingClientRect()
-    const aRect = active.getBoundingClientRect()
+    const behavior = isFirstActiveScrollRef.current ? 'auto' : 'smooth';
+    isFirstActiveScrollRef.current = false;
+    const elRect = el.getBoundingClientRect();
+    const aRect = active.getBoundingClientRect();
     if (aRect.left < elRect.left) {
-      el.scrollBy({ left: aRect.left - elRect.left, behavior })
+      el.scrollBy({ left: aRect.left - elRect.left, behavior });
     } else if (aRect.right > elRect.right) {
-      el.scrollBy({ left: aRect.right - elRect.right, behavior })
+      el.scrollBy({ left: aRect.right - elRect.right, behavior });
     }
-  }, [activeTab])
+  }, [activeTab]);
 
-  const leftFade = canScrollLeft || showLeftGradient
-  const rightFade = canScrollRight || showRightGradient
+  const leftFade = canScrollLeft || showLeftGradient;
+  const rightFade = canScrollRight || showRightGradient;
 
   const borderStyle = useMemo<React.CSSProperties>(() => {
-    const c = 'var(--color-border-default)'
+    const c = 'var(--color-border-default)';
     if (leftFade && rightFade) {
-      return { background: `linear-gradient(to right, transparent 0, ${c} 40px, ${c} calc(100% - 40px), transparent 100%)` }
+      return {
+        background: `linear-gradient(to right, transparent 0, ${c} 40px, ${c} calc(100% - 40px), transparent 100%)`,
+      };
     }
     if (leftFade) {
-      return { background: `linear-gradient(to right, transparent 0, ${c} 40px, ${c} 100%)` }
+      return { background: `linear-gradient(to right, transparent 0, ${c} 40px, ${c} 100%)` };
     }
     if (rightFade) {
-      return { background: `linear-gradient(to right, ${c} 0, ${c} calc(100% - 40px), transparent 100%)` }
+      return { background: `linear-gradient(to right, ${c} 0, ${c} calc(100% - 40px), transparent 100%)` };
     }
-    return { background: c }
-  }, [leftFade, rightFade])
+    return { background: c };
+  }, [leftFade, rightFade]);
 
   // Real width, moved by `translateX`. This used to be a 1px bar stretched with
   // `scaleX(width)` — transform and opacity being the only properties the
@@ -250,21 +299,29 @@ const TabBar = memo(function TabBar({
   // `absolute`, so nothing else in the strip is laid out with it, and 200ms of
   // that for a 4px-tall bar is not measurable. Correctness at every zoom level
   // is worth more than keeping one property on the compositor.
-  const isPlaced = indicator.width > 0
+  const isPlaced = indicator.width > 0;
   const indicatorStyle: React.CSSProperties = {
     width: `${indicator.width}px`,
     transform: `translateX(${indicator.left}px)`,
     opacity: isPlaced ? 1 : 0,
+  };
+  // True from the render AFTER the one that first committed a real position.
+  const shouldAnimateIndicator =
+    placement.placedOnce || (placement.indicator !== indicator && placement.indicator.width > 0);
+  if (!placement.placedOnce && placement.indicator !== indicator) {
+    setPlacement({ indicator, placedOnce: shouldAnimateIndicator });
   }
-  const shouldAnimateIndicator = hasPlacedIndicatorRef.current
 
   return (
-    <div className={cn("relative w-full", className)}>
+    <div className={cn('relative w-full', className)}>
       {/* scrollbar-hide: tabs stay swipe/wheel-scrollable, bar never shows.
           `relative` makes this the offsetParent the underline is measured against. */}
-      <div ref={scrollRef} className="relative flex gap-[var(--spacing-system-xxs)] items-center justify-start h-full overflow-x-auto overflow-y-hidden scrollbar-hide">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id
+      <div
+        ref={scrollRef}
+        className="scrollbar-hide relative flex h-full items-center justify-start gap-[var(--spacing-system-xxs)] overflow-x-auto overflow-y-hidden"
+      >
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.id;
 
           return (
             <button
@@ -273,32 +330,35 @@ const TabBar = memo(function TabBar({
               type="button"
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                "flex gap-[var(--spacing-system-xxs)] items-center justify-center p-[var(--spacing-system-m)] relative shrink-0 cursor-pointer",
+                'relative flex shrink-0 cursor-pointer items-center justify-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]',
                 // Named rather than `transition-all`: the only thing that moves
                 // here is colour. `all` also made the browser re-check every
                 // property each frame, including the background GRADIENT — which
                 // never animated anyway, since the inactive state has no
                 // background-image to interpolate from.
-                "transition-colors duration-200 bg-transparent border-none outline-none",
+                'border-none bg-transparent outline-none transition-colors duration-200',
                 // `outline-none` above drops the browser's own focus ring, so
                 // put one back or the strip is un-navigable by keyboard — you
                 // can tab through it with nothing to show where you are. Inset,
                 // so it stays within the button instead of overlapping the tab
                 // sitting 4px away.
-                "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus",
+                'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
                 stretchTabs && 'flex-1',
                 // Known limitation: ODS color vars hold hex values, so Tailwind
                 // alpha modifiers (to-ods-accent/10) silently produce no CSS.
                 // color-mix() accepts hex, so we derive the 10%-alpha stop from the token.
                 isActive
                   ? 'bg-gradient-to-b from-transparent to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'
-                  : 'hover:bg-gradient-to-b hover:from-transparent hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'
+                  : 'hover:bg-gradient-to-b hover:from-transparent hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]',
               )}
             >
               {tab.icon ? (
                 <div className="relative flex items-center justify-center">
                   <tab.icon
-                    className={cn("h-4 w-4 md:h-6 md:w-6 transition-colors", isActive ? 'text-ods-accent' : 'text-ods-text-secondary')}
+                    className={cn(
+                      'h-4 w-4 transition-colors md:h-6 md:w-6',
+                      isActive ? 'text-ods-accent' : 'text-ods-text-secondary',
+                    )}
                   />
                   {tab.indicator && <StatusDot indicator={tab.indicator} className="absolute right-0 top-[-3px]" />}
                 </div>
@@ -308,14 +368,16 @@ const TabBar = memo(function TabBar({
                 <StatusDot indicator={tab.indicator} className="shrink-0" />
               ) : null}
 
-              <span className={cn(
-                "text-h4 whitespace-nowrap transition-colors",
-                isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary'
-              )}>
+              <span
+                className={cn(
+                  'whitespace-nowrap transition-colors text-h4',
+                  isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                )}
+              >
                 {tab.label}
               </span>
             </button>
-          )
+          );
         })}
 
         {/* One underline for the whole strip, sliding between tabs. Inside the
@@ -323,9 +385,15 @@ const TabBar = memo(function TabBar({
             style below in real pixels — see why it is not a scaled 1px bar. */}
         <div
           aria-hidden
+          // Deliberately reachable by test id: the bar is aria-hidden and
+          // carries no text, so there is no accessible query for it, and its
+          // computed width/transform is a real contract (see tab-navigation
+          // tests) rather than incidental styling.
+          data-testid="tab-navigation-underline"
           className={cn(
-            "pointer-events-none absolute bottom-0 left-0 h-1 bg-ods-accent",
-            shouldAnimateIndicator && "transition-[transform,width,opacity] duration-200 ease-out motion-reduce:transition-none"
+            'pointer-events-none absolute bottom-0 left-0 h-1 bg-ods-accent',
+            shouldAnimateIndicator &&
+              'transition-[transform,width,opacity] duration-200 ease-out motion-reduce:transition-none',
           )}
           style={indicatorStyle}
         />
@@ -333,17 +401,27 @@ const TabBar = memo(function TabBar({
 
       {/* Fade shadows — visible when content overflows or when forced via props */}
       {leftFade && (
-        <div className={cn("absolute left-0 top-0 bottom-0 w-10 pointer-events-none bg-gradient-to-r to-transparent", shadowClassName || "from-ods-bg")} />
+        <div
+          className={cn(
+            'pointer-events-none absolute bottom-0 left-0 top-0 w-10 bg-gradient-to-r to-transparent',
+            shadowClassName || 'from-ods-bg',
+          )}
+        />
       )}
       {rightFade && (
-        <div className={cn("absolute right-0 top-0 bottom-0 w-10 pointer-events-none bg-gradient-to-l to-transparent", shadowClassName || "from-ods-bg")} />
+        <div
+          className={cn(
+            'pointer-events-none absolute bottom-0 right-0 top-0 w-10 bg-gradient-to-l to-transparent',
+            shadowClassName || 'from-ods-bg',
+          )}
+        />
       )}
 
       {/* Bottom border — a gradient-capable 1px line that fades to transparent on any edge that has an active fade shadow. */}
-      <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none" style={borderStyle} />
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px" style={borderStyle} />
     </div>
-  )
-})
+  );
+});
 
 export function TabNavigation({
   activeTab: controlledActiveTab,
@@ -356,47 +434,47 @@ export function TabNavigation({
   stretchTabs = false,
   urlSync = false,
   defaultTab,
-  children
+  children,
 }: TabNavigationProps) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Determine URL sync settings
-  const isUrlSyncEnabled = !!urlSync
-  const paramName = typeof urlSync === 'object' ? (urlSync.paramName || 'tab') : 'tab'
-  const replaceState = typeof urlSync === 'object' ? (urlSync.replaceState !== false) : true
+  const isUrlSyncEnabled = !!urlSync;
+  const paramName = typeof urlSync === 'object' ? urlSync.paramName || 'tab' : 'tab';
+  const replaceState = typeof urlSync === 'object' ? urlSync.replaceState !== false : true;
 
   // Valid tab IDs set
-  const validTabIds = useMemo(() => new Set(tabs.map(t => t.id)), [tabs])
+  const validTabIds = useMemo(() => new Set(tabs.map(t => t.id)), [tabs]);
   // A string, so the sync effect below depends on a VALUE rather than on the
   // `tabs` array identity — a consumer passing an inline array literal would
   // otherwise re-run that effect on every one of its renders.
-  const fallbackTab = defaultTab || tabs[0]?.id || ''
+  const fallbackTab = defaultTab || tabs[0]?.id || '';
 
   // What the URL currently says. Read during render (not in the effect) so the
   // effect can compare it against the last value it ACTED on.
-  const urlTab = isUrlSyncEnabled ? (searchParams?.get(paramName) || '') : ''
+  const urlTab = isUrlSyncEnabled ? searchParams?.get(paramName) || '' : '';
 
   // Get initial tab value
   const getInitialTab = () => {
-    if (isUrlSyncEnabled && validTabIds.has(urlTab)) return urlTab
-    return fallbackTab
-  }
+    if (isUrlSyncEnabled && validTabIds.has(urlTab)) return urlTab;
+    return fallbackTab;
+  };
 
   // Internal state for URL sync mode
-  const [internalActiveTab, setInternalActiveTab] = useState(getInitialTab)
+  const [internalActiveTab, setInternalActiveTab] = useState(getInitialTab);
 
   // Use internal state if URL sync is enabled, otherwise use controlled prop
-  const activeTab = isUrlSyncEnabled ? internalActiveTab : (controlledActiveTab || '')
+  const activeTab = isUrlSyncEnabled ? internalActiveTab : controlledActiveTab || '';
 
   // The last URL value this component reconciled against.
-  const lastSyncedUrlTabRef = useRef(urlTab)
+  const lastSyncedUrlTabRef = useRef(urlTab);
   // Tabs written to the URL whose navigation has not landed yet, oldest first.
   // Until a write lands, `searchParams` still reports the PREVIOUS tab — and
   // reading that as somebody else editing the URL is exactly what used to push
   // the tab back to where the click started.
-  const inFlightUrlTabsRef = useRef<string[]>([])
+  const inFlightUrlTabsRef = useRef<string[]>([]);
 
   // Sync with URL changes (back/forward navigation, a link into a tab).
   //
@@ -409,16 +487,16 @@ export function TabNavigation({
   //
   // The three cases below are the three things that can actually have happened.
   useEffect(() => {
-    if (!isUrlSyncEnabled) return
+    if (!isUrlSyncEnabled) return;
 
     // 1. One of our own writes arriving. The state moved on the click, so there
     //    is nothing to set — just drop it, along with anything written before it
     //    that a faster second click has already superseded.
-    const landed = inFlightUrlTabsRef.current.indexOf(urlTab)
+    const landed = inFlightUrlTabsRef.current.indexOf(urlTab);
     if (landed !== -1) {
-      inFlightUrlTabsRef.current.splice(0, landed + 1)
-      lastSyncedUrlTabRef.current = urlTab
-      return
+      inFlightUrlTabsRef.current.splice(0, landed + 1);
+      lastSyncedUrlTabRef.current = urlTab;
+      return;
     }
 
     // 2. The URL has not moved. Either a write is still in flight and this run
@@ -431,25 +509,23 @@ export function TabNavigation({
     //    comes — deep link dropped, nothing ever active. So re-resolve, but only
     //    when what we are showing is no longer in the list.
     if (urlTab === lastSyncedUrlTabRef.current) {
-      setInternalActiveTab(prev =>
-        validTabIds.has(prev) ? prev : validTabIds.has(urlTab) ? urlTab : fallbackTab,
-      )
-      return
+      setInternalActiveTab(prev => (validTabIds.has(prev) ? prev : validTabIds.has(urlTab) ? urlTab : fallbackTab));
+      return;
     }
 
     // 3. The URL moved somewhere we did not write it: back/forward, a redirect,
     //    a link elsewhere on the page. That wins, and anything still in flight
     //    is stale by definition.
-    inFlightUrlTabsRef.current.length = 0
-    lastSyncedUrlTabRef.current = urlTab
-    setInternalActiveTab(validTabIds.has(urlTab) ? urlTab : fallbackTab)
-  }, [isUrlSyncEnabled, urlTab, validTabIds, fallbackTab])
+    inFlightUrlTabsRef.current.length = 0;
+    lastSyncedUrlTabRef.current = urlTab;
+    setInternalActiveTab(validTabIds.has(urlTab) ? urlTab : fallbackTab);
+  }, [isUrlSyncEnabled, urlTab, validTabIds, fallbackTab]);
 
   // Everything the click handler reads but must not be re-created for. Held in
   // a ref so `handleTabChange` is reference-stable: it is the one prop that
   // would otherwise break `TabBar`'s memo on every navigation, since
   // `searchParams` gets a new identity each time ANY query param moves.
-  const navRef = useRef({ isUrlSyncEnabled, controlledOnTabChange, searchParams, pathname, paramName, replaceState })
+  const navRef = useRef({ isUrlSyncEnabled, controlledOnTabChange, searchParams, pathname, paramName, replaceState });
   // Filled in an effect rather than in the render body. With `useDeferredValue`
   // this component renders more than once per commit, and React is free to
   // discard a render outright — a ref written during one of those would hand the
@@ -457,44 +533,47 @@ export function TabNavigation({
   // click would write its query string against the wrong URL. A click can only
   // arrive after a commit, so the handler still reads current values.
   useEffect(() => {
-    navRef.current = { isUrlSyncEnabled, controlledOnTabChange, searchParams, pathname, paramName, replaceState }
-  })
+    navRef.current = { isUrlSyncEnabled, controlledOnTabChange, searchParams, pathname, paramName, replaceState };
+  });
 
-  const handleTabChange = useCallback((tabId: string) => {
-    const nav = navRef.current
+  const handleTabChange = useCallback(
+    (tabId: string) => {
+      const nav = navRef.current;
 
-    if (!nav.isUrlSyncEnabled) {
-      // Legacy controlled mode
-      nav.controlledOnTabChange?.(tabId)
-      return
-    }
+      if (!nav.isUrlSyncEnabled) {
+        // Legacy controlled mode
+        nav.controlledOnTabChange?.(tabId);
+        return;
+      }
 
-    // The bar follows the click immediately — this update stays urgent.
-    setInternalActiveTab(tabId)
-    // ...and is what the URL is about to say. Recorded so the sync effect knows
-    // the param arriving later is ours, and knows that until it does arrive the
-    // URL is merely stale rather than disagreeing with us. Skipped when it is
-    // already the newest thing in flight, so a double-click on one tab does not
-    // queue the same id twice.
-    const inFlight = inFlightUrlTabsRef.current
-    if (inFlight[inFlight.length - 1] !== tabId) inFlight.push(tabId)
+      // The bar follows the click immediately — this update stays urgent.
+      setInternalActiveTab(tabId);
+      // ...and is what the URL is about to say. Recorded so the sync effect knows
+      // the param arriving later is ours, and knows that until it does arrive the
+      // URL is merely stale rather than disagreeing with us. Skipped when it is
+      // already the newest thing in flight, so a double-click on one tab does not
+      // queue the same id twice.
+      const inFlight = inFlightUrlTabsRef.current;
+      if (inFlight[inFlight.length - 1] !== tabId) inFlight.push(tabId);
 
-    const params = new URLSearchParams(nav.searchParams?.toString())
-    params.set(nav.paramName, tabId)
-    const method = nav.replaceState ? 'replace' : 'push'
-    // Non-urgent: the navigation re-renders every `useSearchParams()` subscriber
-    // on the page, which is a lot of work for a query param nobody is waiting
-    // on. In a transition it yields to the click feedback instead of competing
-    // with it.
-    startTransition(() => {
-      // `scroll: false` because only a query param moves here. The App Router
-      // otherwise scrolls to the top on every navigation, which throws away the
-      // reading position of anyone using a tab strip partway down a page.
-      router[method](`${nav.pathname}?${params.toString()}`, { scroll: false })
-    })
+      const params = new URLSearchParams(nav.searchParams?.toString());
+      params.set(nav.paramName, tabId);
+      const method = nav.replaceState ? 'replace' : 'push';
+      // Non-urgent: the navigation re-renders every `useSearchParams()` subscriber
+      // on the page, which is a lot of work for a query param nobody is waiting
+      // on. In a transition it yields to the click feedback instead of competing
+      // with it.
+      startTransition(() => {
+        // `scroll: false` because only a query param moves here. The App Router
+        // otherwise scrolls to the top on every navigation, which throws away the
+        // reading position of anyone using a tab strip partway down a page.
+        router[method](`${nav.pathname}?${params.toString()}`, { scroll: false });
+      });
 
-    nav.controlledOnTabChange?.(tabId)
-  }, [router])
+      nav.controlledOnTabChange?.(tabId);
+    },
+    [router],
+  );
 
   // The tab BAR follows the click immediately; the tab BODY is deferred, which
   // makes React treat swapping it as a transition. That is the whole fix for the
@@ -512,8 +591,8 @@ export function TabNavigation({
   //    underline with nothing saying so — worse than a skeleton, because stale
   //    data reads as fresh data. `isStale` is handed to the render prop so the
   //    body can mark itself while it waits.
-  const deferredActiveTab = useDeferredValue(activeTab)
-  const isStale = activeTab !== deferredActiveTab
+  const deferredActiveTab = useDeferredValue(activeTab);
+  const isStale = activeTab !== deferredActiveTab;
 
   return (
     <>
@@ -531,15 +610,14 @@ export function TabNavigation({
       {/* Render children with active tab if provided */}
       {children && children(deferredActiveTab, { isStale })}
     </>
-  )
+  );
 }
 
 // Utility function to get tab by id
-export const getTabById = (tabs: TabItem[], tabId: string): TabItem | undefined =>
-  tabs.find(tab => tab.id === tabId)
+export const getTabById = (tabs: TabItem[], tabId: string): TabItem | undefined => tabs.find(tab => tab.id === tabId);
 
 // Utility function to get tab component
-export const getTabComponent = (tabs: TabItem[], tabId: string): React.ComponentType<any> | null => {
-  const tab = getTabById(tabs, tabId)
-  return tab?.component || null
-}
+export const getTabComponent = (tabs: TabItem[], tabId: string): TabItem['component'] | null => {
+  const tab = getTabById(tabs, tabId);
+  return tab?.component || null;
+};

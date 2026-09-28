@@ -59,6 +59,7 @@ jobs:
                 "openframe-gateway-service-core/**",
                 "openframe-idp-configuration/**",
                 "openframe-management-service-core/**",
+                "openframe-notification-core/**",
                 "openframe-notification-mail/**",
                 "openframe-notification-push/**",
                 "openframe-pinot-initializer/**",

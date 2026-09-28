@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { MingoWelcome } from '../components/chat/mingo-welcome'
-import { MingoChatHistory } from '../components/chat/mingo-chat-history'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { MingoChatHistory } from '../components/chat/mingo-chat-history';
+import { MingoWelcome } from '../components/chat/mingo-welcome';
 
 const SAMPLE_HISTORY = (
   <MingoChatHistory
@@ -12,11 +12,11 @@ const SAMPLE_HISTORY = (
       { id: 'd5', title: 'WSUS patching strategy optimization' },
       { id: 'd6', title: 'Analyzing unusual network traffic patterns' },
     ]}
-    onSelectDialog={(id) => console.log('select', id)}
-    onRequestRename={(d) => console.log('request rename', d.id)}
-    onRequestArchive={(d) => console.log('request archive', d.id)}
+    onSelectDialog={id => console.log('select', id)}
+    onRequestRename={d => console.log('request rename', d.id)}
+    onRequestArchive={d => console.log('request archive', d.id)}
   />
-)
+);
 
 const meta: Meta<typeof MingoWelcome> = {
   title: 'Chat/MingoWelcome',
@@ -39,7 +39,7 @@ const meta: Meta<typeof MingoWelcome> = {
     hasExistingChats: { control: 'boolean' },
   },
   decorators: [
-    (Story) => (
+    Story => (
       // Mimic the narrow drawer panel the empty state lives in: fixed height so
       // the greeting's `flex-1` centring and the pinned grid/chips read
       // correctly.
@@ -48,23 +48,23 @@ const meta: Meta<typeof MingoWelcome> = {
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof MingoWelcome>
+export default meta;
+type Story = StoryObj<typeof MingoWelcome>;
 
 /** Full default state with the Guide CTA wired (promo card + yellow chip). */
 export const Default: Story = {
   args: {
     onStartGuideChat: () => console.log('switch to guide mode'),
   },
-}
+};
 
 /** Guide mode not configured → the promo card and "Start Guide Chat" chip are
  *  suppressed (no dead-end CTA). */
 export const WithoutGuide: Story = {
   args: {},
-}
+};
 
 /** Extra quick-action chips appended after the built-in Guide chip. */
 export const WithQuickActions: Story = {
@@ -75,7 +75,7 @@ export const WithQuickActions: Story = {
       { id: 'more', label: '…' },
     ],
   },
-}
+};
 
 /** Returning user (`hasExistingChats`) — the "New to OpenFrame?" notification
  *  is hidden and the "Start Guide Chat" chip drops to the muted outline style. */
@@ -89,7 +89,7 @@ export const ReturningUser: Story = {
       { id: 'more', label: '…' },
     ],
   },
-}
+};
 
 /** Wide panel (e.g. in-layout / desktop). */
 export const Wide: Story = {
@@ -101,10 +101,10 @@ export const Wide: Story = {
     ],
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div className="flex h-[760px] w-[960px] flex-col overflow-hidden rounded-md border border-ods-border bg-ods-bg px-5 py-4">
         <Story />
       </div>
     ),
   ],
-}
+};

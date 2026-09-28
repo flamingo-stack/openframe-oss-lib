@@ -1,7 +1,7 @@
 package com.openframe.api.dataloader;
 
 import com.netflix.graphql.dgs.DgsDataLoader;
-import com.openframe.api.service.KnowledgeBaseTagService;
+import com.openframe.api.service.knowledgebase.KnowledgeBaseTagService;
 import com.openframe.data.document.tag.Tag;
 import lombok.RequiredArgsConstructor;
 import org.dataloader.BatchLoader;

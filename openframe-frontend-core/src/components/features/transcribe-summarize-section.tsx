@@ -1,6 +1,5 @@
-"use client";
+'use client';
 
-import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { AIEnrichSection } from './ai-enrich';
 import type { AIRequiredField } from './ai-enrich';
@@ -51,17 +50,17 @@ export function TranscribeSummarizeSection({
   requiredFields,
   status,
   statusMessage,
-  disabledMessage = "Upload a video first",
+  disabledMessage = 'Upload a video first',
   showCancel = true,
   onCancel,
   isCancelling = false,
   hasResult = false,
-  title = "Transcribe & Summarize",
-  description = "Generate transcript with speaker diarization and AI summary",
+  title = 'Transcribe & Summarize',
+  description = 'Generate transcript with speaker diarization and AI summary',
   buttonLabel,
-  loadingLabel = "Processing...",
+  loadingLabel = 'Processing...',
 }: TranscribeSummarizeSectionProps) {
-  const defaultButtonLabel = hasResult ? "Regenerate" : "Generate";
+  const defaultButtonLabel = hasResult ? 'Regenerate' : 'Generate';
 
   return (
     <AIEnrichSection

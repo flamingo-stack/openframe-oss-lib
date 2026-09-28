@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import { cn } from '../../utils/cn'
+import { cn } from '../../utils/cn';
 
-export type CircularProgressVariant = 'success' | 'warning' | 'error' | 'info' | 'accent'
+export type CircularProgressVariant = 'success' | 'warning' | 'error' | 'info' | 'accent';
 
 /**
  * How to treat a `percentage` over 100.
@@ -12,22 +12,22 @@ export type CircularProgressVariant = 'success' | 'warning' | 'error' | 'info' |
  *   130 → 30%, 230 → 30%, 200 → 100% (exact laps render as full). Use together
  *   with `variant="warning"` / `"error"` to communicate overage semantically.
  */
-export type CircularProgressOverflow = 'clamp' | 'wrap'
+export type CircularProgressOverflow = 'clamp' | 'wrap';
 
 interface CircularProgressProps {
-  percentage: number                    // 0-100 in clamp mode; may exceed 100 in wrap mode
-  variant?: CircularProgressVariant     // Default: 'success'
-  size?: number                         // Default: 56
-  strokeWidth?: number                  // Default: 10
-  showLabel?: boolean                   // Show percentage text in center (default: true)
-  labelFormat?: 'percent' | 'value'    // 'percent' = "70%", 'value' = "70" (default: 'percent')
-  overflow?: CircularProgressOverflow  // Default: 'clamp'
-  className?: string
+  percentage: number; // 0-100 in clamp mode; may exceed 100 in wrap mode
+  variant?: CircularProgressVariant; // Default: 'success'
+  size?: number; // Default: 56
+  strokeWidth?: number; // Default: 10
+  showLabel?: boolean; // Show percentage text in center (default: true)
+  labelFormat?: 'percent' | 'value'; // 'percent' = "70%", 'value' = "70" (default: 'percent')
+  overflow?: CircularProgressOverflow; // Default: 'clamp'
+  className?: string;
 }
 
 // Fallback track for variants that don't have a designed secondary color
 // (info, accent). success/warning/error use their ODS `*-secondary` token.
-const SUBTLE_TRACK = 'rgba(255, 255, 255, 0.06)'
+const SUBTLE_TRACK = 'rgba(255, 255, 255, 0.06)';
 
 const variantColors: Record<CircularProgressVariant, { progress: string; track: string }> = {
   success: {
@@ -50,7 +50,7 @@ const variantColors: Record<CircularProgressVariant, { progress: string; track: 
     progress: 'var(--ods-accent)',
     track: SUBTLE_TRACK,
   },
-}
+};
 
 export function CircularProgress({
   percentage,
@@ -60,44 +60,33 @@ export function CircularProgress({
   showLabel = true,
   labelFormat = 'percent',
   overflow = 'clamp',
-  className
+  className,
 }: CircularProgressProps) {
-  const safePercentage = Math.max(0, percentage)
-  const isWrap = overflow === 'wrap'
+  const safePercentage = Math.max(0, percentage);
+  const isWrap = overflow === 'wrap';
 
   // In wrap mode the ring shows `percentage % 100`. Exact laps (200, 300, …)
   // would otherwise render empty, so collapse them to a full 100% ring.
-  let ringPercentage: number
+  let ringPercentage: number;
   if (isWrap && safePercentage > 100) {
-    const mod = safePercentage % 100
-    ringPercentage = mod === 0 ? 100 : mod
+    const mod = safePercentage % 100;
+    ringPercentage = mod === 0 ? 100 : mod;
   } else {
-    ringPercentage = Math.min(100, safePercentage)
+    ringPercentage = Math.min(100, safePercentage);
   }
 
-  const labelPercentage = isWrap ? safePercentage : Math.min(100, safePercentage)
+  const labelPercentage = isWrap ? safePercentage : Math.min(100, safePercentage);
 
-  const radius = (size - strokeWidth) / 2
-  const circumference = radius * 2 * Math.PI
-  const ringOffset = circumference - (ringPercentage / 100) * circumference
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const ringOffset = circumference - (ringPercentage / 100) * circumference;
 
-  const { progress, track } = variantColors[variant]
+  const { progress, track } = variantColors[variant];
 
   return (
     <div className={cn('relative', className)} style={{ width: size, height: size }}>
-      <svg
-        width={size}
-        height={size}
-        className="transform -rotate-90"
-      >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={track}
-          strokeWidth={strokeWidth}
-          fill="none"
-        />
+      <svg width={size} height={size} className="-rotate-90 transform">
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke={track} strokeWidth={strokeWidth} fill="none" />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -114,10 +103,11 @@ export function CircularProgress({
       {showLabel && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="font-medium text-ods-text-primary" style={{ fontSize: size <= 40 ? 10 : 12 }}>
-            {Math.round(labelPercentage)}{labelFormat === 'percent' ? '%' : ''}
+            {Math.round(labelPercentage)}
+            {labelFormat === 'percent' ? '%' : ''}
           </span>
         </div>
       )}
     </div>
-  )
+  );
 }

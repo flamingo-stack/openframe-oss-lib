@@ -30,7 +30,7 @@ export function faqSectionSlug(section: string): string {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
-  )
+  );
 }
 
 /** Stable anchor for an individual FAQ row. Rendered as the row container's
@@ -40,7 +40,7 @@ export function faqSectionSlug(section: string): string {
  *  stringified verbatim — the FAQ schema uses integer PKs so `parseFaqHash`'s
  *  digits-only regex always matches a real row. */
 export function faqItemAnchor(id: number | string): string {
-  return `faq-item-${id}`
+  return `faq-item-${id}`;
 }
 
 /** Discriminated parse of a `/faqs#…` hash. Returns null for an empty,
@@ -53,18 +53,16 @@ export function faqItemAnchor(id: number | string): string {
  *
  * `rawId` is the matched digit run as a string — the caller compares it
  * to `String(item.id)` so coercion stays at the comparison site. */
-export type FaqHashTarget =
-  | { kind: 'item';    rawId: string }
-  | { kind: 'section'; slug:  string }
+export type FaqHashTarget = { kind: 'item'; rawId: string } | { kind: 'section'; slug: string };
 
-const FAQ_ITEM_HASH_RE = /^faq-item-(\d+)$/
+const FAQ_ITEM_HASH_RE = /^faq-item-(\d+)$/;
 
 export function parseFaqHash(hash: string | null | undefined): FaqHashTarget | null {
-  if (!hash) return null
-  const trimmed = hash.replace(/^#/, '')
-  if (!trimmed) return null
-  const itemMatch = FAQ_ITEM_HASH_RE.exec(trimmed)
-  if (itemMatch) return { kind: 'item', rawId: itemMatch[1] }
-  if (trimmed.startsWith('faq-')) return { kind: 'section', slug: trimmed }
-  return null
+  if (!hash) return null;
+  const trimmed = hash.replace(/^#/, '');
+  if (!trimmed) return null;
+  const itemMatch = FAQ_ITEM_HASH_RE.exec(trimmed);
+  if (itemMatch) return { kind: 'item', rawId: itemMatch[1] };
+  if (trimmed.startsWith('faq-')) return { kind: 'section', slug: trimmed };
+  return null;
 }

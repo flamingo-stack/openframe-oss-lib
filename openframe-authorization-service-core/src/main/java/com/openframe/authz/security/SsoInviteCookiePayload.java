@@ -6,6 +6,7 @@ public record SsoInviteCookiePayload(
         Boolean switchTenant,
         String provider,
         String redirectTo,
+        boolean authMobile,
         long iat,
         long exp
 ) implements SsoCookiePayload {

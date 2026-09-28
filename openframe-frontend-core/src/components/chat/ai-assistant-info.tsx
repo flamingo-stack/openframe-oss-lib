@@ -1,20 +1,20 @@
-"use client"
+'use client';
 
-import { forwardRef, type HTMLAttributes, type ReactNode } from "react"
-import { cn } from "../../utils/cn"
-import { formatTime } from "../../utils/format-date"
+import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
+import { cn } from '../../utils/cn';
+import { formatTime } from '../../utils/format-date';
 
 export interface AiAssistantInfoProps extends HTMLAttributes<HTMLDivElement> {
   /** Rendered inside the standard 48px framed box (typically a 24px icon). */
-  icon?: ReactNode
+  icon?: ReactNode;
   /** Replaces the framed icon box entirely (e.g. a round 48px avatar for the
    *  `direct-chat` variant). Wins over `icon` when both are set. */
-  leading?: ReactNode
-  title: string
+  leading?: ReactNode;
+  title: string;
   /** Secondary line under the title. Omitted → the row is title-only. */
-  body?: ReactNode
+  body?: ReactNode;
   /** Timestamp of the message row this block came in on. */
-  timestamp?: Date
+  timestamp?: Date;
 }
 
 /**
@@ -38,7 +38,7 @@ const AiAssistantInfo = forwardRef<HTMLDivElement, AiAssistantInfoProps>(
       <div
         ref={ref}
         className={cn(
-          "mb-[var(--spacing-system-xsf)] flex items-start gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]",
+          'mb-[var(--spacing-system-xsf)] flex items-start gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]',
           className,
         )}
         {...props}
@@ -50,22 +50,20 @@ const AiAssistantInfo = forwardRef<HTMLDivElement, AiAssistantInfoProps>(
         )}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex w-full items-start">
-            <p className="text-h4 min-w-0 flex-1 truncate text-ods-text-primary" title={title}>
+            <p className="min-w-0 flex-1 truncate text-ods-text-primary text-h4" title={title}>
               {title}
             </p>
             {timestamp && (
-              <span className="text-h6 shrink-0 text-right text-ods-text-secondary">{formatTime(timestamp)}</span>
+              <span className="shrink-0 text-right text-ods-text-secondary text-h6">{formatTime(timestamp)}</span>
             )}
           </div>
-          {body != null && body !== "" && (
-            <p className="text-h4 w-full break-words text-ods-text-secondary">{body}</p>
-          )}
+          {body != null && body !== '' && <p className="w-full break-words text-ods-text-secondary text-h4">{body}</p>}
         </div>
       </div>
-    )
+    );
   },
-)
+);
 
-AiAssistantInfo.displayName = "AiAssistantInfo"
+AiAssistantInfo.displayName = 'AiAssistantInfo';
 
-export { AiAssistantInfo }
+export { AiAssistantInfo };

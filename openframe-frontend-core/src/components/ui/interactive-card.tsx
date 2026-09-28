@@ -1,35 +1,35 @@
-"use client"
+'use client';
 
-import React from "react"
-import { cn } from "../../utils/cn"
+import React from 'react';
+import { cn } from '../../utils/cn';
 
 export interface InteractiveCardProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
    * Children elements to render inside the card
    */
-  children: React.ReactNode
+  children: React.ReactNode;
 
   /**
    * Click handler for the card
    */
-  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void
+  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 
   /**
    * Enable clickable/hover behavior
    * Default: true if onClick is provided, false otherwise
    */
-  clickable?: boolean
+  clickable?: boolean;
 
   /**
    * Custom hover accent color (default: ods-accent)
    * When provided, border and h3 titles will use this color on hover
    */
-  hoverAccentColor?: string
+  hoverAccentColor?: string;
 
   /**
    * Additional CSS classes
    */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -66,89 +66,85 @@ export interface InteractiveCardProps extends React.HTMLAttributes<HTMLDivElemen
  * ```
  */
 export const InteractiveCard = React.forwardRef<HTMLDivElement, InteractiveCardProps>(
-  (
-    {
-      children,
-      onClick,
-      clickable,
-      hoverAccentColor,
-      className,
-      ...props
-    },
-    ref
-  ) => {
+  ({ children, onClick, clickable, hoverAccentColor, className, ...props }, ref) => {
     // Auto-enable clickable if onClick is provided
-    const isClickable = clickable !== undefined ? clickable : !!onClick
+    const isClickable = clickable !== undefined ? clickable : !!onClick;
 
     const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
       if (isClickable && onClick) {
-        onClick(e)
+        onClick(e);
       }
-    }
+    };
 
     const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
       if (hoverAccentColor && isClickable) {
-        e.currentTarget.style.borderColor = hoverAccentColor
+        const card = e.currentTarget;
+        card.style.borderColor = hoverAccentColor;
         // Change h3 titles
-        const title = e.currentTarget.querySelector('h3')
+        const title = card.querySelector('h3');
         if (title) {
-          (title as HTMLElement).style.color = hoverAccentColor
+          title.style.color = hoverAccentColor;
         }
         // Change primary text elements (large values, main content)
         // Exclude button text from color change
-        const primaryTexts = e.currentTarget.querySelectorAll('.text-ods-text-primary:not(button):not(button *)')
-        primaryTexts.forEach((el) => {
-          (el as HTMLElement).style.color = hoverAccentColor
-        })
+        const primaryTexts = card.querySelectorAll<HTMLElement>('.text-ods-text-primary:not(button):not(button *)');
+        for (const text of primaryTexts) {
+          text.style.color = hoverAccentColor;
+        }
       }
-    }
+    };
 
     const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
       if (hoverAccentColor && isClickable) {
-        e.currentTarget.style.borderColor = ''
+        const card = e.currentTarget;
+        card.style.borderColor = '';
         // Reset h3 titles
-        const title = e.currentTarget.querySelector('h3')
+        const title = card.querySelector('h3');
         if (title) {
-          (title as HTMLElement).style.color = ''
+          title.style.color = '';
         }
         // Reset primary text elements
-        const primaryTexts = e.currentTarget.querySelectorAll('.text-ods-text-primary:not(button):not(button *)')
-        primaryTexts.forEach((el) => {
-          (el as HTMLElement).style.color = ''
-        })
+        const primaryTexts = card.querySelectorAll<HTMLElement>('.text-ods-text-primary:not(button):not(button *)');
+        for (const text of primaryTexts) {
+          text.style.color = '';
+        }
       }
-    }
+    };
 
     return (
       <div
         ref={ref}
         className={cn(
-          "transition-all",
+          'transition-all',
           isClickable && [
-            "cursor-pointer",
-            "group",
+            'cursor-pointer',
+            'group',
             !hoverAccentColor && [
-              "hover:border-ods-accent",
+              'hover:border-ods-accent',
               // H3 titles turn accent on hover
-              "[&:hover_h3]:text-ods-accent",
+              '[&:hover_h3]:text-ods-accent',
               // Primary text turns accent on hover (but not inside buttons)
-              "[&:hover_.text-ods-text-primary:not(button):not(button_*)]:text-ods-accent"
-            ]
+              '[&:hover_.text-ods-text-primary:not(button):not(button_*)]:text-ods-accent',
+            ],
           ],
-          className
+          className,
         )}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={hoverAccentColor ? {
-          ['--hover-accent' as any]: hoverAccentColor
-        } : undefined}
+        style={
+          hoverAccentColor
+            ? // A CSS custom property — React accepts it at runtime but
+              // `CSSProperties` has no index signature for `--*`.
+              ({ '--hover-accent': hoverAccentColor } as React.CSSProperties)
+            : undefined
+        }
         {...props}
       >
         {children}
       </div>
-    )
-  }
-)
+    );
+  },
+);
 
-InteractiveCard.displayName = "InteractiveCard"
+InteractiveCard.displayName = 'InteractiveCard';

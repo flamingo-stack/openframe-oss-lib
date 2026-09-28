@@ -22,30 +22,29 @@
  *    (`px-2 py-1 text-[11px]` no border). Same family, no frame.
  */
 export interface ChipClassOptions {
-  tone: 'primary' | 'secondary'
+  tone: 'primary' | 'secondary';
   /** Visual density. Defaults to `'chip'`. */
-  density?: 'chip' | 'list-row' | 'card-row'
+  density?: 'chip' | 'list-row' | 'card-row';
   /** Extra classes appended verbatim (e.g. `cursor-pointer`). */
-  extra?: string
+  extra?: string;
 }
 
 export function chatChipClass({ tone, density = 'chip', extra }: ChipClassOptions): string {
-  const toneClass = tone === 'primary' ? 'text-ods-text-primary' : 'text-ods-text-secondary'
+  const toneClass = tone === 'primary' ? 'text-ods-text-primary' : 'text-ods-text-secondary';
   // Size / padding by density. All three share the same border + hover
   // semantics so a chip and a search-row read as the same UI family.
-  const sizeClass = density === 'list-row'
-    ? 'px-3 py-2 text-sm gap-2'
-    : density === 'card-row'
-      ? 'px-2 py-1 text-h6 gap-1.5'
-      : 'px-2 py-0.5 text-h6 gap-1.5'
+  const sizeClass =
+    density === 'list-row'
+      ? 'px-3 py-2 text-sm gap-2'
+      : density === 'card-row'
+        ? 'px-2 py-1 text-h6 gap-1.5'
+        : 'px-2 py-0.5 text-h6 gap-1.5';
   // `card-row` is the "no-frame" variant — no border, no card bg, so it
   // sits cleanly under a card without visually wrapping it.
-  const frameClass = density === 'card-row'
-    ? ''
-    : 'bg-ods-card border border-ods-border rounded'
+  const frameClass = density === 'card-row' ? '' : 'bg-ods-card border border-ods-border rounded';
   const base =
     `inline-flex items-center ${sizeClass} ${frameClass} ` +
     `${toneClass} ` +
-    'hover:text-ods-accent hover:border-ods-accent transition-colors align-baseline'
-  return extra ? `${base} ${extra}` : base
+    'hover:text-ods-accent hover:border-ods-accent transition-colors align-baseline';
+  return extra ? `${base} ${extra}` : base;
 }

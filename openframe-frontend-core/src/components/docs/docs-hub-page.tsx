@@ -1,17 +1,13 @@
-import React from 'react'
-import { DocViewer, type DocViewerProps } from './doc-viewer'
-import { MarkdownSkeleton, EmbedSkeleton } from './skeletons'
-import { PdfViewer } from '../embeds/pdf-viewer'
-import { GoogleSheetsViewer } from '../embeds/google-sheets-viewer'
-import { FigmaEmbed } from '../embeds/figma-embed'
-import { FileDownloadCard } from '../embeds/file-download-card'
-import type {
-  DocContent,
-  DocRenderHandlers,
-  DocumentType,
-} from '../../types/doc-source'
+import type React from 'react';
+import type { DocContent, DocRenderHandlers, DocumentType } from '../../types/doc-source';
+import { FigmaEmbed } from '../embeds/figma-embed';
+import { FileDownloadCard } from '../embeds/file-download-card';
+import { GoogleSheetsViewer } from '../embeds/google-sheets-viewer';
+import { PdfViewer } from '../embeds/pdf-viewer';
+import { DocViewer, type DocViewerProps } from './doc-viewer';
+import { MarkdownSkeleton, EmbedSkeleton } from './skeletons';
 
-type DocRenderer = (content: DocContent, handlers: DocRenderHandlers) => React.ReactNode
+type DocRenderer = (content: DocContent, handlers: DocRenderHandlers) => React.ReactNode;
 
 /**
  * Per-document-type renderer map. `markdown` is required (the lib does NOT
@@ -22,36 +18,33 @@ type DocRenderer = (content: DocContent, handlers: DocRenderHandlers) => React.R
  * defaults from `components/embeds`. Override only when you want different
  * props than the default (e.g. a custom PDF toolbar, embedded credentials).
  */
-export type DocumentTypeRenderers = { markdown: DocRenderer } & Partial<
-  Record<DocumentType, DocRenderer>
->
+export type DocumentTypeRenderers = { markdown: DocRenderer } & Partial<Record<DocumentType, DocRenderer>>;
 
-export interface DocsHubPageProps
-  extends Omit<DocViewerProps, 'renderContent' | 'renderSkeleton' | 'showAIChat'> {
+export interface DocsHubPageProps extends Omit<DocViewerProps, 'renderContent' | 'renderSkeleton' | 'showAIChat'> {
   /** Per-document-type renderer map. `markdown` is REQUIRED. */
-  documentTypeRenderers: DocumentTypeRenderers
+  documentTypeRenderers: DocumentTypeRenderers;
 
   /** Renderer for unknown / future document types. Defaults to a lib-styled
    *  "Unsupported document type" message. */
-  fallbackRenderer?: DocRenderer
+  fallbackRenderer?: DocRenderer;
 
   /** Loading skeleton picker. Defaults: `markdown` / `undefined` →
    *  `<MarkdownSkeleton>`, everything else → `<EmbedSkeleton>`. */
-  renderSkeleton?: (documentType: DocumentType | undefined) => React.ReactNode
+  renderSkeleton?: (documentType: DocumentType | undefined) => React.ReactNode;
 
   /** Defaults to `true` (the embeddable wrapper favors the chat-enabled
    *  experience). Only mounts the in-source RAG search bar
    *  (`<DocSearchBar>`) — does NOT require `ChatRuntimeContext`. */
-  showAIChat?: boolean
+  showAIChat?: boolean;
 }
 
-const DEFAULT_TITLE = 'Documents'
+const DEFAULT_TITLE = 'Documents';
 
 const defaultFallbackRenderer: DocRenderer = () => (
-  <div className="text-center py-16">
+  <div className="py-16 text-center">
     <p className="text-ods-text-secondary">Unsupported document type</p>
   </div>
-)
+);
 
 // When the DAL hasn't populated the URL field for a rich-content type, the
 // embed-viewer components render a broken iframe (empty src). Fall back to
@@ -64,30 +57,30 @@ const defaultPdfRenderer: DocRenderer = (content, handlers) =>
     <PdfViewer src={content.fileUrl} fileName={content.fileName} />
   ) : (
     defaultFallbackRenderer(content, handlers)
-  )
+  );
 
 const defaultGoogleSheetRenderer: DocRenderer = (content, handlers) =>
   content.externalUrl ? (
     <GoogleSheetsViewer externalUrl={content.externalUrl} fileName={content.fileName} />
   ) : (
     defaultFallbackRenderer(content, handlers)
-  )
+  );
 
 const defaultFigmaRenderer: DocRenderer = (content, handlers) =>
   content.externalUrl ? (
     <FigmaEmbed url={content.externalUrl} title={content.fileName} loading="eager" />
   ) : (
     defaultFallbackRenderer(content, handlers)
-  )
+  );
 
-const defaultFileRenderer: DocRenderer = (content) => (
+const defaultFileRenderer: DocRenderer = content => (
   <FileDownloadCard
     fileName={content.fileName}
     mimeType={content.mimeType}
     fileSize={content.fileSize}
     fileUrl={content.fileUrl}
   />
-)
+);
 
 const defaultRenderSkeleton = (documentType: DocumentType | undefined) =>
   !documentType || documentType === 'markdown' ? (
@@ -96,7 +89,7 @@ const defaultRenderSkeleton = (documentType: DocumentType | undefined) =>
     // Forward the documentType so the embed skeleton renders the right
     // shape (PDF=2 buttons, sheets/figma=1 button, file=centered card).
     <EmbedSkeleton documentType={documentType} />
-  )
+  );
 
 /**
  * Embeddable docs-hub page. Bundles `<DocViewer>` with safe defaults so the
@@ -127,13 +120,13 @@ export function DocsHubPage({
     google_sheet: documentTypeRenderers.google_sheet ?? defaultGoogleSheetRenderer,
     figma: documentTypeRenderers.figma ?? defaultFigmaRenderer,
     file: documentTypeRenderers.file ?? defaultFileRenderer,
-  }
+  };
 
   const renderContent: DocViewerProps['renderContent'] = (content, handlers) => {
-    const type = (content.documentType ?? 'markdown') as DocumentType
-    const renderer = resolvedRenderers[type] ?? fallbackRenderer
-    return renderer(content, handlers)
-  }
+    const type = content.documentType ?? 'markdown';
+    const renderer = resolvedRenderers[type] ?? fallbackRenderer;
+    return renderer(content, handlers);
+  };
 
   return (
     <DocViewer
@@ -145,5 +138,5 @@ export function DocsHubPage({
       renderContent={renderContent}
       renderSkeleton={renderSkeleton}
     />
-  )
+  );
 }

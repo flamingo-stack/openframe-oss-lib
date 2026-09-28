@@ -21,6 +21,7 @@ public class LogEvent {
     private String userId;
     private String deviceId;
     private String hostname;
+    private String nickname;
     private String organizationId;
     private String organizationName;
     private String summary;

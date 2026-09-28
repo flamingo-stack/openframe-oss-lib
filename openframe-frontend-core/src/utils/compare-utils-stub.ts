@@ -22,11 +22,13 @@ export interface StructuredPricingSummary {
   classification: string;
 }
 
-export function getStructuredPricingSummary(_vendor: any): StructuredPricingSummary {
+/** Stub — returns a fixed summary and never reads the vendor row, so the
+ *  parameter stays opaque. */
+export function getStructuredPricingSummary(_vendor: unknown): StructuredPricingSummary {
   return {
     ranges: [{ min: 0, max: 100, currency: 'USD', model: 'per month', unit: 'user' }],
     primaryModel: 'subscription',
     hasFreeTier: false,
-    classification: 'commercial'
+    classification: 'commercial',
   };
 }

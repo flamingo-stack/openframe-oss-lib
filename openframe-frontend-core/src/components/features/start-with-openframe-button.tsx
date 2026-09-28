@@ -1,13 +1,13 @@
-"use client"
+'use client';
 
-import * as React from 'react';
-import { Button, type ButtonProps } from "../ui/button";
-import { StatusBadge } from "../ui/status-badge";
-import { OpenFrameLogo } from "../icons";
-import { cn } from "../../utils";
+import { type CSSProperties, type ReactNode, forwardRef } from 'react';
+import { cn } from '../../utils';
+import { OpenFrameLogo } from '../icons';
+import { Button, type ButtonProps } from '../ui/button';
+import { StatusBadge } from '../ui/status-badge';
 
 export interface StartWithOpenFrameButtonProps extends Omit<ButtonProps, 'variant' | 'size' | 'leftIcon'> {
-  children?: React.ReactNode;
+  children?: ReactNode;
   mode?: 'outline' | 'yellow' | 'pink' | 'purple' | 'cyan';
   buttonSize?: 'sm' | 'md' | 'lg';
   loading?: boolean;
@@ -22,75 +22,88 @@ export interface StartWithOpenFrameButtonProps extends Omit<ButtonProps, 'varian
  * – Same pattern as OpenFrame Github button in hero section
  * – Cyan mode uses custom background/text colors like JoinWaitlistButton
  */
-export const StartWithOpenFrameButton = React.forwardRef<
-  HTMLButtonElement,
-  StartWithOpenFrameButtonProps
->(({ children = 'Start Free Trial', mode = 'outline', className, buttonSize, loading = false, buttonBackgroundColor, buttonTextColor, ...props }, ref) => {
-  const isYellow = mode === 'yellow';
-  const isPink = mode === 'pink' || mode === 'purple';
-  const isCyan = mode === 'cyan';
-  
-  // Map buttonSize to Button component's size prop
-  const mappedSize = buttonSize === 'md' ? 'default' : buttonSize === 'sm' ? 'small-legacy' : buttonSize === 'lg' ? 'default' : undefined;
+export const StartWithOpenFrameButton = forwardRef<HTMLButtonElement, StartWithOpenFrameButtonProps>(
+  (
+    {
+      children = 'Start Free Trial',
+      mode = 'outline',
+      className,
+      buttonSize,
+      loading = false,
+      buttonBackgroundColor,
+      buttonTextColor,
+      ...props
+    },
+    ref,
+  ) => {
+    const isYellow = mode === 'yellow';
+    const isPink = mode === 'pink' || mode === 'purple';
+    const isCyan = mode === 'cyan';
 
-  // Determine button variant and class names based on mode
-  let buttonVariant: 'accent' | 'outline' = 'outline';
-  let modeClassName = '';
-  let iconLowerPath = "var(--ods-open-yellow-base)";
-  let iconUpperPath = "var(--ods-system-greys-white)";
-  let customStyle: React.CSSProperties = {};
-  
-  if (isYellow) {
-    buttonVariant = "accent";
-    modeClassName = 'bg-ods-accent hover:bg-ods-accent-hover text-ods-text-on-accent border-ods-accent';
-    iconLowerPath = "var(--ods-system-greys-white)";
-    iconUpperPath = "var(--ods-system-greys-black)";
-  } else if (isPink) {
-    buttonVariant = "accent";
-    modeClassName = 'bg-ods-flamingo-pink hover:bg-ods-flamingo-pink-hover text-ods-text-on-accent border-ods-flamingo-pink';
-    iconLowerPath = "var(--ods-system-greys-white)";
-    iconUpperPath = "var(--ods-system-greys-black)";
-  } else if (isCyan) {
-    // Cyan mode: similar to JoinWaitlistButton with custom colors
-    buttonVariant = "accent";
-    modeClassName = 'bg-ods-flamingo-cyan hover:bg-ods-flamingo-cyan-hover text-ods-text-on-accent border-ods-flamingo-cyan';
-    // Allow override with custom colors if provided
-    if (buttonBackgroundColor || buttonTextColor) {
-      customStyle = { 
-        backgroundColor: buttonBackgroundColor, 
-        color: buttonTextColor
-      };
-    }
-    // For cyan mode with black text, use white/black icon for contrast
-    iconLowerPath = "#ffffff";
-    iconUpperPath = "#1A1A1A";
-  }
-  
-  return (
-    <Button
-      ref={ref}
-      {...props}
-      size={mappedSize}
-      variant={buttonVariant}
-      loading={loading}
-      className={cn(
-        modeClassName,
-        className
-      )}
-      style={customStyle}
-      leftIcon={!loading ? <OpenFrameLogo className="w-5 h-5"
-        lowerPathColor={iconLowerPath}
-        upperPathColor={iconUpperPath} /> : undefined}
-      rightIcon={
-        <StatusBadge
-          text="Beta"
-          variant="button"
-          colorScheme="yellow"
-        />
+    // Map buttonSize to Button component's size prop
+    const mappedSize =
+      buttonSize === 'md'
+        ? 'default'
+        : buttonSize === 'sm'
+          ? 'small-legacy'
+          : buttonSize === 'lg'
+            ? 'default'
+            : undefined;
+
+    // Determine button variant and class names based on mode
+    let buttonVariant: 'accent' | 'outline' = 'outline';
+    let modeClassName = '';
+    let iconLowerPath = 'var(--ods-open-yellow-base)';
+    let iconUpperPath = 'var(--ods-system-greys-white)';
+    let customStyle: CSSProperties = {};
+
+    if (isYellow) {
+      buttonVariant = 'accent';
+      modeClassName = 'bg-ods-accent hover:bg-ods-accent-hover text-ods-text-on-accent border-ods-accent';
+      iconLowerPath = 'var(--ods-system-greys-white)';
+      iconUpperPath = 'var(--ods-system-greys-black)';
+    } else if (isPink) {
+      buttonVariant = 'accent';
+      modeClassName =
+        'bg-ods-flamingo-pink hover:bg-ods-flamingo-pink-hover text-ods-text-on-accent border-ods-flamingo-pink';
+      iconLowerPath = 'var(--ods-system-greys-white)';
+      iconUpperPath = 'var(--ods-system-greys-black)';
+    } else if (isCyan) {
+      // Cyan mode: similar to JoinWaitlistButton with custom colors
+      buttonVariant = 'accent';
+      modeClassName =
+        'bg-ods-flamingo-cyan hover:bg-ods-flamingo-cyan-hover text-ods-text-on-accent border-ods-flamingo-cyan';
+      // Allow override with custom colors if provided
+      if (buttonBackgroundColor || buttonTextColor) {
+        customStyle = {
+          backgroundColor: buttonBackgroundColor,
+          color: buttonTextColor,
+        };
       }
-    >
-      {children}
-    </Button>
-  );
-});
-StartWithOpenFrameButton.displayName = 'StartWithOpenFrameButton'; 
+      // For cyan mode with black text, use white/black icon for contrast
+      iconLowerPath = '#ffffff';
+      iconUpperPath = '#1A1A1A';
+    }
+
+    return (
+      <Button
+        ref={ref}
+        {...props}
+        size={mappedSize}
+        variant={buttonVariant}
+        loading={loading}
+        className={cn(modeClassName, className)}
+        style={customStyle}
+        leftIcon={
+          !loading ? (
+            <OpenFrameLogo className="h-5 w-5" lowerPathColor={iconLowerPath} upperPathColor={iconUpperPath} />
+          ) : undefined
+        }
+        rightIcon={<StatusBadge text="Beta" variant="button" colorScheme="yellow" />}
+      >
+        {children}
+      </Button>
+    );
+  },
+);
+StartWithOpenFrameButton.displayName = 'StartWithOpenFrameButton';

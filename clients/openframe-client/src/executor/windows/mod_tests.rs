@@ -255,3 +255,35 @@ async fn run_as_user_sees_env_vars() {
     assert_eq!(r.retcode, 0, "stderr: {}", r.stderr);
     assert_eq!(r.stdout.trim_end(), "present", "stderr: {}", r.stderr);
 }
+
+#[tokio::test]
+#[ignore = "requires agent running as SYSTEM with an interactive local administrator"]
+async fn elevated_user_runs_as_interactive_user_with_admin_rights() {
+    let code = r#"$id = [Security.Principal.WindowsIdentity]::GetCurrent()
+Write-Output $id.Name
+Write-Output ([Security.Principal.WindowsPrincipal]$id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+"#;
+    let r = execute_script(ScriptParams {
+        code,
+        shell: "powershell",
+        args: &[],
+        timeout_secs: 30,
+        privilege: crate::executor::Privilege::ElevatedUser,
+        env_vars: &[],
+    })
+    .await;
+    assert_eq!(r.retcode, 0, "stderr: {}", r.stderr);
+
+    let lines: Vec<&str> = r.stdout.lines().map(str::trim).collect();
+    let who = lines.first().unwrap_or(&"").to_lowercase();
+    assert!(
+        !who.ends_with(r"\system") && who != r"nt authority\system",
+        "expected the interactive user, not SYSTEM; got {who:?}"
+    );
+    assert_eq!(
+        lines.get(1).copied().unwrap_or(""),
+        "True",
+        "expected an elevated token; stdout={:?}",
+        r.stdout
+    );
+}

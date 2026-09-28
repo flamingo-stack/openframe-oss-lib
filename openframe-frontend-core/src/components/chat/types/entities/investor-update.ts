@@ -8,6 +8,7 @@
  * formatter move here.
  */
 
+import { formatDateWithTimezone } from '../../../../utils/format';
 import type { ContentRef } from './content-ref';
 
 export interface MetricEntry {
@@ -89,13 +90,10 @@ export function formatInvestorUpdatePeriod(
   options?: { monthFormat?: 'short' | 'long' },
 ): string {
   if (!start && !end) return '';
+  // A reporting period is a content date: UTC-pinned through the one renderer.
+  // An unreadable date reads like a missing one ('?'), not as an empty half.
   const fmt = (d: string) =>
-    new Date(d).toLocaleDateString('en-US', {
-      month: options?.monthFormat || 'short',
-      year: 'numeric',
-      // Pin to UTC so SSR (Vercel = UTC) and the client agree (React #418).
-      timeZone: 'UTC',
-    });
+    formatDateWithTimezone(d, null, options?.monthFormat === 'long' ? 'monthYear' : 'monthYearShort') || '?';
   const s = start ? fmt(start) : '?';
   const e = end ? fmt(end) : '?';
   return `${s} - ${e}`;

@@ -1,5 +1,4 @@
-import type { UserProfile } from "./user"
-import type { EntityPlatformAssoc } from "./entity-platform"
+import type { EntityPlatformAssoc } from './entity-platform';
 
 // Core Platform Types (dynamically fetched from database via API)
 export type Platform = string;
@@ -39,12 +38,12 @@ export interface BlogPost {
   seo_keywords?: string;
   og_image_url?: string;
   view_count: number;
-  
+
   // Normalized relationships (for client-side usage)
   author?: BlogAuthor;
   categories: BlogCategory[];
   tags: BlogTag[];
-  
+
   // Raw API response structure (for database queries)
   profiles?: {
     id: number;
@@ -129,8 +128,10 @@ export interface BlogSEOAnalytics {
   meta_description_score: number;
   content_score: number;
   readability_score: number;
-  keyword_density?: any;
-  suggestions?: any;
+  /** Keyword → density percentage, as stored by the SEO analyser. */
+  keyword_density?: Record<string, number>;
+  /** Free-form improvement hints from the analyser. */
+  suggestions?: string[];
   overall_score: number;
 }
 
@@ -223,65 +224,65 @@ export interface SEOAnalysisOptions {
 }
 
 export interface BlogPostSummary {
-  id: number
-  title: string
-  slug: string
-  summary: string | null
-  featured_image: string | null
-  published_at: string | null
-  author_name: string | null
-  author_avatar: string | null
-  categories: { name: string; slug: string }[]
-  tags: { name: string; slug: string }[]
-  is_featured?: boolean
-  view_count?: number
+  id: number;
+  title: string;
+  slug: string;
+  summary: string | null;
+  featured_image: string | null;
+  published_at: string | null;
+  author_name: string | null;
+  author_avatar: string | null;
+  categories: { name: string; slug: string }[];
+  tags: { name: string; slug: string }[];
+  is_featured?: boolean;
+  view_count?: number;
 }
 
 export interface BlogPagination {
-  posts: BlogPostSummary[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-  hasFeaturedPost?: boolean
+  posts: BlogPostSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasFeaturedPost?: boolean;
 }
 
 export interface BlogSearchParams {
-  page?: number
-  pageSize?: number
-  category?: string
-  tag?: string
-  search?: string
+  page?: number;
+  pageSize?: number;
+  category?: string;
+  tag?: string;
+  search?: string;
 }
 
 // New interfaces for filtering system
 export interface BlogFilterSidebarProps {
-  categories: BlogCategory[]
-  tags: BlogTag[]
-  selectedCategories?: string[]
-  selectedTags?: string[]
-  isLoading?: boolean
+  categories: BlogCategory[];
+  tags: BlogTag[];
+  selectedCategories?: string[];
+  selectedTags?: string[];
+  isLoading?: boolean;
 }
 
 export interface BlogFilterOption {
-  key: string
-  label: string
-  count?: number
+  key: string;
+  label: string;
+  count?: number;
 }
 
 export interface BlogFilters {
-  categories: BlogFilterOption[]
-  tags: BlogFilterOption[]
+  categories: BlogFilterOption[];
+  tags: BlogFilterOption[];
 }
 
 // Transform blog categories/tags to match CategorySidebar interface
 export interface BlogCategoryType {
-  id: number
-  name: string
-  description?: string
-  subcategories?: never // Blog categories don't have subcategories
+  id: number;
+  name: string;
+  description?: string;
+  subcategories?: never; // Blog categories don't have subcategories
 }
 
 export interface BlogCategoryForSidebar extends BlogCategoryType {
-  slug?: string
+  slug?: string;
 }

@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 /**
  * `<ContactForm />` — the canonical contact form used by every public
@@ -21,17 +21,25 @@
  *     `onCustomSubmit` wired to `useTicketActions.submitTicket`.
  */
 
-import { useState, type ReactNode } from 'react'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMemo, useState, type ReactNode } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { useContactSubmission } from '../../hooks/use-contact-submission';
+import { useHumanitySignals } from '../../hooks/use-humanity-signals';
+import { useRescuedForm } from '../../hooks/use-rescued-form';
 import {
   ContactSchema,
   type ContactFormData,
   companySizeOptions,
   referralSourceOptions,
   defaultHelpCategoryOptions,
-} from '../../schemas/contact-schema'
-import { SECTION_HEADING_CLASS } from '../layout/page-heading'
+} from '../../schemas/contact-schema';
+import type { FormRescueDefinition } from '../../utils/form-rescue';
+import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
+import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
+import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
+import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown';
+import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import {
   Button,
   type ButtonProps,
@@ -43,16 +51,9 @@ import {
   SelectContent,
   SelectItem,
   Label,
-} from '../ui'
-import { useContactSubmission } from '../../hooks/use-contact-submission'
-import { useHumanitySignals } from '../../hooks/use-humanity-signals'
-import { HoneypotField } from '../ui/honeypot-field'
-import {
-  ChatAttachmentAddButton,
-  ChatAttachmentChipStrip,
-} from '../chat/chat-attachment-bar'
-import { useChatAttachments } from '../chat/hooks/use-chat-attachments'
-import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown'
+} from '../ui';
+import { HoneypotField } from '../ui/honeypot-field';
+import { RequiredMark } from '../ui/required-mark';
 
 /**
  * Fields the caller can suppress. Six values — every primary form
@@ -60,41 +61,35 @@ import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown'
  * surfaces can hide them; they still need to validate, so the caller
  * MUST supply pre-filled values via `defaultValues` when hiding them).
  */
-export type ContactFormHideableField =
-  | 'name'
-  | 'email'
-  | 'companySize'
-  | 'referralSource'
-  | 'helpCategory'
-  | 'message'
+export type ContactFormHideableField = 'name' | 'email' | 'companySize' | 'referralSource' | 'helpCategory' | 'message';
 
 export interface ContactFormProps {
   /** Host-side user id passed to `useContactSubmission` for attribution.
    *  Hub wrapper passes `useAuth().user?.id`; lib's Help Center surface
    *  passes `useChatIdentity().user?.id`. Omit for anon flows. */
-  userId?: string
+  userId?: string;
   /** Platform-specific help-category dropdown options. Hub wrapper
    *  passes `getAppConfig().contact.contactReasons`. Defaults to the
    *  lib's `defaultHelpCategoryOptions`. */
-  helpCategoryOptions?: readonly string[]
+  helpCategoryOptions?: readonly string[];
   /** Reddit click attribution id. Caller resolves from wherever they
    *  stash it (hub: sessionStorage via `getStoredRedditClickId`). When
    *  set, it's spread into the submission payload. */
-  rdtCid?: string
+  rdtCid?: string;
   /** Called after a successful submit so the caller can clear their
    *  attribution storage (hub wrapper calls `clearStoredRedditClickId`).
    *  Fires for BOTH the built-in and custom submit paths. */
-  onSubmitSuccess?: () => void
+  onSubmitSuccess?: () => void;
 
-  prefilledReason?: string
-  prefilledMessage?: string
-  hideFields?: ContactFormHideableField[]
+  prefilledReason?: string;
+  prefilledMessage?: string;
+  hideFields?: ContactFormHideableField[];
   /** Authoritative pre-fill for any field the caller hides. Merged
    *  into react-hook-form's `defaultValues` AFTER the legacy
    *  `prefilledReason` / `prefilledMessage` props (caller-supplied
    *  wins). REQUIRED when hiding `name` / `email` / `helpCategory` —
    *  those fields are still validated by Zod even when not rendered. */
-  defaultValues?: Partial<ContactFormData>
+  defaultValues?: Partial<ContactFormData>;
   /** Optional custom submit handler. When provided, the form bypasses
    *  the built-in `useContactSubmission` flow (no /api/contact call,
    *  no success-redirect, no built-in toast) — the caller owns the
@@ -106,37 +101,42 @@ export interface ContactFormProps {
    *  the user hasn't picked any). Caller forwards `attachments` to
    *  whichever sink owns the upload (e.g. `actions.submitTicket`'s
    *  `attachments` field for HubSpot Note engagements). */
-  onCustomSubmit?: (data: ContactFormData, attachments: ChatAttachment[]) => Promise<void>
+  onCustomSubmit?: (data: ContactFormData, attachments: ChatAttachment[]) => Promise<void>;
   /** Turn on the attachments bar (file `+` button + chip strip) using
    *  the same lib primitives the chat composer uses
    *  (`<ChatAttachmentAddButton>` + `<ChatAttachmentChipStrip>` +
    *  `useChatAttachments`). When `false` (the default), the form
    *  doesn't render the bar AND the attachments array passed to
    *  `onCustomSubmit` is always empty. */
-  attachmentsEnabled?: boolean
+  attachmentsEnabled?: boolean;
   /** Render slot for an EXTRA field at the very top of the form,
    *  ABOVE the name/email row. Use this for ticket surfaces that need
    *  a Subject input — the field is NOT part of `ContactSchema`, so
    *  the caller manages its own state + validation and reads the
    *  value back inside `onCustomSubmit`. */
-  extraTopField?: ReactNode
+  extraTopField?: ReactNode;
 
-  title?: string
-  subtitle?: string
-  footerText?: string
-  noBorder?: boolean
-  noPadding?: boolean
-  buttonVariant?: ButtonProps['variant']
-  buttonClassName?: string
+  title?: string;
+  subtitle?: string;
+  footerText?: string;
+  noBorder?: boolean;
+  noPadding?: boolean;
+  buttonVariant?: ButtonProps['variant'];
+  buttonClassName?: string;
   /** Submit-button label. Defaults to "Send Message". Override for
    *  ticket surfaces (e.g. "Open ticket"). */
-  submitLabel?: string
+  submitLabel?: string;
   /** Success-state submit-button label (shown briefly after submit on
    *  the built-in flow). Defaults to "Message Sent!". Has no effect
    *  when `onCustomSubmit` is provided — the caller owns success UX. */
-  submitSuccessLabel?: string
-  successRedirectUrl?: string
-  successToastMessage?: string
+  submitSuccessLabel?: string;
+  successRedirectUrl?: string;
+  successToastMessage?: string;
+  /** Form rescue (a half-filled form is saved so the team can follow up): the
+   *  form's definition (`RESCUE_FORMS.contact`, or the host's own
+   *  `defineRescueForm`). OPT-IN: omitted or `null` saves nothing, so a host that
+   *  has not chosen rescue never starts storing what visitors type. */
+  rescue?: FormRescueDefinition | null;
 }
 
 export function ContactForm({
@@ -162,13 +162,14 @@ export function ContactForm({
   submitSuccessLabel = 'Message Sent!',
   successRedirectUrl = '/blog#community',
   successToastMessage = 'Redirecting you to join our community...',
+  rescue: rescueForm = null,
 }: ContactFormProps = {}) {
   // Attachments staging — same hook the chat composer + ticket
   // detail-drawer composer use. Files upload to Supabase as soon as
   // the user picks them; `readyAttachments` is the wire-shape array
   // ready for the next submit. `hasInflightUploads` disables Send
   // until every upload settles.
-  const attachments = useChatAttachments()
+  const attachments = useChatAttachments();
   // Built-in contact-API flow. Hook is called unconditionally (rules
   // of hooks); we just don't dispatch its `submit` when the caller
   // passes `onCustomSubmit`. The hook owns its own toast + redirect
@@ -177,28 +178,22 @@ export function ContactForm({
     userId,
     successRedirectUrl,
     successToastMessage,
-  })
+  });
   // Independent in-flight tracker for the custom path — we can't reuse
   // `builtInSubmission.isSubmitting` because that hook never sees a
   // request when `onCustomSubmit` is active.
-  const [customSubmitting, setCustomSubmitting] = useState(false)
+  const [customSubmitting, setCustomSubmitting] = useState(false);
 
   // Invisible bot-protection signals (honeypot + timing). Spread into the
   // submit payload for BOTH the built-in and custom paths; reset on success.
-  const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals()
+  const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals();
 
-  const isSubmitting = onCustomSubmit ? customSubmitting : builtInSubmission.isSubmitting
+  const isSubmitting = onCustomSubmit ? customSubmitting : builtInSubmission.isSubmitting;
   // `isSuccess` only ever fires on the built-in path; custom callers
   // own their own UX (no "Message Sent!" button-label flicker).
-  const isSuccess = onCustomSubmit ? false : builtInSubmission.isSuccess
+  const isSuccess = onCustomSubmit ? false : builtInSubmission.isSuccess;
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors },
-    reset,
-  } = useForm<ContactFormData>({
+  const form = useForm<ContactFormData>({
     resolver: zodResolver(ContactSchema),
     defaultValues: {
       ...(prefilledReason && { helpCategory: prefilledReason }),
@@ -207,28 +202,47 @@ export function ContactForm({
       // (they're the authoritative seed for hidden fields).
       ...defaultValuesProp,
     },
-  })
+  });
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    reset,
+  } = form;
+
+  // Form rescue: only the fields the visitor can see are tracked, so a hidden
+  // prefilled value (a signed-in email, a fixed category) is never sent.
+  const rescueFieldNames = useMemo(
+    () =>
+      (['name', 'email', 'companySize', 'referralSource', 'helpCategory', 'message'] as const).filter(
+        field => !hideFields.includes(field),
+      ),
+    [hideFields],
+  );
+  const rescue = useRescuedForm(form, { rescue: rescueForm, fields: rescueFieldNames, getSignals });
 
   const handleFormSubmit = async (data: ContactFormData) => {
-    if (isSubmitting) return
-    if (attachmentsEnabled && attachments.hasInflightUploads) return
+    if (isSubmitting) return;
+    if (attachmentsEnabled && attachments.hasInflightUploads) return;
     try {
-      const payload = { ...data, ...(rdtCid && { rdt_cid: rdtCid }), ...getSignals() }
-      const readyAttachments = attachmentsEnabled ? attachments.readyAttachments : []
+      const payload = { ...data, ...(rdtCid && { rdt_cid: rdtCid }), ...getSignals(), ...rescue.submitFields() };
+      const readyAttachments = attachmentsEnabled ? attachments.readyAttachments : [];
       if (onCustomSubmit) {
-        setCustomSubmitting(true)
+        setCustomSubmitting(true);
         try {
-          await onCustomSubmit(payload, readyAttachments)
+          await onCustomSubmit(payload, readyAttachments);
         } finally {
-          setCustomSubmitting(false)
+          setCustomSubmitting(false);
         }
       } else {
-        await builtInSubmission.submit(payload)
+        await builtInSubmission.submit(payload);
       }
-      onSubmitSuccess?.()
-      reset()
-      resetSignals()
-      if (attachmentsEnabled) attachments.clear()
+      rescue.complete();
+      onSubmitSuccess?.();
+      reset();
+      resetSignals();
+      if (attachmentsEnabled) attachments.clear();
     } catch {
       // Error toast is owned by the active flow:
       //  - built-in: `useContactSubmission` toasts inside `submit()`.
@@ -236,51 +250,41 @@ export function ContactForm({
       // Either way we swallow here so a thrown error doesn't crash the
       // form tree (react-hook-form's onSubmit handler rejects upward).
     }
-  }
+  };
 
-  const showName = !hideFields.includes('name')
-  const showEmail = !hideFields.includes('email')
-  const showNameEmailRow = showName || showEmail
-  const showCompanySize = !hideFields.includes('companySize')
-  const showReferralSource = !hideFields.includes('referralSource')
-  const showHelpCategory = !hideFields.includes('helpCategory')
-  const showMessage = !hideFields.includes('message')
+  const showName = !hideFields.includes('name');
+  const showEmail = !hideFields.includes('email');
+  const showNameEmailRow = showName || showEmail;
+  const showCompanySize = !hideFields.includes('companySize');
+  const showReferralSource = !hideFields.includes('referralSource');
+  const showHelpCategory = !hideFields.includes('helpCategory');
+  const showMessage = !hideFields.includes('message');
 
   return (
     <div
-      className={`h-full flex flex-col ${!noBorder ? 'border border-ods-border rounded-2xl md:rounded-3xl' : ''} ${!noPadding ? 'p-6 md:p-8 lg:p-10' : ''}`}
+      className={`flex h-full flex-col ${!noBorder ? 'rounded-2xl border border-ods-border md:rounded-3xl' : ''} ${!noPadding ? 'p-6 md:p-8 lg:p-10' : ''}`}
     >
       {(title || subtitle) && (
         <div className="mb-6 md:mb-8">
-          {title && (
-            <h2 className={`${SECTION_HEADING_CLASS} mb-3 md:mb-4`}>
-              {title}
-            </h2>
-          )}
-          {subtitle && (
-            <p className="text-h4 text-ods-text-primary">
-              {subtitle}
-            </p>
-          )}
+          {title && <h2 className={`${SECTION_HEADING_CLASS} mb-3 md:mb-4`}>{title}</h2>}
+          {subtitle && <p className="text-ods-text-primary text-h4">{subtitle}</p>}
         </div>
       )}
 
       <form
-        onSubmit={handleSubmit(handleFormSubmit, (validationErrors) => {
+        onSubmit={handleSubmit(handleFormSubmit, validationErrors => {
           // When validation fails on a HIDDEN field (e.g. ticket form
           // hides name/email/helpCategory and seeds them via
           // `defaultValues`), there's no visible error UI for the user
           // — the submit button just appears dead. Log so the broken
           // defaultValues wiring is at least discoverable in DevTools.
-          // eslint-disable-next-line no-console
           console.warn(
             '[ContactForm] submit blocked by validation:',
-            Object.fromEntries(
-              Object.entries(validationErrors).map(([k, v]) => [k, v?.message ?? v]),
-            ),
-          )
+            Object.fromEntries(Object.entries(validationErrors).map(([k, v]) => [k, v?.message ?? v])),
+          );
         })}
-        className="flex flex-col flex-grow space-y-4 md:space-y-6"
+        className="flex flex-grow flex-col space-y-4 md:space-y-6"
+        {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}
       >
         {/* Hidden inputs for fields that are required by `ContactSchema`
             but suppressed from the visible UI via `hideFields`. Without
@@ -304,11 +308,12 @@ export function ContactForm({
         {extraTopField}
 
         {showNameEmailRow && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
             {showName && (
               <div className="flex flex-col">
                 <Label htmlFor="name">
-                  Your Name<span className="text-ods-accent">*</span>
+                  Your Name
+                  <RequiredMark />
                 </Label>
                 <Input
                   id="name"
@@ -316,11 +321,12 @@ export function ContactForm({
                   {...register('name')}
                   placeholder="Jane Doe"
                   aria-invalid={!!errors.name}
+                  aria-required
                   aria-describedby="name-error"
-                  className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-12"
+                  className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
                 />
                 {errors.name && (
-                  <span id="name-error" className="text-ods-error text-h6 mt-1">
+                  <span id="name-error" className="mt-1 text-ods-error text-h6">
                     {errors.name.message}
                   </span>
                 )}
@@ -329,7 +335,8 @@ export function ContactForm({
             {showEmail && (
               <div className="flex flex-col">
                 <Label htmlFor="email">
-                  Email<span className="text-ods-accent">*</span>
+                  Email
+                  <RequiredMark />
                 </Label>
                 <Input
                   id="email"
@@ -337,11 +344,12 @@ export function ContactForm({
                   {...register('email')}
                   placeholder="jane@company.com"
                   aria-invalid={!!errors.email}
+                  aria-required
                   aria-describedby="email-error"
-                  className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary px-3 h-12"
+                  className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary placeholder-ods-text-secondary"
                 />
                 {errors.email && (
-                  <span id="email-error" className="text-ods-error text-h6 mt-1">
+                  <span id="email-error" className="mt-1 text-ods-error text-h6">
                     {errors.email.message}
                   </span>
                 )}
@@ -351,7 +359,7 @@ export function ContactForm({
         )}
 
         {(showCompanySize || showReferralSource) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
             {showCompanySize && (
               <div className="flex flex-col">
                 <Label htmlFor="companySize">Company Size</Label>
@@ -359,16 +367,16 @@ export function ContactForm({
                   control={control}
                   name="companySize"
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <SelectTrigger
                         id="companySize"
                         aria-label="Company Size"
-                        className="bg-ods-card border-ods-border text-ods-text-primary h-12 px-3"
+                        className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary"
                       >
                         <SelectValue placeholder="Select company size" />
                       </SelectTrigger>
                       <SelectContent>
-                        {companySizeOptions.map((opt) => (
+                        {companySizeOptions.map(opt => (
                           <SelectItem key={opt} value={opt}>
                             {opt}
                           </SelectItem>
@@ -378,7 +386,7 @@ export function ContactForm({
                   )}
                 />
                 {errors.companySize && (
-                  <span id="companySize-error" className="text-ods-error text-h6 mt-1">
+                  <span id="companySize-error" className="mt-1 text-ods-error text-h6">
                     {errors.companySize.message}
                   </span>
                 )}
@@ -391,16 +399,16 @@ export function ContactForm({
                   control={control}
                   name="referralSource"
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <SelectTrigger
                         id="referralSource"
                         aria-label="Referral Source"
-                        className="bg-ods-card border-ods-border text-ods-text-primary h-12 px-3"
+                        className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary"
                       >
                         <SelectValue placeholder="Select an option" />
                       </SelectTrigger>
                       <SelectContent>
-                        {referralSourceOptions.map((opt) => (
+                        {referralSourceOptions.map(opt => (
                           <SelectItem key={opt} value={opt}>
                             {opt}
                           </SelectItem>
@@ -410,7 +418,7 @@ export function ContactForm({
                   )}
                 />
                 {errors.referralSource && (
-                  <span id="referralSource-error" className="text-ods-error text-h6 mt-1">
+                  <span id="referralSource-error" className="mt-1 text-ods-error text-h6">
                     {errors.referralSource.message}
                   </span>
                 )}
@@ -422,22 +430,24 @@ export function ContactForm({
         {showHelpCategory && (
           <div className="flex flex-col">
             <Label htmlFor="helpCategory">
-              Choose your main interest<span className="text-ods-accent">*</span>
+              Choose your main interest
+              <RequiredMark />
             </Label>
             <Controller
               control={control}
               name="helpCategory"
               render={({ field }) => (
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value ?? ''}>
                   <SelectTrigger
                     id="helpCategory"
                     aria-label="Help Category"
-                    className="bg-ods-card border-ods-border text-ods-text-primary h-12 px-3"
+                    aria-required
+                    className="h-12 border-ods-border bg-ods-card px-3 text-ods-text-primary"
                   >
                     <SelectValue placeholder="Choose your main interest" />
                   </SelectTrigger>
                   <SelectContent>
-                    {helpCategoryOptions.map((opt) => (
+                    {helpCategoryOptions.map(opt => (
                       <SelectItem key={opt} value={opt}>
                         {opt}
                       </SelectItem>
@@ -447,7 +457,7 @@ export function ContactForm({
               )}
             />
             {errors.helpCategory && (
-              <span id="helpCategory-error" className="text-ods-error text-h6 mt-1">
+              <span id="helpCategory-error" className="mt-1 text-ods-error text-h6">
                 {errors.helpCategory.message}
               </span>
             )}
@@ -455,20 +465,22 @@ export function ContactForm({
         )}
 
         {showMessage && (
-          <div className="flex flex-col flex-grow">
+          <div className="flex flex-grow flex-col">
             <Label htmlFor="message">
-              Your Message<span className="text-ods-accent">*</span>
+              Your Message
+              <RequiredMark />
             </Label>
             <Textarea
               id="message"
               {...register('message')}
               placeholder="Share your current challenges or questions about open-source alternatives..."
               aria-invalid={!!errors.message}
+              aria-required
               aria-describedby="message-error"
-              className="bg-ods-card border-ods-border text-ods-text-primary placeholder-ods-text-secondary h-full flex-grow"
+              className="h-full flex-grow border-ods-border bg-ods-card text-ods-text-primary placeholder-ods-text-secondary"
             />
             {errors.message && (
-              <span id="message-error" className="text-ods-error text-h6 mt-1">
+              <span id="message-error" className="mt-1 text-ods-error text-h6">
                 {errors.message.message}
               </span>
             )}
@@ -494,27 +506,17 @@ export function ContactForm({
                 onAddFiles={attachments.addFiles}
                 disabled={isSubmitting}
               />
-              <span className="text-h6 text-ods-text-secondary">
-                Attach files (optional)
-              </span>
+              <span className="text-ods-text-secondary text-h6">Attach files (optional)</span>
             </div>
           </div>
         )}
 
-        <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-center justify-end w-full pt-2 mt-auto">
-          {footerText && (
-            <p className="text-h6 text-ods-text-secondary text-center md:text-left">
-              {footerText}
-            </p>
-          )}
+        <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 md:flex-row md:gap-6">
+          {footerText && <p className="text-center text-ods-text-secondary text-h6 md:text-left">{footerText}</p>}
           <Button
             type="submit"
             loading={isSubmitting}
-            disabled={
-              isSubmitting ||
-              isSuccess ||
-              (attachmentsEnabled && attachments.hasInflightUploads)
-            }
+            disabled={isSubmitting || isSuccess || (attachmentsEnabled && attachments.hasInflightUploads)}
             variant={buttonVariant}
             className={`w-full md:w-auto ${buttonClassName}`}
           >
@@ -523,5 +525,5 @@ export function ContactForm({
         </div>
       </form>
     </div>
-  )
+  );
 }

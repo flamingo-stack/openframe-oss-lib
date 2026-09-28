@@ -9,16 +9,20 @@
  * one protocol module.
  */
 
-export * from './frames'
-export * from './events'
-export * from './encode'
-export * from './decode'
-export * from './nats-decoder'
+export * from './frames';
+export * from './events';
+export * from './encode';
+export * from './decode';
+export * from './nats-decoder';
 // The hub's confirm-tool request/error contract — shared by every transport
 // that resolves a Product Guide proposal.
-export * from './confirm-tool'
+export * from './confirm-tool';
 // Cross-repo IP bucket-key normalizer (producer app + consumer hub share it).
-export * from './ip-normalize'
+export * from './ip-normalize';
 // Cross-repo env-flag predicate — the trust assertion that gates the IP
 // forwarding above must be parsed IDENTICALLY on both sides of the seam.
-export * from './env-flag'
+export * from './env-flag';
+export { isRecord, unwrapEnvelope } from './wire-narrow';
+// The `[card://<type>:<id>]` grammar — the renderer's and the server's one
+// definition, so a reference the hub emits is one the client expands.
+export * from './card-marker';

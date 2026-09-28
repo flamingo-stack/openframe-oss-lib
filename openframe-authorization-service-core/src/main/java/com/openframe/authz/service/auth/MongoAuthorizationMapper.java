@@ -15,6 +15,12 @@ import java.util.Map;
 import java.util.Set;
 
 class MongoAuthorizationMapper {
+
+    private static final String CODE_CHALLENGE_KEY = "code_challenge";
+    private static final String CODE_CHALLENGE_METHOD_KEY = "code_challenge_method";
+    private static final String CODE_CHALLENGE_DOT_KEY = "code.challenge";
+    private static final String CODE_CHALLENGE_METHOD_DOT_KEY = "code.challenge.method";
+
     static MongoOAuth2Authorization toEntity(OAuth2Authorization auth) {
         MongoOAuth2Authorization entity = new MongoOAuth2Authorization();
         entity.setId(auth.getId());
@@ -43,7 +49,7 @@ class MongoAuthorizationMapper {
             OAuth2Authorization.Token<OAuth2AuthorizationCode> code = auth.getToken(OAuth2AuthorizationCode.class);
             if (code != null && code.getMetadata() != null) {
                 code.getMetadata().forEach((k, v) -> {
-                    if (v != null && (k.equals("code_challenge") || k.equals("code_challenge_method"))) {
+                    if (v != null && (k.equals(CODE_CHALLENGE_KEY) || k.equals(CODE_CHALLENGE_METHOD_KEY))) {
                         additional.put(k, v.toString());
                     }
                 });
@@ -86,6 +92,65 @@ class MongoAuthorizationMapper {
         return entity;
     }
 
+    private static void restorePkceAttributes(MongoOAuth2Authorization e, Map<String, Object> attrs) {
+        if (e.getArAdditional() != null) {
+            String cc = e.getArAdditional().get(CODE_CHALLENGE_KEY);
+            if (cc != null) attrs.put(CODE_CHALLENGE_KEY, cc);
+            String ccm = e.getArAdditional().get(CODE_CHALLENGE_METHOD_KEY);
+            if (ccm != null) attrs.put(CODE_CHALLENGE_METHOD_KEY, ccm);
+        }
+    }
+
+    private static Map<String, Object> buildAuthorizationRequestAdditionalParams(MongoOAuth2Authorization e) {
+        Map<String, Object> params = new HashMap<>();
+        // Start with whatever was stored (may contain dot-restored keys)
+        if (e.getArAdditional() != null) {
+            e.getArAdditional().forEach((k, v) -> params.put(k, String.valueOf(v)));
+        }
+
+        // Normalize PKCE from metadata (underscore source)
+        if (e.getAuthorizationCodeMetadata() != null) {
+            Object ccMeta = e.getAuthorizationCodeMetadata().get(CODE_CHALLENGE_KEY);
+            if (ccMeta != null) params.put(CODE_CHALLENGE_KEY, String.valueOf(ccMeta));
+            Object ccmMeta = e.getAuthorizationCodeMetadata().get(CODE_CHALLENGE_METHOD_KEY);
+            if (ccmMeta != null) params.put(CODE_CHALLENGE_METHOD_KEY, String.valueOf(ccmMeta));
+        }
+
+        // Normalize PKCE from arAdditional (handle both forms due to dot replacement reversal)
+        if (e.getArAdditional() != null) {
+            String cc = e.getArAdditional().get(CODE_CHALLENGE_KEY);
+            if (cc == null) cc = e.getArAdditional().get(CODE_CHALLENGE_DOT_KEY);
+            if (cc != null) {
+                params.put(CODE_CHALLENGE_KEY, cc);
+                params.put(CODE_CHALLENGE_DOT_KEY, cc);
+            }
+            String ccm = e.getArAdditional().get(CODE_CHALLENGE_METHOD_KEY);
+            if (ccm == null) ccm = e.getArAdditional().get(CODE_CHALLENGE_METHOD_DOT_KEY);
+            if (ccm != null) {
+                params.put(CODE_CHALLENGE_METHOD_KEY, ccm);
+                params.put(CODE_CHALLENGE_METHOD_DOT_KEY, ccm);
+            }
+        }
+
+        return params;
+    }
+
+    private static void rebuildAuthorizationRequest(MongoOAuth2Authorization e, Map<String, Object> attrs) {
+        if (e.getArClientId() == null) {
+            return;
+        }
+        OAuth2AuthorizationRequest.Builder reqBuilder = OAuth2AuthorizationRequest.authorizationCode()
+                .clientId(e.getArClientId());
+        if (e.getArAuthorizationUri() != null) reqBuilder.authorizationUri(e.getArAuthorizationUri());
+        if (e.getArRedirectUri() != null) reqBuilder.redirectUri(e.getArRedirectUri());
+        if (e.getArScopes() != null) reqBuilder.scopes(Set.of(e.getArScopes().split(" ")));
+        if (e.getArState() != null) reqBuilder.state(e.getArState());
+        if (e.getArAdditional() != null || e.getAuthorizationCodeMetadata() != null) {
+            reqBuilder.additionalParameters(buildAuthorizationRequestAdditionalParams(e));
+        }
+        attrs.put(OAuth2AuthorizationRequest.class.getName(), reqBuilder.build());
+    }
+
     static OAuth2Authorization toDomain(MongoOAuth2Authorization e, RegisteredClientRepository clients) {
         OAuth2Authorization.Builder b = OAuth2Authorization.withRegisteredClient(
                         clients.findById(e.getRegisteredClientId()))
@@ -98,55 +163,9 @@ class MongoAuthorizationMapper {
                     Authentication principal = new UsernamePasswordAuthenticationToken(e.getPrincipalName(), "N/A", java.util.Collections.emptyList());
                     attrs.put(java.security.Principal.class.getName(), principal);
                     // Ensure PKCE is also available directly on authorization attributes (underscore keys)
-                    if (e.getArAdditional() != null) {
-                        String cc = e.getArAdditional().get("code_challenge");
-                        if (cc != null) attrs.put("code_challenge", cc);
-                        String ccm = e.getArAdditional().get("code_challenge_method");
-                        if (ccm != null) attrs.put("code_challenge_method", ccm);
-                    }
+                    restorePkceAttributes(e, attrs);
                     // Rebuild OAuth2AuthorizationRequest if snapshot present
-                    if (e.getArClientId() != null) {
-                        OAuth2AuthorizationRequest.Builder reqBuilder = OAuth2AuthorizationRequest.authorizationCode()
-                                .clientId(e.getArClientId());
-                        if (e.getArAuthorizationUri() != null) reqBuilder.authorizationUri(e.getArAuthorizationUri());
-                        if (e.getArRedirectUri() != null) reqBuilder.redirectUri(e.getArRedirectUri());
-                        if (e.getArScopes() != null) reqBuilder.scopes(Set.of(e.getArScopes().split(" ")));
-                        if (e.getArState() != null) reqBuilder.state(e.getArState());
-                        if (e.getArAdditional() != null || e.getAuthorizationCodeMetadata() != null) {
-                            java.util.Map<String, Object> params = new java.util.HashMap<>();
-                            // Start with whatever was stored (may contain dot-restored keys)
-                            if (e.getArAdditional() != null) {
-                                e.getArAdditional().forEach((k, v) -> params.put(k, String.valueOf(v)));
-                            }
-
-                            // Normalize PKCE from metadata (underscore source)
-                            if (e.getAuthorizationCodeMetadata() != null) {
-                                Object ccMeta = e.getAuthorizationCodeMetadata().get("code_challenge");
-                                if (ccMeta != null) params.put("code_challenge", String.valueOf(ccMeta));
-                                Object ccmMeta = e.getAuthorizationCodeMetadata().get("code_challenge_method");
-                                if (ccmMeta != null) params.put("code_challenge_method", String.valueOf(ccmMeta));
-                            }
-
-                            // Normalize PKCE from arAdditional (handle both forms due to dot replacement reversal)
-                            if (e.getArAdditional() != null) {
-                                String cc = e.getArAdditional().get("code_challenge");
-                                if (cc == null) cc = e.getArAdditional().get("code.challenge");
-                                if (cc != null) {
-                                    params.put("code_challenge", cc);
-                                    params.put("code.challenge", cc);
-                                }
-                                String ccm = e.getArAdditional().get("code_challenge_method");
-                                if (ccm == null) ccm = e.getArAdditional().get("code.challenge.method");
-                                if (ccm != null) {
-                                    params.put("code_challenge_method", ccm);
-                                    params.put("code.challenge.method", ccm);
-                                }
-                            }
-
-                            reqBuilder.additionalParameters(params);
-                        }
-                        attrs.put(OAuth2AuthorizationRequest.class.getName(), reqBuilder.build());
-                    }
+                    rebuildAuthorizationRequest(e, attrs);
                 });
 
         if (e.getAuthorizationCodeValue() != null) {
@@ -162,13 +181,13 @@ class MongoAuthorizationMapper {
                 codeMeta.putAll(e.getAuthorizationCodeMetadata());
             }
             if (e.getArAdditional() != null) {
-                String cc = e.getArAdditional().get("code_challenge");
+                String cc = e.getArAdditional().get(CODE_CHALLENGE_KEY);
                 if (cc != null) {
-                    codeMeta.put("code_challenge", cc);
+                    codeMeta.put(CODE_CHALLENGE_KEY, cc);
                 }
-                String ccm = e.getArAdditional().get("code_challenge_method");
+                String ccm = e.getArAdditional().get(CODE_CHALLENGE_METHOD_KEY);
                 if (ccm != null) {
-                    codeMeta.put("code_challenge_method", ccm);
+                    codeMeta.put(CODE_CHALLENGE_METHOD_KEY, ccm);
                 }
             }
 

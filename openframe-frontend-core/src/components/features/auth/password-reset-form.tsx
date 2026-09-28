@@ -1,41 +1,41 @@
-'use client'
+'use client';
 
-import type * as React from 'react'
-import { cn } from '../../../utils/cn'
-import { useDeferredError } from '../../../hooks/ui/use-deferred-error'
-import { Button } from '../../ui/button'
-import { Input } from '../../ui/input'
-import { BackToLoginLink } from './back-to-login-link'
+import type { KeyboardEvent } from 'react';
+import { useDeferredError } from '../../../hooks/ui/use-deferred-error';
+import { cn } from '../../../utils/cn';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { BackToLoginLink } from './back-to-login-link';
 
 export interface PasswordResetFormProps {
   /** Controlled field values */
-  password: string
-  confirmPassword: string
-  onPasswordChange: (value: string) => void
-  onConfirmPasswordChange: (value: string) => void
+  password: string;
+  confirmPassword: string;
+  onPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
   /** Primary submit ("Reset Password") */
-  onSubmit: () => void
+  onSubmit: () => void;
   /** Secondary action ("Cancel") */
-  onCancel: () => void
+  onCancel: () => void;
   /** In-card "Back to Login" shown on tablet/mobile; desktop uses the shell footer. */
-  onBackToLogin?: () => void
+  onBackToLogin?: () => void;
   /** Disables just the primary submit (fields stay editable). */
-  submitDisabled?: boolean
-  loading?: boolean
-  disabled?: boolean
+  submitDisabled?: boolean;
+  loading?: boolean;
+  disabled?: boolean;
   errors?: {
-    password?: string
-    confirmPassword?: string
-  }
-  title?: string
-  subtitle?: string
-  newPasswordLabel?: string
-  confirmPasswordLabel?: string
-  newPasswordPlaceholder?: string
-  confirmPasswordPlaceholder?: string
-  submitLabel?: string
-  cancelLabel?: string
-  className?: string
+    password?: string;
+    confirmPassword?: string;
+  };
+  title?: string;
+  subtitle?: string;
+  newPasswordLabel?: string;
+  confirmPasswordLabel?: string;
+  newPasswordPlaceholder?: string;
+  confirmPasswordPlaceholder?: string;
+  submitLabel?: string;
+  cancelLabel?: string;
+  className?: string;
 }
 
 /**
@@ -65,17 +65,17 @@ export function PasswordResetForm({
   cancelLabel = 'Cancel',
   className,
 }: PasswordResetFormProps) {
-  const fieldsDisabled = disabled || loading
+  const fieldsDisabled = disabled || loading;
 
   // Validation messages are deferred while the user is typing (shown on blur or after a pause).
-  const passwordErr = useDeferredError(errors?.password, password)
-  const confirmErr = useDeferredError(errors?.confirmPassword, confirmPassword)
+  const passwordErr = useDeferredError(errors?.password, password);
+  const confirmErr = useDeferredError(errors?.confirmPassword, confirmPassword);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !fieldsDisabled && !submitDisabled) {
-      onSubmit()
+      onSubmit();
     }
-  }
+  };
 
   return (
     <div
@@ -86,8 +86,8 @@ export function PasswordResetForm({
     >
       {/* Header */}
       <div className="flex flex-col">
-        <h1 className="text-h2 text-ods-text-primary tracking-[-0.64px]">{title}</h1>
-        <p className="text-h4 text-ods-text-secondary">{subtitle}</p>
+        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
+        <p className="text-ods-text-secondary text-h4">{subtitle}</p>
       </div>
 
       {/* New password */}
@@ -99,7 +99,7 @@ export function PasswordResetForm({
         error={passwordErr.error}
         disabled={fieldsDisabled}
         onBlur={passwordErr.onBlur}
-        onChange={(event) => onPasswordChange(event.target.value)}
+        onChange={event => onPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
@@ -112,7 +112,7 @@ export function PasswordResetForm({
         error={confirmErr.error}
         disabled={fieldsDisabled}
         onBlur={confirmErr.onBlur}
-        onChange={(event) => onConfirmPasswordChange(event.target.value)}
+        onChange={event => onConfirmPasswordChange(event.target.value)}
         onKeyDown={handleKeyDown}
       />
 
@@ -144,5 +144,5 @@ export function PasswordResetForm({
       {/* Back to Login — in-card on tablet/mobile; desktop shows it in the shell footer */}
       {onBackToLogin && <BackToLoginLink onClick={onBackToLogin} className="self-start lg:hidden" />}
     </div>
-  )
+  );
 }

@@ -9,5 +9,5 @@ public enum TenantOnboardingStep {
     MSP_SETUP,
     CUSTOMERS_SETUP,
     DEVICE_MANAGEMENT,
-    COMPANY_TEAM
+    MEET_MINGO
 }

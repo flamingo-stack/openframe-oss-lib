@@ -1,18 +1,20 @@
-"use client"
+'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect'
-import { useLocalStorage } from '../../hooks/ui/use-local-storage'
-import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query'
-import { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation'
-import { cn } from '../../utils'
-import { NavigationSidebarHeader } from './navigation-sidebar-header'
-import { NavigationSidebarItemButton, NavigationSidebarItemSkeleton } from './navigation-sidebar-item'
-import { NavigationSidebarToggle } from './navigation-sidebar-toggle'
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { MouseEvent } from 'react';
+import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
+import { useLocalStorage } from '../../hooks/ui/use-local-storage';
+import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query';
+import type { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation';
+import { cn } from '../../utils';
+import { NavigationSidebarHeader } from './navigation-sidebar-header';
+import { NavigationSidebarItemButton, NavigationSidebarItemSkeleton } from './navigation-sidebar-item';
+import { NavigationSidebarToggle } from './navigation-sidebar-toggle';
 
-const MINIMIZED_WIDTH = 56 // 3.5rem = 56px
-const EXPANDED_WIDTH = 224 // 14rem = 224px
-const STORAGE_KEY = 'of.navigationSidebar.minimized'
+const MINIMIZED_WIDTH = 56; // 3.5rem = 56px
+const EXPANDED_WIDTH = 224; // 14rem = 224px
+const STORAGE_KEY = 'of.navigationSidebar.minimized';
 
 /**
  * The desktop width, as a custom property on `:root`. Read by the `lg:` rule in
@@ -31,7 +33,7 @@ const STORAGE_KEY = 'of.navigationSidebar.minimized'
  * in the class below paints the expanded width until this component's effect
  * catches up, which is the flash the seed exists to remove.
  */
-export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width'
+export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width';
 
 /**
  * The rail as a query container, so the parts of the sidebar that follow its
@@ -55,7 +57,7 @@ export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width'
  * rather than interpolated from a constant: Tailwind scans source text, and a
  * class it cannot see spelled out is a class it never generates.
  */
-const SIDEBAR_CONTAINER = '@container/of-nav-sidebar'
+const SIDEBAR_CONTAINER = '@container/of-nav-sidebar';
 
 /**
  * Where the sidebar sits and how wide it is, per breakpoint — as literal classes,
@@ -92,7 +94,7 @@ const SIDEBAR_GEOMETRY_CLASSES = [
   // fallback IS the default, so the property needs no global declaration and an
   // unseeded consumer gets the full sidebar rather than a rail with no labels.
   'lg:relative lg:inset-auto lg:z-auto lg:h-full lg:w-[var(--of-navigation-sidebar-width,14rem)]',
-].join(' ')
+].join(' ');
 
 /**
  * The tablet width, as ONE `md:` class rather than a rail plus an override.
@@ -108,41 +110,44 @@ const SIDEBAR_GEOMETRY_CLASSES = [
  * `lg:` still governs desktop either way: it is emitted after `md:`, so an
  * overlay left open while the window widens does not leak into the desktop width.
  */
-const SIDEBAR_TABLET_WIDTH = { rail: 'md:w-14', overlay: 'md:w-56' } as const
+const SIDEBAR_TABLET_WIDTH = { rail: 'md:w-14', overlay: 'md:w-56' } as const;
 
 /** A click the browser will resolve itself — new tab, new window, middle button. */
-const isModifiedClick = (event?: React.MouseEvent): boolean =>
-  !!event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)
+const isModifiedClick = (event?: MouseEvent): boolean =>
+  !!event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0);
 
 export interface NavigationSidebarProps {
-  config: NavigationSidebarConfig
+  config: NavigationSidebarConfig;
   /**
    * When true, all navigation items are disabled and visually dimmed.
    * The collapse/expand toggle button remains interactive.
    */
-  disabled?: boolean
+  disabled?: boolean;
 }
 
 export function NavigationSidebar({ config, disabled = false }: NavigationSidebarProps) {
-  const isMdUp = useMdUp() ?? false
-  const isLgUp = useLgUp() ?? false
+  const isMdUp = useMdUp() ?? false;
+  const isLgUp = useLgUp() ?? false;
 
   // Tablet = md viewport but not lg. On tablet the sidebar floats over the
   // content area (overlay) instead of pushing it like on desktop.
-  const isTablet = isMdUp && !isLgUp
+  const isTablet = isMdUp && !isLgUp;
 
   // Desktop preference persists across sessions. Tablet state is in-memory
   // only so entering tablet always starts minimized without clobbering the
   // user's desktop choice.
-  const [desktopMinimized, setDesktopMinimized] = useLocalStorage<boolean>(
-    STORAGE_KEY,
-    config.minimized ?? false,
-  )
-  const [tabletMinimized, setTabletMinimized] = useState(true)
+  const [desktopMinimized, setDesktopMinimized] = useLocalStorage<boolean>(STORAGE_KEY, config.minimized ?? false);
+  const [tabletMinimized, setTabletMinimized] = useState(true);
 
-  useEffect(() => {
-    if (isTablet) setTabletMinimized(true)
-  }, [isTablet])
+  // Entering tablet always starts minimized. Adjusted while rendering — React's
+  // documented pattern for a reset driven by a value the render already has —
+  // rather than from an effect, which committed the crossover frame with the
+  // sidebar still expanded over the content and collapsed it on the pass after.
+  const [tabletFor, setTabletFor] = useState(isTablet);
+  if (tabletFor !== isTablet) {
+    setTabletFor(isTablet);
+    if (isTablet) setTabletMinimized(true);
+  }
 
   // `useLocalStorage` reads the store SYNCHRONOUSLY in its initializer, so on the
   // hydration render it already knows a preference the server could not. Anything
@@ -156,40 +161,39 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // every label is a `flex-1` in a rail with no room to give — zero-wide whatever
   // this says. What flips on the next commit is opacity and margin on boxes that
   // were never visible.
-  const [hydrated, setHydrated] = useState(false)
-  useEffect(() => setHydrated(true), [])
+  const hydrated = useIsHydrated();
 
-  const minimized = hydrated ? (isTablet ? tabletMinimized : desktopMinimized) : (config.minimized ?? false)
+  const minimized = hydrated ? (isTablet ? tabletMinimized : desktopMinimized) : (config.minimized ?? false);
 
   // Enable transitions only after the correct width is painted
-  const [transitionsEnabled, setTransitionsEnabled] = useState(false)
+  const [transitionsEnabled, setTransitionsEnabled] = useState(false);
 
-  const isOverlayOpen = isTablet && !minimized
+  const isOverlayOpen = isTablet && !minimized;
 
-  const showLabel = !minimized
+  const showLabel = !minimized;
 
   const handleToggle = useCallback(() => {
     if (isTablet) {
-      setTabletMinimized(prev => !prev)
+      setTabletMinimized(prev => !prev);
     } else {
-      setDesktopMinimized(prev => !prev)
+      setDesktopMinimized(prev => !prev);
     }
-    config.onToggleMinimized?.()
-  }, [isTablet, setDesktopMinimized, config])
+    config.onToggleMinimized?.();
+  }, [isTablet, setDesktopMinimized, config]);
 
   const closeOverlay = useCallback(() => {
-    setTabletMinimized(true)
-  }, [])
+    setTabletMinimized(true);
+  }, []);
 
   // Dismiss the tablet overlay with Escape so it behaves like a transient panel
   useEffect(() => {
-    if (!isOverlayOpen) return
+    if (!isOverlayOpen) return undefined;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeOverlay()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOverlayOpen, closeOverlay])
+      if (e.key === 'Escape') closeOverlay();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOverlayOpen, closeOverlay]);
 
   // The entry the user just clicked, held until the route commits.
   //
@@ -201,63 +205,71 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // about where you are. Folding pending into active would light the accent on
   // a section still loading and announce it as the current page to a screen
   // reader — a statement that is simply false until the router says otherwise.
-  const [pendingItemId, setPendingItemId] = useState<string | null>(null)
-  const committedActiveId = useMemo(
-    () => config.items.find(item => item.isActive)?.id ?? null,
-    [config.items],
-  )
+  const [pendingItemId, setPendingItemId] = useState<string | null>(null);
+  const committedActiveId = useMemo(() => config.items.find(item => item.isActive)?.id ?? null, [config.items]);
 
   // Any committed change clears it — including one that landed somewhere else
   // entirely (a redirect, a link elsewhere on the page). A navigation that never
   // commits leaves a faint hold on the row it started from; because pending is
   // only ever a soft hint, that costs nothing but a stale hover-weight tint,
   // where a stale ACTIVE state would have been a lie about the current page.
-  useEffect(() => {
-    setPendingItemId(null)
-  }, [committedActiveId])
+  // Adjusted while rendering, not from an effect: the commit that lights the
+  // NEW row active is exactly the one that must stop hinting at the old one, and
+  // an effect left both marked for a frame.
+  const [pendingClearedFor, setPendingClearedFor] = useState(committedActiveId);
+  if (pendingClearedFor !== committedActiveId) {
+    setPendingClearedFor(committedActiveId);
+    setPendingItemId(null);
+  }
 
-  const handleItemClick = useCallback((item: NavigationSidebarItem, event?: React.MouseEvent) => {
-    event?.stopPropagation()
+  const handleItemClick = useCallback(
+    (item: NavigationSidebarItem, event?: MouseEvent) => {
+      event?.stopPropagation();
 
-    if (item.onClick) {
-      item.onClick()
-      if (isTablet) setTabletMinimized(true)
-      return
-    }
+      if (item.onClick) {
+        item.onClick();
+        if (isTablet) setTabletMinimized(true);
+        return;
+      }
 
-    if (!item.path) return
+      if (!item.path) return;
 
-    // ⌘/Ctrl/Shift-click and middle-click open the link somewhere else. THIS
-    // window is not going anywhere, so the browser is left to it: no
-    // preventDefault, no optimistic highlight, no closing the tablet overlay.
-    // Entries render as real anchors precisely so those gestures work at all.
-    if (isModifiedClick(event)) return
+      // ⌘/Ctrl/Shift-click and middle-click open the link somewhere else. THIS
+      // window is not going anywhere, so the browser is left to it: no
+      // preventDefault, no optimistic highlight, no closing the tablet overlay.
+      // Entries render as real anchors precisely so those gestures work at all.
+      if (isModifiedClick(event)) return;
 
-    // A plain click stays the host's to perform, through `onNavigate` exactly
-    // as before — the anchor is here for the href (Next prefetches links in the
-    // viewport) and for the browser affordances, not to take over routing.
-    //
-    // `onNavigate` is optional, though, and with no host router there is nothing
-    // to hand the click to: swallowing it would leave a real anchor, with a real
-    // href, that does nothing at all. So the guard is on having somewhere to
-    // send it — otherwise the anchor navigates on its own and we only close the
-    // overlay behind it.
-    if (config.onNavigate) {
-      event?.preventDefault()
-      // Re-clicking the page you are already on starts no navigation, so there
-      // is nothing to mark — and nothing would ever clear it, since the
-      // committed active id is not about to change.
-      if (item.id !== committedActiveId) setPendingItemId(item.id)
-      config.onNavigate(item.path)
-    }
+      // A plain click stays the host's to perform, through `onNavigate` exactly
+      // as before — the anchor is here for the href (Next prefetches links in the
+      // viewport) and for the browser affordances, not to take over routing.
+      //
+      // `onNavigate` is optional, though, and with no host router there is nothing
+      // to hand the click to: swallowing it would leave a real anchor, with a real
+      // href, that does nothing at all. So the guard is on having somewhere to
+      // send it — otherwise the anchor navigates on its own and we only close the
+      // overlay behind it.
+      if (config.onNavigate) {
+        event?.preventDefault();
+        // Re-clicking the page you are already on starts no navigation, so there
+        // is nothing to mark — and nothing would ever clear it, since the
+        // committed active id is not about to change.
+        if (item.id !== committedActiveId) setPendingItemId(item.id);
+        config.onNavigate(item.path);
+      }
 
-    if (isTablet) setTabletMinimized(true)
-  }, [config, isTablet, committedActiveId])
+      if (isTablet) setTabletMinimized(true);
+    },
+    [config, isTablet, committedActiveId],
+  );
 
-  const { primaryItems, secondaryItems } = useMemo(() => ({
-    primaryItems: config.items.filter(item => item.section !== 'secondary'),
-    secondaryItems: config.items.filter(item => item.section === 'secondary'),
-  }), [config.items])
+  const { primaryItems, secondaryItems } = useMemo(
+    () => ({
+      primaryItems: config.items.filter(item => item.section !== 'secondary'),
+      secondaryItems: config.items.filter(item => item.section === 'secondary'),
+    }),
+    [config.items],
+  );
 
   // Placeholder rows while the host cannot know its entries yet — see
   // `NavigationSidebarConfig.loading`. Only the ROWS are stood in for: the header,
@@ -265,19 +277,16 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // when loaded, so this is the loaded rail with unknown contents rather than a
   // separate skeleton sidebar to keep in sync.
   const loadingRows = useMemo(() => {
-    if (!config.loading) return null
-    const primary = config.loadingRows?.primary ?? 7
-    const secondary = config.loadingRows?.secondary ?? 2
+    if (!config.loading) return null;
+    const primary = config.loadingRows?.primary ?? 7;
+    const secondary = config.loadingRows?.secondary ?? 2;
     return {
       primary: Array.from({ length: Math.max(0, primary) }, (_, i) => `primary-${i}`),
       secondary: Array.from({ length: Math.max(0, secondary) }, (_, i) => `secondary-${i}`),
-    }
-  }, [config.loading, config.loadingRows?.primary, config.loadingRows?.secondary])
+    };
+  }, [config.loading, config.loadingRows?.primary, config.loadingRows?.secondary]);
 
-  const sidebarWidth = useMemo(
-    () => (minimized ? `${MINIMIZED_WIDTH}px` : `${EXPANDED_WIDTH}px`),
-    [minimized],
-  )
+  const sidebarWidth = useMemo(() => (minimized ? `${MINIMIZED_WIDTH}px` : `${EXPANDED_WIDTH}px`), [minimized]);
 
   // Published to CSS from an EFFECT, never from render. Before hydration the
   // width belongs to whatever seeded `NAVIGATION_SIDEBAR_WIDTH_VAR` in `<head>`
@@ -285,8 +294,8 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // which is precisely what cannot agree across the server boundary. Afterwards
   // this is what a toggle moves.
   useIsomorphicLayoutEffect(() => {
-    document.documentElement.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth)
-  }, [sidebarWidth])
+    document.documentElement.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth);
+  }, [sidebarWidth]);
 
   // There used to be an `isHydrated` gate here — `isMdUp !== undefined && ...`
   // — meant to hold the sidebar's contents back until the media queries
@@ -296,23 +305,22 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
   // rendered today, and gating them behind a client-only media query would
   // trade a first paint of the real navigation for an empty rail.
   useIsomorphicLayoutEffect(() => {
-    if (!transitionsEnabled) {
-      const id = requestAnimationFrame(() => {
-        setTransitionsEnabled(true)
-      })
-      return () => cancelAnimationFrame(id)
-    }
-  }, [transitionsEnabled])
+    if (transitionsEnabled) return undefined;
+    const id = requestAnimationFrame(() => {
+      setTransitionsEnabled(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [transitionsEnabled]);
 
   return (
     <>
       {/* Backdrop scrim — only visible on tablet while the overlay is open */}
       <div
         className={cn(
-          "fixed inset-0 z-[40] bg-ods-overlay",
-          "hidden md:block lg:hidden",
-          "transition-opacity duration-300",
-          isOverlayOpen ? "opacity-100" : "opacity-0 pointer-events-none",
+          'fixed inset-0 z-[40] bg-ods-overlay',
+          'hidden md:block lg:hidden',
+          'transition-opacity duration-300',
+          isOverlayOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         onClick={closeOverlay}
         aria-hidden="true"
@@ -324,26 +332,26 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
           geometry is: gated on `isTablet`, it was missing from the server HTML
           and from the first client paint — exactly when the sidebar it
           compensates for has already gone `absolute`. */}
-      <div className="h-full hidden md:block lg:hidden w-14 flex-shrink-0" aria-hidden="true" />
+      <div className="hidden h-full w-14 flex-shrink-0 md:block lg:hidden" aria-hidden="true" />
 
       <aside
         className={cn(
           SIDEBAR_CONTAINER,
-          "flex-col hidden md:flex flex-shrink-0",
-          "bg-ods-card border-r border-ods-border",
+          'hidden flex-shrink-0 flex-col md:flex',
+          'border-r border-ods-border bg-ods-card',
           SIDEBAR_GEOMETRY_CLASSES,
           // The one width a viewport cannot imply: an overlay the user opened on
           // tablet. Only ever true after a click, so the first paint always gets
           // the rail.
           isOverlayOpen ? SIDEBAR_TABLET_WIDTH.overlay : SIDEBAR_TABLET_WIDTH.rail,
-          transitionsEnabled && "transition-[width] duration-300",
+          transitionsEnabled && 'transition-[width] duration-300',
           config.className,
         )}
         aria-label="Main navigation sidebar"
       >
         <NavigationSidebarHeader minimized={minimized} />
 
-        <div className="flex-1 flex flex-col justify-between py-4 overflow-y-auto">
+        <div className="flex flex-1 flex-col justify-between overflow-y-auto py-4">
           {/* The top slot and the primary nav are ONE `justify-between` child.
               As siblings they would be three, and the spare space would open
               between the slot and the nav instead of between the two navs. */}
@@ -354,9 +362,7 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
                 and each placeholder row is already `aria-hidden`. */}
             <nav className="flex flex-col" aria-label="Primary navigation" aria-busy={!!loadingRows}>
               {loadingRows
-                ? loadingRows.primary.map(key => (
-                    <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
-                  ))
+                ? loadingRows.primary.map(key => <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />)
                 : primaryItems.map(item => (
                     <NavigationSidebarItemButton
                       key={item.id}
@@ -374,9 +380,7 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
           {(loadingRows ? loadingRows.secondary.length > 0 : secondaryItems.length > 0) && (
             <nav className="flex flex-col" aria-label="Secondary navigation" aria-busy={!!loadingRows}>
               {loadingRows
-                ? loadingRows.secondary.map(key => (
-                    <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
-                  ))
+                ? loadingRows.secondary.map(key => <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />)
                 : secondaryItems.map(item => (
                     <NavigationSidebarItemButton
                       key={item.id}
@@ -392,12 +396,8 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
           )}
         </div>
 
-        <NavigationSidebarToggle
-          minimized={minimized}
-          showLabel={showLabel}
-          onToggle={handleToggle}
-        />
+        <NavigationSidebarToggle minimized={minimized} showLabel={showLabel} onToggle={handleToggle} />
       </aside>
     </>
-  )
+  );
 }

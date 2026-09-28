@@ -1,9 +1,9 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState, type ReactNode } from 'react'
-import { Button } from '../components/ui/button'
-import { StatusBadge } from '../components/ui/status-badge'
-import { MobileNavPanel } from '../components/navigation/mobile-nav-panel'
-import type { MobileNavConfig } from '../types/navigation'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState, type ReactNode } from 'react';
+import { MobileNavPanel } from '../components/navigation/mobile-nav-panel';
+import { Button } from '../components/ui/button';
+import { StatusBadge } from '../components/ui/status-badge';
+import type { MobileNavConfig } from '../types/navigation';
 
 const meta: Meta<typeof MobileNavPanel> = {
   title: 'Navigation/MobileNavPanel',
@@ -11,10 +11,10 @@ const meta: Meta<typeof MobileNavPanel> = {
   parameters: {
     layout: 'fullscreen',
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 const baseSections: MobileNavConfig['sections'] = [
   {
@@ -32,16 +32,10 @@ const baseSections: MobileNavConfig['sections'] = [
       { id: 'podcasts', label: 'Podcasts', href: '#' },
     ],
   },
-]
+];
 
-function PanelHarness({
-  config,
-  children,
-}: {
-  config: Omit<MobileNavConfig, 'onClose'>
-  children?: ReactNode
-}) {
-  const [open, setOpen] = useState(true)
+function PanelHarness({ config, children }: { config: Omit<MobileNavConfig, 'onClose'>; children?: ReactNode }) {
+  const [open, setOpen] = useState(true);
 
   return (
     <div className="min-h-screen bg-ods-bg p-4">
@@ -49,12 +43,9 @@ function PanelHarness({
         Open menu
       </Button>
       {children}
-      <MobileNavPanel
-        isOpen={open}
-        config={{ ...config, onClose: () => setOpen(false) }}
-      />
+      <MobileNavPanel isOpen={open} config={{ ...config, onClose: () => setOpen(false) }} />
     </div>
-  )
+  );
 }
 
 /** Default chrome (openmsp-style): bg-ods-card + border, auth footer. */
@@ -71,9 +62,9 @@ export const Default: Story = {
           ),
         }}
       />
-    )
+    );
   },
-}
+};
 
 /** Flamingo-style custom chrome via config.className (mobileNavClassName knob). */
 export const CustomChrome: Story = {
@@ -85,9 +76,9 @@ export const CustomChrome: Story = {
           className: 'bg-ods-bg border border-ods-border',
         }}
       />
-    )
+    );
   },
-}
+};
 
 /** TMCG-style disabled auth footer with a status badge. */
 export const DisabledFooter: Story = {
@@ -98,7 +89,7 @@ export const DisabledFooter: Story = {
           sections: baseSections,
           footer: (
             <Button className="w-full cursor-not-allowed opacity-75" variant="outline" disabled>
-              <span className="flex items-center justify-center gap-2 w-full">
+              <span className="flex w-full items-center justify-center gap-2">
                 Member Login
                 <StatusBadge text="Coming Soon" variant="button" colorScheme="cyan" />
               </span>
@@ -106,9 +97,9 @@ export const DisabledFooter: Story = {
           ),
         }}
       />
-    )
+    );
   },
-}
+};
 
 /**
  * Regression story for the reported bug shape: a SHORT visible viewport with
@@ -127,7 +118,7 @@ export const ShortViewportLongList: Story = {
           href: '#',
         })),
       },
-    ]
+    ];
 
     return (
       <PanelHarness
@@ -141,10 +132,9 @@ export const ShortViewportLongList: Story = {
         }}
       >
         <p className="mt-4 text-sm text-ods-text-secondary">
-          Resize the viewport short (~660px): the footer stays pinned and the
-          list scrolls to "Last entry".
+          Resize the viewport short (~660px): the footer stays pinned and the list scrolls to "Last entry".
         </p>
       </PanelHarness>
-    )
+    );
   },
-}
+};

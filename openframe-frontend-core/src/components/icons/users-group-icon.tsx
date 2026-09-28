@@ -1,4 +1,4 @@
-import React from 'react'
+import type React from 'react';
 
 interface UsersGroupIconProps {
   className?: string;
@@ -7,11 +7,7 @@ interface UsersGroupIconProps {
 }
 
 /** @deprecated Use icons from icons-v2-generated instead. */
-export const UsersGroupIcon: React.FC<UsersGroupIconProps> = ({
-  className = '',
-  size = 24,
-  color = 'white'
-}) => {
+export const UsersGroupIcon: React.FC<UsersGroupIconProps> = ({ className = '', size = 24, color = 'white' }) => {
   return (
     <svg
       width={size}

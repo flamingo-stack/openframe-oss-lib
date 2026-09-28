@@ -12,9 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 
-import static com.openframe.test.data.generator.LogGenerator.searchTerm;
-import static com.openframe.test.data.generator.LogGenerator.timestampRangeFilter;
-import static com.openframe.test.data.generator.LogGenerator.timestampSort;
+import static com.openframe.test.data.generator.LogGenerator.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("saas")
@@ -46,7 +44,7 @@ public class LogsTest extends BaseTest {
             assertThat(log.getToolType()).as("Log toolType should not be empty").isNotEmpty();
             assertThat(log.getTimestamp()).as("Log timestamp should not be empty").isNotEmpty();
             assertThat(log.getIngestDay()).as("Log ingestDay should not be empty").isNotEmpty();
-            assertThat(log.getHostname()).as("Log hostname should not be empty").isNotEmpty();
+            assertThat(log.getSummary()).as("Log summary should not be empty").isNotEmpty();
         });
     }
 
@@ -116,7 +114,7 @@ public class LogsTest extends BaseTest {
         List<Instant> timestamps = LogsApi.getLogsTimestamps(timestampRangeFilter(from.toString(), to.toString()));
         assertThat(timestamps).as("Expected logs within range [%s, %s]", from, to).isNotEmpty();
         assertThat(timestamps).allSatisfy(timestamp ->
-                assertThat(timestamp).as("Log timestamp should be within the inclusive range")
-                        .isBetween(from, to));
+            assertThat(timestamp).as("Log timestamp should be within the inclusive range")
+                .isBetween(from, to));
     }
 }

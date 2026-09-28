@@ -12,19 +12,19 @@
  * here; there must never be a second definition of any of these.
  */
 
-import type { VideoTeaser } from '../../types/video-processing'
+import type { VideoTeaser } from '../../types/video-processing';
 
 /** Single exported home for the unified public bites-section title. */
-export const DEFAULT_VIDEO_BITES_TITLE = 'Key Moments'
+export const DEFAULT_VIDEO_BITES_TITLE = 'Key Moments';
 
 /**
  * Profile rendered in the strip's hover overlay. Structurally identical to
  * `UserDisplayProps` — the overlay renders it via `<UserDisplay>` 1:1.
  */
 export interface VideoBiteStripProfile {
-  name: string
-  avatarUrl?: string | null
-  subtitle?: string | null
+  name: string;
+  avatarUrl?: string | null;
+  subtitle?: string | null;
 }
 
 /**
@@ -41,12 +41,12 @@ export function toStripProfile(
   p?: { full_name?: string | null; avatar_url?: string | null; job_title?: string | null } | null,
   fallbackSubtitle?: string | null,
 ): VideoBiteStripProfile | null {
-  if (!p?.full_name) return null
+  if (!p?.full_name) return null;
   return {
     name: p.full_name,
     avatarUrl: p.avatar_url ?? null,
     subtitle: p.job_title ?? fallbackSubtitle ?? null,
-  }
+  };
 }
 
 /**
@@ -55,8 +55,24 @@ export function toStripProfile(
  * the hub admin editor, and the hub featured DAL.
  */
 export function sortBitesByCreatedAtDesc(a: VideoTeaser, b: VideoTeaser): number {
-  if (!a.created_at && !b.created_at) return 0
-  if (!a.created_at) return 1
-  if (!b.created_at) return -1
-  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  if (!a.created_at && !b.created_at) return 0;
+  if (!a.created_at) return 1;
+  if (!b.created_at) return -1;
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
+
+/**
+ * FEATURED-recency comparator: `featured_at` DESC — the stamp every featured
+ * bite carries (written by the admin star toggle; pre-existing featured bites
+ * were backfilled 2026-08-19, so there is no date-fallback ranking). The
+ * comparator FEATURED surfaces (the cross-entity aggregation + its strips)
+ * must use — ranking those surfaces by `created_at` made featuring any older
+ * bite a silent no-op once the surface cap filled with newer bites. A missing
+ * stamp (only possible from a stale mid-deploy writer) sorts last.
+ */
+export function sortBitesByFeaturedAtDesc(a: VideoTeaser, b: VideoTeaser): number {
+  if (!a.featured_at && !b.featured_at) return 0;
+  if (!a.featured_at) return 1;
+  if (!b.featured_at) return -1;
+  return new Date(b.featured_at).getTime() - new Date(a.featured_at).getTime();
 }

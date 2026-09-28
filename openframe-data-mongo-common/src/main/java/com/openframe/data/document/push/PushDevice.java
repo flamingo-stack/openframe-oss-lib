@@ -34,6 +34,8 @@ public class PushDevice implements TenantScoped {
 
     private PushPlatform platform;
 
+    private String appVersion;
+
     private Instant createdAt;
 
     private Instant updatedAt;

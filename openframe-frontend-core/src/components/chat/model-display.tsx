@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
 import React from 'react';
 import { cn } from '../../utils/cn';
-import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
-import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
+import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
 import { Skeleton } from '../ui/skeleton';
+import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
 
 const getProviderIcon = (provider?: string) => {
   if (!provider) return null;
@@ -15,7 +15,7 @@ const getProviderIcon = (provider?: string) => {
   switch (providerLower) {
     case 'anthropic':
     case 'claude':
-      return <AnthropicLogoGreyIcon className="w-4 h-4" />;
+      return <AnthropicLogoGreyIcon className="h-4 w-4" />;
     case 'openai':
       return <OpenaiLogoGreyIcon size={16} color="currentColor" />;
     case 'google':
@@ -40,7 +40,11 @@ const formatTokenCount = (count: number): string => {
   return String(count);
 };
 
-const hasAnyBreakdownRow = (breakdown?: ModelUsageBreakdown): boolean =>
+// Type predicate rather than a plain `boolean`: the early `if
+// (!hasAnyBreakdownRow(breakdown)) return inline;` below then narrows
+// `breakdown` to non-undefined for the whole hover-card branch, so the
+// per-row reads need no non-null assertions.
+const hasAnyBreakdownRow = (breakdown?: ModelUsageBreakdown): breakdown is ModelUsageBreakdown =>
   !!breakdown && !!(breakdown.haikuRewriter || breakdown.haikuClassifier || breakdown.haikuSummarizer);
 
 const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
@@ -70,25 +74,11 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // usage frame. Showing "— / 200K tokens used" early gives users the
     // model's capacity context without waiting for the first byte.
     const inline = (
-      <div
-        ref={ref}
-        className={cn(
-          'flex items-center gap-1 text-ods-text-secondary',
-          'text-h6',
-          className,
-        )}
-        {...props}
-      >
-        {icon && (
-          <span className="flex items-center justify-center">
-            {icon}
-          </span>
-        )}
-        <span className="font-body">
-          {name}
-        </span>
+      <div ref={ref} className={cn('flex items-center gap-1 text-ods-text-secondary', 'text-h6', className)} {...props}>
+        {icon && <span className="flex items-center justify-center">{icon}</span>}
+        <span className="font-body">{name}</span>
         {contextWindow != null && (
-          <span className="text-h6 opacity-70 ml-auto">
+          <span className="ml-auto opacity-70 text-h6">
             {usedTokens != null ? formatTokenCount(usedTokens) : '—'}/{formatTokenCount(contextWindow)} tokens used
           </span>
         )}
@@ -106,48 +96,38 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
           <div className="cursor-help">{inline}</div>
         </HoverCardTrigger>
         <HoverCardContent
-          className={cn(
-            'w-80 p-3',
-            'bg-ods-card border-ods-border text-ods-text-primary',
-          )}
+          className={cn('w-80 p-3', 'border-ods-border bg-ods-card text-ods-text-primary')}
           align="end"
           sideOffset={6}
         >
-          <div className="text-h6 font-semibold text-ods-text-primary mb-2">
-            Token breakdown
-          </div>
+          <div className="mb-2 font-semibold text-ods-text-primary text-h6">Token breakdown</div>
           {/* Answer-call row — uses the SAME pretty model name as the
               inline pill, plus the input/output split that doesn't fit
               in the inline view. */}
-          <BreakdownRow
-            label={`Answer (${name ?? 'model'})`}
-            input={inputTokens}
-            output={outputTokens}
-            isAnswer
-          />
-          {breakdown!.haikuRewriter && (
+          <BreakdownRow label={`Answer (${name ?? 'model'})`} input={inputTokens} output={outputTokens} isAnswer />
+          {breakdown.haikuRewriter && (
             <BreakdownRow
               label="Query rewriter (Haiku)"
-              input={breakdown!.haikuRewriter.input}
-              output={breakdown!.haikuRewriter.output}
+              input={breakdown.haikuRewriter.input}
+              output={breakdown.haikuRewriter.output}
             />
           )}
-          {breakdown!.haikuClassifier && (
+          {breakdown.haikuClassifier && (
             <BreakdownRow
               label="Intent classifier (Haiku)"
-              input={breakdown!.haikuClassifier.input}
-              output={breakdown!.haikuClassifier.output}
+              input={breakdown.haikuClassifier.input}
+              output={breakdown.haikuClassifier.output}
             />
           )}
-          {breakdown!.haikuSummarizer && (
+          {breakdown.haikuSummarizer && (
             <BreakdownRow
               label="History summarizer (Haiku)"
-              input={breakdown!.haikuSummarizer.input}
-              output={breakdown!.haikuSummarizer.output}
+              input={breakdown.haikuSummarizer.input}
+              output={breakdown.haikuSummarizer.output}
             />
           )}
           {typeof hitRatePct === 'number' && hitRatePct > 0 && (
-            <div className="mt-2 pt-2 border-t border-ods-border text-h6 text-ods-text-secondary">
+            <div className="mt-2 border-t border-ods-border pt-2 text-ods-text-secondary text-h6">
               Prompt-cache hit: {hitRatePct}% of answer input
             </div>
           )}
@@ -170,15 +150,8 @@ function BreakdownRow({
 }) {
   return (
     <div className="flex items-center justify-between py-1 text-h6">
-      <span
-        className={cn(
-          'text-ods-text-secondary',
-          isAnswer && 'text-ods-text-primary font-medium',
-        )}
-      >
-        {label}
-      </span>
-      <span className="text-ods-text-secondary tabular-nums">
+      <span className={cn('text-ods-text-secondary', isAnswer && 'font-medium text-ods-text-primary')}>{label}</span>
+      <span className="tabular-nums text-ods-text-secondary">
         {input != null ? formatTokenCount(input) : '—'} in / {output != null ? formatTokenCount(output) : '—'} out
       </span>
     </div>
@@ -203,18 +176,13 @@ export interface ModelDisplaySkeletonProps extends React.HTMLAttributes<HTMLDivE
  */
 const ModelDisplaySkeleton = React.forwardRef<HTMLDivElement, ModelDisplaySkeletonProps>(
   ({ className, showTokens = false, ...props }, ref) => (
-    <div
-      ref={ref}
-      aria-hidden
-      className={cn('flex items-center gap-1 text-h6', className)}
-      {...props}
-    >
+    <div ref={ref} aria-hidden className={cn('flex items-center gap-1 text-h6', className)} {...props}>
       {/* provider icon */}
-      <Skeleton className="w-4 h-5 rounded-sm shrink-0" />
+      <Skeleton className="h-5 w-4 shrink-0 rounded-sm" />
       {/* model name */}
       <Skeleton className="h-5 w-24" />
       {/* "X / Y tokens used" tail — only when tokens are expected */}
-      {showTokens && <Skeleton className="h-3 w-32 ml-auto" />}
+      {showTokens && <Skeleton className="ml-auto h-3 w-32" />}
     </div>
   ),
 );

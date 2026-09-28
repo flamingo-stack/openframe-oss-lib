@@ -1,101 +1,88 @@
-'use client'
+'use client';
 
-import {
-  DndContext,
-  type DragEndEvent,
-  type DraggableAttributes,
-  type DraggableSyntheticListeners,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import * as React from 'react'
-import { cn } from '../../../utils/cn'
+import type { ReactNode } from 'react';
+import { cn } from '../../../utils/cn';
+import { SortableList } from '../sortable-list/sortable-list';
+import { SortableMoveButtons } from '../sortable-list/sortable-move-buttons';
+import { type SortableDragHandleProps, useSortableItem } from '../sortable-list/use-sortable-item';
 
 export interface SortableRowRenderArgs {
-  dragHandleProps: DraggableSyntheticListeners
-  dragHandleAttributes: DraggableAttributes
-  isDragging: boolean
+  /** Spread onto the grip whole — it carries the ref and the keyboard path. */
+  dragHandleProps: SortableDragHandleProps;
+  isDragging: boolean;
+  /**
+   * The touch replacement for the grip: an up/down `SortableMoveButtons` pair,
+   * non-null exactly when drag is unavailable (touch/narrow viewports). Render
+   * it where the row's reorder control belongs — and no grip beside it.
+   */
+  moveButtons: ReactNode | null;
 }
 
 export interface TicketStatusConfigListProps<T extends { id: string }> {
-  items: T[]
-  onReorder: (oldIndex: number, newIndex: number) => void
-  renderRow: (item: T, args: SortableRowRenderArgs) => React.ReactNode
-  className?: string
+  items: T[];
+  onReorder: (oldIndex: number, newIndex: number) => void;
+  renderRow: (item: T, args: SortableRowRenderArgs) => ReactNode;
+  /** Names a row for the live region and the move buttons, e.g. its status name. */
+  getItemLabel?: (index: number) => string | undefined;
+  className?: string;
 }
 
+/**
+ * A reorderable list of config rows (ticket statuses, AI quick actions), built
+ * on {@link SortableList} — Pragmatic drag and drop on desktop, an explicit
+ * up/down pair on touch, where the HTML5 drag events never fire.
+ *
+ * `id` keys React rows only; the reorder itself is DOM-order based, so
+ * duplicates in `items` cannot collide.
+ */
 export function TicketStatusConfigList<T extends { id: string }>({
   items,
   onReorder,
   renderRow,
+  getItemLabel,
   className,
 }: TicketStatusConfigListProps<T>) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const oldIndex = items.findIndex(i => i.id === active.id)
-    const newIndex = items.findIndex(i => i.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-    onReorder(oldIndex, newIndex)
-  }
-
-  const sortableIds = React.useMemo(() => items.map(i => i.id), [items])
-
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-        <div className={cn('flex w-full flex-col gap-[var(--spacing-system-xs)]', className)}>
-          {items.map(item => (
-            <SortableRow key={item.id} id={item.id}>
-              {args => renderRow(item, args)}
-            </SortableRow>
-          ))}
-        </div>
-      </SortableContext>
-    </DndContext>
-  )
+    <SortableList
+      onReorder={onReorder}
+      getItemLabel={getItemLabel}
+      className={cn('flex w-full flex-col gap-[var(--spacing-system-xs)]', className)}
+    >
+      {items.map((item, index) => (
+        <SortableRow key={item.id} index={index} count={items.length} label={getItemLabel?.(index)}>
+          {args => renderRow(item, args)}
+        </SortableRow>
+      ))}
+    </SortableList>
+  );
 }
 
 function SortableRow({
-  id,
+  index,
+  count,
+  label,
   children,
 }: {
-  id: string
-  children: (args: SortableRowRenderArgs) => React.ReactNode
+  index: number;
+  count: number;
+  label?: string;
+  children: (args: SortableRowRenderArgs) => ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    // Raise the actively dragged row above its siblings — without this the
-    // stacking follows DOM order, so a row dragged DOWN slides UNDER the rows
-    // below it while a row dragged up correctly renders on top.
-    zIndex: isDragging ? 1 : undefined,
-  }
+  const { itemRef, dragHandleProps, isDragging, dragAndDropEnabled } = useSortableItem();
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={itemRef}
+      // Raise the actively dragged row above its siblings — without this the
+      // stacking follows DOM order, so a row dragged DOWN slides UNDER the rows
+      // below it while a row dragged up correctly renders on top.
+      className={isDragging ? 'relative z-10' : undefined}
+    >
       {children({
-        dragHandleProps: listeners,
-        dragHandleAttributes: attributes,
+        dragHandleProps,
         isDragging,
+        moveButtons: dragAndDropEnabled ? null : <SortableMoveButtons index={index} count={count} label={label} />,
       })}
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Single MermaidDiagram for the unified markdown engine (dark theme only —
@@ -8,9 +8,13 @@
  * `mermaid` stays a dynamic import so neither chat nor content bundles pay
  * for it unless a diagram is actually rendered.
  */
-import React, { useEffect, useState } from 'react';
+import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react';
 import type { MermaidConfig } from 'mermaid';
+import type React from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useIsHydrated } from '../../../hooks/ui/use-is-hydrated';
 import { AlertCircleIcon } from '../../icons-v2-generated';
+import { Button } from '../button';
 
 /**
  * SECURITY SSOT for the mermaid renderer — the ONLY place these knobs are
@@ -121,38 +125,17 @@ async function withRenderTimeout<T>(promise: Promise<T>, ms: number): Promise<T>
  * module uses ODS semantic classes.
  */
 export const mermaidStyles = `
+  /* The pan surface is a scroll region with NO scrollbars: drag, wheel,
+     arrows and the toolbar move it (a canvas, the way dbdiagram, Figma and
+     Excalidraw draw one). Two mechanisms for one motion read as a bug. */
+  .mermaid-frame-pan { scrollbar-width: none; -ms-overflow-style: none; }
+  .mermaid-frame-pan::-webkit-scrollbar { display: none; }
   .mermaid-svg-container svg {
-    max-width: 100% !important;
-    height: auto !important;
-    min-height: 200px;
+    max-width: 100%;
+    height: auto;
     font-family: 'DM Sans', sans-serif !important;
     font-size: 14px !important;
   }
-  @media (min-width: 1520px) {
-    .mermaid-svg-container svg {
-      max-width: 900px !important;
-      max-height: 700px !important;
-      min-height: 300px;
-      font-size: 16px !important;
-    }
-  }
-  @media (min-width: 768px) and (max-width: 1519px) {
-    .mermaid-svg-container svg {
-      max-width: 700px !important;
-      max-height: 600px !important;
-      min-height: 250px;
-      font-size: 15px !important;
-    }
-  }
-  @media (max-width: 767px) {
-    .mermaid-svg-container svg {
-      max-width: 90vw !important;
-      max-height: 400px !important;
-      min-height: 200px;
-      font-size: 13px !important;
-    }
-  }
-  .mermaid-svg-container svg[width] { width: 100% !important; }
   .mermaid-svg-container .node rect,
   .mermaid-svg-container .node circle,
   .mermaid-svg-container .node ellipse,
@@ -168,19 +151,176 @@ export const mermaidStyles = `
   }
 `;
 
+/**
+ * The VIEWER — every rendered diagram gets it, here in the ONE component, so
+ * a markdown fence in the knowledge base and a server-rendered admin diagram
+ * behave the same way. The contract is the one diagram tools converge on
+ * (dbdiagram, Excalidraw, Mermaid Live):
+ *  - drag to pan (mouse / pen; touch pans the frame natively) — the frame
+ *    shows NO scrollbars, so panning has one visible mechanism;
+ *  - ⌘/Ctrl + wheel (and trackpad pinch, which browsers deliver the same
+ *    way) zooms TOWARD THE CURSOR — the point under the pointer stays put;
+ *    a plain wheel scrolls the frame, like any other scroll region;
+ *  - toolbar: zoom out, the percentage (click = back to 100%), zoom in, fit;
+ *  - keyboard, with the frame focused: arrows scroll (native), `+` / `-`
+ *    zoom, `0` resets, `f` fits.
+ * Applied through the CSS `zoom` property (a LAYOUT scale, unlike
+ * `transform`), so the frame's own scrollbars reach every corner of a
+ * magnified diagram and the zoom math is plain arithmetic on scroll offsets.
+ */
+export const MERMAID_ZOOM_MIN = 0.25;
+export const MERMAID_ZOOM_MAX = 4;
+export const MERMAID_ZOOM_STEP = 1.25;
+const clampZoom = (z: number) => Math.min(MERMAID_ZOOM_MAX, Math.max(MERMAID_ZOOM_MIN, z));
+
 /** Monotonic render id. `Date.now()` was ambiguous: two renders started in the
  *  same millisecond (routine while a diagram streams in) share an id, and
  *  mermaid removes any pre-existing element with that id at the start of a
  *  render — so one render would delete the other's working container. */
 let mermaidRenderSeq = 0;
 
-export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
+/**
+ * How tall the diagram's FRAME is. The frame is a scroll container in both
+ * modes, so a zoomed diagram scrolls inside it instead of growing the page:
+ *  - `content`: as tall as the diagram, capped at 70svh (markdown, chat);
+ *  - `fold`: a fixed 70svh, skeleton and diagram alike — a page whose main
+ *    element is the diagram never jumps when it lands (the admin graphs).
+ */
+export type MermaidFrame = 'content' | 'fold';
+const FRAME_CLASS: Record<MermaidFrame, string> = {
+  content: 'min-h-[200px] max-h-[70svh] md:min-h-[250px]',
+  fold: 'h-[70svh] min-h-[320px]',
+};
+
+export const MermaidDiagram: React.FC<{ chart: string; zoomable?: boolean; frame?: MermaidFrame }> = ({
+  chart,
+  zoomable = true,
+  frame = 'content',
+}) => {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [mounted, setMounted] = useState(false);
+  const [zoom, setZoom] = useState<number>(1);
+  const [dragging, setDragging] = useState(false);
+  const empty = !chart.trim();
+  // Mermaid (`useMaxWidth`) states the diagram's natural width as an inline
+  // `max-width: <n>px` on the SVG. The container takes that width, capped at
+  // the frame, so CSS `zoom` has a fixed box to scale: an auto-width block
+  // would re-fit the frame at every zoom and never overflow into it. Inside a
+  // zoomed element `100%` is the frame divided by the zoom, so the cap is
+  // `calc(100% * zoom)` — the frame's real width — and what fit at 100% is
+  // what grows: at 200% a frame-wide diagram is two frames wide and scrolls.
+  const naturalWidth = useMemo(() => {
+    const px = Number(svg.match(/max-width:\s*([\d.]+)px/)?.[1]);
+    return Number.isFinite(px) && px > 0 ? Math.ceil(px) : null;
+  }, [svg]);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setMounted(true); }, []);
+  // Anchor-preserving zoom: the content scales linearly with `zoom`, so the
+  // point under the anchor stays put when the scroll offset is scaled by the
+  // same ratio around it. The offset is applied in a layout effect, AFTER
+  // React has re-rendered the new zoom, so the scroll range already exists.
+  const pendingAnchor = useRef<{ ratio: number; ax: number; ay: number } | null>(null);
+  const applyZoom = useCallback((next: number, anchor?: { ax: number; ay: number }) => {
+    setZoom(current => {
+      const target = clampZoom(Math.round(next * 100) / 100);
+      if (target === current) return current;
+      const el = scrollRef.current;
+      const ax = anchor?.ax ?? (el ? el.clientWidth / 2 : 0);
+      const ay = anchor?.ay ?? (el ? el.clientHeight / 2 : 0);
+      pendingAnchor.current = { ratio: target / current, ax, ay };
+      return target;
+    });
+  }, []);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const pending = pendingAnchor.current;
+    if (!el || !pending) return;
+    pendingAnchor.current = null;
+    el.scrollLeft = (el.scrollLeft + pending.ax) * pending.ratio - pending.ax;
+    el.scrollTop = (el.scrollTop + pending.ay) * pending.ratio - pending.ay;
+  }, [zoom]);
+  const zoomBy = useCallback(
+    (factor: number, anchor?: { ax: number; ay: number }) => applyZoom(zoom * factor, anchor),
+    [applyZoom, zoom],
+  );
+
+  // Fit: the whole diagram inside the frame, never above 100% — the natural
+  // size is the rendered box divided by the zoom it was measured under.
+  const fit = useCallback(() => {
+    const el = scrollRef.current;
+    const svgEl = el?.querySelector('svg');
+    if (!el || !svgEl) return;
+    const box = svgEl.getBoundingClientRect();
+    const w = box.width / zoom;
+    const h = box.height / zoom;
+    if (!(w > 0 && h > 0)) return;
+    const next = Math.min(1, el.clientWidth / w, el.clientHeight / h);
+    pendingAnchor.current = null;
+    setZoom(clampZoom(Math.floor(next * 100) / 100));
+    el.scrollTo({ left: 0, top: 0 });
+  }, [zoom]);
+
+  // ⌘/Ctrl + wheel (and pinch) zooms toward the cursor instead of scrolling
+  // the page. A native listener registered non-passive: React attaches
+  // `wheel` passively, so `preventDefault` from an `onWheel` prop is ignored.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !zoomable) return undefined;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      // Exponential in deltaY: a wheel notch is one step, a pinch is smooth.
+      applyZoom(zoom * Math.exp(-e.deltaY * 0.0025), { ax: e.clientX - rect.left, ay: e.clientY - rect.top });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // `svg` is a dependency on purpose: the scroll container mounts with the diagram.
+  }, [zoomable, svg, zoom, applyZoom]);
+
+  // Drag to pan — scrolls the frame, so the scrollbars, the wheel and the
+  // keyboard stay the source of truth for the position. Mouse and pen only:
+  // a finger already pans a scroll region natively.
+  const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!zoomable || e.button !== 0 || e.pointerType === 'touch') return;
+    const el = scrollRef.current;
+    if (!el) return;
+    // The default action of a press on text is to start a selection — the
+    // one thing a pan must never do. Focus is restored by hand below.
+    e.preventDefault();
+    drag.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+    el.setPointerCapture?.(e.pointerId);
+    el.focus({ preventScroll: true });
+    setDragging(true);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    const el = scrollRef.current;
+    if (!d || !el) return;
+    el.scrollLeft = d.left - (e.clientX - d.x);
+    el.scrollTop = d.top - (e.clientY - d.y);
+  };
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current) return;
+    drag.current = null;
+    scrollRef.current?.releasePointerCapture?.(e.pointerId);
+    setDragging(false);
+  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!zoomable || !svg) return;
+    if (e.key === '+' || e.key === '=') zoomBy(MERMAID_ZOOM_STEP);
+    else if (e.key === '-') zoomBy(1 / MERMAID_ZOOM_STEP);
+    else if (e.key === '0') applyZoom(1);
+    else if (e.key === 'f' || e.key === 'F') fit();
+    else return;
+    e.preventDefault();
+  };
+  // `useSyncExternalStore` hydration gate rather than the `useState(false)` +
+  // `useEffect(setMounted)` idiom — same one extra render, no setState inside
+  // an effect body.
+  const mounted = useIsHydrated();
 
   useEffect(() => {
     // This effect re-runs on every `chart` change, and during STREAMING the
@@ -191,6 +331,16 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
     // cannot close it: `Promise.race` rejects, it does not abort the render.
     let cancelled = false;
     const renderId = `mermaid-${(mermaidRenderSeq += 1)}`;
+
+    // Nothing to draw yet (a host whose chart is still loading, a stream that
+    // has not produced its first token): never ask mermaid to parse an empty
+    // string — that is an "UnknownDiagramError" it would paint as a failure.
+    // The render below shows the skeleton for an empty chart on its own.
+    if (empty) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const renderMermaid = async () => {
       try {
@@ -218,9 +368,15 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
             mainBkg: 'transparent',
             secondBkg: 'transparent',
             tertiaryBkg: 'transparent',
-            cScale0: '#FFC008', cScale1: '#4ECDC4', cScale2: '#45B7D1',
-            cScale3: '#96CEB4', cScale4: '#FFEAA7', cScale5: '#DDA0DD',
-            cScale6: '#98D8C8', cScale7: '#F7DC6F', cScale8: '#BB8FCE',
+            cScale0: '#FFC008',
+            cScale1: '#4ECDC4',
+            cScale2: '#45B7D1',
+            cScale3: '#96CEB4',
+            cScale4: '#FFEAA7',
+            cScale5: '#DDA0DD',
+            cScale6: '#98D8C8',
+            cScale7: '#F7DC6F',
+            cScale8: '#BB8FCE',
             cScale9: '#85C1E9',
             taskTextColor: '#FAFAFA',
             taskTextOutsideColor: '#FAFAFA',
@@ -244,6 +400,9 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
         );
         if (cancelled) return;
         setSvg(renderedSvg);
+        // A new diagram starts at 100%, top-left — zoom is per diagram, not per host.
+        pendingAnchor.current = null;
+        setZoom(1);
         // CLEAR the previous failure. The render body checks `error` BEFORE
         // `svg`, so a stale message pins the "Diagram Error" card forever and
         // the diagram that just rendered successfully never appears. Transient
@@ -260,7 +419,10 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
       }
     };
 
-    if (mounted) { renderMermaid(); }
+    if (mounted) {
+      // Never rejects — try/catch, every write gated on `cancelled`.
+      void renderMermaid();
+    }
     return () => {
       cancelled = true;
       // An abandoned render (superseded chart, or one wedged past the timeout)
@@ -271,52 +433,124 @@ export const MermaidDiagram: React.FC<{ chart: string }> = ({ chart }) => {
       document.getElementById(`d${renderId}`)?.remove();
       document.getElementById(renderId)?.remove();
     };
-  }, [chart, mounted]);
+  }, [chart, empty, mounted]);
 
-  if (error) {
-    return (
-      <div className="error-state bg-ods-card border border-ods-border rounded-lg p-6 my-6">
-        <div className="error-icon flex justify-center mb-4">
-          <AlertCircleIcon className="w-12 h-12 text-ods-error" />
+  // `safe center` on both axes: a zoomed diagram larger than the frame scrolls
+  // from its top-left corner instead of losing those edges to flex centering.
+  const frameClass = `${FRAME_CLASS[frame]} flex w-full overflow-auto outline-none focus-visible:ring-1 focus-visible:ring-ods-accent ${
+    zoomable && svg ? `mermaid-frame-pan select-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}` : ''
+  }`;
+  const frameStyle = { justifyContent: 'safe center', alignItems: 'safe center' } as const;
+  const body =
+    error && !empty ? (
+      <div className="error-state m-auto rounded-lg border border-ods-border bg-ods-card p-6">
+        <div className="error-icon mb-4 flex justify-center">
+          <AlertCircleIcon className="h-12 w-12 text-ods-error" />
         </div>
-        <div className="error-title text-center font-sans font-semibold text-lg text-ods-error mb-2">
-          Diagram Error
-        </div>
-        <div className="error-description text-center font-sans text-sm text-ods-text-secondary mb-4 break-words overflow-hidden max-w-full">
+        <div className="error-title mb-2 text-center font-sans text-lg font-semibold text-ods-error">Diagram Error</div>
+        <div className="error-description mb-4 max-w-full overflow-hidden break-words text-center font-sans text-sm text-ods-text-secondary">
           <div className="overflow-x-auto">
             <pre className="whitespace-pre-wrap break-words text-xs">{error}</pre>
           </div>
         </div>
       </div>
-    );
-  }
-
-  if (isLoading || !svg) {
-    return (
-      <div className="skeleton-code bg-ods-card border border-ods-border rounded-lg p-6 min-h-[120px] flex items-center justify-center">
-        <div className="animate-pulse text-ods-text-tertiary font-sans">
-          {isLoading ? 'Loading diagram renderer...' : 'Rendering diagram...'}
-        </div>
+    ) : empty || isLoading || !svg ? (
+      <div className="skeleton-code m-auto animate-pulse font-sans text-ods-text-tertiary">
+        {isLoading ? 'Loading diagram renderer...' : 'Rendering diagram...'}
       </div>
+    ) : (
+      <div
+        className="mermaid-svg-container flex shrink-0 justify-center"
+        // The class is a styling hook for the injected SVG (see the <style>
+        // block above); the test id is the stable handle for "which SVG is
+        // mounted right now", which the stale-render guard has to assert on.
+        data-testid="mermaid-svg-container"
+        data-zoom={zoom}
+        style={{
+          fontSize: '14px',
+          zoom,
+          width: naturalWidth ? `min(${naturalWidth}px, calc(100% * ${zoom}))` : '100%',
+        }}
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
     );
-  }
 
   return (
-    <div className="mermaid-container rounded-lg p-4 md:p-6 lg:p-8 my-6 overflow-x-auto bg-ods-card border border-ods-border">
+    <div className="mermaid-container relative my-6 rounded-lg border border-ods-border bg-ods-card p-4 md:p-6 lg:p-8">
       {/* Scoped to `.mermaid-svg-container`, so it only needs to exist when a
           diagram is actually mounted. The engine used to emit this once per
           instance — i.e. once per chat segment, almost never with a diagram. */}
       <style dangerouslySetInnerHTML={{ __html: mermaidStyles }} />
-      <div className="flex justify-center items-center w-full min-h-[200px] md:min-h-[250px] lg:min-h-[300px]">
+      {zoomable && (
         <div
-          className="mermaid-svg-container w-full flex justify-center max-w-full"
-          style={{ fontSize: '14px' }}
-          dangerouslySetInnerHTML={{
-            __html: svg.replace(/<svg[^>]*>/, (match) =>
-              match.replace(/width="[^"]*"/, 'width="100%"').replace(/height="[^"]*"/, 'height="auto"')
-            ),
-          }}
-        />
+          className="absolute right-2 top-2 z-10 flex items-center gap-[var(--spacing-system-xxs)] rounded-md bg-ods-card"
+          role="group"
+          aria-label="Diagram zoom"
+        >
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Zoom out"
+            title="Zoom out (−, ⌘/Ctrl + wheel)"
+            disabled={!svg || zoom <= MERMAID_ZOOM_MIN}
+            onClick={() => zoomBy(1 / MERMAID_ZOOM_STEP)}
+          >
+            <ZoomOut />
+          </Button>
+          <Button
+            variant="outline"
+            size="compact"
+            aria-label="Reset zoom"
+            title="Back to 100% (0)"
+            disabled={!svg || zoom === 1}
+            onClick={() => applyZoom(1)}
+          >
+            {Math.round(zoom * 100)}%
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Zoom in"
+            title="Zoom in (+, ⌘/Ctrl + wheel)"
+            disabled={!svg || zoom >= MERMAID_ZOOM_MAX}
+            onClick={() => zoomBy(MERMAID_ZOOM_STEP)}
+          >
+            <ZoomIn />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Fit to frame"
+            title="Fit the whole diagram in the frame (f)"
+            disabled={!svg}
+            onClick={fit}
+          >
+            <Maximize2 />
+          </Button>
+        </div>
+      )}
+      {/* The frame: the scroll region, the pan surface and the keyboard target. */}
+      <div
+        ref={scrollRef}
+        className={frameClass}
+        style={frameStyle}
+        data-testid="mermaid-frame"
+        data-frame={frame}
+        tabIndex={zoomable && svg ? 0 : -1}
+        role={zoomable && svg ? 'region' : undefined}
+        aria-label={
+          zoomable && svg
+            ? 'Diagram. Drag to pan; Ctrl or Cmd plus wheel, or + and -, to zoom; 0 resets; f fits.'
+            : undefined
+        }
+        title={zoomable && svg ? 'Drag to pan · ⌘/Ctrl + wheel to zoom' : undefined}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onKeyDown={onKeyDown}
+      >
+        {body}
       </div>
     </div>
   );

@@ -5,7 +5,9 @@ import com.openframe.api.dto.organization.OrganizationResponse;
 import com.openframe.api.dto.organization.UpdateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationStatusRequest;
 import com.openframe.api.mapper.OrganizationMapper;
-import com.openframe.api.service.OrganizationCommandService;
+import com.openframe.api.service.organization.OrganizationCommandService;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.service.OrganizationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -77,6 +79,7 @@ public class OrganizationController {
     @GetMapping("/{id}/can-archive")
     @ResponseStatus(HttpStatus.OK)
     public boolean canArchiveOrganization(@PathVariable String id) {
+        requireOrganization(id);
         return organizationService.canArchiveOrganization(id);
     }
 
@@ -94,6 +97,14 @@ public class OrganizationController {
             @PathVariable String id,
             @Valid @RequestBody UpdateOrganizationStatusRequest request) {
         log.info("Internal API: Updating organization {} status to {}", id, request.status());
+        requireOrganization(id);
         organizationCommandService.updateOrganizationStatus(id, request);
+    }
+
+    /** 404 for an unknown id; the domain reports it as a bad argument, which would surface as 400. */
+    private void requireOrganization(String id) {
+        if (organizationService.getOrganizationByOrganizationId(id).isEmpty()) {
+            throw new NotFoundException(ErrorCode.ORGANIZATION_NOT_FOUND, "Organization not found with id: " + id);
+        }
     }
 }

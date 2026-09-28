@@ -21,19 +21,19 @@
  * to keep the lib's wire validator self-contained.
  */
 
-const WIRE_TABLE_ID_REGEX = /^[a-z][a-z0-9-]*$/
-const WIRE_ID_REGEX = /^[A-Za-z0-9._:/-]+$/
-const WIRE_TABLE_ID_MAX = 60
-const WIRE_ID_MAX = 200
-const WIRE_QUERY_MAX = 2000
+const WIRE_TABLE_ID_REGEX = /^[a-z][a-z0-9-]*$/;
+const WIRE_ID_REGEX = /^[A-Za-z0-9._:/-]+$/;
+const WIRE_TABLE_ID_MAX = 60;
+const WIRE_ID_MAX = 200;
+const WIRE_QUERY_MAX = 2000;
 
 /** Wire-supplied `CommandOverride` — the subset of fields a client (chat
  *  shell) is allowed to send on the request body. Excludes
  *  `systemPromptAddendum` by construction: addendum injection is a
  *  Rule-5b bypass vector, so we never accept it from the wire. */
 export interface WireCommandOverride {
-  entityIdFilter?: { tableId: string; id: string }
-  retrievalQueryOverride?: string
+  entityIdFilter?: { tableId: string; id: string };
+  retrievalQueryOverride?: string;
 }
 
 /**
@@ -42,36 +42,36 @@ export interface WireCommandOverride {
  * missing / malformed in every field.
  */
 export function parseWireCommandOverride(raw: unknown): WireCommandOverride | null {
-  if (!raw || typeof raw !== 'object') return null
-  const out: WireCommandOverride = {}
-  const r = raw as Record<string, unknown>
+  if (!raw || typeof raw !== 'object') return null;
+  const out: WireCommandOverride = {};
+  const r = raw as Record<string, unknown>;
 
   if (r.entityIdFilter && typeof r.entityIdFilter === 'object') {
-    const f = r.entityIdFilter as Record<string, unknown>
+    const f = r.entityIdFilter as Record<string, unknown>;
     if (
-      typeof f.tableId === 'string'
-      && f.tableId.length > 0
-      && f.tableId.length <= WIRE_TABLE_ID_MAX
-      && WIRE_TABLE_ID_REGEX.test(f.tableId)
-      && typeof f.id === 'string'
-      && f.id.length > 0
-      && f.id.length <= WIRE_ID_MAX
-      && WIRE_ID_REGEX.test(f.id)
+      typeof f.tableId === 'string' &&
+      f.tableId.length > 0 &&
+      f.tableId.length <= WIRE_TABLE_ID_MAX &&
+      WIRE_TABLE_ID_REGEX.test(f.tableId) &&
+      typeof f.id === 'string' &&
+      f.id.length > 0 &&
+      f.id.length <= WIRE_ID_MAX &&
+      WIRE_ID_REGEX.test(f.id)
     ) {
-      out.entityIdFilter = { tableId: f.tableId, id: f.id }
+      out.entityIdFilter = { tableId: f.tableId, id: f.id };
     }
   }
   if (
-    typeof r.retrievalQueryOverride === 'string'
-    && r.retrievalQueryOverride.length > 0
-    && r.retrievalQueryOverride.length <= WIRE_QUERY_MAX
+    typeof r.retrievalQueryOverride === 'string' &&
+    r.retrievalQueryOverride.length > 0 &&
+    r.retrievalQueryOverride.length <= WIRE_QUERY_MAX
   ) {
-    out.retrievalQueryOverride = r.retrievalQueryOverride
+    out.retrievalQueryOverride = r.retrievalQueryOverride;
   }
   if (out.entityIdFilter === undefined && out.retrievalQueryOverride === undefined) {
-    return null
+    return null;
   }
-  return out
+  return out;
 }
 
 /**
@@ -82,7 +82,7 @@ export function parseWireCommandOverride(raw: unknown): WireCommandOverride | nu
  * confusing way) and tab/CR artifacts from sloppy imports.
  */
 export function sanitizeTitleForChat(value: string | null | undefined): string {
-  return (value ?? '').replace(/[\r\n\t]+/g, ' ').trim()
+  return (value ?? '').replace(/[\r\n\t]+/g, ' ').trim();
 }
 
 /**
@@ -100,41 +100,39 @@ export function formatSingularLookupInvocation(cmdId: string, value?: string | n
   // becomes a literal `"` to a parser that processes backslash escapes,
   // breaking the close quote. CodeQL's `js/incomplete-sanitization` fires
   // on the previous one-pass `\"` escape for exactly this reason.
-  const safe = sanitizeTitleForChat(value)
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-  return safe ? `/${cmdId} "${safe}"` : `/${cmdId}`
+  const safe = sanitizeTitleForChat(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return safe ? `/${cmdId} "${safe}"` : `/${cmdId}`;
 }
 
 /** Command-override structure passed to `buildChatContext.opts.commandOverride`. */
 export interface CommandOverride {
-  retrievalScope?: string[]
-  systemPromptAddendum?: string
-  retrievalQueryOverride?: string | null
+  retrievalScope?: string[];
+  systemPromptAddendum?: string;
+  retrievalQueryOverride?: string | null;
   /** Singular-item lookup. When set, retrieval bypasses FTS and queries the
    *  named table directly via ILIKE on the matchFields. */
   entityLookup?: {
-    tableId: string
-    value: string
-    matchFields: string[]
-  }
+    tableId: string;
+    value: string;
+    matchFields: string[];
+  };
   /** Singular row by primary key. Used by the inline object-card
    *  "Discuss" action — the client knows the exact row id from a prior
    *  chip. Higher precedence than `entityLookup` (route enforces) and
    *  `retrievalQueryOverride`. The retrieval layer still runs the table's
    *  `searchFilter` so privacy invariants hold. */
   entityIdFilter?: {
-    tableId: string
-    id: string
-  }
+    tableId: string;
+    id: string;
+  };
   /** "Browse" bypass for bare slash list commands. The search layer
    *  treats this as "skip FTS — return rows from these tableIds ordered
    *  by the configured `primaryDateColumn` DESC". */
-  browseScope?: string[]
+  browseScope?: string[];
   /** Presentation hint propagated from the slash command. Hub narrows to
    *  its `SlashCommandPresentation` union; lib leaves as `string` for
    *  decoupling. */
-  presentation?: string
+  presentation?: string;
 }
 
 /**
@@ -147,13 +145,13 @@ export function extractEntityIdFilter(
   override: CommandOverride | null | undefined,
   expectedTableId?: string,
 ): { tableId: string; id: string } | null {
-  const f = override?.entityIdFilter
-  if (!f) return null
-  const tableId = typeof f.tableId === 'string' ? f.tableId : ''
-  const id = typeof f.id === 'string' ? f.id : ''
-  if (!tableId || !id) return null
-  if (expectedTableId && tableId !== expectedTableId) return null
-  return { tableId, id }
+  const f = override?.entityIdFilter;
+  if (!f) return null;
+  const tableId = typeof f.tableId === 'string' ? f.tableId : '';
+  const id = typeof f.id === 'string' ? f.id : '';
+  if (!tableId || !id) return null;
+  if (expectedTableId && tableId !== expectedTableId) return null;
+  return { tableId, id };
 }
 
 /**
@@ -164,7 +162,7 @@ export function extractEntityIdFilter(
  * arbitrary prompt content.
  */
 export function buildDiscussAddendum(args: { tableId: string; id: string }): string {
-  const idTag = args.id.length > 24 ? args.id.slice(0, 24) + '…' : args.id
+  const idTag = args.id.length > 24 ? args.id.slice(0, 24) + '…' : args.id;
   return (
     `Ask drill-in for row id="${args.id}" in table "${args.tableId}". Focus the ` +
     `answer on this single record. If retrieval returns 0 rows (privacy ` +
@@ -179,5 +177,5 @@ export function buildDiscussAddendum(args: { tableId: string; id: string }): str
     `Don't invent fields, don't hallucinate values, silently omit absent fields.\n\n` +
     `FORMAT: card+chip+id-tag opener, then ONE framing sentence, then a compact ` +
     `bulleted "**Field** — value" list. Don't restate fields already in the list.`
-  )
+  );
 }

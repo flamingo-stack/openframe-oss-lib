@@ -86,6 +86,7 @@ mobile below):
 | `text-h5` | Azeret Mono | 500 (medium) | 14/20 | 14/20 | 12/16 | -0.02em | **uppercase** |
 | `text-h6` | DM Sans | 500 (medium) | 14/20 | 14/20 | 12/16 | 0 | none |
 | `text-code` | Azeret Mono | 500 (medium) | 14/20 | 14/20 | 12/16 | 0 | none |
+| `.text-wordmark` | Azeret Mono | 700 (bold) | h5-caption scale | Brand wordmarks ONLY (platform name beside a logo in a header/footer). |
 
 The breakpoint scaling is built into the utilities via the responsive CSS variables
 (`--font-size-h*` / `--font-line-space-h*` in `src/styles/ods-responsive-tokens.css`) — never

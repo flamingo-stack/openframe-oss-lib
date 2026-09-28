@@ -24,6 +24,7 @@ public class Machine {
     private String lastSeen;
     private String organizationId;
     private String hostname;
+    private String nickname;
     private String displayName;
     private String serialNumber;
     private String manufacturer;

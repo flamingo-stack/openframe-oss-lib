@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import { UnsavedChangesChip, useGuardedClose } from '../components/ui/modal-guarded-close';
 import { Button } from '../components/ui/button';
+import { UnsavedChangesChip, useGuardedClose } from '../components/ui/modal-guarded-close';
 
 /**
  * Stories for `modal-guarded-close` — the unified dirty-state contract for
@@ -37,7 +37,7 @@ export const InAFooterRow: Story = {
   },
   render: args => (
     <div className="flex w-full max-w-2xl items-center justify-between gap-[var(--spacing-system-xsf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]">
-      <span className="text-h6 text-ods-text-secondary">3 rules selected</span>
+      <span className="text-ods-text-secondary text-h6">3 rules selected</span>
       <div className="flex items-center gap-[var(--spacing-system-xsf)]">
         <UnsavedChangesChip {...args} />
         <Button variant="outline" size="small-legacy">
@@ -65,7 +65,7 @@ function GuardedCloseDemo() {
   const { guardedClose, dialog } = useGuardedClose(dirty, () => setLastOutcome('closed (edits discarded)'));
   return (
     <div className="flex max-w-md flex-col items-start gap-[var(--spacing-system-mf)]">
-      <label className="flex items-center gap-[var(--spacing-system-xsf)] text-h6 text-ods-text-primary">
+      <label className="flex items-center gap-[var(--spacing-system-xsf)] text-ods-text-primary text-h6">
         <input type="checkbox" checked={dirty} onChange={e => setDirty(e.target.checked)} />
         Form has unsaved edits
       </label>
@@ -75,7 +75,7 @@ function GuardedCloseDemo() {
           Close
         </Button>
       </div>
-      <span className="text-h6 text-ods-text-secondary">Last outcome: {lastOutcome}</span>
+      <span className="text-ods-text-secondary text-h6">Last outcome: {lastOutcome}</span>
       {dialog}
     </div>
   );

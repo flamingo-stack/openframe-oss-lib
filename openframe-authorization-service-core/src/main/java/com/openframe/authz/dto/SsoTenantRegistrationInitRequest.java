@@ -20,8 +20,6 @@ public class SsoTenantRegistrationInitRequest {
     @NotBlank(message = "Email is required")
     private String email;
 
-    private String accessCode;
-
     @NotBlank(message = "Organization name is required")
     @Pattern(
             regexp = "^[\\p{L}\\p{M}0-9&.,'’\"()\\- ]{2,100}$",
@@ -37,6 +35,13 @@ public class SsoTenantRegistrationInitRequest {
 
     // Optional final redirect target (absolute or allowed host)
     private String redirectTo;
+
+    /**
+     * Mobile-app flow: forwarded to the BFF {@code /oauth/continue} after finalization so the
+     * callback attaches the one-time ticket the app exchanges for tokens (same contract as
+     * {@code /oauth/login?authMobile=true}).
+     */
+    private boolean authMobile;
 
     private RegistrationAttribution attribution;
 }

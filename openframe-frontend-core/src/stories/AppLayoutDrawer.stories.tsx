@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { useState } from 'react'
-import { fn } from 'storybook/test'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
+import { fn } from 'storybook/test';
 
 import {
   BracketCurlyIcon,
@@ -8,7 +8,7 @@ import {
   IdCardIcon,
   MonitorIcon,
   Settings02Icon,
-} from '../components/icons-v2-generated'
+} from '../components/icons-v2-generated';
 import {
   AppLayout,
   AppLayoutDrawer,
@@ -17,9 +17,9 @@ import {
   AppLayoutDrawerDescription,
   AppLayoutDrawerHeader,
   AppLayoutDrawerTitle,
-} from '../components/navigation'
-import { Button } from '../components/ui/button'
-import { NavigationSidebarConfig } from '../types/navigation'
+} from '../components/navigation';
+import { Button } from '../components/ui/button';
+import type { NavigationSidebarConfig } from '../types/navigation';
 
 const navigationItems: NavigationSidebarConfig['items'] = [
   { id: 'dashboard', label: 'Dashboard', icon: <ChartDonutIcon size={24} />, path: '/dashboard', isActive: true },
@@ -27,7 +27,7 @@ const navigationItems: NavigationSidebarConfig['items'] = [
   { id: 'devices', label: 'Devices', icon: <MonitorIcon size={24} />, path: '/devices' },
   { id: 'scripts', label: 'Scripts', icon: <BracketCurlyIcon size={24} />, path: '/scripts' },
   { id: 'settings', label: 'Settings', icon: <Settings02Icon size={24} />, path: '/settings', section: 'secondary' },
-]
+];
 
 const meta = {
   title: 'Navigation/AppLayoutDrawer',
@@ -54,33 +54,33 @@ auth modals), use the standard \`Drawer\` from \`components/ui\` instead.
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof AppLayoutDrawer>
+} satisfies Meta<typeof AppLayoutDrawer>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 function DashboardChildren({ onOpenDrawer }: { onOpenDrawer: () => void }) {
   return (
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-semibold text-ods-text-primary">Devices Overview</h1>
-        <p className="text-ods-text-secondary mt-1">8,250 Devices in Total</p>
+        <p className="mt-1 text-ods-text-secondary">8,250 Devices in Total</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {[
           { label: 'Active Devices', value: '6,930' },
           { label: 'Active Tickets', value: '136' },
           { label: 'Resolved Tickets', value: '825' },
-        ].map((stat) => (
-          <div key={stat.label} className="p-4 bg-ods-card rounded-lg border border-ods-border">
+        ].map(stat => (
+          <div key={stat.label} className="rounded-lg border border-ods-border bg-ods-card p-4">
             <p className="text-sm text-ods-text-secondary">{stat.label}</p>
-            <p className="text-2xl font-semibold text-ods-text-primary mt-1">{stat.value}</p>
+            <p className="mt-1 text-2xl font-semibold text-ods-text-primary">{stat.value}</p>
           </div>
         ))}
       </div>
       <Button onClick={onOpenDrawer}>Open in-layout drawer</Button>
     </div>
-  )
+  );
 }
 
 /**
@@ -90,7 +90,7 @@ function DashboardChildren({ onOpenDrawer }: { onOpenDrawer: () => void }) {
  */
 export const Right: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
     return (
       <AppLayout
         sidebarConfig={{ items: navigationItems, onNavigate: fn(), onToggleMinimized: fn() }}
@@ -127,9 +127,9 @@ export const Right: Story = {
       >
         <DashboardChildren onOpenDrawer={() => setOpen(true)} />
       </AppLayout>
-    )
+    );
   },
-}
+};
 
 /**
  * Resizable variant — drag the inside edge to resize. Clamped to the
@@ -137,7 +137,7 @@ export const Right: Story = {
  */
 export const ResizableRight: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(true)
+    const [open, setOpen] = useState(true);
     return (
       <AppLayout
         sidebarConfig={{ items: navigationItems, onNavigate: fn(), onToggleMinimized: fn() }}
@@ -170,8 +170,8 @@ export const ResizableRight: Story = {
               </AppLayoutDrawerHeader>
               <AppLayoutDrawerBody>
                 <p className="text-sm text-ods-text-secondary">
-                  Drag the grip on the left edge to resize. The panel can extend all
-                  the way to the container edge (minus a 16px symmetric gap).
+                  Drag the grip on the left edge to resize. The panel can extend all the way to the container edge
+                  (minus a 16px symmetric gap).
                 </p>
               </AppLayoutDrawerBody>
             </AppLayoutDrawerContent>
@@ -180,16 +180,16 @@ export const ResizableRight: Story = {
       >
         <DashboardChildren onOpenDrawer={() => setOpen(true)} />
       </AppLayout>
-    )
+    );
   },
-}
+};
 
 /**
  * Left-side variant.
  */
 export const Left: Story = {
   render: function Render() {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
     return (
       <AppLayout
         sidebarConfig={{ items: navigationItems, onNavigate: fn(), onToggleMinimized: fn() }}
@@ -223,6 +223,6 @@ export const Left: Story = {
       >
         <DashboardChildren onOpenDrawer={() => setOpen(true)} />
       </AppLayout>
-    )
+    );
   },
-}
+};

@@ -1,6 +1,7 @@
 package com.openframe.authz.service.user;
 
-import com.openframe.data.document.user.User;
+import com.openframe.authz.service.auth.MongoAuthorizationService;
+import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
 import com.openframe.notification.mail.service.EmailService;
@@ -25,6 +26,7 @@ public class PasswordResetService {
     private final OpenframeRedisKeyBuilder keyBuilder;
     private final UserService userService;
     private final EmailService emailService;
+    private final MongoAuthorizationService authorizationService;
 
     @Value("${openframe.password-reset.ttlMinutes:30}")
     private int ttlMinutes;
@@ -50,11 +52,14 @@ public class PasswordResetService {
             throw new IllegalArgumentException("Invalid or expired reset token");
         }
 
-        String userId = userService.findActiveByEmail(email)
-                .map(User::getId)
+        AuthUser user = userService.findActiveByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found for reset token"));
 
-        userService.updatePassword(userId, newPassword);
+        userService.updatePassword(user.getId(), newPassword);
+
+        // The old password may be compromised: revoke existing sessions' refresh tokens
+        int revoked = authorizationService.revokeAllForPrincipal(user.getEmail());
+        log.info("Revoked {} refresh token(s) after password reset for user {}", revoked, user.getId());
 
         redisTemplate.delete(key);
     }

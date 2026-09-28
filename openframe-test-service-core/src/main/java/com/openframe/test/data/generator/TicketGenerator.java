@@ -77,10 +77,9 @@ public class TicketGenerator {
                 .build();
     }
 
-    public static TicketFilterInput activeTickets() {
-        return TicketFilterInput.builder()
-                .statuses(List.of("ACTIVE"))
-                .build();
+    /** Every ticket in the tenant: the API no longer offers a lifecycle axis to narrow this by. */
+    public static TicketFilterInput allTickets() {
+        return TicketFilterInput.builder().build();
     }
 
     public static TicketFilterInput ticketsWithStatusId(String statusId) {

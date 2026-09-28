@@ -1,27 +1,27 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
-import { extractSections } from '../markdown-section-extractor'
-import { findAnchorElementByNormalizedId, normalizeAnchorId } from '../anchor-id'
-import { getHashTargetElement } from '../same-page-hash-nav'
+import { beforeEach, describe, expect, it } from 'vitest';
+import { findAnchorElementByNormalizedId, normalizeAnchorId } from '../anchor-id';
+import { extractSections } from '../markdown-section-extractor';
+import { getHashTargetElement } from '../same-page-hash-nav';
 
 describe('normalizeAnchorId', () => {
   it('drops the hyphen GitHub leaves behind a stripped emoji', () => {
-    expect(normalizeAnchorId('-getting-started')).toBe('getting-started')
-    expect(normalizeAnchorId('-architecture-diagrams')).toBe('architecture-diagrams')
-  })
+    expect(normalizeAnchorId('-getting-started')).toBe('getting-started');
+    expect(normalizeAnchorId('-architecture-diagrams')).toBe('architecture-diagrams');
+  });
 
   it('collapses the hyphen run GitHub emits around a dropped "&"', () => {
-    expect(normalizeAnchorId('-community--support')).toBe('community-support')
-  })
+    expect(normalizeAnchorId('-community--support')).toBe('community-support');
+  });
 
   it('is a no-op for an already-clean id', () => {
-    expect(normalizeAnchorId('table-of-contents')).toBe('table-of-contents')
-  })
+    expect(normalizeAnchorId('table-of-contents')).toBe('table-of-contents');
+  });
 
   it('normalizes raw heading text too', () => {
-    expect(normalizeAnchorId('🚀 Getting Started')).toBe('getting-started')
-  })
-})
+    expect(normalizeAnchorId('🚀 Getting Started')).toBe('getting-started');
+  });
+});
 
 describe('findAnchorElementByNormalizedId', () => {
   beforeEach(() => {
@@ -31,32 +31,28 @@ describe('findAnchorElementByNormalizedId', () => {
       <h2 id="getting-started">🚀 Getting Started</h2>
       <h2 id="community-support">💬 Community &amp; Support</h2>
       <h3 id="a---b">A - B</h3>
-    `
-  })
+    `;
+  });
 
   it('resolves a GitHub-style anchor onto our heading id', () => {
-    expect(findAnchorElementByNormalizedId('-getting-started', document)?.id).toBe('getting-started')
-    expect(findAnchorElementByNormalizedId('-table-of-contents', document)?.id).toBe(
-      'table-of-contents',
-    )
-  })
+    expect(findAnchorElementByNormalizedId('-getting-started', document)?.id).toBe('getting-started');
+    expect(findAnchorElementByNormalizedId('-table-of-contents', document)?.id).toBe('table-of-contents');
+  });
 
   it('resolves the double-hyphen "&" form', () => {
-    expect(findAnchorElementByNormalizedId('-community--support', document)?.id).toBe(
-      'community-support',
-    )
-  })
+    expect(findAnchorElementByNormalizedId('-community--support', document)?.id).toBe('community-support');
+  });
 
   it('matches an id whose own raw form normalizes differently', () => {
     // `a---b` is not reachable by normalized lookup — only the heading scan finds it.
-    expect(findAnchorElementByNormalizedId('a-b', document)?.id).toBe('a---b')
-  })
+    expect(findAnchorElementByNormalizedId('a-b', document)?.id).toBe('a---b');
+  });
 
   it('returns null for an anchor with no heading behind it', () => {
-    expect(findAnchorElementByNormalizedId('nope', document)).toBeNull()
-    expect(findAnchorElementByNormalizedId('', document)).toBeNull()
-  })
-})
+    expect(findAnchorElementByNormalizedId('nope', document)).toBeNull();
+    expect(findAnchorElementByNormalizedId('', document)).toBeNull();
+  });
+});
 
 describe('duplicate headings — GitHub numbers from -1, our deduper from -2', () => {
   beforeEach(() => {
@@ -65,49 +61,49 @@ describe('duplicate headings — GitHub numbers from -1, our deduper from -2', (
       <h2 id="setup-2">Setup</h2>
       <h2 id="setup-3">Setup</h2>
       <h2 id="step-2">Step 2</h2>
-    `
-  })
+    `;
+  });
 
   it('shifts a GitHub duplicate fragment onto our id', () => {
-    expect(getHashTargetElement('setup-1')?.id).toBe('setup-2')
-    expect(getHashTargetElement('setup-2')?.id).toBe('setup-2')
-  })
+    expect(getHashTargetElement('setup-1')?.id).toBe('setup-2');
+    expect(getHashTargetElement('setup-2')?.id).toBe('setup-2');
+  });
 
   it('an id that genuinely ends in a number is matched exactly, never shifted', () => {
     // `step-2` exists, so the exact lookup wins and `step-3` is never consulted.
-    expect(getHashTargetElement('step-2')?.id).toBe('step-2')
-  })
+    expect(getHashTargetElement('step-2')?.id).toBe('step-2');
+  });
 
   it('does not invent a match when the shifted id is absent too', () => {
-    expect(getHashTargetElement('missing-1')).toBeNull()
-  })
-})
+    expect(getHashTargetElement('missing-1')).toBeNull();
+  });
+});
 
 describe('getHashTargetElement — the fuzzy pass is wired into THE resolver', () => {
   beforeEach(() => {
     document.body.innerHTML = `
       <h2 id="getting-started">🚀 Getting Started</h2>
       <div id="ticket-a/b">encoded-id row</div>
-    `
-  })
+    `;
+  });
 
   it('exact ids still win, unchanged', () => {
-    expect(getHashTargetElement('getting-started')?.id).toBe('getting-started')
-  })
+    expect(getHashTargetElement('getting-started')?.id).toBe('getting-started');
+  });
 
   it('percent-decoding still runs before the fuzzy pass', () => {
-    expect(getHashTargetElement('ticket-a%2Fb')?.id).toBe('ticket-a/b')
-  })
+    expect(getHashTargetElement('ticket-a%2Fb')?.id).toBe('ticket-a/b');
+  });
 
   it('falls back to a normalized match — the TOC bug, through the public entry point', () => {
-    expect(getHashTargetElement('-getting-started')?.id).toBe('getting-started')
-  })
+    expect(getHashTargetElement('-getting-started')?.id).toBe('getting-started');
+  });
 
   it('still returns null when nothing matches', () => {
-    expect(getHashTargetElement('nope')).toBeNull()
-    expect(getHashTargetElement('')).toBeNull()
-  })
-})
+    expect(getHashTargetElement('nope')).toBeNull();
+    expect(getHashTargetElement('')).toBeNull();
+  });
+});
 
 describe('the openframe-cli doc that reported the bug', () => {
   // Verbatim shapes from
@@ -118,22 +114,16 @@ describe('the openframe-cli doc that reported the bug', () => {
     '## 🚀 Getting Started',
     '## 🛠️ Development',
     '## 💬 Community & Support',
-  ].join('\n\n')
-  const tocHrefs = ['#-getting-started', '#-development', '#-community--support']
+  ].join('\n\n');
+  const tocHrefs = ['#-getting-started', '#-development', '#-community--support'];
 
   it('every TOC href resolves to the id the section extractor emits', () => {
-    const sections = extractSections(headings)
-    document.body.innerHTML = sections
-      .map((s) => `<h2 id="${s.id}">${s.title}</h2>`)
-      .join('')
+    const sections = extractSections(headings);
+    document.body.innerHTML = sections.map(s => `<h2 id="${s.id}">${s.title}</h2>`).join('');
 
-    const resolved = tocHrefs.map((href) => getHashTargetElement(href.slice(1))?.id ?? null)
-    expect(resolved).toEqual(['getting-started', 'development', 'community-support'])
+    const resolved = tocHrefs.map(href => getHashTargetElement(href.slice(1))?.id ?? null);
+    expect(resolved).toEqual(['getting-started', 'development', 'community-support']);
     // …and none of them resolved before this helper existed:
-    expect(tocHrefs.map((href) => document.getElementById(href.slice(1)))).toEqual([
-      null,
-      null,
-      null,
-    ])
-  })
-})
+    expect(tocHrefs.map(href => document.getElementById(href.slice(1)))).toEqual([null, null, null]);
+  });
+});

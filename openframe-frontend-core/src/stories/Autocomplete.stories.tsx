@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import { Autocomplete, AutocompleteOption } from '../components/ui/autocomplete';
+import { Autocomplete, type AutocompleteOption } from '../components/ui/autocomplete';
 
 const meta: Meta = {
   title: 'UI/Autocomplete',
@@ -67,15 +67,7 @@ export const SingleWithValue: Story = {
 export const SingleDisabled: Story = {
   render: function Render() {
     const [value, setValue] = useState<string | null>('startup');
-    return (
-      <Autocomplete
-        options={sampleOptions}
-        value={value}
-        onChange={setValue}
-        label="Disabled"
-        disabled
-      />
-    );
+    return <Autocomplete options={sampleOptions} value={value} onChange={setValue} label="Disabled" disabled />;
   },
 };
 
@@ -126,13 +118,7 @@ export const MultipleWithValues: Story = {
   render: function Render() {
     const [value, setValue] = useState<string[]>(['enterprise', 'startup', 'smb']);
     return (
-      <Autocomplete
-        multiple
-        options={sampleOptions}
-        value={value}
-        onChange={setValue}
-        placeholder="Add More..."
-      />
+      <Autocomplete multiple options={sampleOptions} value={value} onChange={setValue} placeholder="Add More..." />
     );
   },
 };
@@ -163,14 +149,7 @@ export const MultipleDisabled: Story = {
   render: function Render() {
     const [value, setValue] = useState<string[]>(['enterprise', 'startup']);
     return (
-      <Autocomplete
-        multiple
-        options={sampleOptions}
-        value={value}
-        onChange={setValue}
-        label="Disabled"
-        disabled
-      />
+      <Autocomplete multiple options={sampleOptions} value={value} onChange={setValue} label="Disabled" disabled />
     );
   },
 };
@@ -250,12 +229,14 @@ export const MultipleCustomOptionRender: Story = {
         placeholder="Search..."
         renderOption={(option, isSelected) => (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: isSelected ? '#22c55e' : '#888'
-            }} />
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: isSelected ? '#22c55e' : '#888',
+              }}
+            />
             <span>{option.label}</span>
           </div>
         )}
@@ -302,8 +283,8 @@ export const SingleCreatable: Story = {
         label="Industry (creatable)"
         placeholder="Select or create..."
         creatable
-        onCreateOption={(input) => {
-          setOptions((prev) => [...prev, { label: input, value: input }]);
+        onCreateOption={input => {
+          setOptions(prev => [...prev, { label: input, value: input }]);
         }}
       />
     );
@@ -326,8 +307,8 @@ export const MultipleCreatable: Story = {
         label="Tags (creatable)"
         placeholder="Search or create..."
         creatable
-        onCreateOption={(input) => {
-          setOptions((prev) => [...prev, { label: input, value: input }]);
+        onCreateOption={input => {
+          setOptions(prev => [...prev, { label: input, value: input }]);
         }}
       />
     );
@@ -350,11 +331,7 @@ export const ServerSideFilter: Story = {
       // simulate server delay
       setTimeout(() => {
         const lower = input.toLowerCase();
-        setFilteredOpts(
-          input
-            ? sampleOptions.filter((o) => o.label.toLowerCase().includes(lower))
-            : sampleOptions
-        );
+        setFilteredOpts(input ? sampleOptions.filter(o => o.label.toLowerCase().includes(lower)) : sampleOptions);
         setLoading(false);
       }, 400);
     };
@@ -389,11 +366,7 @@ export const ServerSideFilterCreatable: Story = {
       setLoading(true);
       setTimeout(() => {
         const lower = input.toLowerCase();
-        setFilteredOpts(
-          input
-            ? allOptions.filter((o) => o.label.toLowerCase().includes(lower))
-            : allOptions
-        );
+        setFilteredOpts(input ? allOptions.filter(o => o.label.toLowerCase().includes(lower)) : allOptions);
         setLoading(false);
       }, 400);
     };
@@ -409,10 +382,10 @@ export const ServerSideFilterCreatable: Story = {
         disableClientFilter
         creatable
         onInputChange={handleInputChange}
-        onCreateOption={(input) => {
+        onCreateOption={input => {
           const newOpt = { label: input, value: input };
-          setAllOptions((prev) => [...prev, newOpt]);
-          setFilteredOpts((prev) => [...prev, newOpt]);
+          setAllOptions(prev => [...prev, newOpt]);
+          setFilteredOpts(prev => [...prev, newOpt]);
         }}
         loading={loading}
         loadingText="Searching..."

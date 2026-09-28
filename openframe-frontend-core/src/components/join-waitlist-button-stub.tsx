@@ -17,14 +17,14 @@ export const JoinWaitlistButton = React.forwardRef<HTMLButtonElement, JoinWaitli
         className={className}
         style={{
           backgroundColor: buttonBackgroundColor,
-          color: buttonTextColor
+          color: buttonTextColor,
         }}
         {...props}
       >
         {children || 'Join Waitlist'}
       </Button>
     );
-  }
+  },
 );
 
-JoinWaitlistButton.displayName = "JoinWaitlistButton";
+JoinWaitlistButton.displayName = 'JoinWaitlistButton';

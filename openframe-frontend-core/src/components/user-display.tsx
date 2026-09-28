@@ -1,7 +1,6 @@
-"use client";
+'use client';
 
-import React from 'react';
-import { cn } from "../utils/cn";
+import { cn } from '../utils/cn';
 import { getProxiedImageUrl } from '../utils/image-proxy';
 import { SquareAvatar } from './ui/square-avatar';
 
@@ -23,9 +22,17 @@ interface UserDisplayProps {
  * Reusable horizontal avatar + name (+ optional subtitle) row that follows
  * the visual pattern used in CommentCard headers.
  */
-export function UserDisplay({ name, avatarUrl, subtitle, size = 32, shape = 'square', compact = false, className }: UserDisplayProps) {
+export function UserDisplay({
+  name,
+  avatarUrl,
+  subtitle,
+  size = 32,
+  shape = 'square',
+  compact = false,
+  className,
+}: UserDisplayProps) {
   return (
-    <div className={cn('flex items-center gap-2 min-w-0', className)}>
+    <div className={cn('flex min-w-0 items-center gap-2', className)}>
       <SquareAvatar
         src={avatarUrl ? getProxiedImageUrl(avatarUrl) || avatarUrl : undefined}
         fallback={name}
@@ -34,20 +41,9 @@ export function UserDisplay({ name, avatarUrl, subtitle, size = 32, shape = 'squ
         variant={shape}
       />
       <div className="min-w-0 flex-1">
-        <p className={cn(
-          "text-ods-text-primary truncate",
-          compact ? 'text-h6' : 'text-h4',
-        )}>
-          {name}
-        </p>
-        {subtitle && (
-          <span className={cn(
-            "text-h6 text-ods-text-secondary truncate block",
-          )}>
-            {subtitle}
-          </span>
-        )}
+        <p className={cn('truncate text-ods-text-primary', compact ? 'text-h6' : 'text-h4')}>{name}</p>
+        {subtitle && <span className={cn('block truncate text-ods-text-secondary text-h6')}>{subtitle}</span>}
       </div>
     </div>
   );
-} 
+}

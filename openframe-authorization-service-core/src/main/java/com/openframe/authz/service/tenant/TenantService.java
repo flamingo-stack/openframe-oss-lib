@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
@@ -34,11 +35,14 @@ public class TenantService {
 
         registrationValidationService.ensureTenantDomainAvailable(domain);
 
+        // createdAt is set explicitly: with a pre-assigned id Spring Data treats the tenant as existing,
+        // so Mongo auditing only fills @LastModifiedDate and never @CreatedDate.
         Tenant tenant = Tenant.builder()
                 .id(tenantId)
                 .name(tenantName)
                 .domain(domain)
                 .status(TenantStatus.ACTIVE)
+                .createdAt(LocalDateTime.now())
                 .build();
 
         Tenant savedTenant = tenantRepository.save(tenant);
@@ -59,10 +63,6 @@ public class TenantService {
      */
     public Optional<Tenant> findById(String tenantId) {
         return tenantRepository.findById(tenantId);
-    }
-
-    public Optional<Tenant> findFirst() {
-        return tenantRepository.findAll().stream().findFirst();
     }
 
     /**
