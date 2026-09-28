@@ -11,11 +11,14 @@ import com.openframe.api.dto.device.DeviceLogFilterInput;
 import com.openframe.api.mapper.GraphQLDeviceLogMapper;
 import com.openframe.api.service.device.DeviceLogService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
+
+import java.util.List;
+import java.util.stream.Stream;
 
 @DgsComponent
 @Slf4j
@@ -29,16 +32,36 @@ public class DeviceLogDataFetcher {
 
     @DgsQuery
     public GenericConnection<GenericEdge<DeviceLogEntry>> deviceLogs(
-            @InputArgument @NotBlank String machineId,
+            @InputArgument String machineId,
+            @InputArgument List<String> machineIds,
             @InputArgument @Valid DeviceLogFilterInput filter,
             @InputArgument Integer first,
             @InputArgument String after) {
 
-        log.debug("Fetching device logs for machineId: {}, filter: {}, first: {}, after: {}",
-                machineId, filter, first, after);
+        List<String> devices = devices(machineId, machineIds);
+        log.debug("Fetching device logs for machineIds: {}, filter: {}, first: {}, after: {}",
+                devices, filter, first, after);
 
-        GenericQueryResult<DeviceLogEntry> result = deviceLogService.queryDeviceLogs(
-                machineId, mapper.toFilterCriteria(filter), mapper.toCursorPaginationCriteria(first, after));
+        GenericQueryResult<DeviceLogEntry> result = deviceLogService.queryLogs(
+                devices, mapper.toFilterCriteria(filter), mapper.toCursorPaginationCriteria(first, after));
         return mapper.toConnection(result);
+    }
+
+    /**
+     * Null only when neither argument was given, which is what asks for every device of the tenant. The deprecated
+     * single-device argument keeps rejecting a blank value, so a client that sends one still gets its old error
+     * rather than a silent tenant-wide query.
+     */
+    private static List<String> devices(String machineId, List<String> machineIds) {
+        if (machineId == null) {
+            return machineIds;
+        }
+        if (!StringUtils.hasText(machineId)) {
+            throw new IllegalArgumentException("machineId must not be blank");
+        }
+        if (machineIds == null) {
+            return List.of(machineId);
+        }
+        return Stream.concat(Stream.of(machineId), machineIds.stream()).toList();
     }
 }

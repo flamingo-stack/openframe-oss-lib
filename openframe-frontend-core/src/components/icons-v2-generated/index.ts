@@ -7,6 +7,7 @@ export * from './charts';
 export * from './clothes';
 export * from './coding';
 export * from './communication';
+export * from './compliance-logos';
 export * from './date-and-time';
 export * from './design';
 export * from './devices';

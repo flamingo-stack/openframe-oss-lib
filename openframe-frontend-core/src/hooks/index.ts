@@ -41,3 +41,7 @@ export * from './use-scroll-to-hash';
 // Invisible bot-protection client primitive (honeypot ref + submit-timing).
 // Pairs with the server-safe decision fn in `utils/humanity-signals`.
 export * from './use-humanity-signals';
+// Saves a half-filled public form so a visitor who leaves can be followed up with.
+// Pairs with the server-safe rules in `utils/form-rescue`.
+export * from './use-form-rescue';
+export * from './use-rescued-form';

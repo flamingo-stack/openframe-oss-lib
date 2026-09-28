@@ -54,6 +54,7 @@ export * from './waitlist';
 
 // Business logic types
 export * from './faq';
+export * from './trust-center';
 export * from './content-ref';
 export * from './report';
 export * from './stack';

@@ -36,6 +36,7 @@ export default defineConfig([
       // Its own entry so the hub's server-side `verifyHuman` can import
       // `./utils/humanity-signals` without pulling the full utils barrel.
       'utils/humanity-signals': 'src/utils/humanity-signals.ts',
+      'utils/form-rescue': 'src/utils/form-rescue.ts',
       // JSX-free leaves, each with its own `exports` subpath so hub SCRIPTS and
       // `server-only` modules import them without React or the utils barrel.
       'utils/platform-identity': 'src/utils/platform-identity.ts',
