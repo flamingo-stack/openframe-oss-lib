@@ -30,7 +30,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
      * to confirm the account and accept Terms before the user is created; blank keeps the old
      * create-immediately behavior. See {@code SsoJoinController}.
      */
-    @org.springframework.beans.factory.annotation.Value("${openframe.sso.join-confirm-url:}")
+    @org.springframework.beans.factory.annotation.Value("${openframe.sso.join-confirm-url}")
     private String joinConfirmUrl;
 
     @Override
