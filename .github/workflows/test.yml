@@ -42,7 +42,7 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - { name: backend, path: ".", skip: "openframe-frontend-core,react-embedding-example" }
+          - { name: backend, path: ".", skip: openframe-frontend-core }
           - { name: frontend, path: openframe-frontend-core }
     steps:
       - name: Checkout
