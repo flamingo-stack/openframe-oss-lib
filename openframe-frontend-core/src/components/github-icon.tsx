@@ -23,3 +23,8 @@ export const GitHubIcon: React.FC<GitHubIconProps> = ({ className = '', width = 
     </svg>
   );
 };
+
+// Backward-compatible alias so consumers importing either name resolve to the
+// same canonical implementation (see icons-v2-generated/brand-logos).
+export const GithubIcon = GitHubIcon;
+
