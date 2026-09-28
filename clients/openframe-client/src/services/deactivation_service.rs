@@ -314,7 +314,7 @@ fn load_marker(secured_dir: &Path) -> Option<DateTime<Utc>> {
 }
 
 fn save_marker(secured_dir: &Path, ts: DateTime<Utc>) {
-    if let Err(e) = std::fs::write(marker_path(secured_dir), ts.to_rfc3339()) {
+    if let Err(e) = crate::utils::fs::atomic_write(&marker_path(secured_dir), ts.to_rfc3339()) {
         warn!(target: "deactivation", "Failed to persist tenant-gone marker: {e:#}");
     }
 }
