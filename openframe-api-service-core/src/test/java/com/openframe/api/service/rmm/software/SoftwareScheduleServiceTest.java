@@ -21,6 +21,7 @@ import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedReposito
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -52,6 +54,7 @@ class SoftwareScheduleServiceTest {
     private SoftwareScheduleMachineAssignedRepository assignedRepository;
     private SoftwareScheduleTargetResolver targetResolver;
     private TenantIdProvider tenantIdProvider;
+    private PackageManagerAvailability packageManagerAvailability;
     private SoftwareScheduleService service;
 
     private CreateSoftwareScheduleInput createInput;
@@ -62,7 +65,9 @@ class SoftwareScheduleServiceTest {
         assignedRepository = mock(SoftwareScheduleMachineAssignedRepository.class);
         targetResolver = mock(SoftwareScheduleTargetResolver.class);
         tenantIdProvider = mock(TenantIdProvider.class);
-        service = new SoftwareScheduleService(scheduleRepository, assignedRepository, targetResolver, tenantIdProvider);
+        packageManagerAvailability = mock(PackageManagerAvailability.class);
+        service = new SoftwareScheduleService(scheduleRepository, assignedRepository, targetResolver, tenantIdProvider,
+                packageManagerAvailability);
 
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Saves are identity so assertions can read back what the service built.
@@ -118,6 +123,19 @@ class SoftwareScheduleServiceTest {
         verify(assignedRepository).saveAll(rows.capture());
         assertThat(rows.getValue()).extracting(SoftwareScheduleMachineAssigned::getMachineId)
                 .containsExactly("m1", "m2");
+    }
+
+    @Test
+    @DisplayName("create: a device whose agent reported no usable package manager is rejected before anything is saved")
+    void createUnmanageableDeviceRejected() {
+        doThrow(new BadRequestException("These devices have no supported package manager: [m2]"))
+                .when(packageManagerAvailability).requireSoftwareManageable(List.of("m1", "m2"));
+
+        assertThatThrownBy(() -> service.create(createInput, ACTOR))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("m2");
+        verify(scheduleRepository, never()).save(any(SoftwareSchedule.class));
+        verify(assignedRepository, never()).saveAll(any());
     }
 
     @Test

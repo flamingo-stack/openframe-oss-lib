@@ -20,6 +20,7 @@ import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedReposito
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -44,6 +45,7 @@ public class SoftwareScheduleService {
     private final SoftwareScheduleMachineAssignedRepository assignedRepository;
     private final SoftwareScheduleTargetResolver targetResolver;
     private final TenantIdProvider tenantIdProvider;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     public SoftwareScheduleResponse create(CreateSoftwareScheduleInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -53,6 +55,7 @@ public class SoftwareScheduleService {
 
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
         validateTiming(input.getStartAt(), input.getRepeat());
+        packageManagerAvailability.requireSoftwareManageable(input.getMachineIds());
 
         SoftwareSchedule entity = SoftwareSchedule.builder()
                 .tenantId(tenantId)
@@ -86,6 +89,7 @@ public class SoftwareScheduleService {
 
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
         validateTiming(input.getStartAt(), input.getRepeat());
+        packageManagerAvailability.requireSoftwareManageable(input.getMachineIds());
 
         entity.setName(input.getName());
         entity.setDescription(input.getDescription());
@@ -154,6 +158,7 @@ public class SoftwareScheduleService {
     public SoftwareScheduleResponse setDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
+        packageManagerAvailability.requireSoftwareManageable(machineIds);
         ensureSpecificMode(entity);
         replaceDevices(tenantId, scheduleId, machineIds, actor);
         return toResponse(entity);
@@ -165,6 +170,7 @@ public class SoftwareScheduleService {
         if (machineIds == null || machineIds.isEmpty()) {
             return;
         }
+        packageManagerAvailability.requireSoftwareManageable(machineIds);
         ensureSpecificMode(entity);
         Set<String> existing = new HashSet<>(assignedMachineIds(tenantId, scheduleId));
         List<SoftwareScheduleMachineAssigned> rows = machineIds.stream().distinct()
