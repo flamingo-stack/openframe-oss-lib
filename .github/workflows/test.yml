@@ -36,7 +36,8 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: fromJSON(needs.changes.outputs.changes || '{}').java == 'true' || fromJSON(needs.changes.outputs.changes || '{}').rust == 'true'
+      pull-requests: read
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,7 +59,8 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
+      pull-requests: read
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

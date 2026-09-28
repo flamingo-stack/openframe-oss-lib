@@ -16,14 +16,43 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Check if scan should run
+      id: should_run
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        SCAN: ${{ inputs.scan }}
+        SCAN_DIR: ${{ inputs.path }}
+        SKIP_DIRS: ${{ inputs.skip-dirs }}
+      run: |
+        set -euo pipefail
+        if [ "$SCAN" != "code" ] || [ -z "$PR_NUMBER" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+        gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename' > /tmp/pr-files.txt
+        prefix="${SCAN_DIR#./}/"; [ "$prefix" = "./" ] && prefix=""
+        manifest='(^|/)(pom\.xml|package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Dockerfile[^/]*)$'
+        always='^(pom\.xml|\.mvn/|\.trivyignore|\.github/steps/trivy/)'
+        skip=""
+        for dir in ${SKIP_DIRS//,/ }; do skip="${skip:+$skip|}^${prefix}${dir%/}/"; done
+        run=false
+        while read -r f; do
+          [[ "$f" =~ $always ]] && { run=true; break; }
+          [[ "$f" == "$prefix"* ]] || continue
+          [ -n "$skip" ] && [[ "$f" =~ $skip ]] && continue
+          [[ "$f" =~ $manifest ]] && { run=true; break; }
+        done < /tmp/pr-files.txt
+        echo "run=$run" >> "$GITHUB_OUTPUT"
+        [ "$run" = true ] || echo "No dependency manifests changed under $SCAN_DIR, scan skipped"
+
     - name: Install Trivy
+      if: steps.should_run.outputs.run == 'true'
       uses: aquasecurity/setup-trivy@v0.3.1
       with:
         version: v0.74.0
         cache: true
 
     - name: Resolve Maven dependencies
-      if: inputs.scan == 'code'
+      if: inputs.scan == 'code' && steps.should_run.outputs.run == 'true'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.maven-token }}
@@ -40,7 +69,7 @@ runs:
           echo "::warning::Some Maven dependencies could not be resolved; scan depth may be reduced"
 
     - name: Scan dependencies
-      if: inputs.scan == 'code'
+      if: inputs.scan == 'code' && steps.should_run.outputs.run == 'true'
       shell: bash
       env:
         SCAN_DIR: ${{ inputs.path }}
@@ -63,7 +92,7 @@ runs:
         done < "$report" > "$report.tmp" && mv "$report.tmp" "$report"
 
     - name: Scan Dockerfile base images
-      if: inputs.scan == 'code'
+      if: inputs.scan == 'code' && steps.should_run.outputs.run == 'true'
       shell: bash
       env:
         SCAN_DIR: ${{ inputs.path }}
@@ -89,7 +118,7 @@ runs:
         find . -maxdepth 1 -name 'trivy-*.tsv' -empty -delete
 
     - name: Scan built image
-      if: inputs.scan == 'image'
+      if: inputs.scan == 'image' && steps.should_run.outputs.run == 'true'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.maven-token }}
@@ -105,6 +134,7 @@ runs:
         find . -maxdepth 1 -name 'trivy-*.tsv' -empty -delete
 
     - name: Upload report
+      if: steps.should_run.outputs.run == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.scan == 'code' && (inputs.image-name && format('scan_code-{0}', inputs.image-name) || 'scan_code') || format('scan_image-{0}', inputs.image-name) }}
@@ -112,6 +142,7 @@ runs:
         if-no-files-found: ignore
 
     - name: Evaluate
+      if: steps.should_run.outputs.run == 'true'
       shell: bash
       env:
         ARTIFACT: ${{ inputs.scan == 'code' && 'scan_code' || 'scan_image' }}
