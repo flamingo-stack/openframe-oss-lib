@@ -16,7 +16,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { CARD_REFERENCE, createCardMarkerScanner } from '../card-marker';
+import { CARD_REFERENCE, createCardMarkerScanner, extractCardReferences } from '../card-marker';
 
 /** The id half as the backend validates it: anything but `]` and newlines. */
 const PUNCTUATED_IDS = [
@@ -59,5 +59,31 @@ describe('card marker grammar', () => {
 
   it('anchors `CARD_REFERENCE`, so a ref cannot carry trailing text', () => {
     expect(CARD_REFERENCE.exec('[card://faq:a] plus a note')).toBeNull();
+  });
+});
+
+describe('extractCardReferences', () => {
+  it('returns each reference once, in order of first appearance', () => {
+    const text =
+      'See [card://hubspot_ticket_self:48720777129] and [card://faq:a], ' +
+      'then [card://hubspot_ticket_self:48720777129] again ([card://podcast:9b2f).';
+
+    expect(extractCardReferences(text)).toEqual([
+      { type: 'hubspot_ticket_self', id: '48720777129' },
+      { type: 'faq', id: 'a' },
+      { type: 'podcast', id: '9b2f' },
+    ]);
+  });
+
+  it('finds nothing in text without markers, or with a malformed one', () => {
+    expect(extractCardReferences('no cards here')).toEqual([]);
+    expect(extractCardReferences('[card://faq:]')).toEqual([]);
+  });
+
+  it('is served from the server-safe `chat-protocol` entry point', async () => {
+    const chatProtocol = await import('../index');
+    expect(chatProtocol.extractCardReferences).toBe(extractCardReferences);
+    expect(chatProtocol.createCardMarkerScanner).toBe(createCardMarkerScanner);
+    expect(chatProtocol.CARD_REFERENCE).toBe(CARD_REFERENCE);
   });
 });

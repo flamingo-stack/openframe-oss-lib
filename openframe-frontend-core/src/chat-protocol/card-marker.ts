@@ -38,3 +38,27 @@ export const CARD_REFERENCE = new RegExp(`^\\[card://(${CARD_TYPE}):(${CARD_ID})
 export function createCardMarkerScanner(): RegExp {
   return new RegExp(`\\[card://(${CARD_TYPE}):(${CARD_ID})[\\])]`, 'g');
 }
+
+/** One `[card://<type>:<id>]` reference, split into its two halves. */
+export interface CardReference {
+  type: string;
+  id: string;
+}
+
+/**
+ * Every card reference EMBEDDED in a text, in order of first appearance,
+ * each once. The server reads the references an answer cites through this
+ * (the hub's MCP `ask_guide` returns them as `cards[]`), so a host and the
+ * body renderer can never disagree about which markers a text carries.
+ */
+export function extractCardReferences(text: string): CardReference[] {
+  const seen = new Set<string>();
+  const out: CardReference[] = [];
+  for (const match of text.matchAll(createCardMarkerScanner())) {
+    const key = `${match[1]}:${match[2]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ type: match[1], id: match[2] });
+  }
+  return out;
+}
