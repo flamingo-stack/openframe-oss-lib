@@ -90,3 +90,4 @@ export {
   type EmbeddableChatHandle,
   type EmbeddableChatProps,
 } from './embeddable-chat';
+export * from './proxy-credentials-panel';
