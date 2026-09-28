@@ -6,12 +6,16 @@ import type { FormEvent, ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import type { Control, Path, UseFormRegister } from 'react-hook-form';
 import { useRescuedForm } from '../../hooks/use-rescued-form';
+import { useToast } from '../../hooks/use-toast';
 import {
   BUILT_IN_BOOKING_FIELDS,
   type BuiltInBookingFieldName,
   DECIMAL_LITERAL_RE,
   fieldTypeSpec,
   makeDeferredBookingSchema,
+  withDeniedEmailDomains,
+  emailDomainDenied,
+  type DeniedEmailDomains,
   MULTI_VALUE_SEPARATOR,
   normalizeFormFields,
   splitMultiValue,
@@ -59,6 +63,21 @@ export interface BookingFieldSlot {
 export type BookingFieldSpan = keyof typeof SPAN_CLASS;
 
 export type BookingFieldRow = BookingFieldSlot[];
+
+/**
+ * Display copy a HOST overrides for ONE field, keyed by its name — a built-in
+ * (`email`) or a HubSpot-declared question. It replaces what is DRAWN and
+ * nothing else: the name the answer rides under, the validation and the
+ * schema's own messages are untouched, so a campaign page can ask for a
+ * "Business Email" without owning a second email rule.
+ *
+ * An overridden `label` also feeds the type's derived placeholder
+ * (`Enter <label>`), so overriding the label alone keeps the pair consistent.
+ */
+export interface BookingFieldCopy {
+  label?: string;
+  placeholder?: string;
+}
 
 /**
  * A HOST-supplied consent row — the block the waitlist form draws for its SMS
@@ -182,7 +201,9 @@ const canonicalNumber = (v: unknown): string => {
  * validator and the renderer can never disagree about what is supported.
  * Every control states `aria-invalid` from the field's message and carries
  * `required`/`aria-required` from the field, so the accent asterisk is never
- * the only signal.
+ * the only signal. The ones that can PAINT the state take `invalid` too
+ * (`Input`, `Textarea`, `SelectTrigger` — the lib's error border), so a refused
+ * field reads as refused at the control, not only in the line beneath it.
  */
 const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => ReactNode> = {
   text: ({ field, id, registerName, error, register }) => (
@@ -191,6 +212,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       type={field.inputType ?? 'text'}
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       autoComplete={field.autoComplete}
       placeholder={placeholderFor(field)}
       {...register(registerName as never)}
@@ -201,6 +223,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       id={id}
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       placeholder={placeholderFor(field)}
       {...register(registerName as never)}
     />
@@ -213,6 +236,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       step="any"
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       {...register(registerName as never, { setValueAs: canonicalNumber })}
     />
   ),
@@ -224,6 +248,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       autoComplete="tel"
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       placeholder={placeholderFor(field)}
       {...register(registerName as never, { setValueAs: trimmed })}
     />
@@ -235,6 +260,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       type="date"
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       {...register(registerName as never)}
     />
   ),
@@ -244,7 +270,12 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       name={registerName as never}
       render={({ field: rhf }) => (
         <Select value={rhf.value ?? ''} onValueChange={rhf.onChange}>
-          <SelectTrigger id={id} aria-required={field.required || undefined} aria-invalid={Boolean(error)}>
+          <SelectTrigger
+            id={id}
+            aria-required={field.required || undefined}
+            aria-invalid={Boolean(error)}
+            invalid={Boolean(error)}
+          >
             <SelectValue placeholder="Select…" />
           </SelectTrigger>
           <SelectContent>
@@ -365,6 +396,11 @@ export interface BookingFormProps {
    * appended full width. Both are deliberate — see `slotNode`/`unplacedFields`.
    */
   fieldRows?: BookingFieldRow[];
+  /** Per-field display overrides, keyed by field name — see `BookingFieldCopy`. */
+  fieldCopy?: Record<string, BookingFieldCopy>;
+  /** Email domains this form refuses, with the message it shows — see `DeniedEmailDomains`.
+   *  MEMOIZE it: a new object every render rebuilds the resolver's schema. */
+  deniedEmailDomains?: DeniedEmailDomains;
   /** Host-supplied consent row, rendered after the fields — see `BookingFormConsent`. */
   consent?: BookingFormConsent;
   isSubmitting: boolean;
@@ -404,6 +440,8 @@ export function BookingForm({
   submitLabel,
   footerNote,
   fieldRows,
+  fieldCopy,
+  deniedEmailDomains,
   consent,
   isSubmitting,
   onSubmit,
@@ -420,8 +458,8 @@ export function BookingForm({
   // resolver is not assignable to `Resolver<BookingFormValues>`. The strict
   // schema is the server's contract — see `makeBookingSchema`'s docblock.
   const schema = useMemo(
-    () => makeDeferredBookingSchema(supportedFields, legalConsent),
-    [supportedFields, legalConsent],
+    () => withDeniedEmailDomains(makeDeferredBookingSchema(supportedFields, legalConsent), deniedEmailDomains),
+    [supportedFields, legalConsent, deniedEmailDomains],
   );
 
   const consentDefaults = useMemo(
@@ -506,6 +544,28 @@ export function BookingForm({
     },
   );
 
+  const { toast } = useToast();
+
+  /**
+   * A refused submit already reports itself under each field, and the button
+   * stays live — pressing it is how a visitor asks what is wrong.
+   *
+   * The denied-domain rule is the one they cannot see coming: the address is
+   * well formed and the control looks answered, so the inline line under a
+   * filled-in field is easy to miss. That one is ALSO said at the button.
+   * Nothing else toasts — a toast per empty field would bury the messages the
+   * fields already carry.
+   */
+  const onInvalid = () => {
+    if (deniedEmailDomains && emailDomainDenied(getValues('email'), deniedEmailDomains)) {
+      toast({
+        variant: 'error',
+        title: 'Check your email address',
+        description: deniedEmailDomains.message,
+      });
+    }
+  };
+
   const submitValid = handleSubmit(async data => {
     if (consentMissing) return; // the error is already on screen — see `submit`
     if (deferSlot) {
@@ -526,7 +586,7 @@ export function BookingForm({
       ...getSignals(),
       ...formRescue.submitFields(),
     });
-  });
+  }, onInvalid);
 
   // Consent is checked BEFORE the resolver runs, not inside the valid branch,
   // so an unticked box and an empty field are reported together rather than
@@ -546,18 +606,32 @@ export function BookingForm({
   const renderField = (
     field: ControlArgs['field'],
     where: { id: string; registerName: string; error?: string },
-  ): ReactNode => (
-    <FieldWrapper key={field.name} label={field.label} htmlFor={where.id} required={field.required} error={where.error}>
-      {FIELD_CONTROLS[field.type]({
-        field,
-        id: where.id,
-        registerName: where.registerName,
-        error: where.error,
-        register,
-        control,
-      })}
-    </FieldWrapper>
-  );
+  ): ReactNode => {
+    // DISPLAY only: the host's copy replaces what this control draws, never the
+    // name the answer registers under, the validation, or the schema's messages.
+    const copy = fieldCopy?.[field.name];
+    const shown = copy
+      ? { ...field, label: copy.label ?? field.label, placeholder: copy.placeholder ?? field.placeholder }
+      : field;
+    return (
+      <FieldWrapper
+        key={shown.name}
+        label={shown.label}
+        htmlFor={where.id}
+        required={shown.required}
+        error={where.error}
+      >
+        {FIELD_CONTROLS[shown.type]({
+          field: shown,
+          id: where.id,
+          registerName: where.registerName,
+          error: where.error,
+          register,
+          control,
+        })}
+      </FieldWrapper>
+    );
+  };
 
   const builtInFields: Record<string, ReactNode> = Object.fromEntries(
     BUILT_IN_BOOKING_FIELDS.map(field => [

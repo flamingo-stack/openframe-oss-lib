@@ -30,6 +30,7 @@ pub struct ExecutionListener<M> {
     config_service: AgentConfigurationService,
     result_store: Arc<ResultStore>,
     flush_notify: Arc<Notify>,
+    message_handled: Option<Arc<Notify>>,
     _marker: PhantomData<fn() -> M>,
 }
 
@@ -42,6 +43,7 @@ impl<M> Clone for ExecutionListener<M> {
             config_service: self.config_service.clone(),
             result_store: self.result_store.clone(),
             flush_notify: self.flush_notify.clone(),
+            message_handled: self.message_handled.clone(),
             _marker: PhantomData,
         }
     }
@@ -68,8 +70,14 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             config_service,
             result_store,
             flush_notify,
+            message_handled: None,
             _marker: PhantomData,
         }
+    }
+
+    pub fn on_message_handled(mut self, notify: Arc<Notify>) -> Self {
+        self.message_handled = Some(notify);
+        self
     }
 
     pub async fn start(&self) -> Result<tokio::task::JoinHandle<()>> {
@@ -180,6 +188,10 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
                 let bytes = self.encode_for_publish(&result).await;
                 self.deliver(key, &result_subject, bytes).await;
             }
+        }
+
+        if let Some(notify) = &self.message_handled {
+            notify.notify_one();
         }
 
         Ok(())

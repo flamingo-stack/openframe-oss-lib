@@ -22,6 +22,8 @@ import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -49,6 +51,7 @@ public class SoftwareBundleDataFetcher {
     private final SoftwareBundleService softwareBundleService;
     private final DeviceService deviceService;
     private final GraphQLDeviceMapper deviceMapper;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     @DgsQuery
     public SoftwareBundleResponse softwareBundle(@InputArgument String id) {
@@ -76,7 +79,9 @@ public class SoftwareBundleDataFetcher {
     public SoftwareBundleResponse addAllDevicesToSoftwareBundle(@InputArgument String bundleId,
                                                                 @InputArgument @Valid DeviceFilterInput filter,
                                                                 @InputArgument String search) {
-        List<String> machineIds = deviceService.findAllDeviceIds(deviceMapper.toDeviceFilterCriteria(filter), search);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
+        List<String> machineIds = deviceService.findAllDeviceIds(filterOptions, search);
         return softwareBundleService.addDevices(decodeId(bundleId), machineIds, getCurrentUserId());
     }
 
@@ -142,7 +147,8 @@ public class SoftwareBundleDataFetcher {
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
         SoftwareBundleResponse bundle = dfe.getSource();
-        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
         CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(
                 ConnectionArgs.builder().first(first).after(after).last(last).before(before).build());
         Set<String> assignedMachineIds = new HashSet<>(bundle.getMachineIds() == null ? List.of() : bundle.getMachineIds());
@@ -168,7 +174,8 @@ public class SoftwareBundleDataFetcher {
             DgsDataFetchingEnvironment dfe,
             @InputArgument @Valid DeviceFilterInput filter,
             @InputArgument String search) {
-        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
         return deviceService.getAvailableDeviceFilters(null, filterOptions, search);
     }
 
