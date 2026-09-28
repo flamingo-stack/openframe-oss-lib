@@ -61,6 +61,8 @@ public class InstalledAgentListener extends AbstractJetStreamPushListener {
     protected void handleMessage(Message message) {
         String messagePayload = new String(message.getData(), StandardCharsets.UTF_8);
         String subject = message.getSubject();
+        long deliveredCount = message.metaData().deliveredCount();
+        boolean lastAttempt = isLastAttempt(deliveredCount);
 
         try {
             String machineId = machineIdExtractor.extract(subject);
@@ -68,8 +70,6 @@ public class InstalledAgentListener extends AbstractJetStreamPushListener {
 
             String agentType = installedAgentMessage.getAgentType();
             String version = installedAgentMessage.getVersion();
-            long deliveredCount = message.metaData().deliveredCount();
-            boolean lastAttempt = isLastAttempt(deliveredCount);
 
             log.info("Processing installed agent: machineId={} agentType={} version={} (delivery={})",
                     machineId, agentType, version, deliveredCount);
@@ -82,8 +82,13 @@ public class InstalledAgentListener extends AbstractJetStreamPushListener {
             log.info("Installed agent processed successfully and acked");
         } catch (Exception e) {
             log.error("Unexpected error processing installed agent: {}", messagePayload, e);
-            // Don't ack the message and let it be redelivered
-            log.info("Leaving message unacked for potential redelivery: installed agent");
+            if (lastAttempt) {
+                message.ack();
+                log.warn("Last delivery attempt reached, acking and dropping malformed/failing message: installed agent");
+            } else {
+                // Don't ack the message and let it be redelivered
+                log.info("Leaving message unacked for potential redelivery: installed agent");
+            }
         }
     }
 }
