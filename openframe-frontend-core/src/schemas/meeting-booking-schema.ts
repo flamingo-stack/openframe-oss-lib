@@ -699,6 +699,39 @@ export function makeDeferredBookingSchema(formFields: MeetingFormField[], legalC
   });
 }
 
+/**
+ * Email domains a host's form does not accept, with the message it shows when
+ * one is typed. The HOST owns the list (its own personal/free-provider rule)
+ * and re-checks on its own server — this is the answer at the point of typing,
+ * never the gate.
+ */
+export interface DeniedEmailDomains {
+  domains: readonly string[];
+  message: string;
+}
+
+/** The address's domain, lower-cased, matched WHOLE against the list — a
+ *  subdomain is a different domain, which is how a host's own list reads it. */
+export function emailDomainDenied(email: unknown, rule: DeniedEmailDomains): boolean {
+  if (typeof email !== 'string') return false;
+  const domain = email.split('@')[1]?.trim().toLowerCase();
+  return Boolean(domain) && rule.domains.includes(domain as string);
+}
+
+/** `schema` refined to reject those domains ON the email field, so the message
+ *  lands under the control the visitor typed in rather than as a form error. */
+export function withDeniedEmailDomains(
+  schema: ReturnType<typeof makeDeferredBookingSchema>,
+  rule: DeniedEmailDomains | undefined,
+) {
+  if (!rule) return schema;
+  return schema.superRefine((values, ctx) => {
+    if (emailDomainDenied(values.email, rule)) {
+      ctx.addIssue({ code: 'custom', path: ['email'], message: rule.message });
+    }
+  });
+}
+
 /** The wire payload. Pinned to the STRICT builder — see above. */
 export type MeetingBookingPayload = z.infer<ReturnType<typeof makeBookingSchema>>;
 

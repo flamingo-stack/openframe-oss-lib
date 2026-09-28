@@ -152,7 +152,7 @@ export interface HubSpotMeetingSchedulerProps {
    * so a Server Component can pass it across the RSC boundary where a component
    * cannot.
    */
-  detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent' | 'fieldCopy'>;
+  detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent' | 'fieldCopy' | 'deniedEmailDomains'>;
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
   rescue?: FormRescueDefinition | null;
@@ -997,4 +997,4 @@ export {
   type MeetingSchedulerDirectoryProps,
 } from './directory';
 export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost };
-export type { SchedulingLink, SchedulingLinksPayload } from '../../schemas/meeting-booking-schema';
+export type { SchedulingLink, SchedulingLinksPayload, DeniedEmailDomains } from '../../schemas/meeting-booking-schema';

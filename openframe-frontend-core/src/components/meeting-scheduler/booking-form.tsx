@@ -12,6 +12,8 @@ import {
   DECIMAL_LITERAL_RE,
   fieldTypeSpec,
   makeDeferredBookingSchema,
+  withDeniedEmailDomains,
+  type DeniedEmailDomains,
   MULTI_VALUE_SEPARATOR,
   normalizeFormFields,
   splitMultiValue,
@@ -382,6 +384,9 @@ export interface BookingFormProps {
   fieldRows?: BookingFieldRow[];
   /** Per-field display overrides, keyed by field name — see `BookingFieldCopy`. */
   fieldCopy?: Record<string, BookingFieldCopy>;
+  /** Email domains this form refuses, with the message it shows — see `DeniedEmailDomains`.
+   *  MEMOIZE it: a new object every render rebuilds the resolver's schema. */
+  deniedEmailDomains?: DeniedEmailDomains;
   /** Host-supplied consent row, rendered after the fields — see `BookingFormConsent`. */
   consent?: BookingFormConsent;
   isSubmitting: boolean;
@@ -422,6 +427,7 @@ export function BookingForm({
   footerNote,
   fieldRows,
   fieldCopy,
+  deniedEmailDomains,
   consent,
   isSubmitting,
   onSubmit,
@@ -438,8 +444,8 @@ export function BookingForm({
   // resolver is not assignable to `Resolver<BookingFormValues>`. The strict
   // schema is the server's contract — see `makeBookingSchema`'s docblock.
   const schema = useMemo(
-    () => makeDeferredBookingSchema(supportedFields, legalConsent),
-    [supportedFields, legalConsent],
+    () => withDeniedEmailDomains(makeDeferredBookingSchema(supportedFields, legalConsent), deniedEmailDomains),
+    [supportedFields, legalConsent, deniedEmailDomains],
   );
 
   const consentDefaults = useMemo(
