@@ -47,6 +47,26 @@ function getBatchImageConfig(): Required<BatchImageFetchConfig> {
 }
 
 /**
+ * Determine whether `candidateUrl` is same-origin with `tenantHostUrl`.
+ * Relative URLs (resolved against `tenantHostUrl`) are always considered
+ * same-origin. Absolute URLs are only same-origin if their origin matches
+ * `tenantHostUrl`'s origin exactly.
+ */
+function isSameOriginAsTenantHost(candidateUrl: string, tenantHostUrl: string): boolean {
+  try {
+    const base = tenantHostUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+    const resolved = new URL(candidateUrl, base || undefined);
+    if (!base) {
+      return true;
+    }
+    const baseOrigin = new URL(base).origin;
+    return resolved.origin === baseOrigin;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fetch multiple images with authentication in batch
  * Returns a map of original imageUrl to fetched blob URL
  *
@@ -103,8 +123,11 @@ export async function batchFetchAuthenticatedImages(
         Pragma: 'no-cache',
       };
 
-      // Add Bearer token in dev mode
-      if (enableDevMode) {
+      // Add Bearer token in dev mode, but only when the resolved target is
+      // same-origin with the configured tenant host. This prevents an
+      // attacker-influenced absolute imageUrl from siphoning the access
+      // token to a third-party host.
+      if (enableDevMode && isSameOriginAsTenantHost(fullImageUrl, tenantHostUrl)) {
         try {
           const accessToken = localStorage.getItem(accessTokenKey);
           if (accessToken) {
