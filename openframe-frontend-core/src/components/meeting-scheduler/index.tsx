@@ -42,11 +42,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { useFormRescue } from '../../hooks/use-form-rescue';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { BOOKING_IN_FLIGHT_MESSAGE, useMeetingBooking } from '../../hooks/use-meeting-booking';
 import { useToast } from '../../hooks/use-toast';
 import {
   blocksNativeBooking,
+  BUILT_IN_BOOKING_FIELDS,
+  normalizeFormFields,
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
@@ -492,6 +495,30 @@ export function HubSpotMeetingScheduler({
   const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals();
   const { toast } = useToast();
 
+  // Form rescue lives HERE, not in the form: in details-first the form unmounts
+  // before the POST, and the attempt must survive it. The form reports edits
+  // (`onValuesChange`); a restored draft remounts it with the answers seeded.
+  const rescueFieldNames = useMemo(
+    () => [
+      ...BUILT_IN_BOOKING_FIELDS.map(field => field.name),
+      ...normalizeFormFields(availability?.formFields ?? []).map(field => field.name),
+    ],
+    [availability?.formFields],
+  );
+  const [restored, setRestored] = useState<{ version: number; values: Record<string, unknown> } | null>(null);
+  const rescue = useFormRescue({
+    formId: 'meeting_booking',
+    fieldNames: rescueFieldNames,
+    getSignals,
+    onRestore: values => {
+      const { email, firstName, lastName, ...answers } = values;
+      setRestored(prev => ({
+        version: (prev?.version ?? 0) + 1,
+        values: { email: email ?? '', firstName: firstName ?? '', lastName: lastName ?? '', formFields: answers },
+      }));
+    },
+  });
+
   // Reset the machine when the host switches links. Adjusted while rendering —
   // React's documented pattern for a prop-driven reset — so the swapped-in link
   // never paints a frame of the previous link's chosen day, slot or
@@ -634,7 +661,7 @@ export function HubSpotMeetingScheduler({
       // visible SLOT_TAKEN alert on its way to being ignored.
       const priorError = bookingError;
       setBookingError(null);
-      const result = await book(payload);
+      const result = await book({ ...payload, ...rescue.submitFields() });
 
       // Not an error: the hook's in-flight guard. No toast, no step change.
       if (!result.ok && result.message === BOOKING_IN_FLIGHT_MESSAGE) {
@@ -642,6 +669,7 @@ export function HubSpotMeetingScheduler({
         return;
       }
       if (result.ok && result.confirmation) {
+        rescue.complete();
         setConfirmation(result.confirmation);
         setStep('confirmed');
         onBooked?.(result.confirmation);
@@ -681,7 +709,7 @@ export function HubSpotMeetingScheduler({
         });
       }
     },
-    [book, bookingError, detailsFirst, onBooked, refetchAvailability, resetSignals, toast],
+    [book, bookingError, detailsFirst, onBooked, refetchAvailability, rescue, resetSignals, toast],
   );
 
   const escapeHatch = fallbackUrl ? (
@@ -853,6 +881,7 @@ export function HubSpotMeetingScheduler({
                 </p>
               )}
               <DetailsForm
+                key={restored?.version ?? 0}
                 {...detailsFormProps}
                 availability={availability}
                 meetingId={meetingId}
@@ -862,11 +891,12 @@ export function HubSpotMeetingScheduler({
                 deferSlot={detailsFirst}
                 submitLabel={preset.submitLabel}
                 footerNote={preset.footerNote}
-                initialValues={detailsFirst ? stash?.payload : undefined}
+                initialValues={(detailsFirst ? stash?.payload : undefined) ?? restored?.values}
                 isSubmitting={isSubmitting}
                 onSubmit={detailsFirst ? stashDetails : handleSubmit}
                 honeypotInputProps={honeypotInputProps}
                 getSignals={getSignals}
+                onValuesChange={rescue.track}
               />
             </div>
           ) : (

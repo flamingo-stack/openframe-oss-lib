@@ -93,6 +93,7 @@ const DEFAULT_CONTACT_FORM_PROPS = {
   buttonVariant: 'outline' as ContactFormProps['buttonVariant'],
   buttonClassName: 'w-full',
   successToastMessage: "Thank you! We'll reach out to schedule your case study.",
+  rescueFormId: 'case_study_pitch',
 } satisfies Partial<ContactFormProps>;
 
 export function ShareExperienceSection({

@@ -5,6 +5,7 @@ import type { CountryCode } from 'libphonenumber-js';
 import { useEffect, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { useFormRescue } from '../../hooks/use-form-rescue';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { useToast } from '../../hooks/use-toast';
 import { cn } from '../../utils/cn';
@@ -30,7 +31,14 @@ export interface WaitlistFormProps {
    * POST body. Must throw on failure (toast is handled by the form). `signals`
    * is optional for backward compatibility with older callers.
    */
-  onRegister: (email: string, phone?: string, signals?: HumanitySignals) => Promise<void>;
+  /** `rescue` carries the form-rescue keys (`form_attempt_id`, …) to merge into the
+   *  POST body, so the host closes the half-filled draft this submit completes. */
+  onRegister: (
+    email: string,
+    phone?: string,
+    signals?: HumanitySignals,
+    rescue?: Record<string, string>,
+  ) => Promise<void>;
   /** Whether a registration request is currently in flight */
   isSubmitting?: boolean;
   /** Whether registration completed successfully */
@@ -101,6 +109,18 @@ export function WaitlistForm({
   const isClient = useIsHydrated();
   const [isPhoneInvalid, setIsPhoneInvalid] = useState(false);
   const [showConsentError, setShowConsentError] = useState(false);
+  const rescue = useFormRescue({
+    formId: 'waitlist',
+    // The phone is reported as filled only; its value never leaves the form early.
+    fieldNames: ['email', 'phone'],
+    getSignals,
+    onRestore: values => {
+      if (values.email) setEmail(current => current || values.email);
+    },
+  });
+  useEffect(() => {
+    rescue.track({ email, phone }, null);
+  }, [email, phone, rescue]);
 
   const isMailDomainGeneric = hasGenericEmailDomain(email);
 
@@ -160,7 +180,8 @@ export function WaitlistForm({
     const finalPhone = phone ? formatPhoneE164(phone, countryCode) : undefined;
 
     try {
-      await onRegister(email, finalPhone, getSignals());
+      await onRegister(email, finalPhone, getSignals(), rescue.submitFields());
+      rescue.complete();
       resetSignals();
     } catch {
       // caller's onRegister should handle its own error toasts if needed

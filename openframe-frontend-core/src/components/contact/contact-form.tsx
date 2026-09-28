@@ -22,9 +22,10 @@
  */
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useContactSubmission } from '../../hooks/use-contact-submission';
+import { useFormRescue } from '../../hooks/use-form-rescue';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import {
   ContactSchema,
@@ -33,6 +34,7 @@ import {
   referralSourceOptions,
   defaultHelpCategoryOptions,
 } from '../../schemas/contact-schema';
+import type { FormRescueFormId } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
@@ -130,6 +132,10 @@ export interface ContactFormProps {
   submitSuccessLabel?: string;
   successRedirectUrl?: string;
   successToastMessage?: string;
+  /** Which public form this is, for form rescue (a half-filled form is saved so
+   *  the team can follow up). Defaults to `'contact'`; `null` turns it off for a
+   *  form that is not a lead (e.g. a signed-in ticket). */
+  rescueFormId?: FormRescueFormId | null;
 }
 
 export function ContactForm({
@@ -155,6 +161,7 @@ export function ContactForm({
   submitSuccessLabel = 'Message Sent!',
   successRedirectUrl = '/blog#community',
   successToastMessage = 'Redirecting you to join our community...',
+  rescueFormId = 'contact',
 }: ContactFormProps = {}) {
   // Attachments staging — same hook the chat composer + ticket
   // detail-drawer composer use. Files upload to Supabase as soon as
@@ -191,6 +198,9 @@ export function ContactForm({
     control,
     formState: { errors },
     reset,
+    watch,
+    getValues,
+    setValue,
   } = useForm<ContactFormData>({
     resolver: zodResolver(ContactSchema),
     defaultValues: {
@@ -202,11 +212,36 @@ export function ContactForm({
     },
   });
 
+  // Form rescue: only the fields the visitor can see are tracked, so a hidden
+  // prefilled value (a signed-in email, a fixed category) is never sent.
+  const rescueFieldNames = useMemo(
+    () =>
+      (['name', 'email', 'companySize', 'referralSource', 'helpCategory', 'message'] as const).filter(
+        field => !hideFields.includes(field),
+      ),
+    [hideFields],
+  );
+  const rescue = useFormRescue({
+    formId: rescueFormId,
+    fieldNames: rescueFieldNames,
+    getSignals,
+    onRestore: values => {
+      for (const field of rescueFieldNames) {
+        const value = values[field];
+        if (value && !getValues(field)) setValue(field, value);
+      }
+    },
+  });
+  useEffect(() => {
+    const subscription = watch((values, { name }) => rescue.track(values, name));
+    return () => subscription.unsubscribe();
+  }, [watch, rescue]);
+
   const handleFormSubmit = async (data: ContactFormData) => {
     if (isSubmitting) return;
     if (attachmentsEnabled && attachments.hasInflightUploads) return;
     try {
-      const payload = { ...data, ...(rdtCid && { rdt_cid: rdtCid }), ...getSignals() };
+      const payload = { ...data, ...(rdtCid && { rdt_cid: rdtCid }), ...getSignals(), ...rescue.submitFields() };
       const readyAttachments = attachmentsEnabled ? attachments.readyAttachments : [];
       if (onCustomSubmit) {
         setCustomSubmitting(true);
@@ -218,6 +253,7 @@ export function ContactForm({
       } else {
         await builtInSubmission.submit(payload);
       }
+      rescue.complete();
       onSubmitSuccess?.();
       reset();
       resetSignals();

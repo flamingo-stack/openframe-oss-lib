@@ -370,6 +370,9 @@ export interface BookingFormProps {
   /** From useHumanitySignals — parent owns the instance so it can resetSignals(). */
   honeypotInputProps: { ref: Ref<HTMLInputElement>; name: string };
   getSignals: () => Record<string, string | number>;
+  /** Called on every edit with the answers flattened (declared questions beside
+   *  the built-ins) and the edited field's name — the parent's form rescue. */
+  onValuesChange?: (values: Record<string, unknown>, changedField: string | null) => void;
 }
 
 /**
@@ -402,6 +405,7 @@ export function BookingForm({
   onSubmit,
   honeypotInputProps,
   getSignals,
+  onValuesChange,
 }: BookingFormProps) {
   const { formFields, legalConsent } = availability;
   // Every declared question resolved to a control (`resolveFormFieldControl`) —
@@ -431,6 +435,7 @@ export function BookingForm({
     handleSubmit,
     setValue,
     getValues,
+    watch,
     formState: { errors },
   } = useForm<BookingFormValues>({
     resolver: zodResolver(schema),
@@ -478,6 +483,15 @@ export function BookingForm({
       { shouldDirty: false },
     );
   }, [consentDefaults, priorConsents, getValues, setValue]);
+
+  useEffect(() => {
+    if (!onValuesChange) return undefined;
+    const subscription = watch((values, { name }) => {
+      const answers = (values.formFields ?? {}) as Record<string, unknown>;
+      onValuesChange({ ...values, ...answers }, name ? name.replace(/^formFields\./, '') : null);
+    });
+    return () => subscription.unsubscribe();
+  }, [watch, onValuesChange]);
 
   const submitValid = handleSubmit(async data => {
     if (consentMissing) return; // the error is already on screen — see `submit`
