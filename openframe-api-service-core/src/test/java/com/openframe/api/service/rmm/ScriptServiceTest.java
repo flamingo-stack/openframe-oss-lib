@@ -18,6 +18,7 @@ import com.openframe.api.service.rmm.script.ScriptTimeoutValidator;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.ForbiddenException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -777,7 +778,7 @@ class ScriptServiceTest {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
 
         assertThatThrownBy(() -> scriptService.update(updateInput))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
@@ -793,7 +794,7 @@ class ScriptServiceTest {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
 
         assertThatThrownBy(() -> scriptService.delete(SCRIPT_ID))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
@@ -809,7 +810,23 @@ class ScriptServiceTest {
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
 
         assertThatThrownBy(() -> scriptService.archive(SCRIPT_ID))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Managed scripts");
+
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unarchive: system scripts cannot be unarchived")
+    void unarchive_rejectsSystemScript() {
+        Script system = new Script();
+        system.setId(SCRIPT_ID);
+        system.setStatus(ScriptStatus.ARCHIVED);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> scriptService.unarchive(SCRIPT_ID))
+                .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
