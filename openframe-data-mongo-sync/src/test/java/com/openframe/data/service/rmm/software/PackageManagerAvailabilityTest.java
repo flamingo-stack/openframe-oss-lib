@@ -138,56 +138,74 @@ class PackageManagerAvailabilityTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    void unmanageableMachineIds_noIds_emptyWithoutQuery(List<String> machineIds) {
-        // execution
-        List<String> result = availability.unmanageableMachineIds(machineIds);
+    void requireSoftwareManageable_noIds_passesWithoutQuery(List<String> machineIds) {
+        // setup
+        List<PackageManagerType> managers = List.of(BREW);
 
-        // verifications
-        assertThat(result).isEmpty();
+        // execution + verifications
+        assertThatCode(() -> availability.requireSoftwareManageable(machineIds, managers)).doesNotThrowAnyException();
         verifyNoInteractions(machineRepository, tenantIdProvider);
     }
 
     @Test
-    void unmanageableMachineIds_mixedFleet_onlyUnmanageableReturned() {
+    void requireSoftwareManageable_presentOrUnreported_passes() {
         // setup
-        Machine intel = machine("m-intel", Map.of(BREW, UNSUPPORTED, WINGET, UNSUPPORTED, CHOCO, UNSUPPORTED));
         Machine arm = machine("m-arm", Map.of(BREW, PRESENT, WINGET, UNSUPPORTED, CHOCO, UNSUPPORTED));
         Machine silent = machine("m-silent", null);
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(machineRepository.findByTenantIdAndMachineIdIn(TENANT_ID, Set.of("m-intel", "m-arm", "m-silent")))
-                .thenReturn(List.of(intel, arm, silent));
-
-        // execution
-        List<String> result = availability.unmanageableMachineIds(List.of("m-intel", "m-arm", "m-silent"));
-
-        // verifications
-        assertThat(result).containsExactly("m-intel");
-    }
-
-    @Test
-    void requireSoftwareManageable_everyDeviceManageable_passes() {
-        // setup
-        Machine arm = machine("m-arm", Map.of(BREW, PRESENT, WINGET, UNSUPPORTED, CHOCO, UNSUPPORTED));
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(machineRepository.findByTenantIdAndMachineIdIn(TENANT_ID, Set.of("m-arm"))).thenReturn(List.of(arm));
-        List<String> machineIds = List.of("m-arm");
+        stubMachines(Set.of("m-arm", "m-silent"), arm, silent);
+        List<String> machineIds = List.of("m-arm", "m-silent");
+        List<PackageManagerType> managers = List.of(BREW);
 
         // execution + verifications
-        assertThatCode(() -> availability.requireSoftwareManageable(machineIds)).doesNotThrowAnyException();
+        assertThatCode(() -> availability.requireSoftwareManageable(machineIds, managers)).doesNotThrowAnyException();
     }
 
     @Test
-    void requireSoftwareManageable_unmanageableDevice_badRequestNamesIt() {
+    void requireSoftwareManageable_unmanageableDevice_badRequestNamesOnlyIt() {
         // setup
         Machine intel = machine("m-intel", Map.of(BREW, UNSUPPORTED, WINGET, UNSUPPORTED, CHOCO, UNSUPPORTED));
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(machineRepository.findByTenantIdAndMachineIdIn(TENANT_ID, Set.of("m-intel"))).thenReturn(List.of(intel));
-        List<String> machineIds = List.of("m-intel");
+        Machine arm = machine("m-arm", Map.of(BREW, PRESENT, WINGET, UNSUPPORTED, CHOCO, UNSUPPORTED));
+        stubMachines(Set.of("m-intel", "m-arm"), intel, arm);
+        List<String> machineIds = List.of("m-intel", "m-arm");
+        List<PackageManagerType> managers = List.of(BREW);
 
         // execution + verifications
-        assertThatThrownBy(() -> availability.requireSoftwareManageable(machineIds))
+        assertThatThrownBy(() -> availability.requireSoftwareManageable(machineIds, managers))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("m-intel");
+                .hasMessageContaining("m-intel")
+                .hasMessageNotContaining("m-arm");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PackageManagerState.class, names = {"MISSING", "UNKNOWN"})
+    void requireSoftwareManageable_packageManagerNotYetUsable_badRequestNamesDeviceAndManager(PackageManagerState state) {
+        // setup
+        Machine arm = machine("m-arm", Map.of(BREW, state, WINGET, UNSUPPORTED, CHOCO, UNSUPPORTED));
+        stubMachines(Set.of("m-arm"), arm);
+        List<String> machineIds = List.of("m-arm");
+        List<PackageManagerType> managers = List.of(BREW);
+
+        // execution + verifications
+        assertThatThrownBy(() -> availability.requireSoftwareManageable(machineIds, managers))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("m-arm BREW=" + state);
+    }
+
+    @Test
+    void requireSoftwareManageable_managerOfAnotherOsUnsupported_passes() {
+        // setup
+        Machine arm = machine("m-arm", Map.of(BREW, PRESENT, WINGET, UNSUPPORTED, CHOCO, UNSUPPORTED));
+        stubMachines(Set.of("m-arm"), arm);
+        List<String> machineIds = List.of("m-arm");
+        List<PackageManagerType> managers = List.of(BREW, WINGET);
+
+        // execution + verifications
+        assertThatCode(() -> availability.requireSoftwareManageable(machineIds, managers)).doesNotThrowAnyException();
+    }
+
+    private void stubMachines(Set<String> machineIds, Machine... machines) {
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(machineRepository.findByTenantIdAndMachineIdIn(TENANT_ID, machineIds)).thenReturn(List.of(machines));
     }
 
     private static Machine machine(String machineId, Map<PackageManagerType, PackageManagerState> packageManagers) {

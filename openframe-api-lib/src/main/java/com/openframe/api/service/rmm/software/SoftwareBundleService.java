@@ -130,7 +130,8 @@ public class SoftwareBundleService {
         }
         List<SoftwareBundlePackage> packages = toDomainPackages(input.getPackages());
         validatePackages(packages);
-        packageManagerAvailability.requireSoftwareManageable(machineIds);
+        List<PackageManagerType> managers = managersOf(packages);
+        packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
         Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         rejectDevicesWithoutCompatiblePackage(machineIds, packages, deviceOsTypes);
 
@@ -213,6 +214,13 @@ public class SoftwareBundleService {
             throw new BadRequestException("brewPackageType (CASK or FORMULA) is required for brew packages: "
                     + brewMissingType);
         }
+    }
+
+    private static List<PackageManagerType> managersOf(List<SoftwareBundlePackage> packages) {
+        return packages.stream()
+                .map(SoftwareBundlePackage::getPackageManager)
+                .distinct()
+                .toList();
     }
 
     private void rejectDevicesWithoutCompatiblePackage(List<String> machineIds, List<SoftwareBundlePackage> packages,

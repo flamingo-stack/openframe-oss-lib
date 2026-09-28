@@ -129,7 +129,7 @@ class SoftwareScheduleServiceTest {
     @DisplayName("create: a device whose agent reported no usable package manager is rejected before anything is saved")
     void createUnmanageableDeviceRejected() {
         doThrow(new BadRequestException("These devices have no supported package manager: [m2]"))
-                .when(packageManagerAvailability).requireSoftwareManageable(List.of("m1", "m2"));
+                .when(packageManagerAvailability).requireSoftwareManageable(List.of("m1", "m2"), List.of(PackageManagerType.BREW));
 
         assertThatThrownBy(() -> service.create(createInput, ACTOR))
                 .isInstanceOf(BadRequestException.class)

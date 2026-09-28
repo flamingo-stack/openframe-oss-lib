@@ -175,7 +175,7 @@ class SoftwareBundleServiceTest {
                 SoftwareBundlePackage.builder().packageManager(PackageManagerType.BREW).packageName("x").build());
         when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
         doThrow(new BadRequestException("These devices have no supported package manager: [m-intel]"))
-                .when(packageManagerAvailability).requireSoftwareManageable(List.of("m-intel"));
+                .when(packageManagerAvailability).requireSoftwareManageable(List.of("m-intel"), List.of(PackageManagerType.BREW));
 
         assertThatThrownBy(() -> service.submit(submitInput(brewPkg("slack")), USER))
                 .isInstanceOf(BadRequestException.class)

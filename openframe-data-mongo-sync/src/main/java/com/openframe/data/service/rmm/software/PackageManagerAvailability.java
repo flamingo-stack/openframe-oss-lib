@@ -12,15 +12,21 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Component
 @RequiredArgsConstructor
 public class PackageManagerAvailability {
+
+    private static final Set<PackageManagerState> NOT_YET_USABLE =
+            EnumSet.of(PackageManagerState.MISSING, PackageManagerState.UNKNOWN);
 
     private final PackageManagerProperties packageManagerProperties;
     private final MachineRepository machineRepository;
@@ -42,24 +48,41 @@ public class PackageManagerAvailability {
                 .anyMatch(PackageManagerState.MANAGEABLE::contains);
     }
 
-    public void requireSoftwareManageable(Collection<String> machineIds) {
-        List<String> unmanageable = unmanageableMachineIds(machineIds);
+    public void requireSoftwareManageable(Collection<String> machineIds, Collection<PackageManagerType> packageManagers) {
+        List<Machine> machines = machines(machineIds);
+        List<String> unmanageable = machines.stream()
+                .filter(machine -> !isSoftwareManageable(machine))
+                .map(Machine::getMachineId)
+                .toList();
         if (!unmanageable.isEmpty()) {
             throw new BadRequestException("These devices have no supported package manager: " + unmanageable
                     + ". Remove the devices.");
         }
+        List<String> notYetUsable = machines.stream()
+                .flatMap(machine -> notYetUsable(machine, packageManagers))
+                .toList();
+        if (!notYetUsable.isEmpty()) {
+            throw new BadRequestException("Package manager not yet usable on these devices: " + notYetUsable
+                    + ". Wait for the bootstrap to finish or remove the devices.");
+        }
     }
 
-    public List<String> unmanageableMachineIds(Collection<String> machineIds) {
+    private static Stream<String> notYetUsable(Machine machine, Collection<PackageManagerType> packageManagers) {
+        Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
+        if (reported == null) {
+            return Stream.empty();
+        }
+        return packageManagers.stream()
+                .filter(manager -> NOT_YET_USABLE.contains(reported.get(manager)))
+                .map(manager -> machine.getMachineId() + " " + manager + "=" + reported.get(manager));
+    }
+
+    private List<Machine> machines(Collection<String> machineIds) {
         if (isEmpty(machineIds)) {
             return List.of();
         }
         String tenantId = tenantIdProvider.getTenantId();
-        List<Machine> machines = machineRepository.findByTenantIdAndMachineIdIn(tenantId, new HashSet<>(machineIds));
-        return machines.stream()
-                .filter(machine -> !isSoftwareManageable(machine))
-                .map(Machine::getMachineId)
-                .toList();
+        return machineRepository.findByTenantIdAndMachineIdIn(tenantId, new HashSet<>(machineIds));
     }
 
     private boolean isEnabled(PackageManagerType manager) {
