@@ -14,7 +14,6 @@ import org.springframework.data.cassandra.config.CqlSessionFactoryBean;
 import org.springframework.data.cassandra.config.SchemaAction;
 import org.springframework.data.cassandra.repository.config.EnableCassandraRepositories;
 
-import java.net.InetSocketAddress;
 import java.util.Collections;
 
 @Configuration
@@ -80,14 +79,20 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
         bean.setLocalDatacenter(localDatacenter);
         bean.setSessionBuilderConfigurer(builder -> {
             logger.debug("Configuring Cassandra session builder with load balancing DC: {}", localDatacenter);
-            return builder.withConfigLoader(DriverConfigLoader.programmaticBuilder()
-                    .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, localDatacenter)
-                    .withStringList(DefaultDriverOption.CONTACT_POINTS, Collections.singletonList(contactPoints + ":" + port))
-                    .withString(DefaultDriverOption.TIMESTAMP_GENERATOR_CLASS,
-                            "com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator")
-                    .build());
+            return builder.withConfigLoader(driverConfig());
         });
         return bean;
+    }
+
+    private DriverConfigLoader driverConfig() {
+        return DriverConfigLoader.programmaticBuilder()
+                .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, localDatacenter)
+                .withStringList(DefaultDriverOption.CONTACT_POINTS, Collections.singletonList(contactPoints + ":" + port))
+                .withString(DefaultDriverOption.TIMESTAMP_GENERATOR_CLASS,
+                        "com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator")
+                // A session opened by a failed startup is never closed; its threads must not keep the JVM alive.
+                .withBoolean(DefaultDriverOption.NETTY_DAEMON, true)
+                .build();
     }
 
     /**
@@ -98,8 +103,7 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
         logger.info("Ensuring keyspace '{}' exists with replication factor {}", keyspaceName, replicationFactor);
 
         try (CqlSession session = CqlSession.builder()
-                .addContactPoint(new InetSocketAddress(contactPoints, port))
-                .withLocalDatacenter(localDatacenter)
+                .withConfigLoader(driverConfig())
                 .build()) {
 
             String createKeyspaceCql = String.format(
