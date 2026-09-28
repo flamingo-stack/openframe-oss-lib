@@ -39,9 +39,20 @@ public class LokiClient {
      */
     public List<LokiLogEntry> queryRange(String query, long startNanos, long endNanos, int limit,
                                          LokiDirection direction) {
+        return queryRange(query, startNanos, endNanos, limit, direction, null);
+    }
+
+    /**
+     * As {@link #queryRange(String, long, long, int, LokiDirection)}, but declares {@code actor} so Loki's scheduler
+     * gives this caller its own sub-queue instead of queueing it behind everyone else. The actor is a fairness hint
+     * only: it never changes which entries a query returns, and Loki ignores it when hierarchical queues are off.
+     */
+    public List<LokiLogEntry> queryRange(String query, long startNanos, long endNanos, int limit,
+                                         LokiDirection direction, String actor) {
         LokiQueryResponse response;
         try {
-            response = api.queryRange(query, startNanos, endNanos, limit, direction.name().toLowerCase(Locale.ROOT));
+            response = api.queryRange(query, startNanos, endNanos, limit, direction.name().toLowerCase(Locale.ROOT),
+                    actor);
         } catch (RestClientResponseException e) {
             String body = abbreviate(e.getResponseBodyAsString());
             throw new LokiQueryException("Loki query failed with HTTP " + e.getStatusCode().value() + ": " + body, e);

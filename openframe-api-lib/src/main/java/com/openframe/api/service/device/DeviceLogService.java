@@ -34,6 +34,11 @@ import static java.util.stream.Collectors.toSet;
  * Device agent logs, read from Loki where {@code openframe-saas-logs-stream} writes them as
  * {@code {job="agent-logs", tenant_domain, level}} streams with {@code machine_id}, {@code hostname},
  * {@code agent_ts} and {@code count} as structured metadata.
+ * <p>
+ * The tenant domain that pins the stream selector comes from {@link TenantDomainService}, never from a caller, so no
+ * argument reaching this service can widen the query past its own tenant. The same domain is declared as the Loki
+ * scheduler actor: Loki has no multi-tenancy here, so without it every tenant shares one queue and one tenant's heavy
+ * queries hold up everyone else's small ones.
  */
 @Service
 @Slf4j
@@ -109,14 +114,16 @@ public class DeviceLogService {
             endNanos = Math.min(endNanos, after.timestampNanos());
         }
 
-        String query = buildQuery(tenantDomainService.getTenantDomain(), devices, criteria);
+        String tenantDomain = tenantDomainService.getTenantDomain();
+        String query = buildQuery(tenantDomain, devices, criteria);
         int pageSize = pageSize(page.getLimit());
         log.debug("Querying device logs for machineIds: {}, query: {}, start: {}, end: {}", devices, query, startNanos, endNanos);
 
         // One extra line tells whether there is a next page
         int queryLimit = pageSize + 1;
-        List<LokiLogEntry> entries = lokiClient.queryRange(query, startNanos, endNanos, queryLimit, LokiDirection.BACKWARD);
-        List<LokiLogEntry> pageEntries = wholeTimestampsOnly(entries, pageSize, query);
+        List<LokiLogEntry> entries = lokiClient.queryRange(query, startNanos, endNanos, queryLimit,
+                LokiDirection.BACKWARD, tenantDomain);
+        List<LokiLogEntry> pageEntries = wholeTimestampsOnly(entries, pageSize, query, tenantDomain);
         List<DeviceLogEntry> items = toItems(pageEntries);
         boolean hasNextPage = entries.size() > pageSize;
         boolean hasPreviousPage = after != null;
@@ -214,7 +221,8 @@ public class DeviceLogService {
      * the cut timestamp it keeps. The page therefore ends before that timestamp, and the next page starts with all of
      * its lines. When one timestamp fills the whole page, its lines are fetched in full instead.
      */
-    private List<LokiLogEntry> wholeTimestampsOnly(List<LokiLogEntry> entries, int pageSize, String query) {
+    private List<LokiLogEntry> wholeTimestampsOnly(List<LokiLogEntry> entries, int pageSize, String query,
+                                                  String tenantDomain) {
         if (entries.size() <= pageSize) {
             return entries;
         }
@@ -226,7 +234,8 @@ public class DeviceLogService {
         if (end > 0) {
             return entries.subList(0, end);
         }
-        return lokiClient.queryRange(query, cutNanos, cutNanos + 1, MAX_LINES_PER_TIMESTAMP, LokiDirection.BACKWARD);
+        return lokiClient.queryRange(query, cutNanos, cutNanos + 1, MAX_LINES_PER_TIMESTAMP, LokiDirection.BACKWARD,
+                tenantDomain);
     }
 
     private static List<DeviceLogEntry> toItems(List<LokiLogEntry> entries) {

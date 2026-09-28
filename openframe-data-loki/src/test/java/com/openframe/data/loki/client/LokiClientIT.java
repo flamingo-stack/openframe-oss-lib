@@ -75,6 +75,28 @@ class LokiClientIT {
     }
 
     @Test
+    void realLokiAcceptsTheActorHeaderAndReturnsTheSameEntries() throws Exception {
+        // The actor is a scheduler hint. Loki must neither reject an unknown-to-it header nor let it change results,
+        // otherwise declaring a tenant would silently alter what that tenant sees.
+        long start = BASE_NANOS + 3 * ONE_SECOND;
+        push(Map.of("job", "actor"), List.of(
+                entry(start, "one", Map.of("machine_id", "m-1")),
+                entry(start + 1, "two", Map.of("machine_id", "m-2"))));
+        awaitEntries("{job=\"actor\"}", start, start + 2, LokiDirection.BACKWARD, 2);
+
+        List<LokiLogEntry> anonymous = client.queryRange("{job=\"actor\"}", start, start + 2, 10, LokiDirection.BACKWARD);
+        List<LokiLogEntry> declared = client.queryRange("{job=\"actor\"}", start, start + 2, 10, LokiDirection.BACKWARD,
+                "acme.openframe.test");
+        List<LokiLogEntry> otherActor = client.queryRange("{job=\"actor\"}", start, start + 2, 10, LokiDirection.BACKWARD,
+                "globex.openframe.test");
+
+        assertThat(declared).extracting(LokiLogEntry::line).containsExactly("two", "one");
+        assertThat(declared).usingRecursiveComparison().isEqualTo(anonymous);
+        // A different actor is a different queue, never a different view of the data
+        assertThat(otherActor).usingRecursiveComparison().isEqualTo(anonymous);
+    }
+
+    @Test
     void includesTheStartTimestampAndExcludesTheEndTimestamp() throws Exception {
         // DeviceLogService's cursor depends on this: it ends the next page's query 1 ns after the cursor
         long start = BASE_NANOS + 2 * ONE_SECOND;

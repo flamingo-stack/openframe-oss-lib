@@ -19,6 +19,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
@@ -37,6 +39,27 @@ class LokiClientTest {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://loki.test");
         server = MockRestServiceServer.bindTo(builder).build();
         client = new LokiClient(builder.build());
+    }
+
+    @Test
+    void declaresTheActorSoTheSchedulerGivesTheCallerItsOwnSubQueue() {
+        server.expect(requestTo(startsWith("http://loki.test/loki/api/v1/query_range")))
+                .andExpect(header(LokiHttpApi.ACTOR_HEADER, "acme.openframe.ai"))
+                .andRespond(withSuccess(EMPTY_RESPONSE, MediaType.APPLICATION_JSON));
+
+        client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD, "acme.openframe.ai");
+        server.verify();
+    }
+
+    @Test
+    void sendsNoActorHeaderWhenNoneIsGiven() {
+        // An empty header would make every anonymous caller share one named sub-queue instead of none
+        server.expect(requestTo(startsWith("http://loki.test/loki/api/v1/query_range")))
+                .andExpect(headerDoesNotExist(LokiHttpApi.ACTOR_HEADER))
+                .andRespond(withSuccess(EMPTY_RESPONSE, MediaType.APPLICATION_JSON));
+
+        client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD);
+        server.verify();
     }
 
     @Test
