@@ -1,5 +1,6 @@
 package com.openframe.api.service.device;
 
+import com.openframe.api.config.DeviceLogProperties;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
 import com.openframe.api.dto.device.DeviceLogFilterCriteria;
@@ -8,6 +9,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.tenant.TenantDomainService;
+import com.openframe.core.logs.AgentLogBucket;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.loki.client.LogQl;
 import com.openframe.data.loki.client.LokiClient;
@@ -26,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
@@ -67,6 +70,7 @@ public class DeviceLogService {
     private final LokiClient lokiClient;
     private final DeviceService deviceService;
     private final TenantDomainService tenantDomainService;
+    private final DeviceLogProperties properties;
 
     /**
      * Logs of one device, newest first. Shorthand for {@link #queryLogs(List, DeviceLogFilterCriteria,
@@ -115,7 +119,7 @@ public class DeviceLogService {
         }
 
         String tenantDomain = tenantDomainService.getTenantDomain();
-        String query = buildQuery(tenantDomain, devices, criteria);
+        String query = buildQuery(tenantDomain, devices, criteria, bucketed(from));
         int pageSize = pageSize(page.getLimit());
         log.debug("Querying device logs for machineIds: {}, query: {}, start: {}, end: {}", devices, query, startNanos, endNanos);
 
@@ -131,7 +135,19 @@ public class DeviceLogService {
         return result(items, hasNextPage, hasPreviousPage);
     }
 
-    static String buildQuery(String tenantDomain, List<String> machineIds, DeviceLogFilterCriteria criteria) {
+    /**
+     * True only once the whole window is known to carry the {@code bucket} label. A window that starts before the
+     * cutover is queried unbucketed in full rather than split into a bucketed and an unbucketed half: the cursor is a
+     * timestamp alone and paging assumes one Loki result set, so merging two would reopen the gap-and-duplicate bug
+     * that whole-timestamp paging exists to prevent.
+     */
+    private boolean bucketed(Instant from) {
+        Instant cutover = properties.getBucketCutover();
+        return cutover != null && !from.isBefore(cutover);
+    }
+
+    static String buildQuery(String tenantDomain, List<String> machineIds, DeviceLogFilterCriteria criteria,
+                             boolean bucketed) {
         StringBuilder query = new StringBuilder("{job=").append(LogQl.quote(AGENT_LOGS_JOB))
                 .append(", tenant_domain=").append(LogQl.quote(tenantDomain));
         List<DeviceLogLevel> levels = criteria.getLevels();
@@ -139,12 +155,34 @@ public class DeviceLogService {
             String alternatives = levels.stream().distinct().map(Enum::name).collect(joining("|"));
             query.append(", level=~").append(LogQl.quote(alternatives));
         }
+        if (bucketed) {
+            appendBucketMatcher(query, machineIds);
+        }
         query.append('}');
         // Line filters before the metadata filter: the cheapest stage runs first
         appendTermFilters(query, " |~ ", criteria.getContains());
         appendTermFilters(query, " !~ ", criteria.getExcludes());
         appendDeviceFilter(query, machineIds);
         return query.toString();
+    }
+
+    /**
+     * The one part of the selector the index can use to skip a device's logs. Named devices hash to at most as many
+     * buckets as there are devices, so a handful of devices reads a fraction of the tenant's data; a set spanning every
+     * bucket, or no devices at all, adds nothing and is left off.
+     */
+    private static void appendBucketMatcher(StringBuilder query, List<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return;
+        }
+        Set<String> buckets = new TreeSet<>();
+        for (String machineId : machineIds) {
+            buckets.add(AgentLogBucket.label(machineId));
+        }
+        if (buckets.size() >= AgentLogBucket.BUCKET_COUNT) {
+            return;
+        }
+        query.append(", bucket=~").append(LogQl.quote(String.join("|", buckets)));
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.openframe.api.service.device;
 
+import com.openframe.api.config.DeviceLogProperties;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
 import com.openframe.api.dto.device.DeviceLogFilterCriteria;
@@ -13,6 +14,7 @@ import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -56,11 +58,12 @@ class DeviceLogServiceTest {
     @Mock private DeviceService deviceService;
     @Mock private TenantDomainService tenantDomainService;
 
+    private final DeviceLogProperties properties = new DeviceLogProperties();
     private DeviceLogService service;
 
     @BeforeEach
     void setUp() {
-        service = new DeviceLogService(lokiClient, deviceService, tenantDomainService);
+        service = new DeviceLogService(lokiClient, deviceService, tenantDomainService, properties);
         when(deviceService.findByMachineIds(anyCollection())).thenAnswer(invocation ->
                 invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceTest::machine).toList());
         when(tenantDomainService.getTenantDomain()).thenReturn(TENANT_DOMAIN);
@@ -115,6 +118,64 @@ class DeviceLogServiceTest {
         verify(lokiClient, times(2)).queryRange(anyString(), anyLong(), anyLong(), anyInt(),
                 eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN));
         verify(lokiClient, never()).queryRange(anyString(), anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD));
+    }
+
+    @Test
+    @DisplayName("no cutover configured: the selector is unbucketed, so deploying this reader changes nothing")
+    void doesNotBucketUntilACutoverIsConfigured() {
+        service.queryLogs(List.of(MACHINE_ID), DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"} | machine_id=\"machine-1\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+    }
+
+    @Test
+    void bucketsOneDeviceToItsOwnStreamSubset() {
+        properties.setBucketCutover(FROM);
+
+        service.queryLogs(List.of(MACHINE_ID), DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        // CRC32("machine-1") % 16 == 5; the algorithm itself is pinned in AgentLogBucketTest
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\", bucket=~\"5\"} | machine_id=\"machine-1\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+    }
+
+    @Test
+    @DisplayName("a window starting before the cutover is queried unbucketed in full, never as two merged halves")
+    void doesNotBucketAWindowThatPredatesTheCutover() {
+        properties.setBucketCutover(TO);
+
+        service.queryLogs(List.of(MACHINE_ID), DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"} | machine_id=\"machine-1\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+    }
+
+    @Test
+    @DisplayName("a whole-tenant query wants every bucket, so it carries no bucket matcher")
+    void doesNotBucketAWholeTenantQuery() {
+        properties.setBucketCutover(FROM);
+
+        service.queryLogs(null, DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+    }
+
+    @Test
+    @DisplayName("devices spanning every bucket gain nothing, so the matcher is left off")
+    void dropsTheBucketMatcherWhenTheDevicesSpanEveryBucket() {
+        properties.setBucketCutover(FROM);
+        List<String> everyBucket = java.util.stream.IntStream.range(0, 40).mapToObj(i -> "machine-" + i).toList();
+
+        service.queryLogs(everyBucket, DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        verify(lokiClient).queryRange(startsWith("{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"} |"),
+                anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN));
     }
 
     @Test

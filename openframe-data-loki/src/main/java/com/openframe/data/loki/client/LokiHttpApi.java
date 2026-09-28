@@ -14,6 +14,7 @@ import org.springframework.web.service.annotation.HttpExchange;
 public interface LokiHttpApi {
 
     String ACTOR_HEADER = "X-Loki-Actor-Path";
+    String QUERY_LIMITS_HEADER = "X-Loki-Query-Limits";
 
     /**
      * Timestamps are nanosecond Unix epochs: {@code start} is inclusive, {@code end} exclusive.
@@ -22,6 +23,9 @@ public interface LokiHttpApi {
      * that all wait in one queue. Callers sharing an actor share a sub-queue and are served round-robin against the
      * other actors, so one caller's heavy query no longer holds up everyone else's small ones. A null actor sends no
      * header, which is the unfair single-queue behaviour.
+     * <p>
+     * {@code queryLimits} is a JSON object of Loki limits to apply to this request alone; it can only lower them.
+     * Null sends no header.
      */
     @GetExchange("/query_range")
     LokiQueryResponse queryRange(@RequestParam("query") String query,
@@ -29,5 +33,6 @@ public interface LokiHttpApi {
                                  @RequestParam("end") long endNanos,
                                  @RequestParam("limit") int limit,
                                  @RequestParam("direction") String direction,
-                                 @RequestHeader(name = ACTOR_HEADER, required = false) String actor);
+                                 @RequestHeader(name = ACTOR_HEADER, required = false) String actor,
+                                 @RequestHeader(name = QUERY_LIMITS_HEADER, required = false) String queryLimits);
 }

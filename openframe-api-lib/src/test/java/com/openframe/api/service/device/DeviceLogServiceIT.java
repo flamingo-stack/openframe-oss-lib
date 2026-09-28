@@ -1,6 +1,7 @@
 package com.openframe.api.service.device;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.api.config.DeviceLogProperties;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
 import com.openframe.api.dto.device.DeviceLogFilterCriteria;
@@ -278,11 +279,11 @@ class DeviceLogServiceIT {
                 invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceIT::machine).toList());
         TenantDomainService tenantDomainService = mock(TenantDomainService.class);
         when(tenantDomainService.getTenantDomain()).thenReturn(TENANT_DOMAIN);
-        return new DeviceLogService(lokiClient, deviceService, tenantDomainService);
+        return new DeviceLogService(lokiClient, deviceService, tenantDomainService, new DeviceLogProperties());
     }
 
     private static void awaitLines(String machineId, int expected) throws InterruptedException {
-        String query = DeviceLogService.buildQuery(TENANT_DOMAIN, List.of(machineId), new DeviceLogFilterCriteria());
+        String query = DeviceLogService.buildQuery(TENANT_DOMAIN, List.of(machineId), new DeviceLogFilterCriteria(), false);
         for (int attempt = 0; attempt < 50; attempt++) {
             int found = lokiClient.queryRange(query, toNanos(FROM), toNanos(Instant.now()) + 1, expected + 1,
                     LokiDirection.BACKWARD).size();

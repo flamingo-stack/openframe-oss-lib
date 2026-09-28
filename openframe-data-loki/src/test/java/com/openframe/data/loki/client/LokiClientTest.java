@@ -3,6 +3,7 @@ package com.openframe.data.loki.client;
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class LokiClientTest {
@@ -60,6 +62,51 @@ class LokiClientTest {
 
         client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD);
         server.verify();
+    }
+
+    @Test
+    void capsTheBytesOneQueryMayReadWhenConfigured() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://loki.test");
+        MockRestServiceServer capped = MockRestServiceServer.bindTo(builder).build();
+        LokiClient client = new LokiClient(builder.build(), "5GB");
+        capped.expect(requestTo(startsWith("http://loki.test/loki/api/v1/query_range")))
+                .andExpect(header(LokiHttpApi.QUERY_LIMITS_HEADER, "{\"maxQueryBytesRead\":\"5GB\"}"))
+                .andRespond(withSuccess(EMPTY_RESPONSE, MediaType.APPLICATION_JSON));
+
+        client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD);
+        capped.verify();
+    }
+
+    @Test
+    @DisplayName("no cap configured sends no header, so Loki's own limits apply unchanged")
+    void sendsNoLimitsHeaderWhenNoCapIsConfigured() {
+        server.expect(requestTo(startsWith("http://loki.test/loki/api/v1/query_range")))
+                .andExpect(headerDoesNotExist(LokiHttpApi.QUERY_LIMITS_HEADER))
+                .andRespond(withSuccess(EMPTY_RESPONSE, MediaType.APPLICATION_JSON));
+
+        client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("a rejected query is not a server fault: retrying it unchanged would hit the same limit")
+    void reportsAFourHundredAsARejectionRatherThanAFailure() {
+        server.expect(requestTo(startsWith("http://loki.test/")))
+                .andRespond(withBadRequest().body("the query would read too many bytes"));
+
+        assertThatThrownBy(() -> client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD))
+                .isInstanceOf(LokiQueryRejectedException.class)
+                .hasMessageContaining("too many bytes");
+    }
+
+    @Test
+    void reportsAServerErrorAsAPlainFailure() {
+        server.expect(requestTo(startsWith("http://loki.test/")))
+                .andRespond(withServerError().body("ingester unavailable"));
+
+        assertThatThrownBy(() -> client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD))
+                .isInstanceOf(LokiQueryException.class)
+                .isNotInstanceOf(LokiQueryRejectedException.class);
     }
 
     @Test

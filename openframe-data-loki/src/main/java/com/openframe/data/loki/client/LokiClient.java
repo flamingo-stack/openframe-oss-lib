@@ -25,10 +25,23 @@ public class LokiClient {
 
     private final LokiHttpApi api;
 
+    /** Pre-rendered X-Loki-Query-Limits payload, or null to send no header. */
+    private final String queryLimits;
+
     public LokiClient(RestClient restClient) {
+        this(restClient, null);
+    }
+
+    /**
+     * {@code maxQueryBytesRead} caps the bytes one query may read, e.g. {@code 5GB}; blank sends no header.
+     */
+    public LokiClient(RestClient restClient, String maxQueryBytesRead) {
         this.api = HttpServiceProxyFactory.builderFor(RestClientAdapter.create(restClient))
                 .build()
                 .createClient(LokiHttpApi.class);
+        this.queryLimits = maxQueryBytesRead == null || maxQueryBytesRead.isBlank()
+                ? null
+                : "{\"maxQueryBytesRead\":\"" + maxQueryBytesRead.trim() + "\"}";
     }
 
     /**
@@ -52,14 +65,26 @@ public class LokiClient {
         LokiQueryResponse response;
         try {
             response = api.queryRange(query, startNanos, endNanos, limit, direction.name().toLowerCase(Locale.ROOT),
-                    actor);
+                    actor, queryLimits);
         } catch (RestClientResponseException e) {
-            String body = abbreviate(e.getResponseBodyAsString());
-            throw new LokiQueryException("Loki query failed with HTTP " + e.getStatusCode().value() + ": " + body, e);
+            throw translate(e);
         } catch (RestClientException e) {
             throw new LokiQueryException("Loki query failed: " + e.getMessage(), e);
         }
         return toEntries(response, direction);
+    }
+
+    /**
+     * A 4xx means Loki rejected the request rather than failed on it: over a limit, or - our bug - malformed LogQL.
+     * Either way the caller should not retry it unchanged, which a 5xx would invite.
+     */
+    private static LokiQueryException translate(RestClientResponseException e) {
+        String body = abbreviate(e.getResponseBodyAsString());
+        String message = "Loki query failed with HTTP " + e.getStatusCode().value() + ": " + body;
+        if (e.getStatusCode().is4xxClientError()) {
+            return new LokiQueryRejectedException(message, e);
+        }
+        return new LokiQueryException(message, e);
     }
 
     private static List<LokiLogEntry> toEntries(LokiQueryResponse response, LokiDirection direction) {

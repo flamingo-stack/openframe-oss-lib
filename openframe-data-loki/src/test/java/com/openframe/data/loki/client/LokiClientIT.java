@@ -97,6 +97,38 @@ class LokiClientIT {
     }
 
     @Test
+    void aBucketedSelectorFindsOnlyThatBucketAndAnAlternationFindsSeveral() throws Exception {
+        // The bucket label is what makes a per-device query cheap, so prove Loki actually narrows on it: the index
+        // must skip bucket 2 entirely for a bucket=~"1" query, and an alternation must be fully anchored.
+        long start = BASE_NANOS + 4 * ONE_SECOND;
+        push(Map.of("job", "bucketed", "bucket", "1"), List.of(entry(start, "in-bucket-1", Map.of())));
+        push(Map.of("job", "bucketed", "bucket", "2"), List.of(entry(start + 1, "in-bucket-2", Map.of())));
+        push(Map.of("job", "bucketed", "bucket", "11"), List.of(entry(start + 2, "in-bucket-11", Map.of())));
+        awaitEntries("{job=\"bucketed\"}", start, start + 3, LokiDirection.BACKWARD, 3);
+
+        List<LokiLogEntry> one = client.queryRange("{job=\"bucketed\", bucket=~\"1\"}", start, start + 3, 10, LokiDirection.BACKWARD);
+        List<LokiLogEntry> two = client.queryRange("{job=\"bucketed\", bucket=~\"1|2\"}", start, start + 3, 10, LokiDirection.BACKWARD);
+
+        // "1" must not match the stream labelled "11" - an unanchored regex would
+        assertThat(one).extracting(LokiLogEntry::line).containsExactly("in-bucket-1");
+        assertThat(two).extracting(LokiLogEntry::line).containsExactly("in-bucket-2", "in-bucket-1");
+    }
+
+    @Test
+    void aLokiWithPerRequestLimitsOffIgnoresTheCapRatherThanRejectingTheQuery() throws Exception {
+        // Non-prod Loki has querier.per_request_limits_enabled unset, as does this container. The cap must be inert
+        // there, not an error, or shipping it would break every environment except prod.
+        long start = BASE_NANOS + 5 * ONE_SECOND;
+        push(Map.of("job", "capped"), List.of(entry(start, "still-returned", Map.of())));
+        awaitEntries("{job=\"capped\"}", start, start + 1, LokiDirection.BACKWARD, 1);
+
+        LokiClient capped = new LokiClient(RestClient.builder().baseUrl(baseUrl()).build(), "1B");
+
+        assertThat(capped.queryRange("{job=\"capped\"}", start, start + 1, 10, LokiDirection.BACKWARD))
+                .extracting(LokiLogEntry::line).containsExactly("still-returned");
+    }
+
+    @Test
     void includesTheStartTimestampAndExcludesTheEndTimestamp() throws Exception {
         // DeviceLogService's cursor depends on this: it ends the next page's query 1 ns after the cursor
         long start = BASE_NANOS + 2 * ONE_SECOND;
