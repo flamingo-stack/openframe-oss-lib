@@ -46,6 +46,9 @@ public class TenantAwareMongoTemplate extends MongoTemplate {
      * AbstractMongoQuery stores the result of operations.query(type) at construction time and
      * uses find.matching(query).all() for execution — bypassing find(Query, Class, String).
      * By wrapping the returned ExecutableFind, we ensure tenantId is injected into every query.
+     * Terminal methods (all()/one()/first()/firstValue()/oneValue()/allValue()/stream()) invoked
+     * without a prior matching(Query) call are also intercepted: since there is no Query object
+     * to scope, we fail loudly rather than silently return unscoped data across tenants.
      */
     @Override
     @SuppressWarnings("unchecked")
@@ -57,7 +60,7 @@ public class TenantAwareMongoTemplate extends MongoTemplate {
         return (ExecutableFindOperation.ExecutableFind<T>) Proxy.newProxyInstance(
                 delegate.getClass().getClassLoader(),
                 getInterfaces(delegate.getClass()),
-                new TenantScopedFindHandler<>(delegate, this)
+                new TenantScopedFindHandler<>(delegate, this, false)
         );
     }
 
@@ -77,13 +80,19 @@ public class TenantAwareMongoTemplate extends MongoTemplate {
         return interfaces.toArray(new Class[0]);
     }
 
+    private static final java.util.Set<String> TERMINAL_METHODS = java.util.Set.of(
+            "all", "one", "first", "firstValue", "oneValue", "allValue", "stream"
+    );
+
     private static class TenantScopedFindHandler<T> implements InvocationHandler {
         private final Object delegate;
         private final TenantAwareMongoTemplate template;
+        private final boolean matched;
 
-        TenantScopedFindHandler(Object delegate, TenantAwareMongoTemplate template) {
+        TenantScopedFindHandler(Object delegate, TenantAwareMongoTemplate template, boolean matched) {
             this.delegate = delegate;
             this.template = template;
+            this.matched = matched;
         }
 
         @Override
@@ -95,7 +104,24 @@ public class TenantAwareMongoTemplate extends MongoTemplate {
                 if (!query.getQueryObject().containsKey("tenantId")) {
                     query.addCriteria(Criteria.where("tenantId").is(template.tenantId()));
                 }
-                return method.invoke(delegate, args);
+                Object matchedResult = method.invoke(delegate, args);
+                if (matchedResult != null) {
+                    return Proxy.newProxyInstance(
+                            matchedResult.getClass().getClassLoader(),
+                            getInterfaces(matchedResult.getClass()),
+                            new TenantScopedFindHandler<>(matchedResult, template, true)
+                    );
+                }
+                return matchedResult;
+            }
+            // Fail loudly on terminal operations invoked without a prior matching(Query) call,
+            // instead of silently returning unscoped data across all tenants.
+            if (!matched && TERMINAL_METHODS.contains(method.getName())) {
+                throw new IllegalStateException(
+                        "Tenant-scoped query executed via '" + method.getName()
+                                + "()' without a preceding matching(Query) call; "
+                                + "refusing to return unscoped cross-tenant data. "
+                                + "Call .matching(query) before invoking terminal operations.");
             }
             Object result = method.invoke(delegate, args);
             // Wrap as() and inCollection() results so matching() on them is also intercepted
@@ -103,7 +129,7 @@ public class TenantAwareMongoTemplate extends MongoTemplate {
                 result = Proxy.newProxyInstance(
                         result.getClass().getClassLoader(),
                         getInterfaces(result.getClass()),
-                        new TenantScopedFindHandler<>(result, template)
+                        new TenantScopedFindHandler<>(result, template, matched)
                 );
             }
             return result;
