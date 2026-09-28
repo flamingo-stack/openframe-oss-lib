@@ -3,6 +3,7 @@ package com.openframe.authz.config;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.session.DefaultCookieSerializerCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,18 +25,29 @@ import static com.openframe.authz.web.AuthStateUtils.JSESSIONID;
  * fail (e.g. {@code authorization_request_not_found}); it also pins the service to one replica.
  *
  * <p>Cookie SameSite/Secure/timeout still come from {@code server.servlet.session.*}.
+ *
+ * <p>Every filter that touches the session must run after Spring Session's filter
+ * ({@link org.springframework.session.web.http.SessionRepositoryFilter#DEFAULT_ORDER}), or it gets
+ * Tomcat's in-memory session instead; see {@link com.openframe.authz.config.tenant.TenantContextFilter#ORDER}.
  */
 @Slf4j
 @Configuration
 public class SessionConfig {
 
     /**
-     * Keeps Tomcat's cookie name: {@link com.openframe.authz.web.AuthStateUtils#clearAuthState} and
-     * clients address the session cookie as JSESSIONID.
+     * Keeps Tomcat's cookie name and path: {@link com.openframe.authz.web.AuthStateUtils#clearAuthState}
+     * and clients address the session cookie as JSESSIONID on the servlet context path. The path is
+     * pinned because Spring Session otherwise takes it from the request's context path, which
+     * ForwardedHeaderFilter rewrites to the tenant prefix that TenantForwardedPrefixFilter adds on
+     * /oauth2/* requests; a session created there would get a cookie the browser never sends back to /sas.
      */
     @Bean
-    public DefaultCookieSerializerCustomizer sessionCookieNameCustomizer() {
-        return serializer -> serializer.setCookieName(JSESSIONID);
+    public DefaultCookieSerializerCustomizer sessionCookieCustomizer(@Value("${server.servlet.context-path:}") String contextPath) {
+        String cookiePath = StringUtils.hasText(contextPath) ? contextPath : "/";
+        return serializer -> {
+            serializer.setCookieName(JSESSIONID);
+            serializer.setCookiePath(cookiePath);
+        };
     }
 
     /**
