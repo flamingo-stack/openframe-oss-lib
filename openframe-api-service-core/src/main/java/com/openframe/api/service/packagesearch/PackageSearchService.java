@@ -45,8 +45,8 @@ public class PackageSearchService {
     public CountedGenericConnection<GenericEdge<PackageSearchItem>> search(
             PackageManagerType packageManager, String rawSearch, CursorPaginationCriteria pagination) {
         String search = rawSearch == null ? "" : rawSearch.trim();
-        if (search.length() < MIN_QUERY_LENGTH) {
-            throw new IllegalArgumentException("search must be at least " + MIN_QUERY_LENGTH + " characters long");
+        if (!search.isEmpty() && search.length() < MIN_QUERY_LENGTH) {
+            throw new IllegalArgumentException("search must be empty or at least " + MIN_QUERY_LENGTH + " characters long");
         }
         Page page = resolvePage(pagination);
 

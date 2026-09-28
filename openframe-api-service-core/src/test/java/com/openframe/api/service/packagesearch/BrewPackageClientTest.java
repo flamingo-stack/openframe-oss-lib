@@ -9,13 +9,17 @@ import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.exception.PackageNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class BrewPackageClientTest {
@@ -42,6 +46,23 @@ class BrewPackageClientTest {
         List<String> ids = result.getItems().stream().map(item -> item.getId()).toList();
         assertEquals(List.of("slack", "slack@beta", "slack-cli"), ids);
         assertEquals(3, result.getTotal());
+    }
+
+    @Test
+    void emptyQueryListsMostPopularFirst() {
+        PackageCatalogEntry gh = formulaEntry("gh", "gh", 157390);
+        PackageCatalogEntry codex = caskEntry("codex", "Codex", 84023);
+        Sort mostPopularFirst = Sort.by(Sort.Order.desc("popularity"), Sort.Order.asc("packageId"));
+        when(packageCatalogRepository.listByManager(PackageManagerType.BREW, mostPopularFirst, 0, 2)).thenReturn(List.of(gh, codex));
+        when(packageCatalogRepository.countByManager(PackageManagerType.BREW)).thenReturn(19000L);
+
+        PackageSearchResult result = client.search("  ", 2, 0);
+
+        List<String> ids = result.getItems().stream().map(item -> item.getId()).toList();
+        assertEquals(List.of("gh", "codex"), ids);
+        assertEquals(19000, result.getTotal());
+        assertTrue(result.isHasMore());
+        verify(packageCatalogRepository, never()).findByManagerAndSearchBlobContaining(any(), any());
     }
 
     @Test

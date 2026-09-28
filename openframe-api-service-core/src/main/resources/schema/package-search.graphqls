@@ -1,6 +1,8 @@
 extend type Query {
     """
     Search packages in a public package-manager repository (Homebrew, Chocolatey, winget).
+    An empty or omitted `search` lists the whole catalog: Homebrew and Chocolatey most popular
+    first, winget alphabetically. Otherwise `search` must be at least 2 characters.
     Homebrew and winget results are ranked by match quality with popularity/canonical-id
     tiebreaks; Chocolatey results come in the repository's own relevance order.
     Forward cursor pagination only: pass `pageInfo.endCursor` back as `after`.

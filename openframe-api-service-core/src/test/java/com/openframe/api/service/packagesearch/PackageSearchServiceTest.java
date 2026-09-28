@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,6 +66,16 @@ class PackageSearchServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> service.search(PackageManagerType.BREW, " a ", forward(null, null)));
         verify(brewClient, never()).search(anyString(), anyInt(), anyInt());
+    }
+
+    @Test
+    void emptySearchListsTheCatalog() {
+        when(brewClient.search(eq(""), anyInt(), anyInt())).thenReturn(resultOf(2, true, 19000));
+
+        service.search(PackageManagerType.BREW, null, forward(null, null));
+        service.search(PackageManagerType.BREW, "   ", forward(null, null));
+
+        verify(brewClient, times(2)).search("", 25, 0);
     }
 
     @Test
