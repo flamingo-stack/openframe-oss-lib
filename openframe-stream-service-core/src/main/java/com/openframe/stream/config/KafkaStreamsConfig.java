@@ -37,8 +37,10 @@ public class KafkaStreamsConfig {
      * deployment has BOTH clusters configured but the streams topology must run against a
      * specific one (e.g. the shared cluster's Fleet activity join reads the Debezium raw topics
      * on the shared Kafka while {@code spring.oss-tenant.kafka} points at the tenant cluster).
+     * This property must be set explicitly per environment; there is no terminal default, so a
+     * missing configuration fails fast at startup instead of silently resolving to an empty string.
      */
-    @Value("${openframe.stream.kafka-streams.bootstrap-servers:${spring.oss-tenant.kafka.bootstrap-servers:${spring.saas.kafka.bootstrap-servers:}}}")
+    @Value("${openframe.stream.kafka-streams.bootstrap-servers:${spring.oss-tenant.kafka.bootstrap-servers:${spring.saas.kafka.bootstrap-servers}}}")
     private String bootstrapServers;
 
     @Value("${spring.application.name}")
@@ -100,7 +102,7 @@ public class KafkaStreamsConfig {
         props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 1);
         
         // State store configuration
-        props.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/kafka-streams");
+        props.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/kafka-streams/" + buildStreamsApplicationId());
         
         // Consumer configuration
         props.put(StreamsConfig.consumerPrefix(org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG), "earliest");
