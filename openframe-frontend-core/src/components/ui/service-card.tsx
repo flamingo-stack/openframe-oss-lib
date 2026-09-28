@@ -111,6 +111,8 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
     window.open(row.href, '_blank', 'noopener,noreferrer');
   };
 
+  const tooltipContent = row.isSecret && !revealed ? '•'.repeat(Math.min(row.value.length, 12)) : row.value;
+
   return (
     <div className="flex min-w-0 items-center gap-3">
       {row.label && <div className="w-20 shrink-0 text-ods-text-primary text-h6 md:w-24">{row.label}</div>}
@@ -122,7 +124,7 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
       >
         {/* No tooltip while a secret is masked — the old native `title` leaked the raw value on hover. */}
         <FloatingTooltip
-          content={row.value}
+          content={tooltipContent}
           side="top"
           disabled={!valueTruncated || (row.isSecret && !revealed)}
           triggerClassName="min-w-0"
