@@ -95,7 +95,11 @@ import { SourceActionButton } from './source-action-button';
 import type { ChatInputRef, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { MessageSegment, Message } from './types/message.types';
-import type { ChatDialogCapabilities, UnifiedChatState } from './types/unified-chat-state.types';
+import type {
+  ChatDialogCapabilities,
+  UnifiedChatState,
+  UnifiedSendMessageOptions,
+} from './types/unified-chat-state.types';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
@@ -1215,7 +1219,7 @@ function EmbeddableChatInner({
   const {
     messages: rawMessages,
     isLoading: chatLoading,
-    sendMessage,
+    sendMessage: sendMessageRaw,
     discussRef,
     stopMessage,
     clearMessages,
@@ -1256,6 +1260,29 @@ function EmbeddableChatInner({
   // is talking to: `useUnifiedChat` already resolved which state won, and the
   // adapters already know whether they own a list. Absent = single-thread.
   const historyListMode = dialogCapabilities !== undefined;
+
+  // A send from the new-chat surface asks the host to create the dialog, and
+  // the id the panel then lands on is THIS conversation being named — not the
+  // user leaving it. The editor stays typable while the first turn streams, so
+  // a follow-up already being typed has to survive that transition; the
+  // composer-scope reset below reads this flag to tell the two apart. Armed in
+  // the send's own event (one batch with the composer's own clear, so it is
+  // set by the render the id lands in) and dropped once the send settles either
+  // way: a create that failed would otherwise leave it armed for the next real
+  // switch. Every send path goes through here — the composer, a clarification
+  // card, a quick-action chip, the Guide launcher prompt.
+  const [namingNewChat, setNamingNewChat] = useState(false);
+  const sendMessage = useCallback(
+    async (text: string, options?: UnifiedSendMessageOptions) => {
+      if (activeDialogId == null) setNamingNewChat(true);
+      try {
+        return await sendMessageRaw(text, options);
+      } finally {
+        setNamingNewChat(false);
+      }
+    },
+    [activeDialogId, sendMessageRaw],
+  );
 
   // Non-optional view of the same object for the JSX below. `canRename` /
   // `canArchive` default OFF: the ⋯ menu must never advertise an action
@@ -1333,25 +1360,42 @@ function EmbeddableChatInner({
   // Source of truth = the input text — deleting a token's chip drops its item.
   const mentionKeysRef = useRef<Set<string>>(new Set());
 
-  // Staged picker selection is per-conversation and Mingo-only. Clear it (and the
-  // mention bookkeeping) whenever the active dialog changes or the mode toggles,
-  // so unsent chips can't bleed into another conversation — or into a Guide send,
-  // where the SSE transport silently drops `contextItems`. Mirrors the post-send
-  // reset in `handleSend`.
-  // The two STATE halves are adjusted while rendering (React's documented
-  // pattern for a reset the render already has the answer to) — the composer
-  // draws its chips from `contextItems`, so clearing from an effect committed
-  // one frame of the previous conversation's chips under the new one. The ref
-  // bookkeeping stays in an effect: a ref must not be written during render.
-  const [contextClearedFor, setContextClearedFor] = useState({ activeDialogId, activeMode });
-  if (contextClearedFor.activeDialogId !== activeDialogId || contextClearedFor.activeMode !== activeMode) {
-    setContextClearedFor({ activeDialogId, activeMode });
-    setContextItems(NO_CONTEXT_ITEMS);
-    setMentionQuery(null);
+  // The composer belongs to the conversation on screen. Leaving it — another
+  // dialog opened from the list, a notification or a link, back to the list, a
+  // new chat, the Mingo ⇄ Guide toggle — drops everything unsent: the draft
+  // text (and with it the slash-command menu that text keeps open), the staged
+  // context chips and the `@` / `+` picker, and the staged uploads. Nothing
+  // typed for one conversation may bleed into another — or into a Guide send,
+  // where the SSE transport silently drops `contextItems`. Mirrors the
+  // post-send reset in `handleSend`.
+  // The draft lives in an UNCONTROLLED contenteditable, so it is dropped the
+  // React way: `composerKey` remounts the composer subtree, in the same commit
+  // the new conversation renders in. An effect-time `clear()` painted one frame
+  // of the old draft — menu open — under the new conversation, and so did
+  // clearing the chips from an effect. So the STATE halves are adjusted while
+  // rendering (React's documented pattern for a reset the render already has
+  // the answer to); the ref and attachment bookkeeping stays in an effect: a ref
+  // must not be written during render, and aborting uploads is a side effect.
+  // The one id change that is NOT a switch: `null → id` while a send from the
+  // new-chat surface is naming it (`namingNewChat` above).
+  const scopeDialogId = activeDialogId ?? null;
+  const [composerScope, setComposerScope] = useState({ dialogId: scopeDialogId, mode: activeMode });
+  const [composerKey, setComposerKey] = useState(0);
+  if (composerScope.dialogId !== scopeDialogId || composerScope.mode !== activeMode) {
+    const named =
+      namingNewChat && composerScope.dialogId == null && scopeDialogId != null && composerScope.mode === activeMode;
+    setComposerScope({ dialogId: scopeDialogId, mode: activeMode });
+    if (!named) {
+      setComposerKey(k => k + 1);
+      setContextItems(NO_CONTEXT_ITEMS);
+      setContextPickerOpen(false);
+      setMentionQuery(null);
+    }
   }
   useEffect(() => {
     mentionKeysRef.current.clear();
-  }, [activeDialogId, activeMode]);
+    clearAttachments();
+  }, [composerKey, clearAttachments]);
 
   // Map each entity type to its backend mention marker (host-declared on the
   // entity type). Drives the committed `@marker:id` token; missing markers fall
@@ -2661,6 +2705,7 @@ function EmbeddableChatInner({
                       />
 
                       <ChatComposer
+                        key={composerKey}
                         archived={isViewingArchived}
                         lock={composerLock}
                         inputRef={chatInputRef}
