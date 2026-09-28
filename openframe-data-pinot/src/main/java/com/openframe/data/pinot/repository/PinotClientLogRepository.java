@@ -48,7 +48,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                         List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
                                         String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "executionSource", "scriptCreationSource", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -69,7 +69,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                           List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
                                           String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "executionSource", "scriptCreationSource", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -181,14 +181,15 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
         return DEFAULT_SORT_COLUMN;
     }
 
-    // Most devices have no nickname: Pinot stores the schema default (empty string) for those rows,
-    // and the API contract is an absent nickname, not an empty one.
-    private String readNickname(ResultSet resultSet, int rowIndex, Map<String, Integer> columnIndexMap) {
-        String nickname = readString(resultSet, rowIndex, columnIndexMap, "nickname");
-        if (!hasText(nickname)) {
+    // Optional columns store the schema default (empty string) when absent, and the API contract is an
+    // absent field, not an empty one.
+    private String readOptionalString(ResultSet resultSet, int rowIndex, Map<String, Integer> columnIndexMap,
+                                      String column) {
+        String value = readString(resultSet, rowIndex, columnIndexMap, column);
+        if (!hasText(value)) {
             return null;
         }
-        return nickname;
+        return value;
     }
 
     private List<LogProjection> executeLogQuery(String query) {
@@ -204,7 +205,9 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 projection.userId = readString(resultSet, rowIndex, columnIndexMap, "userId");
                 projection.deviceId = readString(resultSet, rowIndex, columnIndexMap, "deviceId");
                 projection.hostname = readString(resultSet, rowIndex, columnIndexMap, "hostname");
-                projection.nickname = readNickname(resultSet, rowIndex, columnIndexMap);
+                projection.nickname = readOptionalString(resultSet, rowIndex, columnIndexMap, "nickname");
+                projection.executionSource = readOptionalString(resultSet, rowIndex, columnIndexMap, "executionSource");
+                projection.scriptCreationSource = readOptionalString(resultSet, rowIndex, columnIndexMap, "scriptCreationSource");
                 projection.organizationId = readString(resultSet, rowIndex, columnIndexMap, "organizationId");
                 projection.organizationName = readString(resultSet, rowIndex, columnIndexMap, "organizationName");
                 projection.summary = readString(resultSet, rowIndex, columnIndexMap, "summary");

@@ -91,6 +91,8 @@ public class Script implements TenantScoped {
      * Surfaced on read via the GraphQL {@code author} field, resolved to a User.
      */
     private String createdBy;
+    // Null on scripts created before the field existed; the API reads that as MANUAL.
+    private ScriptCreationSource creationSource;
     @CreatedDate
     private Instant createdAt;
     @LastModifiedDate

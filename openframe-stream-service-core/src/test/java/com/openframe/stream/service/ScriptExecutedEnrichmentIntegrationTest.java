@@ -90,7 +90,9 @@ class ScriptExecutedEnrichmentIntegrationTest {
 
         // 4. Enrich via the new direct-Machine-lookup service (Option C path).
         RmmEnrichmentService enrichmentService =
-                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider);
+                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
+                        org.mockito.Mockito.mock(ScriptExecutionRepository.class),
+                        org.mockito.Mockito.mock(com.openframe.data.repository.rmm.ScriptRepository.class));
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         // 5. The four dashboard-visible fields must ALL be non-null — that's the
@@ -133,7 +135,9 @@ class ScriptExecutedEnrichmentIntegrationTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
 
         RmmEnrichmentService enrichmentService =
-                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider);
+                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
+                        org.mockito.Mockito.mock(ScriptExecutionRepository.class),
+                        org.mockito.Mockito.mock(com.openframe.data.repository.rmm.ScriptRepository.class));
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         assertThat(enriched.getMachineId()).isEqualTo(MACHINE_ID);

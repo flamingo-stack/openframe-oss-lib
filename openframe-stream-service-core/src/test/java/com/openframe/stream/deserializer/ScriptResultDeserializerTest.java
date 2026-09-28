@@ -3,7 +3,10 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.model.enums.MessageType;
@@ -17,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -316,6 +320,97 @@ class ScriptResultDeserializerTest {
 
         // verifications
         assertThat(message).contains("Failed to update Mozilla.Firefox.");
+    }
+
+    @Test
+    @DisplayName("getResult: the script's stored input (shell, privilege, timeout, default args, env vars) is attached as input next to the output")
+    void getResult_scriptFound_attachesScriptInput() throws Exception {
+        // setup
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("scriptId", SCRIPT_ID)
+                .put("stdout", "ok").put("exitCode", 0);
+        Script script = Script.builder()
+                .id(SCRIPT_ID).tenantId(TENANT_ID).shell(ScriptShell.BASH).privilegeLevel(PrivilegeLevel.ADMIN)
+                .defaultTimeoutSeconds(300).defaultArgs(List.of("-a", "--verbose"))
+                .envVars(List.of(new ScriptEnvVar("REGION", "eu", false), new ScriptEnvVar("API_KEY", "s3cr3t", true)))
+                .build();
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(script));
+
+        // execution
+        JsonNode result = mapper.readTree(deserializer.getResult(after));
+
+        // verifications
+        assertThat(result.get("output").asText()).isEqualTo("ok");
+        JsonNode input = result.get("input");
+        assertThat(input.get("shell").asText()).isEqualTo("BASH");
+        assertThat(input.get("privilege_level").asText()).isEqualTo("ADMIN");
+        assertThat(input.get("timeout_seconds").asInt()).isEqualTo(300);
+        assertThat(input.get("args")).extracting(JsonNode::asText).containsExactly("-a", "--verbose");
+        assertThat(input.get("env_vars").get(0).get("value").asText()).isEqualTo("eu");
+        JsonNode secret = input.get("env_vars").get(1);
+        assertThat(secret.get("name").asText()).isEqualTo("API_KEY");
+        assertThat(secret.get("value").isNull()).isTrue();
+        assertThat(secret.get("secret").asBoolean()).isTrue();
+    }
+
+    @Test
+    @DisplayName("getResult: script gone → the base result is returned untouched")
+    void getResult_scriptMissing_keepsBaseResult() throws Exception {
+        // setup
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("scriptId", SCRIPT_ID).put("exitCode", 0);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.empty());
+
+        // execution
+        JsonNode result = mapper.readTree(deserializer.getResult(after));
+
+        // verifications
+        assertThat(result.get("exit_code").asInt()).isZero();
+        assertThat(result.has("input")).isFalse();
+    }
+
+    @Test
+    @DisplayName("getResult: no scriptId on the wire → no lookup, base result only")
+    void getResult_noScriptIdOnWire_keepsBaseResult() throws Exception {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("tenantId", TENANT_ID).put("exitCode", 0);
+
+        // execution
+        JsonNode result = mapper.readTree(deserializer.getResult(after));
+
+        // verifications
+        assertThat(result.has("input")).isFalse();
+        verifyNoInteractions(scriptRepository);
+    }
+
+    @Test
+    @DisplayName("getResult: Mongo throws → the base result survives; deserialize must not break the consumer thread")
+    void getResult_mongoFailure_keepsBaseResult() throws Exception {
+        // setup
+        ObjectNode after = mapper.createObjectNode()
+                .put("tenantId", TENANT_ID).put("scriptId", SCRIPT_ID).put("exitCode", 0);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenThrow(new IllegalStateException("mongo down"));
+
+        // execution
+        JsonNode result = mapper.readTree(deserializer.getResult(after));
+
+        // verifications
+        assertThat(result.get("exit_code").asInt()).isZero();
+        assertThat(result.has("input")).isFalse();
+    }
+
+    @Test
+    @DisplayName("getResult: a payload with nothing to record still yields null, as before, without a Mongo lookup")
+    void getResult_nothingToRecord_null() {
+        // setup
+        ObjectNode after = mapper.createObjectNode();
+
+        // execution
+        String result = deserializer.getResult(after);
+
+        // verifications
+        assertThat(result).isNull();
+        verifyNoInteractions(scriptRepository);
     }
 
     private static ScriptExecution executionWithScriptId(String scriptId) {
