@@ -14,6 +14,7 @@
 import { Component, type ReactNode, type UIEvent, useCallback } from 'react';
 import { cn } from '../../utils/cn';
 import { CheckFillIcon } from '../icons-v2-generated/signs-and-symbols/check-fill-icon';
+import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
 import type { ChatContextItem } from './types/context-item.types';
 
@@ -58,8 +59,9 @@ export function ContextMenuRow({
   title,
 }: ContextMenuRowProps) {
   return (
-    <button
+    <Button
       type="button"
+      variant="transparent"
       role={role}
       aria-selected={role === 'option' ? selected : undefined}
       disabled={disabled}
@@ -70,7 +72,7 @@ export function ContextMenuRow({
       {icon != null && <span className={CONTEXT_ICON_CLASS}>{icon}</span>}
       <span className={CONTEXT_LABEL_CLASS}>{label}</span>
       {trailing}
-    </button>
+    </Button>
   );
 }
 
@@ -206,3 +208,4 @@ export class ContextErrorBoundary extends Component<ContextErrorBoundaryProps, {
     return typeof this.props.fallback === 'function' ? this.props.fallback(this.retry) : this.props.fallback;
   }
 }
+
