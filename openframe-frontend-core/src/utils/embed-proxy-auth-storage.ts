@@ -44,16 +44,30 @@
 import { getAppType } from './app-config';
 import { createLocalStorageAdapter } from './local-storage-adapter';
 
-export interface EmbedProxyAuth {
+/**
+ * Every OPTIONAL header of the chat-proxy contract, with the field it is stored
+ * in: the ONE list storage, validation and `applyProxyAuth` all loop over, so a
+ * new header is one row. `identity` rows are the acting user's display identity
+ * (the hub threads them through `resolveChatProxyIdentity`); `visitor` rows are
+ * the visitor context a gateway forwards (honoured hub-side only from a SERVICE
+ * key). Empty or omitted = not sent.
+ */
+export const EMBED_PROXY_OPTIONAL_HEADERS = [
+  { field: 'firstName', group: 'identity', header: 'X-Chat-First-Name' },
+  { field: 'lastName', group: 'identity', header: 'X-Chat-Last-Name' },
+  { field: 'avatarUrl', group: 'identity', header: 'X-Chat-Avatar-Url' },
+  { field: 'originUrl', group: 'visitor', header: 'X-Chat-Origin-Url' },
+  { field: 'ip', group: 'visitor', header: 'X-Chat-Ip' },
+  { field: 'country', group: 'visitor', header: 'X-Chat-Country' },
+  { field: 'visitorId', group: 'visitor', header: 'X-Chat-User-Id' },
+] as const;
+
+export type EmbedProxyOptionalField = (typeof EMBED_PROXY_OPTIONAL_HEADERS)[number]['field'];
+
+export type EmbedProxyAuth = {
   secret: string;
   email: string;
-  /** Optional identity passthrough — empty/omitted = not sent. Server
-   *  parses these as `X-Chat-{First,Last}-Name` / `X-Chat-Avatar-Url` and
-   *  threads them through `resolveChatProxyIdentity`'s returned user. */
-  firstName?: string;
-  lastName?: string;
-  avatarUrl?: string;
-}
+} & Partial<Record<EmbedProxyOptionalField, string>>;
 
 function isValidPersistedAuth(value: unknown): value is EmbedProxyAuth {
   if (!value || typeof value !== 'object') return false;
@@ -67,10 +81,7 @@ function isValidPersistedAuth(value: unknown): value is EmbedProxyAuth {
     return false;
   // Optional fields: when present must be strings. Empty string is treated
   // as absent later (in `getEmbedProxyAuth`).
-  if (v.firstName != null && typeof v.firstName !== 'string') return false;
-  if (v.lastName != null && typeof v.lastName !== 'string') return false;
-  if (v.avatarUrl != null && typeof v.avatarUrl !== 'string') return false;
-  return true;
+  return EMBED_PROXY_OPTIONAL_HEADERS.every(({ field }) => v[field] == null || typeof v[field] === 'string');
 }
 
 const adapter = createLocalStorageAdapter<EmbedProxyAuth>({
@@ -96,6 +107,16 @@ function normalizeOptional(value: string | undefined): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+/** Every optional field of `value`, trimmed, blank ones dropped. */
+function normalizedOptionalFields(value: Partial<Record<EmbedProxyOptionalField, string>>) {
+  const out: Partial<Record<EmbedProxyOptionalField, string>> = {};
+  for (const { field } of EMBED_PROXY_OPTIONAL_HEADERS) {
+    const normalized = normalizeOptional(value[field]);
+    if (normalized) out[field] = normalized;
+  }
+  return out;
+}
+
 /**
  * Returns full credentials (secret + email + optional identity passthrough)
  * when secret + email are available. Returns `null` when nothing is saved —
@@ -107,9 +128,7 @@ export function getEmbedProxyAuth(): EmbedProxyAuth | null {
   return {
     secret: persisted.secret,
     email: persisted.email.trim().toLowerCase(),
-    firstName: normalizeOptional(persisted.firstName),
-    lastName: normalizeOptional(persisted.lastName),
-    avatarUrl: normalizeOptional(persisted.avatarUrl),
+    ...normalizedOptionalFields(persisted),
   };
 }
 
@@ -128,9 +147,7 @@ export function setEmbedProxyAuth(value: EmbedProxyAuth): void {
   adapter.save({
     secret: value.secret,
     email: value.email.trim().toLowerCase(),
-    firstName: normalizeOptional(value.firstName),
-    lastName: normalizeOptional(value.lastName),
-    avatarUrl: normalizeOptional(value.avatarUrl),
+    ...normalizedOptionalFields(value),
   });
 }
 
@@ -162,10 +179,11 @@ export function applyProxyAuth(
   if (auth?.email) {
     headers['X-Chat-Act-As'] = auth.email;
   }
-  // Optional identity passthrough — only attached when present so the
-  // server's "required vs optional" header shape stays exact.
-  if (auth?.firstName) headers['X-Chat-First-Name'] = auth.firstName;
-  if (auth?.lastName) headers['X-Chat-Last-Name'] = auth.lastName;
-  if (auth?.avatarUrl) headers['X-Chat-Avatar-Url'] = auth.avatarUrl;
+  // Optional headers — only attached when present so the server's
+  // "required vs optional" header shape stays exact.
+  for (const { field, header } of EMBED_PROXY_OPTIONAL_HEADERS) {
+    const value = auth?.[field];
+    if (value) headers[header] = value;
+  }
   return { url, headers };
 }

@@ -235,6 +235,8 @@ export {
 } from './sse-subscription';
 export {
   type EmbedProxyAuth,
+  type EmbedProxyOptionalField,
+  EMBED_PROXY_OPTIONAL_HEADERS,
   getEmbedProxyAuth,
   setEmbedProxyAuth,
   clearEmbedProxyAuth,
