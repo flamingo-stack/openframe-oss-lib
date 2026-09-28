@@ -312,7 +312,7 @@ public class KnowledgeBaseController {
             description = "Partially update name, folder, content and summary. Use the publish/unpublish/archive " +
                     "endpoints to change the status and the tag endpoints to change tags.")
     @ApiResponses({
-            @ApiResponse(responseCode = "404", description = "Article not found",
+            @ApiResponse(responseCode = "404", description = "Article not found, or the target parent folder does not exist",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PatchMapping("/articles/{id}")
@@ -383,7 +383,7 @@ public class KnowledgeBaseController {
     @Operation(summary = "Restore an archived article",
             description = "Move an archived article back into a folder as PUBLISHED")
     @ApiResponses({
-            @ApiResponse(responseCode = "404", description = "Article not found",
+            @ApiResponse(responseCode = "404", description = "Article not found, or the target parent folder does not exist",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "409", description = "Article is not archived",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))

@@ -171,7 +171,11 @@ public class TicketController {
                     "the next ticket number, lands in the requested (or first custom) status and the assignee is notified.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Ticket created",
-                    content = @Content(schema = @Schema(implementation = TicketResponse.class)))
+                    content = @Content(schema = @Schema(implementation = TicketResponse.class))),
+            @ApiResponse(responseCode = "404", description = "An assignee, device, customer, status or tag in the request does not exist",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "The device does not belong to the selected customer",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping
     @ResponseStatus(CREATED)
@@ -250,6 +254,10 @@ public class TicketController {
     }
 
     @Operation(summary = "Assign a ticket", description = "Assign the ticket to a user (the assignee is notified)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Ticket not found, or the assignee does not exist",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @PutMapping("/{id}/assignee")
     @ResponseStatus(OK)
     public TicketResponse assignTicket(
@@ -263,6 +271,10 @@ public class TicketController {
     }
 
     @Operation(summary = "Unassign a ticket", description = "Remove the current assignee")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Ticket not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @DeleteMapping("/{id}/assignee")
     @ResponseStatus(OK)
     public TicketResponse unassignTicket(
@@ -275,6 +287,10 @@ public class TicketController {
     }
 
     @Operation(summary = "Unlink the device", description = "Remove the linked device from the ticket")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Ticket not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @DeleteMapping("/{id}/device")
     @ResponseStatus(OK)
     public TicketResponse unlinkDevice(
@@ -288,6 +304,10 @@ public class TicketController {
 
     @Operation(summary = "Unlink the customer",
             description = "Remove the linked customer (and, as a consequence, the linked device) from the ticket")
+    @ApiResponses({
+            @ApiResponse(responseCode = "404", description = "Ticket not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
     @DeleteMapping("/{id}/customer")
     @ResponseStatus(OK)
     public TicketResponse unlinkCustomer(
@@ -359,6 +379,8 @@ public class TicketController {
 
     @Operation(summary = "Update a ticket note", description = "Only the note author can edit it")
     @ApiResponses({
+            @ApiResponse(responseCode = "403", description = "Only the note author may change it",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Note not found on this ticket",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
@@ -378,6 +400,8 @@ public class TicketController {
 
     @Operation(summary = "Delete a ticket note", description = "Only the note author can delete it")
     @ApiResponses({
+            @ApiResponse(responseCode = "403", description = "Only the note author may change it",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Note not found on this ticket",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
