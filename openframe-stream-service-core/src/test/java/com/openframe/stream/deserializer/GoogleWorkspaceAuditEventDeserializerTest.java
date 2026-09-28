@@ -74,6 +74,15 @@ class GoogleWorkspaceAuditEventDeserializerTest {
     }
 
     @Test
+    void eventKeyTakesPrecedenceOverEventIndexInToolEventId() {
+        String withEventKey = AUDIT_EVENT_JSON.replace("\"eventIndex\": 0,", "\"eventIndex\": 1, \"eventKey\": \"CREATE_USER-0\",");
+
+        DeserializedDebeziumMessage result = deserialize(withEventKey);
+
+        assertEquals("1234567890-CREATE_USER-0-org-uuid-1", result.getToolEventId());
+    }
+
+    @Test
     void passesThroughTenantAndOrgFields() {
         DeserializedDebeziumMessage result = deserialize(AUDIT_EVENT_JSON);
 
