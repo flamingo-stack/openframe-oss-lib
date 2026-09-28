@@ -4,6 +4,8 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
@@ -39,6 +41,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String STATUS_FIELD = "status";
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
+    private static final String PACKAGE_MANAGERS_FIELD = "packageManagers";
     private static final String COUNT_FIELD = "count";
     private static final String BUCKET_FIELD = "_availableBucket";
     private static final String ONLINE_STATUS = "ONLINE";
@@ -346,6 +349,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                     criteriaList.add(Criteria.where(MACHINE_ID_FIELD).in(restrict));
                 }
             }
+            Collection<PackageManagerType> manageableBy = filter.getManageableByPackageManagers();
+            if (manageableBy != null) {
+                criteriaList.add(softwareManageableCriteria(manageableBy));
+            }
         }
 
         if (search != null && !search.isEmpty()) {
@@ -388,6 +395,14 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         List<OsType> valid = osTypeScope == null ? List.of() : osTypeScope.stream().filter(Objects::nonNull).toList();
         return valid.isEmpty() ? Optional.empty()
                 : Optional.of(Criteria.where(OS_TYPE_FIELD).in(valid));
+    }
+
+    private static Criteria softwareManageableCriteria(Collection<PackageManagerType> manageableBy) {
+        List<Criteria> anyManageable = new ArrayList<>();
+        anyManageable.add(Criteria.where(PACKAGE_MANAGERS_FIELD).exists(false));
+        manageableBy.forEach(manager -> anyManageable.add(
+                Criteria.where(PACKAGE_MANAGERS_FIELD + "." + manager.name()).in(PackageManagerState.MANAGEABLE)));
+        return new Criteria().orOperator(anyManageable.toArray(new Criteria[0]));
     }
 
 }
