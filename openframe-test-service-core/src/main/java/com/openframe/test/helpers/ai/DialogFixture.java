@@ -88,9 +88,6 @@ public class DialogFixture {
      * <p>Two steps because only RESOLVED may move to ARCHIVED — {@code TicketsTest} asserts that rule
      * in both directions. The kind is re-read between them rather than reused, so a ticket already
      * RESOLVED is not resolved twice and one already ARCHIVED is left alone.
-     *
-     * <p>{@code AssertionError} is caught as well: the {@code graphqlSuccess()} spec raises one for any
-     * GraphQL error, and letting it out of an {@code @AfterEach} fails a case whose body passed.
      */
     private void archiveBoundTicket() {
         try {
@@ -106,20 +103,13 @@ public class DialogFixture {
             }
             log.info("Archived ticket {} bound to dialog {}", ticketId, dialogId);
         } catch (RuntimeException | AssertionError e) {
-            // Best effort: a failed cleanup must not mask the case that failed.
+            // Best effort: a failed cleanup must not mask the case that failed, nor fail one that passed.
+            // AssertionError too — the graphqlSuccess() spec raises it for any GraphQL error.
             log.warn("Failed to archive the ticket bound to dialog {}: {}", dialogId, e.getMessage());
         }
     }
 
-    /**
-     * Moves the ticket to RESOLVED, first rejecting the approval that freezes it if one does.
-     *
-     * <p>A run the assistant escalated to technician approval parks its ticket in Tech Required with the
-     * request pending, and the backend then refuses every status change with
-     * {@code TICKET_STATUS_LOCKED_BY_APPROVAL} until the request is resolved
-     * ({@code TicketTransitionPolicyValidator}, oss-lib #2365). Teardown runs as ADMIN, which may resolve
-     * an ADMIN-typed request. The refusal names the request, so the transition itself is the probe.
-     */
+    // A pending technician approval freezes the ticket (#2365); teardown runs as ADMIN, so it may reject it.
     private static void resolveReleasingApprovalLock(String ticketId) {
         String resolved = TicketApi.resolveSystemStatusId("RESOLVED");
         List<GraphqlError> errors = TicketApi.attemptTransitionTicketErrors(ticketId, resolved);
@@ -134,7 +124,7 @@ public class DialogFixture {
                 .orElseThrow(() -> new AssertionError("Resolving ticket " + ticketId + " was refused: " + errors));
         log.info("Ticket {} is locked by pending approval {}; rejecting it so the ticket can close",
                 ticketId, approvalRequestId);
-        ApprovalApi.approve(approvalRequestId, false);
+        ApprovalApi.reject(approvalRequestId);
         TicketApi.transitionTicket(ticketId, resolved);
     }
 
