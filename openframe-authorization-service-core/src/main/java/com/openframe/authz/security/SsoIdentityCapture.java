@@ -54,7 +54,7 @@ public class SsoIdentityCapture {
             userService.findActiveByEmailAndTenant(email.toLowerCase(ROOT), tenantId)
                     .ifPresent(authUser -> ssoIdentityService.link(provider, user.getClaims(), authUser));
         } catch (Exception e) {
-            log.warn("SSO identity capture failed: {}", e.getMessage());
+            log.warn("SSO identity capture failed", e);
         }
     }
 }
