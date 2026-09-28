@@ -7,14 +7,11 @@ import com.openframe.api.dto.device.DeviceLogLevel;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.exception.DeviceNotFoundException;
-import com.openframe.core.exception.InternalException;
+import com.openframe.api.service.tenant.TenantDomainService;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
-import com.openframe.data.repository.tenant.TenantRepository;
-import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +25,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,7 +45,6 @@ import static org.mockito.Mockito.when;
 class DeviceLogServiceTest {
 
     private static final String MACHINE_ID = "machine-1";
-    private static final String TENANT_ID = "tenant-1";
     private static final String TENANT_DOMAIN = "acme.openframe.ai";
     private static final Instant TO = Instant.parse("2026-09-14T12:00:00Z");
     private static final Instant FROM = TO.minus(Duration.ofDays(1));
@@ -58,19 +53,16 @@ class DeviceLogServiceTest {
 
     @Mock private LokiClient lokiClient;
     @Mock private DeviceService deviceService;
-    @Mock private TenantIdProvider tenantIdProvider;
-    @Mock private TenantRepository tenantRepository;
+    @Mock private TenantDomainService tenantDomainService;
 
     private DeviceLogService service;
 
     @BeforeEach
     void setUp() {
-        service = new DeviceLogService(lokiClient, deviceService, tenantIdProvider, tenantRepository);
+        service = new DeviceLogService(lokiClient, deviceService, tenantDomainService);
         when(deviceService.findByMachineIds(anyCollection())).thenAnswer(invocation ->
                 invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceTest::machine).toList());
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(tenantRepository.findById(TENANT_ID))
-                .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).domain(TENANT_DOMAIN).build()));
+        when(tenantDomainService.getTenantDomain()).thenReturn(TENANT_DOMAIN);
     }
 
     @Test
@@ -175,38 +167,6 @@ class DeviceLogServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("50 devices");
         verifyNoInteractions(lokiClient);
-    }
-
-    @Test
-    void failsWhenTheTenantHasNoDomain() {
-        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).build()));
-
-        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, window(), page(null, null)))
-                .isInstanceOf(InternalException.class);
-        verifyNoInteractions(lokiClient);
-    }
-
-    @Test
-    void cachesTheTenantDomainAcrossRequests() {
-        service.queryDeviceLogs(MACHINE_ID, window(), page(null, null));
-        service.queryDeviceLogs(MACHINE_ID, window(), page(null, null));
-
-        verify(tenantRepository, times(1)).findById(TENANT_ID);
-    }
-
-    @Test
-    void doesNotCacheAMissingDomain() {
-        when(tenantRepository.findById(TENANT_ID))
-                .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).build()))
-                .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).domain(TENANT_DOMAIN).build()));
-
-        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, window(), page(null, null)))
-                .isInstanceOf(InternalException.class);
-        service.queryDeviceLogs(MACHINE_ID, window(), page(null, null));
-
-        verify(tenantRepository, times(2)).findById(TENANT_ID);
-        verify(lokiClient).queryRange(startsWith("{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\""),
-                anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD));
     }
 
     @Test

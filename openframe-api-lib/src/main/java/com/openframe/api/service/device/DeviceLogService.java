@@ -7,15 +7,12 @@ import com.openframe.api.dto.device.DeviceLogLevel;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.DeviceNotFoundException;
-import com.openframe.core.exception.InternalException;
+import com.openframe.api.service.tenant.TenantDomainService;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.loki.client.LogQl;
 import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
-import com.openframe.data.repository.tenant.TenantRepository;
-import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,9 +25,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
@@ -66,9 +61,7 @@ public class DeviceLogService {
 
     private final LokiClient lokiClient;
     private final DeviceService deviceService;
-    private final TenantIdProvider tenantIdProvider;
-    private final TenantRepository tenantRepository;
-    private final Map<String, String> tenantDomains = new ConcurrentHashMap<>();
+    private final TenantDomainService tenantDomainService;
 
     /**
      * Logs of one device, newest first. Shorthand for {@link #queryLogs(List, DeviceLogFilterCriteria,
@@ -116,7 +109,7 @@ public class DeviceLogService {
             endNanos = Math.min(endNanos, after.timestampNanos());
         }
 
-        String query = buildQuery(resolveTenantDomain(), devices, criteria);
+        String query = buildQuery(tenantDomainService.getTenantDomain(), devices, criteria);
         int pageSize = pageSize(page.getLimit());
         log.debug("Querying device logs for machineIds: {}, query: {}, start: {}, end: {}", devices, query, startNanos, endNanos);
 
@@ -214,27 +207,6 @@ public class DeviceLogService {
                 query.append(operator).append(LogQl.quote(CASE_INSENSITIVE + LogQl.regexLiteral(term)));
             }
         }
-    }
-
-    /**
-     * Cached for the life of the pod: a tenant pod serves one tenant and tenant domains never change. A missing
-     * domain is not cached, so a tenant that is still being provisioned recovers on the next call.
-     */
-    private String resolveTenantDomain() {
-        String tenantId = tenantIdProvider.getTenantId();
-        String domain = tenantDomains.computeIfAbsent(tenantId, this::findTenantDomain);
-        if (domain == null) {
-            log.error("Cannot query device logs: tenant {} has no domain", tenantId);
-            throw new InternalException("Device logs are not available for this tenant");
-        }
-        return domain;
-    }
-
-    private String findTenantDomain(String tenantId) {
-        return tenantRepository.findById(tenantId)
-                .map(Tenant::getDomain)
-                .filter(StringUtils::hasText)
-                .orElse(null);
     }
 
     /**
