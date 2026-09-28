@@ -3,12 +3,15 @@ import { describe, expect, it } from 'vitest';
 import {
   filledRescueFields,
   isExcludedRescueField,
-  isFormRescueFormId,
   isRescueEmail,
   rescueCompletionPct,
   sanitizeRescueFieldName,
   sanitizeRescueValues,
   FORM_RESCUE_MAX_VALUE_CHARS,
+  RESCUE_FORMS,
+  defineRescueForm,
+  getRescueForm,
+  listRescueForms,
 } from '../form-rescue';
 
 /**
@@ -80,12 +83,6 @@ describe('field and id checks', () => {
     }
   });
 
-  it('accepts only known form ids', () => {
-    expect(isFormRescueFormId('contact')).toBe(true);
-    expect(isFormRescueFormId('meeting_booking')).toBe(true);
-    expect(isFormRescueFormId('anything_else')).toBe(false);
-  });
-
   it('validates emails the way the contact table does', () => {
     expect(isRescueEmail('alex@northwind-it.com')).toBe(true);
     expect(isRescueEmail('alex@')).toBe(false);
@@ -102,5 +99,26 @@ describe('field and id checks', () => {
     expect(rescueCompletionPct(3, 4)).toBe(75);
     expect(rescueCompletionPct(0, 0)).toBe(0);
     expect(rescueCompletionPct(9, 4)).toBe(100);
+  });
+});
+
+describe('rescue form definitions', () => {
+  it('knows the lib forms and refuses unknown ids', () => {
+    expect(getRescueForm('contact')).toBe(RESCUE_FORMS.contact);
+    expect(getRescueForm('meeting_booking')?.label).toBe('Meeting booking');
+    expect(getRescueForm('anything_else')).toBeNull();
+    expect(getRescueForm(42)).toBeNull();
+  });
+
+  it('lets a host add its own form beside it, with no central list', () => {
+    const joinForm = defineRescueForm({ id: 'host_join', label: 'Join form' });
+    expect(getRescueForm('host_join')).toBe(joinForm);
+    expect(listRescueForms()).toContain(joinForm);
+  });
+
+  it('is idempotent for the same definition and refuses a conflicting one', () => {
+    expect(defineRescueForm({ id: 'contact', label: 'Contact form' })).toBe(RESCUE_FORMS.contact);
+    expect(() => defineRescueForm({ id: 'contact', label: 'Something else' })).toThrow(/already defined/);
+    expect(() => defineRescueForm({ id: 'Bad Id!', label: 'x' })).toThrow(/invalid form id/);
   });
 });

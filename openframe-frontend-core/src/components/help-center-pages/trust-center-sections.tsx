@@ -34,6 +34,7 @@ import {
   type TrustFrameworkMonitoringEntry,
 } from '../../types/trust-center';
 import { getFlagFromCountryName } from '../../utils/country-phone-utils';
+import { RESCUE_FORMS } from '../../utils/form-rescue';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { brandLogoForName } from '../chat/utils/icon-library';
 import { ContactForm } from '../contact/contact-form';
@@ -443,7 +444,7 @@ export function DocumentRequestModal({
               with access, usually within one business day.
             </p>
             <ContactForm
-              rescueFormId="trust_center_request"
+              rescue={RESCUE_FORMS.trustCenterRequest}
               title=""
               noBorder
               noPadding

@@ -42,21 +42,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
-import { useFormRescue } from '../../hooks/use-form-rescue';
+import { completeFormRescue } from '../../hooks/use-form-rescue';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { BOOKING_IN_FLIGHT_MESSAGE, useMeetingBooking } from '../../hooks/use-meeting-booking';
 import { useToast } from '../../hooks/use-toast';
 import {
   blocksNativeBooking,
-  BUILT_IN_BOOKING_FIELDS,
-  normalizeFormFields,
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
   type MeetingHost,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
-import type { FormRescueFormId } from '../../utils/form-rescue';
+import { FORM_RESCUE_ATTEMPT_FIELD, type FormRescueDefinition } from '../../utils/form-rescue';
 import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
 import { BookingForm, BookingFormSkeleton, DEFAULT_SUBMIT_LABEL, type BookingFormProps } from './booking-form';
@@ -154,9 +152,9 @@ export interface HubSpotMeetingSchedulerProps {
    * can pass it across the RSC boundary where a component cannot.
    */
   detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent'>;
-  /** Form rescue (save the half-filled booking form for follow-up). OPT-IN:
+  /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
-  rescueFormId?: FormRescueFormId | null;
+  rescue?: FormRescueDefinition | null;
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
@@ -410,7 +408,7 @@ export function HubSpotMeetingScheduler({
   flow = DEFAULT_SCHEDULER_FLOW,
   detailsForm: DetailsForm = BookingForm,
   detailsFormProps,
-  rescueFormId = null,
+  rescue = null,
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -499,30 +497,6 @@ export function HubSpotMeetingScheduler({
 
   const { honeypotInputProps, getSignals, resetSignals } = useHumanitySignals();
   const { toast } = useToast();
-
-  // Form rescue lives HERE, not in the form: in details-first the form unmounts
-  // before the POST, and the attempt must survive it. The form reports edits
-  // (`onValuesChange`); a restored draft remounts it with the answers seeded.
-  const rescueFieldNames = useMemo(
-    () => [
-      ...BUILT_IN_BOOKING_FIELDS.map(field => field.name),
-      ...normalizeFormFields(availability?.formFields ?? []).map(field => field.name),
-    ],
-    [availability?.formFields],
-  );
-  const [restored, setRestored] = useState<{ version: number; values: Record<string, unknown> } | null>(null);
-  const rescue = useFormRescue({
-    formId: rescueFormId,
-    fieldNames: rescueFieldNames,
-    getSignals,
-    onRestore: values => {
-      const { email, firstName, lastName, ...answers } = values;
-      setRestored(prev => ({
-        version: (prev?.version ?? 0) + 1,
-        values: { email: email ?? '', firstName: firstName ?? '', lastName: lastName ?? '', formFields: answers },
-      }));
-    },
-  });
 
   // Reset the machine when the host switches links. Adjusted while rendering —
   // React's documented pattern for a prop-driven reset — so the swapped-in link
@@ -666,7 +640,7 @@ export function HubSpotMeetingScheduler({
       // visible SLOT_TAKEN alert on its way to being ignored.
       const priorError = bookingError;
       setBookingError(null);
-      const result = await book({ ...payload, ...rescue.submitFields() });
+      const result = await book(payload);
 
       // Not an error: the hook's in-flight guard. No toast, no step change.
       if (!result.ok && result.message === BOOKING_IN_FLIGHT_MESSAGE) {
@@ -674,7 +648,8 @@ export function HubSpotMeetingScheduler({
         return;
       }
       if (result.ok && result.confirmation) {
-        rescue.complete();
+        // The details form may have unmounted (details-first); its attempt id rides the payload.
+        completeFormRescue(rescue, payload[FORM_RESCUE_ATTEMPT_FIELD]);
         setConfirmation(result.confirmation);
         setStep('confirmed');
         onBooked?.(result.confirmation);
@@ -886,7 +861,6 @@ export function HubSpotMeetingScheduler({
                 </p>
               )}
               <DetailsForm
-                key={restored?.version ?? 0}
                 {...detailsFormProps}
                 availability={availability}
                 meetingId={meetingId}
@@ -896,12 +870,12 @@ export function HubSpotMeetingScheduler({
                 deferSlot={detailsFirst}
                 submitLabel={preset.submitLabel}
                 footerNote={preset.footerNote}
-                initialValues={(detailsFirst ? stash?.payload : undefined) ?? restored?.values}
+                initialValues={detailsFirst ? stash?.payload : undefined}
                 isSubmitting={isSubmitting}
                 onSubmit={detailsFirst ? stashDetails : handleSubmit}
                 honeypotInputProps={honeypotInputProps}
                 getSignals={getSignals}
-                onValuesChange={rescue.track}
+                rescue={rescue}
               />
             </div>
           ) : (

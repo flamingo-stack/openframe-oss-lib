@@ -22,11 +22,11 @@
  */
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useContactSubmission } from '../../hooks/use-contact-submission';
-import { useFormRescue } from '../../hooks/use-form-rescue';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
+import { useRescuedForm } from '../../hooks/use-rescued-form';
 import {
   ContactSchema,
   type ContactFormData,
@@ -34,7 +34,7 @@ import {
   referralSourceOptions,
   defaultHelpCategoryOptions,
 } from '../../schemas/contact-schema';
-import type { FormRescueFormId } from '../../utils/form-rescue';
+import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
@@ -132,10 +132,11 @@ export interface ContactFormProps {
   submitSuccessLabel?: string;
   successRedirectUrl?: string;
   successToastMessage?: string;
-  /** Which public form this is, for form rescue (a half-filled form is saved so
-   *  the team can follow up). OPT-IN: omitted or `null` saves nothing, so a host
-   *  that has not chosen rescue never starts storing what visitors type. */
-  rescueFormId?: FormRescueFormId | null;
+  /** Form rescue (a half-filled form is saved so the team can follow up): the
+   *  form's definition (`RESCUE_FORMS.contact`, or the host's own
+   *  `defineRescueForm`). OPT-IN: omitted or `null` saves nothing, so a host that
+   *  has not chosen rescue never starts storing what visitors type. */
+  rescue?: FormRescueDefinition | null;
 }
 
 export function ContactForm({
@@ -161,7 +162,7 @@ export function ContactForm({
   submitSuccessLabel = 'Message Sent!',
   successRedirectUrl = '/blog#community',
   successToastMessage = 'Redirecting you to join our community...',
-  rescueFormId = null,
+  rescue: rescueForm = null,
 }: ContactFormProps = {}) {
   // Attachments staging — same hook the chat composer + ticket
   // detail-drawer composer use. Files upload to Supabase as soon as
@@ -192,16 +193,7 @@ export function ContactForm({
   // own their own UX (no "Message Sent!" button-label flicker).
   const isSuccess = onCustomSubmit ? false : builtInSubmission.isSuccess;
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors },
-    reset,
-    watch,
-    getValues,
-    setValue,
-  } = useForm<ContactFormData>({
+  const form = useForm<ContactFormData>({
     resolver: zodResolver(ContactSchema),
     defaultValues: {
       ...(prefilledReason && { helpCategory: prefilledReason }),
@@ -211,6 +203,13 @@ export function ContactForm({
       ...defaultValuesProp,
     },
   });
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    reset,
+  } = form;
 
   // Form rescue: only the fields the visitor can see are tracked, so a hidden
   // prefilled value (a signed-in email, a fixed category) is never sent.
@@ -221,21 +220,7 @@ export function ContactForm({
       ),
     [hideFields],
   );
-  const rescue = useFormRescue({
-    formId: rescueFormId,
-    fieldNames: rescueFieldNames,
-    getSignals,
-    onRestore: values => {
-      for (const field of rescueFieldNames) {
-        const value = values[field];
-        if (value && !getValues(field)) setValue(field, value);
-      }
-    },
-  });
-  useEffect(() => {
-    const subscription = watch((values, { name }) => rescue.track(values, name));
-    return () => subscription.unsubscribe();
-  }, [watch, rescue]);
+  const rescue = useRescuedForm(form, { rescue: rescueForm, fields: rescueFieldNames, getSignals });
 
   const handleFormSubmit = async (data: ContactFormData) => {
     if (isSubmitting) return;
@@ -382,7 +367,7 @@ export function ContactForm({
                   control={control}
                   name="companySize"
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <SelectTrigger
                         id="companySize"
                         aria-label="Company Size"
@@ -414,7 +399,7 @@ export function ContactForm({
                   control={control}
                   name="referralSource"
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <SelectTrigger
                         id="referralSource"
                         aria-label="Referral Source"
@@ -452,7 +437,7 @@ export function ContactForm({
               control={control}
               name="helpCategory"
               render={({ field }) => (
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value ?? ''}>
                   <SelectTrigger
                     id="helpCategory"
                     aria-label="Help Category"

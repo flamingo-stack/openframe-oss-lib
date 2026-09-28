@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import type { Control, UseFormRegister } from 'react-hook-form';
+import type { Control, Path, UseFormRegister } from 'react-hook-form';
+import { useRescuedForm } from '../../hooks/use-rescued-form';
 import {
   BUILT_IN_BOOKING_FIELDS,
   type BuiltInBookingFieldName,
@@ -22,6 +23,7 @@ import {
   type BookingFormValues,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
+import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import {
   Button,
@@ -370,9 +372,11 @@ export interface BookingFormProps {
   /** From useHumanitySignals — parent owns the instance so it can resetSignals(). */
   honeypotInputProps: { ref: Ref<HTMLInputElement>; name: string };
   getSignals: () => Record<string, string | number>;
-  /** Called on every edit with the answers flattened (declared questions beside
-   *  the built-ins) and the edited field's name — the parent's form rescue. */
-  onValuesChange?: (values: Record<string, unknown>, changedField: string | null) => void;
+  /** Form rescue for this form (`RESCUE_FORMS.meetingBooking`); `null` or omitted saves nothing.
+   *  The attempt's keys ride the payload handed to `onSubmit`, so the parent closes it after
+   *  the booking commits (`completeFormRescue`), in details-first too, where this form has
+   *  unmounted by then. */
+  rescue?: FormRescueDefinition | null;
 }
 
 /**
@@ -405,7 +409,7 @@ export function BookingForm({
   onSubmit,
   honeypotInputProps,
   getSignals,
-  onValuesChange,
+  rescue = null,
 }: BookingFormProps) {
   const { formFields, legalConsent } = availability;
   // Every declared question resolved to a control (`resolveFormFieldControl`) —
@@ -484,14 +488,23 @@ export function BookingForm({
     );
   }, [consentDefaults, priorConsents, getValues, setValue]);
 
-  useEffect(() => {
-    if (!onValuesChange) return undefined;
-    const subscription = watch((values, { name }) => {
-      const answers = (values.formFields ?? {}) as Record<string, unknown>;
-      onValuesChange({ ...values, ...answers }, name ? name.replace(/^formFields\./, '') : null);
-    });
-    return () => subscription.unsubscribe();
-  }, [watch, onValuesChange]);
+  // Form rescue: the built-ins by name, the declared questions under `formFields.<name>`.
+  const rescueFields = useMemo(
+    () => [...BUILT_IN_BOOKING_FIELDS.map(field => field.name), ...supportedFields.map(field => field.name)],
+    [supportedFields],
+  );
+  const formRescue = useRescuedForm(
+    { watch, getValues, setValue },
+    {
+      rescue,
+      fields: rescueFields,
+      getSignals,
+      fieldPath: name =>
+        (BUILT_IN_BOOKING_FIELDS.some(field => field.name === name)
+          ? name
+          : `formFields.${name}`) as Path<BookingFormValues>,
+    },
+  );
 
   const submitValid = handleSubmit(async data => {
     if (consentMissing) return; // the error is already on screen — see `submit`
@@ -500,7 +513,7 @@ export function BookingForm({
       // must do so synchronously in this call — this form and its honeypot are
       // still mounted here, and `getSignals()` reads a detached ref once they
       // unmount, which would silently disable the decoy.
-      await onSubmit({ ...data, meetingId, [HOST_CONSENT_KEY]: consented });
+      await onSubmit({ ...data, meetingId, [HOST_CONSENT_KEY]: consented, ...formRescue.submitFields() });
       return;
     }
     await onSubmit({
@@ -511,6 +524,7 @@ export function BookingForm({
       durationMs,
       timezone,
       ...getSignals(),
+      ...formRescue.submitFields(),
     });
   });
 

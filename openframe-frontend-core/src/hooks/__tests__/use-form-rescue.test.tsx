@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { EndpointsRuntimeContext, type EndpointsRuntime } from '../../contexts/endpoints-runtime-context';
-import { FORM_RESCUE_DEBOUNCE_MS } from '../../utils/form-rescue';
+import { FORM_RESCUE_DEBOUNCE_MS, RESCUE_FORMS } from '../../utils/form-rescue';
 import { useFormRescue } from '../use-form-rescue';
 
 /**
@@ -61,7 +61,7 @@ function sentBodies(): Array<{ url: string; body: SentBody }> {
 
 describe('useFormRescue', () => {
   it('debounces one save per burst with allowlisted values only', () => {
-    const { result } = renderHook(() => useFormRescue({ formId: 'contact', fieldNames: FIELDS }), { wrapper });
+    const { result } = renderHook(() => useFormRescue({ form: RESCUE_FORMS.contact, fieldNames: FIELDS }), { wrapper });
 
     act(() => {
       result.current.track({ name: 'Al', email: '', message: '' }, 'name');
@@ -87,7 +87,7 @@ describe('useFormRescue', () => {
   });
 
   it('sends nothing until a field is filled', () => {
-    const { result } = renderHook(() => useFormRescue({ formId: 'contact', fieldNames: FIELDS }), { wrapper });
+    const { result } = renderHook(() => useFormRescue({ form: RESCUE_FORMS.contact, fieldNames: FIELDS }), { wrapper });
     act(() => {
       result.current.track({ name: '', email: '', message: '' }, 'name');
       vi.advanceTimersByTime(FORM_RESCUE_DEBOUNCE_MS * 2);
@@ -96,7 +96,7 @@ describe('useFormRescue', () => {
   });
 
   it('never puts a field value into an analytics event', () => {
-    const { result } = renderHook(() => useFormRescue({ formId: 'contact', fieldNames: FIELDS }), { wrapper });
+    const { result } = renderHook(() => useFormRescue({ form: RESCUE_FORMS.contact, fieldNames: FIELDS }), { wrapper });
     act(() => {
       result.current.track({ name: 'Alex', email: 'alex@northwind-it.com', message: '' }, 'email');
       vi.advanceTimersByTime(FORM_RESCUE_DEBOUNCE_MS);
@@ -108,7 +108,7 @@ describe('useFormRescue', () => {
   });
 
   it('carries the saved attempt into the submit and starts a fresh one after', () => {
-    const { result } = renderHook(() => useFormRescue({ formId: 'contact', fieldNames: FIELDS }), { wrapper });
+    const { result } = renderHook(() => useFormRescue({ form: RESCUE_FORMS.contact, fieldNames: FIELDS }), { wrapper });
     act(() => {
       result.current.track({ name: 'Alex', email: '', message: '' }, 'name');
       vi.advanceTimersByTime(FORM_RESCUE_DEBOUNCE_MS);
@@ -131,7 +131,7 @@ describe('useFormRescue', () => {
       }),
     );
     const onRestore = vi.fn();
-    const { result } = renderHook(() => useFormRescue({ formId: 'contact', fieldNames: FIELDS, onRestore }), {
+    const { result } = renderHook(() => useFormRescue({ form: RESCUE_FORMS.contact, fieldNames: FIELDS, onRestore }), {
       wrapper,
     });
     expect(onRestore).toHaveBeenCalledWith({ email: 'alex@northwind-it.com' });
@@ -152,7 +152,7 @@ describe('useFormRescue', () => {
       ),
     );
     const onRestore = vi.fn();
-    const { result } = renderHook(() => useFormRescue({ formId: 'contact', fieldNames: FIELDS, onRestore }), {
+    const { result } = renderHook(() => useFormRescue({ form: RESCUE_FORMS.contact, fieldNames: FIELDS, onRestore }), {
       wrapper,
     });
     await waitFor(() => expect(onRestore).toHaveBeenCalledWith({ email: 'alex@northwind-it.com' }));
@@ -164,7 +164,7 @@ describe('useFormRescue', () => {
   });
 
   it('does nothing when rescue is off', () => {
-    const { result } = renderHook(() => useFormRescue({ formId: null, fieldNames: FIELDS }), { wrapper });
+    const { result } = renderHook(() => useFormRescue({ form: null, fieldNames: FIELDS }), { wrapper });
     act(() => {
       result.current.track({ name: 'Alex', email: 'alex@northwind-it.com', message: '' }, 'name');
       vi.advanceTimersByTime(FORM_RESCUE_DEBOUNCE_MS);
@@ -174,7 +174,7 @@ describe('useFormRescue', () => {
   });
 
   it('saves once more with keepalive when the tab is hidden', () => {
-    const { result } = renderHook(() => useFormRescue({ formId: 'contact', fieldNames: FIELDS }), { wrapper });
+    const { result } = renderHook(() => useFormRescue({ form: RESCUE_FORMS.contact, fieldNames: FIELDS }), { wrapper });
     act(() => {
       result.current.track({ name: 'Alex', email: '', message: '' }, 'name');
     });

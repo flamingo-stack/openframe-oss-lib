@@ -19,22 +19,60 @@
  * (`captureFormRescueEvent`) carry ids, field names and percentages.
  */
 
-/** Every public form that can be rescued. The host validates `form_id` against this list. */
-export const FORM_RESCUE_FORM_IDS = [
-  'contact',
-  'case_study_pitch',
-  'data_room_request',
-  'trust_center_request',
-  'tmcg_join',
-  'meeting_booking',
-  'waitlist',
-] as const;
-
-export type FormRescueFormId = (typeof FORM_RESCUE_FORM_IDS)[number];
-
-export function isFormRescueFormId(value: unknown): value is FormRescueFormId {
-  return typeof value === 'string' && (FORM_RESCUE_FORM_IDS as readonly string[]).includes(value);
+/**
+ * A rescuable form, defined ONCE beside the form that uses it (the strategy a
+ * form plugs in with). The browser sends `id`; the host validates it with
+ * `getRescueForm` and shows `label` to the team. A new form is one
+ * `defineRescueForm` call: no central list, no host change.
+ */
+export interface FormRescueDefinition {
+  /** Stable wire id: lower snake case, stored on every draft of this form. */
+  readonly id: string;
+  /** What the team reads on the alert ("Contact form"). */
+  readonly label: string;
 }
+
+const FORM_ID_PATTERN = /^[a-z][a-z0-9_]{1,47}$/;
+const definitions = new Map<string, FormRescueDefinition>();
+
+/**
+ * Register a rescuable form. Idempotent for the same id and label (a module
+ * evaluated twice registers once); a second, different definition of one id
+ * throws, so two forms can never share a draft vocabulary.
+ */
+export function defineRescueForm(definition: FormRescueDefinition): FormRescueDefinition {
+  if (!FORM_ID_PATTERN.test(definition.id)) throw new Error(`[form-rescue] invalid form id "${definition.id}"`);
+  const existing = definitions.get(definition.id);
+  if (existing) {
+    if (existing.label !== definition.label) {
+      throw new Error(`[form-rescue] form id "${definition.id}" is already defined as "${existing.label}"`);
+    }
+    return existing;
+  }
+  const frozen = Object.freeze({ id: definition.id, label: definition.label });
+  definitions.set(frozen.id, frozen);
+  return frozen;
+}
+
+/** The registered definition for a wire id, or null (unknown ids are refused by the host). */
+export function getRescueForm(id: unknown): FormRescueDefinition | null {
+  return typeof id === 'string' ? (definitions.get(id) ?? null) : null;
+}
+
+/** Every registered form, for a host listing them. */
+export function listRescueForms(): FormRescueDefinition[] {
+  return [...definitions.values()];
+}
+
+/** The lib's own public forms. A host defines its own forms the same way, beside them. */
+export const RESCUE_FORMS = {
+  contact: defineRescueForm({ id: 'contact', label: 'Contact form' }),
+  caseStudyPitch: defineRescueForm({ id: 'case_study_pitch', label: 'Case study pitch' }),
+  dataRoomRequest: defineRescueForm({ id: 'data_room_request', label: 'Data room request' }),
+  trustCenterRequest: defineRescueForm({ id: 'trust_center_request', label: 'Trust Center document request' }),
+  meetingBooking: defineRescueForm({ id: 'meeting_booking', label: 'Meeting booking' }),
+  waitlist: defineRescueForm({ id: 'waitlist', label: 'Waitlist' }),
+} as const;
 
 /**
  * Fields whose VALUES a draft keeps: who the visitor is and where they work.
@@ -159,14 +197,15 @@ export interface FormDraftProgress {
 export interface FormDraftSaveRequest extends FormDraftProgress {
   /** The attempt's idempotency key: every save of one attempt updates one draft. */
   attempt_id: string;
-  form_id: FormRescueFormId;
+  /** A `FormRescueDefinition.id`. */
+  form_id: string;
   source_path: string;
   utm?: Partial<Record<'source' | 'medium' | 'campaign' | 'content' | 'term', string>>;
 }
 
 /** What the host answers a resume link with: the allowlisted values, nothing internal. */
 export interface FormDraftResumeResponse {
-  form_id: FormRescueFormId;
+  form_id: string;
   values: Record<string, string>;
 }
 

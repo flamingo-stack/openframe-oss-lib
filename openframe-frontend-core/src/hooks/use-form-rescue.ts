@@ -19,7 +19,7 @@ import {
   type FormDraftProgress,
   type FormDraftResumeResponse,
   type FormDraftSaveRequest,
-  type FormRescueFormId,
+  type FormRescueDefinition,
 } from '../utils/form-rescue';
 
 /** A local draft older than this is ignored and replaced. */
@@ -34,8 +34,8 @@ interface LocalDraft {
 }
 
 export interface UseFormRescueOptions {
-  /** Which form this is; `null` turns rescue off (e.g. a signed-in ticket form). */
-  formId: FormRescueFormId | null;
+  /** Which form this is (`defineRescueForm`); `null` turns rescue off. */
+  form: FormRescueDefinition | null;
   /** Every field the visitor can see. Hidden fields are never listed, so never sent. */
   fieldNames: readonly string[];
   /** Called once after mount with values from a resume link, else from this device's local draft. */
@@ -93,6 +93,21 @@ function clearLocalDraft(formId: string): void {
   }
 }
 
+/**
+ * Close a rescue attempt after a successful submit, for a form that has already
+ * unmounted by then (the meeting scheduler's details-first flow): clears this
+ * device's draft and reports the submit. The hook's `complete` calls it too.
+ */
+export function completeFormRescue(form: FormRescueDefinition | null, attemptId?: unknown): void {
+  if (!form || typeof window === 'undefined') return;
+  const local = readLocalDraft(form.id);
+  captureFormRescueEvent(FORM_RESCUE_EVENTS.submitted, {
+    form_id: form.id,
+    attempt_id: isFormAttemptId(attemptId) ? attemptId : (local?.attemptId ?? null),
+  });
+  clearLocalDraft(form.id);
+}
+
 function readUtm(): FormDraftSaveRequest['utm'] {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -113,7 +128,7 @@ function readUtm(): FormDraftSaveRequest['utm'] {
  *
  * Every public lead form calls it the same way (next to `useHumanitySignals`):
  *
- *   const rescue = useFormRescue({ formId: 'contact', fieldNames, onRestore, getSignals })
+ *   const rescue = useFormRescue({ form: RESCUE_FORMS.waitlist, fieldNames, onRestore, getSignals })
  *   // on change: rescue.track(values, changedField)
  *   // submit:    body = { ...data, ...getSignals(), ...rescue.submitFields() }
  *   // success:   rescue.complete()
@@ -123,8 +138,9 @@ function readUtm(): FormDraftSaveRequest['utm'] {
  * the url gets the local draft only. Nothing here can block or delay a submit:
  * every network and storage call is fire-and-forget and swallows its errors.
  */
-export function useFormRescue({ formId, fieldNames, onRestore, getSignals }: UseFormRescueOptions): FormRescueHandle {
+export function useFormRescue({ form, fieldNames, onRestore, getSignals }: UseFormRescueOptions): FormRescueHandle {
   const draftsUrl = useEndpointsRuntime()?.formDraftsUrl;
+  const formId = form?.id ?? null;
 
   const attemptIdRef = useRef<string | null>(null);
   const resumeTokenRef = useRef<string | null>(null);
@@ -300,8 +316,7 @@ export function useFormRescue({ formId, fieldNames, onRestore, getSignals }: Use
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    captureFormRescueEvent(FORM_RESCUE_EVENTS.submitted, { form_id: formId, attempt_id: attemptId() });
-    clearLocalDraft(formId);
+    completeFormRescue(form, attemptId());
     // A fresh attempt for a second submission from the same page.
     attemptIdRef.current = null;
     resumeTokenRef.current = null;
@@ -309,7 +324,7 @@ export function useFormRescue({ formId, fieldNames, onRestore, getSignals }: Use
     dirtyRef.current = false;
     startedRef.current = false;
     leadCapturedRef.current = false;
-  }, [attemptId, formId]);
+  }, [attemptId, form, formId]);
 
   return useMemo(() => ({ track, submitFields, complete }), [track, submitFields, complete]);
 }
