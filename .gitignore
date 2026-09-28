@@ -45,7 +45,6 @@ jspm_packages/
 .yarn-integrity
 tsconfig.tsbuildinfo
 *.tsbuildinfo
-package-lock.json
 pnpm-lock.yaml
 
 *storybook.log

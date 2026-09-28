@@ -124,31 +124,31 @@ jobs:
         with:
           node-version: '22'
           # Caches ~/.npm so a run does not re-download the whole tree.
-          # Keyed on package.json, NOT package-lock.json: this repo ignores
-          # lockfiles (.gitignore), so none is committed and pointing the key at
-          # one fails the step outright with "paths were not resolved".
+          # Keyed on the lockfile: it changes only when the resolved tree
+          # changes, so the key stays valid across the package.json edits that
+          # do not move a version (scripts, exports, metadata).
           cache: npm
-          cache-dependency-path: ${{ matrix.path }}/package.json
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
 
       # Works around an Arborist bug in the npm version `actions/setup-node`'s
-      # Node 22 image currently bundles: resolving this project's tree with no
-      # lockfile to pin it (see the comment on Install Dependencies below)
-      # intermittently throws "Cannot read properties of null (reading
-      # 'edgesOut')" — reproduced on unrelated PRs the same day, not
-      # reproducible locally on npm 11.9.0. Pin removed once the bundled npm
-      # on that image picks up the fix upstream.
+      # Node 22 image currently bundles: it intermittently throws "Cannot read
+      # properties of null (reading 'edgesOut')" — reproduced on unrelated PRs
+      # the same day, not reproducible locally on npm 11.9.0. It surfaced while
+      # this repo resolved its tree with no lockfile to pin it; the lockfile is
+      # committed now, which likely removes the trigger, but the pin stays
+      # until a few green runs say so rather than on that assumption alone.
       - name: Upgrade npm (workaround for a bundled-npm Arborist bug)
         if: steps.should_run.outputs.run == 'true'
         run: npm install -g npm@11.9.0
 
-      # `install`, not `ci`: `npm ci` requires a committed lockfile and this
-      # repo has none. The consequence is that CI resolves dependencies afresh
-      # and can test a different tree than a developer has — worth fixing, but
-      # by committing lockfiles, which is a repo-wide policy call.
+      # `ci`, not `install`: the lockfile is committed, so CI installs exactly
+      # the tree a developer has instead of re-resolving the ranges afresh. It
+      # also fails loudly when package.json and the lockfile drift apart,
+      # which `npm install` would silently paper over by rewriting the lock.
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm install
+        run: npm ci
 
       # Config smoke first: it is ~1s and a broken eslint config makes every
       # lint result below meaningless rather than failing honestly.
@@ -250,7 +250,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: ${{ matrix.path }}/package.json
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
 
       # See the identical step in test-node above for why this is here.
       - name: Upgrade npm (workaround for a bundled-npm Arborist bug)
@@ -260,7 +260,7 @@ jobs:
       - name: Install Dependencies
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm install
+        run: npm ci
 
       - name: Lint (import cycles)
         if: steps.should_run.outputs.run == 'true'
