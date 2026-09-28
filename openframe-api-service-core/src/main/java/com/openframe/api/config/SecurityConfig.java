@@ -2,8 +2,8 @@ package com.openframe.api.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -28,23 +28,17 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 @Slf4j
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Value("${openframe.security.jwt.cache.expire-after}")
-    private java.time.Duration expireAfter;
-
-    @Value("${openframe.security.jwt.cache.refresh-after}")
-    private java.time.Duration refreshAfter;
-
-    @Value("${openframe.security.jwt.cache.maximum-size}")
-    private long maximumSize;
+    private final JwtCacheProperties jwtCacheProperties;
 
     @Bean
     public LoadingCache<String, JwtAuthenticationProvider> jwtProviderCache() {
         return Caffeine.newBuilder()
-                .maximumSize(maximumSize)
-                .expireAfterWrite(expireAfter)
-                .refreshAfterWrite(refreshAfter)
+                .maximumSize(jwtCacheProperties.getMaximumSize())
+                .expireAfterWrite(jwtCacheProperties.getExpireAfter())
+                .refreshAfterWrite(jwtCacheProperties.getRefreshAfter())
                 .build(issuer -> {
                     log.info("Creating JwtDecoder for issuer: {}", issuer);
                     var decoder = JwtDecoders.fromIssuerLocation(issuer);

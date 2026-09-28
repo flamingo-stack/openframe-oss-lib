@@ -2,9 +2,11 @@ package com.openframe.management.packagesearch;
 
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class PackageCatalogSyncMetrics {
 
     private static final String SYNC_COUNTER = "openframe.package_catalog.sync";
@@ -14,10 +16,6 @@ public class PackageCatalogSyncMetrics {
     private static final String RESULT_FAILURE = "failure";
 
     private final MeterRegistry meterRegistry;
-
-    public PackageCatalogSyncMetrics(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
-    }
 
     public void recordSuccess(PackageManagerType manager) {
         record(manager, RESULT_SUCCESS);

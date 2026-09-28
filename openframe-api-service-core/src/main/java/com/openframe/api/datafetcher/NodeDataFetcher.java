@@ -19,9 +19,9 @@ import com.openframe.data.service.OrganizationService;
 import graphql.relay.Relay;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
+import java.util.Optional;
 
 @DgsComponent
 @RequiredArgsConstructor
@@ -40,12 +40,8 @@ public class NodeDataFetcher {
     private final ScriptExecutionService scriptExecutionService;
     private final ScheduleScriptService scheduleScriptService;
     private final ScheduleRunService scheduleRunService;
-
-    @Autowired(required = false)
-    private TenantRepository tenantRepository;
-
-    @Autowired(required = false)
-    private SoftwareBundleService softwareBundleService;
+    private final Optional<TenantRepository> tenantRepository;
+    private final Optional<SoftwareBundleService> softwareBundleService;
 
     @DgsQuery
     public Object node(@InputArgument String id) {
@@ -73,19 +69,44 @@ public class NodeDataFetcher {
     private Object resolveNode(Relay.ResolvedGlobalId globalId) {
         NodeType nodeType = NodeType.fromTypeName(globalId.getType());
         return switch (nodeType) {
-            case MACHINE -> deviceService.findByMachineId(globalId.getId()).orElse(null);
-            case ORGANIZATION -> organizationService.getOrganizationByOrganizationId(globalId.getId()).orElse(null);
-            case INTEGRATED_TOOL -> toolService.findById(globalId.getId()).orElse(null);
-            case TAG -> tagService.findById(globalId.getId()).orElse(null);
-            case TOOL_CONNECTION -> toolConnectionService.findById(globalId.getId()).orElse(null);
-            case INSTALLED_AGENT -> installedAgentService.getInstalledAgent(globalId.getId()).orElse(null);
-            case SCRIPT -> scriptService.findById(globalId.getId()).orElse(null);
-            case SCRIPT_EXECUTION -> scriptExecutionService.findById(globalId.getId()).orElse(null);
-            case SCRIPT_SCHEDULE -> scheduleScriptService.findById(globalId.getId()).orElse(null);
-            case SCHEDULE_RUN -> scheduleRunService.findById(globalId.getId()).orElse(null);
-            case TENANT -> tenantRepository != null ? tenantRepository.findById(globalId.getId()).orElse(null) : null;
-            case SOFTWARE_BUNDLE -> softwareBundleService != null ? softwareBundleService.findById(globalId.getId()).orElse(null) : null;
+            case MACHINE -> deviceService.findByMachineId(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case ORGANIZATION -> organizationService.getOrganizationByOrganizationId(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case INTEGRATED_TOOL -> toolService.findById(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case TAG -> tagService.findById(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case TOOL_CONNECTION -> toolConnectionService.findById(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case INSTALLED_AGENT -> installedAgentService.getInstalledAgent(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case SCRIPT -> scriptService.findById(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case SCRIPT_EXECUTION -> scriptExecutionService.findById(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case SCRIPT_SCHEDULE -> scheduleScriptService.findById(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case SCHEDULE_RUN -> scheduleRunService.findById(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case TENANT -> tenantRepository
+                    .orElseThrow(() -> serviceNotConfigured(nodeType))
+                    .findById(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
+            case SOFTWARE_BUNDLE -> softwareBundleService
+                    .orElseThrow(() -> serviceNotConfigured(nodeType))
+                    .findById(globalId.getId())
+                    .orElseThrow(() -> nodeNotFound(globalId));
             default -> throw new IllegalArgumentException("Unsupported node type: " + globalId.getType());
         };
     }
+
+    private static IllegalStateException nodeNotFound(Relay.ResolvedGlobalId globalId) {
+        return new IllegalStateException("Node not found for type " + globalId.getType() + " and id " + globalId.getId());
+    }
+
+    private static IllegalStateException serviceNotConfigured(NodeType nodeType) {
+        return new IllegalStateException("No service configured to resolve node type: " + nodeType);
+    }
 }
+
