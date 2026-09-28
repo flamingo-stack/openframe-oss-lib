@@ -146,14 +146,18 @@ export function getOpenFramePaths(platform: OpenFramePathsPlatform): string[] {
 /**
  * Doctor command per platform. Run to diagnose installation issues and repair
  * the agent (works even if the agent didn't install correctly).
+ *
+ * TODO(openframe): The download URL below is a placeholder and must be
+ * replaced with the actual, published release/download URL for the
+ * openframe-client binary before this command is shown to end users.
  */
 export const OPENFRAME_DOCTOR_COMMANDS: Record<OpenFramePathsPlatform, string> = {
   // PowerShell: Invoke-WebRequest / .\openframe-client.exe, mirroring the
   // Windows install command pattern.
   windows:
-    "Set-Location ~; Invoke-WebRequest -Uri 'github.com/openframe-client' -OutFile 'openframe-client.exe'; .\\openframe-client.exe doctor",
-  darwin: 'cd ~; wget github.com/openframe-client; openframe-client doctor',
-  linux: 'cd ~; wget github.com/openframe-client; openframe-client doctor',
+    "Set-Location ~; Invoke-WebRequest -Uri 'REPLACE_WITH_OPENFRAME_CLIENT_DOWNLOAD_URL' -OutFile 'openframe-client.exe'; .\\openframe-client.exe doctor",
+  darwin: 'cd ~; wget REPLACE_WITH_OPENFRAME_CLIENT_DOWNLOAD_URL; openframe-client doctor',
+  linux: 'cd ~; wget REPLACE_WITH_OPENFRAME_CLIENT_DOWNLOAD_URL; openframe-client doctor',
 } as const;
 
 /**
