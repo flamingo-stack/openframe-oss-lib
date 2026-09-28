@@ -71,9 +71,8 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
-use crate::services::package_manager::presence_report::{
-    PackageManagerPresenceReporter, PackageManagerPresenceRunManager,
-};
+use crate::services::package_manager::report_publisher::PackageManagerReportPublisher;
+use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
 use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
@@ -180,7 +179,7 @@ pub struct Client {
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
-    package_manager_presence_run_manager: PackageManagerPresenceRunManager,
+    package_manager_report_run_manager: PackageManagerReportRunManager,
     package_manager_update_run_manager: PackageManagerUpdateRunManager,
     hostname_report_publisher: HostnameReportPublisher,
     machine_timezone_run_manager: MachineTimezoneRunManager,
@@ -595,8 +594,8 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
-        let package_manager_presence_run_manager =
-            PackageManagerPresenceRunManager::new(PackageManagerPresenceReporter::new(
+        let package_manager_report_run_manager =
+            PackageManagerReportRunManager::new(PackageManagerReportPublisher::new(
                 nats_message_publisher.clone(),
                 config_service.clone(),
             ));
@@ -636,7 +635,7 @@ impl Client {
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
-            package_manager_presence_run_manager,
+            package_manager_report_run_manager,
             package_manager_update_run_manager,
             hostname_report_publisher,
             machine_timezone_run_manager,
@@ -716,7 +715,7 @@ impl Client {
 
         self.package_manager_update_run_manager.start();
 
-        self.package_manager_presence_run_manager.start();
+        self.package_manager_report_run_manager.start();
 
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
