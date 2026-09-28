@@ -1,5 +1,5 @@
 use super::report_publisher::PackageManagerReportPublisher;
-use super::PRESENCE_PROBE_TIMEOUT_SECS;
+use super::{ManagerId, PRESENCE_PROBE_TIMEOUT_SECS};
 use tokio::time::{interval, timeout, Duration};
 use tracing::{error, info};
 
@@ -7,7 +7,8 @@ const REPORT_INTERVAL: Duration = Duration::from_secs(900);
 const PUBLISH_GRACE: Duration = Duration::from_secs(10);
 
 fn report_timeout() -> Duration {
-    Duration::from_secs(u64::from(PRESENCE_PROBE_TIMEOUT_SECS)) + PUBLISH_GRACE
+    let probes = ManagerId::ALL.len().max(1) as u64;
+    Duration::from_secs(u64::from(PRESENCE_PROBE_TIMEOUT_SECS) * probes) + PUBLISH_GRACE
 }
 
 pub struct PackageManagerReportRunManager {
