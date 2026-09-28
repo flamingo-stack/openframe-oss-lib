@@ -98,12 +98,12 @@ public class OrganizationService {
      * Check if an organization can be archived.
      * Returns true if all associated devices are in ARCHIVED or DELETED status (or no devices exist).
      *
-     * @param id organization document ID
+     * @param organizationId unique organization identifier
      * @return true if organization can be archived
      */
-    public boolean canArchiveOrganization(String id) {
-        Organization organization = organizationRepository.findByOrganizationId(id)
-                .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
+    public boolean canArchiveOrganization(String organizationId) {
+        Organization organization = organizationRepository.findByOrganizationId(organizationId)
+                .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + organizationId));
 
         var excludedStatuses = EnumSet.of(DeviceStatus.ARCHIVED, DeviceStatus.DELETED);
         return !machineRepository.existsByOrganizationIdAndStatusNotIn(organization.getOrganizationId(), excludedStatuses);
