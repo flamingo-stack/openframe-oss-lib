@@ -178,6 +178,7 @@ export function useFormRescue({ form, fieldNames, onRestore, getSignals }: UseFo
         ...latestRef.current,
         source_path: typeof window !== 'undefined' ? window.location.pathname : '/',
         utm: readUtm(),
+        ...(resumeTokenRef.current ? { resume_token: resumeTokenRef.current } : {}),
       };
       try {
         void contentFetch(draftsUrl, {

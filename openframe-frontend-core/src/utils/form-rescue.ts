@@ -201,6 +201,9 @@ export interface FormDraftSaveRequest extends FormDraftProgress {
   form_id: string;
   source_path: string;
   utm?: Partial<Record<'source' | 'medium' | 'campaign' | 'content' | 'term', string>>;
+  /** Set when the visitor came back through a resume link: the host saves onto
+   *  THAT draft, so one person's return never starts a second draft. */
+  resume_token?: string;
 }
 
 /** What the host answers a resume link with: the allowlisted values, nothing internal. */

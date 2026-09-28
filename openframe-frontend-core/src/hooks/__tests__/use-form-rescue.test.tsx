@@ -158,6 +158,13 @@ describe('useFormRescue', () => {
     await waitFor(() => expect(onRestore).toHaveBeenCalledWith({ email: 'alex@northwind-it.com' }));
     expect(String(fetchSpy.mock.calls[0][0])).toBe('/api/contact/drafts/resume/k3Xq9vT2mB7wYp1sLr8dQa');
     expect(result.current.submitFields()).toMatchObject({ form_resume_token: 'k3Xq9vT2mB7wYp1sLr8dQa' });
+    // Saves after a resume carry the token, so the host writes onto the resumed draft.
+    await act(async () => {
+      result.current.track({ name: 'Alex', email: 'alex@northwind-it.com', message: '' }, 'name');
+      await new Promise(resolve => setTimeout(resolve, FORM_RESCUE_DEBOUNCE_MS + 50));
+    });
+    const saves = sentBodies();
+    expect(saves[saves.length - 1]?.body.resume_token).toBe('k3Xq9vT2mB7wYp1sLr8dQa');
     expect(captures.map(c => c.event)).toContain('form_resumed');
     location.pathname = '/';
     location.search = '';
