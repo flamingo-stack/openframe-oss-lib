@@ -79,7 +79,7 @@ public class MachinePackageManagersListener extends AbstractJetStreamPushListene
                 return;
             }
 
-            log.info("Processing package-managers report: machineId={} packageManagers={}", machineId, packageManagers);
+            log.debug("Processing package-managers report: machineId={} packageManagers={}", machineId, packageManagers);
             packageManagersService.apply(machineId, packageManagers);
 
             message.ack();

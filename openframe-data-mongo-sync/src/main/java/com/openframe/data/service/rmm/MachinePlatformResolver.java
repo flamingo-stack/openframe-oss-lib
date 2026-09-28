@@ -23,8 +23,7 @@ public class MachinePlatformResolver {
     private final TenantIdProvider tenantIdProvider;
     private final PackageManagerAvailability packageManagerAvailability;
 
-    // Software-only resolver: a machine whose agent reported no usable package manager is dropped here,
-    // so every caller treats it as OS-incompatible and never dispatches to it.
+    // Machines without a usable package manager are absent from the result on purpose.
     public Map<String, OsType> osTypesByMachineId(Collection<String> machineIds) {
         if (machineIds == null || machineIds.isEmpty()) {
             return Map.of();
