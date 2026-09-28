@@ -35,13 +35,7 @@ public class EncryptionService {
         }
     }
 
-    /**
-     * Encrypts the given plain text using Spring Security Crypto (AES-256-CBC + HMAC)
-     *
-     * @param plainText the text to encrypt
-     * @return encrypted text
-     * @throws EncryptionException if encryption fails
-     */
+    // Uses Spring Security Crypto (AES-256-CBC + HMAC)
     public String encrypt(String plainText) {
         if (plainText == null || plainText.trim().isEmpty()) {
             throw new IllegalArgumentException("Plain text cannot be null or empty");
@@ -55,13 +49,6 @@ public class EncryptionService {
         }
     }
 
-    /**
-     * Decrypts the given encrypted text using Spring Security Crypto
-     *
-     * @param encryptedText the encrypted text
-     * @return decrypted plain text
-     * @throws EncryptionException if decryption fails
-     */
     public String decrypt(String encryptedText) {
         if (encryptedText == null || encryptedText.trim().isEmpty()) {
             throw new IllegalArgumentException("Encrypted text cannot be null or empty");
@@ -75,12 +62,6 @@ public class EncryptionService {
         }
     }
 
-    /**
-     * Encrypts client secret specifically for OAuth configurations
-     *
-     * @param clientSecret the plain text client secret
-     * @return encrypted client secret
-     */
     public String encryptClientSecret(String clientSecret) {
         if (clientSecret == null || clientSecret.trim().isEmpty()) {
             throw new IllegalArgumentException("Client secret cannot be null or empty");
@@ -95,12 +76,6 @@ public class EncryptionService {
         }
     }
 
-    /**
-     * Decrypts client secret specifically for OAuth configurations
-     *
-     * @param encryptedClientSecret the encrypted client secret
-     * @return decrypted client secret
-     */
     public String decryptClientSecret(String encryptedClientSecret) {
         if (encryptedClientSecret == null || encryptedClientSecret.trim().isEmpty()) {
             throw new IllegalArgumentException("Encrypted client secret cannot be null or empty");
