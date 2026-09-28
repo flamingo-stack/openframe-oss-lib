@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::runtime::Runtime;
 use tracing::{debug, error, info, warn};
 
@@ -304,7 +304,7 @@ impl Service {
                 .context("Failed to initialize InstallationInitialConfigService")?;
 
         if params.is_parameterless() {
-            info!("Parameterless install — configuration deferred to 'openframe auth'");
+            info!("Parameterless install — configuration deferred to 'openframe-client auth'");
         } else {
             installation_initial_config_service
                 .build_and_save(params)
@@ -388,20 +388,13 @@ impl Service {
             }
 
             info!(
-                "Binary installed successfully. You can now use 'openframe' command from anywhere."
+                "Binary installed successfully. You can now use 'openframe-client' command from anywhere."
             );
         } else {
             info!(
                 "Binary is already in the standard location: {}",
                 install_path.display()
             );
-        }
-
-        // Outside the copy branch: an install run from the installed location skips the copy,
-        // but the uninstall it launched first has already removed the alias and the PATH entry.
-        // Both operations are idempotent, so running them every time is safe.
-        if let Err(e) = Self::create_alias(&install_path) {
-            warn!("Failed to create 'openframe' alias: {:#}", e);
         }
 
         #[cfg(target_os = "windows")]
@@ -544,7 +537,7 @@ impl Service {
                 .ok()
         };
 
-        Self::remove_alias(&install_path);
+        crate::platform::uninstall::remove_legacy_alias(&install_path);
 
         // Call platform-specific uninstall implementation
         #[cfg(target_os = "windows")]
@@ -599,15 +592,17 @@ impl Service {
         #[cfg(target_os = "windows")]
         crate::platform::windows_path_migration::run();
 
+        crate::platform::uninstall::remove_legacy_alias(&Self::get_install_location());
+
         // Awaiting-auth gate: after a parameterless install there is no initial
         // configuration yet, and constructing the client without one would fail and
-        // crash-loop the service. Idle here until `openframe auth` writes it.
+        // crash-loop the service. Idle here until `openframe-client auth` writes it.
         let initial_config_service =
             crate::services::InitialConfigurationService::new(dir_manager.clone())
                 .context("Failed to initialize initial configuration service")?;
         if !initial_config_service.is_configured() {
             info!(
-                "Not authenticated yet — waiting for configuration (run 'openframe auth' with your tenant parameters)"
+                "Not authenticated yet — waiting for configuration (run 'openframe-client auth' with your tenant parameters)"
             );
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(
@@ -626,58 +621,6 @@ impl Service {
 
         // Start the client
         client.start().await
-    }
-
-    /// `openframe` next to the installed `openframe-client`, so the documented
-    /// commands (`openframe auth ...`) work as typed.
-    fn alias_path(install_path: &Path) -> PathBuf {
-        #[cfg(target_os = "windows")]
-        {
-            install_path.with_file_name("openframe.cmd")
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            install_path.with_file_name("openframe")
-        }
-    }
-
-    fn create_alias(install_path: &Path) -> Result<()> {
-        let alias = Self::alias_path(install_path);
-        if alias.symlink_metadata().map(|_| true).unwrap_or(false) {
-            std::fs::remove_file(&alias)
-                .with_context(|| format!("Failed to remove existing alias {}", alias.display()))?;
-        }
-
-        // A shim, not a link: the updater swaps the binary by replacing its directory
-        // entry, so a hard link (or copy) would keep serving the pre-update binary
-        // forever. `%~dp0` resolves at run time, so the shim always execs the current exe.
-        #[cfg(target_os = "windows")]
-        {
-            let target = install_path
-                .file_name()
-                .map(|name| name.to_string_lossy().to_string())
-                .unwrap_or_else(|| "openframe-client.exe".to_string());
-            std::fs::write(&alias, format!("@\"%~dp0{}\" %*\r\n", target))
-                .with_context(|| format!("Failed to write alias shim at {}", alias.display()))?;
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            // A symlink stores the path and resolves at exec time, so it survives updates.
-            std::os::unix::fs::symlink(install_path, &alias)
-                .with_context(|| format!("Failed to symlink alias at {}", alias.display()))?;
-        }
-
-        info!("Created 'openframe' alias at {}", alias.display());
-        Ok(())
-    }
-
-    fn remove_alias(install_path: &Path) {
-        let alias = Self::alias_path(install_path);
-        if alias.symlink_metadata().is_ok() {
-            if let Err(e) = std::fs::remove_file(&alias) {
-                warn!("Failed to remove alias {}: {:#}", alias.display(), e);
-            }
-        }
     }
 
     /// Restart the service so a freshly written configuration is picked up now.

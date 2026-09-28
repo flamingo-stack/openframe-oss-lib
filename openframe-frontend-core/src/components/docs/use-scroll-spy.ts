@@ -21,6 +21,24 @@ interface ScrollSpySection {
   level?: number;
 }
 
+export interface UseScrollSpyOptions {
+  /**
+   * Keep the URL's `#hash` on the section being read as the user SCROLLS
+   * (`replaceState`: no history entry, and no `hashchange`, so
+   * `useScrollToHash` never re-scrolls to it). Above the first section the hash
+   * is cleared. Only a scroll writes it — mounting a page never adds a hash.
+   */
+  syncHash?: boolean;
+}
+
+/** Point the URL's hash at `sectionId` (or clear it) without a history entry or a `hashchange`. */
+function replaceHash(sectionId: string | null): void {
+  const { pathname, search, hash } = window.location;
+  const next = sectionId ? `#${sectionId}` : '';
+  if (hash === next) return;
+  window.history.replaceState(window.history.state, '', `${pathname}${search}${next}`);
+}
+
 interface UseScrollSpyReturn {
   activeSection: string;
   handleSectionClick: (sectionId: string) => void;
@@ -30,7 +48,11 @@ interface UseScrollSpyReturn {
  * Shared scroll spy hook for tracking active section based on scroll position.
  * Used by DocViewer for sticky section navigation.
  */
-export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrollSpyReturn {
+export function useScrollSpy(
+  sections: ScrollSpySection[] | undefined,
+  options: UseScrollSpyOptions = {},
+): UseScrollSpyReturn {
+  const { syncHash = false } = options;
   const [activeSection, setActiveSection] = useState('');
   const isScrollingFromClick = useRef(false);
 
@@ -59,27 +81,48 @@ export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrol
     const sectionIds = sectionIdsKey === '' ? [] : sectionIdsKey.split(ID_SEPARATOR);
     if (sectionIds.length === 0) return undefined;
 
-    const handleScroll = () => {
+    // `fromScroll`: a real scroll settled (not the mount-time pass).
+    const handleScroll = (fromScroll = false) => {
       if (isScrollingFromClick.current) return;
 
       const scrollPosition = window.scrollY + SCROLL_OFFSET;
       let currentSection = sectionIds[0] ?? '';
 
-      for (let i = sectionIds.length - 1; i >= 0; i--) {
-        const element = document.getElementById(sectionIds[i]);
-        if (element && scrollPosition >= element.offsetTop) {
-          currentSection = sectionIds[i];
-          break;
+      // At the bottom of the page the last sections can never reach the offset
+      // line, so they would never highlight: the last one wins there. Only on a
+      // page that actually SCROLLS — a short page is "at the bottom" at
+      // scrollY 0, which would otherwise highlight the last section on load.
+      const { scrollHeight } = document.documentElement;
+      const scrollable = scrollHeight > window.innerHeight + 2;
+      const atBottom = scrollable && window.innerHeight + window.scrollY >= scrollHeight - 2;
+      if (atBottom) {
+        currentSection = sectionIds[sectionIds.length - 1] ?? currentSection;
+      } else {
+        for (let i = sectionIds.length - 1; i >= 0; i--) {
+          const element = document.getElementById(sectionIds[i]);
+          // Document-absolute top: `offsetTop` is relative to the nearest
+          // POSITIONED ancestor, which is not the document inside most layouts.
+          if (element && scrollPosition >= element.getBoundingClientRect().top + window.scrollY) {
+            currentSection = sectionIds[i];
+            break;
+          }
         }
       }
 
       setActiveSection(prev => (prev !== currentSection ? currentSection : prev));
+
+      if (syncHash && fromScroll) {
+        const first = document.getElementById(sectionIds[0] ?? '');
+        const aboveFirst =
+          !atBottom && first !== null && scrollPosition < first.getBoundingClientRect().top + window.scrollY;
+        replaceHash(aboveFirst ? null : currentSection);
+      }
     };
 
     let scrollTimer: ReturnType<typeof setTimeout>;
     const throttledScroll = () => {
       clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(handleScroll, 100);
+      scrollTimer = setTimeout(() => handleScroll(true), 100);
     };
 
     window.addEventListener('scroll', throttledScroll);
@@ -89,7 +132,7 @@ export function useScrollSpy(sections: ScrollSpySection[] | undefined): UseScrol
       window.removeEventListener('scroll', throttledScroll);
       clearTimeout(scrollTimer);
     };
-  }, [sectionIdsKey]);
+  }, [sectionIdsKey, syncHash]);
 
   return { activeSection, handleSectionClick };
 }

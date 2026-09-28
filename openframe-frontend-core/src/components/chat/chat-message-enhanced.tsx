@@ -542,8 +542,17 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             Avatar is INLINE in the name row below (2025-2026 chat
             pattern — Claude.ai, ChatGPT, Gemini, Perplexity).
             Legacy hanging-avatar layout (`absolute -left-16`) wasted
-            64px of gutter and clipped in narrow panels. */}
-        <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
+            64px of gutter and clipped in narrow panels.
+
+            Single-column GRID, not `flex flex-col` — here, in the segment
+            stack below, in the thread's per-message wrapper and in the
+            card/video pair (entity-cards/dispatch): WebKit re-lays-out the
+            children of every nested column flexbox to measure them, so the
+            cost compounds per level. One 9-level Mingo reply took ~155ms of
+            layout per drawer-resize frame in Safari / the desktop WKWebView
+            vs ~9ms as grid (Chrome: ~2ms either way). Same gap and stretch,
+            no margin collapsing — visually identical. */}
+        <div className="grid min-w-0 grid-cols-1 gap-[var(--spacing-system-xxs)]">
           {/* Avatar + Name + Timestamp Row.
               Sizing rationale (per design-token measurements):
                 - Name uses `text-h3` = 14px mobile / 18px desktop.
@@ -604,7 +613,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
           {/* Message segments — hidden for system messages without content */}
           {(!isSystem || segments.length > 0) && (
-            <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {segments.map((segment, index) => {
                 // The engine's streaming path (atomic-block memoization +
                 // fence tail-completion + aria-live) applies ONLY to the

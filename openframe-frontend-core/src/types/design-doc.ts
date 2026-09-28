@@ -376,7 +376,11 @@ export interface DesignDocListResponse {
   count: number;
   /** Server-computed spec-mode counts over the scope, MINUS the spec-mode
    *  filter itself — so a filtered row still shows what the other value holds. */
-  facets: { spec_mode: Record<string, number> };
+  facets: {
+    spec_mode: Record<string, number>;
+    /** The same over readiness (`ready` / `not_ready`), MINUS the ready filter itself: the filter row's options. */
+    ready: Record<'ready' | 'not_ready', number>;
+  };
 }
 
 export interface DesignDocStats {

@@ -198,6 +198,35 @@ function resolveFromLibrary(iconName: string): IconComponent | undefined {
 }
 
 /**
+ * THE brand logo for a company or product NAME ("Google Cloud Platform",
+ * "Anthropic", "Azure AD"), or `null` when the icon set has no mark for it —
+ * the caller keeps its own fallback (initials). Dynamic by the icon set's
+ * naming convention, never a list: a brand's mark is `<Brand>LogoIcon`, so a
+ * logo added to `icons-v2-generated/brand-logos` is found with no code change.
+ * The name's word runs are tried longest first ("Azure AD" → `AzureAdLogoIcon`
+ * before `AzureLogoIcon`; "Google Workspace" → `GoogleLogoIcon`). Only
+ * `…LogoIcon` names count, so "Cloud" never resolves to a generic cloud glyph.
+ */
+export function brandLogoForName(name: string | null | undefined): IconComponent | null {
+  const words = (name ?? '').split(/[^A-Za-z0-9]+/).filter(Boolean);
+  const pascal = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  const registry = IconsV2 as unknown as Record<string, IconComponent | undefined>;
+  for (let length = Math.min(3, words.length); length >= 1; length -= 1) {
+    for (let start = 0; start + length <= words.length; start += 1) {
+      const Logo =
+        registry[
+          `${words
+            .slice(start, start + length)
+            .map(pascal)
+            .join('')}LogoIcon`
+        ];
+      if (Logo) return Logo;
+    }
+  }
+  return null;
+}
+
+/**
  * THE single icon-name → component resolver for the whole app. Two variants —
  * one entry point, no duplicated resolver machinery:
  *
