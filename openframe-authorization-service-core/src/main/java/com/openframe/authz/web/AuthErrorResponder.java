@@ -13,14 +13,15 @@ import java.io.IOException;
 import java.net.URLEncoder;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.springframework.util.StringUtils.hasText;
 
 /**
  * Single exit point for auth failures that end in a redirect to the error page.
  * <p>
- * The failure message is shown to the user as-is, including the identity provider's own
- * {@code error_description}. The classification exists only for the log line, so provider-side
- * failures can be counted and grouped without changing what the user sees.
+ * The failure message shown to the user is a fixed, localized string chosen from the
+ * classification of the failure. Raw provider-supplied text (e.g. the identity provider's own
+ * {@code error_description}) is never echoed back to the user; it is only ever logged, so
+ * provider-side failures can be counted and grouped without exposing untrusted third-party
+ * content on our own error page.
  */
 @Slf4j
 @Component
@@ -31,12 +32,23 @@ public class AuthErrorResponder {
 
     public void send(HttpServletResponse response, HttpServletRequest request, String event, Exception e,
                      String fallbackMessage) throws IOException {
+        String classification = classify(e);
         log.error("Auth failure [{}] event={} tenantId={} uri={} detail={}",
-                classify(e), event, TenantContext.getTenantId(),
+                classification, event, TenantContext.getTenantId(),
                 request != null ? request.getRequestURI() : null, e.getMessage(), e);
 
-        String message = hasText(e.getMessage()) ? e.getMessage() : fallbackMessage;
+        String message = userFacingMessage(classification, fallbackMessage);
         response.sendRedirect(authErrorUrl + "?error=" + URLEncoder.encode(message, UTF_8));
+    }
+
+    private String userFacingMessage(String classification, String fallbackMessage) {
+        return switch (classification) {
+            case "PROVIDER_CANCELLED" -> "Sign-in was cancelled.";
+            case "PROVIDER_CONSENT" -> "The identity provider could not complete consent for this application.";
+            case "PROVIDER_ERROR" -> "The identity provider returned an error during sign-in.";
+            case "USER_INPUT" -> fallbackMessage;
+            default -> fallbackMessage;
+        };
     }
 
     private String classify(Exception e) {
