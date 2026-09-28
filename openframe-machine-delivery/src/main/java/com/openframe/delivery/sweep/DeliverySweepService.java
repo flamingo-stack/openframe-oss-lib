@@ -12,6 +12,7 @@ import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.config.DeliveryProperties.Sweep;
+import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliverySeed;
@@ -40,6 +41,7 @@ public class DeliverySweepService {
     private final DeliveryProperties properties;
     private final DeliveryCloser closer;
     private final DeliveryMetrics metrics;
+    private final DeliveryPublisher publisher;
     private final ObjectMapper objectMapper;
 
     public void retryPending() {
@@ -132,9 +134,10 @@ public class DeliverySweepService {
                 type, delivery.getTargetId(), machineId, attempt, dueAt);
     }
 
-    private static boolean publish(DeliverySpec<DeliverySeed, DeliveryPayload> spec, String machineId, DeliveryPayload payload) {
+    private boolean publish(DeliverySpec<DeliverySeed, DeliveryPayload> spec, String machineId, DeliveryPayload payload) {
         try {
-            spec.publish(machineId, payload);
+            String subject = spec.subject(machineId);
+            publisher.publish(subject, payload);
             return true;
         } catch (RuntimeException e) {
             log.error("Delivery publish failed: machineId={}", machineId, e);

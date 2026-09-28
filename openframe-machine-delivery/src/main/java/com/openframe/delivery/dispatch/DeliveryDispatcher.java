@@ -9,6 +9,7 @@ import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -20,6 +21,8 @@ public class DeliveryDispatcher {
 
     private final DeliverySpecRegistry registry;
     private final DeliveryRecorder recorder;
+    // ObjectProvider: the dispatcher boots in services without NATS, where no publisher bean exists
+    private final ObjectProvider<DeliveryPublisher> publisher;
 
     public void dispatch(DeliverySeed seed) {
         DeliveryType type = seed.type();
@@ -32,7 +35,8 @@ public class DeliveryDispatcher {
         payload.setDelivery(delivery);
         recorder.record(request);
         String machineId = request.getMachineId();
-        spec.publish(machineId, payload);
+        String subject = spec.subject(machineId);
+        publisher.getObject().publish(subject, payload);
         log.info("Delivery dispatched: type={} targetId={} machineId={} dispatchId={}",
                 type, request.getTargetId(), machineId, dispatchId);
     }

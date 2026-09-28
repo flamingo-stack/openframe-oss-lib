@@ -8,6 +8,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.metrics.DeliveryMetrics;
@@ -50,6 +51,7 @@ class DeliverySweepServiceTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String OTHER_MACHINE_ID = "mach-43";
+    private static final String SUBJECT = "machine.mach-42.test";
     private static final String TARGET_ID = "fleetmdm-agent";
     private static final String PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\"}";
     private static final String CORRUPT_JSON = "not-json";
@@ -67,6 +69,7 @@ class DeliverySweepServiceTest {
     @Mock private DeliveryCloser closer;
     @Mock private DeliveryMetrics metrics;
     @Mock private DeliverySpec<TestSeed, TestPayload> spec;
+    @Mock private DeliveryPublisher publisher;
 
     @Captor private ArgumentCaptor<TestPayload> payloadCaptor;
     @Captor private ArgumentCaptor<Instant> dueAtCaptor;
@@ -82,7 +85,7 @@ class DeliverySweepServiceTest {
         dispatchedAt = Instant.now().minusSeconds(ACK_THRESHOLD * 2);
         delivery = row(MACHINE_ID, PAYLOAD_JSON);
         properties = DeliveryTestPolicies.properties();
-        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, new ObjectMapper());
+        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, publisher, new ObjectMapper());
     }
 
     @Test
@@ -98,7 +101,7 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(spec).publish(eq(MACHINE_ID), payloadCaptor.capture());
+        verify(publisher).publish(eq(SUBJECT), payloadCaptor.capture());
         assertThat(payloadCaptor.getValue().getValue()).isEqualTo(TARGET_ID);
         assertThat(dueAtCaptor.getValue())
                 .isAfterOrEqualTo(before.plusSeconds(FIRST_RETRY_DELAY))
@@ -134,7 +137,7 @@ class DeliverySweepServiceTest {
         stubDue(delivery);
         stubMachineOnline();
         stubSpec();
-        doThrow(new IllegalStateException("nats down")).when(spec).publish(eq(MACHINE_ID), any(TestPayload.class));
+        doThrow(new IllegalStateException("nats down")).when(publisher).publish(eq(SUBJECT), any(TestPayload.class));
 
         // execution
         service.retryPending();
@@ -197,7 +200,7 @@ class DeliverySweepServiceTest {
         service.retryPending();
 
         // verifications
-        verify(spec).publish(eq(MACHINE_ID), any(TestPayload.class));
+        verify(publisher).publish(eq(SUBJECT), any(TestPayload.class));
         verify(metrics, never()).recordRetried(DeliveryType.TOOL_INSTALLATION);
         verifyNoInteractions(closer);
     }
@@ -313,9 +316,9 @@ class DeliverySweepServiceTest {
 
         // verifications
         verify(repository).postponeAfterError(eq(corrupt.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class));
-        verify(spec).publish(eq(MACHINE_ID), payloadCaptor.capture());
+        verify(publisher).publish(eq(SUBJECT), payloadCaptor.capture());
         assertThat(payloadCaptor.getValue().getValue()).isEqualTo(TARGET_ID);
-        verify(spec, never()).publish(eq(OTHER_MACHINE_ID), any(TestPayload.class));
+        verify(spec, never()).subject(OTHER_MACHINE_ID);
         verify(metrics).recordRetried(DeliveryType.TOOL_INSTALLATION);
         verify(metrics).recordRowError();
     }
@@ -369,5 +372,6 @@ class DeliverySweepServiceTest {
     private void stubSpec() {
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         when(spec.getPayloadClass()).thenReturn(TestPayload.class);
+        when(spec.subject(MACHINE_ID)).thenReturn(SUBJECT);
     }
 }

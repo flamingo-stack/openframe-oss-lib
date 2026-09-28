@@ -12,7 +12,7 @@ public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload>
 
     DeliveryRequest<P> request(S seed);
 
-    void publish(String machineId, P payload);
+    String subject(String machineId);
 
     void onFailed(MachineDelivery delivery, DeliveryFailure failure);
 }
