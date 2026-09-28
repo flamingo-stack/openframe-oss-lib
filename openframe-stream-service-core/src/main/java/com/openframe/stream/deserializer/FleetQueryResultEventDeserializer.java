@@ -209,7 +209,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
             log.debug("Resolving query info for query_id: {}, host_id: {}", queryId,
                     afterField.has("host_id") ? afterField.get("host_id").asText() : "unknown");
 
-            Query query = fleetMdmCacheService.getQueryById(queryId, eventTenantId(afterField));
+            Query query = fleetMdmCacheService.getQueryById(queryId);
 
             if (query == null) {
                 log.warn("Failed to resolve query name for query_id: {}. Fleet MDM client may not be initialized or query may have been deleted.", queryId);
