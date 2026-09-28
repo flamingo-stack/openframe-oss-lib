@@ -2203,7 +2203,7 @@ export function ChatCardLoader({
       // Same 12px rhythm as the message renderer's block-sibling wrapper
       // (`my-3` in chat-message-enhanced) so card→player spacing matches
       // the spacing between any two hoisted blocks.
-      <div className="flex min-w-0 flex-col gap-3">
+      <div className="grid min-w-0 grid-cols-1 gap-3">
         {finish(entry.render(item, finalChatRef, renderOpts))}
         <ChatVideoEntityCard chatRef={videoRef} />
       </div>
