@@ -1,14 +1,18 @@
 package com.openframe.test.helpers.ai;
 
+import com.openframe.test.api.ApprovalApi;
 import com.openframe.test.api.DialogApi;
 import com.openframe.test.api.TicketApi;
 import com.openframe.test.data.dto.ai.AgentType;
 import com.openframe.test.data.dto.ai.CreateDialogRequest;
 import com.openframe.test.data.dto.ai.DialogMode;
 import com.openframe.test.data.dto.ai.DialogResponse;
+import com.openframe.test.data.dto.shared.GraphqlError;
 import com.openframe.test.data.dto.ticket.Ticket;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
 
 /**
  * A plain ADMIN/AI dialog to drive the assistant on. The execution target is named in the prompt (by
@@ -18,6 +22,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Getter
 public class DialogFixture {
+
+    /** The backend's code for a status change refused while an approval on the ticket is pending. */
+    private static final String APPROVAL_LOCK = "TICKET_STATUS_LOCKED_BY_APPROVAL";
 
     private final String dialogId;
 
@@ -81,6 +88,9 @@ public class DialogFixture {
      * <p>Two steps because only RESOLVED may move to ARCHIVED — {@code TicketsTest} asserts that rule
      * in both directions. The kind is re-read between them rather than reused, so a ticket already
      * RESOLVED is not resolved twice and one already ARCHIVED is left alone.
+     *
+     * <p>{@code AssertionError} is caught as well: the {@code graphqlSuccess()} spec raises one for any
+     * GraphQL error, and letting it out of an {@code @AfterEach} fails a case whose body passed.
      */
     private void archiveBoundTicket() {
         try {
@@ -89,16 +99,43 @@ public class DialogFixture {
                 return;
             }
             if (!isKind(ticketId, "RESOLVED") && !isKind(ticketId, "ARCHIVED")) {
-                TicketApi.transitionTicket(ticketId, TicketApi.resolveSystemStatusId("RESOLVED"));
+                resolveReleasingApprovalLock(ticketId);
             }
             if (!isKind(ticketId, "ARCHIVED")) {
                 TicketApi.transitionTicket(ticketId, TicketApi.resolveSystemStatusId("ARCHIVED"));
             }
             log.info("Archived ticket {} bound to dialog {}", ticketId, dialogId);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | AssertionError e) {
             // Best effort: a failed cleanup must not mask the case that failed.
             log.warn("Failed to archive the ticket bound to dialog {}: {}", dialogId, e.getMessage());
         }
+    }
+
+    /**
+     * Moves the ticket to RESOLVED, first rejecting the approval that freezes it if one does.
+     *
+     * <p>A run the assistant escalated to technician approval parks its ticket in Tech Required with the
+     * request pending, and the backend then refuses every status change with
+     * {@code TICKET_STATUS_LOCKED_BY_APPROVAL} until the request is resolved
+     * ({@code TicketTransitionPolicyValidator}, oss-lib #2365). Teardown runs as ADMIN, which may resolve
+     * an ADMIN-typed request. The refusal names the request, so the transition itself is the probe.
+     */
+    private static void resolveReleasingApprovalLock(String ticketId) {
+        String resolved = TicketApi.resolveSystemStatusId("RESOLVED");
+        List<GraphqlError> errors = TicketApi.attemptTransitionTicketErrors(ticketId, resolved);
+        if (errors == null || errors.isEmpty()) {
+            return;
+        }
+        String approvalRequestId = errors.stream()
+                .map(GraphqlError::getExtensions)
+                .filter(ext -> ext != null && APPROVAL_LOCK.equals(ext.get("code")))
+                .map(ext -> String.valueOf(ext.get("approvalRequestId")))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Resolving ticket " + ticketId + " was refused: " + errors));
+        log.info("Ticket {} is locked by pending approval {}; rejecting it so the ticket can close",
+                ticketId, approvalRequestId);
+        ApprovalApi.approve(approvalRequestId, false);
+        TicketApi.transitionTicket(ticketId, resolved);
     }
 
     private static boolean isKind(String ticketId, String kind) {
