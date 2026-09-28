@@ -715,7 +715,8 @@ export interface DeniedEmailDomains {
 export function emailDomainDenied(email: unknown, rule: DeniedEmailDomains): boolean {
   if (typeof email !== 'string') return false;
   const domain = email.split('@')[1]?.trim().toLowerCase();
-  return Boolean(domain) && rule.domains.includes(domain as string);
+  if (domain === undefined || domain === '') return false;
+  return rule.domains.includes(domain);
 }
 
 /** `schema` refined to reject those domains ON the email field, so the message
