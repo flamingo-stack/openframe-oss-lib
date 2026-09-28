@@ -201,7 +201,9 @@ const canonicalNumber = (v: unknown): string => {
  * validator and the renderer can never disagree about what is supported.
  * Every control states `aria-invalid` from the field's message and carries
  * `required`/`aria-required` from the field, so the accent asterisk is never
- * the only signal.
+ * the only signal. The ones that can PAINT the state take `invalid` too
+ * (`Input`, `Textarea`, `SelectTrigger` — the lib's error border), so a refused
+ * field reads as refused at the control, not only in the line beneath it.
  */
 const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => ReactNode> = {
   text: ({ field, id, registerName, error, register }) => (
@@ -210,6 +212,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       type={field.inputType ?? 'text'}
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       autoComplete={field.autoComplete}
       placeholder={placeholderFor(field)}
       {...register(registerName as never)}
@@ -220,6 +223,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       id={id}
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       placeholder={placeholderFor(field)}
       {...register(registerName as never)}
     />
@@ -232,6 +236,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       step="any"
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       {...register(registerName as never, { setValueAs: canonicalNumber })}
     />
   ),
@@ -243,6 +248,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       autoComplete="tel"
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       placeholder={placeholderFor(field)}
       {...register(registerName as never, { setValueAs: trimmed })}
     />
@@ -254,6 +260,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       type="date"
       required={field.required}
       aria-invalid={Boolean(error)}
+      invalid={Boolean(error)}
       {...register(registerName as never)}
     />
   ),
@@ -263,7 +270,12 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
       name={registerName as never}
       render={({ field: rhf }) => (
         <Select value={rhf.value ?? ''} onValueChange={rhf.onChange}>
-          <SelectTrigger id={id} aria-required={field.required || undefined} aria-invalid={Boolean(error)}>
+          <SelectTrigger
+            id={id}
+            aria-required={field.required || undefined}
+            aria-invalid={Boolean(error)}
+            invalid={Boolean(error)}
+          >
             <SelectValue placeholder="Select…" />
           </SelectTrigger>
           <SelectContent>
