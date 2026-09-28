@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -17,6 +18,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.service.rmm.software.WingetPackageManagerHandler;
 import org.junit.jupiter.api.DisplayName;
@@ -55,7 +57,10 @@ class SoftwareInstallUpdateManagementServiceTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        MachinePlatformResolver platformResolver = new MachinePlatformResolver(machineRepository, tenantIdProvider);
+        PackageManagerAvailability packageManagerAvailability =
+                new PackageManagerAvailability(new PackageManagerProperties(), machineRepository, tenantIdProvider);
+        MachinePlatformResolver platformResolver =
+                new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
         service = new SoftwareInstallUpdateManagementService(registry, scriptService, softwareDispatchService,
                 platformResolver);
         // A real brew handler so we exercise real script-code + arg building.
