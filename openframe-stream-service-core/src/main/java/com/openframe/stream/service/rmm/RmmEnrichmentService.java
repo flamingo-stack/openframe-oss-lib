@@ -120,7 +120,7 @@ public class RmmEnrichmentService implements DataEnrichmentService<DeserializedD
             scriptRepository.findByTenantIdAndId(tenantId, scriptId)
                     .map(RmmEnrichmentService::creationSourceOf)
                     .ifPresent(enriched::setScriptCreationSource);
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             log.warn("Failed to resolve the run origin for tenantId={} executionId={}", tenantId, executionId, e);
         }
     }

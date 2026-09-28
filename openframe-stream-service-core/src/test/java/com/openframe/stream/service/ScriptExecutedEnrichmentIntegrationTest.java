@@ -8,6 +8,7 @@ import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
@@ -59,6 +60,10 @@ class ScriptExecutedEnrichmentIntegrationTest {
     private MachineIdCacheService machineIdCacheService;
     @Mock
     private TenantIdProvider tenantIdProvider;
+    @Mock
+    private ScriptExecutionRepository scriptExecutionRepository;
+    @Mock
+    private ScriptRepository scriptRepository;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -73,9 +78,8 @@ class ScriptExecutedEnrichmentIntegrationTest {
         //    we want to lock in that the agentId really IS extracted from machineId).
         // Repository mocks — this test focuses on agentId extraction + enrichment,
         // not on getMessage name formatting; the deserializer is invoked with mocks present.
-        ScriptResultDeserializer deserializer = new ScriptResultDeserializer(mapper,
-                org.mockito.Mockito.mock(ScriptExecutionRepository.class),
-                org.mockito.Mockito.mock(com.openframe.data.repository.rmm.ScriptRepository.class));
+        ScriptResultDeserializer deserializer =
+                new ScriptResultDeserializer(mapper, scriptExecutionRepository, scriptRepository);
         DeserializedDebeziumMessage deserialized = deserializer.deserialize(inbound, MessageType.SCRIPT_EXECUTED);
         assertThat(deserialized.getAgentId())
                 .as("ScriptResultDeserializer must use machineId as agentId — that's the key the new enrichment looks up")
@@ -91,8 +95,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
         // 4. Enrich via the new direct-Machine-lookup service (Option C path).
         RmmEnrichmentService enrichmentService =
                 new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
-                        org.mockito.Mockito.mock(ScriptExecutionRepository.class),
-                        org.mockito.Mockito.mock(com.openframe.data.repository.rmm.ScriptRepository.class));
+                        scriptExecutionRepository, scriptRepository);
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         // 5. The four dashboard-visible fields must ALL be non-null — that's the
@@ -136,8 +139,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
 
         RmmEnrichmentService enrichmentService =
                 new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
-                        org.mockito.Mockito.mock(ScriptExecutionRepository.class),
-                        org.mockito.Mockito.mock(com.openframe.data.repository.rmm.ScriptRepository.class));
+                        scriptExecutionRepository, scriptRepository);
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         assertThat(enriched.getMachineId()).isEqualTo(MACHINE_ID);
