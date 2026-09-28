@@ -56,6 +56,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -84,25 +85,25 @@ public class SoftwareInventoryService {
     private final TenantIdProvider tenantIdProvider;
     private final DeviceHostInventoryLoader deviceHostInventoryLoader;
 
-    @Value("${TENANT_ID:}")
+    @Value("${TENANT_ID}")
     private String tenantIdEnv;
 
     @Value("${openframe.fleet.multi-tenancy.enabled}")
     private boolean fleetMultiTenancyEnabled;
 
-    private FleetMdmClient fleet;
+    private final AtomicReference<FleetMdmClient> fleetRef = new AtomicReference<>();
 
     private FleetMdmClient fleet() {
-        FleetMdmClient client = fleet;
-        if (client == null) {
-            FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantIdEnv);
-            String key = IntegratedToolId.FLEET_SERVER_ID.getValue();
-            IntegratedTool tool = integratedToolRepository.findByKey(key)
-                    .orElseThrow(() -> new IllegalStateException("Fleet MDM tool not configured: " + key));
-            client = new FleetMdmClient(tool.apiUrl(), tool.apiToken(), tenantIdEnv);
-            fleet = client;
+        FleetMdmClient existing = fleetRef.get();
+        if (existing != null) {
+            return existing;
         }
-        return client;
+        FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantIdEnv);
+        String key = IntegratedToolId.FLEET_SERVER_ID.getValue();
+        IntegratedTool tool = integratedToolRepository.findByKey(key)
+                .orElseThrow(() -> new IllegalStateException("Fleet MDM tool not configured: " + key));
+        FleetMdmClient created = new FleetMdmClient(tool.apiUrl(), tool.apiToken(), tenantIdEnv);
+        return fleetRef.compareAndSet(null, created) ? created : fleetRef.get();
     }
 
     public Optional<SoftwareResponse> findById(String softwareId) {
