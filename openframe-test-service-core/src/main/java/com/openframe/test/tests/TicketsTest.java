@@ -188,13 +188,9 @@ public class TicketsTest extends BaseTest {
     @DisplayName("Resolve ticket")
     @Order(4)
     public void testResolveTicket() {
-        // Without the old lifecycle filter a bare listing can hand back a ticket that is already RESOLVED
-        // or ARCHIVED, and resolving one of those is not a valid transition. Select on the kind instead,
-        // the same way the archive case below does.
-        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
-        assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        Ticket resolvable = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
-        assertThat(resolvable).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
+        // Its own ticket, not one borrowed from the shared listing: teardown archives every chat ticket
+        // the suite opens (#2376), so the top of that listing can be all ARCHIVED.
+        Ticket resolvable = newOwnTicket(me());
         String ticketId = resolvable.getId();
 
         String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
@@ -214,14 +210,13 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("Archive non-resolved ticket is rejected")
     public void testArchiveActiveTicketRejected() {
-        // Only RESOLVED → ARCHIVED is a valid transition, and an unfiltered listing carries tickets in
-        // every column, so pick one whose lifecycle status kind is neither RESOLVED nor ARCHIVED.
-        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
-        assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        Ticket ticket = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
-        assertThat(ticket).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
+        // Only RESOLVED → ARCHIVED is a valid transition, so this needs a fresh ticket in neither kind —
+        // its own, for the reason given in testResolveTicket.
+        Ticket ticket = newOwnTicket(me());
         String ticketId = ticket.getId();
+        assertThat(ticket.getStatusDefinition()).as("A new ticket has a statusDefinition").isNotNull();
         String kindBefore = ticket.getStatusDefinition().getKind();
+        assertThat(kindBefore).as("A new ticket starts outside RESOLVED/ARCHIVED").isNotIn("RESOLVED", "ARCHIVED");
 
         String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
         assertThat(archivedStatusId).as("No system status definition found for kind ARCHIVED").isNotNull();
