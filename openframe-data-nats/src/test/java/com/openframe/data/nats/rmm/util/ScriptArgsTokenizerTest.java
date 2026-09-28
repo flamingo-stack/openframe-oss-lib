@@ -122,11 +122,19 @@ class ScriptArgsTokenizerTest {
     }
 
     @Test
-    @DisplayName("NOT idempotent for spaced values — quotes are stripped on the first pass, so a second pass re-splits 'my value'. Tokenization is applied exactly once, at dispatch.")
+    @DisplayName("NOT idempotent for spaced values — quotes are stripped on the first pass, so a second pass re-splits 'my value'. "
+            + "CALL-SITE GUARD REQUIRED: production code must call ScriptArgsTokenizer.tokenize() exactly once, at dispatch, "
+            + "and must never re-tokenize an already-tokenized argv (e.g. during preview/validation followed by dispatch).")
     void notIdempotentForSpacedValues() {
         List<String> once = ScriptArgsTokenizer.tokenize(List.of("-Bucket 'my value'", "-Flag"));
         assertThat(once).containsExactly("-Bucket", "my value", "-Flag");   // quotes gone after pass 1
         assertThat(ScriptArgsTokenizer.tokenize(once))
                 .containsExactly("-Bucket", "my", "value", "-Flag");        // pass 2 would re-split the bare value
+
+        // Guard-rail regression check: any caller that re-tokenizes an already-tokenized
+        // argv containing a spaced value will observe token-count growth. If a future
+        // production call-site guard normalizes/rejects double-tokenization, this
+        // assertion should be updated to assert the guarded (safe) behavior instead.
+        assertThat(ScriptArgsTokenizer.tokenize(once)).hasSize(once.size() + 1);
     }
 }
