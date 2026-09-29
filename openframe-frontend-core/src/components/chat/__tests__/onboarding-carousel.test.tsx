@@ -15,7 +15,7 @@ describe('OnboardingCarousel', () => {
   it('starts on the first step with Previous disabled', () => {
     render(<OnboardingCarousel steps={STEPS} onComplete={vi.fn()} />);
     expect(currentSlide()).toHaveTextContent('First');
-    expect(screen.getByRole('button', { name: 'Previous Step' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Previous Step' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('button', { name: 'Next Step' })).toBeEnabled();
   });
 
@@ -25,6 +25,7 @@ describe('OnboardingCarousel', () => {
     expect(currentSlide()).toHaveTextContent('Second');
     fireEvent.click(screen.getByRole('button', { name: 'Previous Step' }));
     expect(currentSlide()).toHaveTextContent('First');
+    expect(screen.getByText('Step 1 of 3: First')).toHaveAttribute('aria-live', 'polite');
   });
 
   it('swaps Next for the complete action on the last step', () => {

@@ -80,7 +80,6 @@ export function OnboardingCarousel({
       <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-[var(--spacing-system-xs)]">
         <div className="relative flex min-h-0 w-full flex-1 overflow-hidden">
           <div
-            aria-live="polite"
             className="flex w-full gap-[var(--onboarding-gap)] transition-transform duration-300 ease-out motion-reduce:transition-none"
             style={trackStyle}
           >
@@ -114,6 +113,11 @@ export function OnboardingCarousel({
           <div className="pointer-events-none absolute inset-y-0 right-0 w-[120px] bg-gradient-to-l from-ods-bg to-transparent" />
         </div>
 
+        {/* The slides only toggle visibility, which is not announced. */}
+        <p className="sr-only" aria-live="polite">
+          Step {index + 1} of {steps.length}: {steps[index]?.title}
+        </p>
+
         <div className="flex items-center" role="group" aria-label="Choose step">
           {steps.map((step, i) => {
             const isCurrent = i === index;
@@ -139,7 +143,14 @@ export function OnboardingCarousel({
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-[var(--spacing-system-m)]">
-        <Button variant="outline" className="w-[200px]" disabled={isFirst} onClick={() => goTo(index - 1)}>
+        {/* aria-disabled, not disabled: stepping back onto the first card must
+            not drop keyboard focus from the button the user just pressed. */}
+        <Button
+          variant="outline"
+          className="w-[200px]"
+          aria-disabled={isFirst || undefined}
+          onClick={() => goTo(index - 1)}
+        >
           {previousLabel}
         </Button>
         <Button variant="accent" className="w-[200px]" onClick={isLast ? onComplete : () => goTo(index + 1)}>
