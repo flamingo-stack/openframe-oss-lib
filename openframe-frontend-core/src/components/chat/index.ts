@@ -6,6 +6,7 @@ export * from './approval-batch-message';
 export * from './escalation-offer-message';
 export * from './ticket-escalated-message';
 export * from './ticket-event-message';
+export * from './system-event-message';
 export * from './ai-assistant-info';
 export * from './chat-appearance-context';
 export * from './context-compaction-display';

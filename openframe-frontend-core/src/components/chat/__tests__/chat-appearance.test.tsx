@@ -42,6 +42,26 @@ describe('chat appearance', () => {
     expect(info.className).toContain('items-center');
   });
 
+  it('v2 turns a technician joining into a receipt card', () => {
+    render(
+      <ChatMessageEnhanced
+        role="user"
+        authorType="system"
+        name="Roman Smith joined the chat"
+        content=""
+        appearance="v2"
+      />,
+    );
+    expect(screen.getByText('Technician Joined')).toBeTruthy();
+    expect(screen.getByText("You're now chatting with Roman Smith.")).toBeTruthy();
+  });
+
+  it('classic keeps the system line as an author row', () => {
+    render(<ChatMessageEnhanced role="user" authorType="system" name="Roman Smith joined the chat" content="" />);
+    expect(screen.getByText('Roman Smith joined the chat')).toBeTruthy();
+    expect(screen.queryByText('Technician Joined')).toBeNull();
+  });
+
   it('hand-off bar names the team and shows their faces', () => {
     render(
       <ChatInput

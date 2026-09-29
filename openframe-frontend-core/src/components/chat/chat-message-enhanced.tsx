@@ -21,6 +21,7 @@ import { EscalationOfferMessage } from './escalation-offer-message';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
+import { SystemEventMessage } from './system-event-message';
 import { ThinkingDisplay } from './thinking-display';
 import { TicketEscalatedMessage } from './ticket-escalated-message';
 import { TicketEventMessage } from './ticket-event-message';
@@ -542,6 +543,18 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const avatarProps = getAvatarProps();
 
     const isSystem = authorType === 'system';
+
+    // v2 draws a system line (e.g. a technician joining) as an in-thread
+    // receipt card rather than as an author row with no body.
+    if (isV2 && isSystem && name) {
+      return (
+        <div ref={ref} className={cn('relative py-[calc(var(--spacing-system-m)/2)]', className)} {...props}>
+          <ChatAppearanceContext.Provider value={appearance}>
+            <SystemEventMessage text={name} timestamp={timestamp} />
+          </ChatAppearanceContext.Provider>
+        </div>
+      );
+    }
 
     return (
       <ChatAppearanceContext.Provider value={appearance}>

@@ -53,6 +53,14 @@ const ESCALATION_THREAD: Message[] = [
     ],
   },
   {
+    id: 's1',
+    role: 'user',
+    authorType: 'system',
+    name: 'Michael Johnson joined the chat',
+    content: '',
+    timestamp: at(48),
+  },
+  {
     id: 't1',
     role: 'assistant',
     name: 'Michael Johnson',
@@ -152,4 +160,33 @@ export const EscalationV2: Story = { args: { messages: ESCALATION_THREAD, appear
 export const EscalationClassic: Story = {
   args: { messages: ESCALATION_THREAD, appearance: 'classic', handedOff: true },
 };
+
+const approvalCard = (id: string, status: 'approved' | 'rejected' | 'cancelled', resolvedByName: string) => ({
+  type: 'approval_request' as const,
+  status,
+  resolvedByName,
+  data: {
+    requestId: id,
+    command: 'Remove-Item C:\\Temp\\* -Recurse',
+    explanation: 'Clears temporary files in C:\\Temp.',
+  },
+});
+
+const APPROVAL_STATES_THREAD: Message[] = [
+  {
+    id: 'a1',
+    role: 'assistant',
+    name: 'Fae',
+    assistantType: 'fae',
+    timestamp: at(47),
+    content: [
+      approvalCard('r1', 'approved', 'Michael Johnson'),
+      approvalCard('r2', 'rejected', 'Michael Johnson'),
+      approvalCard('r3', 'cancelled', 'Michael Johnson'),
+    ],
+  },
+];
+
 export const ApprovalV2: Story = { args: { messages: APPROVAL_THREAD, appearance: 'v2' } };
+
+export const ApprovalStatesV2: Story = { args: { messages: APPROVAL_STATES_THREAD, appearance: 'v2' } };
