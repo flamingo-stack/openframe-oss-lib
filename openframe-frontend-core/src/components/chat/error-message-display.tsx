@@ -3,9 +3,11 @@
 import { forwardRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { AlertCircleIcon } from '../icons-v2-generated';
+import { useChatAppearance } from './chat-appearance-context';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
 import type { ErrorMessageDisplayProps } from './types';
+import { CHAT_APPEARANCE } from './types/chat.types';
 
 const iconTint = {
   error: 'text-ods-error',
@@ -18,11 +20,20 @@ const ErrorMessageDisplay = forwardRef<HTMLDivElement, ErrorMessageDisplayProps>
     const [expanded, setExpanded] = useState(false);
     const { innerRef, containerStyle } = useCollapsible({ expanded });
     const hasDetails = Boolean(details);
+    // v2 (fae chat `chat-info-block`): outlined on the page surface, the title
+    // always reads as a heading, and the row spacing comes from the thread.
+    const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
 
     return (
       <div
         ref={ref}
-        className={cn('mb-[var(--spacing-system-xsf)] rounded-md bg-ods-card p-[var(--spacing-system-xsf)]', className)}
+        className={cn(
+          'rounded-md',
+          isV2
+            ? 'border border-ods-border bg-ods-bg p-[var(--spacing-system-xs)]'
+            : 'mb-[var(--spacing-system-xsf)] bg-ods-card p-[var(--spacing-system-xsf)]',
+          className,
+        )}
         {...props}
       >
         <button
@@ -40,7 +51,8 @@ const ErrorMessageDisplay = forwardRef<HTMLDivElement, ErrorMessageDisplayProps>
           <span
             className={cn(
               'min-w-0 flex-1 text-h5',
-              expanded ? 'text-ods-text-primary' : 'truncate text-ods-text-secondary',
+              expanded || isV2 ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+              !expanded && 'truncate',
             )}
           >
             {title}
@@ -50,7 +62,13 @@ const ErrorMessageDisplay = forwardRef<HTMLDivElement, ErrorMessageDisplayProps>
 
         {hasDetails && (
           <div style={containerStyle}>
-            <div ref={innerRef} className="px-[var(--spacing-system-lf)] pt-[var(--spacing-system-xsf)]">
+            <div
+              ref={innerRef}
+              className={cn(
+                'px-[var(--spacing-system-lf)]',
+                isV2 ? 'pt-[var(--spacing-system-xs)]' : 'pt-[var(--spacing-system-xsf)]',
+              )}
+            >
               <p className="text-ods-text-primary text-h6">{details}</p>
             </div>
           </div>

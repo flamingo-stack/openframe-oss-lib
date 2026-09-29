@@ -15,6 +15,8 @@ export const ToolTypeValues = {
   OPENFRAME_RMM: 'OPENFRAME_RMM',
   OSQUERY: 'OSQUERY',
   SYSTEM: 'SYSTEM',
+  // Directory tenants (Tenant Management): the same identifiers the gateway's
+  // DirectoryProvider enum uses, so a directory sync's log rows resolve here.
   MICROSOFT_365: 'MICROSOFT_365',
   GOOGLE_WORKSPACE: 'GOOGLE_WORKSPACE',
 } as const;
