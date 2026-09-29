@@ -15,7 +15,10 @@ public class ChatQueries {
                         node {
                             id
                             createdAt
-                            owner { type }
+                            owner {
+                                type
+                                ... on AssistantOwner { model modelName providerName }
+                            }
                             messageData {
                                 type
                                 ... on TextData { text }
