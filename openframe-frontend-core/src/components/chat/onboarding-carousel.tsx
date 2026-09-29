@@ -29,7 +29,8 @@ export interface OnboardingCarouselProps {
  * Step-by-step introduction: one card at a time in the middle, its neighbours
  * peeking in from the sides under an edge fade, dots below, Previous / Next
  * underneath. The last step swaps Next for `completeLabel`. There is no skip:
- * the design walks every step.
+ * the design walks every step. Fills the height its parent gives it: the cards
+ * stretch, the dots and buttons keep their size.
  */
 export function OnboardingCarousel({
   steps,
@@ -63,15 +64,21 @@ export function OnboardingCarousel({
     transform: `translateX(calc(${-index} * (var(--onboarding-card-w) + var(--onboarding-gap))))`,
   } as CSSProperties;
 
+  // The design's large steps (card padding, dots to buttons) are 80px at the
+  // app's 1024px default width, where `--spacing-system-xxl` is still 48px:
+  // spelled as twice the fixed 40px step.
   return (
     <section
       aria-roledescription="carousel"
       aria-label={label}
       onKeyDown={handleKeyDown}
-      className={cn('flex w-full flex-col items-center gap-[var(--spacing-system-xl)]', className)}
+      className={cn(
+        'flex min-h-0 w-full flex-1 flex-col items-center gap-[calc(2*var(--spacing-system-xlf))]',
+        className,
+      )}
     >
-      <div className="flex w-full flex-col items-center gap-[var(--spacing-system-xs)]">
-        <div className="relative w-full overflow-hidden">
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-[var(--spacing-system-xs)]">
+        <div className="relative flex min-h-0 w-full flex-1 overflow-hidden">
           <div
             aria-live="polite"
             className="flex w-full gap-[var(--onboarding-gap)] transition-transform duration-300 ease-out motion-reduce:transition-none"
@@ -88,7 +95,7 @@ export function OnboardingCarousel({
                   aria-hidden={!isCurrent}
                   inert={!isCurrent || undefined}
                   className={cn(
-                    'flex w-[var(--onboarding-card-w)] shrink-0 flex-col items-center justify-center gap-[var(--spacing-system-m)] rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-xl)] py-[var(--spacing-system-xxl)] text-center',
+                    'flex w-[var(--onboarding-card-w)] shrink-0 flex-col items-center justify-center gap-[var(--spacing-system-m)] rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-xl)] py-[calc(2*var(--spacing-system-xlf))] text-center',
                     i === 0 && 'ml-[calc((100%-var(--onboarding-card-w))/2)]',
                   )}
                 >

@@ -36,7 +36,7 @@ const STEPS: OnboardingCarouselStep[] = [
 
 function Screen() {
   return (
-    <div className="flex h-[800px] w-[1024px] flex-col items-center justify-between gap-[var(--spacing-system-xl)] bg-ods-bg px-[var(--spacing-system-xxl)] py-[var(--spacing-system-xl)]">
+    <div className="flex h-[800px] w-[1024px] flex-col items-center gap-[calc(2*var(--spacing-system-xlf))] bg-ods-bg px-[calc(2*var(--spacing-system-xlf))] py-[var(--spacing-system-xl)]">
       <span className="flex items-center gap-[var(--spacing-system-xxs)] text-ods-text-primary">
         <OpenFrameLogo
           className="size-6"
@@ -45,8 +45,11 @@ function Screen() {
         />
         <span className="text-wordmark">OpenFrame</span>
       </span>
-      <OnboardingCarousel steps={STEPS} onComplete={() => undefined} />
-      <span className="flex items-center gap-[var(--spacing-system-xs)] text-ods-text-secondary">
+      {/* The side cards run to the window edge, past the screen padding. */}
+      <div className="-mx-[calc(2*var(--spacing-system-xlf))] flex min-h-0 flex-1 self-stretch">
+        <OnboardingCarousel steps={STEPS} onComplete={() => undefined} />
+      </div>
+      <span className="flex h-6 items-center gap-[var(--spacing-system-xs)] text-ods-text-secondary">
         <span className="text-h6">Powered by</span>
         <FlamingoLogo className="size-5" fill="var(--color-text-secondary)" />
         <span className="text-wordmark">Flamingo</span>
