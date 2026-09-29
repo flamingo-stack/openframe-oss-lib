@@ -1,7 +1,7 @@
 export { AdobeAeIcon } from './adobe-ae-icon';
 export { AdobeAiIcon } from './adobe-ai-icon';
-export { AdobePdfIcon } from './adobe-pdf-icon';
 export { AdobeIdIcon } from './adobe-id-icon';
+export { AdobePdfIcon } from './adobe-pdf-icon';
 export { AdobePrIcon } from './adobe-pr-icon';
 export { AdobePsIcon } from './adobe-ps-icon';
 export { AdobeXdIcon } from './adobe-xd-icon';
@@ -62,6 +62,7 @@ export { Office365LogoGreyIcon } from './office-365-logo-grey-icon';
 export { Office365LogoIcon } from './office-365-logo-icon';
 export { OpenaiLogoGreyIcon } from './openai-logo-grey-icon';
 export { OpenaiLogoIcon } from './openai-logo-icon';
+export { OpenframeLogoGreyIcon } from './openframe-logo-grey-icon';
 export { OsqueryLogoGreyIcon } from './osquery-logo-grey-icon';
 export { OsqueryLogoIcon } from './osquery-logo-icon';
 export { PaypalIcon } from './paypal-icon';
