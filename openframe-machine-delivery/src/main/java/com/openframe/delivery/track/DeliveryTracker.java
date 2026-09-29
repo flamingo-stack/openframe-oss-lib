@@ -7,6 +7,7 @@ import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.spec.DeliveryPayload;
+import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
@@ -27,7 +28,11 @@ public class DeliveryTracker {
     private final DeliveryCloser closer;
     private final DeliverySpecRegistry registry;
 
-    public void acknowledge(DeliveryType type, String targetId, String machineId, String dispatchId) {
+    // ref = the delivery block the agent copied back from the command; the row is looked up by that exact dispatch
+    public void acknowledge(DeliveryRef ref, String machineId) {
+        DeliveryType type = ref.getType();
+        String targetId = ref.getTargetId();
+        String dispatchId = ref.getDispatchId();
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Policy policy = properties.resolve(type);
@@ -42,7 +47,10 @@ public class DeliveryTracker {
         }
     }
 
-    public void done(DeliveryType type, String targetId, String machineId, String dispatchId) {
+    public void done(DeliveryRef ref, String machineId) {
+        DeliveryType type = ref.getType();
+        String targetId = ref.getTargetId();
+        String dispatchId = ref.getDispatchId();
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Instant expiresAt = expiresAt(type, now);
@@ -54,7 +62,7 @@ public class DeliveryTracker {
         }
     }
 
-    // for a completion the server learns outside the result channel, e.g. the agent's own uninstall call
+    // seed = what we asked for; used when the server learns the outcome outside the result channel, e.g. the agent's own uninstall call
     public void done(DeliverySeed seed) {
         DeliveryType type = seed.type();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
@@ -71,19 +79,9 @@ public class DeliveryTracker {
         }
     }
 
-    public void fail(DeliveryType type, String targetId, String machineId, String dispatchId, String error) {
+    public void fail(DeliveryRef ref, String machineId, String error) {
         Instant now = Instant.now();
-        closer.failReported(type, targetId, machineId, dispatchId, error, now);
-    }
-
-    public void cancel(DeliveryType type, String targetId, String machineId) {
-        String id = DeliveryId.of(type, targetId, machineId);
-        Instant now = Instant.now();
-        Instant expiresAt = expiresAt(type, now);
-        boolean cancelled = repository.markCancelled(id, DeliveryStatus.OPEN, now, expiresAt);
-        if (cancelled) {
-            log.info("Delivery CANCELLED: type={} targetId={} machineId={}", type, targetId, machineId);
-        }
+        closer.failReported(ref.getType(), ref.getTargetId(), machineId, ref.getDispatchId(), error, now);
     }
 
     private void notifyAcked(MachineDelivery delivery) {

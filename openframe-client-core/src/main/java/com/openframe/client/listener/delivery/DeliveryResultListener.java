@@ -3,7 +3,6 @@ package com.openframe.client.listener.delivery;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.DeliveryResultMessage;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.delivery.metrics.DeliveryMetrics;
@@ -96,13 +95,10 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
 
     private void apply(String machineId, DeliveryResultMessage report) {
         DeliveryRef delivery = report.getDelivery();
-        DeliveryType type = delivery.getType();
-        String targetId = delivery.getTargetId();
-        String dispatchId = delivery.getDispatchId();
         switch (report.getResult()) {
-            case ACKED -> deliveryTracker.acknowledge(type, targetId, machineId, dispatchId);
-            case DONE -> deliveryTracker.done(type, targetId, machineId, dispatchId);
-            case FAILED -> deliveryTracker.fail(type, targetId, machineId, dispatchId, report.getError());
+            case ACKED -> deliveryTracker.acknowledge(delivery, machineId);
+            case DONE -> deliveryTracker.done(delivery, machineId);
+            case FAILED -> deliveryTracker.fail(delivery, machineId, report.getError());
         }
     }
 
