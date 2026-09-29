@@ -35,6 +35,14 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
     private static final String DEFAULT_SORT_COLUMN = "eventTimestamp";
     private static final String PRIMARY_KEY_FIELD = "toolEventId";
 
+    /**
+     * Explicit upper bound for the filter-option queries. Pinot applies its own default of 10 to any query that
+     * does not set a LIMIT, so without this a facet silently returns only the first 10 values in ORDER BY order -
+     * an organization whose name sorts eleventh simply never appears in the Source filter. 10000 is the builder's
+     * maximum and is comfortably above the number of distinct values any of these facets can hold.
+     */
+    private static final int MAX_FILTER_OPTIONS = 10000;
+
     @Value("${pinot.tables.logs.name:logs}")
     private String logsTable;
 
@@ -94,7 +102,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("toolType", toolTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("eventType");
+                .orderBy("eventType")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -108,7 +117,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("severity");
+                .orderBy("severity")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -122,7 +132,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("toolType");
+                .orderBy("toolType")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -136,7 +147,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("ingestDay");
+                .orderBy("ingestDay")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -151,7 +163,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
-                .orderBy("organizationName");
+                .orderBy("organizationName")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeQuery(queryBuilder.build(), resultSet -> rowIndex -> {
             String organizationId = resultSet.getString(rowIndex, 0);
