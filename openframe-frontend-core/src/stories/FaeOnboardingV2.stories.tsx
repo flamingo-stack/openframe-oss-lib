@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 
 import { OnboardingCarousel, type OnboardingCarouselStep } from '../components/chat/onboarding-carousel';
-import { FlamingoLogo, OpenFrameLogo } from '../components/icons';
+import { PoweredByFlamingo } from '../components/features/auth/auth-branding';
+import { OpenFrameLogo } from '../components/icons';
 import { ClockCheckIcon, MessagesIcon, UserCheckIcon } from '../components/icons-v2-generated';
 import { SquareAvatar } from '../components/ui/square-avatar';
 import { withFaeBrand } from './fae-brand-decorator';
@@ -49,11 +50,7 @@ function Screen() {
       <div className="-mx-[calc(2*var(--spacing-system-xlf))] flex min-h-0 flex-1 self-stretch">
         <OnboardingCarousel steps={STEPS} onComplete={() => undefined} />
       </div>
-      <span className="flex h-6 items-center gap-[var(--spacing-system-xs)] text-ods-text-secondary">
-        <span className="text-h6">Powered by</span>
-        <FlamingoLogo className="size-5" fill="var(--color-text-secondary)" />
-        <span className="text-wordmark">Flamingo</span>
-      </span>
+      <PoweredByFlamingo />
     </div>
   );
 }
