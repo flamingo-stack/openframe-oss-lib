@@ -6,7 +6,9 @@ import { cn } from '../../utils/cn';
 import { Button } from '../ui/button';
 import { Tag } from '../ui/tag';
 import { ApprovalStatusTag } from './approval-batch-message';
+import { useChatAppearance } from './chat-appearance-context';
 import type { ApprovalRequestMessageProps } from './types';
+import { CHAT_APPEARANCE } from './types/chat.types';
 import type { ApprovalRequestField } from './types/message.types';
 
 /**
@@ -77,6 +79,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
     ref,
   ) => {
     const [isProcessing, setIsProcessing] = useState(false);
+    const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
 
     const handleApprove = async () => {
       setIsProcessing(true);
@@ -104,7 +107,9 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         <div
           ref={ref}
           className={cn(
-            'mb-[var(--spacing-system-xsf)] flex flex-col gap-[var(--spacing-system-mf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
+            'flex flex-col gap-[var(--spacing-system-mf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
+            // v2: the thread owns the space below the card.
+            !isV2 && 'mb-[var(--spacing-system-xsf)]',
             className,
           )}
           {...props}

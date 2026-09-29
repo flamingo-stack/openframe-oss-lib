@@ -22,6 +22,12 @@ export interface MspOrganizationCardProps {
   href?: string;
   /** Click handler for the trailing action (used when `href` is not set). */
   onOpenWebsite?: () => void;
+  /**
+   * `card` (default): the welcome-screen card, title with the website beneath.
+   * `footer`: the compact sidebar footer of the fae chat v2 layout, a caption
+   * "Your IT is managed by" over the name, no website line, no card chrome.
+   */
+  variant?: 'card' | 'footer';
   /** Appended to the root element. */
   className?: string;
 }
@@ -44,9 +50,38 @@ export function MspOrganizationCard({
   title,
   href,
   onOpenWebsite,
+  variant = 'card',
   className,
 }: MspOrganizationCardProps) {
   const actionLabel = website ? `Open ${website}` : 'Open organization website';
+
+  if (variant === 'footer') {
+    return (
+      <div
+        className={cn(
+          'flex items-center gap-[var(--spacing-system-s)] px-[var(--spacing-system-m)] py-[var(--spacing-system-s)]',
+          className,
+        )}
+      >
+        <SquareAvatar src={logoUrl} alt={name} fallback={name} size="sm" variant="square" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-ods-text-secondary text-h6">Your IT is managed by</span>
+          <span className="truncate text-ods-text-primary text-h4">{title ?? name}</span>
+        </div>
+        {href ? (
+          <Button asChild variant="outline" size="icon-sm" aria-label={actionLabel}>
+            <a href={href} target="_blank" rel="noreferrer noopener">
+              <ExternalLinkIcon />
+            </a>
+          </Button>
+        ) : onOpenWebsite ? (
+          <Button variant="outline" size="icon-sm" aria-label={actionLabel} onClick={onOpenWebsite}>
+            <ExternalLinkIcon />
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div
