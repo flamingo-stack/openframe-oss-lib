@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import type { ReactNode } from 'react';
+import { copyrightLine } from '../utils/copyright-line';
 import { SocialIconRow } from './social-icon-row';
 import { Skeleton } from './ui/skeleton';
 
@@ -187,7 +188,7 @@ function UniversalFooter({
 
       {/* Copyright */}
       <p className="text-md md:text-md w-full pt-4 text-center font-body font-medium leading-[1.33] text-ods-text-muted md:pt-0">
-        © {new Date().getFullYear()} {config.legalName}. All rights reserved.
+        {copyrightLine(config.legalName)}
       </p>
     </footer>
   );
