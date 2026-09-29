@@ -1,6 +1,5 @@
 import type { Preview } from '@storybook/nextjs-vite';
-// Fonts: Next.js apps use next/font/google (fonts.ts), Storybook needs direct CSS import
-import '../src/styles/storybook-fonts.css';
+// Fonts come with the styles (src/styles/fonts.css, self-hosted).
 import '../src/styles/index.css';
 
 const preview: Preview = {
