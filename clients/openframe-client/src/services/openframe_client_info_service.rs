@@ -1,5 +1,6 @@
 use crate::models::openframe_client_info::OpenFrameClientInfo;
 use crate::platform::directories::DirectoryManager;
+use crate::utils::fs::atomic_write;
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
@@ -43,7 +44,7 @@ impl OpenFrameClientInfoService {
         let json_content = serde_json::to_string_pretty(info)
             .context("Failed to serialize OpenFrame client info to JSON")?;
 
-        fs::write(&self.info_file_path, json_content).with_context(|| {
+        atomic_write(&self.info_file_path, json_content.as_bytes()).with_context(|| {
             format!(
                 "Failed to write client info file: {:?}",
                 self.info_file_path

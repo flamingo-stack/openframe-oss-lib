@@ -124,17 +124,30 @@ export function useRoadmapVoting(options: UseRoadmapVotingOptions = {}) {
       } else {
         // User clicked different vote - set it. If they had an opposite
         // vote, remove that first so the server totals stay consistent.
+        // If the removal fails, we must not proceed with the optimistic
+        // switch: doing so would risk the server ending up with BOTH the
+        // old and new vote persisted while the client believes only the
+        // new vote is active.
         if (currentVote) {
-          await contentFetch(voteApiEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId,
-              voteType: currentVote,
-              action: 'remove',
-              ...getSignals(),
-            }),
-          }).catch((err: unknown) => console.error('[Voting] Error removing opposite vote:', err));
+          try {
+            const removeResponse = await contentFetch(voteApiEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                taskId,
+                voteType: currentVote,
+                action: 'remove',
+                ...getSignals(),
+              }),
+            });
+
+            if (!removeResponse.ok) {
+              throw new Error('Vote removal API request failed');
+            }
+          } catch (err: unknown) {
+            console.error('[Voting] Error removing opposite vote:', err);
+            return { success: false, newVote: currentVote, action: 'add' };
+          }
         }
 
         newVote = voteType;

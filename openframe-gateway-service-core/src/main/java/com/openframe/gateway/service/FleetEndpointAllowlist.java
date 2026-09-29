@@ -34,6 +34,12 @@ import java.util.Map;
  * Entries are {@code "METHOD pattern"} in Spring {@link PathPattern} syntax, matched against the path
  * <em>after</em> {@code /tools/fleetmdm-server}. Only the browser plane ({@code proxyApiRequest}) is
  * checked; the agent plane uses a separate proxy method and is never filtered here.
+ *
+ * <p><b>Caller contract:</b> this component performs no filtering by itself — it must be invoked
+ * explicitly from the browser proxy request path (e.g. {@code RestProxyService#proxyApiRequest})
+ * before the request is forwarded to Fleet. Callers must reject the request (e.g. HTTP 403) when
+ * {@link #isAllowed(String, HttpMethod, String)} returns {@code false}. Without that call site, this
+ * class has no effect and the restriction described above does not apply.
  */
 @Component
 public class FleetEndpointAllowlist {
@@ -52,6 +58,10 @@ public class FleetEndpointAllowlist {
      * @return true if the browser proxy may forward this request. Always true unless multi-tenancy
      * is enabled and the tool is {@code fleetmdm-server}, in which case only the configured
      * method+path combinations pass.
+     *
+     * <p><b>Must be called</b> by the browser proxy request path (e.g.
+     * {@code RestProxyService#proxyApiRequest}) prior to forwarding the request; a {@code false}
+     * result must cause the caller to reject the request rather than forward it.
      */
     public boolean isAllowed(String toolId, HttpMethod method, String path) {
         if (!multiTenancyEnabled || !FLEET_TOOL_ID.equals(toolId)) {

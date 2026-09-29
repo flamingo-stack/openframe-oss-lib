@@ -161,7 +161,6 @@ export function FileManager({
           <FileManagerTable
             files={files}
             selectedFiles={selectedFiles}
-            resultsCount={resultsCount || files.length}
             showCheckboxes={showCheckboxes}
             loading={loading}
             isSearchResult={!!searchQuery}

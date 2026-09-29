@@ -24,6 +24,11 @@ pub fn get_log_directory() -> PathBuf {
     {
         PathBuf::from("/var/log/openframe")
     }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        compile_error!("get_log_directory() is not implemented for this target_os");
+    }
 }
 
 /// Ensures the log directory exists and has correct permissions

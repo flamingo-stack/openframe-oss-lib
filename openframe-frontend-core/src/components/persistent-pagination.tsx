@@ -210,7 +210,7 @@ export function PersistentPaginationWrapper({
         <UnifiedPagination
           currentPage={displayCurrentPage}
           totalPages={displayTotalPages}
-          onPageChange={hasResults ? onPageChange : () => {}} // Provide empty function instead of undefined
+          onPageChange={onPageChange ?? (() => {})}
         />
       </div>
 

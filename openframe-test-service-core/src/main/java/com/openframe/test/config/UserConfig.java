@@ -17,6 +17,7 @@ public class UserConfig {
 
     public static void random() {
         email = new Faker().letterify("??????@flamingo.cx");
+        password = null;
     }
 
     public static User getUser() {

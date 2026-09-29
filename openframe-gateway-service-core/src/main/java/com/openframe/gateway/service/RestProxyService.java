@@ -5,7 +5,6 @@ import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolReposit
 import com.openframe.gateway.config.CurlLoggingHandler;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -251,7 +250,6 @@ public class RestProxyService {
                 .secure(sslSpec -> {
                     try {
                         sslSpec.sslContext(io.netty.handler.ssl.SslContextBuilder.forClient()
-                                .trustManager(InsecureTrustManagerFactory.INSTANCE)
                                 .build());
                     } catch (SSLException e) {
                         log.error("Error configuring SSL context: {}", e.getMessage());

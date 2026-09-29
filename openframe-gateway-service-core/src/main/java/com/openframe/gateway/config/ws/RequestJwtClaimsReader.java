@@ -19,9 +19,13 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @RequiredArgsConstructor
 public class RequestJwtClaimsReader {
 
-    public Instant getExpiration(ServerWebExchange exchange) {
-        Claims jwtClaims = getClaims(exchange);
-        return jwtClaims.getExpiration().toInstant();
+    public Optional<Instant> getExpiration(ServerWebExchange exchange) {
+        try {
+            Claims jwtClaims = getClaims(exchange);
+            return Optional.of(jwtClaims.getExpiration().toInstant());
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 
     public Optional<String> getSubject(ServerWebExchange exchange) {
@@ -44,7 +48,13 @@ public class RequestJwtClaimsReader {
             throw new IllegalStateException("No bearer token in Authorization header");
         }
 
-        String jwtClaimsPart = authorization.substring(7, authorization.lastIndexOf('.') + 1);
+        String token = authorization.substring(7);
+        int lastDot = token.lastIndexOf('.');
+        if (lastDot < 0) {
+            throw new IllegalStateException("Malformed JWT in Authorization header");
+        }
+
+        String jwtClaimsPart = token.substring(0, lastDot + 1);
         return Jwts.parserBuilder()
                 .setAllowedClockSkewSeconds(CLOCK_SKEW_SECONDS)
                 .build()

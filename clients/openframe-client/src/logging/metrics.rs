@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use tracing::{Event, Subscriber};
 use tracing_subscriber::Layer;
 
@@ -108,7 +107,7 @@ where
         event.record(&mut visitor);
 
         if let Some((name, value, labels)) = visitor.metric {
-            let mut store = self.store.blocking_write();
+            let mut store = self.store.write().expect("metrics store lock poisoned");
             match value {
                 MetricValue::Counter(v) => store.record_counter(&name, v, labels),
                 MetricValue::Gauge(v) => store.record_gauge(&name, v, labels),

@@ -28,10 +28,13 @@ if (-not $exe) { Write-Output '__NOT_PRESENT__'; exit 0 }
 $before = (& $exe --version).Trim()
 
 & $exe upgrade --id Microsoft.AppInstaller --exact --silent --accept-source-agreements --accept-package-agreements --disable-interactivity | Out-Null
+$upgradeExitCode = $LASTEXITCODE
 
 $exe = Get-WingetExe
 if (-not $exe) { Write-Output 'upgrade left winget unavailable'; exit 1 }
 $after = (& $exe --version).Trim()
+
+if ($upgradeExitCode -ne 0) { Write-Output "upgrade command failed with exit code $upgradeExitCode"; exit 1 }
 
 if ($after -eq $before) { Write-Output "__LATEST__|$before"; exit 0 }
 Write-Output "__FROM__|$before"

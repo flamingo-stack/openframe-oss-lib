@@ -39,9 +39,10 @@ import static org.mockito.Mockito.when;
  * {@link RmmEnrichmentService} resolves the openframe Machine + Organization
  * directly and fills the four previously-null fields.
  *
- * <p>Sister regression test for {@code COMMAND_EXECUTED} can be added later by
- * swapping the deserializer + MessageType; the fix re-uses the same enrichment
- * service once that MessageType is also routed to {@code RMM_RESULTS}.
+ * <p>The sister regression test for {@code COMMAND_EXECUTED} is covered below by
+ * {@code commandExecutedKafkaMessage_yieldsFullyPopulatedEnrichment}, which swaps in
+ * {@link CommandResultDeserializer} and {@code MessageType.COMMAND_EXECUTED} and
+ * confirms the same enrichment service fills the four fields for that MessageType too.
  */
 @ExtendWith(MockitoExtension.class)
 class ScriptExecutedEnrichmentIntegrationTest {

@@ -11,6 +11,13 @@ public interface IntegratedToolRepository extends MongoRepository<IntegratedTool
     @Override
     Optional<IntegratedTool> findByType(String type);
 
+    /**
+     * @deprecated Unscoped, non-tenant-aware lookup. Per OPENFRAM-008-8, multi-tenant
+     * callers MUST use {@link #findByTenantIdAndKey(String, String)} instead, as this
+     * method can return another tenant's IntegratedTool document (including
+     * credentials/config) when tenant-routing is enabled.
+     */
+    @Deprecated
     @Override
     Optional<IntegratedTool> findByKey(String key);
 

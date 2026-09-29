@@ -68,17 +68,6 @@ export interface ReleaseClientOptions {
 // subscription that silently received nothing.
 const connections = new Map<string, SharedConnection>();
 
-/** Legacy accessor from the single-slot era: returns the first live shared
- *  connection, or null. With MULTIPLE URLs connected (e.g. `/ws/nats` client
- *  chat + `/ws/nats-api` dashboard mounted together) "first" is whichever
- *  surface acquired first — an arbitrary, mount-order-dependent answer.
- *  Prefer `getSharedConnectionFor(url)`; this stays only for external
- *  registry-pinned consumers of the old single-connection API. */
-export function getSharedConnection(): SharedConnection | null {
-  const first = connections.values().next();
-  return first.done ? null : first.value;
-}
-
 export function acquireClient(url: string, opts?: AcquireClientOptions): SharedConnection {
   let conn = connections.get(url);
 

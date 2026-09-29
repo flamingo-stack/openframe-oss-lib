@@ -2,39 +2,33 @@
  * Utility functions for handling image proxy URLs
  */
 
+import { getProxiedImageUrl as getProxiedImageUrlImpl, shouldProxyImage as shouldProxyImageImpl } from './image-proxy';
+
 /**
  * Get proxied image URL for external images
  * If it's an external HTTP/HTTPS URL, proxy it through our API
  * Otherwise, return the original URL
+ *
+ * @deprecated This is a thin wrapper delegating to image-proxy.ts, preserved
+ * for existing call sites that still import from this module. Prefer
+ * importing getProxiedImageUrl from './image-proxy' directly.
  */
 export function getProxiedImageUrl(imageUrl: string | null): string | null {
-  if (!imageUrl) return null;
-
-  // If it's an external HTTP/HTTPS URL, determine if we should proxy it
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    // Skip if it's already our own proxy URL
-    if (imageUrl.includes('/api/image-proxy')) {
-      return imageUrl;
-    }
-
-    // Skip proxying for OpenMSP-owned domains (e.g., app.openmsp.ai, cdn.openmsp.ai, etc.)
-    if (imageUrl.includes('openmsp.ai')) {
-      return imageUrl;
-    }
-
-    return `/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
-  }
-
-  // Return local/relative images as-is
-  return imageUrl;
+  return getProxiedImageUrlImpl(imageUrl, {
+    proxyPrefix: '/api/image-proxy',
+    skipDomains: ['openmsp.ai'],
+  });
 }
 
 /**
  * Check if an image URL needs to be proxied
+ *
+ * @deprecated This is a thin wrapper delegating to image-proxy.ts, preserved
+ * for existing call sites that still import from this module. Prefer
+ * importing shouldProxyImage from './image-proxy' directly.
  */
 export function shouldProxyImage(imageUrl: string | null): boolean {
-  if (!imageUrl) return false;
-
-  // Proxy external HTTP/HTTPS URLs that aren't already proxied
-  return (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) && !imageUrl.includes('/api/image-proxy');
+  return shouldProxyImageImpl(imageUrl, {
+    proxyPrefix: '/api/image-proxy',
+  });
 }

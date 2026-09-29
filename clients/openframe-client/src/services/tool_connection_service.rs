@@ -75,12 +75,38 @@ impl ToolConnectionService {
     async fn persist(&self, list: &[ToolConnection]) -> Result<()> {
         let json = serde_json::to_string_pretty(list)
             .context("Failed to serialize tool connections to JSON")?;
-        fs::write(&self.file_path, json).with_context(|| {
+        self.write_atomic(&json)?;
+        Ok(())
+    }
+
+    /// Writes `contents` to `self.file_path` atomically by writing to a
+    /// temporary file in the same directory and then renaming it into place,
+    /// so concurrent readers never observe a truncated or empty file.
+    fn write_atomic(&self, contents: &str) -> Result<()> {
+        let dir = self.file_path.parent().with_context(|| {
             format!(
-                "Failed to write tool connections file: {:?}",
+                "Failed to determine parent directory for {:?}",
                 self.file_path
             )
         })?;
+        let tmp_path = dir.join(format!(
+            ".{}.tmp",
+            self.file_path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "tool_connections.json".to_string())
+        ));
+
+        fs::write(&tmp_path, contents)
+            .with_context(|| format!("Failed to write temporary file: {:?}", tmp_path))?;
+
+        fs::rename(&tmp_path, &self.file_path).with_context(|| {
+            format!(
+                "Failed to rename temporary file {:?} to {:?}",
+                tmp_path, self.file_path
+            )
+        })?;
+
         Ok(())
     }
 }

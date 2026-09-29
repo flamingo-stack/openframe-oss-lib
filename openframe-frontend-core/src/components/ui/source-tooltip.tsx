@@ -48,6 +48,10 @@ export interface SourceTooltipProps {
 }
 
 export function SourceTooltip({ intro, sources, note, iconClassName, triggerAnchorProps }: SourceTooltipProps) {
+  if (sources.length === 0) {
+    return null;
+  }
+
   return (
     <FloatingTooltip
       as="span"
