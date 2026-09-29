@@ -5,6 +5,7 @@ import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.loki.client.LokiQueryException;
+import com.openframe.data.loki.client.LokiQueryRejectedException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
@@ -34,6 +35,10 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
 
         if (exception instanceof PinotQueryException) {
             error = buildError("Query failed. Please try again later.", ErrorCode.PINOT_QUERY_ERROR);
+        } else if (exception instanceof LokiQueryRejectedException) {
+            // Checked before LokiQueryException, its supertype: retrying this unchanged would hit the same limit
+            error = buildError("This log search covers too much data. Narrow the time range, or filter by device or level.",
+                    ErrorCode.LOKI_QUERY_REJECTED);
         } else if (exception instanceof LokiQueryException) {
             error = buildError("Device logs are temporarily unavailable. Please try again later.", ErrorCode.LOKI_QUERY_ERROR);
         } else if (exception instanceof DataAccessException) {
