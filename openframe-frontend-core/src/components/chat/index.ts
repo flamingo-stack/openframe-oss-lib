@@ -52,6 +52,7 @@ export * from './chat-sidebar';
 export * from './chat-nav-sidebar';
 export * from './chat-list-empty-state';
 export * from './chat-top-navigation';
+export * from './onboarding-carousel';
 export type { ChatRef } from './chat-ref.types';
 export { remarkCardLinks } from './remark-card-links';
 export { remarkMentionChips } from './remark-mention-chips';
