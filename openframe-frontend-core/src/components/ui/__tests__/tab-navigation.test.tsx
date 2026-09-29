@@ -1,7 +1,7 @@
 import { render, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { mockReplace, setMockSearchParams } from '../../../../vitest.setup';
-import { TabNavigation, type TabItem } from '../tab-navigation';
+import { mockPush, mockReplace, setMockSearchParams } from '../../../../vitest.setup';
+import { TabNavigation, type TabItem, type TabNavigationUrlSyncOptions } from '../tab-navigation';
 
 beforeAll(() => {
   // jsdom ships no ResizeObserver; the tab strip observes itself on mount to
@@ -156,6 +156,44 @@ describe('TabNavigation with urlSync', () => {
       expect(nav.active).toBe('general');
     });
   });
+
+  describe('with sync options', () => {
+    function renderWith(options: TabNavigationUrlSyncOptions) {
+      let seen = '__never-rendered__';
+      render(
+        <TabNavigation tabs={TABS} urlSync={options}>
+          {active => {
+            seen = active;
+            return null;
+          }}
+        </TabNavigation>,
+      );
+      return {
+        get active() {
+          return seen;
+        },
+      };
+    }
+
+    it('reads and writes the param it was given, leaving `tab` alone', () => {
+      setMockSearchParams(new URLSearchParams('tab=general&view=software'));
+      const nav = renderWith({ paramName: 'view' });
+      expect(nav.active).toBe('software');
+
+      fireEvent.click(screen.getByText('General'));
+      expect(mockReplace).toHaveBeenCalledWith('/?tab=general&view=general', { scroll: false });
+    });
+
+    it('pushes a history entry when `replaceState` is off', () => {
+      setMockSearchParams(new URLSearchParams('tab=general'));
+      renderWith({ replaceState: false });
+      fireEvent.click(screen.getByText('Software'));
+
+      expect(mockPush).toHaveBeenCalledWith('/?tab=software', { scroll: false });
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+  });
+
   describe('a tab with a badge', () => {
     it('draws the stamp after the label and names the tab with it', () => {
       setMockSearchParams(new URLSearchParams('tab=general'));
