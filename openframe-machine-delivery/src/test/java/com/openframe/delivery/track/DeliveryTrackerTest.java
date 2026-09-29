@@ -2,8 +2,13 @@ package com.openframe.delivery.track;
 
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryTestPolicies;
+import com.openframe.delivery.spec.DeliverySpec;
+import com.openframe.delivery.spec.DeliverySpecRegistry;
+import com.openframe.delivery.spec.TestPayload;
+import com.openframe.delivery.spec.TestSeed;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,13 +18,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.RESULT_TIMEOUT;
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +41,8 @@ class DeliveryTrackerTest {
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliveryCloser closer;
+    @Mock private DeliverySpecRegistry registry;
+    @Mock private DeliverySpec<TestSeed, TestPayload> spec;
 
     @Captor private ArgumentCaptor<Instant> atCaptor;
     @Captor private ArgumentCaptor<Instant> untilCaptor;
@@ -41,7 +51,7 @@ class DeliveryTrackerTest {
 
     @BeforeEach
     void setUp() {
-        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer);
+        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer, registry);
     }
 
     @Test
@@ -58,12 +68,55 @@ class DeliveryTrackerTest {
     }
 
     @Test
-    void complete_typedKey_openOrFailedRowMarkedDoneWithTtlExpiry() {
+    void acknowledge_rowJustAcked_specToldWithTheRow() {
+        // setup
+        MachineDelivery row = MachineDelivery.builder().id(DELIVERY_ID).type(DeliveryType.TOOL_INSTALLATION).build();
+        when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), any(Instant.class), any(Instant.class))).thenReturn(true);
+        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.of(row));
+        doReturn(Optional.of(spec)).when(registry).find(DeliveryType.TOOL_INSTALLATION);
+
+        // execution
+        tracker.acknowledge(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID, DISPATCH_ID);
+
+        // verifications
+        verify(spec).onAcked(row);
+    }
+
+    @Test
+    void acknowledge_staleDispatch_specNotTold() {
+        // setup
+        when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), any(Instant.class), any(Instant.class))).thenReturn(false);
+
+        // execution
+        tracker.acknowledge(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID, DISPATCH_ID);
+
+        // verifications
+        verifyNoInteractions(registry);
+    }
+
+    @Test
+    void done_seed_keyResolvedThroughSpecAndCompletableRowMarkedDone() {
+        // setup
+        TestSeed seed = new TestSeed(MACHINE_ID);
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.targetId(seed)).thenReturn(TARGET_ID);
+        when(repository.markDone(eq(DELIVERY_ID), eq(DeliveryStatus.COMPLETABLE), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
+
+        // execution
+        tracker.done(seed);
+
+        // verifications
+        Instant finishedAt = atCaptor.getValue();
+        assertThat(untilCaptor.getValue()).isEqualTo(finishedAt.plusSeconds(TTL));
+    }
+
+    @Test
+    void done_typedKey_openOrFailedRowMarkedDoneWithTtlExpiry() {
         // setup
         when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
 
         // execution
-        tracker.complete(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID, DISPATCH_ID);
+        tracker.done(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID, DISPATCH_ID);
 
         // verifications
         Instant finishedAt = atCaptor.getValue();

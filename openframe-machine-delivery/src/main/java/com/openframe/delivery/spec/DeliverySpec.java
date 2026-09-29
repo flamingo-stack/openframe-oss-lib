@@ -10,9 +10,13 @@ public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload>
 
     Class<P> getPayloadClass();
 
+    String targetId(S seed);
+
     DeliveryRequest<P> request(S seed);
 
     String subject(String machineId);
+
+    void onAcked(MachineDelivery delivery);
 
     void onFailed(MachineDelivery delivery, DeliveryFailure failure);
 }

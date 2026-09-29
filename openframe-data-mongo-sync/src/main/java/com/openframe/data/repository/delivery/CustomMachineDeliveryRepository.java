@@ -25,6 +25,8 @@ public interface CustomMachineDeliveryRepository {
 
     boolean markDone(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
 
+    boolean markDone(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
+
     boolean markCancelled(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
 
     boolean markCancelled(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant finishedAt, Instant expiresAt);

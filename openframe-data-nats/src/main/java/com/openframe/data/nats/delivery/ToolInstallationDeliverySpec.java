@@ -41,16 +41,20 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
         return ToolInstallationMessage.class;
     }
 
-    // targetId must equal the agentType the agent sends in installed-agent, or complete() never finds the row
+    // must equal the agentType the agent sends in installed-agent, or done() never finds the row
+    @Override
+    public String targetId(ToolInstallationDeliverySeed seed) {
+        return seed.getToolAgent().getKey();
+    }
+
     @Override
     public DeliveryRequest<ToolInstallationMessage> request(ToolInstallationDeliverySeed seed) {
         IntegratedToolAgent toolAgent = seed.getToolAgent();
         ToolInstallationMessage message = buildMessage(toolAgent, seed.getTool(), seed.isReinstall());
-        String targetId = toolAgent.getKey();
         return DeliveryRequest.<ToolInstallationMessage>builder()
                 .type(DeliveryType.TOOL_INSTALLATION)
-                .targetId(targetId)
-                .machineId(seed.getMachineId())
+                .targetId(targetId(seed))
+                .machineId(seed.machineId())
                 .payload(message)
                 .build();
     }
@@ -61,8 +65,13 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
     }
 
     @Override
+    public void onAcked(MachineDelivery delivery) {
+        // nothing to do: an install in progress changes nothing on the machine document
+    }
+
+    @Override
     public void onFailed(MachineDelivery delivery, DeliveryFailure failure) {
-        // intentionally empty: a failed install leaves nothing to compensate
+        // nothing to compensate: a failed install leaves the machine as it was
     }
 
     private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {

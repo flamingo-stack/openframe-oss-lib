@@ -20,4 +20,9 @@ public class ToolInstallationDeliverySeed implements DeliverySeed {
     public DeliveryType type() {
         return DeliveryType.TOOL_INSTALLATION;
     }
+
+    @Override
+    public String machineId() {
+        return machineId;
+    }
 }

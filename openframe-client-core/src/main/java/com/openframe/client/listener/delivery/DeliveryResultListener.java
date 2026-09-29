@@ -101,7 +101,7 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
         String dispatchId = delivery.getDispatchId();
         switch (report.getResult()) {
             case ACKED -> deliveryTracker.acknowledge(type, targetId, machineId, dispatchId);
-            case DONE -> deliveryTracker.complete(type, targetId, machineId, dispatchId);
+            case DONE -> deliveryTracker.done(type, targetId, machineId, dispatchId);
             case FAILED -> deliveryTracker.fail(type, targetId, machineId, dispatchId, report.getError());
         }
     }

@@ -2,14 +2,20 @@ package com.openframe.delivery.track;
 
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
+import com.openframe.delivery.spec.DeliveryPayload;
+import com.openframe.delivery.spec.DeliverySeed;
+import com.openframe.delivery.spec.DeliverySpec;
+import com.openframe.delivery.spec.DeliverySpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -19,6 +25,7 @@ public class DeliveryTracker {
     private final MachineDeliveryRepository repository;
     private final DeliveryProperties properties;
     private final DeliveryCloser closer;
+    private final DeliverySpecRegistry registry;
 
     public void acknowledge(DeliveryType type, String targetId, String machineId, String dispatchId) {
         String id = DeliveryId.of(type, targetId, machineId);
@@ -29,12 +36,13 @@ public class DeliveryTracker {
         boolean acked = repository.markAcked(id, dispatchId, DeliveryStatus.UNACKED, now, resultDueAt);
         if (acked) {
             log.info("Delivery ACKED: type={} targetId={} machineId={} dispatchId={}", type, targetId, machineId, dispatchId);
+            repository.findById(id).ifPresent(this::notifyAcked);
         } else {
             log.debug("Delivery ack ignored, no unacked row for this dispatch: id={} dispatchId={}", id, dispatchId);
         }
     }
 
-    public void complete(DeliveryType type, String targetId, String machineId, String dispatchId) {
+    public void done(DeliveryType type, String targetId, String machineId, String dispatchId) {
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Instant expiresAt = expiresAt(type, now);
@@ -43,6 +51,23 @@ public class DeliveryTracker {
             log.info("Delivery DONE: type={} targetId={} machineId={} dispatchId={}", type, targetId, machineId, dispatchId);
         } else {
             log.debug("Delivery completion ignored, no row for this dispatch: id={} dispatchId={}", id, dispatchId);
+        }
+    }
+
+    // for a completion the server learns outside the result channel, e.g. the agent's own uninstall call
+    public void done(DeliverySeed seed) {
+        DeliveryType type = seed.type();
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        String targetId = spec.targetId(seed);
+        String machineId = seed.machineId();
+        String id = DeliveryId.of(type, targetId, machineId);
+        Instant now = Instant.now();
+        Instant expiresAt = expiresAt(type, now);
+        boolean done = repository.markDone(id, DeliveryStatus.COMPLETABLE, now, expiresAt);
+        if (done) {
+            log.info("Delivery DONE: type={} targetId={} machineId={}", type, targetId, machineId);
+        } else {
+            log.debug("Delivery completion ignored, no completable row: id={}", id);
         }
     }
 
@@ -59,6 +84,12 @@ public class DeliveryTracker {
         if (cancelled) {
             log.info("Delivery CANCELLED: type={} targetId={} machineId={}", type, targetId, machineId);
         }
+    }
+
+    private void notifyAcked(MachineDelivery delivery) {
+        DeliveryType type = delivery.getType();
+        Optional<DeliverySpec<DeliverySeed, DeliveryPayload>> spec = registry.find(type);
+        spec.ifPresent(registered -> registered.onAcked(delivery));
     }
 
     private Instant expiresAt(DeliveryType type, Instant now) {

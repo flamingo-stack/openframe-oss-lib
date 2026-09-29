@@ -1,18 +1,19 @@
-package com.openframe.delivery.spec;
+package com.openframe.data.nats.delivery;
 
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.spec.DeliverySeed;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class TestSeed implements DeliverySeed {
+public class ClientUninstallDeliverySeed implements DeliverySeed {
 
     private final String machineId;
 
     @Override
     public DeliveryType type() {
-        return DeliveryType.TOOL_INSTALLATION;
+        return DeliveryType.CLIENT_UNINSTALL;
     }
 
     @Override

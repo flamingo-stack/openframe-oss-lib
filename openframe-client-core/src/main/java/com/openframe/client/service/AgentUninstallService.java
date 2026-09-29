@@ -4,8 +4,10 @@ import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
+import com.openframe.data.nats.delivery.ClientUninstallDeliverySeed;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
+import com.openframe.delivery.track.DeliveryTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ public class AgentUninstallService {
     private final MachineRepository machineRepository;
     private final ToolConnectionService toolConnectionService;
     private final InstalledAgentService installedAgentService;
+    private final DeliveryTracker deliveryTracker;
 
     public void uninstall(String machineId, String clientSecret) {
         Optional<OAuthClient> client = oauthClientRepository.findByMachineId(machineId);
@@ -48,6 +51,7 @@ public class AgentUninstallService {
 
         toolConnectionService.disconnectAll(machineId);
         installedAgentService.disconnectAll(machineId);
+        deliveryTracker.done(new ClientUninstallDeliverySeed(machineId));
 
         log.info("Machine {} deregistered on uninstall", machineId);
     }

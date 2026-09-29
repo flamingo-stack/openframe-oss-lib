@@ -77,7 +77,7 @@ class DeliveryResultListenerTest {
         listener.handleMessage(message);
 
         // verifications
-        verify(deliveryTracker).complete(DeliveryType.TOOL_INSTALLATION, TOOL_AGENT_ID, MACHINE_ID, DISPATCH_ID);
+        verify(deliveryTracker).done(DeliveryType.TOOL_INSTALLATION, TOOL_AGENT_ID, MACHINE_ID, DISPATCH_ID);
         verify(message).ack();
     }
 
