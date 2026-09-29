@@ -308,12 +308,6 @@
       "require": "./dist/assets/index.cjs",
       "default": "./dist/assets/index.js"
     },
-    "./fonts": {
-      "types": "./dist/fonts.d.ts",
-      "import": "./dist/fonts.js",
-      "require": "./dist/fonts.cjs",
-      "default": "./dist/fonts.js"
-    },
     "./tailwind.config.ts": {
       "types": "./dist/tailwind.config.d.ts",
       "default": "./tailwind.config.ts"
