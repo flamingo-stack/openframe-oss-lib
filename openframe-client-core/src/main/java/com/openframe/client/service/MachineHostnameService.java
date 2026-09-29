@@ -9,9 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
-import static com.openframe.data.document.device.DeviceStatus.DELETED;
-import static com.openframe.data.document.device.DeviceStatus.PENDING_DELETION;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -28,7 +25,7 @@ public class MachineHostnameService {
 
         Machine machine = foundMachine.get();
         DeviceStatus status = machine.getStatus();
-        if (status == PENDING_DELETION || status == DELETED) {
+        if (DeviceStatus.DELETING_OR_DELETED.contains(status)) {
             log.debug("Ignoring hostname update for machineId={} in status {}", machineId, status);
             return;
         }

@@ -259,6 +259,7 @@ public class DeviceService {
             out.setStatuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null);
             out.setDeviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null);
             out.setOrganizationIds(filter.getOrganizationIds());
+            out.setManageableByPackageManagers(filter.getManageableByPackageManagers());
             filterOsTypes = filter.getOsTypes();
         }
         out.setOsTypes(resolveOsTypes(filterOsTypes, osTypeScope));

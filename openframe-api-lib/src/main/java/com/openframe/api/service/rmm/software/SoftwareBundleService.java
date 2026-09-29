@@ -27,6 +27,7 @@ import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,6 +58,7 @@ public class SoftwareBundleService {
     private final SoftwareActionResultRepository softwareActionResultRepository;
     private final MachinePlatformResolver machinePlatformResolver;
     private final TenantIdProvider tenantIdProvider;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     @Value("${openframe.rmm.software.bundle.pending-ttl}")
     private Duration pendingTtl;
@@ -128,6 +130,8 @@ public class SoftwareBundleService {
         }
         List<SoftwareBundlePackage> packages = toDomainPackages(input.getPackages());
         validatePackages(packages);
+        List<PackageManagerType> managers = managersOf(packages);
+        packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
         Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         rejectDevicesWithoutCompatiblePackage(machineIds, packages, deviceOsTypes);
 
@@ -210,6 +214,13 @@ public class SoftwareBundleService {
             throw new BadRequestException("brewPackageType (CASK or FORMULA) is required for brew packages: "
                     + brewMissingType);
         }
+    }
+
+    private static List<PackageManagerType> managersOf(List<SoftwareBundlePackage> packages) {
+        return packages.stream()
+                .map(SoftwareBundlePackage::getPackageManager)
+                .distinct()
+                .toList();
     }
 
     private void rejectDevicesWithoutCompatiblePackage(List<String> machineIds, List<SoftwareBundlePackage> packages,

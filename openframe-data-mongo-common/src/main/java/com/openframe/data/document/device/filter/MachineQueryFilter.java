@@ -1,5 +1,6 @@
 package com.openframe.data.document.device.filter;
 
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,4 +21,5 @@ public class MachineQueryFilter {
     private List<OsType> osTypes;
     private List<String> organizationIds;
     private Collection<String> restrictToMachineIds;
+    private Collection<PackageManagerType> manageableByPackageManagers;
 }

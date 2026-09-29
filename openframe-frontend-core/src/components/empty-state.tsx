@@ -159,10 +159,9 @@ export function EmptyState({
   // page with a link CTA must never enter that branch. Existing callers
   // without ctaHref keep today's smart-default behavior unchanged.
   const smartCTA = ctaHref ? null : getSmartCTA();
-  const ctaClassName =
-    ctaVariant === 'primary'
-      ? 'w-full bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover transition-all duration-150 font-body font-medium'
-      : 'w-full bg-transparent border border-ods-border text-ods-text-primary hover:border-ods-accent hover:text-ods-accent transition-all duration-150 font-body font-medium';
+  // The CTA is the house Button in its own variant: painting colours over the
+  // default accent Button with classes lost to its hover (green text on green).
+  const ctaButtonVariant = ctaVariant === 'primary' ? 'accent' : 'outline';
 
   return (
     <div className="flex flex-col items-center justify-center px-6 py-6 text-center md:py-16">
@@ -184,7 +183,7 @@ export function EmptyState({
       {/* Link CTA (ctaHref) — SSR-safe, no path sniffing */}
       {showCTA && ctaHref && (
         <div className="mb-3 w-full max-w-xs">
-          <Button href={ctaHref} className={ctaClassName}>
+          <Button href={ctaHref} variant={ctaButtonVariant} className="w-full">
             {ctaText || 'Contact us'}
           </Button>
         </div>
@@ -193,7 +192,7 @@ export function EmptyState({
       {/* Smart CTA Button */}
       {showCTA && !ctaHref && smartCTA && (
         <div className="mb-3 w-full max-w-xs">
-          <Button onClick={smartCTA.action} className={ctaClassName}>
+          <Button onClick={smartCTA.action} variant={ctaButtonVariant} className="w-full">
             {smartCTA.text}
           </Button>
         </div>
