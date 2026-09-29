@@ -43,20 +43,15 @@ public class TicketsTest extends BaseTest {
         TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
         assertThat(connection).as("Tickets connection should not be null").isNotNull();
         assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        // No withFailMessage() here on purpose. It overrides the per-field .as() descriptions below,
-        // which is what this assertion is worth: the tenant is shared, tickets arrive from the AI cases,
-        // the External API suite and every pipeline run, and ticketNumber/title/status are all nullable
-        // in the schema (only id is ID!). So a legitimate null is possible, and the failure has to name
-        // which field on which ticket -- "Expected tickets to have mandatory fields" alone is not
-        // diagnosable from a nightly log, because response bodies are not logged.
-        assertThat(connection.getEdges())
-                .allSatisfy(edge -> {
-                    Ticket ticket = edge.getNode();
-                    assertThat(ticket.getId()).as("No Id").isNotNull();
-                    assertThat(ticket.getTicketNumber()).as("No ticketNumber for " + ticket.getId()).isNotNull();
-                    assertThat(ticket.getTitle()).as("No title for " + ticket.getId()).isNotEmpty();
-                    assertThat(ticket.getStatus()).as("No status for " + ticket.getId()).isNotEmpty();
-                });
+        // The tenant is shared, so the failure has to name which field on which ticket. Collected rather
+        // than allSatisfy(): its message prints every edge before the reason, and the runner's log cuts
+        // the stack at ~2000 characters, which lost the offender on stage (KI-29).
+        List<String> missing = connection.getEdges().stream()
+                .map(TicketEdge::getNode)
+                .map(TicketsTest::missingFields)
+                .filter(problem -> problem != null)
+                .toList();
+        assertThat(missing).as("Tickets missing a mandatory field").isEmpty();
     }
 
     @Tag("feature")
@@ -188,13 +183,9 @@ public class TicketsTest extends BaseTest {
     @DisplayName("Resolve ticket")
     @Order(4)
     public void testResolveTicket() {
-        // Without the old lifecycle filter a bare listing can hand back a ticket that is already RESOLVED
-        // or ARCHIVED, and resolving one of those is not a valid transition. Select on the kind instead,
-        // the same way the archive case below does.
-        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
-        assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        Ticket resolvable = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
-        assertThat(resolvable).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
+        // Its own ticket, not one borrowed from the shared listing: teardown archives every chat ticket
+        // the suite opens (#2376), so the top of that listing can be all ARCHIVED.
+        Ticket resolvable = newOwnTicket(me());
         String ticketId = resolvable.getId();
 
         String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
@@ -214,14 +205,13 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("Archive non-resolved ticket is rejected")
     public void testArchiveActiveTicketRejected() {
-        // Only RESOLVED → ARCHIVED is a valid transition, and an unfiltered listing carries tickets in
-        // every column, so pick one whose lifecycle status kind is neither RESOLVED nor ARCHIVED.
-        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
-        assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        Ticket ticket = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
-        assertThat(ticket).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
+        // Only RESOLVED → ARCHIVED is a valid transition, so this needs a fresh ticket in neither kind —
+        // its own, for the reason given in testResolveTicket.
+        Ticket ticket = newOwnTicket(me());
         String ticketId = ticket.getId();
+        assertThat(ticket.getStatusDefinition()).as("A new ticket has a statusDefinition").isNotNull();
         String kindBefore = ticket.getStatusDefinition().getKind();
+        assertThat(kindBefore).as("A new ticket starts outside RESOLVED/ARCHIVED").isNotIn("RESOLVED", "ARCHIVED");
 
         String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
         assertThat(archivedStatusId).as("No system status definition found for kind ARCHIVED").isNotNull();
@@ -375,6 +365,25 @@ public class TicketsTest extends BaseTest {
 
     private static String me() {
         return UserApi.me().getUser().getId();
+    }
+
+    /** "id #number: missing a, b", or null when the ticket has every field "List tickets" requires. */
+    private static String missingFields(Ticket ticket) {
+        List<String> fields = new ArrayList<>();
+        if (ticket.getId() == null) {
+            fields.add("id");
+        }
+        if (ticket.getTicketNumber() == null) {
+            fields.add("ticketNumber");
+        }
+        if (ticket.getTitle() == null || ticket.getTitle().isEmpty()) {
+            fields.add("title");
+        }
+        if (ticket.getStatus() == null || ticket.getStatus().isEmpty()) {
+            fields.add("status");
+        }
+        return fields.isEmpty() ? null
+                : ticket.getId() + " #" + ticket.getTicketNumber() + ": missing " + String.join(", ", fields);
     }
 
     @Tag("feature")
