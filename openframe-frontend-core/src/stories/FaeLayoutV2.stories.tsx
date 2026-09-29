@@ -54,7 +54,7 @@ const CHATS = [
 function Layout({ withChats, withThread }: { withChats: boolean; withThread: boolean }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   return (
-    <div className="flex h-[800px] w-[1024px] bg-ods-bg">
+    <div data-surface="brand-tinted" className="flex h-[800px] w-[1024px] border-t border-ods-border bg-ods-bg">
       {sidebarOpen && (
         <ChatNavSidebar
           logo={
@@ -108,7 +108,7 @@ function Layout({ withChats, withThread }: { withChats: boolean; withThread: boo
             </Button>
           }
         />
-        <main className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)] pt-[var(--spacing-system-mf)]">
+        <main className="ods-glow-accent-corner flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)] pt-[var(--spacing-system-mf)]">
           {withThread ? (
             <ChatMessageList
               messages={THREAD}
