@@ -5,7 +5,7 @@ import {
   MeshcentralLogoGreyIcon,
   FleetMdmLogoGreyIcon,
   AuthentikLogoGreyIcon,
-  MicrosoftLogoGreyIcon,
+  Office365LogoGreyIcon,
   OpenframeLogoGreyIcon,
   GoogleLogoGreyIcon,
 } from './icons-v2-generated';
@@ -28,7 +28,7 @@ const toolIconMap: Record<ToolType, ToolIconRenderer> = {
   [ToolTypeValues.AUTHENTIK]: (size, className) => <AuthentikLogoGreyIcon size={size} className={className} />,
   [ToolTypeValues.OSQUERY]: (size, className) => <OsqueryLogoGreyIcon size={size} className={className} />,
   [ToolTypeValues.SYSTEM]: () => null,
-  [ToolTypeValues.MICROSOFT_365]: (size, className) => <MicrosoftLogoGreyIcon size={size} className={className} />,
+  [ToolTypeValues.MICROSOFT_365]: (size, className) => <Office365LogoGreyIcon size={size} className={className} />,
   [ToolTypeValues.GOOGLE_WORKSPACE]: (size, className) => <GoogleLogoGreyIcon size={size} className={className} />,
 };
 
