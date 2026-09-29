@@ -19,7 +19,7 @@ import java.util.Map;
 import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Component
-@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.rmm.package-manager-bootstrap.enabled", havingValue = "true")
 @Slf4j
 public class MachinePackageManagersListener extends AbstractJetStreamPushListener {
 
