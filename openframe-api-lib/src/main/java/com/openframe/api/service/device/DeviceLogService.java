@@ -1,5 +1,6 @@
 package com.openframe.api.service.device;
 
+import com.openframe.api.config.DeviceLogProperties;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
 import com.openframe.api.dto.device.DeviceLogFilterCriteria;
@@ -7,15 +8,13 @@ import com.openframe.api.dto.device.DeviceLogLevel;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.DeviceNotFoundException;
-import com.openframe.core.exception.InternalException;
+import com.openframe.api.service.tenant.TenantDomainService;
+import com.openframe.core.logs.AgentLogBucket;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.loki.client.LogQl;
 import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
-import com.openframe.data.repository.tenant.TenantRepository;
-import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,9 +27,8 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.TreeSet;
 
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
@@ -39,6 +37,11 @@ import static java.util.stream.Collectors.toSet;
  * Device agent logs, read from Loki where {@code openframe-saas-logs-stream} writes them as
  * {@code {job="agent-logs", tenant_domain, level}} streams with {@code machine_id}, {@code hostname},
  * {@code agent_ts} and {@code count} as structured metadata.
+ * <p>
+ * The tenant domain that pins the stream selector comes from {@link TenantDomainService}, never from a caller, so no
+ * argument reaching this service can widen the query past its own tenant. The same domain is declared as the Loki
+ * scheduler actor: Loki has no multi-tenancy here, so without it every tenant shares one queue and one tenant's heavy
+ * queries hold up everyone else's small ones.
  */
 @Service
 @Slf4j
@@ -66,9 +69,8 @@ public class DeviceLogService {
 
     private final LokiClient lokiClient;
     private final DeviceService deviceService;
-    private final TenantIdProvider tenantIdProvider;
-    private final TenantRepository tenantRepository;
-    private final Map<String, String> tenantDomains = new ConcurrentHashMap<>();
+    private final TenantDomainService tenantDomainService;
+    private final DeviceLogProperties properties;
 
     /**
      * Logs of one device, newest first. Shorthand for {@link #queryLogs(List, DeviceLogFilterCriteria,
@@ -116,14 +118,16 @@ public class DeviceLogService {
             endNanos = Math.min(endNanos, after.timestampNanos());
         }
 
-        String query = buildQuery(resolveTenantDomain(), devices, criteria);
+        String tenantDomain = tenantDomainService.getTenantDomain();
+        String query = buildQuery(tenantDomain, devices, criteria, bucketed(from));
         int pageSize = pageSize(page.getLimit());
         log.debug("Querying device logs for machineIds: {}, query: {}, start: {}, end: {}", devices, query, startNanos, endNanos);
 
         // One extra line tells whether there is a next page
         int queryLimit = pageSize + 1;
-        List<LokiLogEntry> entries = lokiClient.queryRange(query, startNanos, endNanos, queryLimit, LokiDirection.BACKWARD);
-        List<LokiLogEntry> pageEntries = wholeTimestampsOnly(entries, pageSize, query);
+        List<LokiLogEntry> entries = lokiClient.queryRange(query, startNanos, endNanos, queryLimit,
+                LokiDirection.BACKWARD, tenantDomain);
+        List<LokiLogEntry> pageEntries = wholeTimestampsOnly(entries, pageSize, query, tenantDomain);
         List<DeviceLogEntry> items = toItems(pageEntries);
         boolean hasNextPage = entries.size() > pageSize;
         boolean hasPreviousPage = after != null;
@@ -131,7 +135,19 @@ public class DeviceLogService {
         return result(items, hasNextPage, hasPreviousPage);
     }
 
-    static String buildQuery(String tenantDomain, List<String> machineIds, DeviceLogFilterCriteria criteria) {
+    /**
+     * True only once the whole window is known to carry the {@code bucket} label. A window that starts before the
+     * cutover is queried unbucketed in full rather than split into a bucketed and an unbucketed half: the cursor is a
+     * timestamp alone and paging assumes one Loki result set, so merging two would reopen the gap-and-duplicate bug
+     * that whole-timestamp paging exists to prevent.
+     */
+    private boolean bucketed(Instant from) {
+        Instant cutover = properties.getBucketCutover();
+        return cutover != null && !from.isBefore(cutover);
+    }
+
+    static String buildQuery(String tenantDomain, List<String> machineIds, DeviceLogFilterCriteria criteria,
+                             boolean bucketed) {
         StringBuilder query = new StringBuilder("{job=").append(LogQl.quote(AGENT_LOGS_JOB))
                 .append(", tenant_domain=").append(LogQl.quote(tenantDomain));
         List<DeviceLogLevel> levels = criteria.getLevels();
@@ -139,12 +155,34 @@ public class DeviceLogService {
             String alternatives = levels.stream().distinct().map(Enum::name).collect(joining("|"));
             query.append(", level=~").append(LogQl.quote(alternatives));
         }
+        if (bucketed) {
+            appendBucketMatcher(query, machineIds);
+        }
         query.append('}');
         // Line filters before the metadata filter: the cheapest stage runs first
         appendTermFilters(query, " |~ ", criteria.getContains());
         appendTermFilters(query, " !~ ", criteria.getExcludes());
         appendDeviceFilter(query, machineIds);
         return query.toString();
+    }
+
+    /**
+     * The one part of the selector the index can use to skip a device's logs. Named devices hash to at most as many
+     * buckets as there are devices, so a handful of devices reads a fraction of the tenant's data; a set spanning every
+     * bucket, or no devices at all, adds nothing and is left off.
+     */
+    private static void appendBucketMatcher(StringBuilder query, List<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return;
+        }
+        Set<String> buckets = new TreeSet<>();
+        for (String machineId : machineIds) {
+            buckets.add(AgentLogBucket.label(machineId));
+        }
+        if (buckets.size() >= AgentLogBucket.BUCKET_COUNT) {
+            return;
+        }
+        query.append(", bucket=~").append(LogQl.quote(String.join("|", buckets)));
     }
 
     /**
@@ -217,32 +255,12 @@ public class DeviceLogService {
     }
 
     /**
-     * Cached for the life of the pod: a tenant pod serves one tenant and tenant domains never change. A missing
-     * domain is not cached, so a tenant that is still being provisioned recovers on the next call.
-     */
-    private String resolveTenantDomain() {
-        String tenantId = tenantIdProvider.getTenantId();
-        String domain = tenantDomains.computeIfAbsent(tenantId, this::findTenantDomain);
-        if (domain == null) {
-            log.error("Cannot query device logs: tenant {} has no domain", tenantId);
-            throw new InternalException("Device logs are not available for this tenant");
-        }
-        return domain;
-    }
-
-    private String findTenantDomain(String tenantId) {
-        return tenantRepository.findById(tenantId)
-                .map(Tenant::getDomain)
-                .filter(StringUtils::hasText)
-                .orElse(null);
-    }
-
-    /**
      * Loki cuts a result at the limit without regard to timestamps, and does not guarantee which of the lines sharing
      * the cut timestamp it keeps. The page therefore ends before that timestamp, and the next page starts with all of
      * its lines. When one timestamp fills the whole page, its lines are fetched in full instead.
      */
-    private List<LokiLogEntry> wholeTimestampsOnly(List<LokiLogEntry> entries, int pageSize, String query) {
+    private List<LokiLogEntry> wholeTimestampsOnly(List<LokiLogEntry> entries, int pageSize, String query,
+                                                  String tenantDomain) {
         if (entries.size() <= pageSize) {
             return entries;
         }
@@ -254,7 +272,8 @@ public class DeviceLogService {
         if (end > 0) {
             return entries.subList(0, end);
         }
-        return lokiClient.queryRange(query, cutNanos, cutNanos + 1, MAX_LINES_PER_TIMESTAMP, LokiDirection.BACKWARD);
+        return lokiClient.queryRange(query, cutNanos, cutNanos + 1, MAX_LINES_PER_TIMESTAMP, LokiDirection.BACKWARD,
+                tenantDomain);
     }
 
     private static List<DeviceLogEntry> toItems(List<LokiLogEntry> entries) {

@@ -21,7 +21,7 @@ import static com.openframe.data.service.machine.MachineFields.PACKAGE_MANAGERS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
 @Service
-@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.rmm.package-manager-bootstrap.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class MachinePackageManagersService {
