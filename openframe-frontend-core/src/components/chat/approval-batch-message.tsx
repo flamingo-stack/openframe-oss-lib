@@ -149,7 +149,9 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
         onClick={onToggle}
         className="flex w-full cursor-pointer items-start gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-sf)] text-left"
       >
-        <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+        {/* The tool mark is the grey `currentColor` cut, so the wrapper sets the colour it takes; without it
+            the icon inherits the message text's primary (white). Same treatment as ToolBadge. */}
+        <div className="flex h-5 w-5 shrink-0 items-center justify-center text-ods-text-secondary">
           <ToolIcon toolType={toolType} size={16} />
         </div>
         <div
