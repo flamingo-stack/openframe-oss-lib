@@ -1,5 +1,6 @@
 package com.openframe.test.api;
 
+import com.openframe.test.data.dto.ai.ChatType;
 import com.openframe.test.data.dto.ai.CreateDialogRequest;
 import com.openframe.test.data.dto.ai.DialogConnection;
 import com.openframe.test.data.dto.ai.DialogFilterInput;
@@ -35,6 +36,7 @@ public class DialogApi {
 
     private static final String DIALOGS = "chat/api/v1/dialogs";
     private static final String COMPACT = DIALOGS + "/{id}/compact";
+    private static final String STOP = DIALOGS + "/{id}/stop";
 
     /** Creates an empty dialog. For ADMIN-with-ticket targeting, {@code request.ticketId} must carry the target device. */
     public static DialogResponse createDialog(CreateDialogRequest request) {
@@ -55,6 +57,19 @@ public class DialogApi {
         return given(getAuthorizedSpec())
                 .pathParam("id", dialogId)
                 .post(COMPACT)
+                .statusCode();
+    }
+
+    /**
+     * Asks the agent to stop the reply in progress and returns the HTTP status unchecked: 200 when a reply
+     * was running, 409 when none was. The stop only raises a flag; the run winds down on its own.
+     */
+    public static int stopGeneration(String dialogId, ChatType chatType) {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .pathParam("id", dialogId)
+                .body(Map.of("chatType", chatType))
+                .post(STOP)
                 .statusCode();
     }
 
