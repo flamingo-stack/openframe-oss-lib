@@ -8,12 +8,17 @@ import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.exception.PackageNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class WingetPackageClientTest {
@@ -36,6 +41,22 @@ class WingetPackageClientTest {
         PackageSearchResult result = client.search("firefox", 2, 0);
 
         assertEquals("Mozilla.Firefox", result.getItems().getFirst().getId());
+    }
+
+    @Test
+    void emptyQueryListsAlphabetically() {
+        PackageCatalogEntry sevenZip = entry("7zip.7zip", "7-Zip");
+        PackageCatalogEntry firefox = entry("Mozilla.Firefox", "Mozilla Firefox (en-US)");
+        Sort byName = Sort.by(Sort.Order.asc("name"), Sort.Order.asc("packageId"));
+        when(packageCatalogRepository.listByManager(PackageManagerType.WINGET, byName, 0, 25)).thenReturn(List.of(sevenZip, firefox));
+        when(packageCatalogRepository.countByManager(PackageManagerType.WINGET)).thenReturn(2L);
+
+        PackageSearchResult result = client.search("", 25, 0);
+
+        assertEquals("7zip.7zip", result.getItems().getFirst().getId());
+        assertEquals(2, result.getTotal());
+        assertFalse(result.isHasMore());
+        verify(packageCatalogRepository, never()).findByManagerAndSearchBlobContaining(any(), any());
     }
 
     @Test

@@ -34,6 +34,7 @@ public class ChocoPackageClient implements PackageManagerClient {
     private static final String FILTER_LATEST_VERSION = "IsLatestVersion";
     private static final String EMPTY_TARGET_FRAMEWORK = "''";
     private static final String ORDER_BY_PUBLISHED = "Published desc";
+    private static final String ORDER_BY_DOWNLOADS = "DownloadCount desc,Id";
     private static final int SEARCH_ITEM_DESCRIPTION_LIMIT = 300;
     private static final int CACHE_MAX_SIZE = 2000;
 
@@ -72,9 +73,8 @@ public class ChocoPackageClient implements PackageManagerClient {
         // one extra row makes hasMore exact without a second $count request;
         // the server caps a page at 40, which is why the router clamps limit to 39
         int probeSize = limit + 1;
-        String quotedQuery = quote(query);
         String xml = callCommunityRepo(() -> restClient.get()
-                .uri(builder -> searchUri(builder, quotedQuery, probeSize, offset))
+                .uri(builder -> searchUri(builder, query, probeSize, offset))
                 .retrieve()
                 .body(String.class));
         List<ChocoEntry> entries = parseFeed(xml);
@@ -124,15 +124,18 @@ public class ChocoPackageClient implements PackageManagerClient {
         }
     }
 
-    private URI searchUri(UriBuilder builder, String quotedQuery, int top, int skip) {
-        return builder.path("/Search()")
+    private URI searchUri(UriBuilder builder, String query, int top, int skip) {
+        builder.path("/Search()")
                 .queryParam("$filter", FILTER_LATEST_VERSION)
-                .queryParam("searchTerm", quotedQuery)
+                .queryParam("searchTerm", quote(query))
                 .queryParam("targetFramework", EMPTY_TARGET_FRAMEWORK)
                 .queryParam("includePrerelease", "false")
                 .queryParam("$top", top)
-                .queryParam("$skip", skip)
-                .build();
+                .queryParam("$skip", skip);
+        if (query.isEmpty()) {
+            builder.queryParam("$orderby", ORDER_BY_DOWNLOADS);
+        }
+        return builder.build();
     }
 
     private PackageDetails loadDetails(String packageId) {
