@@ -167,6 +167,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     sending = false,
     awaitingResponse = false,
     awaitingTeam,
+    awaitingTeamCount,
     appearance = CHAT_APPEARANCE.CLASSIC,
     placeholder = 'Enter your Request...',
     reserveAvatarOffset: _reserveAvatarOffset,
@@ -578,7 +579,13 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
           className="flex min-h-11 w-full items-center justify-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] md:min-h-12"
         >
           {awaitingTeam && awaitingTeam.length > 0 && (
-            <AvatarStack people={awaitingTeam} size="xs" ringClassName="ring-ods-bg" label="Technicians" />
+            <AvatarStack
+              people={awaitingTeam}
+              total={awaitingTeamCount}
+              size="xs"
+              ringClassName="ring-ods-bg"
+              label="Technicians"
+            />
           )}
           <p className="min-w-0 truncate text-ods-text-primary text-h4">Handed off to your technical support team</p>
           <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-secondary" />

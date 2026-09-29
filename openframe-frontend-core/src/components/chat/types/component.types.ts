@@ -456,6 +456,9 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   /** Faces shown in the v2 hand-off bar (the tenant's technicians). Omit or
    *  pass an empty list for a text-only bar. */
   awaitingTeam?: AvatarStackPerson[];
+  /** Size of the whole team when `awaitingTeam` is only a sample of it: the
+   *  bar shows those faces and "+N" for the rest. */
+  awaitingTeamCount?: number;
   /** `v2`: the fae chat v2 hand-off bar ("Handed off to your technical
    *  support team" + faces). `classic` (default): "Waiting for Technician
    *  Response". Only the awaiting state differs. */
