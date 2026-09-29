@@ -156,6 +156,22 @@ describe('TabNavigation with urlSync', () => {
       expect(nav.active).toBe('general');
     });
   });
+  describe('a tab with a badge', () => {
+    it('draws the stamp after the label and names the tab with it', () => {
+      setMockSearchParams(new URLSearchParams('tab=general'));
+      render(
+        <TabNavigation tabs={[...TABS, { id: 'logs', label: 'Device Logs', badge: 'Beta' }]} urlSync>
+          {() => null}
+        </TabNavigation>,
+      );
+
+      const tab = screen.getByRole('button', { name: 'Device Logs (Beta)' });
+      expect(tab.textContent).toBe('Device LogsBeta');
+      // Tabs without a badge keep their label as the accessible name.
+      expect(screen.getByRole('button', { name: 'General' }).textContent).toBe('General');
+    });
+  });
+
   describe('the underline', () => {
     it('is sized in real pixels rather than a scaled 1px bar', () => {
       // Regression guard. The underline used to be `w-px` stretched with
