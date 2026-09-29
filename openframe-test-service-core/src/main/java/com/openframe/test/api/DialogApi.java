@@ -34,6 +34,7 @@ import static io.restassured.RestAssured.given;
 public class DialogApi {
 
     private static final String DIALOGS = "chat/api/v1/dialogs";
+    private static final String COMPACT = DIALOGS + "/{id}/compact";
 
     /** Creates an empty dialog. For ADMIN-with-ticket targeting, {@code request.ticketId} must carry the target device. */
     public static DialogResponse createDialog(CreateDialogRequest request) {
@@ -43,6 +44,18 @@ public class DialogApi {
                 .post(DIALOGS)
                 .then().statusCode(201)
                 .extract().as(DialogResponse.class);
+    }
+
+    /**
+     * Asks the agent to compact the dialog's memory and returns the HTTP status unchecked: 202 accepted, 409
+     * while a reply is running, 422 when there is nothing new to compact. The summary arrives on the chat
+     * stream afterwards; {@code CompactionWaiter} waits for it.
+     */
+    public static int compact(String dialogId) {
+        return given(getAuthorizedSpec())
+                .pathParam("id", dialogId)
+                .post(COMPACT)
+                .statusCode();
     }
 
     /** Reads {@code streamState} — derived from the Redis dialog lock. Diagnostic only; not a run-completion signal. */

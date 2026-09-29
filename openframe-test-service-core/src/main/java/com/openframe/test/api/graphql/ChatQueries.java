@@ -28,6 +28,7 @@ public class ChatQueries {
                                 }
                                 ... on ErrorData { error details }
                                 ... on AskData { question options { label description } }
+                                ... on ContextCompactionEndData { summary }
                             }
                         }
                     }
