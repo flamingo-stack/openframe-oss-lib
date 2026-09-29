@@ -15,6 +15,8 @@ export const ToolTypeValues = {
   OPENFRAME_RMM: 'OPENFRAME_RMM',
   OSQUERY: 'OSQUERY',
   SYSTEM: 'SYSTEM',
+  MICROSOFT_365: 'MICROSOFT_365',
+  GOOGLE_WORKSPACE: 'GOOGLE_WORKSPACE',
 } as const;
 
 export type ToolType = (typeof ToolTypeValues)[keyof typeof ToolTypeValues];
@@ -32,4 +34,6 @@ export const toolLabels: Record<ToolType, string> = {
   OPENFRAME_RMM: 'RMM',
   OSQUERY: 'Osquery',
   SYSTEM: 'System',
+  MICROSOFT_365: 'Microsoft 365',
+  GOOGLE_WORKSPACE: 'Google Workspace',
 };
