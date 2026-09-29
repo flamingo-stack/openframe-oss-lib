@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation';
 import { cn } from '../../utils/cn';
+import { Tag } from './tag';
 
 export interface TabItem {
   id: string;
@@ -43,6 +44,13 @@ export interface TabItem {
    */
   component?: React.ComponentType<any>;
   indicator?: 'success' | 'warning' | 'error';
+  /**
+   * A stamp drawn after the label, e.g. "Beta" on a tab that is shipped but
+   * still behind its flag. The same `warning` chip the navigation sidebar draws
+   * for `NavigationSidebarItem.badge`; the tab's accessible name becomes
+   * "Label (Badge)". Cased as read — the chip upper-cases it.
+   */
+  badge?: string;
 }
 
 export interface TabNavigationUrlSyncOptions {
@@ -329,6 +337,7 @@ const TabBar = memo(function TabBarImpl({
               ref={isActive ? activeTabRef : undefined}
               type="button"
               onClick={() => onTabChange(tab.id)}
+              aria-label={tab.badge ? `${tab.label} (${tab.badge})` : undefined}
               className={cn(
                 'relative flex shrink-0 cursor-pointer items-center justify-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]',
                 // Named rather than `transition-all`: the only thing that moves
@@ -376,6 +385,20 @@ const TabBar = memo(function TabBarImpl({
               >
                 {tab.label}
               </span>
+
+              {tab.badge && (
+                // The chip is 32px against a 20/24px label line. The negative
+                // margin takes the difference back, so a stamped tab is exactly
+                // as tall as its neighbours at every breakpoint. No hover shade:
+                // the tab is the target, and the cursor passes through to it.
+                <Tag
+                  as="span"
+                  aria-hidden
+                  label={tab.badge}
+                  variant="warning"
+                  className="pointer-events-none my-[calc((var(--font-line-space-h4-body)_-_2rem)/2)] ml-[var(--spacing-system-xxs)] shrink-0"
+                />
+              )}
             </button>
           );
         })}
