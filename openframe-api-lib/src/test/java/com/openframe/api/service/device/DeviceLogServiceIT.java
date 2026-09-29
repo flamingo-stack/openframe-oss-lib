@@ -1,18 +1,17 @@
 package com.openframe.api.service.device;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.api.config.DeviceLogProperties;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
 import com.openframe.api.dto.device.DeviceLogFilterCriteria;
 import com.openframe.api.dto.device.DeviceLogLevel;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.service.tenant.TenantDomainService;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.model.LokiDirection;
-import com.openframe.data.repository.tenant.TenantRepository;
-import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
@@ -33,7 +32,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -53,7 +51,6 @@ class DeviceLogServiceIT {
             .waitingFor(Wait.forHttp("/ready").forPort(3100).forStatusCode(200)
                     .withStartupTimeout(Duration.ofMinutes(2)));
 
-    private static final String TENANT_ID = "tenant-a";
     private static final String TENANT_DOMAIN = "acme.openframe.test";
     private static final String OTHER_TENANT_DOMAIN = "globex.openframe.test";
     private static final String MACHINE_ID = "machine-a";
@@ -280,16 +277,13 @@ class DeviceLogServiceIT {
         DeviceService deviceService = mock(DeviceService.class);
         when(deviceService.findByMachineIds(anyCollection())).thenAnswer(invocation ->
                 invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceIT::machine).toList());
-        TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        TenantRepository tenantRepository = mock(TenantRepository.class);
-        when(tenantRepository.findById(TENANT_ID))
-                .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).domain(TENANT_DOMAIN).build()));
-        return new DeviceLogService(lokiClient, deviceService, tenantIdProvider, tenantRepository);
+        TenantDomainService tenantDomainService = mock(TenantDomainService.class);
+        when(tenantDomainService.getTenantDomain()).thenReturn(TENANT_DOMAIN);
+        return new DeviceLogService(lokiClient, deviceService, tenantDomainService, new DeviceLogProperties());
     }
 
     private static void awaitLines(String machineId, int expected) throws InterruptedException {
-        String query = DeviceLogService.buildQuery(TENANT_DOMAIN, List.of(machineId), new DeviceLogFilterCriteria());
+        String query = DeviceLogService.buildQuery(TENANT_DOMAIN, List.of(machineId), new DeviceLogFilterCriteria(), false);
         for (int attempt = 0; attempt < 50; attempt++) {
             int found = lokiClient.queryRange(query, toNanos(FROM), toNanos(Instant.now()) + 1, expected + 1,
                     LokiDirection.BACKWARD).size();
