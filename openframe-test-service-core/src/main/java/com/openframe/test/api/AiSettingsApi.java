@@ -6,9 +6,13 @@ import com.openframe.test.data.dto.aisettings.AgentAiConfigPayload;
 import com.openframe.test.data.dto.aisettings.ClientView;
 import com.openframe.test.data.dto.aisettings.ClientViewInput;
 import com.openframe.test.data.dto.aisettings.ClientViewPayload;
+import com.openframe.test.data.dto.aisettings.SupportedModel;
+import io.restassured.common.mapper.TypeRef;
+import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.api.graphql.AiSettingsQueries.ADMIN_AI_CONFIG;
@@ -29,6 +33,22 @@ import static io.restassured.RestAssured.given;
  * per-organization override).
  */
 public class AiSettingsApi {
+
+    private static final String SUPPORTED_MODELS = "chat/api/v1/ai-configuration/supported-models";
+
+    /**
+     * The models this environment offers, keyed by provider group. Only these are honoured: a stored model
+     * outside the list silently falls back to the provider default ({@code AgentChatModelResolver}), so a
+     * case that switches models must pick from here rather than name one.
+     */
+    public static Map<String, List<SupportedModel>> supportedModels() {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .get(SUPPORTED_MODELS)
+                .then().statusCode(200)
+                .extract().as(new TypeRef<Map<String, List<SupportedModel>>>() {
+                });
+    }
 
     public static AgentAiConfig getClientAiConfig() {
         return object(CLIENT_AI_CONFIG, "clientAiConfig", Map.of(), AgentAiConfig.class);
