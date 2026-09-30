@@ -12,6 +12,7 @@ import com.openframe.api.exception.PackageNotFoundException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -23,6 +24,8 @@ import java.util.Locale;
 public class BrewPackageClient implements PackageManagerClient {
 
 
+    private static final Sort MOST_POPULAR_FIRST = Sort.by(Sort.Order.desc("popularity"), Sort.Order.asc("packageId"));
+
     private final PackageCatalogRepository packageCatalogRepository;
 
     @Override
@@ -33,9 +36,24 @@ public class BrewPackageClient implements PackageManagerClient {
     @Override
     public PackageSearchResult search(String query, int limit, int offset) {
         String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
+        if (normalizedQuery.isEmpty()) {
+            return listCatalog(limit, offset);
+        }
         List<Scored> matched = scoreCandidates(normalizedQuery);
         List<PackageSearchItem> items = pageOf(matched, limit, offset);
         int total = matched.size();
+        boolean hasMore = offset + limit < total;
+        return PackageSearchResult.builder()
+                .items(items)
+                .total(total)
+                .hasMore(hasMore)
+                .build();
+    }
+
+    private PackageSearchResult listCatalog(int limit, int offset) {
+        List<PackageCatalogEntry> entries = packageCatalogRepository.listByManager(PackageManagerType.BREW, MOST_POPULAR_FIRST, offset, limit);
+        List<PackageSearchItem> items = entries.stream().map(this::toItem).toList();
+        int total = (int) packageCatalogRepository.countByManager(PackageManagerType.BREW);
         boolean hasMore = offset + limit < total;
         return PackageSearchResult.builder()
                 .items(items)
@@ -89,12 +107,12 @@ public class BrewPackageClient implements PackageManagerClient {
         return matched.stream()
                 .skip(offset)
                 .limit(limit)
+                .map(Scored::getEntry)
                 .map(this::toItem)
                 .toList();
     }
 
-    private PackageSearchItem toItem(Scored scored) {
-        PackageCatalogEntry entry = scored.getEntry();
+    private PackageSearchItem toItem(PackageCatalogEntry entry) {
         String installCommand = installCommand(entry);
         return PackageSearchItem.builder()
                 .id(entry.getPackageId())

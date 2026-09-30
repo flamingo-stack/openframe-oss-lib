@@ -16,6 +16,7 @@ import com.openframe.api.exception.PackageNotFoundException;
 import com.openframe.api.exception.PackageSourceUnavailableException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -34,6 +35,9 @@ public class WingetPackageClient implements PackageManagerClient {
     private static final String UNAVAILABLE_MESSAGE =
             "The winget catalog is temporarily unavailable. Please try again later.";
     private static final int DETAILS_CACHE_MAX_SIZE = 5000;
+
+    // winget publishes no install counts, so the unfiltered list is alphabetical
+    private static final Sort BY_NAME = Sort.by(Sort.Order.asc("name"), Sort.Order.asc("packageId"));
 
     private final PackageCatalogRepository packageCatalogRepository;
     private final RestClient restClient;
@@ -57,9 +61,24 @@ public class WingetPackageClient implements PackageManagerClient {
     @Override
     public PackageSearchResult search(String query, int limit, int offset) {
         String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
+        if (normalizedQuery.isEmpty()) {
+            return listCatalog(limit, offset);
+        }
         List<Scored> matched = scoreCandidates(normalizedQuery);
         List<PackageSearchItem> items = pageOf(matched, limit, offset);
         int total = matched.size();
+        boolean hasMore = offset + limit < total;
+        return PackageSearchResult.builder()
+                .items(items)
+                .total(total)
+                .hasMore(hasMore)
+                .build();
+    }
+
+    private PackageSearchResult listCatalog(int limit, int offset) {
+        List<PackageCatalogEntry> entries = packageCatalogRepository.listByManager(PackageManagerType.WINGET, BY_NAME, offset, limit);
+        List<PackageSearchItem> items = entries.stream().map(this::toItem).toList();
+        int total = (int) packageCatalogRepository.countByManager(PackageManagerType.WINGET);
         boolean hasMore = offset + limit < total;
         return PackageSearchResult.builder()
                 .items(items)
@@ -107,12 +126,12 @@ public class WingetPackageClient implements PackageManagerClient {
         return matched.stream()
                 .skip(offset)
                 .limit(limit)
+                .map(Scored::getEntry)
                 .map(this::toItem)
                 .toList();
     }
 
-    private PackageSearchItem toItem(Scored scored) {
-        PackageCatalogEntry entry = scored.getEntry();
+    private PackageSearchItem toItem(PackageCatalogEntry entry) {
         String id = entry.getPackageId();
         String installCommand = installCommand(id);
         return PackageSearchItem.builder()

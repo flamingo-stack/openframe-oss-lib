@@ -1,5 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
@@ -48,6 +50,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -56,6 +59,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -77,6 +81,10 @@ public class SoftwareInventoryService {
     private static final String DEFAULT_SORT_FIELD = "name";
     private static final int TITLES_FETCH_PAGE = 500;
     private static final int TITLES_FETCH_CAP = 5000;
+    private static final Duration TITLES_REFRESH = Duration.ofMinutes(2);
+    private static final Duration TITLES_EXPIRY = Duration.ofMinutes(30);
+    private static final int TITLES_MAX_QUERIES = 50;
+    private static final Executor BACKGROUND_RELOAD = task -> Thread.ofVirtual().start(task);
 
     private final IntegratedToolRepository integratedToolRepository;
     private final FleetDeviceCountEnricher deviceCountEnricher;
@@ -91,6 +99,14 @@ public class SoftwareInventoryService {
     private boolean fleetMultiTenancyEnabled;
 
     private FleetMdmClient fleet;
+
+    // stale for up to TITLES_REFRESH: past it the cached catalog is served while a background reload replaces it
+    private final LoadingCache<TitleQuery, List<SoftwareTitle>> titles = Caffeine.newBuilder()
+            .refreshAfterWrite(TITLES_REFRESH)
+            .expireAfterWrite(TITLES_EXPIRY)
+            .maximumSize(TITLES_MAX_QUERIES)
+            .executor(BACKGROUND_RELOAD)
+            .build(query -> loadAllTitles(query.search(), query.vulnerable()));
 
     private FleetMdmClient fleet() {
         FleetMdmClient client = fleet;
@@ -112,7 +128,8 @@ public class SoftwareInventoryService {
                 .map(row -> {
                     enrichRealDevicesCount(List.of(row));
                     return row;
-                });
+                })
+                .filter(row -> deviceCount(row) > 0);
     }
 
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
@@ -173,6 +190,10 @@ public class SoftwareInventoryService {
 
 
     private List<SoftwareTitle> fetchAllTitles(String search, Boolean vulnerable) {
+        return titles.get(new TitleQuery(search, vulnerable));
+    }
+
+    private List<SoftwareTitle> loadAllTitles(String search, Boolean vulnerable) {
         List<SoftwareTitle> all = new ArrayList<>();
         int page = 0;
         while (all.size() < TITLES_FETCH_CAP) {
@@ -264,7 +285,7 @@ public class SoftwareInventoryService {
             String softwareId, String search, int page, Integer perPage,
             String sortField, boolean sortAsc) {
         Optional<Long> parsed = parseNumericId(softwareId);
-        if (parsed.isEmpty()) {
+        if (parsed.isEmpty() || !isInstalled(softwareId)) {
             return PageResult.empty(page);
         }
         SoftwareTitle title = fleet().getSoftwareTitle(parsed.get());
@@ -338,6 +359,13 @@ public class SoftwareInventoryService {
         List<SoftwareTitle> catalog = fetchAllTitles(null, null);
         Map<Long, String> titleIdByVersionId = titleIdByVersionId(catalog);
         enrichDevicesCountFromHosts(rows, titleIdByVersionId);
+    }
+
+    // until the shared Fleet scopes titles per tenant, any title id resolves; answer only for this tenant's software
+    private boolean isInstalled(String softwareId) {
+        SoftwareResponse probe = SoftwareResponse.builder().id(softwareId).build();
+        enrichDevicesCountFromHosts(List.of(probe));
+        return deviceCount(probe) > 0;
     }
 
     private static Comparator<SoftwareResponse> deviceSoftwareOrder(SortInput sort) {
@@ -647,5 +675,8 @@ public class SoftwareInventoryService {
     }
 
     private record VersionCve(String version, String cve) {
+    }
+
+    private record TitleQuery(String search, Boolean vulnerable) {
     }
 }
