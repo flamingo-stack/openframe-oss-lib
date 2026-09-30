@@ -2,11 +2,12 @@ package com.openframe.data.cassandra.config;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.DriverTimeoutException;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
-import com.openframe.data.cassandra.model.CommandResult;
 import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.springframework.data.cassandra.core.convert.MappingCassandraConverter
 import org.springframework.data.cassandra.core.convert.SchemaFactory;
 import org.springframework.data.cassandra.core.mapping.CassandraMappingContext;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -26,7 +28,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -36,31 +39,29 @@ import static org.mockito.Mockito.when;
 class CassandraTableColumnSyncTest {
 
     private static final String KEYSPACE = "openframe_test";
+    private static final Duration SCHEMA_CHANGE_TIMEOUT = Duration.ofSeconds(30);
     private static final CqlIdentifier UNIFIED_LOGS = CqlIdentifier.fromCql("unified_logs");
-    private static final CqlIdentifier COMMAND_RESULTS = CqlIdentifier.fromCql("command_results");
-    private static final String[] UNIFIED_LOGS_COLUMNS_BEFORE_RUN_ORIGIN = {
+    private static final String[] COLUMNS_BEFORE_RUN_ORIGIN = {
             "user_id", "device_id", "hostname", "nickname", "organization_id", "organization_name",
             "severity", "message", "debezium_message", "details"};
-    private static final String[] UNIFIED_LOGS_COLUMNS = {
+    private static final String[] ALL_COLUMNS = {
             "user_id", "device_id", "hostname", "nickname", "execution_source", "script_creation_source",
             "organization_id", "organization_name", "severity", "message", "debezium_message", "details"};
-    private static final String[] COMMAND_RESULTS_COLUMNS = {"result"};
 
     @Mock private CqlSession session;
     @Mock private Metadata metadata;
     @Mock private KeyspaceMetadata keyspace;
     @Mock private TableMetadata unifiedLogs;
-    @Mock private TableMetadata commandResults;
     @Mock private ColumnMetadata column;
 
-    @Captor private ArgumentCaptor<String> cqlCaptor;
+    @Captor private ArgumentCaptor<SimpleStatement> statementCaptor;
 
     private CassandraTableColumnSync sync;
 
     @BeforeEach
     void setUp() {
         CassandraMappingContext mappingContext = new CassandraMappingContext();
-        mappingContext.setInitialEntitySet(Set.of(UnifiedLogEvent.class, CommandResult.class));
+        mappingContext.setInitialEntitySet(Set.of(UnifiedLogEvent.class));
         mappingContext.afterPropertiesSet();
         MappingCassandraConverter converter = new MappingCassandraConverter(mappingContext);
         converter.afterPropertiesSet();
@@ -72,71 +73,98 @@ class CassandraTableColumnSyncTest {
     void afterSingletonsInstantiated_runOriginColumnsMissing_addsEachWithIfNotExists() {
         // setup
         stubKeyspace();
-        stubTable(UNIFIED_LOGS, unifiedLogs, UNIFIED_LOGS_COLUMNS_BEFORE_RUN_ORIGIN);
-        stubTable(COMMAND_RESULTS, commandResults, COMMAND_RESULTS_COLUMNS);
+        stubUnifiedLogs(COLUMNS_BEFORE_RUN_ORIGIN);
 
         // execution
         sync.afterSingletonsInstantiated();
 
         // verifications
-        verify(session, times(2)).execute(cqlCaptor.capture());
-        assertThat(cqlCaptor.getAllValues()).containsExactlyInAnyOrder(
-                "ALTER TABLE openframe_test.unified_logs ADD IF NOT EXISTS execution_source text",
-                "ALTER TABLE openframe_test.unified_logs ADD IF NOT EXISTS script_creation_source text");
+        verify(session, times(2)).execute(statementCaptor.capture());
+        assertThat(statementCaptor.getAllValues())
+                .extracting(SimpleStatement::getQuery)
+                .containsExactlyInAnyOrder(
+                        "ALTER TABLE openframe_test.unified_logs ADD IF NOT EXISTS execution_source text",
+                        "ALTER TABLE openframe_test.unified_logs ADD IF NOT EXISTS script_creation_source text");
+    }
+
+    @Test
+    void afterSingletonsInstantiated_columnAdded_usesSchemaChangeTimeout() {
+        // setup
+        stubKeyspace();
+        stubUnifiedLogs(COLUMNS_BEFORE_RUN_ORIGIN);
+
+        // execution
+        sync.afterSingletonsInstantiated();
+
+        // verifications
+        verify(session, times(2)).execute(statementCaptor.capture());
+        assertThat(statementCaptor.getAllValues())
+                .extracting(SimpleStatement::getTimeout)
+                .containsOnly(SCHEMA_CHANGE_TIMEOUT);
     }
 
     @Test
     void afterSingletonsInstantiated_allColumnsPresent_altersNothing() {
         // setup
         stubKeyspace();
-        stubTable(UNIFIED_LOGS, unifiedLogs, UNIFIED_LOGS_COLUMNS);
-        stubTable(COMMAND_RESULTS, commandResults, COMMAND_RESULTS_COLUMNS);
+        stubUnifiedLogs(ALL_COLUMNS);
 
         // execution
         sync.afterSingletonsInstantiated();
 
         // verifications
-        verify(session).refreshSchema();
+        verify(session).getMetadata();
         verifyNoMoreInteractions(session);
     }
 
     @Test
-    void afterSingletonsInstantiated_tableNotCreatedYet_skipsThatTable() {
+    void afterSingletonsInstantiated_tableNotCreatedYet_skipsIt() {
         // setup
         stubKeyspace();
         when(keyspace.getTable(UNIFIED_LOGS)).thenReturn(Optional.empty());
-        stubTable(COMMAND_RESULTS, commandResults, COMMAND_RESULTS_COLUMNS);
 
         // execution
         sync.afterSingletonsInstantiated();
 
         // verifications
-        verify(session).refreshSchema();
+        verify(session).getMetadata();
         verifyNoMoreInteractions(session);
     }
 
     @Test
-    void afterSingletonsInstantiated_keyspaceMissing_throwsIllegalState() {
+    void afterSingletonsInstantiated_keyspaceMissingFromMetadata_skipsWithoutFailing() {
         // setup
-        when(session.refreshSchema()).thenReturn(metadata);
+        when(session.getMetadata()).thenReturn(metadata);
         when(metadata.getKeyspace(KEYSPACE)).thenReturn(Optional.empty());
 
         // execution
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> sync.afterSingletonsInstantiated());
+        sync.afterSingletonsInstantiated();
 
         // verifications
-        assertThat(ex.getMessage()).contains(KEYSPACE);
+        verify(session).getMetadata();
+        verifyNoMoreInteractions(session);
+    }
+
+    @Test
+    void afterSingletonsInstantiated_alterTimesOut_startupSurvives() {
+        // setup
+        stubKeyspace();
+        stubUnifiedLogs(COLUMNS_BEFORE_RUN_ORIGIN);
+        when(session.execute(any(SimpleStatement.class))).thenThrow(new DriverTimeoutException("Query timed out after PT2S"));
+
+        // execution & verifications
+        assertThatCode(() -> sync.afterSingletonsInstantiated()).doesNotThrowAnyException();
     }
 
     private void stubKeyspace() {
-        when(session.refreshSchema()).thenReturn(metadata);
+        when(session.getMetadata()).thenReturn(metadata);
         when(metadata.getKeyspace(KEYSPACE)).thenReturn(Optional.of(keyspace));
     }
 
-    private void stubTable(CqlIdentifier name, TableMetadata table, String... existingColumns) {
+    private void stubUnifiedLogs(String... existingColumns) {
         Map<CqlIdentifier, ColumnMetadata> columns = Stream.of(existingColumns)
                 .collect(Collectors.toMap(CqlIdentifier::fromCql, existing -> column));
-        when(keyspace.getTable(name)).thenReturn(Optional.of(table));
-        when(table.getColumns()).thenReturn(columns);
+        when(keyspace.getTable(UNIFIED_LOGS)).thenReturn(Optional.of(unifiedLogs));
+        when(unifiedLogs.getColumns()).thenReturn(columns);
     }
 }

@@ -1,13 +1,10 @@
 package com.openframe.stream.deserializer;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.openframe.data.document.rmm.script.PrivilegeLevel;
-import com.openframe.data.document.rmm.script.ScriptEnvVar;
-import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.software.SoftwareAction;
@@ -18,7 +15,6 @@ import com.openframe.stream.mapping.SourceEventTypes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -37,17 +33,14 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     private static final String FALLBACK_FAILED_MESSAGE = "Script failed";
 
     private static final String DETAILS_INPUT = "input";
-    private static final String DETAILS_SHELL = "shell";
-    private static final String DETAILS_PRIVILEGE_LEVEL = "privilege_level";
-    private static final String DETAILS_TIMEOUT_SECONDS = "timeout_seconds";
-    private static final String DETAILS_ARGS = "args";
-    private static final String DETAILS_ENV_VARS = "env_vars";
-    private static final String DETAILS_NAME = "name";
-    private static final String DETAILS_VALUE = "value";
-    private static final String DETAILS_SECRET = "secret";
+    private static final String SCRIPT_CONTENT_HASH = "contentHash";
+    private static final String SCRIPT_ENV_VARS = "envVars";
+    private static final String ENV_VAR_VALUE = "value";
+    private static final String ENV_VAR_SECRET = "secret";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptRepository scriptRepository;
+    private final ObjectMapper scriptMapper;
 
     public ScriptResultDeserializer(ObjectMapper mapper,
                                     ScriptExecutionRepository scriptExecutionRepository,
@@ -55,6 +48,7 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
         super(mapper);
         this.scriptExecutionRepository = scriptExecutionRepository;
         this.scriptRepository = scriptRepository;
+        this.scriptMapper = mapper.copy().setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
     @Override
@@ -111,8 +105,8 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
         }
     }
 
-    // The result block carries the script's stored input next to the output: shell, privilege level, default
-    // timeout, default args and env vars. A secret env var keeps its name only; logs never hold its value.
+    // The result block carries the script document as stored next to the output, without its content hash,
+    // its null fields and the values of secret env vars; logs never hold a secret.
     @Override
     protected String getResult(JsonNode after) {
         String baseResult = super.getResult(after);
@@ -144,32 +138,18 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     }
 
     private ObjectNode inputOf(Script script) {
-        ObjectNode input = mapper.createObjectNode();
-        ScriptShell shell = script.getShell();
-        putIfPresent(input, DETAILS_SHELL, shell == null ? null : shell.name());
-        PrivilegeLevel privilegeLevel = script.getPrivilegeLevel();
-        putIfPresent(input, DETAILS_PRIVILEGE_LEVEL, privilegeLevel == null ? null : privilegeLevel.name());
-        putIfPresent(input, DETAILS_TIMEOUT_SECONDS, script.getDefaultTimeoutSeconds());
-        List<String> args = script.getDefaultArgs();
-        if (args != null) {
-            ArrayNode argsNode = input.putArray(DETAILS_ARGS);
-            args.forEach(argsNode::add);
-        }
-        List<ScriptEnvVar> envVars = script.getEnvVars();
-        if (envVars != null) {
-            ArrayNode envVarsNode = input.putArray(DETAILS_ENV_VARS);
-            envVars.forEach(envVar -> envVarsNode.add(envVarOf(envVar)));
-        }
+        ObjectNode input = scriptMapper.valueToTree(script);
+        input.remove(SCRIPT_CONTENT_HASH);
+        JsonNode envVars = input.path(SCRIPT_ENV_VARS);
+        envVars.forEach(ScriptResultDeserializer::dropSecretValue);
         return input;
     }
 
-    private ObjectNode envVarOf(ScriptEnvVar envVar) {
-        ObjectNode node = mapper.createObjectNode();
-        boolean secret = envVar.isSecret();
-        node.put(DETAILS_NAME, envVar.getName());
-        node.put(DETAILS_VALUE, secret ? null : envVar.getValue());
-        node.put(DETAILS_SECRET, secret);
-        return node;
+    private static void dropSecretValue(JsonNode envVar) {
+        boolean secret = envVar.path(ENV_VAR_SECRET).asBoolean();
+        if (secret && envVar.isObject()) {
+            ((ObjectNode) envVar).remove(ENV_VAR_VALUE);
+        }
     }
 
     private static String softwareMessage(ScriptExecution row, boolean failed) {

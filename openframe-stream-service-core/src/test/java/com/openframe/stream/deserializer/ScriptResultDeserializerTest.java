@@ -2,10 +2,15 @@ package com.openframe.stream.deserializer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.software.SoftwareAction;
@@ -20,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,7 +45,10 @@ class ScriptResultDeserializerTest {
     @Mock
     private ScriptRepository scriptRepository;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builder()
+            .addModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .build();
     private ScriptResultDeserializer deserializer;
 
     @BeforeEach
@@ -323,16 +332,19 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("getResult: the script's stored input (shell, privilege, timeout, default args, env vars) is attached as input next to the output")
-    void getResult_scriptFound_attachesScriptInput() throws Exception {
+    @DisplayName("getResult: the whole script document is attached as input next to the output, minus content hash, null fields and secret values")
+    void getResult_scriptFound_attachesScriptDocumentAsInput() throws Exception {
         // setup
         ObjectNode after = mapper.createObjectNode()
                 .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("scriptId", SCRIPT_ID)
                 .put("stdout", "ok").put("exitCode", 0);
         Script script = Script.builder()
-                .id(SCRIPT_ID).tenantId(TENANT_ID).shell(ScriptShell.BASH).privilegeLevel(PrivilegeLevel.ADMIN)
+                .id(SCRIPT_ID).tenantId(TENANT_ID).name("Disk cleanup").shell(ScriptShell.BASH)
+                .privilegeLevel(PrivilegeLevel.ADMIN).scriptBody("echo hi").supportedPlatforms(List.of(OsType.MAC_OS))
                 .defaultTimeoutSeconds(300).defaultArgs(List.of("-a", "--verbose"))
                 .envVars(List.of(new ScriptEnvVar("REGION", "eu", false), new ScriptEnvVar("API_KEY", "s3cr3t", true)))
+                .createdBy("user-1").creationSource(ScriptCreationSource.AI_ASSISTANT)
+                .createdAt(Instant.parse("2026-09-28T17:58:16.101Z")).contentHash("abc123")
                 .build();
         when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(script));
 
@@ -342,14 +354,25 @@ class ScriptResultDeserializerTest {
         // verifications
         assertThat(result.get("output").asText()).isEqualTo("ok");
         JsonNode input = result.get("input");
+        assertThat(input.get("id").asText()).isEqualTo(SCRIPT_ID);
+        assertThat(input.get("name").asText()).isEqualTo("Disk cleanup");
         assertThat(input.get("shell").asText()).isEqualTo("BASH");
-        assertThat(input.get("privilege_level").asText()).isEqualTo("ADMIN");
-        assertThat(input.get("timeout_seconds").asInt()).isEqualTo(300);
-        assertThat(input.get("args")).extracting(JsonNode::asText).containsExactly("-a", "--verbose");
-        assertThat(input.get("env_vars").get(0).get("value").asText()).isEqualTo("eu");
-        JsonNode secret = input.get("env_vars").get(1);
+        assertThat(input.get("privilegeLevel").asText()).isEqualTo("ADMIN");
+        assertThat(input.get("scriptBody").asText()).isEqualTo("echo hi");
+        assertThat(input.get("supportedPlatforms")).extracting(JsonNode::asText).containsExactly("MAC_OS");
+        assertThat(input.get("defaultTimeoutSeconds").asInt()).isEqualTo(300);
+        assertThat(input.get("defaultArgs")).extracting(JsonNode::asText).containsExactly("-a", "--verbose");
+        assertThat(input.get("createdBy").asText()).isEqualTo("user-1");
+        assertThat(input.get("creationSource").asText()).isEqualTo("AI_ASSISTANT");
+        assertThat(input.get("createdAt").asText()).isEqualTo("2026-09-28T17:58:16.101Z");
+        assertThat(input.get("status").asText()).isEqualTo("ACTIVE");
+        assertThat(input.has("contentHash")).isFalse();
+        assertThat(input.has("description")).isFalse();
+        assertThat(input.has("updatedAt")).isFalse();
+        assertThat(input.get("envVars").get(0).get("value").asText()).isEqualTo("eu");
+        JsonNode secret = input.get("envVars").get(1);
         assertThat(secret.get("name").asText()).isEqualTo("API_KEY");
-        assertThat(secret.get("value").isNull()).isTrue();
+        assertThat(secret.has("value")).isFalse();
         assertThat(secret.get("secret").asBoolean()).isTrue();
     }
 

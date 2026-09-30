@@ -2,6 +2,7 @@ package com.openframe.data.cassandra.config;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
@@ -15,14 +16,19 @@ import org.springframework.data.cassandra.core.cql.keyspace.CreateTableSpecifica
 import org.springframework.data.cassandra.core.mapping.CassandraMappingContext;
 import org.springframework.data.cassandra.core.mapping.CassandraPersistentEntity;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 // Spring Data's CREATE_IF_NOT_EXISTS never alters a table that already exists, so a column added to an
 // entity later has to be added here; it runs after the schema action, once every singleton is up.
 @Slf4j
 @RequiredArgsConstructor
 public class CassandraTableColumnSync implements SmartInitializingSingleton {
+
+    // A schema change waits for cluster-wide agreement, which takes longer than the default request timeout.
+    private static final Duration SCHEMA_CHANGE_TIMEOUT = Duration.ofSeconds(30);
 
     private final CqlSession session;
     private final CassandraMappingContext mappingContext;
@@ -31,10 +37,26 @@ public class CassandraTableColumnSync implements SmartInitializingSingleton {
 
     @Override
     public void afterSingletonsInstantiated() {
-        Metadata metadata = session.refreshSchema();
-        KeyspaceMetadata keyspace = metadata.getKeyspace(keyspaceName)
-                .orElseThrow(() -> new IllegalStateException("Cassandra keyspace not found: " + keyspaceName));
+        try {
+            syncKeyspace();
+        } catch (RuntimeException e) {
+            // A missing column fails only the writes that use it; failing startup would take the whole service down.
+            log.error("Cassandra column sync failed for keyspace {}", keyspaceName, e);
+        }
+    }
+
+    private void syncKeyspace() {
+        Metadata metadata = session.getMetadata();
+        Optional<KeyspaceMetadata> keyspace = metadata.getKeyspace(keyspaceName);
+        keyspace.ifPresentOrElse(this::syncTables, this::warnKeyspaceMissing);
+    }
+
+    private void syncTables(KeyspaceMetadata keyspace) {
         mappingContext.getTableEntities().forEach(entity -> syncTable(entity, keyspace));
+    }
+
+    private void warnKeyspaceMissing() {
+        log.warn("Cassandra keyspace {} is not in the driver metadata, skipping the column sync", keyspaceName);
     }
 
     private void syncTable(CassandraPersistentEntity<?> entity, KeyspaceMetadata keyspace) {
@@ -62,7 +84,8 @@ public class CassandraTableColumnSync implements SmartInitializingSingleton {
         String columnName = column.getName().asCql(true);
         String columnType = column.getType().asCql(true, true);
         String cql = String.format("ALTER TABLE %s.%s ADD IF NOT EXISTS %s %s", keyspaceName, tableName, columnName, columnType);
-        session.execute(cql);
+        SimpleStatement statement = SimpleStatement.newInstance(cql).setTimeout(SCHEMA_CHANGE_TIMEOUT);
+        session.execute(statement);
         log.info("Added missing column {} {} to Cassandra table {}.{}", columnName, columnType, keyspaceName, tableName);
     }
 }
