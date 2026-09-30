@@ -52,6 +52,16 @@ public class TagApi {
         return flag(DELETE_TAG, "deleteTag", Map.of("id", id));
     }
 
+    /** A delete for teardown, where the tag may already be gone: returns the HTTP status instead of asserting. */
+    public static int attemptDeleteTag(String id) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", DELETE_TAG);
+        body.put("variables", Map.of("id", id));
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().extract().statusCode();
+    }
+
     public static List<TagDefinition> tagKeySuggestions(String search, int limit) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("limit", limit);
