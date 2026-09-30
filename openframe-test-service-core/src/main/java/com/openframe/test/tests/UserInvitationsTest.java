@@ -155,6 +155,7 @@ public class UserInvitationsTest extends BaseTest {
     }
 
     @Tag("feature")
+    @Tag("users")
     @Test
     @DisplayName("Edit the name of an invited user")
     public void testUpdateUserName() {
@@ -178,6 +179,7 @@ public class UserInvitationsTest extends BaseTest {
     }
 
     @Tag("feature")
+    @Tag("users")
     @Test
     @DisplayName("A first name of 128 characters is accepted and one of 129 is refused")
     public void testUpdateUserNameLengthLimit() {
