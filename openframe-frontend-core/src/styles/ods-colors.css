@@ -408,6 +408,16 @@
 }
 
 /* ===================================================================== */
+/* BRAND-TINTED SURFACE — the page background takes 2% of the accent.    */
+/* Figma's fae-background (#1a1719) and mingo-background (#171b1a) are   */
+/* exactly 2% of their brand over the base background. Resolved on the   */
+/* element, so it follows the theme and a runtime (tenant) accent.       */
+/* ===================================================================== */
+[data-surface='brand-tinted'] {
+  --color-bg: color-mix(in srgb, var(--color-accent-primary) 2%, var(--ods-system-greys-background));
+}
+
+/* ===================================================================== */
 /* PLATFORM OVERRIDES — brand/accent ONLY.                               */
 /* Reference `--ods-*` so they follow the active theme; never touch      */
 /* bg/text/border so theme (data-theme on <html>) and platform           */

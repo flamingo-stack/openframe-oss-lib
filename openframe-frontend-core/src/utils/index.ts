@@ -445,3 +445,6 @@ export {
 // line from one set rather than mirroring the triple.
 export { PROGRAM_META_RENDERERS } from './program-meta-renderers';
 export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './program-instant';
+
+// Footer copyright line (one owner; never a double period after "Inc.").
+export { copyrightLine } from './copyright-line';
