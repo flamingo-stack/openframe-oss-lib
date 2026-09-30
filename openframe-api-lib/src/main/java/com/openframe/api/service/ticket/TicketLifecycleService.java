@@ -1,6 +1,8 @@
 package com.openframe.api.service.ticket;
 
 import com.github.pravin.raha.lexorank4j.LexoRank;
+import com.openframe.core.exception.ValidationException;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.api.dto.ticket.ReorderTicketInput;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.dto.ticket.TransitionTicketInput;
@@ -191,7 +193,7 @@ public class TicketLifecycleService {
         TicketStatusDefinition status = statusRepository.findById(statusId)
                 .orElseThrow(() -> new TicketStatusNotFoundException(statusId));
         if (!MANUALLY_CREATABLE_KINDS.contains(status.getKind())) {
-            throw new IllegalArgumentException(
+            throw new ValidationException(
                     "Tickets cannot be created in the \"" + status.getName() + "\" status");
         }
         return status;
@@ -264,7 +266,7 @@ public class TicketLifecycleService {
 
     public String computeRankBetween(String afterTicketId, String beforeTicketId, String targetStatusId) {
         if (areBothNeighborsAbsent(afterTicketId, beforeTicketId)) {
-            throw new IllegalArgumentException("afterTicketId or beforeTicketId must be specified");
+            throw new ValidationException("afterTicketId or beforeTicketId must be specified");
         }
 
         if (areBothNeighborsPresent(afterTicketId, beforeTicketId)) {
@@ -314,9 +316,9 @@ public class TicketLifecycleService {
 
     private LexoRank loadRank(String ticketId, String expectedStatusId) {
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new IllegalArgumentException("Neighbor ticket not found: " + ticketId));
+                .orElseThrow(() -> new TicketNotFoundException(ticketId));
         if (isWrongStatus(ticket, expectedStatusId)) {
-            throw new IllegalArgumentException(
+            throw new ConflictException(
                     "Neighbor " + ticketId + " is in statusId " + ticket.getStatusId()
                             + ", expected " + expectedStatusId);
         }
