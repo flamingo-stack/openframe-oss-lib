@@ -36,13 +36,18 @@ impl PackageManagerReportPublisher {
         let machine_id = self.config_service.get_machine_id()?;
         let subject = format!("machine.{}.{}", machine_id, PACKAGE_MANAGERS_SUBJECT);
 
+        let console_user_present = crate::executor::console_user_present().await;
         let mut package_managers = BTreeMap::new();
 
         for id in ManagerId::ALL {
-            package_managers.insert(*id, state_of(*id).await);
+            package_managers.insert(*id, state_of(*id, console_user_present).await);
         }
 
-        info!(report = ?package_managers, "Reporting package manager state");
+        info!(
+            report = ?package_managers,
+            console_user_present,
+            "Reporting package manager state"
+        );
         self.nats_publisher
             .publish(&subject, PackageManagerReport { package_managers })
             .await
