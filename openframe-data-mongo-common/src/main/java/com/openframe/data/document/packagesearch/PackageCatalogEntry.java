@@ -6,8 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.TypeAlias;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -22,13 +20,6 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "package_catalog")
 @TypeAlias("packageCatalogEntry")
-// collation must match PackageCatalogRepository.findByManager, or the unfiltered listing scans the collection
-@CompoundIndexes({
-        @CompoundIndex(name = "manager_popularity_packageId_ci", def = "{'manager': 1, 'popularity': -1, 'packageId': 1}",
-                collation = "{'locale': 'en', 'strength': 2}"),
-        @CompoundIndex(name = "manager_name_packageId_ci", def = "{'manager': 1, 'name': 1, 'packageId': 1}",
-                collation = "{'locale': 'en', 'strength': 2}")
-})
 public class PackageCatalogEntry {
 
     @Id

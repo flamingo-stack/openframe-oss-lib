@@ -18,7 +18,6 @@ public interface PackageCatalogRepository extends MongoRepository<PackageCatalog
 
     long deleteByManagerAndUpdatedAtBefore(PackageManagerType manager, Instant updatedAt);
 
-    // same collation as the listing indexes on PackageCatalogEntry, or the sort scans the manager's entries
     @Collation("{ 'locale': 'en', 'strength': 2 }")
     List<PackageCatalogEntry> findByManager(PackageManagerType manager, Pageable pageable);
 
