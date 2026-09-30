@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * new {@code ak_*} id, so the id to clean up is updated after that call.
  */
 @Tag("oss")
+@Tag("api-keys")
 @DisplayName("API keys")
 public class ApiKeysTest extends BaseTest {
 
