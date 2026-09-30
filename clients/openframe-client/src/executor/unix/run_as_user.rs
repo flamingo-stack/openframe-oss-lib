@@ -19,10 +19,19 @@ pub(crate) struct UserInfo {
     pub home_dir: PathBuf,
 }
 
+pub(crate) async fn console_user_present() -> bool {
+    console_user().await.is_some()
+}
+
 pub(crate) async fn resolve_run_as(privilege: Privilege) -> Result<RunAs> {
     match privilege {
         Privilege::Agent => Ok(RunAs::Current),
-        Privilege::User => Ok(RunAs::User(lookup_user(&resolve_active_user().await?)?)),
+        Privilege::User => {
+            let username = console_user()
+                .await
+                .ok_or_else(|| anyhow!("no active interactive user (USER privilege)"))?;
+            Ok(RunAs::User(lookup_user(&username)?))
+        }
     }
 }
 
@@ -39,21 +48,21 @@ fn lookup_user(username: &str) -> Result<UserInfo> {
 }
 
 #[cfg(target_os = "macos")]
-async fn resolve_active_user() -> Result<String> {
+async fn console_user() -> Option<String> {
     let output = Command::new("stat")
         .args(["-f", "%Su", "/dev/console"])
         .output()
         .await
-        .map_err(|e| anyhow!("failed to query console user: {e}"))?;
+        .ok()?;
     let user = String::from_utf8_lossy(&output.stdout).trim().to_string();
     if user.is_empty() || user == "root" {
-        return Err(anyhow!("no active interactive user (USER privilege)"));
+        return None;
     }
-    Ok(user)
+    Some(user)
 }
 
 #[cfg(not(target_os = "macos"))]
-async fn resolve_active_user() -> Result<String> {
+async fn console_user() -> Option<String> {
     if let Ok(output) = Command::new("loginctl")
         .args(["list-sessions", "--no-legend"])
         .output()
@@ -65,22 +74,18 @@ async fn resolve_active_user() -> Result<String> {
             if fields.len() >= 4 && fields[3].starts_with("seat") {
                 let user = fields[2];
                 if !user.is_empty() && user != "root" {
-                    return Ok(user.to_string());
+                    return Some(user.to_string());
                 }
             }
         }
     }
 
-    let output = Command::new("who")
-        .output()
-        .await
-        .map_err(|e| anyhow!("failed to query active user: {e}"))?;
+    let output = Command::new("who").output().await.ok()?;
     String::from_utf8_lossy(&output.stdout)
         .lines()
         .filter_map(|line| line.split_whitespace().next())
         .find(|user| !user.is_empty() && *user != "root")
         .map(|user| user.to_string())
-        .ok_or_else(|| anyhow!("no active interactive user (USER privilege)"))
 }
 
 pub(crate) fn configure_preexec(cmd: &mut Command, run_as: &RunAs) -> Result<()> {
