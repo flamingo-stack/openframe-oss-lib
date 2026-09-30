@@ -59,7 +59,7 @@ public class OrganizationQueries {
             }
             """ + ORGANIZATION_FIELDS;
 
-    /** {@code id} is the Relay global id ({@code Organization.id}), not the raw {@code organizationId}. */
+    // id is the Relay global id (Organization.id), not the raw organizationId.
     public static final String ORGANIZATION = """
             query($id: ID!) {
                 organization(id: $id) { ...organizationFields }

@@ -211,9 +211,7 @@ public class OrganizationsTest extends BaseTest {
     @Test
     @DisplayName("Get Organization by a global id with no record returns null")
     public void testRetrieveOrganizationByMissingGlobalId() {
-        // Well-formed (Organization:<uuid>) but no such organizationId: the resolver maps an empty lookup to null.
-        // The server decodes URL-safe Base64 and RelayIds encodes standard Base64; the two only differ on
-        // '+' and '/', which the ASCII of "Organization:" plus a UUID never produces.
+        // A well-formed global id with no record resolves to null (standard Base64 is safe here: "Organization:" plus a UUID never yields '+' or '/').
         String missingId = RelayIds.toGlobalId("Organization", UUID.randomUUID().toString());
         assertThat(OrganizationApi.retrieveOrganization(missingId))
                 .as("organization(id:) for a missing record is null, not an error").isNull();

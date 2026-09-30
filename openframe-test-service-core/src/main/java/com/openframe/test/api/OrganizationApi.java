@@ -94,7 +94,7 @@ public class OrganizationApi {
                 .extract().jsonPath().getObject("data.organizationByOrganizationId", Organization.class);
     }
 
-    /** {@code organization(id:)} by Relay global id; null when no organization has that id. */
+    // organization(id:) by Relay global id; null when no organization has that id.
     public static Organization retrieveOrganization(String globalId) {
         Map<String, Object> body = Map.of(
                 "query", ORGANIZATION,
