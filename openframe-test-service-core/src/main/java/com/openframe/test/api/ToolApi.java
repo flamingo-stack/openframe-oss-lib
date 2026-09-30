@@ -15,7 +15,7 @@ import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import static io.restassured.RestAssured.given;
 
-/** {@code integratedTools} / {@code toolFilters} on api/graphql — the tool registry, read-only and unpaginated. */
+// integratedTools / toolFilters on api/graphql — the tool registry, read-only and unpaginated.
 public class ToolApi {
 
     public static ToolFilters getToolFilters() {

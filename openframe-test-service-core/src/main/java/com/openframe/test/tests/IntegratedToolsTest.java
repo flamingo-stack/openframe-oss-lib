@@ -18,13 +18,7 @@ import java.util.function.Function;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-/**
- * {@code integratedTools} and {@code toolFilters} on api/graphql — the tenant's tool registry, which
- * the monitoring and settings pages list. Every tenant registers its tools at setup, so the list is
- * never empty. The facets are the distinct non-null values of the same collection; tools registered
- * through {@code v1/tools} may carry no type or category at all, in which case every facet is empty.
- * Read-only.
- */
+// integratedTools and toolFilters on api/graphql (CP-48): the tenant's tool registry, read-only; the facets are the distinct non-null values and may all be empty.
 @Tag("saas")
 @Tag("integrated-tools")
 @DisplayName("Integrated Tools")
@@ -147,8 +141,7 @@ public class IntegratedToolsTest extends BaseTest {
                 .as("An unknown type should match no tools").isEmpty();
         assertThat(ToolApi.getIntegratedTools(ToolFilterInput.builder().category(unknown).build()))
                 .as("An unknown category should match no tools").isEmpty();
-        // Regex metacharacters are quoted server-side: ".*(" must be taken literally, not match everything
-        // or fail to compile.
+        // Regex metacharacters are quoted server-side, so ".*(" must be taken literally.
         assertThat(ToolApi.searchIntegratedTools(unknown + ".*("))
                 .as("An unmatched search containing regex metacharacters should match no tools").isEmpty();
     }
