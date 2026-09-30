@@ -129,6 +129,12 @@ interface WalkthroughVideoBaseProps {
    *  SSR-safe: the server renders closed, and the theater lives in a portal,
    *  so the hydrated (non-portal) markup is identical either way. */
   deepLinkParam?: string;
+  /** Start the card playing on mount, muted, with the unmute glyph up — the
+   *  muted-autoplay pattern, for a page whose point IS the clip (an onboarding
+   *  hero). The card behaves as after a muted theater close: the clip runs in
+   *  the card, a click opens the theater from the current time. File videos
+   *  only; a YouTube card never plays inline. */
+  autoPlayCard?: boolean;
   label?: string;
   className?: string;
 }
@@ -199,6 +205,7 @@ function WalkthroughVideo({
   defaultOpen,
   defaultOpenPaused,
   deepLinkParam = WALKTHROUGH_OPEN_QUERY_PARAM,
+  autoPlayCard = false,
   label = 'Play Demo Video',
   placement,
   // Keeps the FLOATING card off the critical path. The inline preset passes 0:
@@ -313,7 +320,11 @@ function WalkthroughVideo({
   const endedLatchRef = useRef(false);
 
   const [hovered, setHovered] = useState(false);
-  const [handoff, setHandoff] = useState<Handoff | null>(null);
+  // `autoPlayCard` seeds the same state a muted theater close leaves behind, so
+  // the card starts in resume mode with nothing else to special-case.
+  const [handoff, setHandoff] = useState<Handoff | null>(() =>
+    autoPlayCard && !video?.youtubeUrl ? { time: 0, muted: true, playing: true } : null,
+  );
   const [suspended, setSuspended] = useState(false);
   const [theaterStart, setTheaterStart] = useState<{ time: number; muted: boolean }>({ time: 0, muted: false });
   const [footerObservation, setFooterObservation] = useState<{ key: string; hidden: boolean } | null>(null);

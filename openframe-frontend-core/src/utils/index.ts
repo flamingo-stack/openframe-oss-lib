@@ -48,6 +48,7 @@ export {
   pick,
   NO_CLIENT_CACHE,
 } from './common';
+export { escapeRegExp } from './escape-regexp';
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title';
@@ -56,6 +57,7 @@ export { SEO_DESCRIPTION_MAX_LENGTH } from './seo-description';
 // Brand silhouette SVG registry (CSS mask-image tinting) — centralized so
 // consumers (e.g. company-hub deck) don't ship their own copies of the marks.
 export * from './brand-marks';
+export * from './design-doc-readiness';
 export * from './platform-config';
 export * from './os-platforms';
 export * from './access-code-client';
@@ -107,6 +109,7 @@ export * from './video-bite-id';
 export * from './os-utils';
 // Phone utilities
 export * from './country-phone-utils';
+export * from './compliance-standards';
 // Generic domain detection
 export * from './generic-domain-utils';
 
@@ -232,6 +235,8 @@ export {
 } from './sse-subscription';
 export {
   type EmbedProxyAuth,
+  type EmbedProxyOptionalField,
+  EMBED_PROXY_OPTIONAL_HEADERS,
   getEmbedProxyAuth,
   setEmbedProxyAuth,
   clearEmbedProxyAuth,
@@ -362,7 +367,7 @@ export {
   type ContentRefLayout,
   type ContentRefGridSize,
 } from './content-ref-groups';
-export { extractItems, extractItemId } from './extract-items';
+export { extractItems, extractItemId, extractCardItems } from './extract-items';
 export { FullscreenSwitchController, type FullscreenSwitchOptions } from './fullscreen-switch';
 export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url';
 
@@ -383,6 +388,11 @@ export {
 // decision fn the lib forms feed. Also exported via the granular subpath
 // `./utils/humanity-signals` for server-only consumers.
 export * from './humanity-signals';
+
+// Form rescue rules (allowlist, exclusions, caps, lifecycle) — pure + server-safe
+// so the host's draft endpoint re-applies the same filter the browser hook runs.
+// Also exported via the granular subpath `./utils/form-rescue`.
+export * from './form-rescue';
 
 // Doc-source viewer utilities (path parsing, tree building, section extraction,
 // embed-URL conversion) — single home for all doc-viewer pure helpers across
@@ -435,3 +445,6 @@ export {
 // line from one set rather than mirroring the triple.
 export { PROGRAM_META_RENDERERS } from './program-meta-renderers';
 export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './program-instant';
+
+// Footer copyright line (one owner; never a double period after "Inc.").
+export { copyrightLine } from './copyright-line';

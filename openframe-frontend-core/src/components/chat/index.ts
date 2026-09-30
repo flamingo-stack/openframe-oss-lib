@@ -6,7 +6,9 @@ export * from './approval-batch-message';
 export * from './escalation-offer-message';
 export * from './ticket-escalated-message';
 export * from './ticket-event-message';
+export * from './system-event-message';
 export * from './ai-assistant-info';
+export * from './chat-appearance-context';
 export * from './context-compaction-display';
 export * from './expand-chevron';
 export * from './thinking-display';
@@ -47,6 +49,10 @@ export * from './context-items-list';
 export * from './chat-archive-page';
 export * from './model-display';
 export * from './chat-sidebar';
+export * from './chat-nav-sidebar';
+export * from './chat-list-empty-state';
+export * from './chat-top-navigation';
+export * from './onboarding-carousel';
 export type { ChatRef } from './chat-ref.types';
 export { remarkCardLinks } from './remark-card-links';
 export { remarkMentionChips } from './remark-mention-chips';
@@ -90,3 +96,4 @@ export {
   type EmbeddableChatHandle,
   type EmbeddableChatProps,
 } from './embeddable-chat';
+export * from './proxy-credentials-panel';

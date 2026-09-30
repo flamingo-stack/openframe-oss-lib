@@ -26,7 +26,8 @@ ui-kit/src/styles/
 ├── ods-responsive-tokens.css  # Breakpoints, fluid font-size clamps
 ├── dark_theme.tokens.json     # Source of truth for dark primitives (1:1 with ods-colors.css)
 ├── light_theme.tokens.json    # Source of truth for light primitives
-├── storybook-fonts.css        # Direct font CSS for Storybook (Next.js apps use next/font)
+├── fonts.css                  # THE font loader: self-hosted Azeret Mono + DM Sans (@font-face), all apps
+├── fonts/                     # The woff2 files it serves (SIL OFL 1.1, licenses included)
 ├── vendor-react-easy-crop.css # Vendor override for react-easy-crop
 ├── vendor-react-scroll.css    # Vendor override for react-scroll
 └── README.md                  # This file

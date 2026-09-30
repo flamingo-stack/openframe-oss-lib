@@ -30,6 +30,8 @@
  *     for filenames containing URL-shaped text.
  */
 
+import { escapeRegExp } from '../../../utils/escape-regexp';
+
 // ---------------------------------------------------------------------------
 // Lib-local constants + types (mirror the hub's chat-attachment-config /
 // chat-attachment.ts). These are wire-format contracts owned by the hub's
@@ -137,10 +139,7 @@ export function formatChatAttachmentMarkdownForBubble(att: ChatAttachment, viewU
  * regex sources. Computed ONCE at module load. Exported so other
  * regex-building call sites can share the same source of truth.
  */
-export const CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED = CHAT_ATTACHMENT_VIEW_URL_PREFIX.replace(
-  /[.*+?^${}()|[\]\\]/g,
-  '\\$&',
-);
+export const CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED = escapeRegExp(CHAT_ATTACHMENT_VIEW_URL_PREFIX);
 
 /**
  * Single anchored regex matching both the image (`![]()`) and link

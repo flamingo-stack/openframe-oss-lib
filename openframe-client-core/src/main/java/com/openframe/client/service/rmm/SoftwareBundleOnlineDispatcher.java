@@ -15,6 +15,7 @@ import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import lombok.RequiredArgsConstructor;
@@ -36,9 +37,15 @@ public class SoftwareBundleOnlineDispatcher {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final SoftwareNatsPublisher softwareNatsPublisher;
     private final ScriptDeliveryRetryStore retryStore;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     public void dispatch(SoftwareBundle bundle, Machine machine) {
         if (bundle.getPackages() == null || bundle.getPackages().isEmpty()) {
+            return;
+        }
+        if (!packageManagerAvailability.isSoftwareManageable(machine)) {
+            log.info("Skipping software bundle bundleId={} for machineId={} — no usable package manager reported",
+                    bundle.getId(), machine.getMachineId());
             return;
         }
         for (SoftwareBundlePackage pkg : bundle.getPackages()) {

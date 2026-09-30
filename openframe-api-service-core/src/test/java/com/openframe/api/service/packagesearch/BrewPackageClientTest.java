@@ -77,6 +77,19 @@ class BrewPackageClientTest {
     }
 
     @Test
+    void emptyQueryListsMostPopularFirst() {
+        PackageCatalogEntry slack = caskEntry("slack", "Slack", 7594);
+        PackageCatalogEntry gh = formulaEntry("gh", "gh", 90000);
+        PackageCatalogEntry xz = formulaEntry("xz", "xz", 400);
+        when(packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.BREW, "")).thenReturn(List.of(slack, xz, gh));
+
+        PackageSearchResult result = client.search("", 3, 0);
+
+        List<String> ids = result.getItems().stream().map(item -> item.getId()).toList();
+        assertEquals(List.of("gh", "slack", "xz"), ids);
+    }
+
+    @Test
     void paginationReportsHasMore() {
         PackageCatalogEntry slack = caskEntry("slack", "Slack", 7594);
         PackageCatalogEntry slackCli = caskEntry("slack-cli", "Slack CLI", 791);

@@ -25,7 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.rmm.package-manager-bootstrap.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class PackageManagerBootstrapService {

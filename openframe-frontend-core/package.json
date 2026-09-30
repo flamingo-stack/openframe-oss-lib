@@ -229,6 +229,12 @@
       "require": "./dist/utils/humanity-signals.cjs",
       "default": "./dist/utils/humanity-signals.js"
     },
+    "./utils/form-rescue": {
+      "types": "./dist/utils/form-rescue.d.ts",
+      "import": "./dist/utils/form-rescue.js",
+      "require": "./dist/utils/form-rescue.cjs",
+      "default": "./dist/utils/form-rescue.js"
+    },
     "./utils/platform-identity": {
       "types": "./dist/utils/platform-identity.d.ts",
       "import": "./dist/utils/platform-identity.js",
@@ -301,12 +307,6 @@
       "import": "./dist/assets/index.js",
       "require": "./dist/assets/index.cjs",
       "default": "./dist/assets/index.js"
-    },
-    "./fonts": {
-      "types": "./dist/fonts.d.ts",
-      "import": "./dist/fonts.js",
-      "require": "./dist/fonts.cjs",
-      "default": "./dist/fonts.js"
     },
     "./tailwind.config.ts": {
       "types": "./dist/tailwind.config.d.ts",
