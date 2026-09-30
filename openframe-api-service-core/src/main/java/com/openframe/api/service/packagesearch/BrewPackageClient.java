@@ -12,6 +12,7 @@ import com.openframe.api.exception.PackageNotFoundException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
@@ -51,8 +52,12 @@ public class BrewPackageClient implements PackageManagerClient {
     }
 
     private PackageSearchResult listCatalog(int limit, int offset) {
-        List<PackageCatalogEntry> entries = packageCatalogRepository.listByManager(PackageManagerType.BREW, MOST_POPULAR_FIRST, offset, limit);
-        List<PackageSearchItem> items = entries.stream().map(this::toItem).toList();
+        // a cursor can land on any offset, and a Pageable only pages in whole page sizes
+        PageRequest firstRows = PageRequest.of(0, offset + limit, MOST_POPULAR_FIRST);
+        List<PackageSearchItem> items = packageCatalogRepository.findByManager(PackageManagerType.BREW, firstRows).stream()
+                .skip(offset)
+                .map(this::toItem)
+                .toList();
         int total = (int) packageCatalogRepository.countByManager(PackageManagerType.BREW);
         boolean hasMore = offset + limit < total;
         return PackageSearchResult.builder()

@@ -2,6 +2,8 @@ package com.openframe.data.repository.packagesearch;
 
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.core.annotation.Collation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.time.Instant;
@@ -15,6 +17,10 @@ public interface PackageCatalogRepository extends MongoRepository<PackageCatalog
     List<PackageCatalogEntry> findByManagerAndPackageIdIgnoreCase(PackageManagerType manager, String packageId);
 
     long deleteByManagerAndUpdatedAtBefore(PackageManagerType manager, Instant updatedAt);
+
+    // same collation as the listing indexes on PackageCatalogEntry, or the sort scans the manager's entries
+    @Collation("{ 'locale': 'en', 'strength': 2 }")
+    List<PackageCatalogEntry> findByManager(PackageManagerType manager, Pageable pageable);
 
     long countByManager(PackageManagerType manager);
 }

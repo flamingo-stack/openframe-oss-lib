@@ -16,6 +16,7 @@ import com.openframe.api.exception.PackageNotFoundException;
 import com.openframe.api.exception.PackageSourceUnavailableException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -76,8 +77,12 @@ public class WingetPackageClient implements PackageManagerClient {
     }
 
     private PackageSearchResult listCatalog(int limit, int offset) {
-        List<PackageCatalogEntry> entries = packageCatalogRepository.listByManager(PackageManagerType.WINGET, BY_NAME, offset, limit);
-        List<PackageSearchItem> items = entries.stream().map(this::toItem).toList();
+        // a cursor can land on any offset, and a Pageable only pages in whole page sizes
+        PageRequest firstRows = PageRequest.of(0, offset + limit, BY_NAME);
+        List<PackageSearchItem> items = packageCatalogRepository.findByManager(PackageManagerType.WINGET, firstRows).stream()
+                .skip(offset)
+                .map(this::toItem)
+                .toList();
         int total = (int) packageCatalogRepository.countByManager(PackageManagerType.WINGET);
         boolean hasMore = offset + limit < total;
         return PackageSearchResult.builder()

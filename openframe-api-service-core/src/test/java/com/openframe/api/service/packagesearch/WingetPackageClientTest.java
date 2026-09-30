@@ -8,6 +8,7 @@ import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.exception.PackageNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
@@ -47,7 +48,7 @@ class WingetPackageClientTest {
         // setup
         Sort byName = Sort.by(Sort.Order.asc("name"), Sort.Order.asc("packageId"));
         PackageCatalogEntry chrome = entry("Google.Chrome", "Google Chrome");
-        when(packageCatalogRepository.listByManager(PackageManagerType.WINGET, byName, 0, 1)).thenReturn(List.of(chrome));
+        when(packageCatalogRepository.findByManager(PackageManagerType.WINGET, PageRequest.of(0, 1, byName))).thenReturn(List.of(chrome));
         when(packageCatalogRepository.countByManager(PackageManagerType.WINGET)).thenReturn(1L);
 
         // execution

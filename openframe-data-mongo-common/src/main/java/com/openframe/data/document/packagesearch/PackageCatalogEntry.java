@@ -22,7 +22,7 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "package_catalog")
 @TypeAlias("packageCatalogEntry")
-// collation must match PackageCatalogRepositoryImpl.listByManager, or the unfiltered listing scans the collection
+// collation must match PackageCatalogRepository.findByManager, or the unfiltered listing scans the collection
 @CompoundIndexes({
         @CompoundIndex(name = "manager_popularity_packageId_ci", def = "{'manager': 1, 'popularity': -1, 'packageId': 1}",
                 collation = "{'locale': 'en', 'strength': 2}"),

@@ -9,6 +9,7 @@ import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.exception.PackageNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
@@ -85,15 +86,17 @@ class BrewPackageClientTest {
         Sort mostPopularFirst = Sort.by(Sort.Order.desc("popularity"), Sort.Order.asc("packageId"));
         PackageCatalogEntry gh = formulaEntry("gh", "gh", 90000);
         PackageCatalogEntry slack = caskEntry("slack", "Slack", 7594);
-        when(packageCatalogRepository.listByManager(PackageManagerType.BREW, mostPopularFirst, 25, 2)).thenReturn(List.of(gh, slack));
+        PackageCatalogEntry xz = formulaEntry("xz", "xz", 400);
+        when(packageCatalogRepository.findByManager(PackageManagerType.BREW, PageRequest.of(0, 3, mostPopularFirst)))
+                .thenReturn(List.of(gh, slack, xz));
         when(packageCatalogRepository.countByManager(PackageManagerType.BREW)).thenReturn(15323L);
 
         // execution
-        PackageSearchResult result = client.search("", 2, 25);
+        PackageSearchResult result = client.search("", 2, 1);
 
         // verifications
         List<String> ids = result.getItems().stream().map(item -> item.getId()).toList();
-        assertEquals(List.of("gh", "slack"), ids);
+        assertEquals(List.of("slack", "xz"), ids);
         assertEquals(15323, result.getTotal());
         assertTrue(result.isHasMore());
         verify(packageCatalogRepository, never()).findByManagerAndSearchBlobContaining(PackageManagerType.BREW, "");
