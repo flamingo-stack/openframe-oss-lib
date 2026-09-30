@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/** Relay connection returned by {@code searchPackages}; forward pagination only. */
+// Relay connection returned by searchPackages; forward pagination only.
 @Data
 @Builder
 @NoArgsConstructor

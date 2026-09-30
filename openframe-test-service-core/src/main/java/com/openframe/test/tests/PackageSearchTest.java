@@ -17,20 +17,7 @@ import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The public package catalog behind the Software screen's install form (coverage plan item CP-34):
- * {@code searchPackages} feeds the package picker and {@code packageDetails} its version list.
- *
- * <p>Read-only: no case writes tenant state, so there is nothing to clean up. Homebrew and winget
- * search, and Homebrew details, are served from the catalog the management service syncs into the
- * tenant's Mongo; winget details are fetched from Microsoft's CDN on demand, so the winget case is the
- * one that fails when the public internet is unreachable rather than when the product is broken.
- *
- * <p>Each manager fills a different subset of the optional fields, and the schema documents the gaps:
- * {@code publisher} is WINGET-only and {@code iconUrl} CHOCO-only in search results, {@code popularity}
- * is BREW/CHOCO-only, {@code releasedAt} Chocolatey-only, and Homebrew publishes only the current
- * version. The assertions pin those gaps rather than assert them away.
- */
+// Public package catalog behind the Software install form (CP-34), read-only; winget details need Microsoft's CDN, and per-manager field gaps are pinned, not asserted away.
 @Tag("saas")
 @Tag("package-search")
 @DisplayName("Package search")
@@ -42,16 +29,16 @@ public class PackageSearchTest extends BaseTest {
     private static final String FORMULA = "FORMULA";
     private static final String CASK = "CASK";
 
-    /** A formula with no cask of the same name; the cask lookup of it is the strict-packageType negative case. */
+    // A formula with no cask of the same name; the cask lookup of it is the strict-packageType negative case.
     private static final String BREW_FORMULA_ONLY = "wget";
-    /** A Homebrew term whose first hits include both a formula (wireshark) and a cask (wireshark-app). */
+    // A Homebrew term whose first hits include both a formula (wireshark) and a cask (wireshark-app).
     private static final String BREW_MIXED_SEARCH = "wireshark";
-    /** A long-lived winget package with many published versions and a slow release cadence. */
+    // A long-lived winget package with many published versions and a slow release cadence.
     private static final String WINGET_PACKAGE = "7zip.7zip";
-    /** A broad Homebrew term with far more matches than the two pages the pagination case reads. */
+    // A broad Homebrew term with far more matches than the two pages the pagination case reads.
     private static final String BROAD_SEARCH = "python";
     private static final int PAGE = 5;
-    /** The server's page cap (PackageSearchService.MAX_LIMIT): Chocolatey's 40-row page less one look-ahead row. */
+    // The server's page cap (PackageSearchService.MAX_LIMIT): Chocolatey's 40-row page less one look-ahead row.
     private static final int MAX_PAGE = 39;
 
     private static final String UNKNOWN_ID = "no-such-package-" + RunId.next();
@@ -97,14 +84,7 @@ public class PackageSearchTest extends BaseTest {
                 .as("releasedAt is Chocolatey-only").containsOnlyNulls();
     }
 
-    /**
-     * The schema's example is a name that exists as both a formula and a cask. Homebrew has since
-     * renamed the casks that collided with a formula (the qa catalog holds {@code wireshark} and
-     * {@code wireshark-app}, {@code docker} and {@code docker-desktop}, and no name tried exists as both), so
-     * there is no such pair to open; the case
-     * asserts the same contract from both sides instead — each hit opens as exactly the type it was
-     * returned with, and the other type of the same name is not substituted for it.
-     */
+    // No name exists as both formula and cask any more (Homebrew renamed them), so each hit must open as exactly its own type, never the other.
     @Tag("feature")
     @Test
     @DisplayName("packageType opens exactly the Homebrew formula or cask the search returned")
@@ -215,12 +195,7 @@ public class PackageSearchTest extends BaseTest {
                 .as("A blank packageId is a VALIDATION_ERROR").containsExactly("VALIDATION_ERROR");
     }
 
-    /**
-     * Chocolatey sits behind {@code openframe.package-managers.choco-enabled}, which defaults to false and
-     * which no environment config sets, so on qa both queries refuse it. This pins that state: when the
-     * flag is turned on this case fails, and it is the signal to replace it with the Chocolatey-only
-     * assertions (iconUrl in search, releasedAt, more than one version).
-     */
+    // Chocolatey is off (openframe.package-managers.choco-enabled defaults to false and nothing sets it); when this fails, add the Chocolatey assertions.
     @Tag("feature")
     @Test
     @DisplayName("Chocolatey is refused while the deployment keeps it disabled")
@@ -240,11 +215,7 @@ public class PackageSearchTest extends BaseTest {
         return connection.nodes().stream().map(item -> item.getId() + "/" + item.getPackageType()).toList();
     }
 
-    /**
-     * The codes of the errors that carry one. A refused non-null root field also gets graphql-java's own
-     * NullValueInNonNullableField error, which has no {@code code}; it is dropped so the assertion is about
-     * the product's error alone.
-     */
+    // Codes of the errors that carry one; graphql-java's code-less NullValueInNonNullableField is dropped.
     private static List<Object> codes(List<GraphqlError> errors) {
         return errors.stream()
                 .map(error -> error.getExtensions() == null ? null : error.getExtensions().get("code"))

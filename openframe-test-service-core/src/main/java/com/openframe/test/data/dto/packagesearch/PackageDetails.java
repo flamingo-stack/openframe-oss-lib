@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/** {@code packageDetails} answer; {@code versions} are newest first. */
+// packageDetails answer; versions are newest first.
 @Data
 @Builder
 @NoArgsConstructor

@@ -6,11 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * One {@code searchPackages} hit. {@code id} (with {@code packageType} for BREW) is what
- * {@code packageDetails} takes back; {@code publisher} is WINGET-only and {@code iconUrl} CHOCO-only in
- * search results.
- */
+// One searchPackages hit: id (plus packageType for BREW) is what packageDetails takes; publisher is WINGET-only, iconUrl CHOCO-only.
 @Data
 @Builder
 @NoArgsConstructor

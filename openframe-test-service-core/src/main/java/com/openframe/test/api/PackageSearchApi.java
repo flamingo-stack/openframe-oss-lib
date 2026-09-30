@@ -17,21 +17,16 @@ import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import static io.restassured.RestAssured.given;
 
-/**
- * Client for the public package catalog: {@code searchPackages} over Homebrew, Chocolatey or winget and
- * {@code packageDetails} for one package. Read-only — nothing here writes tenant state. Package managers
- * are passed as their schema enum names (BREW, CHOCO, WINGET); {@code packageType} (FORMULA, CASK) is
- * BREW-only and may be null.
- */
+// Public package catalog client: searchPackages (BREW, CHOCO, WINGET) and packageDetails; read-only, and packageType (FORMULA, CASK) is BREW-only.
 public class PackageSearchApi {
 
-    /** One page of matches; {@code after} is the previous page's {@code pageInfo.endCursor}, or null. */
+    // One page of matches; after is the previous page's pageInfo.endCursor, or null.
     public static PackageSearchConnection searchPackages(String packageManager, String search, int first, String after) {
         JsonPath response = query(SEARCH_PACKAGES, searchVariables(packageManager, search, first, after));
         return response.getObject("data.searchPackages", PackageSearchConnection.class);
     }
 
-    /** A search expected to be refused (a package manager the deployment disables); returns the GraphQL errors. */
+    // A search expected to be refused (a package manager the deployment disables); returns the GraphQL errors.
     public static List<GraphqlError> attemptSearchPackagesErrors(String packageManager, String search, int first) {
         return errorsOf(SEARCH_PACKAGES, searchVariables(packageManager, search, first, null));
     }
@@ -41,7 +36,7 @@ public class PackageSearchApi {
         return response.getObject("data.packageDetails", PackageDetails.class);
     }
 
-    /** A lookup expected to be refused (unknown id, blank id, the wrong Homebrew type); returns the GraphQL errors. */
+    // A lookup expected to be refused (unknown id, blank id, the wrong Homebrew type); returns the GraphQL errors.
     public static List<GraphqlError> attemptPackageDetailsErrors(String packageManager, String packageId, String packageType) {
         return errorsOf(PACKAGE_DETAILS, detailsVariables(packageManager, packageId, packageType));
     }
@@ -77,11 +72,7 @@ public class PackageSearchApi {
                 .extract().jsonPath();
     }
 
-    /**
-     * Sends a document without the success spec and returns its top-level GraphQL errors (never null).
-     * A non-200 answer is a contract violation in its own right — GraphQL reports rejections as 200 +
-     * errors — so it fails with the status and the body instead of a bare status mismatch.
-     */
+    // Sends a document without the success spec and returns its GraphQL errors; a non-200 answer fails with the status and body.
     private static List<GraphqlError> errorsOf(String document, Map<String, Object> variables) {
         Map<String, Object> body = Map.of("query", document, "variables", variables);
         Response response = given(getAuthorizedSpec()).body(body).post(GRAPHQL);

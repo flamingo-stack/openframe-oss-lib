@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** One entry of {@code PackageDetails.versions}; {@code releasedAt} is published by Chocolatey only. */
+// One entry of PackageDetails.versions; releasedAt is published by Chocolatey only.
 @Data
 @Builder
 @NoArgsConstructor

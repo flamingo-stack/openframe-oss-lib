@@ -1,10 +1,6 @@
 package com.openframe.test.api.graphql;
 
-/**
- * GraphQL documents for the public package catalog (openframe-api-service-core
- * {@code package-search.graphqls}), served on {@code api/graphql}. The Software screen's install form
- * searches with {@code searchPackages} and opens the version picker with {@code packageDetails}.
- */
+// Public package catalog documents on api/graphql: searchPackages feeds the install form's picker, packageDetails its version list.
 public class PackageSearchQueries {
 
     public static final String SEARCH_PACKAGES = """
