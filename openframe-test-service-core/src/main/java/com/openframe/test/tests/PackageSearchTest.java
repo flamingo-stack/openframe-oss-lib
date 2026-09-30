@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * version. The assertions pin those gaps rather than assert them away.
  */
 @Tag("saas")
+@Tag("package-search")
 @DisplayName("Package search")
 public class PackageSearchTest extends BaseTest {
 
