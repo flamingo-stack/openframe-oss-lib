@@ -6,11 +6,13 @@ import com.openframe.test.context.PipelineContext;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
 import com.openframe.test.data.generator.OrganizationGenerator;
+import com.openframe.test.helpers.RelayIds;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import static com.openframe.test.data.generator.OrganizationGenerator.lastActivityRangeFilter;
 import static com.openframe.test.data.generator.OrganizationGenerator.lastActivitySort;
@@ -187,5 +189,32 @@ public class OrganizationsTest extends BaseTest {
         }
         Organization archived = OrganizationApi.retrieveOrganizationByOrganizationId(organization.getOrganizationId());
         assertThat(archived.getStatus()).as("The organization is archived afterwards").isEqualTo("ARCHIVED");
+    }
+
+    @Tag("feature")
+    @Tag("saas")
+    @Test
+    @DisplayName("Get Organization by global id")
+    public void testRetrieveOrganizationByGlobalId() {
+        Organization listed = OrganizationApi.listOrganizations().getFirst();
+        Organization organization = OrganizationApi.retrieveOrganization(listed.getId());
+        assertThat(organization).as("organization(id:) should resolve the listed global id").isNotNull();
+        assertThat(organization.getId()).as("The returned global id is the one requested").isEqualTo(listed.getId());
+        assertThat(organization).as("organization(id:) and organizationByOrganizationId return the same organization")
+                .usingRecursiveComparison()
+                .isEqualTo(OrganizationApi.retrieveOrganizationByOrganizationId(listed.getOrganizationId()));
+    }
+
+    @Tag("feature")
+    @Tag("saas")
+    @Test
+    @DisplayName("Get Organization by a global id with no record returns null")
+    public void testRetrieveOrganizationByMissingGlobalId() {
+        // Well-formed (Organization:<uuid>) but no such organizationId: the resolver maps an empty lookup to null.
+        // The server decodes URL-safe Base64 and RelayIds encodes standard Base64; the two only differ on
+        // '+' and '/', which the ASCII of "Organization:" plus a UUID never produces.
+        String missingId = RelayIds.toGlobalId("Organization", UUID.randomUUID().toString());
+        assertThat(OrganizationApi.retrieveOrganization(missingId))
+                .as("organization(id:) for a missing record is null, not an error").isNull();
     }
 }
