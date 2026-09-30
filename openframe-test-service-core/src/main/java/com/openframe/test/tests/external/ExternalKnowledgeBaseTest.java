@@ -57,6 +57,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * the tag case attaches is created over GraphQL by that case and deleted in {@link #cleanup()}.
  */
 @Tag("external-api")
+@Tag("knowledge-base")
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
 @DisplayName("ExtApi: External API - Knowledge Base")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
