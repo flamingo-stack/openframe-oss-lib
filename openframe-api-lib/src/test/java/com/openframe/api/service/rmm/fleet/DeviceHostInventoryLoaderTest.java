@@ -15,11 +15,10 @@ import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareResponse;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
+import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,7 +26,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.hostSoftware;
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.title;
@@ -54,10 +52,7 @@ class DeviceHostInventoryLoaderTest {
     @Mock private DeviceService deviceService;
     @Mock private FleetHostMachineResolver hostMachineResolver;
     @Mock private TenantIdProvider tenantIdProvider;
-    @Mock private CorrelatedHostSoftwareCache hostSoftwareCache;
     @Mock private ToolConnectionRepository toolConnectionRepository;
-
-    @Captor private ArgumentCaptor<Function<HostSearchRequest, List<Host>>> hostSearchCaptor;
 
     @InjectMocks private DeviceHostInventoryLoader loader;
 
@@ -123,7 +118,7 @@ class DeviceHostInventoryLoaderTest {
         when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
         stubFleetConnection(String.valueOf(HOST_ID));
         when(fleet.listHostSoftware(HOST_ID, 0, FETCH_PAGE_SIZE)).thenReturn(null);
-        when(hostSoftwareCache.softwareByHostId(any())).thenReturn(Map.of());
+        when(fleet.getHostVulnerabilityInventoryById(HOST_ID)).thenReturn(null);
 
         // execution
         HostInventory inventory = loader.load(fleet, MACHINE_ID);
@@ -163,7 +158,7 @@ class DeviceHostInventoryLoaderTest {
         // verifications
         assertThat(inventory.getTitles()).isEmpty();
         verify(fleet, never()).listHostSoftware(HOST_ID, 0, FETCH_PAGE_SIZE);
-        verifyNoInteractions(hostSoftwareCache);
+        verify(fleet, never()).getHostVulnerabilityInventoryById(HOST_ID);
     }
 
     @Test
@@ -183,28 +178,27 @@ class DeviceHostInventoryLoaderTest {
     }
 
     @Test
-    void load_correlatedHost_softwareCacheFilledThroughCallersFleetClient() {
+    void load_correlatedHost_softwareDetailsReadForThatHostOnly() {
         // setup
         stubCorrelatedHost();
         stubHostSoftwarePage(0, false, title(10L, "Google Chrome", "apps", "120.0"));
         stubCorrelatedSoftware();
-        HostSearchRequest request = new HostSearchRequest();
 
         // execution
         loader.load(fleet, MACHINE_ID);
 
         // verifications
-        verify(hostSoftwareCache).softwareByHostId(hostSearchCaptor.capture());
-        hostSearchCaptor.getValue().apply(request);
-        verify(fleet).searchHosts(request);
+        verify(fleet).getHostVulnerabilityInventoryById(HOST_ID);
+        verify(fleet, never()).searchHosts(any(HostSearchRequest.class));
     }
 
     @Test
-    void load_hostAbsentFromSoftwareCache_titlesKeptWithoutCveDetails() {
+    void load_hostWithoutSoftwareDetails_titlesKeptWithoutCveDetails() {
         // setup
         stubCorrelatedHost();
         stubHostSoftwarePage(0, false, title(10L, "Google Chrome", "apps", "120.0", CVE_A));
-        when(hostSoftwareCache.softwareByHostId(any())).thenReturn(Map.of());
+        when(fleet.getHostVulnerabilityInventoryById(HOST_ID))
+                .thenReturn(new HostVulnerabilityInventory(HOST_ID, "host-1", null, null));
 
         // execution
         HostInventory inventory = loader.load(fleet, MACHINE_ID);
@@ -262,6 +256,7 @@ class DeviceHostInventoryLoaderTest {
     }
 
     private void stubCorrelatedSoftware(FleetSoftware... software) {
-        when(hostSoftwareCache.softwareByHostId(any())).thenReturn(Map.of(HOST_ID, List.of(software)));
+        when(fleet.getHostVulnerabilityInventoryById(HOST_ID))
+                .thenReturn(new HostVulnerabilityInventory(HOST_ID, "host-1", null, List.of(software)));
     }
 }

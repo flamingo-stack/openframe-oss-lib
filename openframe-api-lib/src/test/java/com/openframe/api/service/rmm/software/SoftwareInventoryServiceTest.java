@@ -16,13 +16,13 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
-import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
 import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
+import com.openframe.sdk.fleetmdm.model.FleetVulnerability;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
@@ -35,15 +35,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Stream;
 
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.hostSoftware;
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.title;
@@ -53,8 +50,9 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -70,20 +68,16 @@ class SoftwareInventoryServiceTest {
     private static final String CVE_MEDIUM = "CVE-2024-0002";
 
     @Mock private FleetMdmClient fleet;
-    @Mock private FleetDeviceCountEnricher deviceCountEnricher;
     @Mock private FleetHostMachineResolver hostMachineResolver;
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private com.openframe.data.repository.tool.IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
 
-    @Captor private ArgumentCaptor<List<SoftwareResponse>> pageRowsCaptor;
-    @Captor private ArgumentCaptor<Function<FleetSoftware, Stream<String>>> keysOfCaptor;
-
     private SoftwareInventoryService service;
 
     @BeforeEach
     void setUp() {
-        service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
+        service = new SoftwareInventoryService(integratedToolRepository, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
@@ -127,103 +121,63 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
-    @DisplayName("getSoftwareFilters: no titles -> valid empty facet lists (never null)")
-    void getSoftwareFilters_noTitles_emptyFacets() {
-        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
-        when(response.getSoftwareTitles()).thenReturn(List.of());
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
-
-        SoftwareFilters filters = service.getSoftwareFilters(null);
+    @DisplayName("getSoftwareFilters: empty facet lists (never null) without downloading the Fleet catalog")
+    void getSoftwareFilters_emptyFacetsWithoutFleet() {
+        SoftwareFilters filters = service.getSoftwareFilters();
 
         assertThat(filters.getSources()).isEmpty();
         assertThat(filters.getVersionStatuses()).isEmpty();
         assertThat(filters.getSeverities()).isEmpty();
+        verifyNoInteractions(fleet);
     }
 
     @Test
-    @DisplayName("listSoftware: sort by cveCount DESC is a client-side sort — highest CVE count first, ties by name")
-    void listSoftware_sortByCveCount_desc_clientSideTiesByName() {
-        SoftwareTitlesResponse response = org.mockito.Mockito.mock(SoftwareTitlesResponse.class);
-        when(response.getSoftwareTitles()).thenReturn(List.of(
-                titleWithCves("Bravo", 5),
-                titleWithCves("Alpha", 5),
-                titleWithCves("Chrome", 40)));
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response); // meta null -> single page in the scan
-        simulateEnricherSetsCount(1);
+    @DisplayName("listSoftware: one Fleet page per request — paging, search, vulnerable and the devices sort go to Fleet; its count and has-next come back")
+    void listSoftware_onePageFromFleet() {
+        SoftwareTitle chrome = titleWithSource("Chrome", "homebrew_packages");
+        chrome.setId(42L);
+        chrome.setHostsCount(31);
+        SoftwareTitlesResponse response = titlesPage(45, true, chrome);
+        ArgumentCaptor<SoftwareTitleRequest> request = ArgumentCaptor.forClass(SoftwareTitleRequest.class);
+        when(fleet.listSoftwareTitles(request.capture())).thenReturn(response);
 
-        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, sort("cveCount", SortDirection.DESC), null);
+        PageResult<SoftwareResponse> result = service.listSoftware("chr", 2, 20,
+                sort("devicesCount", SortDirection.DESC), true);
 
-        assertThat(result.items()).extracting(SoftwareResponse::getName)
-                .containsExactly("Chrome", "Alpha", "Bravo"); // 40 first; the two 5s by name ascending
+        assertThat(request.getValue())
+                .extracting(SoftwareTitleRequest::getPage, SoftwareTitleRequest::getPerPage, SoftwareTitleRequest::getQuery,
+                        SoftwareTitleRequest::getVulnerable, SoftwareTitleRequest::getOrderKey,
+                        SoftwareTitleRequest::getOrderDirection)
+                .containsExactly(2, 20, "chr", true, "hosts_count", "desc");
+        assertThat(result.items()).extracting(SoftwareResponse::getId, SoftwareResponse::getDevicesCount)
+                .containsExactly(tuple("42", 31));
+        assertThat(result.filteredCount()).isEqualTo(45);
+        assertThat(result.hasNext()).isTrue();
+        assertThat(result.hasPrevious()).isTrue();
+        assertThat(result.page()).isEqualTo(2);
     }
 
     @Test
-    @DisplayName("getSoftwareFilters: with titles → source facet counts each package-manager bucket; unknown fleet source falls back to UNMANAGED")
-    void getSoftwareFilters_countsSourceBucketsAcrossTitles() {
-        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
-        when(response.getSoftwareTitles()).thenReturn(List.of(
-                titleWithSource("Chocolatey app 1", "chocolatey_packages"),
-                titleWithSource("Chocolatey app 2", "chocolatey_packages"),
-                titleWithSource("Homebrew tool",    "homebrew_packages"),
-                titleWithSource("Random pkg",       "programs")));      // unknown -> UNMANAGED
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+    @DisplayName("listSoftware: sorts Fleet cannot do (CVE count) leave the order to Fleet's default")
+    void listSoftware_cveCountSort_fleetDefaultOrder() {
+        ArgumentCaptor<SoftwareTitleRequest> request = ArgumentCaptor.forClass(SoftwareTitleRequest.class);
+        when(fleet.listSoftwareTitles(request.capture())).thenReturn(titlesPage(0, false));
 
-        SoftwareFilters filters = service.getSoftwareFilters(null);
+        service.listSoftware(null, 0, 20, sort("cveCount", SortDirection.DESC), null);
 
-        // Each dimension is capped by SoftwareFilterOption; order follows enum ordinal so we assert as-map.
-        java.util.Map<String, Integer> sourceCounts = filters.getSources().stream()
-                .collect(java.util.stream.Collectors.toMap(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount));
-        assertThat(sourceCounts).containsEntry(SoftwareSource.CHOCOLATEY.name(), 2);
-        assertThat(sourceCounts).containsEntry(SoftwareSource.BREW.name(), 1);
-        assertThat(sourceCounts).containsEntry(SoftwareSource.UNMANAGED.name(), 1);
+        assertThat(request.getValue().getOrderKey()).isNull();
+        assertThat(request.getValue().getOrderDirection()).isNull();
     }
 
     @Test
-    @DisplayName("listSoftware: delegates devicesCount enrichment to FleetDeviceCountEnricher — whatever count the enricher sets is what the user sees, and Fleet's raw hosts_count is discarded in the process")
-    void listSoftware_delegatesEnrichmentToEnricher() {
-        // Fleet says 31 devices; enricher correlates down to 2 real Machines.
-        SoftwareTitle raw = new SoftwareTitle();
-        raw.setId(42L);
-        raw.setName("Chrome");
-        raw.setHostsCount(31);
-        raw.setVersions(List.of());
-        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
-        when(response.getSoftwareTitles()).thenReturn(List.of(raw));
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
-        simulateEnricherSetsCount(2);
+    @DisplayName("findById: the devices count is Fleet's own count for the title")
+    void findById_devicesCountFromFleet() {
+        SoftwareTitle chrome = titleWithSource("Chrome", "homebrew_packages");
+        chrome.setId(42L);
+        chrome.setHostsCount(7);
+        when(fleet.getSoftwareTitle(42L)).thenReturn(chrome);
 
-        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, null, null);
-
-        assertThat(result.items()).hasSize(1);
-        // The critical invariant: user sees the enricher-provided count, not Fleet's raw 31.
-        assertThat(result.items().get(0).getDevicesCount()).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("getSoftwareFilters: bypasses devicesCount enrichment — facet counts don't need it, and firing N Fleet /hosts calls per facet request is wasteful")
-    void getSoftwareFilters_doesNotFireEnrichment() {
-        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
-        when(response.getSoftwareTitles()).thenReturn(List.of(
-                titleWithSource("Chocolatey app", "chocolatey_packages")));
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
-
-        service.getSoftwareFilters(null);
-
-        // Invariant: facet reads must never fire the enricher — that would explode into N Fleet
-        // /hosts lookups per facet request.
-        org.mockito.Mockito.verifyNoInteractions(deviceCountEnricher);
-    }
-
-    // Simulate the enricher's side-effect: write count back via the passed countSetter.
-    // Its correlation math is tested in FleetDeviceCountEnricherTest, not here.
-    @SuppressWarnings("unchecked")
-    private void simulateEnricherSetsCount(int count) {
-        org.mockito.Mockito.doAnswer(inv -> {
-            List<SoftwareResponse> rows = inv.getArgument(0);
-            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(4);
-            rows.forEach(row -> setter.accept(row, count));
-            return null;
-        }).when(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), any(), any(), any());
+        assertThat(service.findById("42")).map(SoftwareResponse::getDevicesCount).contains(7);
     }
 
     @Test
@@ -295,57 +249,6 @@ class SoftwareInventoryServiceTest {
         assertThat(total).isEqualTo(1); // one correlated device → one status bucket, count 1
     }
 
-    @Test
-    @DisplayName("listSoftware: titles the enricher correlates to zero live devices are hidden from the list")
-    void listSoftware_dropsZeroDeviceTitles() {
-        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
-        when(response.getSoftwareTitles()).thenReturn(List.of(
-                titleWithSource("Keep", "homebrew_packages"),
-                titleWithSource("Drop", "homebrew_packages")));
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
-        org.mockito.Mockito.doAnswer(inv -> {
-            List<SoftwareResponse> rows = inv.getArgument(0);
-            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(4);
-            rows.forEach(row -> setter.accept(row, "Keep".equals(row.getName()) ? 1 : 0));
-            return null;
-        }).when(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), any(), any(), any());
-
-        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, null, null);
-
-        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Keep");
-    }
-
-    @Test
-    @DisplayName("listSoftware: a host's software version is counted under the title that owns that version id")
-    @SuppressWarnings("unchecked")
-    void listSoftware_keysHostSoftwareByTitleOfItsVersion() {
-        SoftwareTitle chrome = titleWithSource("Chrome", "homebrew_packages");
-        chrome.setId(42L);
-        chrome.getVersions().get(0).setId(7L);
-        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
-        when(response.getSoftwareTitles()).thenReturn(List.of(chrome));
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
-        simulateEnricherSetsCount(1);
-
-        service.listSoftware("", 0, 20, null, null);
-
-        org.mockito.ArgumentCaptor<java.util.function.Function<FleetSoftware, java.util.stream.Stream<String>>> keysOf =
-                org.mockito.ArgumentCaptor.forClass(java.util.function.Function.class);
-        org.mockito.ArgumentCaptor<java.util.function.Function<SoftwareResponse, String>> rowKey =
-                org.mockito.ArgumentCaptor.forClass(java.util.function.Function.class);
-        org.mockito.Mockito.verify(deviceCountEnricher)
-                .enrichFromHostSoftware(anyList(), any(), keysOf.capture(), rowKey.capture(), any());
-        assertThat(keysOf.getValue().apply(installed(7L))).containsExactly("42");
-        assertThat(keysOf.getValue().apply(installed(8L))).isEmpty();
-        assertThat(rowKey.getValue().apply(SoftwareResponse.builder().id("42").build())).isEqualTo("42");
-    }
-
-    private static FleetSoftware installed(long versionId) {
-        FleetSoftware software = new FleetSoftware();
-        software.setId(versionId);
-        return software;
-    }
-
     private static SoftwareTitle titleWithSource(String name, String fleetSource) {
         SoftwareTitle t = new SoftwareTitle();
         t.setName(name);
@@ -363,12 +266,11 @@ class SoftwareInventoryServiceTest {
         title.setId(42L);
         title.setName("setuptools");
         title.setVersions(List.of(
-                versionWithCve("10.0", "CVE-2026-59890"),
-                versionWithCve("9.0", "CVE-2026-59890"),
-                versionWithCve("58.0.4", "CVE-2026-59890")));
+                versionWithCve(1L, "10.0", "CVE-2026-59890"),
+                versionWithCve(2L, "9.0", "CVE-2026-59890"),
+                versionWithCve(3L, "58.0.4", "CVE-2026-59890")));
         when(fleet.getSoftwareTitle(42L)).thenReturn(title);
-        when(fleet.getVulnerability(org.mockito.ArgumentMatchers.anyString()))
-                .thenReturn(new com.openframe.sdk.fleetmdm.model.Vulnerability());
+        when(fleet.getSoftwareVersion(anyLong())).thenReturn(versionDetails(cveFound("CVE-2026-59890", null)));
 
         PageResult<SoftwareVulnerabilityResponse> result =
                 service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
@@ -381,21 +283,58 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
-    @DisplayName("listVulnerabilitiesForSoftware: a CVE Fleet has no record for (null enrichment) does not NPE")
-    void listVulnerabilitiesForSoftware_nullEnrichment_noNpe() {
+    @DisplayName("listVulnerabilitiesForSoftware: CVE details come from one Fleet call per version, never one per CVE; the earliest discovery wins")
+    void listVulnerabilitiesForSoftware_detailsPerVersion() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(42L);
+        title.setVersions(List.of(versionWithCve(1L, "1.0", "CVE-A"), versionWithCve(2L, "2.0", "CVE-A")));
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+        when(fleet.getSoftwareVersion(1L)).thenReturn(versionDetails(cveFound("CVE-A", "2026-09-02T00:00:00Z")));
+        when(fleet.getSoftwareVersion(2L)).thenReturn(versionDetails(cveFound("CVE-A", "2026-09-01T00:00:00Z")));
+
+        PageResult<SoftwareVulnerabilityResponse> result =
+                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
+
+        assertThat(result.items()).extracting(row -> row.getDiscoveredAt().toString())
+                .containsExactly("2026-09-01T00:00:00Z");
+        verify(fleet, never()).getVulnerability(anyString());
+    }
+
+    @Test
+    @DisplayName("listVulnerabilitiesForSoftware: a version Fleet no longer has (404) does not NPE")
+    void listVulnerabilitiesForSoftware_versionGone_noNpe() {
         SoftwareTitle title = new SoftwareTitle();
         title.setId(42L);
         title.setName("setuptools");
-        title.setVersions(List.of(versionWithCve("58.0.4", "CVE-2026-00000")));
+        title.setVersions(List.of(versionWithCve(1L, "58.0.4", "CVE-2026-00000")));
         when(fleet.getSoftwareTitle(42L)).thenReturn(title);
-        when(fleet.getVulnerability(org.mockito.ArgumentMatchers.anyString())).thenReturn(null); // 404 from Fleet
+        when(fleet.getSoftwareVersion(1L)).thenReturn(null);
 
         PageResult<SoftwareVulnerabilityResponse> result =
                 service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
 
         assertThat(result.items()).hasSize(1);
         assertThat(result.items().get(0).getCveId()).isEqualTo("CVE-2026-00000");
-        assertThat(result.items().get(0).getSeverity()).isNull(); // no enrichment → no severity
+        assertThat(result.items().get(0).getDiscoveredAt()).isNull();
+    }
+
+    private static SoftwareTitleVersion versionWithCve(Long id, String version, String cve) {
+        SoftwareTitleVersion v = versionWithCve(version, cve);
+        v.setId(id);
+        return v;
+    }
+
+    private static FleetSoftware versionDetails(FleetVulnerability... cves) {
+        FleetSoftware software = new FleetSoftware();
+        software.setVulnerabilities(List.of(cves));
+        return software;
+    }
+
+    private static FleetVulnerability cveFound(String cve, String createdAt) {
+        FleetVulnerability vulnerability = new FleetVulnerability();
+        vulnerability.setCve(cve);
+        vulnerability.setCreatedAt(createdAt);
+        return vulnerability;
     }
 
     private static SoftwareTitleVersion versionWithCve(String version, String cve) {
@@ -497,13 +436,15 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
-    void listSoftwareForDevice_pageRequested_everyFilteredRowCountedFromHostSoftwareNotPerRow() {
+    void listSoftwareForDevice_pageRequested_devicesCountReadForPageRowsOnly() {
         // setup
         stubInventory(
                 List.of(title(10L, "Google Chrome", "apps", "120.0"),
                         title(11L, "node", "homebrew_packages", "20.1"),
                         title(12L, "zsh", "homebrew_packages", "5.9")),
                 List.of());
+        when(fleet.getSoftwareTitle(10L)).thenReturn(titleWithHosts(10L, 4));
+        when(fleet.getSoftwareTitle(11L)).thenReturn(titleWithHosts(11L, 9));
 
         // execution
         PageResult<SoftwareResponse> result = service.listSoftwareForDevice(MACHINE_ID, null, null, FIRST_PAGE, 2, null);
@@ -511,49 +452,11 @@ class SoftwareInventoryServiceTest {
         // verifications
         assertThat(result.hasNext()).isTrue();
         assertThat(result.filteredCount()).isEqualTo(3);
-        verify(deviceCountEnricher).enrichFromHostSoftware(pageRowsCaptor.capture(), any(), any(), any(), any());
-        assertThat(pageRowsCaptor.getValue())
-                .extracting(SoftwareResponse::getName)
-                .containsExactly("Google Chrome", "node", "zsh");
-        verify(deviceCountEnricher, never()).enrich(anyList(), any(), any());
-    }
-
-    @Test
-    void listSoftwareForDevice_sortDevicesCountDesc_orderedByFleetWideCount() {
-        // setup
-        stubInventory(
-                List.of(title(10L, "Google Chrome", "apps", "120.0"),
-                        title(11L, "node", "homebrew_packages", "20.1"),
-                        title(12L, "zsh", "homebrew_packages", "5.9")),
-                List.of());
-        simulateEnricherSetsCounts(Map.of("Google Chrome", 1, "node", 5, "zsh", 3));
-        SortInput sort = SortInput.builder().field("devicesCount").direction(SortDirection.DESC).build();
-
-        // execution
-        PageResult<SoftwareResponse> result =
-                service.listSoftwareForDevice(MACHINE_ID, null, null, FIRST_PAGE, PAGE_SIZE, sort);
-
-        // verifications
         assertThat(result.items())
                 .extracting(SoftwareResponse::getName, SoftwareResponse::getDevicesCount)
-                .containsExactly(tuple("node", 5), tuple("zsh", 3), tuple("Google Chrome", 1));
-    }
-
-    @Test
-    void listSoftwareForDevice_pageRequested_devicesCountKeyedByCatalogTitleOfHostSoftwareVersion() {
-        // setup
-        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID))
-                .thenReturn(HostInventory.of(List.of(title(10L, "Google Chrome", "apps", "120.0")), List.of()));
-        SoftwareTitlesResponse catalog = catalog(10L, 7L);
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(catalog);
-        FleetSoftware chromeVersion = installed(7L);
-
-        // execution
-        service.listSoftwareForDevice(MACHINE_ID, null, null, FIRST_PAGE, PAGE_SIZE, null);
-
-        // verifications
-        verify(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), keysOfCaptor.capture(), any(), any());
-        assertThat(keysOfCaptor.getValue().apply(chromeVersion)).containsExactly("10");
+                .containsExactly(tuple("Google Chrome", 4), tuple("node", 9));
+        verify(fleet, never()).getSoftwareTitle(12L);
+        verify(fleet, never()).listSoftwareTitles(any(SoftwareTitleRequest.class));
     }
 
     @Test
@@ -569,7 +472,7 @@ class SoftwareInventoryServiceTest {
         assertThat(result.items()).isEmpty();
         assertThat(result.filteredCount()).isZero();
         verify(fleet, never()).listSoftwareTitles(any(SoftwareTitleRequest.class));
-        verifyNoInteractions(deviceCountEnricher);
+        verify(fleet, never()).getSoftwareTitle(anyLong());
     }
 
     @Test
@@ -607,8 +510,8 @@ class SoftwareInventoryServiceTest {
                 .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
                 .containsExactly(tuple("CRITICAL", 1), tuple("MEDIUM", 1));
         assertThat(filters.getVersionStatuses()).isEmpty();
-        verifyNoInteractions(deviceCountEnricher);
         verify(fleet, never()).listSoftwareTitles(any(SoftwareTitleRequest.class));
+        verify(fleet, never()).getSoftwareTitle(anyLong());
     }
 
     @Test
@@ -640,41 +543,25 @@ class SoftwareInventoryServiceTest {
         assertThat(filters.getSeverities()).isEmpty();
     }
 
-    @SuppressWarnings("unchecked")
-    private void simulateEnricherSetsCounts(Map<String, Integer> countByName) {
-        org.mockito.Mockito.doAnswer(inv -> {
-            List<SoftwareResponse> rows = inv.getArgument(0);
-            java.util.function.BiConsumer<SoftwareResponse, Integer> setter = inv.getArgument(4);
-            rows.forEach(row -> setter.accept(row, countByName.get(row.getName())));
-            return null;
-        }).when(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), any(), any(), any());
-    }
-
     private void stubInventory(List<HostSoftwareTitle> titles, List<FleetSoftware> hostSoftware) {
         when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.of(titles, hostSoftware));
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(new SoftwareTitlesResponse());
     }
 
-    private static SoftwareTitlesResponse catalog(long titleId, long versionId) {
-        SoftwareTitleVersion version = new SoftwareTitleVersion();
-        version.setId(versionId);
+    private static SoftwareTitle titleWithHosts(long id, int hostsCount) {
         SoftwareTitle title = new SoftwareTitle();
-        title.setId(titleId);
-        title.setVersions(List.of(version));
-        SoftwareTitlesResponse response = new SoftwareTitlesResponse();
-        response.setSoftwareTitles(List.of(title));
-        return response;
+        title.setId(id);
+        title.setHostsCount(hostsCount);
+        return title;
     }
 
-    private static SoftwareTitle titleWithCves(String name, int cveCount) {
-        SoftwareTitle t = new SoftwareTitle();
-        t.setName(name);
-        SoftwareTitleVersion v = new SoftwareTitleVersion();
-        v.setVersion("1.0");
-        v.setVulnerabilities(java.util.stream.IntStream.range(0, cveCount)
-                .mapToObj(i -> "CVE-" + name + "-" + i).toList());
-        t.setVersions(List.of(v));
-        return t;
+    private static SoftwareTitlesResponse titlesPage(int count, boolean hasNext, SoftwareTitle... titles) {
+        SoftwareTitlesResponse.Meta meta = new SoftwareTitlesResponse.Meta();
+        meta.setHasNextResults(hasNext);
+        SoftwareTitlesResponse response = new SoftwareTitlesResponse();
+        response.setSoftwareTitles(List.of(titles));
+        response.setCount(count);
+        response.setMeta(meta);
+        return response;
     }
 
     private static Host host(long id, String uuid, String hostname) {

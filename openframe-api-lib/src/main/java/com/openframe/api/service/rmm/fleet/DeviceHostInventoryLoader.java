@@ -12,6 +12,7 @@ import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareResponse;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
+import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -40,7 +41,6 @@ public class DeviceHostInventoryLoader {
     private final DeviceService deviceService;
     private final FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
-    private final CorrelatedHostSoftwareCache hostSoftwareCache;
     private final ToolConnectionRepository toolConnectionRepository;
 
     public HostInventory load(FleetMdmClient fleet, String machineId) {
@@ -90,17 +90,13 @@ public class DeviceHostInventoryLoader {
 
     private HostInventory loadInventory(FleetMdmClient fleet, long hostId) {
         List<HostSoftwareTitle> titles = fetchAllTitles(fleet, hostId);
-        List<FleetSoftware> hostSoftware = correlatedSoftwareOf(fleet, hostId);
+        List<FleetSoftware> hostSoftware = softwareOf(fleet, hostId);
         return HostInventory.of(titles, hostSoftware);
     }
 
-    private List<FleetSoftware> correlatedSoftwareOf(FleetMdmClient fleet, long hostId) {
-        Map<Long, List<FleetSoftware>> softwareByHostId = hostSoftwareCache.softwareByHostId(fleet::searchHosts);
-        return softwareByHostId.getOrDefault(hostId, List.of());
-    }
-
-    public List<HostSoftwareTitle> titlesForHost(FleetMdmClient fleet, long hostId) {
-        return fetchAllTitles(fleet, hostId);
+    private static List<FleetSoftware> softwareOf(FleetMdmClient fleet, long hostId) {
+        HostVulnerabilityInventory host = fleet.getHostVulnerabilityInventoryById(hostId);
+        return host == null || host.software() == null ? List.of() : host.software();
     }
 
     private static List<HostSoftwareTitle> fetchAllTitles(FleetMdmClient fleet, long hostId) {
