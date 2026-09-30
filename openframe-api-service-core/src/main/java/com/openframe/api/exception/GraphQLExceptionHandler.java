@@ -5,7 +5,9 @@ import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.loki.client.LokiQueryException;
+import com.openframe.data.loki.client.LokiQueryRejectedException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
+import com.openframe.security.authentication.AccessDeniedErrorCode;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
 import graphql.execution.DataFetcherExceptionHandlerResult;
@@ -14,6 +16,7 @@ import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -28,12 +31,21 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             DataFetcherExceptionHandlerParameters handlerParameters) {
 
         Throwable exception = handlerParameters.getException();
+        if (exception instanceof AccessDeniedException) {
+            ErrorCode code = AccessDeniedErrorCode.forCurrentCaller();
+            log.warn("GraphQL access denied ({}): {}", code.getCode(), exception.getMessage());
+            return result(buildError(AccessDeniedErrorCode.MESSAGE, code));
+        }
         log.error("GraphQL error occurred", exception);
 
         GraphQLError error;
 
         if (exception instanceof PinotQueryException) {
             error = buildError("Query failed. Please try again later.", ErrorCode.PINOT_QUERY_ERROR);
+        } else if (exception instanceof LokiQueryRejectedException) {
+            // Checked before LokiQueryException, its supertype: retrying this unchanged would hit the same limit
+            error = buildError("This log search covers too much data. Narrow the time range, or filter by device or level.",
+                    ErrorCode.LOKI_QUERY_REJECTED);
         } else if (exception instanceof LokiQueryException) {
             error = buildError("Device logs are temporarily unavailable. Please try again later.", ErrorCode.LOKI_QUERY_ERROR);
         } else if (exception instanceof DataAccessException) {
@@ -55,6 +67,10 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             error = buildError("An unexpected error occurred. Please try again later.", ErrorCode.INTERNAL_ERROR);
         }
 
+        return result(error);
+    }
+
+    private static CompletableFuture<DataFetcherExceptionHandlerResult> result(GraphQLError error) {
         return CompletableFuture.completedFuture(
                 DataFetcherExceptionHandlerResult.newResult()
                         .error(error)

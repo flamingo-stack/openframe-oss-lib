@@ -26,6 +26,9 @@ const meta = {
         'OPENFRAME',
         'OPENFRAME_CHAT',
         'OPENFRAME_CLIENT',
+        'OSQUERY',
+        'GOOGLE_WORKSPACE',
+        'MICROSOFT_365',
         'SYSTEM',
       ] as ToolType[],
       description: 'The type of tool to display',
@@ -104,6 +107,24 @@ export const OpenFrameClient: Story = {
 };
 
 /**
+ * ToolBadge showing a Google Workspace directory tenant.
+ */
+export const GoogleWorkspace: Story = {
+  args: {
+    toolType: 'GOOGLE_WORKSPACE',
+  },
+};
+
+/**
+ * ToolBadge showing a Microsoft 365 directory tenant.
+ */
+export const Microsoft365: Story = {
+  args: {
+    toolType: 'MICROSOFT_365',
+  },
+};
+
+/**
  * ToolBadge showing System.
  */
 export const System: Story = {
@@ -124,6 +145,8 @@ export const AllTools: Story = {
       <ToolBadge toolType="OPENFRAME" />
       <ToolBadge toolType="OPENFRAME_CHAT" />
       <ToolBadge toolType="OPENFRAME_CLIENT" />
+      <ToolBadge toolType="GOOGLE_WORKSPACE" />
+      <ToolBadge toolType="MICROSOFT_365" />
     </div>
   ),
 };

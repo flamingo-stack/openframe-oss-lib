@@ -15,7 +15,10 @@ public class ChatQueries {
                         node {
                             id
                             createdAt
-                            owner { type }
+                            owner {
+                                type
+                                ... on AssistantOwner { model modelName providerName }
+                            }
                             messageData {
                                 type
                                 ... on TextData { text }
@@ -28,6 +31,7 @@ public class ChatQueries {
                                 }
                                 ... on ErrorData { error details }
                                 ... on AskData { question options { label description } }
+                                ... on ContextCompactionEndData { summary }
                             }
                         }
                     }

@@ -77,8 +77,9 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
 
     const headerContent = (
       <>
+        {/* Grey `currentColor` mark: the wrapper gives it the secondary colour, as ToolBadge does. */}
         {!isClient && (
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center text-ods-text-secondary">
             <ToolIcon toolType={integratedToolType} size={16} />
           </div>
         )}
