@@ -1,7 +1,7 @@
 package com.openframe.api.service.rmm.fleet;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -16,8 +16,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -29,36 +27,29 @@ import static org.springframework.util.CollectionUtils.isEmpty;
 public class CorrelatedHostSoftwareCache {
 
     private static final int HOSTS_PAGE = 100;
-    private static final Duration REFRESH = Duration.ofMinutes(2);
-    private static final Duration EXPIRY = Duration.ofMinutes(30);
-    private static final Executor BACKGROUND_RELOAD = task -> Thread.ofVirtual().start(task);
+    private static final Duration TTL = Duration.ofMinutes(2);
 
     private final FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
-    // every caller searches the same Fleet; the latest search serves the background reloads
-    private final AtomicReference<Function<HostSearchRequest, List<Host>>> latestHostSearch = new AtomicReference<>();
-    private final LoadingCache<String, Snapshot> byTenant = Caffeine.newBuilder()
-            .refreshAfterWrite(REFRESH)
-            .expireAfterWrite(EXPIRY)
-            .executor(BACKGROUND_RELOAD)
-            .build(this::load);
+    private final Cache<String, Snapshot> byTenant = Caffeine.newBuilder()
+            .expireAfterWrite(TTL)
+            .build();
 
     public record Snapshot(Map<Long, Machine> machinesByHostId,
                            Map<Long, List<FleetSoftware>> softwareByHostId) {
     }
 
     public Snapshot snapshot(Function<HostSearchRequest, List<Host>> hostSearch) {
-        latestHostSearch.set(hostSearch);
         String tenantId = tenantIdProvider.getTenantId();
-        return byTenant.get(tenantId);
+        return byTenant.get(tenantId, key -> load(key, hostSearch));
     }
 
     public Map<Long, List<FleetSoftware>> softwareByHostId(Function<HostSearchRequest, List<Host>> hostSearch) {
         return snapshot(hostSearch).softwareByHostId();
     }
 
-    private Snapshot load(String tenantId) {
-        List<Host> hosts = fetchHostsWithSoftware(latestHostSearch.get());
+    private Snapshot load(String tenantId, Function<HostSearchRequest, List<Host>> hostSearch) {
+        List<Host> hosts = fetchHostsWithSoftware(hostSearch);
         Map<Long, Machine> correlated = hostMachineResolver.resolve(tenantId, hosts);
         Map<Long, List<FleetSoftware>> software = hosts.stream()
                 .filter(host -> correlated.containsKey(host.getId()))

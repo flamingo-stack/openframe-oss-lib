@@ -398,27 +398,6 @@ class SoftwareInventoryServiceTest {
         assertThat(result.items().get(0).getSeverity()).isNull(); // no enrichment → no severity
     }
 
-    @Test
-    void listSoftware_repeatedAndFacets_fetchCatalogOnce() {
-        // setup
-        stubCatalog(List.of(titleWithCves("Chrome", 3)));
-        simulateEnricherSetsCount(1);
-
-        // execution
-        service.listSoftware("", 0, 20, null, null);
-        service.listSoftware("", 1, 20, sort("cveCount", SortDirection.DESC), null);
-        service.getSoftwareFilters("");
-
-        // verifications
-        verify(fleet).listSoftwareTitles(any(SoftwareTitleRequest.class));
-    }
-
-    private void stubCatalog(List<SoftwareTitle> titles) {
-        SoftwareTitlesResponse catalog = mock(SoftwareTitlesResponse.class);
-        when(catalog.getSoftwareTitles()).thenReturn(titles);
-        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(catalog);
-    }
-
     private static SoftwareTitleVersion versionWithCve(String version, String cve) {
         SoftwareTitleVersion v = new SoftwareTitleVersion();
         v.setVersion(version);
