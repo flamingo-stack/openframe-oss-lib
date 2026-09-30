@@ -28,6 +28,15 @@ public class InvitationApi {
                 .extract().as(InvitationConflictResponse.class);
     }
 
+    public static InvitationPageResponse listInvitations(int page, int size) {
+        return given(getAuthorizedSpec())
+                .queryParam("page", page)
+                .queryParam("size", size)
+                .get(INVITATIONS)
+                .then().statusCode(200)
+                .extract().as(InvitationPageResponse.class);
+    }
+
     public static AcceptInvitationResponse acceptInvitation(AcceptInvitationRequest request) {
         return given(getUnAuthorizedAuthSpec())
                 .body(request)

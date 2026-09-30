@@ -6,14 +6,17 @@ import com.openframe.test.config.UserConfig;
 import com.openframe.test.context.PipelineContext;
 import com.openframe.test.data.db.collections.InvitationsCollection;
 import com.openframe.test.data.db.collections.UsersCollection;
+import com.openframe.test.data.dto.error.ErrorResponse;
 import com.openframe.test.data.dto.invitation.*;
 import com.openframe.test.data.dto.user.AuthUser;
-import com.openframe.test.data.dto.user.UserRole;
+import com.openframe.test.data.dto.user.UpdateUserRequest;
 import com.openframe.test.data.dto.user.UserStatus;
 import com.openframe.test.data.generator.InvitationGenerator;
+import com.openframe.test.data.generator.UserGenerator;
 import org.junit.jupiter.api.*;
 
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -110,21 +113,12 @@ public class UserInvitationsTest extends BaseTest {
     @Test
     @DisplayName("Delete Admin User")
     public void testDeleteUser() {
-        // In a pipeline run, delete exactly the user this run created (published by Accept) so the run cleans
-        // up after itself and leaves shared admins intact. Standalone, fall back to any non-owner admin
-        // (the owner returns 409 and is never deletable).
-        String targetId;
-        if (PipelineContext.hasInvitedUser()) {
-            targetId = PipelineContext.getInvitedUserId();
-        } else {
-            // Any non-owner admin, but never the pipeline's shared fixture admin (torn down at the very end).
-            List<AuthUser> users = UserApi.getUsers(UserRole.ADMIN).stream()
-                    .filter(user -> user.getRoles() == null || !user.getRoles().contains(UserRole.OWNER))
-                    .filter(user -> !user.getId().equals(PipelineContext.getFixtureAdminId()))
-                    .toList();
-            assertThat(users).as("No deletable (non-owner) Admin users").isNotEmpty();
-            targetId = users.getFirst().getId();
-        }
+        // Delete exactly the user this run created (published by Accept) so the run cleans up after itself and
+        // leaves shared admins intact. When Accept did not run or failed, invite and accept a throwaway user
+        // here instead: the shared tenant's other admins are real people's accounts and must never be deleted.
+        String targetId = PipelineContext.hasInvitedUser()
+                ? PipelineContext.getInvitedUserId()
+                : inviteAndAcceptUser().getId();
         int statusCode = UserApi.deleteUser(targetId);
         assertThat(statusCode).as("Delete user status code should be 204").isEqualTo(204);
         AuthUser deletedUser = UserApi.getUser(targetId);
@@ -158,5 +152,125 @@ public class UserInvitationsTest extends BaseTest {
         } finally {
             InvitationApi.revokeInvitation(invitation.getId());
         }
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Edit the name of an invited user")
+    public void testUpdateUserName() {
+        AcceptInvitationResponse user = inviteAndAcceptUser();
+        try {
+            UpdateUserRequest request = UserGenerator.updateUserRequest();
+            AuthUser updated = UserApi.updateUser(user.getId(), request);
+            assertThat(updated.getId()).as("PUT users/{id} should return the edited user").isEqualTo(user.getId());
+            assertThat(updated.getFirstName()).as("Returned first name should be the new one").isEqualTo(request.getFirstName());
+            assertThat(updated.getLastName()).as("Returned last name should be the new one").isEqualTo(request.getLastName());
+            assertThat(updated.getEmail()).as("Email is not editable and should be unchanged").isEqualTo(user.getEmail());
+            assertThat(updated.getRoles()).as("Roles are not editable and should be unchanged").isEqualTo(user.getRoles());
+            assertThat(updated.getStatus()).as("Status is not editable and should stay ACTIVE").isEqualTo(UserStatus.ACTIVE);
+
+            AuthUser fetched = UserApi.getUser(user.getId());
+            assertThat(fetched.getFirstName()).as("GET users/{id} should show the new first name").isEqualTo(request.getFirstName());
+            assertThat(fetched.getLastName()).as("GET users/{id} should show the new last name").isEqualTo(request.getLastName());
+        } finally {
+            UserApi.deleteUser(user.getId());
+        }
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("A first name of 128 characters is accepted and one of 129 is refused")
+    public void testUpdateUserNameLengthLimit() {
+        // UpdateUserRequest.firstName is @Size(max = 128) under @Valid, so 129 characters fail bean validation
+        // (BaseGlobalExceptionHandler: 400 VALIDATION_ERROR) before the user is touched. Only the first name is
+        // sent, and a null field is left as is, so the last name must survive both requests.
+        AcceptInvitationResponse user = inviteAndAcceptUser();
+        try {
+            UpdateUserRequest longest = UserGenerator.updateFirstNameRequest(128);
+            AuthUser updated = UserApi.updateUser(user.getId(), longest);
+            assertThat(updated.getFirstName()).as("A 128-character first name should be saved").isEqualTo(longest.getFirstName());
+            assertThat(updated.getLastName()).as("An omitted last name should be left unchanged").isEqualTo(user.getLastName());
+
+            ErrorResponse error = UserApi.attemptUpdateUser(user.getId(), UserGenerator.updateFirstNameRequest(129));
+            assertThat(error.getCode()).as("A 129-character first name should fail validation").isEqualTo("VALIDATION_ERROR");
+            assertThat(error.getMessage()).as("The validation message should name the field").contains("firstName");
+
+            AuthUser fetched = UserApi.getUser(user.getId());
+            assertThat(fetched.getFirstName()).as("A refused edit should leave the first name unchanged").isEqualTo(longest.getFirstName());
+            assertThat(fetched.getLastName()).as("A refused edit should leave the last name unchanged").isEqualTo(user.getLastName());
+        } finally {
+            UserApi.deleteUser(user.getId());
+        }
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("A new invitation is listed as pending until it is revoked")
+    public void testListPendingInvitations() {
+        // InvitationService.listInvitations returns only invitations that are neither ACCEPTED nor REVOKED,
+        // so revoking takes an invitation off the list rather than listing it as REVOKED.
+        InvitationRequest request = InvitationGenerator.newUserInvitationRequest();
+        Invitation invitation = InvitationApi.inviteUser(request);
+        try {
+            InvitationPageResponse firstPage = InvitationApi.listInvitations(0, 20);
+            assertThat(firstPage.getPage()).as("The requested page should be returned").isZero();
+            assertThat(firstPage.getSize()).as("The requested page size should be echoed").isEqualTo(20);
+            assertThat(firstPage.getTotalElements()).as("The new invitation should be counted").isPositive();
+
+            Invitation listed = listAllInvitations().stream()
+                    .filter(item -> item.getId().equals(invitation.getId()))
+                    .findFirst().orElse(null);
+            assertThat(listed).as("The new invitation should be in the list").isNotNull();
+            assertThat(listed.getStatus()).as("The new invitation should be listed as PENDING").isEqualTo(InvitationStatus.PENDING);
+            assertThat(listed.getEmail()).as("The listed invitation should carry the invited email").isEqualTo(request.getEmail());
+            assertThat(listed.getRoles()).as("The listed invitation should carry the invitation's roles").isEqualTo(invitation.getRoles());
+            assertThat(listed.getExpiresAt()).as("The listed invitation should carry the invitation's expiry")
+                    .isCloseTo(invitation.getExpiresAt(), within(1, ChronoUnit.SECONDS));
+        } finally {
+            InvitationApi.revokeInvitation(invitation.getId());
+        }
+        assertThat(listAllInvitations()).as("A revoked invitation should no longer be listed")
+                .extracting(Invitation::getId).doesNotContain(invitation.getId());
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Listing invitations with size=1 returns a single invitation")
+    public void testListInvitationsPageSize() {
+        Invitation invitation = InvitationApi.inviteUser(InvitationGenerator.newUserInvitationRequest());
+        try {
+            InvitationPageResponse page = InvitationApi.listInvitations(0, 1);
+            assertThat(page.getItems()).as("size=1 should return exactly one invitation while one is pending").hasSize(1);
+            assertThat(page.getSize()).as("The requested page size should be echoed").isEqualTo(1);
+            assertThat(page.getTotalPages()).as("With one invitation per page there is a page per invitation")
+                    .isEqualTo(page.getTotalElements());
+            assertThat(page.isHasNext()).as("hasNext should be true exactly when more than one invitation is pending")
+                    .isEqualTo(page.getTotalElements() > 1);
+        } finally {
+            InvitationApi.revokeInvitation(invitation.getId());
+        }
+    }
+
+    /** A throwaway active user for this case: a fresh invitation, accepted. The caller deletes it. */
+    private AcceptInvitationResponse inviteAndAcceptUser() {
+        Invitation invitation = InvitationApi.inviteUser(InvitationGenerator.newUserInvitationRequest());
+        try {
+            return InvitationApi.acceptInvitation(InvitationGenerator.acceptInvitationRequest(invitation));
+        } catch (RuntimeException | AssertionError e) {
+            InvitationApi.revokeInvitation(invitation.getId());
+            throw e;
+        }
+    }
+
+    /** Every listed invitation, page by page (the shared tenant can hold more than one page of them). */
+    private List<Invitation> listAllInvitations() {
+        List<Invitation> all = new ArrayList<>();
+        InvitationPageResponse page;
+        int index = 0;
+        do {
+            page = InvitationApi.listInvitations(index++, 100);
+            all.addAll(page.getItems());
+        } while (page.isHasNext());
+        return all;
     }
 }
