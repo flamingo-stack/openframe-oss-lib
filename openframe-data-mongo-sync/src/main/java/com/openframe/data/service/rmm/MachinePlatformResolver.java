@@ -4,6 +4,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +21,9 @@ public class MachinePlatformResolver {
 
     private final MachineRepository machineRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final PackageManagerAvailability packageManagerAvailability;
 
+    // Machines without a usable package manager are absent from the result on purpose.
     public Map<String, OsType> osTypesByMachineId(Collection<String> machineIds) {
         if (machineIds == null || machineIds.isEmpty()) {
             return Map.of();
@@ -28,6 +31,7 @@ public class MachinePlatformResolver {
         return machineRepository
                 .findByTenantIdAndMachineIdIn(tenantIdProvider.getTenantId(), new HashSet<>(machineIds)).stream()
                 .filter(m -> m.getOsType() != null)
+                .filter(packageManagerAvailability::isSoftwareManageable)
                 .collect(Collectors.toMap(Machine::getMachineId, Machine::getOsType, (a, b) -> a));
     }
 

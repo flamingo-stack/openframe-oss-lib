@@ -19,6 +19,7 @@ import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -58,13 +60,14 @@ class SoftwareBundleServiceTest {
     @Mock private SoftwareActionResultRepository softwareActionResultRepository;
     @Mock private MachinePlatformResolver machinePlatformResolver;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
 
     private SoftwareBundleService service;
 
     @BeforeEach
     void setUp() {
         service = new SoftwareBundleService(bundleRepository, onlineDispatchRepository, softwareScheduleService,
-                softwareActionResultRepository, machinePlatformResolver, tenantIdProvider);
+                softwareActionResultRepository, machinePlatformResolver, tenantIdProvider, packageManagerAvailability);
         ReflectionTestUtils.setField(service, "pendingTtl", Duration.ofHours(1));
         ReflectionTestUtils.setField(service, "scheduleReconnectWindowSeconds", RECONNECT_WINDOW);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -163,6 +166,22 @@ class SoftwareBundleServiceTest {
                 .hasMessageContaining("m-win");
         verify(bundleRepository, never()).save(any());
         verifyNoInteractions(onlineDispatchRepository);
+    }
+
+    @Test
+    @DisplayName("submit: a device whose agent reported no usable package manager fails, naming that device")
+    void submit_unmanageableDevice_rejected() {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m-intel"),
+                SoftwareBundlePackage.builder().packageManager(PackageManagerType.BREW).packageName("x").build());
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        doThrow(new BadRequestException("These devices have no supported package manager: [m-intel]"))
+                .when(packageManagerAvailability).requireSoftwareManageable(List.of("m-intel"), List.of(PackageManagerType.BREW));
+
+        assertThatThrownBy(() -> service.submit(submitInput(brewPkg("slack")), USER))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("m-intel");
+        verify(bundleRepository, never()).save(any());
+        verifyNoInteractions(machinePlatformResolver, onlineDispatchRepository);
     }
 
     @Test

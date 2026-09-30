@@ -26,7 +26,9 @@ import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.software.SoftwareScheduleService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import jakarta.validation.Valid;
@@ -54,6 +56,7 @@ public class SoftwareScheduleDataFetcher {
     private final SoftwareScheduleService scheduleService;
     private final DeviceService deviceService;
     private final GraphQLDeviceMapper deviceMapper;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     @DgsQuery
     public SoftwareScheduleResponse softwareSchedule(@InputArgument @NotBlank String id) {
@@ -169,7 +172,8 @@ public class SoftwareScheduleDataFetcher {
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
         SoftwareScheduleResponse schedule = dfe.getSource();
-        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
         ConnectionArgs args = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
         CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(args);
         Set<String> assigned = new HashSet<>(scheduleService.getMachineIds(schedule.getId()));
@@ -192,7 +196,9 @@ public class SoftwareScheduleDataFetcher {
     public DeviceFilters availableDeviceFilters(DgsDataFetchingEnvironment dfe,
                                                 @InputArgument @Valid DeviceFilterInput filter,
                                                 @InputArgument String search) {
-        return deviceService.getAvailableDeviceFilters(null, deviceMapper.toDeviceFilterCriteria(filter), search);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
+        return deviceService.getAvailableDeviceFilters(null, filterOptions, search);
     }
 
     @DgsData(parentType = "SoftwareSchedule", field = "deviceCount")

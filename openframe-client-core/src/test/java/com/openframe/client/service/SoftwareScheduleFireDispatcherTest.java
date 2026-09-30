@@ -2,6 +2,7 @@ package com.openframe.client.service;
 
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore;
 import com.openframe.client.service.rmm.SoftwareScheduleFireDispatcher;
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -24,6 +25,7 @@ import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.service.rmm.software.WingetPackageManagerHandler;
 import org.junit.jupiter.api.DisplayName;
@@ -54,7 +56,10 @@ class SoftwareScheduleFireDispatcherTest {
     private final ScriptDeliveryRetryStore retryStore = mock(ScriptDeliveryRetryStore.class);
     private final MachineRepository machineRepository = mock(MachineRepository.class);
     private final TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
-    private final MachinePlatformResolver platformResolver = new MachinePlatformResolver(machineRepository, tenantIdProvider);
+    private final PackageManagerAvailability packageManagerAvailability =
+            new PackageManagerAvailability(new PackageManagerProperties(), machineRepository, tenantIdProvider);
+    private final MachinePlatformResolver platformResolver =
+            new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
 
     private final SoftwareScheduleFireDispatcher dispatcher = new SoftwareScheduleFireDispatcher(
             scriptRepository, registry, scriptExecutionRepository, softwareNatsPublisher, retryStore, platformResolver);

@@ -205,6 +205,8 @@ export function HelpCenterCreateForm({
 
   return (
     <ContactForm
+      // A signed-in support ticket, not a lead: nothing to rescue.
+      rescue={null}
       title="Open a new ticket"
       footerText="The support team typically responds within one business day."
       hideFields={['name', 'email', 'companySize', 'referralSource', 'helpCategory']}

@@ -3,12 +3,14 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
 import type {
   ApprovalBlockVariant,
   AssistantType,
   AuthorType,
+  ChatAppearance,
   ChatApprovalStatus,
   ConnectionStatus,
 } from './chat.types';
@@ -141,6 +143,9 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    *  (Fae desktop app) title-only card. Forwarded to
    *  ApprovalRequestMessage / ApprovalBatchMessage. */
   approvalVariant?: ApprovalBlockVariant;
+  /** Visual generation of the row. Omit to inherit the thread's
+   *  (`ChatMessageList.appearance`); `classic` outside a list. */
+  appearance?: ChatAppearance;
   assistantIcon?: ReactNode;
   avatar?: string | null;
   timestamp?: Date;
@@ -288,6 +293,9 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  `'client'` ONLY on true end-client surfaces — admin views of a Fae
    *  dialog (tickets dialog client tab) keep the default. */
   approvalVariant?: ApprovalBlockVariant;
+  /** Visual generation of the whole thread, blocks included. Default
+   *  `classic`; the Fae client passes `v2`. See `ChatAppearance`. */
+  appearance?: ChatAppearance;
   assistantIcon?: ReactNode;
   pendingApprovals?: MessageSegment[];
   onApprove?: ApprovalResolutionHandler;
@@ -442,7 +450,19 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   onSend?: (message: string) => void | boolean | Promise<boolean | void>;
   onStop?: () => void | Promise<void>;
   sending?: boolean;
+  /** Replaces the editor with the hand-off bar: the conversation is with the
+   *  technicians now, and the client waits for one of them to reply. */
   awaitingResponse?: boolean;
+  /** Faces shown in the v2 hand-off bar (the tenant's technicians). Omit or
+   *  pass an empty list for a text-only bar. */
+  awaitingTeam?: AvatarStackPerson[];
+  /** Size of the whole team when `awaitingTeam` is only a sample of it: the
+   *  bar shows those faces and "+N" for the rest. */
+  awaitingTeamCount?: number;
+  /** `v2`: the fae chat v2 hand-off bar ("Handed off to your technical
+   *  support team" + faces). `classic` (default): "Waiting for Technician
+   *  Response". Only the awaiting state differs. */
+  appearance?: ChatAppearance;
   /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
    *  the default `max-w-ods-content-narrow` so the input fills the
    *  parent. */

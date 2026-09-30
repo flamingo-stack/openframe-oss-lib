@@ -1,14 +1,18 @@
 package com.openframe.test.helpers.ai;
 
+import com.openframe.test.api.ApprovalApi;
 import com.openframe.test.api.DialogApi;
 import com.openframe.test.api.TicketApi;
 import com.openframe.test.data.dto.ai.AgentType;
 import com.openframe.test.data.dto.ai.CreateDialogRequest;
 import com.openframe.test.data.dto.ai.DialogMode;
 import com.openframe.test.data.dto.ai.DialogResponse;
+import com.openframe.test.data.dto.shared.GraphqlError;
 import com.openframe.test.data.dto.ticket.Ticket;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
 
 /**
  * A plain ADMIN/AI dialog to drive the assistant on. The execution target is named in the prompt (by
@@ -18,6 +22,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Getter
 public class DialogFixture {
+
+    /** The backend's code for a status change refused while an approval on the ticket is pending. */
+    private static final String APPROVAL_LOCK = "TICKET_STATUS_LOCKED_BY_APPROVAL";
 
     private final String dialogId;
 
@@ -89,16 +96,36 @@ public class DialogFixture {
                 return;
             }
             if (!isKind(ticketId, "RESOLVED") && !isKind(ticketId, "ARCHIVED")) {
-                TicketApi.transitionTicket(ticketId, TicketApi.resolveSystemStatusId("RESOLVED"));
+                resolveReleasingApprovalLock(ticketId);
             }
             if (!isKind(ticketId, "ARCHIVED")) {
                 TicketApi.transitionTicket(ticketId, TicketApi.resolveSystemStatusId("ARCHIVED"));
             }
             log.info("Archived ticket {} bound to dialog {}", ticketId, dialogId);
-        } catch (RuntimeException e) {
-            // Best effort: a failed cleanup must not mask the case that failed.
+        } catch (RuntimeException | AssertionError e) {
+            // Best effort: a failed cleanup must not mask the case that failed, nor fail one that passed.
+            // AssertionError too — the graphqlSuccess() spec raises it for any GraphQL error.
             log.warn("Failed to archive the ticket bound to dialog {}: {}", dialogId, e.getMessage());
         }
+    }
+
+    // A pending technician approval freezes the ticket (#2365); teardown runs as ADMIN, so it may reject it.
+    private static void resolveReleasingApprovalLock(String ticketId) {
+        String resolved = TicketApi.resolveSystemStatusId("RESOLVED");
+        List<GraphqlError> errors = TicketApi.attemptTransitionTicketErrors(ticketId, resolved);
+        if (errors == null || errors.isEmpty()) {
+            return;
+        }
+        String approvalRequestId = errors.stream()
+                .map(GraphqlError::getExtensions)
+                .filter(ext -> ext != null && APPROVAL_LOCK.equals(ext.get("code")))
+                .map(ext -> String.valueOf(ext.get("approvalRequestId")))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Resolving ticket " + ticketId + " was refused: " + errors));
+        log.info("Ticket {} is locked by pending approval {}; rejecting it so the ticket can close",
+                ticketId, approvalRequestId);
+        ApprovalApi.reject(approvalRequestId);
+        TicketApi.transitionTicket(ticketId, resolved);
     }
 
     private static boolean isKind(String ticketId, String kind) {

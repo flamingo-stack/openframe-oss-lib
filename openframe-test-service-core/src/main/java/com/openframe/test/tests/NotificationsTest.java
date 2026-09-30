@@ -53,8 +53,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 public class NotificationsTest extends BaseTest {
 
     private static final RunId RUN_ID = RunId.next();
+    // Mirrors the NotificationCategory enum in notification.graphqls; a value the schema gains must be added here.
     private static final Set<String> CATEGORIES = Set.of("DASHBOARD", "CUSTOMERS", "DEVICES", "SCRIPTS",
-            "MONITORING", "SOFTWARE", "LOGS", "TICKETS", "MINGO", "GENERIC");
+            "MONITORING", "SOFTWARE", "LOGS", "TICKETS", "INSIGHTS", "MINGO", "GENERIC");
     private static final Set<String> SEVERITIES = Set.of("INFO", "SUCCESS", "WARNING", "DANGER");
     private static final int PAGE = 50;
 
