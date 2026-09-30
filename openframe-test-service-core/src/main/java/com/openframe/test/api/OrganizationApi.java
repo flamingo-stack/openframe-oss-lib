@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION;
 import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION_BY_ORGANIZATION_ID;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
@@ -83,14 +84,23 @@ public class OrganizationApi {
     }
 
     public static Organization retrieveOrganizationByOrganizationId(String organizationId) {
+        return queryOrganization(ORGANIZATION_BY_ORGANIZATION_ID, "organizationId", organizationId, "organizationByOrganizationId");
+    }
+
+    // organization(id:) by Relay global id; null when no organization has that id.
+    public static Organization retrieveOrganization(String globalId) {
+        return queryOrganization(ORGANIZATION, "id", globalId, "organization");
+    }
+
+    private static Organization queryOrganization(String document, String variable, String value, String field) {
         Map<String, Object> body = Map.of(
-                "query", ORGANIZATION_BY_ORGANIZATION_ID,
-                "variables", Map.of("organizationId", organizationId)
+                "query", document,
+                "variables", Map.of(variable, value)
         );
         return given(RequestSpecHelper.getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
-                .extract().jsonPath().getObject("data.organizationByOrganizationId", Organization.class);
+                .extract().jsonPath().getObject("data." + field, Organization.class);
     }
 
     public static Organization createOrganization(CreateOrganizationRequest request) {

@@ -44,6 +44,22 @@ public class UserApi {
                 .extract().as(AuthUser.class);
     }
 
+    public static AuthUser updateUser(String userId, UpdateUserRequest request) {
+        return given(getAuthorizedSpec())
+                .body(request)
+                .put(USERS.concat("/").concat(userId))
+                .then().statusCode(200)
+                .extract().as(AuthUser.class);
+    }
+
+    public static ErrorResponse attemptUpdateUser(String userId, UpdateUserRequest request) {
+        return given(getAuthorizedSpec())
+                .body(request)
+                .put(USERS.concat("/").concat(userId))
+                .then().statusCode(400)
+                .extract().as(ErrorResponse.class);
+    }
+
     public static int deleteUser(String userId) {
         final String DELETE_USER = USERS.concat("/").concat(userId);
         return given(getAuthorizedSpec())
