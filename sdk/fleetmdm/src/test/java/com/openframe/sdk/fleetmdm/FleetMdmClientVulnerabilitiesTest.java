@@ -140,6 +140,20 @@ class FleetMdmClientVulnerabilitiesTest {
         assertEquals(500, ex.getStatusCode());
     }
 
+    @Test
+    void getVulnerability_noContentResponse_returnsNull() throws Exception {
+        // setup
+        when(httpResponse.statusCode()).thenReturn(204);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
+        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
+
+        // execution
+        Vulnerability vulnerability = client.getVulnerability("CVE-2026-0001");
+
+        // verifications
+        assertNull(vulnerability);
+    }
+
     private void stubResponse(int statusCode, String body) throws Exception {
         when(httpResponse.statusCode()).thenReturn(statusCode);
         when(httpResponse.body()).thenReturn(body);
