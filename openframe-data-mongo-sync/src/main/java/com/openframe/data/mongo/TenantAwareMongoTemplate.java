@@ -228,5 +228,15 @@ public class TenantAwareMongoTemplate extends MongoTemplate {
     public <T> T findAndRemove(Query query, Class<T> entityClass, String collectionName) {
         return super.findAndRemove(scope(query, entityClass), entityClass, collectionName);
     }
+
+    /**
+     * The other findDistinct overloads delegate here, and distinct runs against the
+     * collection directly rather than through find(), so it needs its own scoping.
+     */
+    @Override
+    public <T> List<T> findDistinct(Query query, String field, String collectionName,
+                                    Class<?> entityClass, Class<T> resultClass) {
+        return super.findDistinct(scope(query, entityClass), field, collectionName, entityClass, resultClass);
+    }
     // aggregate() intentionally NOT overridden — callers must add tenantId $match explicitly
 }
