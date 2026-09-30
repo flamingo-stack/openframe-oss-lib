@@ -121,9 +121,7 @@ public class UserInvitationsTest extends BaseTest {
     @Test
     @DisplayName("Delete Admin User")
     public void testDeleteUser() {
-        // Delete exactly the user this run created (published by Accept) so the run cleans up after itself and
-        // leaves shared admins intact. When Accept did not run or failed, invite and accept a throwaway user
-        // here instead: the shared tenant's other admins are real people's accounts and must never be deleted.
+        // Delete only this run's own user (from Accept, else a fresh throwaway): other admins are real people's accounts.
         String targetId = PipelineContext.hasInvitedUser()
                 ? PipelineContext.getInvitedUserId()
                 : inviteAndAcceptUser().getId();
@@ -225,8 +223,7 @@ public class UserInvitationsTest extends BaseTest {
     @Test
     @DisplayName("A first name of 129 characters is refused")
     public void testUpdateUserNameTooLong() {
-        // UpdateUserRequest.firstName is @Size(max = 128) under @Valid, so 129 characters fail bean validation
-        // (BaseGlobalExceptionHandler: 400 VALIDATION_ERROR) before the user is touched.
+        // firstName is @Size(max = 128) under @Valid: 129 characters are a 400 VALIDATION_ERROR before the user is touched.
         requireEditUser();
 
         ErrorResponse error = UserApi.attemptUpdateUser(editUser.getId(), UserGenerator.updateFirstNameRequest(129));
@@ -300,8 +297,7 @@ public class UserInvitationsTest extends BaseTest {
     @Test
     @DisplayName("A revoked invitation is no longer listed")
     public void testRevokedInvitationNotListed() {
-        // InvitationService.listInvitations returns only invitations that are neither ACCEPTED nor REVOKED,
-        // so revoking takes an invitation off the list rather than listing it as REVOKED.
+        // listInvitations excludes ACCEPTED and REVOKED, so a revoked invitation drops off the list instead of showing as REVOKED.
         requireListedInvitation();
 
         InvitationApi.revokeInvitation(listedInvitation.getId());
@@ -311,7 +307,7 @@ public class UserInvitationsTest extends BaseTest {
                 .extracting(Invitation::getId).doesNotContain(listedInvitation.getId());
     }
 
-    /** Removes what a failed case left behind; both calls return the HTTP status instead of throwing. */
+    // Removes what a failed case left behind; both calls return the HTTP status instead of throwing.
     @AfterAll
     public static void cleanup() {
         if (editUser != null) {
@@ -332,13 +328,13 @@ public class UserInvitationsTest extends BaseTest {
         assumeTrue(listedInvitation != null, "No invitation was created in \"A new invitation is listed as pending\"; see that failure");
     }
 
-    /** A throwaway active user: a fresh invitation, accepted. The caller deletes it. */
+    // A throwaway active user: a fresh invitation, accepted. The caller deletes it.
     private AcceptInvitationResponse inviteAndAcceptUser() {
         Invitation invitation = InvitationApi.inviteUser(InvitationGenerator.newUserInvitationRequest());
         return InvitationApi.acceptInvitation(InvitationGenerator.acceptInvitationRequest(invitation));
     }
 
-    /** Every listed invitation, page by page (the shared tenant can hold more than one page of them). */
+    // Every listed invitation, page by page (the shared tenant can hold more than one page of them).
     private List<Invitation> listAllInvitations() {
         List<Invitation> all = new ArrayList<>();
         InvitationPageResponse page;

@@ -14,7 +14,7 @@ public class UserGenerator {
                 .build();
     }
 
-    /** Only the first name, {@code length} characters long; the last name is omitted and so left unchanged. */
+    // Only the first name, length characters long; the last name is omitted and so left unchanged.
     public static UpdateUserRequest updateFirstNameRequest(int length) {
         return UpdateUserRequest.builder()
                 .firstName(faker.lorem().characters(length, false, false))

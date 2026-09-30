@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** PUT /users/{id}: only the name is editable; both fields are {@code @Size(max = 128)} and a null field is left as is. */
+// PUT /users/{id}: only the name is editable; both fields are @Size(max = 128) and a null field is left as is.
 @Data
 @Builder
 @NoArgsConstructor

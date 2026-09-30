@@ -60,7 +60,7 @@ public class InvitationApi {
                 .then().statusCode(204);
     }
 
-    /** A revoke for teardown, where the invitation may already be revoked or accepted: returns the HTTP status. */
+    // A revoke for teardown, where the invitation may already be revoked or accepted: returns the HTTP status.
     public static int attemptRevokeInvitation(String invitationId) {
         final String REVOKE_INVITATION = INVITATIONS.concat("/").concat(invitationId);
         return given(getAuthorizedSpec())

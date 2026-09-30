@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/** GET /invitations: one page of the tenant's invitations that are neither ACCEPTED nor REVOKED. */
+// GET /invitations: one page of the tenant's invitations that are neither ACCEPTED nor REVOKED.
 @Data
 @Builder
 @NoArgsConstructor
