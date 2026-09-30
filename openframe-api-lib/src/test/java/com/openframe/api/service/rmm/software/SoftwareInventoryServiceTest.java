@@ -41,7 +41,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -367,7 +366,6 @@ class SoftwareInventoryServiceTest {
                 versionWithCve("10.0", "CVE-2026-59890"),
                 versionWithCve("9.0", "CVE-2026-59890"),
                 versionWithCve("58.0.4", "CVE-2026-59890")));
-        stubTenantHasTheTitle();
         when(fleet.getSoftwareTitle(42L)).thenReturn(title);
         when(fleet.getVulnerability(org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(new com.openframe.sdk.fleetmdm.model.Vulnerability());
@@ -389,7 +387,6 @@ class SoftwareInventoryServiceTest {
         title.setId(42L);
         title.setName("setuptools");
         title.setVersions(List.of(versionWithCve("58.0.4", "CVE-2026-00000")));
-        stubTenantHasTheTitle();
         when(fleet.getSoftwareTitle(42L)).thenReturn(title);
         when(fleet.getVulnerability(org.mockito.ArgumentMatchers.anyString())).thenReturn(null); // 404 from Fleet
 
@@ -399,36 +396,6 @@ class SoftwareInventoryServiceTest {
         assertThat(result.items()).hasSize(1);
         assertThat(result.items().get(0).getCveId()).isEqualTo("CVE-2026-00000");
         assertThat(result.items().get(0).getSeverity()).isNull(); // no enrichment → no severity
-    }
-
-    @Test
-    void listVulnerabilitiesForSoftware_titleNotOnTenantDevices_emptyWithoutTitleLookup() {
-        // setup
-        stubCatalog(List.of());
-
-        // execution
-        PageResult<SoftwareVulnerabilityResponse> result =
-                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
-
-        // verifications
-        assertThat(result.items()).isEmpty();
-        verify(fleet, never()).getSoftwareTitle(42L);
-    }
-
-    @Test
-    void findById_titleNotOnTenantDevices_empty() {
-        // setup
-        SoftwareTitle title = new SoftwareTitle();
-        title.setId(42L);
-        title.setName("IntelliJ IDEA");
-        title.setVersions(List.of());
-        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
-
-        // execution
-        Optional<SoftwareResponse> result = service.findById("42");
-
-        // verifications
-        assertThat(result).isEmpty();
     }
 
     @Test
@@ -444,11 +411,6 @@ class SoftwareInventoryServiceTest {
 
         // verifications
         verify(fleet).listSoftwareTitles(any(SoftwareTitleRequest.class));
-    }
-
-    private void stubTenantHasTheTitle() {
-        stubCatalog(List.of());
-        simulateEnricherSetsCount(1);
     }
 
     private void stubCatalog(List<SoftwareTitle> titles) {

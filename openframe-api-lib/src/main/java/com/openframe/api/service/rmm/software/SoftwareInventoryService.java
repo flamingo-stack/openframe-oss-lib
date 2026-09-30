@@ -128,8 +128,7 @@ public class SoftwareInventoryService {
                 .map(row -> {
                     enrichRealDevicesCount(List.of(row));
                     return row;
-                })
-                .filter(row -> deviceCount(row) > 0);
+                });
     }
 
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
@@ -285,7 +284,7 @@ public class SoftwareInventoryService {
             String softwareId, String search, int page, Integer perPage,
             String sortField, boolean sortAsc) {
         Optional<Long> parsed = parseNumericId(softwareId);
-        if (parsed.isEmpty() || !isInstalled(softwareId)) {
+        if (parsed.isEmpty()) {
             return PageResult.empty(page);
         }
         SoftwareTitle title = fleet().getSoftwareTitle(parsed.get());
@@ -359,13 +358,6 @@ public class SoftwareInventoryService {
         List<SoftwareTitle> catalog = fetchAllTitles(null, null);
         Map<Long, String> titleIdByVersionId = titleIdByVersionId(catalog);
         enrichDevicesCountFromHosts(rows, titleIdByVersionId);
-    }
-
-    // until the shared Fleet scopes titles per tenant, any title id resolves; answer only for this tenant's software
-    private boolean isInstalled(String softwareId) {
-        SoftwareResponse probe = SoftwareResponse.builder().id(softwareId).build();
-        enrichDevicesCountFromHosts(List.of(probe));
-        return deviceCount(probe) > 0;
     }
 
     private static Comparator<SoftwareResponse> deviceSoftwareOrder(SortInput sort) {
