@@ -43,7 +43,7 @@ export { GithubLogoIcon } from './github-logo-icon';
 export { GoogleDriveIcon } from './google-drive-icon';
 export { GoogleGeminiLogoIcon } from './google-gemini-logo-icon';
 export { GoogleIcon } from './google-icon';
-export { GoogleLogo1Icon } from './google-logo-1-icon';
+export { GoogleLogoGreyIcon } from './google-logo-grey-icon';
 export { GoogleLogoIcon } from './google-logo-icon';
 export { GooglePlayIcon } from './google-play-icon';
 export { GoogleSheetsIcon } from './google-sheets-icon';
