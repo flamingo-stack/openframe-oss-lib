@@ -60,6 +60,14 @@ public class InvitationApi {
                 .then().statusCode(204);
     }
 
+    /** A revoke for teardown, where the invitation may already be revoked or accepted: returns the HTTP status. */
+    public static int attemptRevokeInvitation(String invitationId) {
+        final String REVOKE_INVITATION = INVITATIONS.concat("/").concat(invitationId);
+        return given(getAuthorizedSpec())
+                .delete(REVOKE_INVITATION)
+                .then().extract().statusCode();
+    }
+
     /** POST /invitations/{id}/resend: renews an expired pending invitation and returns the new one (201). */
     public static Invitation resendInvitation(String invitationId) {
         final String RESEND_INVITATION = INVITATIONS.concat("/").concat(invitationId).concat("/resend");

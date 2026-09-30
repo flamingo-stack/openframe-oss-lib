@@ -21,12 +21,20 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @Tag("oss")
 @Tag("invitations")
 @DisplayName("Invitations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class UserInvitationsTest extends BaseTest {
+
+    private static Invitation editInvitation;
+    private static AcceptInvitationResponse editUser;
+    private static String firstName;
+    private static String lastName;
+    private static Invitation listedInvitation;
+    private static boolean listedInvitationRevoked;
 
     @Order(1)
     @Test
@@ -138,6 +146,142 @@ public class UserInvitationsTest extends BaseTest {
         assertThat(apiInvitation.getEmail()).as("Invitation email should match deleted user email").isEqualTo(deletedUser.getEmail());
     }
 
+    // ── Editing a user (CP-44): a user of this class's own, invited and accepted over the API ──────────────
+
+    @Order(10)
+    @Tag("feature")
+    @Tag("users")
+    @Test
+    @DisplayName("Invite a user to edit")
+    public void testInviteUserToEdit() {
+        editInvitation = InvitationApi.inviteUser(InvitationGenerator.newUserInvitationRequest());
+
+        assertThat(editInvitation.getId()).as("The invitation should have an id").isNotNull();
+        assertThat(editInvitation.getStatus()).as("A new invitation should be PENDING").isEqualTo(InvitationStatus.PENDING);
+    }
+
+    @Order(11)
+    @Tag("feature")
+    @Tag("users")
+    @Test
+    @DisplayName("Accept the invitation of the user to edit")
+    public void testAcceptInvitationOfUserToEdit() {
+        assumeTrue(editInvitation != null, "No invitation was created in \"Invite a user to edit\"; see that failure");
+
+        editUser = InvitationApi.acceptInvitation(InvitationGenerator.acceptInvitationRequest(editInvitation));
+        firstName = editUser.getFirstName();
+        lastName = editUser.getLastName();
+
+        assertThat(editUser.getEmail()).as("The accepted user should carry the invited email").isEqualTo(editInvitation.getEmail());
+        assertThat(UserApi.getUser(editUser.getId()).getStatus()).as("The accepted user should be ACTIVE").isEqualTo(UserStatus.ACTIVE);
+    }
+
+    @Order(12)
+    @Tag("feature")
+    @Tag("users")
+    @Test
+    @DisplayName("Edit the name of a user")
+    public void testUpdateUserName() {
+        requireEditUser();
+        UpdateUserRequest request = UserGenerator.updateUserRequest();
+
+        AuthUser updated = UserApi.updateUser(editUser.getId(), request);
+        firstName = request.getFirstName();
+        lastName = request.getLastName();
+
+        assertThat(updated.getId()).as("PUT users/{id} should return the edited user").isEqualTo(editUser.getId());
+        assertThat(updated.getFirstName()).as("Returned first name should be the new one").isEqualTo(firstName);
+        assertThat(updated.getLastName()).as("Returned last name should be the new one").isEqualTo(lastName);
+        assertThat(updated.getEmail()).as("Email is not editable and should be unchanged").isEqualTo(editUser.getEmail());
+        assertThat(updated.getRoles()).as("Roles are not editable and should be unchanged").isEqualTo(editUser.getRoles());
+        assertThat(updated.getStatus()).as("Status is not editable and should stay ACTIVE").isEqualTo(UserStatus.ACTIVE);
+
+        AuthUser fetched = UserApi.getUser(editUser.getId());
+        assertThat(fetched.getFirstName()).as("GET users/{id} should show the new first name").isEqualTo(firstName);
+        assertThat(fetched.getLastName()).as("GET users/{id} should show the new last name").isEqualTo(lastName);
+    }
+
+    @Order(13)
+    @Tag("feature")
+    @Tag("users")
+    @Test
+    @DisplayName("A first name of 128 characters is accepted")
+    public void testUpdateUserNameLongest() {
+        // Only the first name is sent; the service leaves a null field as is, so the last name must survive.
+        requireEditUser();
+        UpdateUserRequest longest = UserGenerator.updateFirstNameRequest(128);
+
+        AuthUser updated = UserApi.updateUser(editUser.getId(), longest);
+        firstName = longest.getFirstName();
+
+        assertThat(updated.getFirstName()).as("A 128-character first name should be saved").isEqualTo(firstName);
+        assertThat(updated.getLastName()).as("An omitted last name should be left unchanged").isEqualTo(lastName);
+    }
+
+    @Order(14)
+    @Tag("feature")
+    @Tag("users")
+    @Tag("negative")
+    @Test
+    @DisplayName("A first name of 129 characters is refused")
+    public void testUpdateUserNameTooLong() {
+        // UpdateUserRequest.firstName is @Size(max = 128) under @Valid, so 129 characters fail bean validation
+        // (BaseGlobalExceptionHandler: 400 VALIDATION_ERROR) before the user is touched.
+        requireEditUser();
+
+        ErrorResponse error = UserApi.attemptUpdateUser(editUser.getId(), UserGenerator.updateFirstNameRequest(129));
+
+        assertThat(error.getCode()).as("A 129-character first name should fail validation").isEqualTo("VALIDATION_ERROR");
+        assertThat(error.getMessage()).as("The validation message should name the field").contains("firstName");
+        AuthUser fetched = UserApi.getUser(editUser.getId());
+        assertThat(fetched.getFirstName()).as("A refused edit should leave the first name unchanged").isEqualTo(firstName);
+        assertThat(fetched.getLastName()).as("A refused edit should leave the last name unchanged").isEqualTo(lastName);
+    }
+
+    // ── Listing invitations (CP-45) and resending one (CP-18), on one pending invitation of this class's own ──
+
+    @Order(15)
+    @Tag("feature")
+    @Test
+    @DisplayName("A new invitation is listed as pending")
+    public void testListPendingInvitation() {
+        InvitationRequest request = InvitationGenerator.newUserInvitationRequest();
+        listedInvitation = InvitationApi.inviteUser(request);
+
+        InvitationPageResponse firstPage = InvitationApi.listInvitations(0, 20);
+        assertThat(firstPage.getPage()).as("The requested page should be returned").isZero();
+        assertThat(firstPage.getSize()).as("The requested page size should be echoed").isEqualTo(20);
+        assertThat(firstPage.getTotalElements()).as("The new invitation should be counted").isPositive();
+
+        Invitation listed = listAllInvitations().stream()
+                .filter(item -> item.getId().equals(listedInvitation.getId()))
+                .findFirst().orElse(null);
+        assertThat(listed).as("The new invitation should be in the list").isNotNull();
+        assertThat(listed.getStatus()).as("The new invitation should be listed as PENDING").isEqualTo(InvitationStatus.PENDING);
+        assertThat(listed.getEmail()).as("The listed invitation should carry the invited email").isEqualTo(request.getEmail());
+        assertThat(listed.getRoles()).as("The listed invitation should carry the invitation's roles").isEqualTo(listedInvitation.getRoles());
+        assertThat(listed.getExpiresAt()).as("The listed invitation should carry the invitation's expiry")
+                .isCloseTo(listedInvitation.getExpiresAt(), within(1, ChronoUnit.SECONDS));
+    }
+
+    @Order(16)
+    @Tag("feature")
+    @Test
+    @DisplayName("Listing invitations with size=1 returns a single invitation")
+    public void testListInvitationsPageSize() {
+        requireListedInvitation();
+
+        InvitationPageResponse page = InvitationApi.listInvitations(0, 1);
+
+        assertThat(page.getItems()).as("size=1 should return exactly one invitation while one is pending").hasSize(1);
+        assertThat(page.getSize()).as("The requested page size should be echoed").isEqualTo(1);
+        assertThat(page.getTotalPages()).as("With one invitation per page there is a page per invitation")
+                .isEqualTo(page.getTotalElements());
+        assertThat(page.isHasNext()).as("hasNext should be true exactly when more than one invitation is pending")
+                .isEqualTo(page.getTotalElements() > 1);
+    }
+
+    @Order(17)
     @Tag("feature")
     @Test
     @DisplayName("Resending an invitation that has not expired is refused")
@@ -145,123 +289,53 @@ public class UserInvitationsTest extends BaseTest {
         // InvitationService.renewInvitation renews only PENDING invitations whose expiry has passed
         // ("Only expired invitations can be resent"); a fresh one is refused with 409, and the E2E suite
         // cannot age an invitation, so the refusal is the contract this case pins down.
-        Invitation invitation = InvitationApi.inviteUser(InvitationGenerator.newUserInvitationRequest());
-        try {
-            assertThat(InvitationApi.attemptResendInvitation(invitation.getId()))
-                    .as("A pending invitation that has not expired cannot be resent").isEqualTo(409);
-        } finally {
-            InvitationApi.revokeInvitation(invitation.getId());
-        }
+        requireListedInvitation();
+
+        assertThat(InvitationApi.attemptResendInvitation(listedInvitation.getId()))
+                .as("A pending invitation that has not expired cannot be resent").isEqualTo(409);
     }
 
-    @Tag("feature")
-    @Tag("users")
-    @Test
-    @DisplayName("Edit the name of an invited user")
-    public void testUpdateUserName() {
-        AcceptInvitationResponse user = inviteAndAcceptUser();
-        try {
-            UpdateUserRequest request = UserGenerator.updateUserRequest();
-            AuthUser updated = UserApi.updateUser(user.getId(), request);
-            assertThat(updated.getId()).as("PUT users/{id} should return the edited user").isEqualTo(user.getId());
-            assertThat(updated.getFirstName()).as("Returned first name should be the new one").isEqualTo(request.getFirstName());
-            assertThat(updated.getLastName()).as("Returned last name should be the new one").isEqualTo(request.getLastName());
-            assertThat(updated.getEmail()).as("Email is not editable and should be unchanged").isEqualTo(user.getEmail());
-            assertThat(updated.getRoles()).as("Roles are not editable and should be unchanged").isEqualTo(user.getRoles());
-            assertThat(updated.getStatus()).as("Status is not editable and should stay ACTIVE").isEqualTo(UserStatus.ACTIVE);
-
-            AuthUser fetched = UserApi.getUser(user.getId());
-            assertThat(fetched.getFirstName()).as("GET users/{id} should show the new first name").isEqualTo(request.getFirstName());
-            assertThat(fetched.getLastName()).as("GET users/{id} should show the new last name").isEqualTo(request.getLastName());
-        } finally {
-            UserApi.deleteUser(user.getId());
-        }
-    }
-
-    @Tag("feature")
-    @Tag("users")
-    @Test
-    @DisplayName("A first name of 128 characters is accepted and one of 129 is refused")
-    public void testUpdateUserNameLengthLimit() {
-        // UpdateUserRequest.firstName is @Size(max = 128) under @Valid, so 129 characters fail bean validation
-        // (BaseGlobalExceptionHandler: 400 VALIDATION_ERROR) before the user is touched. Only the first name is
-        // sent, and a null field is left as is, so the last name must survive both requests.
-        AcceptInvitationResponse user = inviteAndAcceptUser();
-        try {
-            UpdateUserRequest longest = UserGenerator.updateFirstNameRequest(128);
-            AuthUser updated = UserApi.updateUser(user.getId(), longest);
-            assertThat(updated.getFirstName()).as("A 128-character first name should be saved").isEqualTo(longest.getFirstName());
-            assertThat(updated.getLastName()).as("An omitted last name should be left unchanged").isEqualTo(user.getLastName());
-
-            ErrorResponse error = UserApi.attemptUpdateUser(user.getId(), UserGenerator.updateFirstNameRequest(129));
-            assertThat(error.getCode()).as("A 129-character first name should fail validation").isEqualTo("VALIDATION_ERROR");
-            assertThat(error.getMessage()).as("The validation message should name the field").contains("firstName");
-
-            AuthUser fetched = UserApi.getUser(user.getId());
-            assertThat(fetched.getFirstName()).as("A refused edit should leave the first name unchanged").isEqualTo(longest.getFirstName());
-            assertThat(fetched.getLastName()).as("A refused edit should leave the last name unchanged").isEqualTo(user.getLastName());
-        } finally {
-            UserApi.deleteUser(user.getId());
-        }
-    }
-
+    @Order(18)
     @Tag("feature")
     @Test
-    @DisplayName("A new invitation is listed as pending until it is revoked")
-    public void testListPendingInvitations() {
+    @DisplayName("A revoked invitation is no longer listed")
+    public void testRevokedInvitationNotListed() {
         // InvitationService.listInvitations returns only invitations that are neither ACCEPTED nor REVOKED,
         // so revoking takes an invitation off the list rather than listing it as REVOKED.
-        InvitationRequest request = InvitationGenerator.newUserInvitationRequest();
-        Invitation invitation = InvitationApi.inviteUser(request);
-        try {
-            InvitationPageResponse firstPage = InvitationApi.listInvitations(0, 20);
-            assertThat(firstPage.getPage()).as("The requested page should be returned").isZero();
-            assertThat(firstPage.getSize()).as("The requested page size should be echoed").isEqualTo(20);
-            assertThat(firstPage.getTotalElements()).as("The new invitation should be counted").isPositive();
+        requireListedInvitation();
 
-            Invitation listed = listAllInvitations().stream()
-                    .filter(item -> item.getId().equals(invitation.getId()))
-                    .findFirst().orElse(null);
-            assertThat(listed).as("The new invitation should be in the list").isNotNull();
-            assertThat(listed.getStatus()).as("The new invitation should be listed as PENDING").isEqualTo(InvitationStatus.PENDING);
-            assertThat(listed.getEmail()).as("The listed invitation should carry the invited email").isEqualTo(request.getEmail());
-            assertThat(listed.getRoles()).as("The listed invitation should carry the invitation's roles").isEqualTo(invitation.getRoles());
-            assertThat(listed.getExpiresAt()).as("The listed invitation should carry the invitation's expiry")
-                    .isCloseTo(invitation.getExpiresAt(), within(1, ChronoUnit.SECONDS));
-        } finally {
-            InvitationApi.revokeInvitation(invitation.getId());
-        }
+        InvitationApi.revokeInvitation(listedInvitation.getId());
+        listedInvitationRevoked = true;
+
         assertThat(listAllInvitations()).as("A revoked invitation should no longer be listed")
-                .extracting(Invitation::getId).doesNotContain(invitation.getId());
+                .extracting(Invitation::getId).doesNotContain(listedInvitation.getId());
     }
 
-    @Tag("feature")
-    @Test
-    @DisplayName("Listing invitations with size=1 returns a single invitation")
-    public void testListInvitationsPageSize() {
-        Invitation invitation = InvitationApi.inviteUser(InvitationGenerator.newUserInvitationRequest());
-        try {
-            InvitationPageResponse page = InvitationApi.listInvitations(0, 1);
-            assertThat(page.getItems()).as("size=1 should return exactly one invitation while one is pending").hasSize(1);
-            assertThat(page.getSize()).as("The requested page size should be echoed").isEqualTo(1);
-            assertThat(page.getTotalPages()).as("With one invitation per page there is a page per invitation")
-                    .isEqualTo(page.getTotalElements());
-            assertThat(page.isHasNext()).as("hasNext should be true exactly when more than one invitation is pending")
-                    .isEqualTo(page.getTotalElements() > 1);
-        } finally {
-            InvitationApi.revokeInvitation(invitation.getId());
+    /** Removes what a failed case left behind; both calls return the HTTP status instead of throwing. */
+    @AfterAll
+    public static void cleanup() {
+        if (editUser != null) {
+            UserApi.deleteUser(editUser.getId());
+        } else if (editInvitation != null) {
+            InvitationApi.attemptRevokeInvitation(editInvitation.getId());
+        }
+        if (listedInvitation != null && !listedInvitationRevoked) {
+            InvitationApi.attemptRevokeInvitation(listedInvitation.getId());
         }
     }
 
-    /** A throwaway active user for this case: a fresh invitation, accepted. The caller deletes it. */
+    private static void requireEditUser() {
+        assumeTrue(editUser != null, "No user was accepted in \"Accept the invitation of the user to edit\"; see that failure");
+    }
+
+    private static void requireListedInvitation() {
+        assumeTrue(listedInvitation != null, "No invitation was created in \"A new invitation is listed as pending\"; see that failure");
+    }
+
+    /** A throwaway active user: a fresh invitation, accepted. The caller deletes it. */
     private AcceptInvitationResponse inviteAndAcceptUser() {
         Invitation invitation = InvitationApi.inviteUser(InvitationGenerator.newUserInvitationRequest());
-        try {
-            return InvitationApi.acceptInvitation(InvitationGenerator.acceptInvitationRequest(invitation));
-        } catch (RuntimeException | AssertionError e) {
-            InvitationApi.revokeInvitation(invitation.getId());
-            throw e;
-        }
+        return InvitationApi.acceptInvitation(InvitationGenerator.acceptInvitationRequest(invitation));
     }
 
     /** Every listed invitation, page by page (the shared tenant can hold more than one page of them). */
