@@ -143,3 +143,19 @@ confirmed by the suite owner. Confirm, reclassify, or delete.
   /api/v1/policies/{policyId}, /api/v1/policies/custom, /api/v1/policies/{policyId}/activate).
 - **Why:** owner's decision, 2026-09-13: a new version of the policies API is coming, so covering the
   current endpoints makes no sense (plan item CP-7 dropped). Re-propose when the replacement lands.
+
+## KG-16 — Security-policy operator surface in management-api — OUT-OF-SCOPE(not gateway-exposed) — *proposed*
+- **Ops:** `BasePolicyController`, `PolicyTemplateController`, `PolicySyncController`
+  (openframe-saas-management-api: `/api/v1/security-policies/rules/**`, `/api/v1/security-policies/templates/**`,
+  `/api/v1/security-policies/broadcast/**`).
+- **Why:** 14 endpoints, no UI consumer and no test. Same class as KG-5, which covers other
+  cluster-internal surface but names no `openframe-saas-management-api` path, so these rows fall through
+  into the open API-only list. Verified at the analysed refs: no route matches `security-policies` in
+  either gateway config — `configs/base/openframe-saas-gateway.yml` in openframe-saas-tenant
+  (`f31cdf2bb`) or in openframe-saas-shared (`42f55ad16`) — so nothing reaches them through a tenant
+  host. They are broadcast/sync plumbing between the platform and the agents' command-security rules.
+- **Deliberately excluded from this entry:** `BackofficeController` (`/api/v1/backoffice/**`, 4 ops) **is**
+  routed — the shared gateway exposes it as `/backoffice-api/**` (`openframe-saas-gateway.yml:79-86`,
+  RewritePath to `/api/v1/backoffice/`), guarded by its own `X-API-Key` from
+  `openframe-saas-management-api.yml`. That is reachable external surface with a real consumer and needs
+  its own decision, not this exclusion — it stays an open gap.
