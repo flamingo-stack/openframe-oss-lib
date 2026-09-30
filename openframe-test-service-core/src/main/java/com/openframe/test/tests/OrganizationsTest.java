@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("oss")
 @Tag("saas")
+@Tag("organizations")
 @DisplayName("Organizations")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Slf4j
