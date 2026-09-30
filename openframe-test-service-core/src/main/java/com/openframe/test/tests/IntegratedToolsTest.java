@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Read-only.
  */
 @Tag("saas")
+@Tag("integrated-tools")
 @DisplayName("Integrated Tools")
 public class IntegratedToolsTest extends BaseTest {
 
