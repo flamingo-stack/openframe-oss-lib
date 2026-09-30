@@ -84,26 +84,23 @@ public class OrganizationApi {
     }
 
     public static Organization retrieveOrganizationByOrganizationId(String organizationId) {
-        Map<String, Object> body = Map.of(
-                "query", ORGANIZATION_BY_ORGANIZATION_ID,
-                "variables", Map.of("organizationId", organizationId)
-        );
-        return given(RequestSpecHelper.getAuthorizedSpec())
-                .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
-                .extract().jsonPath().getObject("data.organizationByOrganizationId", Organization.class);
+        return queryOrganization(ORGANIZATION_BY_ORGANIZATION_ID, "organizationId", organizationId, "organizationByOrganizationId");
     }
 
     // organization(id:) by Relay global id; null when no organization has that id.
     public static Organization retrieveOrganization(String globalId) {
+        return queryOrganization(ORGANIZATION, "id", globalId, "organization");
+    }
+
+    private static Organization queryOrganization(String document, String variable, String value, String field) {
         Map<String, Object> body = Map.of(
-                "query", ORGANIZATION,
-                "variables", Map.of("id", globalId)
+                "query", document,
+                "variables", Map.of(variable, value)
         );
         return given(RequestSpecHelper.getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
-                .extract().jsonPath().getObject("data.organization", Organization.class);
+                .extract().jsonPath().getObject("data." + field, Organization.class);
     }
 
     public static Organization createOrganization(CreateOrganizationRequest request) {
