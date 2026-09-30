@@ -3,11 +3,13 @@ $ProgressPreference = 'SilentlyContinue'
 
 $FamilyName = 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe'
 $LatestUrl = 'https://github.com/microsoft/winget-cli/releases/latest'
-$CacheRoot = Join-Path $env:LOCALAPPDATA 'OpenFrame\winget-bootstrap'
+$CacheRoot = Join-Path $env:TEMP 'openframe-winget-bootstrap'
 $CacheTtlDays = 7
-$DiskMarginMb = 200
+$DiskMarginMb = 100
+$ExtractedDepsMb = 50
 
-$OsArch = $env:PROCESSOR_ARCHITEW6432
+$OsArch = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment' -ErrorAction SilentlyContinue).PROCESSOR_ARCHITECTURE
+if (-not $OsArch) { $OsArch = $env:PROCESSOR_ARCHITEW6432 }
 if (-not $OsArch) { $OsArch = $env:PROCESSOR_ARCHITECTURE }
 $Arch = switch ($OsArch) {
     'AMD64' { 'x64' }
@@ -16,8 +18,11 @@ $Arch = switch ($OsArch) {
 }
 
 function Get-WingetExe {
-    $p = (Get-AppxPackage -Name Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue).InstallLocation
-    if ($p -and (Test-Path "$p\winget.exe")) { return "$p\winget.exe" }
+    $package = Get-AppxPackage -Name Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue |
+               Select-Object -First 1
+    if (-not $package) { return $null }
+    $exe = Join-Path $package.InstallLocation 'winget.exe'
+    if (Test-Path $exe) { return $exe }
     return $null
 }
 
@@ -77,7 +82,8 @@ function Get-CachedAsset {
 function Test-DependencySatisfied {
     param([string]$Name, [string]$MinVersion)
 
-    $installed = Get-AppxPackage -Name $Name -ErrorAction SilentlyContinue
+    $installed = Get-AppxPackage -Name $Name -ErrorAction SilentlyContinue |
+                 Where-Object { $_.Architecture -eq $Arch -or $_.Architecture -eq 'Neutral' }
     if (-not $installed) { return $false }
     $best = $installed | ForEach-Object { [version]$_.Version } | Sort-Object -Descending | Select-Object -First 1
     return $best -ge [version]$MinVersion
@@ -126,7 +132,14 @@ try {
 }
 
 if ($exe) {
-    Write-Output "winget ready: $((& $exe --version).Trim())"
+    try {
+        $version = (& $exe --version).Trim()
+    } catch {
+        Write-Output "winget is present but will not run: $(($_.Exception.Message -split "`r?`n")[0])"
+        exit 40
+    }
+    Remove-Item $CacheRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Output "winget ready: $version"
     exit 0
 }
 
@@ -135,7 +148,7 @@ try {
     $exe = Get-WingetExe
     if ($exe) { Write-Output 'recovered by registering the package already on disk' }
 } catch {
-    Write-Output "register-in-place not applicable: $($_.Exception.Message)"
+    Write-Output "register-in-place not applicable: $(($_.Exception.Message -split "`r?`n")[0])"
 }
 
 if (-not $exe) {
@@ -158,7 +171,7 @@ if (-not $exe) {
         Write-Output "dependencies: $($required.Count) required, $($missing.Count) missing"
 
         $needed = Get-RemoteSize -Url $bundleUrl
-        if ($missing.Count -gt 0) { $needed += (Get-RemoteSize -Url $zipUrl) * 2 }
+        if ($missing.Count -gt 0) { $needed += (Get-RemoteSize -Url $zipUrl) + ($ExtractedDepsMb * 1MB) }
         Assert-FreeSpace -RequiredBytes $needed
 
         $dependencyPaths = @()
