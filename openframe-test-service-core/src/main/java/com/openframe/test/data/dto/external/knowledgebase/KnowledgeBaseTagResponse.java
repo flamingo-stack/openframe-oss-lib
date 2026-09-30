@@ -8,11 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-/**
- * Knowledge base tag
- *
- * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0.
- */
+// Knowledge base tag; from the External API OpenAPI contract (GET /api-docs), v1.1.0.
 @Data
 @Builder
 @NoArgsConstructor

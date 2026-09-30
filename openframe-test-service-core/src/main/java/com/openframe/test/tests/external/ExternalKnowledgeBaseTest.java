@@ -40,23 +40,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-/**
- * {@code /api/v1/knowledge-base} — the folder tree, the tag taxonomy (CP-41) and the article lifecycle
- * with its attachments (CP-42), one ordered case per state.
- *
- * <p>Built on records the class makes itself: a root folder holding a sub-folder and one article. Every
- * later case reads, moves, tags, publishes, archives or attaches to those, so nothing pre-existing on the
- * shared tenant is touched. State is carried between cases in static fields; a case whose record was never
- * made is skipped by an assumption rather than failing on that case's behalf. The last case deletes the
- * root folder with {@code childrenAction=ARCHIVE}, which hard-deletes the sub-folder and archives the
- * article — the strongest cleanup this API offers, since articles are never hard-deleted.
- *
- * <p>Every call costs one slot of the key's per-minute budget, so the cases assert on the responses they
- * already have rather than re-reading.
- *
- * <p>The External API cannot create a tag, and {@code GET /tags} only lists tags in use, so the tag is
- * created over GraphQL by "Tag an article" and deleted in {@link #cleanup()}.
- */
+// /api/v1/knowledge-base (CP-41, CP-42), one ordered case per state on records the class makes itself; the tag comes from GraphQL, as the External API cannot create one.
 @Tag("external-api")
 @Tag("knowledge-base")
 @EnabledIf(ExternalApiBaseTest.EXTERNAL_API_KEY_CONDITION)
@@ -542,11 +526,7 @@ public class ExternalKnowledgeBaseTest extends ExternalApiBaseTest {
         assertThat(orphan.getParentId()).as("An article archived with its folder is detached to the root").isNull();
     }
 
-    /**
-     * Undoes what a failed run left behind; on a green run only the tag remains to delete. Every call here
-     * returns the HTTP status instead of throwing, so one failed step cannot strand the rest. Deleting the
-     * root folder archives the article with it, so the article archive that follows may answer 409.
-     */
+    // Undoes what a failed run left behind; every call returns the status instead of throwing (the article archive may 409 after the folder delete).
     @AfterAll
     public static void cleanup() {
         if (attachment != null && !attachmentDeleted) {
@@ -563,7 +543,7 @@ public class ExternalKnowledgeBaseTest extends ExternalApiBaseTest {
         }
     }
 
-    /** Aborts a dependent case as skipped, with a reason, when the fixture it builds on was never made. */
+    // Aborts a dependent case as skipped, with a reason, when the fixture it builds on was never made.
     private static void fixture(KnowledgeBaseItemResponse item, String what) {
         assumeTrue(item != null, "Skipped: the step creating the " + what + " did not complete");
     }

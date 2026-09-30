@@ -8,11 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-/**
- * Knowledge base attachment metadata
- *
- * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0.
- */
+// Knowledge base attachment metadata; from the External API OpenAPI contract (GET /api-docs), v1.1.0.
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,7 +18,7 @@ public class KnowledgeBaseAttachmentResponse {
 
     private String id;
 
-    /** The article the attachment belongs to. */
+    // The article the attachment belongs to.
     private String itemId;
 
     private String fileName;

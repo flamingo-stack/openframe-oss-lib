@@ -6,11 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Attachment record plus the signed URL to upload the file bytes to
- *
- * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0.
- */
+// Attachment record plus the signed URL to upload its bytes to; from the External API OpenAPI contract (GET /api-docs), v1.1.0.
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,6 +16,6 @@ public class KnowledgeBaseAttachmentUploadResponse {
 
     private KnowledgeBaseAttachmentResponse attachment;
 
-    /** Short-lived signed URL; PUT the bytes to it with the declared Content-Type. */
+    // Short-lived signed URL; PUT the bytes to it with the declared Content-Type.
     private String uploadUrl;
 }

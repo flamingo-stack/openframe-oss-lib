@@ -22,18 +22,7 @@ import java.util.Map;
 import static com.openframe.test.helpers.RequestSpecHelper.getExternalApiSpec;
 import static io.restassured.RestAssured.given;
 
-/**
- * External API client for {@code /api/v1/knowledge-base} — folders, articles, tags and attachments.
- *
- * <p>The controller runs the same domain services as the dashboard's GraphQL API, on behalf of the API
- * key's owner, so the folder and article rules are the ones {@code KnowledgeBaseTest} asserts over
- * GraphQL. What differs is the error contract: an unknown id, or an id of the other item kind on a
- * folder- or article-only route, is a 404; a bad argument (missing parent, a folder moved into its own
- * descendant, a non-empty folder deleted without {@code childrenAction}) is a 400; a state conflict
- * (unarchiving an article that is not archived) is a 409.
- *
- * <p>Folders are hard-deleted; articles never are — archive is their terminal state.
- */
+// External API client for /api/v1/knowledge-base: unknown id or wrong item kind is 404, bad argument 400, state conflict 409; articles are never hard-deleted.
 public class ExternalKnowledgeBaseApi {
 
     private static final String KB = "api/v1/knowledge-base";
@@ -59,7 +48,7 @@ public class ExternalKnowledgeBaseApi {
 
     // --- items -------------------------------------------------------------------------------
 
-    /** Folders first, then articles; archived articles are never listed here. */
+    // Folders first, then articles; archived articles are never listed here.
     public static KnowledgeBaseItemsResponse listItems(Map<String, Object> queryParams) {
         return given(getExternalApiSpec())
                 .queryParams(queryParams)
@@ -68,7 +57,7 @@ public class ExternalKnowledgeBaseApi {
                 .extract().as(KnowledgeBaseItemsResponse.class);
     }
 
-    /** The single read is the one that carries an article's {@code content}. */
+    // The single read is the one that carries an article's content.
     public static KnowledgeBaseItemResponse getItem(String id) {
         return given(getExternalApiSpec())
                 .pathParam("id", id)
@@ -85,7 +74,7 @@ public class ExternalKnowledgeBaseApi {
                 .extract().as(ExternalErrorResponse.class);
     }
 
-    /** {@code parentId} null moves the item to the root. */
+    // parentId null moves the item to the root.
     public static KnowledgeBaseItemResponse moveItem(String id, String parentId) {
         return given(getExternalApiSpec())
                 .pathParam("id", id)
@@ -130,7 +119,7 @@ public class ExternalKnowledgeBaseApi {
 
     // --- folders -----------------------------------------------------------------------------
 
-    /** Every folder, flat and ordered by name; the tree is rebuilt from {@code parentId}. */
+    // Every folder, flat and ordered by name; the tree is rebuilt from parentId.
     public static List<KnowledgeBaseItemResponse> getFolders() {
         return given(getExternalApiSpec())
                 .get(FOLDERS)
@@ -155,7 +144,7 @@ public class ExternalKnowledgeBaseApi {
                 .extract().as(KnowledgeBaseItemResponse.class);
     }
 
-    /** 204 No Content. A non-empty folder needs a {@code childrenAction}. */
+    // 204 No Content. A non-empty folder needs a childrenAction.
     public static void deleteFolder(String id, FolderChildrenAction childrenAction) {
         deleteFolderRaw(id, childrenAction).then().statusCode(204);
     }
@@ -168,7 +157,7 @@ public class ExternalKnowledgeBaseApi {
                 .extract().as(ExternalErrorResponse.class);
     }
 
-    /** Unchecked, for teardown. */
+    // Unchecked, for teardown.
     public static Response deleteFolderRaw(String id, FolderChildrenAction childrenAction) {
         return given(getExternalApiSpec())
                 .pathParam("id", id)
@@ -227,14 +216,14 @@ public class ExternalKnowledgeBaseApi {
                 .extract().as(KnowledgeBaseItemResponse.class);
     }
 
-    /** Unchecked, for teardown. */
+    // Unchecked, for teardown.
     public static Response archiveArticleRaw(String id) {
         return given(getExternalApiSpec())
                 .pathParam("id", id)
                 .post(ARCHIVE);
     }
 
-    /** Restores into {@code parentId} (root when null) as PUBLISHED. */
+    // Restores into parentId (root when null) as PUBLISHED.
     public static KnowledgeBaseItemResponse unarchiveArticle(String id, String parentId) {
         return given(getExternalApiSpec())
                 .pathParam("id", id)
@@ -255,7 +244,7 @@ public class ExternalKnowledgeBaseApi {
 
     // --- tags --------------------------------------------------------------------------------
 
-    /** Only tags in use: with {@code folderId}, on articles in that subtree; else on active articles. */
+    // Only tags in use: with folderId, on articles in that subtree; else on active articles.
     public static List<KnowledgeBaseTagResponse> getTags(Map<String, Object> queryParams) {
         return given(getExternalApiSpec())
                 .queryParams(queryParams)
@@ -266,7 +255,7 @@ public class ExternalKnowledgeBaseApi {
 
     // --- attachments -------------------------------------------------------------------------
 
-    /** Registers the attachment; the bytes then go to the returned signed URL. */
+    // Registers the attachment; the bytes then go to the returned signed URL.
     public static KnowledgeBaseAttachmentUploadResponse createAttachment(String articleId,
                                                                          CreateKnowledgeBaseAttachmentRequest request) {
         return given(getExternalApiSpec())
@@ -293,12 +282,12 @@ public class ExternalKnowledgeBaseApi {
                 .extract().as(ExternalErrorResponse.class);
     }
 
-    /** 204 No Content; removes the stored file and the metadata. */
+    // 204 No Content; removes the stored file and the metadata.
     public static void deleteAttachment(String attachmentId) {
         deleteAttachmentRaw(attachmentId).then().statusCode(204);
     }
 
-    /** Unchecked, for teardown. */
+    // Unchecked, for teardown.
     public static Response deleteAttachmentRaw(String attachmentId) {
         return given(getExternalApiSpec())
                 .pathParam("attachmentId", attachmentId)

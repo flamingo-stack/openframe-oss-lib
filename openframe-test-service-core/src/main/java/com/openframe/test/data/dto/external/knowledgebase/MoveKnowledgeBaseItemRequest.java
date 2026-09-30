@@ -7,11 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Move an item into another folder
- *
- * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0.
- */
+// Move an item into another folder; from the External API OpenAPI contract (GET /api-docs), v1.1.0.
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,6 +16,6 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class MoveKnowledgeBaseItemRequest {
 
-    /** Target folder; null moves the item to the root. */
+    // Target folder; null moves the item to the root.
     private String parentId;
 }

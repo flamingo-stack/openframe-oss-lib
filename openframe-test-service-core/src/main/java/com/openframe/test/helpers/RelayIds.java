@@ -33,10 +33,7 @@ public final class RelayIds {
         }
     }
 
-    /**
-     * The raw id inside a global id — what the REST surfaces (the External API) take for the same
-     * record. Returns the input unchanged when it does not decode to {@code Typename:rawId}.
-     */
+    // The raw id inside a global id, as the External API takes it; returns the input unchanged if it is not Typename:rawId.
     public static String rawId(String globalId) {
         String decoded = decode(globalId);
         int separator = decoded.indexOf(':');

@@ -52,7 +52,7 @@ public class TagApi {
         return flag(DELETE_TAG, "deleteTag", Map.of("id", id));
     }
 
-    /** A delete for teardown, where the tag may already be gone: returns the HTTP status instead of asserting. */
+    // A delete for teardown, where the tag may already be gone: returns the HTTP status instead of asserting.
     public static int attemptDeleteTag(String id) {
         Map<String, Object> body = new HashMap<>();
         body.put("query", DELETE_TAG);

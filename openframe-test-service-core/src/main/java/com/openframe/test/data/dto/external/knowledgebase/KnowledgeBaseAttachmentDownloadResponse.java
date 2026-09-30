@@ -6,11 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Signed download link for an attachment
- *
- * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0.
- */
+// Signed download link for an attachment; from the External API OpenAPI contract (GET /api-docs), v1.1.0.
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,6 +14,6 @@ import lombok.NoArgsConstructor;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class KnowledgeBaseAttachmentDownloadResponse {
 
-    /** Short-lived signed URL to GET the file bytes from. */
+    // Short-lived signed URL to GET the file bytes from.
     private String downloadUrl;
 }

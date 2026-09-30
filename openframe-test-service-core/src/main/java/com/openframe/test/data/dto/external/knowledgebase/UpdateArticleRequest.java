@@ -7,12 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Update article request; only non-null fields are applied
- *
- * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0,
- * trimmed to the fields the suite sends.
- */
+// Update article request (only non-null fields apply); from the External API contract v1.1.0, trimmed to the fields the suite sends.
 @Data
 @Builder
 @NoArgsConstructor

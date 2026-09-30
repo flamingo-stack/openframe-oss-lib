@@ -7,12 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Create article request; the article lands as DRAFT unless a status is given
- *
- * <p>Generated from the OpenFrame External API OpenAPI contract ({@code GET /api-docs}), version 1.1.0,
- * trimmed to the fields the suite sends.
- */
+// Create article request (lands as DRAFT unless a status is given); from the External API contract v1.1.0, trimmed to the fields the suite sends.
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,13 +16,13 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CreateArticleRequest {
 
-    /** Required by the contract; at most 255 characters. */
+    // Required by the contract; at most 255 characters.
     private String name;
 
-    /** Omit to create at the root. */
+    // Omit to create at the root.
     private String parentId;
 
-    /** Markdown. */
+    // Markdown.
     private String content;
 
     private String summary;

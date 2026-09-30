@@ -11,10 +11,10 @@ import static com.openframe.test.data.generator.external.ExternalTestData.MARKER
 import static com.openframe.test.data.generator.external.ExternalTestData.faker;
 import static com.openframe.test.data.generator.external.ExternalTestData.uniqueName;
 
-/** Knowledge base payloads for the External API. */
+// Knowledge base payloads for the External API.
 public class ExternalKnowledgeBaseGenerator {
 
-    /** Declared on create; the round trip PUTs the bytes with the same type, read back from the request. */
+    // Declared on create; the round trip PUTs the bytes with the same type, read back from the request.
     private static final String ATTACHMENT_CONTENT_TYPE = "text/plain";
 
     public static CreateFolderRequest createFolderRequest(String parentId) {
@@ -45,15 +45,12 @@ public class ExternalKnowledgeBaseGenerator {
                 .build();
     }
 
-    /**
-     * A knowledge base tag key. The External API has no tag-creation endpoint, so the suite creates the
-     * tag over GraphQL; the key carries the marker like every other record the suite makes.
-     */
+    // A marked tag key; the External API cannot create tags, so the suite creates this one over GraphQL.
     public static String tagKey() {
         return uniqueName("kb-tag").replace(' ', '-');
     }
 
-    /** Declares {@code file} for upload; the stored file name carries the marker, not the temp-file name. */
+    // Declares file for upload; the stored file name carries the marker, not the temp-file name.
     public static CreateKnowledgeBaseAttachmentRequest attachmentRequest(Path file) {
         return CreateKnowledgeBaseAttachmentRequest.builder()
                 .fileName(MARKER + "-" + file.getFileName())
