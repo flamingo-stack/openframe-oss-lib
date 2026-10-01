@@ -394,19 +394,16 @@ notes = "Option (a) looks right and covers the more interesting branch: Software
 
 [[items]]
 id = "CP-24"
-title = "Remote-access policy: organization and device scope"
+title = "Remote-access policy: organization scope"
 status = "proposed"
 priority = "P1"
-ops = [
-  "query:organizationRemoteAccessPolicy", "mutation:setOrganizationRemoteAccessMode",
-  "mutation:setDeviceRemoteAccessMode",
-]
+ops = ["query:organizationRemoteAccessPolicy", "mutation:setOrganizationRemoteAccessMode"]
 test_class = "RemoteAccessPolicyTest"
 tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "report 2026-09-30 #4"
-notes = "The cheapest P1 in this report: RemoteAccessPolicyApi, RemoteAccessQueries and RemoteAccessPolicyTest already exist and already do exactly this at tenant scope, so the item is two constants and three methods. It also closes the hole RemoteAccessPolicyTest's own javadoc names ('a device or organization override still wins and would have to be cleared separately') — today the suite sets SILENT_ACCESS tenant-wide and an org or device override left behind by anyone silently re-parks every remote session, which is the failure mode that cost the qa nightly of 2026-09-25. Asserting the resolution order device → organization → tenant is the point of the case. Two different error conventions in one file: setOrganizationRemoteAccessMode returns OrganizationRemoteAccessPolicyPayload with userErrors (ORGANIZATION_NOT_FOUND, REMOTE_ACCESS_DISABLED) like the tenant mutation, while setDeviceRemoteAccessMode returns Machine! and raises DEVICE_NOT_FOUND / REMOTE_ACCESS_DISABLED as GraphQL errors with extensions.code. mode:null clears an override at both scopes — that is the restore path, and OrganizationRemoteAccessPolicy.mode null vs effectiveMode is how you prove the clear worked. The device override reads back on Machine.remoteAccess { mode effectiveMode effectiveScope }, an extension on the oss-lib Machine type, so DeviceQueries needs the selection added. Use the throwaway organization pattern from AiSettingsTest for the org scope; run it under the existing remote-access-setup/teardown tags only if the mode has to outlive the class, otherwise plain feature tags keep it in the functional phase."
+notes = "Split 2026-10-01: the device scope is CP-51, because a throwaway organization has no devices and the device half needs the enrolled box. RemoteAccessPolicyApi, RemoteAccessQueries and RemoteAccessPolicyTest already drive the tenant scope; this adds the organization override on a throwaway organization (the AiSettingsTest pattern), so it stays in the functional phase. setOrganizationRemoteAccessMode(organizationId, mode) returns OrganizationRemoteAccessPolicyPayload with userErrors (ORGANIZATION_NOT_FOUND, REMOTE_ACCESS_DISABLED); mode null clears the override. organizationRemoteAccessPolicy returns mode (the override, or null when inheriting) and effectiveMode: assert inherit (mode null, effectiveMode = tenant mode) → override (both follow) → clear (back to inherit). Negative: a fabricated organization id answers ORGANIZATION_NOT_FOUND in userErrors. Clear the override in @AfterAll."
 
 [[items]]
 id = "CP-25"
@@ -557,7 +554,7 @@ notes = "Cheapest item in the batch and it extends a class that is already done 
 [[items]]
 id = "CP-34"
 title = "Package catalog search"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = ["query:searchPackages", "query:packageDetails"]
 test_class = "PackageSearchTest"
@@ -565,7 +562,8 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "report 2026-09-30 (unplanned-gap sweep)"
-notes = "Read-only and needs no tenant state at all — no device, no organization, nothing to clean up — but it reaches out to Homebrew / Chocolatey / winget, so it is the one case in the suite that fails when the *public* internet is unavailable rather than when the product is broken; say so in the @DisplayName or accept the flake. The contract gives the whole test: PackageSearchItem.id is what packageDetails takes, packageType must be passed back for BREW or you may open the formula's cask twin, packageDetails errors NOT_FOUND on an unknown id (the negative case), versions come newest first, and forward cursor pagination only — pass pageInfo.endCursor back as after. Per-manager gaps are specified and must not be asserted away: publisher is WINGET-only in search results, iconUrl CHOCO-only in search, popularity BREW/CHOCO only, releasedAt Chocolatey only. Homebrew publishes only the current version, so a 'more than one version' assertion has to pick CHOCO. This is also the fixture CP-22/CP-23 need — a bundle's packages must be identified 'exactly as package search returns it' — so doing it first pays twice."
+pr = "#2482"
+notes = "Read-only and needs no tenant state at all — no device, no organization, nothing to clean up — but it reaches out to Homebrew / Chocolatey / winget, so it is the one case in the suite that fails when the *public* internet is unavailable rather than when the product is broken; say so in the @DisplayName or accept the flake. The contract gives the whole test: PackageSearchItem.id is what packageDetails takes, packageType must be passed back for BREW or you may open the formula's cask twin, packageDetails errors NOT_FOUND on an unknown id (the negative case), versions come newest first, and forward cursor pagination only — pass pageInfo.endCursor back as after. Per-manager gaps are specified and must not be asserted away: publisher is WINGET-only in search results, iconUrl CHOCO-only in search, popularity BREW/CHOCO only, releasedAt Chocolatey only. Homebrew publishes only the current version, so a 'more than one version' assertion has to pick CHOCO. This is also the fixture CP-22/CP-23 need — a bundle's packages must be identified 'exactly as package search returns it' — so doing it first pays twice. Done 2026-09-30 (#2482): PackageSearchTest, 7 cases; Chocolatey is disabled on every environment, so its case pins the refusal; proved by the matrix."
 
 [[items]]
 id = "CP-35"
@@ -659,7 +657,7 @@ notes = "ScriptApi.runScript already exists and no enabled test calls it — it 
 [[items]]
 id = "CP-41"
 title = "External API v1 knowledge base: items, folders and tags"
-status = "proposed"
+status = "done"
 priority = "P3"
 ops = [
   "GET api/v1/knowledge-base/items", "GET api/v1/knowledge-base/items/{}",
@@ -673,12 +671,13 @@ tags = ["external-api"]
 depends_on = []
 needs = []
 source = "report 2026-09-30 (largest untested external-consumer surface)"
-notes = "KnowledgeBaseController in openframe-external-api-service-core is 20 endpoints, all introduced 2026-09-21, none touched by any test and none under a known-gaps entry — the largest single block of external-consumer surface in the matrix with no safety net. Split in two for one PR each; this half is the tree and the taxonomy, CP-42 is the article lifecycle. The external suite's whole harness already exists (tests/external/, api/external/, ExternalApiBaseTest, the X-API-Key clients) and the GraphQL twins of these operations are the best-covered area in the product — knowledge-base is 24/24 covered by KnowledgeBaseTest — so the assertions can be lifted from there and only the transport changes. Two constraints the external suite already encodes and this must not forget: the qa external API key is limited to 5 requests per minute (which is why the existing external tests carry a pacing layer), and external display names start with 'ExtApi: '. Tag external-api so it lands in that phase, which runs last, after the admin that mints the key still exists."
+pr = "#2480"
+notes = "KnowledgeBaseController in openframe-external-api-service-core is 20 endpoints, all introduced 2026-09-21, none touched by any test and none under a known-gaps entry — the largest single block of external-consumer surface in the matrix with no safety net. Split in two for one PR each; this half is the tree and the taxonomy, CP-42 is the article lifecycle. The external suite's whole harness already exists (tests/external/, api/external/, ExternalApiBaseTest, the X-API-Key clients) and the GraphQL twins of these operations are the best-covered area in the product — knowledge-base is 24/24 covered by KnowledgeBaseTest — so the assertions can be lifted from there and only the transport changes. Two constraints the external suite already encodes and this must not forget: the qa external API key is limited to 5 requests per minute (which is why the existing external tests carry a pacing layer), and external display names start with 'ExtApi: '. Tag external-api so it lands in that phase, which runs last, after the admin that mints the key still exists. Done 2026-09-30 (#2480): ExternalKnowledgeBaseTest cases 1-14, one ordered case per state; proved by the matrix."
 
 [[items]]
 id = "CP-42"
 title = "External API v1 knowledge base: article lifecycle and attachments"
-status = "proposed"
+status = "done"
 priority = "P3"
 ops = [
   "POST api/v1/knowledge-base/articles", "PATCH api/v1/knowledge-base/articles/{}",
@@ -694,7 +693,8 @@ tags = ["external-api"]
 depends_on = ["CP-41"]
 needs = []
 source = "report 2026-09-30 (largest untested external-consumer surface)"
-notes = "The second half of the same controller; CP-41 creates the client and the folder fixtures this needs. The lifecycle is the same state machine KnowledgeBaseTest already drives over GraphQL (create → publish → unpublish → archive → unarchive, with archivedArticles as the read-back), and CP-11's attachment case is the template for the presigned round trip: create the attachment, PUT the bytes to the signed URL, fetch the download URL and compare byte for byte, then delete. The 5-requests-per-minute key limit bites hardest here — this half is ten endpoints and a byte-for-byte upload/download, so budget the pacing before writing the case, and archive whatever the class created so the tenant stays reusable."
+pr = "#2480"
+notes = "The second half of the same controller; CP-41 creates the client and the folder fixtures this needs. The lifecycle is the same state machine KnowledgeBaseTest already drives over GraphQL (create → publish → unpublish → archive → unarchive, with archivedArticles as the read-back), and CP-11's attachment case is the template for the presigned round trip: create the attachment, PUT the bytes to the signed URL, fetch the download URL and compare byte for byte, then delete. The 5-requests-per-minute key limit bites hardest here — this half is ten endpoints and a byte-for-byte upload/download, so budget the pacing before writing the case, and archive whatever the class created so the tenant stays reusable. Done 2026-09-30 (#2480): ExternalKnowledgeBaseTest cases 15-26; proved by the matrix."
 
 # ── Added 2026-09-30 after the analyser fix (76c8e11f1) ───────────────────────────────────────────
 # Fixing the `{}/{}` path resolution turned eight UI-used operations from false "covered" into open
@@ -704,7 +704,7 @@ notes = "The second half of the same controller; CP-41 creates the client and th
 [[items]]
 id = "CP-43"
 title = "API key lifecycle"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = [
   "GET api-keys", "POST api-keys", "GET api-keys/{}", "PUT api-keys/{}", "POST api-keys/{}/regenerate",
@@ -715,12 +715,13 @@ tags = ["oss", "feature"]
 depends_on = []
 needs = []
 source = "analyser fix 2026-09-30 (unplanned UI gaps, settings)"
-notes = "ApiKeyController (openframe-api-service-core, @RequestMapping(\"/api-keys\")): GET list (List<ApiKeyResponse>, scoped to the principal), POST (201, @Valid CreateApiKeyRequest → CreateApiKeyResponse with the secret), GET /{keyId}, PUT /{keyId} (@Valid UpdateApiKeyRequest{name, description, enabled, expiresAt} → ApiKeyResponse), DELETE /{keyId} (204), POST /{keyId}/regenerate (CreateApiKeyResponse — a new secret). ApiKeyApi already has createApiKey/getApiKeys/getApiKey/deleteApiKey(Raw); create, get and delete are reached today only as fixtures of StatsTest and MingoCompactionTest, so the matrix counts them as setup, not direct — this item asserts them directly. Missing: updateApiKey and regenerateApiKey client methods, UpdateApiKeyRequest DTO. One case on a key the test creates and deletes in finally: create → listed → update name/description → GET shows them → regenerate returns a secret different from the original → delete → GET 404. Boundary: disable (enabled=false) and check the list reports it. Shared-tenant safe: touches only its own key."
+pr = "#2477"
+notes = "ApiKeyController (openframe-api-service-core, @RequestMapping(\"/api-keys\")): GET list (List<ApiKeyResponse>, scoped to the principal), POST (201, @Valid CreateApiKeyRequest → CreateApiKeyResponse with the secret), GET /{keyId}, PUT /{keyId} (@Valid UpdateApiKeyRequest{name, description, enabled, expiresAt} → ApiKeyResponse), DELETE /{keyId} (204), POST /{keyId}/regenerate (CreateApiKeyResponse — a new secret). ApiKeyApi already has createApiKey/getApiKeys/getApiKey/deleteApiKey(Raw); create, get and delete are reached today only as fixtures of StatsTest and MingoCompactionTest, so the matrix counts them as setup, not direct — this item asserts them directly. Missing: updateApiKey and regenerateApiKey client methods, UpdateApiKeyRequest DTO. One case on a key the test creates and deletes in finally: create → listed → update name/description → GET shows them → regenerate returns a secret different from the original → delete → GET 404. Boundary: disable (enabled=false) and check the list reports it. Shared-tenant safe: touches only its own key. Done 2026-09-30 (#2477): ApiKeysTest, 9 ordered cases; regenerate issues a new key id, not just a new secret; proved by the matrix."
 
 [[items]]
 id = "CP-44"
 title = "Edit a user's name"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = ["PUT users/{}"]
 test_class = "UserInvitationsTest"
@@ -728,12 +729,13 @@ tags = ["oss", "feature"]
 depends_on = []
 needs = []
 source = "analyser fix 2026-09-30 (unplanned UI gaps, settings)"
-notes = "UserController.updateUserById: PUT /users/{id}, @Valid UpdateUserRequest{firstName, lastName}, both @Size(max = 128), → UserResponse. Only the name is editable — roles and status are not in the DTO. Edit a user the test owns: invite + accept (UserInvitationsTest already has the fixture flow via InvitationGenerator.acceptInvitationRequest), PUT new names, GET users/{id} (UserApi.getUser, now correctly resolved) shows them. Negative: a 129-character firstName is refused (expect 400 from @Valid; record the actual status). Do not edit the owner or the pipeline admin. Missing: UserApi.updateUser and an UpdateUserRequest DTO. Belongs in UserInvitationsTest because that class creates the throwaway active user; delete it afterwards as testDeleteUser does."
+pr = "#2478"
+notes = "UserController.updateUserById: PUT /users/{id}, @Valid UpdateUserRequest{firstName, lastName}, both @Size(max = 128), → UserResponse. Only the name is editable — roles and status are not in the DTO. Edit a user the test owns: invite + accept (UserInvitationsTest already has the fixture flow via InvitationGenerator.acceptInvitationRequest), PUT new names, GET users/{id} (UserApi.getUser, now correctly resolved) shows them. Negative: a 129-character firstName is refused (expect 400 from @Valid; record the actual status). Do not edit the owner or the pipeline admin. Missing: UserApi.updateUser and an UpdateUserRequest DTO. Belongs in UserInvitationsTest because that class creates the throwaway active user; delete it afterwards as testDeleteUser does. Done 2026-09-30 (#2478): UserInvitationsTest orders 10-14 on a user the class invites and accepts over the API; proved by the matrix."
 
 [[items]]
 id = "CP-45"
 title = "List pending invitations"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = ["GET invitations"]
 test_class = "UserInvitationsTest"
@@ -741,7 +743,8 @@ tags = ["oss", "feature"]
 depends_on = []
 needs = []
 source = "analyser fix 2026-09-30 (unplanned UI gaps, settings)"
-notes = "InvitationController.listInvitations: GET /invitations?page=0&size=20 (defaults) → InvitationPageResponse. Invite a fresh address (InvitationApi.inviteUser), find it in the list by id with its status, revoke it, and assert the list no longer shows it as pending (or shows it revoked — read the response to see which). Boundary: size=1 returns at most one item. Missing: InvitationApi.listInvitations and the page DTO. Additive and self-cleaning; safe on the shared tenant."
+pr = "#2478"
+notes = "InvitationController.listInvitations: GET /invitations?page=0&size=20 (defaults) → InvitationPageResponse. Invite a fresh address (InvitationApi.inviteUser), find it in the list by id with its status, revoke it, and assert the list no longer shows it as pending (or shows it revoked — read the response to see which). Boundary: size=1 returns at most one item. Missing: InvitationApi.listInvitations and the page DTO. Additive and self-cleaning; safe on the shared tenant. Done 2026-09-30 (#2478): UserInvitationsTest orders 15-18; a revoked invitation drops off the list rather than showing as REVOKED; proved by the matrix."
 
 [[items]]
 id = "CP-46"
@@ -759,7 +762,7 @@ notes = "UserController.transferOwnership: POST /users/{id}/transfer-ownership, 
 [[items]]
 id = "CP-47"
 title = "Organization by global id"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = ["query:organization"]
 test_class = "OrganizationsTest"
@@ -767,12 +770,13 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "analyser fix 2026-09-30 (unplanned UI gaps, customers)"
-notes = "organization.graphqls: organization(id: ID!): Organization (nullable). The customers UI uses it; the suite covers only organizationByOrganizationId(organizationId: String!). The id is the Relay global id, not organizationId — take it from the organizations connection. Assert the same organization comes back as via organizationByOrganizationId; boundary: a well-formed global id for a missing record returns null, not an error (confirm which). Missing: an OrganizationQueries constant and OrganizationApi method. Read-only."
+pr = "#2479"
+notes = "organization.graphqls: organization(id: ID!): Organization (nullable). The customers UI uses it; the suite covers only organizationByOrganizationId(organizationId: String!). The id is the Relay global id, not organizationId — take it from the organizations connection. Assert the same organization comes back as via organizationByOrganizationId; boundary: a well-formed global id for a missing record returns null, not an error (confirm which). Missing: an OrganizationQueries constant and OrganizationApi method. Read-only. Done 2026-09-30 (#2479): OrganizationsTest; a well-formed global id with no record resolves to null; proved by the matrix."
 
 [[items]]
 id = "CP-48"
 title = "Integrated tools list and filters"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = ["query:integratedTools", "query:toolFilters"]
 test_class = "IntegratedToolsTest"
@@ -780,7 +784,8 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "analyser fix 2026-09-30 (unplanned UI gaps, monitoring/settings)"
-notes = "tool.graphqls: integratedTools(filter: ToolFilterInput, search: String, sort: SortInput): ToolList! (a plain list — tools are configuration data) and toolFilters: ToolFilters!. integratedTools is used by the monitoring and settings UI; toolFilters has no UI consumer but is the same resolver's facet and costs one assertion. Every tenant has its integrated tools registered at setup (v1/tools registration), so the list is non-empty: assert it, then filter by one facet value from toolFilters and check every returned tool matches it, and search by a name taken from the list. Missing: Queries constants, client methods and ToolList/ToolFilters DTOs (check data/dto for an existing tool type first — ExternalToolsTest covers the external-API side). Read-only."
+pr = "#2481"
+notes = "tool.graphqls: integratedTools(filter: ToolFilterInput, search: String, sort: SortInput): ToolList! (a plain list — tools are configuration data) and toolFilters: ToolFilters!. integratedTools is used by the monitoring and settings UI; toolFilters has no UI consumer but is the same resolver's facet and costs one assertion. Every tenant has its integrated tools registered at setup (v1/tools registration), so the list is non-empty: assert it, then filter by one facet value from toolFilters and check every returned tool matches it, and search by a name taken from the list. Missing: Queries constants, client methods and ToolList/ToolFilters DTOs (check data/dto for an existing tool type first — ExternalToolsTest covers the external-API side). Read-only. Done 2026-09-30 (#2481): IntegratedToolsTest, 7 cases; the facet round-trip skips on qa because no tool there has a type or category; proved by the matrix."
 
 [[items]]
 id = "CP-49"
@@ -794,3 +799,33 @@ depends_on = []
 needs = ["decision for POST events only: a valid publish puts a real DASHBOARD_ACTIVITY event for the test user on the user-events outbound Kafka topic; find its consumer (onboarding progress, CP-31, is the likely one) before asserting more than 202. The validation cases below publish nothing and need no decision"]
 source = "analyser fix 2026-09-30 (unplanned UI gaps, UI plumbing)"
 notes = "Two small calls the UI shell makes on every session. feFeatureFlags(names: [String!]): [FeFeatureFlag!]! (module openframe-fe-feature-flags) — 'unknown flags default to false': request one fabricated name and assert it comes back with enabled false, plus one real flag name read from the frontend's hooks. POST /events is TenantEventController in openframe-saas-api (202 ACCEPTED, TenantEventRequest{eventType, subtype, repeatMode}). TenantEventService allows only eventType DASHBOARD_ACTIVITY, requires a non-blank subtype and a repeatMode; each violation is IllegalArgumentException → 400, thrown before anything is published — three safe negative cases. Idempotency key is userId:subtype (ONCE) or with a timestamp (MULTI). Missing: a Queries constant, client methods, and a TenantEventRequest DTO. Split into two classes if the owner prefers; they share no fixture."
+
+# ── Added 2026-10-01 after wave 1 ───────────────────────────────────────────────────────────────────
+# CP-51 is the device half split out of CP-24; CP-50 is query:deviceLogs, which the analyser fix turned
+# from four phantom rows into one real, UI-used operation.
+
+[[items]]
+id = "CP-50"
+title = "Device logs"
+status = "proposed"
+priority = "P2"
+ops = ["query:deviceLogs"]
+test_class = "DeviceLogsTest"
+tags = ["saas", "feature"]
+depends_on = []
+needs = []
+source = "analyser fix 2026-09-30 (deviceLogs was four phantom rows)"
+notes = "device-log.graphqls: deviceLogs(machineId: String @deprecated, machineIds: [String!], filter: DeviceLogFilterInput, first: Int, after: String): DeviceLogConnection!, newest first, always scoped to the current tenant. Omitting machineIds reads every device in the tenant, so the tenant-wide cases need no device; an empty machineIds list is rejected, and at most 50 ids are allowed. DeviceLogFilterInput: levels (DEBUG/INFO/WARN/ERROR), contains/excludes (case-insensitive literal terms, max 5 of 256 characters), from/to (inclusive; from defaults to 7 days before to with a device named, 24 hours without; the range may not exceed 30 days). first is 1-500, default 100; page older entries with after. DeviceLogEntry: timestamp (ingestion, nanosecond precision, the sort key), agentTimestamp, level, message, machineId, hostname, count. Cases: tenant-wide page sorted newest first; levels filter returns only those levels; contains/excludes honoured; first/after pages without overlap; a range over 30 days and an empty machineIds list are refused; one case naming the enrolled box's machineId (tag needs-device on that case only) returns only its lines. The devices UI gates the logs tab behind useDeviceLogsGate, so check the gate before calling the feature live."
+
+[[items]]
+id = "CP-51"
+title = "Remote-access policy: device scope"
+status = "proposed"
+priority = "P1"
+ops = ["mutation:setDeviceRemoteAccessMode"]
+test_class = "RemoteAccessPolicyTest"
+tags = ["saas", "feature", "needs-device"]
+depends_on = ["CP-24"]
+needs = []
+source = "split from CP-24, 2026-10-01"
+notes = "setDeviceRemoteAccessMode(machineId: String!, mode: RemoteAccessMode): Machine! sets a per-device override; refusals (DEVICE_NOT_FOUND, REMOTE_ACCESS_DISABLED) are GraphQL errors with extensions.code, unlike the userErrors of the tenant and organization mutations. The override reads back on Machine.remoteAccess { mode effectiveMode effectiveScope } (an extension on the oss-lib Machine type, so DeviceQueries needs the selection); RemoteAccessPolicyScope is DEVICE|ORGANIZATION|TENANT|DEFAULTS. Use the enrolled box in its real organization (a throwaway organization has no devices): with no override, effectiveScope is ORGANIZATION or TENANT; set an override and assert mode, effectiveMode and effectiveScope DEVICE; clear it with mode null and assert the previous scope returns. Negative: a fabricated machineId raises DEVICE_NOT_FOUND. The override changes how remote sessions to that box behave for everyone, so keep it short, clear it in @AfterAll, and do not run it alongside other remote-access cases."
