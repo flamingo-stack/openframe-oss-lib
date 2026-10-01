@@ -15,6 +15,7 @@ import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -41,7 +42,11 @@ public class DeviceHostInventoryLoader {
     private final DeviceService deviceService;
     private final FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
+    private final CorrelatedHostSoftwareCache hostSoftwareCache;
     private final ToolConnectionRepository toolConnectionRepository;
+
+    @Value("${openframe.rmm.software.fleet-paging.enabled:false}")
+    private boolean fleetPaging;
 
     public HostInventory load(FleetMdmClient fleet, String machineId) {
         Machine machine = requireMachine(machineId);
@@ -90,13 +95,22 @@ public class DeviceHostInventoryLoader {
 
     private HostInventory loadInventory(FleetMdmClient fleet, long hostId) {
         List<HostSoftwareTitle> titles = fetchAllTitles(fleet, hostId);
-        List<FleetSoftware> hostSoftware = softwareOf(fleet, hostId);
+        List<FleetSoftware> hostSoftware = fleetPaging ? hostSoftwareOf(fleet, hostId) : correlatedSoftwareOf(fleet, hostId);
         return HostInventory.of(titles, hostSoftware);
     }
 
-    private static List<FleetSoftware> softwareOf(FleetMdmClient fleet, long hostId) {
+    private static List<FleetSoftware> hostSoftwareOf(FleetMdmClient fleet, long hostId) {
         HostVulnerabilityInventory host = fleet.getHostVulnerabilityInventoryById(hostId);
         return host == null || host.software() == null ? List.of() : host.software();
+    }
+
+    private List<FleetSoftware> correlatedSoftwareOf(FleetMdmClient fleet, long hostId) {
+        Map<Long, List<FleetSoftware>> softwareByHostId = hostSoftwareCache.softwareByHostId(fleet::searchHosts);
+        return softwareByHostId.getOrDefault(hostId, List.of());
+    }
+
+    public List<HostSoftwareTitle> titlesForHost(FleetMdmClient fleet, long hostId) {
+        return fetchAllTitles(fleet, hostId);
     }
 
     private static List<HostSoftwareTitle> fetchAllTitles(FleetMdmClient fleet, long hostId) {

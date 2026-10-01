@@ -89,7 +89,7 @@ public class SoftwareDataFetcher {
 
     @DgsQuery
     public SoftwareFilters softwareFilters(@InputArgument Object filter, @InputArgument String search) {
-        return softwareInventoryService.getSoftwareFilters();
+        return softwareInventoryService.getSoftwareFilters(search);
     }
 
     @DgsQuery
