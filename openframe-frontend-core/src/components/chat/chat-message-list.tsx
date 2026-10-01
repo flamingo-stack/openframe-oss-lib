@@ -122,6 +122,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       dialogId,
       isLoading = false,
       isTyping = false,
+      typingMessage,
       autoScroll = true,
       overscrollContain = true,
       pinBottom = false,
@@ -1080,7 +1081,15 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 aria-live="polite"
               >
                 <DotsLoaderIcon className="h-6 w-6" />
-                <CyclingPhrase words={STREAMING_WORDS} className="text-h6" />
+                {/* What the turn is actually doing, when the host knows; the
+                    cycling phrase when it does not. One line, updated in place. */}
+                {typingMessage ? (
+                  <span className="text-h6" aria-atomic="true">
+                    {typingMessage}
+                  </span>
+                ) : (
+                  <CyclingPhrase words={STREAMING_WORDS} className="text-h6" />
+                )}
               </div>
             )}
 
