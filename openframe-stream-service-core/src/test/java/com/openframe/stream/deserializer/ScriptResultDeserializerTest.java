@@ -332,7 +332,7 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("getResult: the whole script document is attached as input next to the output, minus content hash, null fields and secret values")
+    @DisplayName("getResult: the whole script document is attached as input next to the output, minus id, tenant id, content hash, null fields and secret values")
     void getResult_scriptFound_attachesScriptDocumentAsInput() throws Exception {
         // setup
         ObjectNode after = mapper.createObjectNode()
@@ -354,7 +354,8 @@ class ScriptResultDeserializerTest {
         // verifications
         assertThat(result.get("output").asText()).isEqualTo("ok");
         JsonNode input = result.get("input");
-        assertThat(input.get("id").asText()).isEqualTo(SCRIPT_ID);
+        assertThat(input.has("id")).isFalse();
+        assertThat(input.has("tenantId")).isFalse();
         assertThat(input.get("name").asText()).isEqualTo("Disk cleanup");
         assertThat(input.get("shell").asText()).isEqualTo("BASH");
         assertThat(input.get("privilegeLevel").asText()).isEqualTo("ADMIN");

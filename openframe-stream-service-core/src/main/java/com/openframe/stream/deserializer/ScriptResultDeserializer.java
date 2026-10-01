@@ -15,6 +15,7 @@ import com.openframe.stream.mapping.SourceEventTypes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -33,7 +34,7 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     private static final String FALLBACK_FAILED_MESSAGE = "Script failed";
 
     private static final String DETAILS_INPUT = "input";
-    private static final String SCRIPT_CONTENT_HASH = "contentHash";
+    private static final List<String> SCRIPT_FIELDS_LEFT_OUT = List.of("id", "tenantId", "contentHash");
     private static final String SCRIPT_ENV_VARS = "envVars";
     private static final String ENV_VAR_VALUE = "value";
     private static final String ENV_VAR_SECRET = "secret";
@@ -105,8 +106,8 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
         }
     }
 
-    // The result block carries the script document as stored next to the output, without its content hash,
-    // its null fields and the values of secret env vars; logs never hold a secret.
+    // The result block carries the script document as stored next to the output, without its id, tenant id,
+    // content hash, null fields and the values of secret env vars; logs never hold a secret.
     @Override
     protected String getResult(JsonNode after) {
         String baseResult = super.getResult(after);
@@ -139,7 +140,7 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
 
     private ObjectNode inputOf(Script script) {
         ObjectNode input = scriptMapper.valueToTree(script);
-        input.remove(SCRIPT_CONTENT_HASH);
+        input.remove(SCRIPT_FIELDS_LEFT_OUT);
         JsonNode envVars = input.path(SCRIPT_ENV_VARS);
         envVars.forEach(ScriptResultDeserializer::dropSecretValue);
         return input;
