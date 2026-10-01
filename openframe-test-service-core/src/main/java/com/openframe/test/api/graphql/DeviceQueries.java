@@ -93,6 +93,15 @@ public class DeviceQueries {
             }
             """;
 
+    // What the agent last reported per package manager (PRESENT, MISSING, UNSUPPORTED, UNKNOWN); software submit refuses MISSING and UNKNOWN.
+    public static final String DEVICE_PACKAGE_MANAGERS = """
+            query($machineId: String!) {
+                device(machineId: $machineId) {
+                    packageManagers { brew winget choco }
+                }
+            }
+            """;
+
     public static final String DEVICES_WITH_FILTER = """
             query($filter: DeviceFilterInput) {
                 devices(filter: $filter) {
