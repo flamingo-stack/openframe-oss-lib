@@ -1,10 +1,20 @@
 package com.openframe.stream.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.model.enums.DataEnrichmentServiceType;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import com.openframe.stream.service.rmm.RmmEnrichmentService;
@@ -14,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
@@ -28,11 +40,19 @@ class RmmEnrichmentServiceTest {
     private static final String TENANT_ID = "tenant-1";
     private static final String HOSTNAME = "MBP-Oleksandr.lan";
     private static final String NICKNAME = "Reception iMac";
+    private static final String EXECUTION_ID = "exec-1";
+    private static final String SCRIPT_ID = "script-1";
+    private static final String ADMIN_ID = "admin-7";
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Mock
     private MachineIdCacheService machineIdCacheService;
     @Mock
     private TenantIdProvider tenantIdProvider;
+    @Mock
+    private ScriptExecutionRepository scriptExecutionRepository;
+    @Mock
+    private ScriptRepository scriptRepository;
 
     private RmmEnrichmentService service;
 
@@ -40,7 +60,8 @@ class RmmEnrichmentServiceTest {
     void setUp() {
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Tenant cluster mode — no ClusterTenantIdResolver bean.
-        service = new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider);
+        service = new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
+                scriptExecutionRepository, scriptRepository);
     }
 
     @Test
@@ -144,6 +165,108 @@ class RmmEnrichmentServiceTest {
         assertThat(enriched.getMachineId()).isNull();
         assertThat(enriched.getTenantId()).isNull();
         verifyNoInteractions(machineIdCacheService, tenantIdProvider);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: a script result resolves its execution row and script — trigger source, initiator and script creation source reach the enrichment")
+    void getExtraParams_scriptResult_stampsExecutionAndScriptOrigin() {
+        // setup
+        stubMachine();
+        ScriptExecution execution = ScriptExecution.builder()
+                .tenantId(TENANT_ID).executionId(EXECUTION_ID).scriptId(SCRIPT_ID)
+                .source(ExecutionSource.AI_ASSISTANT).initiatedBy(ADMIN_ID)
+                .build();
+        Script script = Script.builder().id(SCRIPT_ID).tenantId(TENANT_ID)
+                .creationSource(ScriptCreationSource.AI_ASSISTANT).build();
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(execution));
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(script));
+
+        // execution
+        IntegratedToolEnrichedData enriched = service.getExtraParams(scriptResult(SCRIPT_ID));
+
+        // verifications
+        assertThat(enriched.getExecutionSource()).isEqualTo("AI_ASSISTANT");
+        assertThat(enriched.getScriptCreationSource()).isEqualTo("AI_ASSISTANT");
+        assertThat(enriched.getUserId()).isEqualTo(ADMIN_ID);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: a row and a script written before the fields existed read as MANUAL, and the row's scriptId is used when the wire carries none")
+    void getExtraParams_legacyRowAndScript_readAsManual() {
+        // setup
+        stubMachine();
+        ScriptExecution execution = ScriptExecution.builder()
+                .tenantId(TENANT_ID).executionId(EXECUTION_ID).scriptId(SCRIPT_ID).initiatedBy(ADMIN_ID)
+                .build();
+        Script script = Script.builder().id(SCRIPT_ID).tenantId(TENANT_ID).build();
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(execution));
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(script));
+
+        // execution
+        IntegratedToolEnrichedData enriched = service.getExtraParams(scriptResult(null));
+
+        // verifications
+        assertThat(enriched.getExecutionSource()).isEqualTo("MANUAL");
+        assertThat(enriched.getScriptCreationSource()).isEqualTo("MANUAL");
+    }
+
+    @Test
+    @DisplayName("getExtraParams: an unknown execution leaves the origin fields null and skips the script lookup when the wire carries no scriptId")
+    void getExtraParams_unknownExecution_leavesOriginNull() {
+        // setup
+        stubMachine();
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.empty());
+
+        // execution
+        IntegratedToolEnrichedData enriched = service.getExtraParams(scriptResult(null));
+
+        // verifications
+        assertThat(enriched.getExecutionSource()).isNull();
+        assertThat(enriched.getScriptCreationSource()).isNull();
+        assertThat(enriched.getUserId()).isNull();
+        verifyNoInteractions(scriptRepository);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: a Mongo failure during the origin lookup is logged and the rest of the enrichment survives")
+    void getExtraParams_originLookupFails_enrichmentSurvives() {
+        // setup
+        stubMachine();
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenThrow(new IllegalStateException("mongo down"));
+
+        // execution
+        IntegratedToolEnrichedData enriched = service.getExtraParams(scriptResult(SCRIPT_ID));
+
+        // verifications
+        assertThat(enriched.getHostname()).isEqualTo(HOSTNAME);
+        assertThat(enriched.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(enriched.getExecutionSource()).isNull();
+    }
+
+    private void stubMachine() {
+        when(machineIdCacheService.getMachineByMachineId(MACHINE_ID))
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, null, ORG_ID));
+        when(machineIdCacheService.getOrganization(ORG_ID))
+                .thenReturn(new CachedOrganizationInfo(ORG_ID, "Default"));
+    }
+
+    private static DeserializedDebeziumMessage scriptResult(String scriptId) {
+        ObjectNode after = MAPPER.createObjectNode()
+                .put("tenantId", TENANT_ID)
+                .put("machineId", MACHINE_ID)
+                .put("executionId", EXECUTION_ID);
+        if (scriptId != null) {
+            after.put("scriptId", scriptId);
+        }
+        DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
+        payload.setAfter(after);
+        DeserializedDebeziumMessage m = message(MACHINE_ID);
+        m.setPayload(payload);
+        return m;
     }
 
     private static DeserializedDebeziumMessage message(String agentId) {

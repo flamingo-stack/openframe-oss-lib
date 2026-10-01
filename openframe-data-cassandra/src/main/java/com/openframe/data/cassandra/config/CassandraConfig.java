@@ -12,6 +12,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.cassandra.config.AbstractCassandraConfiguration;
 import org.springframework.data.cassandra.config.CqlSessionFactoryBean;
 import org.springframework.data.cassandra.config.SchemaAction;
+import org.springframework.data.cassandra.core.convert.CassandraConverter;
+import org.springframework.data.cassandra.core.convert.SchemaFactory;
+import org.springframework.data.cassandra.core.mapping.CassandraMappingContext;
 import org.springframework.data.cassandra.repository.config.EnableCassandraRepositories;
 
 import java.util.Collections;
@@ -132,5 +135,13 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
     @Bean
     public CassandraSessionLogger cassandraSessionLogger(CqlSession session) {
         return new CassandraSessionLogger(session);
+    }
+
+    @Bean
+    public CassandraTableColumnSync cassandraTableColumnSync(CqlSession session,
+                                                             CassandraMappingContext mappingContext,
+                                                             CassandraConverter converter) {
+        SchemaFactory schemaFactory = new SchemaFactory(converter);
+        return new CassandraTableColumnSync(session, mappingContext, schemaFactory, keyspaceName);
     }
 }
