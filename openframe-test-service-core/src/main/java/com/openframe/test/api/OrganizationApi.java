@@ -7,6 +7,7 @@ import com.openframe.test.data.dto.organization.OrganizationFilterInput;
 import com.openframe.test.data.dto.organization.OrganizationSortInput;
 import com.openframe.test.helpers.RequestSpecHelper;
 import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -119,11 +120,15 @@ public class OrganizationApi {
     }
 
     public static void archiveOrganization(Organization organization) {
-        final String ARCHIVE_ORGANIZATION = ORGANIZATIONS.concat("/").concat(organization.getOrganizationId()).concat("/status");
-        given(RequestSpecHelper.getAuthorizedSpec()).contentType(ContentType.JSON)
+        archiveOrganizationRaw(organization.getOrganizationId()).then().statusCode(204);
+    }
+
+    // Raw form, for teardown paths that must not throw.
+    public static Response archiveOrganizationRaw(String organizationId) {
+        final String ARCHIVE_ORGANIZATION = ORGANIZATIONS.concat("/").concat(organizationId).concat("/status");
+        return given(RequestSpecHelper.getAuthorizedSpec()).contentType(ContentType.JSON)
                 .body(Map.of("status", "ARCHIVED"))
-                .patch(ARCHIVE_ORGANIZATION)
-                .then().statusCode(204);
+                .patch(ARCHIVE_ORGANIZATION);
     }
 
     // Cleanup form: the HTTP status instead of an assertion

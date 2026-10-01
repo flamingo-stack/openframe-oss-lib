@@ -28,6 +28,7 @@ import static com.openframe.test.data.generator.DeviceGenerator.onlineDevicesFil
 import static com.openframe.test.data.generator.KnowledgeBaseGenerator.attachmentFile;
 import static com.openframe.test.data.generator.TicketGenerator.allTickets;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @Tag("saas")
 @DisplayName("Tickets")
@@ -567,35 +568,86 @@ public class TicketsTest extends BaseTest {
         assertThat(sum).as("Per-status counts never exceed the total").isLessThanOrEqualTo(stats.getTotalCount());
     }
 
+    @Tag("feature")
+    @Test
+    @DisplayName("Resolve two tickets of this run's own for the bulk archive: one assigned to the caller, one unassigned")
+    @Order(10)
+    public void testResolveTicketsForBulkArchive() {
+        String me = me();
+        String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+        assertThat(resolvedStatusId).as("No system status definition found for kind RESOLVED").isNotNull();
+        Ticket mine = newOwnTicket(me);
+        Ticket unassigned = newOwnTicket(null);
+        assertThat(mine.getAssignedTo()).as("The first ticket is assigned to the caller").isEqualTo(me);
+        assertThat(unassigned.getAssignedTo()).as("The second ticket has no assignee").isNull();
+        assertThat(unassigned.getOrganizationId()).as("Both tickets sit in the same organization").isEqualTo(mine.getOrganizationId());
+
+        assertThat(TicketApi.transitionTicket(mine.getId(), resolvedStatusId).getStatusDefinition().getKind())
+                .as("The caller's ticket is RESOLVED").isEqualTo("RESOLVED");
+        assertThat(TicketApi.transitionTicket(unassigned.getId(), resolvedStatusId).getStatusDefinition().getKind())
+                .as("The unassigned ticket is RESOLVED").isEqualTo("RESOLVED");
+        Ticket rereadUnassigned = TicketApi.getTicket(unassigned.getId());
+        assertThat(rereadUnassigned.getAssignedTo()).as("Resolving does not assign the unassigned ticket").isNull();
+
+        bulkArchiveAssigneeId = me;
+        bulkArchiveOrganizationId = mine.getOrganizationId();
+        bulkArchiveMineId = mine.getId();
+        bulkArchiveUnassignedId = unassigned.getId();
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Archive resolved tickets in bulk, narrowed to one organization and the caller as assignee")
+    @Order(11)
+    public void testArchiveResolvedTickets() {
+        requireResolvedForBulkArchive();
+        String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
+        assertThat(archivedStatusId).as("No system status definition found for kind ARCHIVED").isNotNull();
+
+        // The owner allowed this tenant-wide write on test-env; the filter keeps it to the caller's tickets in one organization.
+        BulkOperationPayload payload = TicketApi.archiveResolvedTickets(
+                TicketGenerator.ticketsOfOrganizationAssignedTo(bulkArchiveOrganizationId, bulkArchiveAssigneeId));
+        assertThat(payload).as("archiveResolvedTickets returns a payload").isNotNull();
+        assertThat(payload.getUserErrors()).as("The bulk archive reports no userErrors").isNullOrEmpty();
+        assertThat(payload.getCount()).as("At least this run's resolved ticket was archived").isGreaterThanOrEqualTo(1);
+
+        Ticket mine = TicketApi.getTicket(bulkArchiveMineId);
+        assertThat(mine.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(mine.getStatusDefinition().getId()).as("The caller's resolved ticket moved to the ARCHIVED status definition").isEqualTo(archivedStatusId);
+        assertThat(mine.getStatusDefinition().getKind()).as("The caller's resolved ticket is ARCHIVED").isEqualTo("ARCHIVED");
+
+        Ticket unassigned = TicketApi.getTicket(bulkArchiveUnassignedId);
+        assertThat(unassigned.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(unassigned.getStatusDefinition().getKind()).as("A resolved ticket outside the assignee filter stays RESOLVED").isEqualTo("RESOLVED");
+    }
+
+    private static String bulkArchiveAssigneeId;
+    private static String bulkArchiveOrganizationId;
+    private static String bulkArchiveMineId;
+    private static String bulkArchiveUnassignedId;
+
+    private static void requireResolvedForBulkArchive() {
+        assumeTrue(bulkArchiveMineId != null,
+                "No resolved tickets were prepared in \"Resolve two tickets of this run's own for the bulk archive\"; see that failure");
+    }
+
+    // Undoes only what a failed run left behind: staged files, own tickets not yet ARCHIVED, custom statuses; raw calls never throw.
     @AfterAll
     public static void cleanupOwnTicketsAndStatuses() {
-        for (String id : stagedAttachmentIds) {
-            try {
-                TicketApi.deleteTempAttachment(id);
-            } catch (RuntimeException | AssertionError ignored) {
-                // best effort: already discarded by the case, or gone with its ticket
-            }
-        }
-        for (Ticket ticket : createdTickets) {
-            try {
-                Ticket current = TicketApi.getTicket(ticket.getId());
-                String kind = current.getStatusDefinition() == null ? null : current.getStatusDefinition().getKind();
+        stagedAttachmentIds.forEach(TicketApi::deleteTempAttachmentRaw);
+        if (!createdTickets.isEmpty()) {
+            String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+            String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
+            for (Ticket ticket : createdTickets) {
+                String kind = TicketApi.ticketKindRaw(ticket.getId());
                 if (!"RESOLVED".equals(kind) && !"ARCHIVED".equals(kind)) {
-                    TicketApi.transitionTicket(ticket.getId(), TicketApi.resolveSystemStatusId("RESOLVED"));
+                    TicketApi.transitionTicketRaw(ticket.getId(), resolvedStatusId);
                 }
                 if (!"ARCHIVED".equals(kind)) {
-                    TicketApi.transitionTicket(ticket.getId(), TicketApi.resolveSystemStatusId("ARCHIVED"));
+                    TicketApi.transitionTicketRaw(ticket.getId(), archivedStatusId);
                 }
-            } catch (RuntimeException | AssertionError ignored) {
-                // best effort: a failed cleanup must not mask the case that failed
             }
         }
-        for (String id : createdStatusIds) {
-            try {
-                TicketApi.deleteTicketStatus(id);
-            } catch (RuntimeException | AssertionError ignored) {
-                // best effort
-            }
-        }
+        createdStatusIds.forEach(TicketApi::deleteTicketStatusRaw);
     }
 }
