@@ -1,9 +1,12 @@
 package com.openframe.sdk.fleetmdm;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
+import com.openframe.sdk.fleetmdm.model.AffectedSoftware;
+import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSearchResponse;
@@ -45,6 +48,7 @@ import java.util.concurrent.CompletableFuture;
 public class FleetMdmClient {
 
     private static final String HOSTS_URL = "/api/v1/fleet/hosts";
+    private static final String HOSTS_COUNT_URL = "/api/v1/fleet/hosts/count";
     private static final String QUERIES_URL = "/api/v1/fleet/queries";
     private static final String POLICIES_URL = "/api/v1/fleet/global/policies";
     private static final String GET_ENROLL_SECRET_URL = "/api/latest/fleet/spec/enroll_secret";
@@ -53,6 +57,7 @@ public class FleetMdmClient {
     private static final String POLICIES_DELETE_URL = "/api/latest/fleet/policies/delete";
     private static final String VULNERABILITIES_URL = "/api/latest/fleet/vulnerabilities";
     private static final String SOFTWARE_TITLES_URL = "/api/latest/fleet/software/titles";
+    private static final String SOFTWARE_VERSIONS_URL = "/api/latest/fleet/software/versions/";
     private static final String VULNERABILITY_DETAIL_URL = "/api/latest/fleet/vulnerabilities/";
     private static final String INCLUDE_MANAGED_QUERY = "?include_openframe_managed=1";
 
@@ -208,7 +213,7 @@ public class FleetMdmClient {
         }
 
         return call("process host search request", () -> {
-            String url = buildSearchUrl(searchRequest);
+            String url = buildSearchUrl(HOSTS_URL, searchRequest);
             HttpRequest request = addHeaders(HttpRequest.newBuilder()
                     .uri(URI.create(url)))
                     .GET()
@@ -252,11 +257,24 @@ public class FleetMdmClient {
         return searchHosts(new HostSearchRequest(query, page, perPage));
     }
 
+    public int countHosts(HostSearchRequest searchRequest) {
+        return call("count Fleet hosts", () -> {
+            HttpRequest request = addHeaders(HttpRequest.newBuilder()
+                    .uri(URI.create(buildSearchUrl(HOSTS_COUNT_URL, searchRequest))))
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            checkResponse(response, "count Fleet hosts");
+            return requireNode(response.body(), "count").asInt();
+        });
+    }
+
     /**
      * Build the search URL with query parameters
      */
-    private String buildSearchUrl(HostSearchRequest searchRequest) {
-        StringBuilder urlBuilder = new StringBuilder(baseUrl + HOSTS_URL);
+    private String buildSearchUrl(String path, HostSearchRequest searchRequest) {
+        StringBuilder urlBuilder = new StringBuilder(baseUrl + path);
         List<String> params = new ArrayList<>();
 
         if (searchRequest.getQuery() != null && !searchRequest.getQuery().trim().isEmpty()) {
@@ -517,7 +535,21 @@ public class FleetMdmClient {
                 return null;
             }
             checkResponse(response, "get Fleet vulnerability");
-            return MAPPER.treeToValue(requireNode(response.body(), "vulnerability"), Vulnerability.class);
+            Vulnerability vulnerability = MAPPER.treeToValue(requireNode(response.body(), "vulnerability"), Vulnerability.class);
+            vulnerability.setSoftware(MAPPER.convertValue(listNodeOrEmpty(response.body(), "software"),
+                    new TypeReference<List<AffectedSoftware>>() { }));
+            return vulnerability;
+        });
+    }
+
+    public FleetSoftware getSoftwareVersion(long id) {
+        return call("get Fleet software version " + id, () -> {
+            HttpResponse<String> response = sendRequest(SOFTWARE_VERSIONS_URL + id, "GET", null);
+            if (response.statusCode() == 404) {
+                return null;
+            }
+            checkResponse(response, "get Fleet software version");
+            return MAPPER.treeToValue(requireNode(response.body(), "software"), FleetSoftware.class);
         });
     }
 
