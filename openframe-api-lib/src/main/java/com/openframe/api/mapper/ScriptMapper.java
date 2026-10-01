@@ -6,6 +6,7 @@ import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.stereotype.Component;
@@ -63,6 +64,7 @@ public class ScriptMapper {
                 .defaultArgs(entity.getDefaultArgs())
                 .envVars(mapEnvVarsToResponse(entity.getEnvVars()))
                 .createdBy(entity.getCreatedBy())
+                .creationSource(creationSourceOf(entity))
                 .status(entity.getStatus() != null ? entity.getStatus() : ScriptStatus.ACTIVE)
                 .statusChangedAt(entity.getStatusChangedAt())
                 .createdAt(entity.getCreatedAt())
@@ -84,4 +86,8 @@ public class ScriptMapper {
                 .toList();
     }
 
+    private static ScriptCreationSource creationSourceOf(Script entity) {
+        ScriptCreationSource creationSource = entity.getCreationSource();
+        return creationSource != null ? creationSource : ScriptCreationSource.MANUAL;
+    }
 }

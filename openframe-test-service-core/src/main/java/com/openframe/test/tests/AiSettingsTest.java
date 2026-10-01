@@ -428,6 +428,7 @@ public class AiSettingsTest extends BaseTest {
     }
 
     @Tag("feature")
+    @Tag("needs-registered-tenant")
     @Test
     @DisplayName("Save the AI configuration back unchanged")
     @Order(15)

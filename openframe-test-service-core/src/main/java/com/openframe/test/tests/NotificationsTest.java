@@ -4,11 +4,15 @@ import com.openframe.test.api.NotificationApi;
 import com.openframe.test.api.TicketApi;
 import com.openframe.test.data.dto.notification.Notification;
 import com.openframe.test.data.dto.notification.NotificationConnection;
+import com.openframe.test.data.dto.notification.NotificationSettings;
+import com.openframe.test.data.dto.notification.NotificationTypeSetting;
+import com.openframe.test.data.dto.notification.NotificationTypeSettingInput;
 import com.openframe.test.data.dto.notification.UnreadCategoryCount;
 import com.openframe.test.data.dto.ticket.Ticket;
 import com.openframe.test.data.dto.ticket.TicketConnection;
 import com.openframe.test.data.generator.TicketGenerator;
 import com.openframe.test.helpers.ai.RunId;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -17,7 +21,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.openframe.test.data.generator.CursorGenerator.limit;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +54,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 @Tag("saas")
 @Tag("post-mingo")
+@Tag("notifications")
 @DisplayName("Notifications")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class NotificationsTest extends BaseTest {
@@ -58,6 +65,15 @@ public class NotificationsTest extends BaseTest {
             "MONITORING", "SOFTWARE", "LOGS", "TICKETS", "INSIGHTS", "MINGO", "GENERIC");
     private static final Set<String> SEVERITIES = Set.of("INFO", "SUCCESS", "WARNING", "DANGER");
     private static final int PAGE = 50;
+    // The product's NotificationSettingGroup values; INSIGHTS is used by the insight notification specs but still missing from the schema.
+    private static final Set<String> SETTING_GROUPS = Set.of("TICKET_ASSIGNED", "TICKET_CREATED", "TICKET_STATUS_CHANGED",
+            "CUSTOMER_REPLIED", "ADMIN_REPLIED", "MINGO_MESSAGES", "APPROVAL_TICKET", "APPROVAL_MINGO", "INSIGHTS");
+    private static final String FLIPPED_GROUP = "TICKET_CREATED";
+
+    // The shared user's settings as read in case 5; written back in case 8, or in cleanup when case 8 never ran.
+    private static NotificationSettings originalSettings;
+    private static Map<String, Boolean> flippedGroups;
+    private static boolean settingsRestored;
 
     @Tag("feature")
     @Tag("read")
@@ -166,6 +182,98 @@ public class NotificationsTest extends BaseTest {
         assertThat(NotificationApi.listRead(PAGE).nodes()).as("No read notifications remain").isEmpty();
         assertThat(NotificationApi.listNotifications(null, PAGE).nodes()).as("The inbox is empty").isEmpty();
         assertThat(NotificationApi.deleteAllRead()).as("deleteAllRead on an empty inbox removes nothing").isZero();
+    }
+
+    @Tag("feature")
+    @Tag("read")
+    @Test
+    @DisplayName("Read the notification settings: every group once, defaults resolved")
+    @Order(5)
+    public void testReadSettings() {
+        NotificationSettings settings = NotificationApi.getSettings();
+        assertThat(settings).as("notificationSettings always answers, persisted or default").isNotNull();
+        assertThat(settings.getEnabled()).as("The master switch is resolved, never null").isNotNull();
+        assertThat(settings.getTypeSettings()).as("typeSettings lists every group").isNotNull();
+        assertThat(settings.getTypeSettings().stream().map(NotificationTypeSetting::getGroup).toList())
+                .as("Every NotificationSettingGroup appears exactly once").containsExactlyInAnyOrderElementsOf(SETTING_GROUPS);
+        assertThat(settings.getTypeSettings()).allSatisfy(s -> {
+            assertThat(s.getLabel()).as("Each group ships a server-rendered caption (" + s.getGroup() + ")").isNotBlank();
+            assertThat(s.getEnabled()).as("Each group's state is resolved (" + s.getGroup() + ")").isNotNull();
+        });
+        originalSettings = settings;
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Flip one notification group: only that group moves")
+    @Order(6)
+    public void testFlipOneGroup() {
+        requireOriginalSettings();
+        Map<String, Boolean> expected = byGroup(originalSettings);
+        expected.put(FLIPPED_GROUP, !expected.get(FLIPPED_GROUP));
+        List<NotificationTypeSettingInput> inputs = expected.entrySet().stream()
+                .map(e -> NotificationTypeSettingInput.builder().group(e.getKey()).enabled(e.getValue()).build())
+                .toList();
+
+        NotificationSettings updated = NotificationApi.updateSettings(originalSettings.getEnabled(), inputs);
+        flippedGroups = expected;
+        assertThat(updated.getEnabled()).as("The master switch is unchanged").isEqualTo(originalSettings.getEnabled());
+        assertThat(byGroup(updated)).as("Only " + FLIPPED_GROUP + " moved in the mutation's answer").isEqualTo(expected);
+        assertThat(labels(updated)).as("Labels do not change with the state").isEqualTo(labels(originalSettings));
+        assertThat(byGroup(NotificationApi.getSettings())).as("A re-read agrees with the answer").isEqualTo(expected);
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Update with enabled alone: the stored group overrides are kept")
+    @Order(7)
+    public void testEnabledAloneKeepsGroups() {
+        requireFlippedGroups();
+        NotificationSettings updated = NotificationApi.updateSettings(originalSettings.getEnabled(), null);
+        assertThat(updated.getEnabled()).as("The master switch is what was sent").isEqualTo(originalSettings.getEnabled());
+        assertThat(byGroup(updated)).as("Omitting typeSettings keeps the flipped group as stored").isEqualTo(flippedGroups);
+        assertThat(byGroup(NotificationApi.getSettings())).as("A re-read still holds the stored overrides").isEqualTo(flippedGroups);
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Write the original notification settings back")
+    @Order(8)
+    public void testRestoreSettings() {
+        requireOriginalSettings();
+        NotificationSettings restored = NotificationApi.updateSettings(originalSettings.getEnabled(), originalSettings.toInputs());
+        settingsRestored = true;
+        assertThat(restored.getEnabled()).as("The master switch is the original").isEqualTo(originalSettings.getEnabled());
+        assertThat(byGroup(restored)).as("Every group is back to its original state").isEqualTo(byGroup(originalSettings));
+        NotificationSettings reread = NotificationApi.getSettings();
+        assertThat(reread.getEnabled()).as("A re-read has the original master switch").isEqualTo(originalSettings.getEnabled());
+        assertThat(byGroup(reread)).as("A re-read has the original groups").isEqualTo(byGroup(originalSettings));
+    }
+
+    @AfterAll
+    public static void restoreSettings() {
+        if (originalSettings != null && !settingsRestored) {
+            NotificationApi.attemptUpdateSettings(originalSettings.getEnabled(), originalSettings.toInputs());
+        }
+    }
+
+    private static void requireOriginalSettings() {
+        assumeTrue(originalSettings != null, "The original settings were never read in case 5; see that failure");
+    }
+
+    private static void requireFlippedGroups() {
+        requireOriginalSettings();
+        assumeTrue(flippedGroups != null, "No group was flipped in case 6; see that failure");
+    }
+
+    private static Map<String, Boolean> byGroup(NotificationSettings settings) {
+        return settings.getTypeSettings().stream()
+                .collect(Collectors.toMap(NotificationTypeSetting::getGroup, NotificationTypeSetting::getEnabled));
+    }
+
+    private static Map<String, String> labels(NotificationSettings settings) {
+        return settings.getTypeSettings().stream()
+                .collect(Collectors.toMap(NotificationTypeSetting::getGroup, NotificationTypeSetting::getLabel));
     }
 
     private static int countFor(String category) {
