@@ -88,6 +88,14 @@ public class TicketGenerator {
                 .build();
     }
 
+    // Narrows archiveResolvedTickets to one organization and one assignee; that endpoint ignores statusIds.
+    public static TicketFilterInput ticketsOfOrganizationAssignedTo(String organizationId, String assigneeId) {
+        return TicketFilterInput.builder()
+                .organizationIds(List.of(organizationId))
+                .assigneeIds(List.of(assigneeId))
+                .build();
+    }
+
     /**
      * A custom status create request with a unique name (backend enforces uniqueness and a 32-char
      * limit) and a valid 6-digit hex color (backend pattern: {@code ^#[0-9A-Fa-f]{6}$}).
