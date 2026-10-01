@@ -190,6 +190,17 @@ public class TicketApi {
                 Map.of("input", TransitionTicketInput.builder().ticketId(ticketId).toStatusId(toStatusId).build()));
     }
 
+    // A transition for teardown, where the ticket may already be in that status: returns the HTTP status instead of asserting.
+    public static int transitionTicketRaw(String ticketId, String toStatusId) {
+        Map<String, Object> body = Map.of(
+                "query", TRANSITION_TICKET,
+                "variables", Map.of("input", TransitionTicketInput.builder().ticketId(ticketId).toStatusId(toStatusId).build())
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(CHAT_GRAPHQL)
+                .then().extract().statusCode();
+    }
+
     /**
      * Attempts a transition expected to be rejected. An invalid lifecycle transition is raised as a
      * top-level GraphQL error (not a domain {@code userErrors} entry), so this does not use the
