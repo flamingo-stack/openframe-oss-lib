@@ -15,6 +15,7 @@ import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.Script;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
@@ -46,7 +47,7 @@ public class ScriptService {
     private final ScriptTimeoutValidator timeoutValidator;
     private final ScriptPrivilegeValidator privilegeValidator;
 
-    public ScriptResponse create(CreateScriptInput input, String createdBy) {
+    public ScriptResponse create(CreateScriptInput input, String createdBy, ScriptCreationSource creationSource) {
         String tenantId = tenantIdProvider.getTenantId();
 
         timeoutValidator.validate(input.getDefaultTimeoutSeconds());
@@ -59,9 +60,11 @@ public class ScriptService {
 
         Script entity = scriptMapper.toEntity(tenantId, input);
         entity.setCreatedBy(createdBy);
+        entity.setCreationSource(creationSource);
         Script saved = scriptRepository.save(entity);
         scriptTagService.replaceTags(saved.getId(), input.getTagIds());
-        log.info("Created script id={} name='{}' tenantId={}", saved.getId(), saved.getName(), tenantId);
+        log.info("Created script id={} name='{}' tenantId={} creationSource={} createdBy={}",
+                saved.getId(), saved.getName(), tenantId, creationSource, createdBy);
         return scriptMapper.toResponse(saved);
     }
 
