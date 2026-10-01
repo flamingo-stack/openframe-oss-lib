@@ -11,6 +11,8 @@ import com.openframe.sdk.fleetmdm.model.HostSoftwareResponse;
 import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import com.openframe.sdk.fleetmdm.model.QueryResult;
 import com.openframe.sdk.fleetmdm.model.LiveQueryCampaign;
+import com.openframe.sdk.fleetmdm.model.OsquerySchemaSearchRequest;
+import com.openframe.sdk.fleetmdm.model.OsquerySchemaSearchResponse;
 import com.openframe.sdk.fleetmdm.model.RunLiveQueryRequest;
 import com.openframe.sdk.fleetmdm.model.Policy;
 import com.openframe.sdk.fleetmdm.model.Query;
@@ -47,6 +49,7 @@ public class FleetMdmClient {
     private static final String POLICIES_URL = "/api/v1/fleet/global/policies";
     private static final String GET_ENROLL_SECRET_URL = "/api/latest/fleet/spec/enroll_secret";
     private static final String LIVE_QUERY_RUN_URL = "/api/v1/fleet/queries/run";
+    private static final String OSQUERY_SCHEMA_SEARCH_URL = "/api/v1/fleet/osquery/schema/search";
     private static final String POLICIES_DELETE_URL = "/api/latest/fleet/policies/delete";
     private static final String VULNERABILITIES_URL = "/api/latest/fleet/vulnerabilities";
     private static final String SOFTWARE_TITLES_URL = "/api/latest/fleet/software/titles";
@@ -155,6 +158,16 @@ public class FleetMdmClient {
             }
             checkResponse(response, action);
             return MAPPER.readValue(response.body(), HostSoftwareResponse.class);
+        });
+    }
+
+    public OsquerySchemaSearchResponse searchOsquerySchema(OsquerySchemaSearchRequest request) {
+        String action = "search Fleet osquery schema";
+        return call(action, () -> {
+            String path = buildOsquerySchemaSearchPath(request);
+            HttpResponse<String> response = sendRequest(path, "GET", null);
+            checkResponse(response, action);
+            return MAPPER.readValue(response.body(), OsquerySchemaSearchResponse.class);
         });
     }
 
@@ -499,7 +512,8 @@ public class FleetMdmClient {
         return call("get Fleet vulnerability " + cve, () -> {
             HttpResponse<String> response = sendRequest(VULNERABILITY_DETAIL_URL + URLEncoder.encode(cve, StandardCharsets.UTF_8),
                     "GET", null);
-            if (response.statusCode() == 404) {
+            // 204 = CVE known to Fleet but on none of this tenant's hosts
+            if (response.statusCode() == 404 || response.statusCode() == 204) {
                 return null;
             }
             checkResponse(response, "get Fleet vulnerability");
@@ -975,6 +989,20 @@ public class FleetMdmClient {
             failed.completeExceptionally(new FleetMdmException("Failed to " + ("POST".equals(method) ? "assign" : "remove") + " hosts on " + contextLabel, e));
             return failed;
         }
+    }
+
+    private String buildOsquerySchemaSearchPath(OsquerySchemaSearchRequest request) {
+        String encodedQuery = URLEncoder.encode(request.getQuery(), StandardCharsets.UTF_8);
+        List<String> parameters = new ArrayList<>();
+        parameters.add("query=" + encodedQuery);
+        if (request.getPlatform() != null && !request.getPlatform().isBlank()) {
+            String encodedPlatform = URLEncoder.encode(request.getPlatform(), StandardCharsets.UTF_8);
+            parameters.add("platform=" + encodedPlatform);
+        }
+        if (request.getLimit() != null) {
+            parameters.add("limit=" + request.getLimit());
+        }
+        return OSQUERY_SCHEMA_SEARCH_URL + "?" + String.join("&", parameters);
     }
 
     private HttpRequest buildRequest(String path, String method, String body) {

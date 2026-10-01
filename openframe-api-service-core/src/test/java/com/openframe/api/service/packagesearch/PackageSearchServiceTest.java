@@ -61,10 +61,14 @@ class PackageSearchServiceTest {
     }
 
     @Test
-    void rejectsShortQuery() {
-        assertThrows(IllegalArgumentException.class,
-                () -> service.search(PackageManagerType.BREW, " a ", forward(null, null)));
-        verify(brewClient, never()).search(anyString(), anyInt(), anyInt());
+    void passesBlankAndSingleCharacterSearchThrough() {
+        when(brewClient.search(anyString(), anyInt(), anyInt())).thenReturn(resultOf(2, false, 2));
+
+        service.search(PackageManagerType.BREW, null, forward(null, null));
+        service.search(PackageManagerType.BREW, " a ", forward(null, null));
+
+        verify(brewClient).search("", 25, 0);
+        verify(brewClient).search("a", 25, 0);
     }
 
     @Test

@@ -28,6 +28,9 @@ export interface ReopenTicketRequestModalProps {
    * omits `handoffToTechnician`.
    */
   showHandoffOption?: boolean;
+  /** Opens with the handoff checkbox already ticked — the user reached the
+   *  modal by asking for a technician, so that is the choice to confirm. */
+  defaultHandoff?: boolean;
   /** Confirm in-flight: buttons lock and the modal refuses to close. */
   isPending?: boolean;
   onConfirm: (selection: ReopenTicketRequestSelection) => void;
@@ -45,11 +48,12 @@ export function ReopenTicketRequestModal({
   isOpen,
   onClose,
   showHandoffOption = false,
+  defaultHandoff = false,
   isPending = false,
   onConfirm,
 }: ReopenTicketRequestModalProps) {
   const [reason, setReason] = useState('');
-  const [handoff, setHandoff] = useState(false);
+  const [handoff, setHandoff] = useState(defaultHandoff);
 
   // Re-seed the inputs every time the modal opens. Adjusted while rendering,
   // not from an effect: the modal does not unmount when it closes, so an effect
@@ -60,7 +64,7 @@ export function ReopenTicketRequestModal({
     setWasOpen(isOpen);
     if (isOpen) {
       setReason('');
-      setHandoff(false);
+      setHandoff(defaultHandoff);
     }
   }
 
