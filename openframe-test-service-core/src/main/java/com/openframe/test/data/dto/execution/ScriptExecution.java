@@ -1,6 +1,7 @@
 package com.openframe.test.data.dto.execution;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.openframe.test.data.dto.device.Machine;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,4 +23,12 @@ public class ScriptExecution {
     private String status;
     private String dispatchedAt;
     private String statusChangedAt;
+    private Machine machine;
+    private String privilegeLevel;
+    private String finishedAt;
+    private Integer exitCode;
+    private Boolean timedOut;
+    private String stdout;
+    private String stderr;
+    private String error;
 }
