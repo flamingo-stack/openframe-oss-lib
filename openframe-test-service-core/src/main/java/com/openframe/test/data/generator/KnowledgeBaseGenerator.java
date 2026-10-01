@@ -23,7 +23,10 @@ public class KnowledgeBaseGenerator {
     }
 
     public static CreateArticleInput draftArticle(String parentFolderId) {
-        String name = "Test Article " + faker.lorem().sentence(3);
+        return draftArticle(parentFolderId, "Test Article " + faker.lorem().sentence(3));
+    }
+
+    public static CreateArticleInput draftArticle(String parentFolderId, String name) {
         return CreateArticleInput.builder()
                 .name(name)
                 .parentId(parentFolderId)
