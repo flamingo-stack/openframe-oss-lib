@@ -513,7 +513,8 @@ public class FleetMdmClient {
         return call("get Fleet vulnerability " + cve, () -> {
             HttpResponse<String> response = sendRequest(VULNERABILITY_DETAIL_URL + URLEncoder.encode(cve, StandardCharsets.UTF_8),
                     "GET", null);
-            if (response.statusCode() == 404) {
+            // 204 = CVE known to Fleet but on none of this tenant's hosts
+            if (response.statusCode() == 404 || response.statusCode() == 204) {
                 return null;
             }
             checkResponse(response, "get Fleet vulnerability");
