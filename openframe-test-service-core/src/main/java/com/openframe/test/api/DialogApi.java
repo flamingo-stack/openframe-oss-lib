@@ -5,7 +5,10 @@ import com.openframe.test.data.dto.ai.CreateDialogRequest;
 import com.openframe.test.data.dto.ai.DialogConnection;
 import com.openframe.test.data.dto.ai.DialogFilterInput;
 import com.openframe.test.data.dto.ai.DialogResponse;
+import com.openframe.test.data.dto.ai.DialogMode;
 import com.openframe.test.data.dto.ai.DialogStatistics;
+import com.openframe.test.data.dto.ai.UpdateDialogModeRequest;
+import com.openframe.test.data.dto.ai.UpdateDialogStatusRequest;
 import com.openframe.test.data.dto.shared.CursorPaginationInput;
 import com.openframe.test.data.dto.shared.MutationError;
 import com.openframe.test.data.dto.ai.DialogStreamState;
@@ -17,8 +20,10 @@ import java.util.Map;
 
 import static com.openframe.test.api.graphql.ChatQueries.ARCHIVE_DIALOG;
 import static com.openframe.test.api.graphql.ChatQueries.DIALOGS_QUERY;
+import static com.openframe.test.api.graphql.ChatQueries.DIALOG_QUERY;
 import static com.openframe.test.api.graphql.ChatQueries.DIALOG_STATISTICS;
 import static com.openframe.test.api.graphql.ChatQueries.DIALOG_STREAM_STATE;
+import static com.openframe.test.api.graphql.ChatQueries.MARK_DIALOG_MESSAGES_READ;
 import static com.openframe.test.api.graphql.ChatQueries.RENAME_DIALOG;
 import static com.openframe.test.api.graphql.ChatQueries.UNARCHIVE_DIALOG;
 import static com.openframe.test.api.graphql.ChatQueries.DIALOG_TICKET;
@@ -37,6 +42,8 @@ public class DialogApi {
     private static final String DIALOGS = "chat/api/v1/dialogs";
     private static final String COMPACT = DIALOGS + "/{id}/compact";
     private static final String STOP = DIALOGS + "/{id}/stop";
+    private static final String MODE = DIALOGS + "/{id}/mode";
+    private static final String STATUS = DIALOGS + "/{id}/status";
 
     /** Creates an empty dialog. For ADMIN-with-ticket targeting, {@code request.ticketId} must carry the target device. */
     public static DialogResponse createDialog(CreateDialogRequest request) {
@@ -71,6 +78,37 @@ public class DialogApi {
                 .body(Map.of("chatType", chatType))
                 .post(STOP)
                 .statusCode();
+    }
+
+    // ADMIN only; switching to DIRECT pauses the assistant and hands the client chat to the technician.
+    public static DialogResponse updateDialogMode(String dialogId, DialogMode mode) {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .pathParam("id", dialogId)
+                .body(UpdateDialogModeRequest.builder().mode(mode).build())
+                .patch(MODE)
+                .then().statusCode(200)
+                .extract().as(DialogResponse.class);
+    }
+
+    // ADMIN only; a RESOLVED or ARCHIVED status closes the client chat.
+    public static DialogResponse updateDialogStatus(String dialogId, String status) {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .pathParam("id", dialogId)
+                .body(UpdateDialogStatusRequest.builder().status(status).build())
+                .patch(STATUS)
+                .then().statusCode(200)
+                .extract().as(DialogResponse.class);
+    }
+
+    // The dialog as the current actor sees it, unreadMessageCount being that actor's side of the counter.
+    public static DialogResponse getDialog(String dialogId) {
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", DIALOG_QUERY, "variables", Map.of("id", dialogId)))
+                .post(CHAT_GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.dialog", DialogResponse.class);
     }
 
     /** Reads {@code streamState} — derived from the Redis dialog lock. Diagnostic only; not a run-completion signal. */
@@ -129,6 +167,11 @@ public class DialogApi {
 
     public static DialogResponse unarchiveDialog(String dialogId) {
         return dialogPayload(UNARCHIVE_DIALOG, "unarchiveDialog", Map.of("input", Map.of("id", dialogId)));
+    }
+
+    // Zeroes the caller's side of the unread counter: the client's for an AGENT, the shared technician side for an ADMIN.
+    public static DialogResponse markDialogMessagesRead(String dialogId) {
+        return dialogPayload(MARK_DIALOG_MESSAGES_READ, "markDialogMessagesRead", Map.of("input", Map.of("id", dialogId)));
     }
 
     private static DialogResponse dialogPayload(String document, String mutationName, Map<String, Object> variables) {

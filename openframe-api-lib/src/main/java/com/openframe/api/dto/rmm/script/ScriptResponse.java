@@ -2,6 +2,7 @@ package com.openframe.api.dto.rmm.script;
 
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import lombok.Builder;
@@ -30,6 +31,7 @@ public class ScriptResponse {
     private List<ScriptEnvVarInput> envVars;
 
     private String createdBy;
+    private ScriptCreationSource creationSource;
 
     private ScriptStatus status;
 
