@@ -1,13 +1,26 @@
 package com.openframe.test.tests;
 
+import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.DialogApi;
+import com.openframe.test.api.MessageApi;
+import com.openframe.test.api.TicketApi;
+import com.openframe.test.config.MachineConfig;
+import com.openframe.test.data.dto.ai.AgentType;
+import com.openframe.test.data.dto.ai.ChatType;
 import com.openframe.test.data.dto.ai.DialogConnection;
 import com.openframe.test.data.dto.ai.DialogFilterInput;
+import com.openframe.test.data.dto.ai.DialogMode;
 import com.openframe.test.data.dto.ai.DialogResponse;
 import com.openframe.test.data.dto.ai.DialogStatistics;
+import com.openframe.test.data.dto.ai.SendMessageRequest;
+import com.openframe.test.data.dto.device.Machine;
+import com.openframe.test.data.dto.ticket.Ticket;
+import com.openframe.test.helpers.ai.AgentSession;
 import com.openframe.test.helpers.ai.DialogFixture;
 import com.openframe.test.helpers.ai.RunId;
+import com.openframe.test.helpers.ai.SshMachineVerifier;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -18,13 +31,11 @@ import org.junit.jupiter.api.TestMethodOrder;
 import java.util.List;
 import java.util.Set;
 
+import static com.openframe.test.data.generator.DeviceGenerator.osDevicesFilter;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-/**
- * Dialog management over {@code chat/graphql} (coverage plan item CP-16): an ADMIN/AI dialog of this
- * run's own is renamed, listed, archived, unarchived, and the tenant's dialog statistics are read.
- * No message is sent, so no AI provider is involved.
- */
+// Dialog management (CP-16) on an ADMIN dialog, then the mode, unread counter and status (CP-35) on a Fae dialog of the target box; no AI provider is involved.
 @Tag("saas")
 @DisplayName("Dialogs")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -34,6 +45,12 @@ public class DialogsTest extends BaseTest {
     private static final Set<String> STATUSES = Set.of("ACTIVE", "ACTION_REQUIRED", "ON_HOLD", "RESOLVED", "ARCHIVED");
 
     private static DialogFixture dialog;
+    private static Machine box;
+    private static AgentSession agent;
+    private static DialogFixture clientDialog;
+    private static String clientTicketId;
+    private static boolean directMode;
+    private static boolean unreadMinted;
 
     @Tag("feature")
     @Test
@@ -96,10 +113,127 @@ public class DialogsTest extends BaseTest {
                 .as("The restored dialog is back under ACTIVE").contains(id);
     }
 
+    @Tag("feature")
+    @Tag("needs-device")
+    @Test
+    @DisplayName("Hand a Fae dialog to the technician by switching it to DIRECT mode")
+    @Order(4)
+    public void testSwitchToDirectMode() {
+        assumeTrue(MachineConfig.isConfigured(), "No TARGET_* machine is configured; the Fae dialog needs the enrolled box");
+        Machine found = DeviceApi.searchDevice(osDevicesFilter(MachineConfig.getOs().name()), MachineConfig.getHostname());
+        box = found != null && MachineConfig.getHostname().equalsIgnoreCase(found.getHostname()) ? found : null;
+        assumeTrue(box != null, "The box " + MachineConfig.getHostname() + " is not listed");
+
+        agent = AgentSession.open(new SshMachineVerifier());
+        assertThat(agent.getMachineId()).as("The agent identity is the listed box's").isEqualTo(box.getMachineId());
+        clientDialog = DialogFixture.openClient();
+        releaseAgent();
+        clientTicketId = DialogApi.getDialogTicketId(clientDialog.getDialogId());
+        assertThat(clientTicketId).as("A Fae dialog gets a ticket").isNotNull();
+
+        String id = clientDialog.getDialogId();
+        DialogResponse direct = DialogApi.updateDialogMode(id, DialogMode.DIRECT);
+        directMode = true;
+        assertThat(direct.getId()).as("The mode change keeps the id").isEqualTo(id);
+        assertThat(direct.getAgentType()).as("It is the client's dialog").isEqualTo(AgentType.CLIENT);
+        assertThat(direct.getCurrentMode()).as("The dialog is now DIRECT").isEqualTo(DialogMode.DIRECT);
+        assertThat(direct.getStatus()).as("Switching the mode leaves the status ACTIVE").isEqualTo("ACTIVE");
+
+        DialogResponse again = DialogApi.updateDialogMode(id, DialogMode.DIRECT);
+        assertThat(again.getCurrentMode()).as("Asking for the current mode again is a no-op").isEqualTo(DialogMode.DIRECT);
+        DialogResponse read = DialogApi.getDialog(id);
+        assertThat(read.getCurrentMode()).as("GraphQL reads the DIRECT mode back").isEqualTo(DialogMode.DIRECT);
+        assertThat(read.getUnreadMessageCount()).as("Nothing is unread for technicians yet").isZero();
+    }
+
+    @Tag("feature")
+    @Tag("needs-device")
+    @Test
+    @DisplayName("A client message in a technician-held dialog is unread for technicians only")
+    @Order(5)
+    public void testClientMessageIsUnreadForTechnicians() {
+        requireDirectMode();
+        String id = clientDialog.getDialogId();
+        // While the ticket is in AI_ASSISTANCE a client message is Fae's to answer and is not counted for technicians.
+        Ticket held = TicketApi.transitionTicket(clientTicketId, TicketApi.resolveSystemStatusId("TECH_REQUIRED"));
+        assertThat(held.getStatusDefinition().getKind()).as("The ticket is with the technicians").isEqualTo("TECH_REQUIRED");
+
+        agent = AgentSession.open(new SshMachineVerifier());
+        MessageApi.sendMessage(SendMessageRequest.builder()
+                .dialogId(id).chatType(ChatType.CLIENT_CHAT).content("E2E-" + RUN_ID + " unread probe").build());
+        DialogResponse clientView = DialogApi.getDialog(id);
+        releaseAgent();
+        assertThat(clientView.getUnreadMessageCount()).as("The sender's own side stays read").isZero();
+
+        DialogResponse adminView = DialogApi.getDialog(id);
+        assertThat(adminView.getUnreadMessageCount()).as("The client message is unread on the technician side").isEqualTo(1);
+        assertThat(adminView.getCurrentMode()).as("The dialog stays DIRECT").isEqualTo(DialogMode.DIRECT);
+        unreadMinted = true;
+    }
+
+    @Tag("feature")
+    @Tag("needs-device")
+    @Test
+    @DisplayName("Mark the dialog's messages read as a technician")
+    @Order(6)
+    public void testMarkMessagesRead() {
+        assumeTrue(unreadMinted, "No unread client message was minted in \"A client message in a technician-held dialog is unread for technicians only\"; see that failure");
+        String id = clientDialog.getDialogId();
+        DialogResponse marked = DialogApi.markDialogMessagesRead(id);
+        assertThat(marked.getId()).as("The payload carries the dialog").isEqualTo(id);
+        assertThat(marked.getUnreadMessageCount()).as("The technician side is zeroed in the payload").isZero();
+        assertThat(DialogApi.getDialog(id).getUnreadMessageCount()).as("The zeroed counter reads back").isZero();
+
+        DialogResponse repeated = DialogApi.markDialogMessagesRead(id);
+        assertThat(repeated.getUnreadMessageCount()).as("Marking an already read dialog read again is harmless").isZero();
+    }
+
+    @Tag("feature")
+    @Tag("needs-device")
+    @Test
+    @DisplayName("Put the Fae dialog on hold and resolve it through the status endpoint")
+    @Order(7)
+    public void testUpdateStatus() {
+        requireDirectMode();
+        String id = clientDialog.getDialogId();
+        DialogResponse onHold = DialogApi.updateDialogStatus(id, "ON_HOLD");
+        assertThat(onHold.getId()).as("The status change keeps the id").isEqualTo(id);
+        assertThat(onHold.getStatus()).as("The dialog is ON_HOLD").isEqualTo("ON_HOLD");
+        assertThat(onHold.getCurrentMode()).as("A status change leaves the mode alone").isEqualTo(DialogMode.DIRECT);
+        assertThat(onHold.getResolvedAt()).as("An open dialog has no resolvedAt").isNull();
+
+        DialogResponse resolved = DialogApi.updateDialogStatus(id, "RESOLVED");
+        assertThat(resolved.getStatus()).as("The dialog is RESOLVED").isEqualTo("RESOLVED");
+        assertThat(resolved.getResolvedAt()).as("Resolving stamps resolvedAt").isNotNull();
+        assertThat(DialogApi.getDialog(id).getStatus()).as("GraphQL reads the RESOLVED status back").isEqualTo("RESOLVED");
+    }
+
+    private static void requireDirectMode() {
+        assumeTrue(directMode, "No Fae dialog was switched to DIRECT in \"Hand a Fae dialog to the technician by switching it to DIRECT mode\"; see that failure");
+    }
+
+    // Drops the AGENT bearer so the next call runs as the admin again.
+    private static void releaseAgent() {
+        if (agent != null) {
+            agent.close();
+            agent = null;
+        }
+    }
+
+    // A case that failed while acting as the agent leaves the bearer set; the next case must start as the admin.
+    @AfterEach
+    public void restoreAdmin() {
+        releaseAgent();
+    }
+
     @AfterAll
     public static void cleanup() {
         if (dialog != null) {
             dialog.cleanup();
+        }
+        // Resolves and archives the Fae dialog's ticket, then archives the dialog.
+        if (clientDialog != null) {
+            clientDialog.cleanup();
         }
     }
 }

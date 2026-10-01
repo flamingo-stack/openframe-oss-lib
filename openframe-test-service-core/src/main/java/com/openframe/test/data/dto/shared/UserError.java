@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-// A userErrors entry carrying a stable code, the saas-api UserError type (code, message, field).
+// A coded userErrors entry of the SaaS api schema (code, message, optional field), unlike the field-path MutationError.
 @Data
 @Builder
 @NoArgsConstructor
