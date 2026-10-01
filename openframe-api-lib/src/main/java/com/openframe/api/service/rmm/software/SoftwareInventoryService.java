@@ -524,11 +524,25 @@ public class SoftwareInventoryService {
         Map<Long, Machine> machinesByHostId = hostMachineResolver.resolve(
                 tenantIdProvider.getTenantId(), hostVersions.stream().map(HostVersion::host).toList());
 
-        return hostVersions.stream()
+        // one machine can carry several versions (e.g. a pip per Python install) and several Fleet hosts
+        Map<String, List<SoftwareOnDeviceResponse>> rowsByMachine = hostVersions.stream()
                 .map(hv -> toDeviceResponse(hv, machinesByHostId, latestVersion))
                 .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(row -> row.getDevice().getMachineId(),
+                        java.util.LinkedHashMap::new, Collectors.toList()));
+        return rowsByMachine.values().stream()
+                .map(SoftwareInventoryService::mergeDeviceRows)
                 .filter(row -> matchesDeviceSearch(row, search))
                 .toList();
+    }
+
+    private static SoftwareOnDeviceResponse mergeDeviceRows(List<SoftwareOnDeviceResponse> rows) {
+        boolean upToDate = rows.stream().allMatch(row -> row.getStatus() == SoftwareOnDeviceStatus.UP_TO_DATE);
+        return SoftwareOnDeviceResponse.builder()
+                .device(rows.get(0).getDevice())
+                .softwareVersion(joinVersions(rows.stream().map(SoftwareOnDeviceResponse::getSoftwareVersion).toList()))
+                .status(upToDate ? SoftwareOnDeviceStatus.UP_TO_DATE : SoftwareOnDeviceStatus.OUTDATED)
+                .build();
     }
 
     private List<HostVersion> hostVersionsOf(SoftwareTitleVersion version) {
