@@ -6,6 +6,7 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.script.BatchRunScriptInput;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterInput;
@@ -188,10 +189,10 @@ class ScriptDataFetcherTest {
         try {
             CreateScriptInput input = new CreateScriptInput();
             ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
-            when(scriptService.create(input, "user-1")).thenReturn(resp);
+            when(scriptService.create(input, "user-1", ScriptCreationSource.MANUAL)).thenReturn(resp);
 
             assertThat(dataFetcher.createScript(input)).isSameAs(resp);
-            verify(scriptService).create(input, "user-1");
+            verify(scriptService).create(input, "user-1", ScriptCreationSource.MANUAL);
         } finally {
             SecurityContextHolder.clearContext();
         }
