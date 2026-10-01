@@ -131,15 +131,6 @@ public class OrganizationApi {
                 .patch(ARCHIVE_ORGANIZATION);
     }
 
-    // Cleanup form: the HTTP status instead of an assertion
-    public static int archiveOrganizationRaw(String organizationId) {
-        final String ARCHIVE_ORGANIZATION = ORGANIZATIONS.concat("/").concat(organizationId).concat("/status");
-        return given(RequestSpecHelper.getAuthorizedSpec()).contentType(ContentType.JSON)
-                .body(Map.of("status", "ARCHIVED"))
-                .patch(ARCHIVE_ORGANIZATION)
-                .statusCode();
-    }
-
     /** GET /organizations/{id}/can-archive: true when no active device is linked to the organization. */
     public static boolean canArchiveOrganization(String organizationId) {
         final String CAN_ARCHIVE = ORGANIZATIONS.concat("/").concat(organizationId).concat("/can-archive");
