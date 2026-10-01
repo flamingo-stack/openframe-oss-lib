@@ -87,6 +87,14 @@ public class MachineConfig {
         return value.trim();
     }
 
+    // Whether a target machine is configured at all, so a case outside the ai suite can skip without one.
+    public static boolean isConfigured() {
+        return loaded || (trimToNull(System.getenv("TARGET_HOSTNAME")) != null
+                && trimToNull(System.getenv("TARGET_SSH_HOST")) != null
+                && trimToNull(System.getenv("TARGET_SSH_USER")) != null
+                && trimToNull(System.getenv("TARGET_SSH_PASSWORD")) != null);
+    }
+
     public static String getHostname() {
         loadEnv();
         return hostname;
