@@ -92,6 +92,7 @@ export * from './policy-configuration-panel';
 export * from './waitlist-form';
 export * from './notifications';
 export * from './time-tracker';
+export * from './remote-session';
 export * from './board';
 export * from './sortable-list';
 export * from './ticket-status-config-list';

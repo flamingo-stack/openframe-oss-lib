@@ -6,7 +6,7 @@ import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime } from '../../../utils/date-utils';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { dotColorByVariant, progressColorByVariant } from '../../ui/toaster';
+import { dotColorByVariant, progressColorByVariant as toastProgressColorByVariant } from '../../ui/toaster';
 import type { Notification, NotificationSeverity, NotificationVariant } from './types';
 
 /** Backend severity → tile color variant; overrides `notification.variant` when present. */
@@ -24,6 +24,18 @@ const typeColorByVariant: Record<NotificationVariant, string> = {
   success: 'text-ods-success',
   warning: 'text-ods-warning',
   error: 'text-ods-error',
+};
+
+/**
+ * The live countdown bar. The attention variants keep their colour; the neutral card's bar
+ * is the brand accent (Figma `notification-card`: `open-colors/yellow`), not the grey the
+ * toast draws. A toast's bar only times out; a card's says "new, still live" in a drawer of
+ * settled grey rows, so it needs the accent to read at all. The dot keeps the toast colours.
+ */
+const progressColorByVariant: Record<NotificationVariant, string> = {
+  ...toastProgressColorByVariant,
+  default: 'bg-ods-accent',
+  info: 'bg-ods-accent',
 };
 
 const headerControlClass =

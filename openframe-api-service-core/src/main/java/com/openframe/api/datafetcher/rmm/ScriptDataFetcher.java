@@ -37,6 +37,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.script.ScriptDispatchService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.api.service.rmm.script.ScriptFilterService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import jakarta.validation.Valid;
@@ -103,7 +104,8 @@ public class ScriptDataFetcher {
     @DgsMutation
     public ScriptResponse createScript(@InputArgument @Valid CreateScriptInput input) {
         input.setTagIds(decodeIds(input.getTagIds()));
-        return scriptService.create(input, getCurrentUserId());
+        String userId = getCurrentUserId();
+        return scriptService.create(input, userId, ScriptCreationSource.MANUAL);
     }
 
     @DgsMutation
