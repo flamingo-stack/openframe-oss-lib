@@ -194,6 +194,7 @@ public class UserTest extends BaseTest {
     }
 
     @Tag("feature")
+    @Tag("needs-registered-tenant")
     @Test
     @DisplayName("The owner transfers ownership to an admin")
     @Order(10)
@@ -214,6 +215,7 @@ public class UserTest extends BaseTest {
     }
 
     @Tag("feature")
+    @Tag("needs-registered-tenant")
     @Test
     @DisplayName("The new owner transfers ownership back")
     @Order(11)
