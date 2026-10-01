@@ -65,9 +65,9 @@ public class NotificationsTest extends BaseTest {
             "MONITORING", "SOFTWARE", "LOGS", "TICKETS", "INSIGHTS", "MINGO", "GENERIC");
     private static final Set<String> SEVERITIES = Set.of("INFO", "SUCCESS", "WARNING", "DANGER");
     private static final int PAGE = 50;
-    // Mirrors the NotificationSettingGroup enum in notification-settings.graphqls; a value the schema gains must be added here.
+    // The product's NotificationSettingGroup values; INSIGHTS is used by the insight notification specs but still missing from the schema.
     private static final Set<String> SETTING_GROUPS = Set.of("TICKET_ASSIGNED", "TICKET_CREATED", "TICKET_STATUS_CHANGED",
-            "CUSTOMER_REPLIED", "ADMIN_REPLIED", "MINGO_MESSAGES", "APPROVAL_TICKET", "APPROVAL_MINGO");
+            "CUSTOMER_REPLIED", "ADMIN_REPLIED", "MINGO_MESSAGES", "APPROVAL_TICKET", "APPROVAL_MINGO", "INSIGHTS");
     private static final String FLIPPED_GROUP = "TICKET_CREATED";
 
     // The shared user's settings as read in case 5; written back in case 8, or in cleanup when case 8 never ran.
