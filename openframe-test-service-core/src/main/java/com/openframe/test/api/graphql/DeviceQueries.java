@@ -198,4 +198,17 @@ public class DeviceQueries {
                 }
             }
             """;
+
+    // Machine.remoteAccess is a SaaS extension of the Machine type, so it has a query of its own rather than joining FULL_DEVICE.
+    public static final String DEVICE_REMOTE_ACCESS = """
+            query DeviceRemoteAccess($machineId: String!) {
+                device(machineId: $machineId) {
+                    id
+                    machineId
+                    hostname
+                    organizationId
+                    remoteAccess { mode effectiveMode effectiveScope updatedBy updatedAt }
+                }
+            }
+            """;
 }
