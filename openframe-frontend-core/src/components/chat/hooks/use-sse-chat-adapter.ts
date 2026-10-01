@@ -859,6 +859,8 @@ export function useSseChatAdapter(
     stopMessage,
     clearMessages,
     streamingPhase,
+    /** The stage the pending turn reports before its first token, or null. */
+    streamingProgress: state.streamingProgress,
     /** True while the mount-time rebuild from the server transcript runs. */
     isHydratingHistory,
     /** Provider key for the lib's `<ModelDisplay>` icon. */
