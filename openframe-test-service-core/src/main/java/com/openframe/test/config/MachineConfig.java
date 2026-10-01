@@ -61,6 +61,20 @@ public class MachineConfig {
         loaded = true;
     }
 
+    // Whether a target box is set, by configure() or the TARGET_* env, without the getters' fail-fast.
+    public static boolean isConfigured() {
+        if (loaded) {
+            return hostname != null && sshHost != null && sshUser != null && sshPassword != null;
+        }
+        return present("TARGET_HOSTNAME") && present("TARGET_SSH_HOST")
+                && present("TARGET_SSH_USER") && present("TARGET_SSH_PASSWORD");
+    }
+
+    private static boolean present(String key) {
+        String value = System.getenv(key);
+        return value != null && !value.isBlank();
+    }
+
     private static String trimToNull(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
     }
