@@ -55,6 +55,26 @@ public class ScriptGenerator {
                 .build();
     }
 
+    public static final String MARKER_VAR = "E2E_MARKER";
+
+    // A harmless PowerShell script for dispatch cases: prints marker=<E2E_MARKER> and nothing else.
+    public static CreateScriptInput echoScriptRequest(String name, String marker) {
+        return CreateScriptInput.builder()
+                .name(name)
+                .description("Prints a marker; dispatched by the E2E suite")
+                .shell("POWERSHELL")
+                .privilegeLevel("ADMIN")
+                .scriptBody("Write-Output \"marker=$env:" + MARKER_VAR + "\"")
+                .supportedPlatforms(List.of("WINDOWS"))
+                .defaultTimeoutSeconds(60)
+                .envVars(List.of(envVar(MARKER_VAR, marker)))
+                .build();
+    }
+
+    public static ScriptEnvVar envVar(String name, String value) {
+        return ScriptEnvVar.builder().name(name).value(value).secret(false).build();
+    }
+
     public static RunScriptRequest runSpeedTestScriptRequest(String... agents) {
         return RunScriptRequest.builder()
                 .mode("script")

@@ -8,12 +8,17 @@ import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.exception.PackageNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class WingetPackageClientTest {
@@ -36,6 +41,24 @@ class WingetPackageClientTest {
         PackageSearchResult result = client.search("firefox", 2, 0);
 
         assertEquals("Mozilla.Firefox", result.getItems().getFirst().getId());
+    }
+
+    @Test
+    void emptyQueryPagesTheCatalogByNameWithoutScoring() {
+        // setup
+        Sort byName = Sort.by(Sort.Order.asc("name"), Sort.Order.asc("packageId"));
+        PackageCatalogEntry chrome = entry("Google.Chrome", "Google Chrome");
+        when(packageCatalogRepository.findByManager(PackageManagerType.WINGET, PageRequest.of(0, 1, byName))).thenReturn(List.of(chrome));
+        when(packageCatalogRepository.countByManager(PackageManagerType.WINGET)).thenReturn(1L);
+
+        // execution
+        PackageSearchResult result = client.search("", 1, 0);
+
+        // verifications
+        assertEquals("Google.Chrome", result.getItems().getFirst().getId());
+        assertEquals(1, result.getTotal());
+        assertFalse(result.isHasMore());
+        verify(packageCatalogRepository, never()).findByManagerAndSearchBlobContaining(PackageManagerType.WINGET, "");
     }
 
     @Test
