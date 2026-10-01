@@ -235,7 +235,7 @@ notes = "Done 2026-09-13: TicketsTest 'Edit and reorder a custom ticket status; 
 [[items]]
 id = "CP-14"
 title = "Bulk archive of resolved tickets"
-status = "proposed"
+status = "done"
 priority = "P3"
 ops = ["mutation:archiveResolvedTickets"]
 test_class = "TicketsTest"
@@ -243,7 +243,8 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "left out of CP-11..13 on 2026-09-13 on purpose"
-notes = "The UI calls it from the board's bulk action. BulkOperationPayload returns count + userErrors. A safe shape: create two own resolved tickets, call with a filter restricted to the test organization, assert count == 2 and both ARCHIVED — only if TicketFilterInput can scope by organization on this endpoint. Owner decision 2026-10-01: allowed everywhere, including the shared test-env, accepting that other resolved tickets get archived."
+pr = "#2493"
+notes = "The UI calls it from the board's bulk action. BulkOperationPayload returns count + userErrors. A safe shape: create two own resolved tickets, call with a filter restricted to the test organization, assert count == 2 and both ARCHIVED — only if TicketFilterInput can scope by organization on this endpoint. Owner decision 2026-10-01: allowed everywhere, including the shared test-env, accepting that other resolved tickets get archived. Done 2026-10-01 (#2493): TicketsTest; the bulk archive is narrowed to the run's organization and the caller as assignee; proved by the matrix."
 
 [[items]]
 id = "CP-15"
@@ -361,7 +362,7 @@ notes = "Mirrors CP-14 exactly; decide both together. Returns Int! (how many wer
 [[items]]
 id = "CP-22"
 title = "Software bundle staging lifecycle"
-status = "proposed"
+status = "done"
 priority = "P1"
 ops = [
   "query:softwareBundle", "mutation:createSoftwareBundle",
@@ -374,12 +375,13 @@ tags = ["saas", "feature", "needs-device"]
 depends_on = []
 needs = []
 source = "report 2026-09-30 #2"
-notes = "Nothing here dispatches: a bundle stays PENDING until submitSoftwareBundle (CP-23), and a PENDING bundle is disposable — configs/qa/openframe-saas-api.yml pins openframe.rmm.software.bundle.pending-ttl to 1h, so even a leaked draft is reaped. Verified live on qa: openframe.rmm.software.enabled is true (configs/qa/openframe-saas-api.yml:29). machineIds are Machine *global* ids here (schema: 'machineIds are Machine global ids'), while softwares/deviceSoftware take the raw machineId — the one place in the area where the two id shapes sit side by side, so use helpers/RelayIds. The add/remove-all pair takes the same filter+search as the bundle's own availableDevices field, so the natural assertion is availableDevices/assignedDevices deviceCount before and after. Idempotence is specified and worth asserting: re-adding an assigned id is skipped, removing an unassigned one is a no-op, deleteSoftwareBundle on an unknown or reaped id returns true and never throws, and on a COMPLETED bundle returns false. ScriptScheduleDevicesTest is the template for the device-targeting half."
+pr = "#2487"
+notes = "Nothing here dispatches: a bundle stays PENDING until submitSoftwareBundle (CP-23), and a PENDING bundle is disposable — configs/qa/openframe-saas-api.yml pins openframe.rmm.software.bundle.pending-ttl to 1h, so even a leaked draft is reaped. Verified live on qa: openframe.rmm.software.enabled is true (configs/qa/openframe-saas-api.yml:29). machineIds are Machine *global* ids here (schema: 'machineIds are Machine global ids'), while softwares/deviceSoftware take the raw machineId — the one place in the area where the two id shapes sit side by side, so use helpers/RelayIds. The add/remove-all pair takes the same filter+search as the bundle's own availableDevices field, so the natural assertion is availableDevices/assignedDevices deviceCount before and after. Idempotence is specified and worth asserting: re-adding an assigned id is skipped, removing an unassigned one is a no-op, deleteSoftwareBundle on an unknown or reaped id returns true and never throws, and on a COMPLETED bundle returns false. ScriptScheduleDevicesTest is the template for the device-targeting half. Done 2026-10-01 (#2487): SoftwareBundleTest cases 1-6, staging only; proved by the matrix."
 
 [[items]]
 id = "CP-23"
 title = "Submit a software bundle"
-status = "proposed"
+status = "done"
 priority = "P1"
 ops = ["mutation:submitSoftwareBundle"]
 test_class = "SoftwareBundleTest"
@@ -387,12 +389,13 @@ tags = ["saas", "feature"]
 depends_on = ["CP-22"]
 needs = []
 source = "report 2026-09-30 #2 (split out of CP-22 on purpose)"
-notes = "Option (a) looks right and covers the more interesting branch: SoftwareBundleScheduleInput carries the same fields and rules as CreateSoftwareScheduleInput minus action/packages/machineIds, so submit-with-schedule creates a software schedule (SoftwareBundle.scheduleId) whose lifecycle ops are deferred under KG-13 — closing this op would give that area its first reachable entry point and is a reason to revisit KG-13. Validate → mark COMPLETED is the only path to status COMPLETED, which is also the precondition for CP-22's 'deleteSoftwareBundle on a COMPLETED bundle returns false' case, so the two items interlock. Owner decision 2026-10-01: submit for real with a harmless package (e.g. 7zip via winget) on vm115982 and uninstall it afterwards; this also gives CP-29 real action-history rows."
+pr = "#2499"
+notes = "Option (a) looks right and covers the more interesting branch: SoftwareBundleScheduleInput carries the same fields and rules as CreateSoftwareScheduleInput minus action/packages/machineIds, so submit-with-schedule creates a software schedule (SoftwareBundle.scheduleId) whose lifecycle ops are deferred under KG-13 — closing this op would give that area its first reachable entry point and is a reason to revisit KG-13. Validate → mark COMPLETED is the only path to status COMPLETED, which is also the precondition for CP-22's 'deleteSoftwareBundle on a COMPLETED bundle returns false' case, so the two items interlock. Owner decision 2026-10-01: submit for real with a harmless package (e.g. 7zip via winget) on vm115982 and uninstall it afterwards; this also gives CP-29 real action-history rows. Done 2026-10-01 (#2499): SoftwareBundleTest cases 7-11; the real install (8-11) skips while vm115982 reports winget UNKNOWN; proved by the matrix."
 
 [[items]]
 id = "CP-24"
 title = "Remote-access policy: organization scope"
-status = "proposed"
+status = "done"
 priority = "P1"
 ops = ["query:organizationRemoteAccessPolicy", "mutation:setOrganizationRemoteAccessMode"]
 test_class = "RemoteAccessPolicyTest"
@@ -400,12 +403,13 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "report 2026-09-30 #4"
-notes = "Split 2026-10-01: the device scope is CP-51, because a throwaway organization has no devices and the device half needs the enrolled box. RemoteAccessPolicyApi, RemoteAccessQueries and RemoteAccessPolicyTest already drive the tenant scope; this adds the organization override on a throwaway organization (the AiSettingsTest pattern), so it stays in the functional phase. setOrganizationRemoteAccessMode(organizationId, mode) returns OrganizationRemoteAccessPolicyPayload with userErrors (ORGANIZATION_NOT_FOUND, REMOTE_ACCESS_DISABLED); mode null clears the override. organizationRemoteAccessPolicy returns mode (the override, or null when inheriting) and effectiveMode: assert inherit (mode null, effectiveMode = tenant mode) → override (both follow) → clear (back to inherit). Negative: a fabricated organization id answers ORGANIZATION_NOT_FOUND in userErrors. Clear the override in @AfterAll."
+pr = "#2491"
+notes = "Split 2026-10-01: the device scope is CP-51, because a throwaway organization has no devices and the device half needs the enrolled box. RemoteAccessPolicyApi, RemoteAccessQueries and RemoteAccessPolicyTest already drive the tenant scope; this adds the organization override on a throwaway organization (the AiSettingsTest pattern), so it stays in the functional phase. setOrganizationRemoteAccessMode(organizationId, mode) returns OrganizationRemoteAccessPolicyPayload with userErrors (ORGANIZATION_NOT_FOUND, REMOTE_ACCESS_DISABLED); mode null clears the override. organizationRemoteAccessPolicy returns mode (the override, or null when inheriting) and effectiveMode: assert inherit (mode null, effectiveMode = tenant mode) → override (both follow) → clear (back to inherit). Negative: a fabricated organization id answers ORGANIZATION_NOT_FOUND in userErrors. Clear the override in @AfterAll. Done 2026-10-01 (#2491): RemoteAccessPolicyTest organization cases on a throwaway organization; proved by the matrix."
 
 [[items]]
 id = "CP-25"
 title = "Remote-access request and session lifecycle"
-status = "proposed"
+status = "done"
 priority = "P1"
 ops = [
   "mutation:createRemoteAccessRequest", "mutation:revokeRemoteAccessRequest", "query:remoteAccessRequest",
@@ -417,7 +421,8 @@ tags = ["saas", "feature", "needs-device"]
 depends_on = ["CP-24"]
 needs = []
 source = "report 2026-09-30 #5"
-notes = "The request half needs no approval and is worth doing even if the decision lands on (c): createRemoteAccessRequest → remoteAccessRequest(requestId) → revokeRemoteAccessRequest is a closed loop, and the schema pins the refusal codes as userErrors on RemoteAccessRequestPayload (DEVICE_HAS_LIVE_REQUEST, DEVICE_HAS_ACTIVE_SESSION, DEVICE_UNREACHABLE, REMOTE_ACCESS_DISABLED, DEVICE_NOT_FOUND, REMOTE_ACCESS_REQUEST_NOT_FOUND, REMOTE_ACCESS_FORBIDDEN, REMOTE_ACCESS_REQUEST_SETTLED). Two cheap negatives fall straight out of that list: a second create on the same device returns the caller's own live request with created:false rather than a new one, and revoke on an already-settled request answers REMOTE_ACCESS_REQUEST_SETTLED with the settled request attached. Set the device to DENY_ACCESS through CP-24 to get REMOTE_ACCESS_DISABLED deterministically. deviceId is the OpenFrame machine id (the ?id= value on the device pages), not a global id. requestId/sessionId are plain 26-char ULIDs, not Relay ids. The read-side ops remoteSessions/remoteAccessRequests are per-device audit connections, clamped first 1..100 default 20, and are legitimately empty on a device nothing has connected to — assert the connection shape and totalCount, not a row. activeRemoteSession returns null for another technician's session on purpose, so an empty answer is never proof of absence. Ordered before the `device` phase would collide with DeviceRemoteTest, which opens real sessions on the same box — keep this in functional and pick a request the class revokes itself. Owner decision 2026-10-01: route (b): approve over the machine-side REST endpoint with vm115982's agent identity, as the Fae suite does; that also covers the open gap-api row for the approve endpoint."
+pr = "#2498"
+notes = "The request half needs no approval and is worth doing even if the decision lands on (c): createRemoteAccessRequest → remoteAccessRequest(requestId) → revokeRemoteAccessRequest is a closed loop, and the schema pins the refusal codes as userErrors on RemoteAccessRequestPayload (DEVICE_HAS_LIVE_REQUEST, DEVICE_HAS_ACTIVE_SESSION, DEVICE_UNREACHABLE, REMOTE_ACCESS_DISABLED, DEVICE_NOT_FOUND, REMOTE_ACCESS_REQUEST_NOT_FOUND, REMOTE_ACCESS_FORBIDDEN, REMOTE_ACCESS_REQUEST_SETTLED). Two cheap negatives fall straight out of that list: a second create on the same device returns the caller's own live request with created:false rather than a new one, and revoke on an already-settled request answers REMOTE_ACCESS_REQUEST_SETTLED with the settled request attached. Set the device to DENY_ACCESS through CP-24 to get REMOTE_ACCESS_DISABLED deterministically. deviceId is the OpenFrame machine id (the ?id= value on the device pages), not a global id. requestId/sessionId are plain 26-char ULIDs, not Relay ids. The read-side ops remoteSessions/remoteAccessRequests are per-device audit connections, clamped first 1..100 default 20, and are legitimately empty on a device nothing has connected to — assert the connection shape and totalCount, not a row. activeRemoteSession returns null for another technician's session on purpose, so an empty answer is never proof of absence. Ordered before the `device` phase would collide with DeviceRemoteTest, which opens real sessions on the same box — keep this in functional and pick a request the class revokes itself. Owner decision 2026-10-01: route (b): approve over the machine-side REST endpoint with vm115982's agent identity, as the Fae suite does; that also covers the open gap-api row for the approve endpoint. Done 2026-10-01 (#2498): RemoteAccessSessionTest, 14 cases; 2 skip while vm115982 resolves to SILENT_ACCESS (no pending request to approve); proved by the matrix."
 
 [[items]]
 id = "CP-26"
@@ -440,7 +445,7 @@ notes = "The reason this is reachable without a Google/Microsoft account, and th
 [[items]]
 id = "CP-27"
 title = "Software inventory and vulnerability reads (fleet-wide)"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = [
   "query:softwares", "query:software", "query:softwareFilters",
@@ -452,12 +457,13 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "report 2026-09-30 #8"
-notes = "Read-only, so the risk is entirely 'does the data exist', not 'what does it break'. Verified enabled on qa: openframe.rmm.software.enabled true (configs/qa/openframe-saas-api.yml:29) — the resolvers are @Conditional on it, so on a deployment where it is off these fields are absent from the schema, not empty. Follow LogsTest, which already asserts a connection against its own facets. Boundary case the schema hands you for free: 'an unknown sort field is rejected as a client error (BAD_REQUEST), not a server error' on softwares, and the sortable set is exactly name/devicesCount/cveCount/highestSeverity. vulnerability(cveId) is the one op with a recent fix behind it — 03944fa32 2026-09-25 'Fixed: VulnerabilityByCVE does not provide Softwares and Devices' — so the assertion that earns its keep is that a CVE taken from the vulnerabilities list resolves affectedSoftware and that vulnerabilityDevices(cveId) is non-empty for it; those are the two fields that regressed. Detail-only fields (description, resolvedInVersion, affectedSoftware) are null on list rows by design, so read them from the by-id query and not from the connection. software(id) and softwares take Relay global ids; vulnerability/vulnerabilityDevices key on the plain CVE string. Owner decision 2026-10-01: Fleet MDM is fixed and connects again, so the cases assert real rows; configs/base/openframe-saas-test.yml still pins require-fleet-connection to false and may be flipped back."
+pr = "#2500"
+notes = "Read-only, so the risk is entirely 'does the data exist', not 'what does it break'. Verified enabled on qa: openframe.rmm.software.enabled true (configs/qa/openframe-saas-api.yml:29) — the resolvers are @Conditional on it, so on a deployment where it is off these fields are absent from the schema, not empty. Follow LogsTest, which already asserts a connection against its own facets. Boundary case the schema hands you for free: 'an unknown sort field is rejected as a client error (BAD_REQUEST), not a server error' on softwares, and the sortable set is exactly name/devicesCount/cveCount/highestSeverity. vulnerability(cveId) is the one op with a recent fix behind it — 03944fa32 2026-09-25 'Fixed: VulnerabilityByCVE does not provide Softwares and Devices' — so the assertion that earns its keep is that a CVE taken from the vulnerabilities list resolves affectedSoftware and that vulnerabilityDevices(cveId) is non-empty for it; those are the two fields that regressed. Detail-only fields (description, resolvedInVersion, affectedSoftware) are null on list rows by design, so read them from the by-id query and not from the connection. software(id) and softwares take Relay global ids; vulnerability/vulnerabilityDevices key on the plain CVE string. Owner decision 2026-10-01: Fleet MDM is fixed and connects again, so the cases assert real rows; configs/base/openframe-saas-test.yml still pins require-fleet-connection to false and may be flipped back. Done 2026-10-01 (#2500): SoftwareInventoryTest; case 5 stays red on purpose: a Mac mapped to two Fleet hosts is listed and counted twice; proved by the matrix."
 
 [[items]]
 id = "CP-28"
 title = "Device-scoped software and vulnerability reads"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = [
   "query:deviceSoftware", "query:deviceSoftwareFilters",
@@ -468,12 +474,13 @@ tags = ["saas", "feature", "needs-device"]
 depends_on = ["CP-27"]
 needs = []
 source = "report 2026-09-30 #8"
-notes = "Split from CP-27 only because these four need a device and the fleet-wide ten do not — same client and same Queries class, so it is one PR's worth together if a device is in hand. All four take a raw machineId (String!, not a global id) and all four specify the same two boundaries, which is the whole negative half of the item: an unknown machineId is NOT_FOUND, a known device with nothing installed / no CVEs is an empty connection or empty facets, never an error. Device-scope subtlety to assert rather than assume: Software.currentVersion is the version installed on *this* device while devicesCount stays fleet-wide, and deviceVulnerabilities populates affectedSoftware on every row scoped to this host. deviceVulnerabilityFilters is the only one of the four the UI does not call yet (gap-api) — it is in here because it shares the fixture, not because a screen needs it."
+pr = "#2500"
+notes = "Split from CP-27 only because these four need a device and the fleet-wide ten do not — same client and same Queries class, so it is one PR's worth together if a device is in hand. All four take a raw machineId (String!, not a global id) and all four specify the same two boundaries, which is the whole negative half of the item: an unknown machineId is NOT_FOUND, a known device with nothing installed / no CVEs is an empty connection or empty facets, never an error. Device-scope subtlety to assert rather than assume: Software.currentVersion is the version installed on *this* device while devicesCount stays fleet-wide, and deviceVulnerabilities populates affectedSoftware on every row scoped to this host. deviceVulnerabilityFilters is the only one of the four the UI does not call yet (gap-api) — it is in here because it shares the fixture, not because a screen needs it. Done 2026-10-01 (#2500): SoftwareInventoryTest device cases; vm115982 has no CVEs, the row assertions run on an affected device; proved by the matrix."
 
 [[items]]
 id = "CP-29"
 title = "Software action history"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = [
   "query:softwareActions", "query:softwareAction", "query:softwareActionFilters", "query:softwareActionExecutions",
@@ -483,12 +490,13 @@ tags = ["saas", "feature"]
 depends_on = ["CP-23"]
 needs = []
 source = "report 2026-09-30 (unplanned-gap sweep)"
-notes = "Exactly the shape of CP-17 (ScriptExecutionHistoryTest), which solved the same 'history of something nobody dispatched' problem by preferring a subject that already has history and falling back to an own subject whose empty history is legitimate — reuse that structure rather than inventing one. Sequence the item after CP-23 if the owner takes option (a) there, since a submitted bundle is the cheapest way to mint one real row. softwareActionExecutions is gap-api (no UI consumer yet); the other three are UI-used from the software screens. Owner decision 2026-10-01: unblocked by CP-23, which installs a real package and so writes action history."
+pr = "#2499"
+notes = "Exactly the shape of CP-17 (ScriptExecutionHistoryTest), which solved the same 'history of something nobody dispatched' problem by preferring a subject that already has history and falling back to an own subject whose empty history is legitimate — reuse that structure rather than inventing one. Sequence the item after CP-23 if the owner takes option (a) there, since a submitted bundle is the cheapest way to mint one real row. softwareActionExecutions is gap-api (no UI consumer yet); the other three are UI-used from the software screens. Owner decision 2026-10-01: unblocked by CP-23, which installs a real package and so writes action history. Done 2026-10-01 (#2499): SoftwareActionHistoryTest, read-only on the tenant's newest finished bundle install; proved by the matrix."
 
 [[items]]
 id = "CP-30"
 title = "Per-organization AI config and guardrails"
-status = "proposed"
+status = "done"
 priority = "P1"
 ops = [
   "query:organizationClientAiConfig", "mutation:updateOrganizationClientAiConfig",
@@ -500,12 +508,13 @@ tags = ["saas", "feature"]
 depends_on = ["CP-8"]
 needs = []
 source = "report 2026-09-30 #6"
-notes = "CP-8 already built the whole fixture and the pattern: AiSettingsApi, AiSettingsQueries and AiSettingsTest read the tenant-wide configs and write them back unchanged, and already create a throwaway organization, override its clientView, partially update it, reset it and archive the organization afterwards — these seven ops are the same operations one scope down, on the same throwaway org. That makes it the highest-value-per-line P1 in this report. Both reset mutations and the update are per-organization, so nothing tenant-wide is touched and the archive at the end disposes of the evidence. The guardrails inherit/override model is what to assert: organizationGuardrails reports inheritDefault true with the *tenant* rules showing through while the org has no policy of its own, update materializes an org policy from a template plus per-operation overrides keyed by GuardrailRule.naturalKey, and resetOrganizationGuardrails puts inheritDefault back to true — so the round trip is provable without knowing the rule set. Guardrails refusals come back as userErrors on OrganizationGuardrailsPayload; SecurityApprovalLevel is ALLOW/ASK_USER/ASK_TECHNICIAN/DENY in declaration order. resetOrganizationClientAiQuickActions is narrower than resetOrganizationClientAiConfig — reset the quick actions alone and assert the rest of the config survives, which is the only thing that distinguishes the two ops. Owner decision 2026-10-01: borrow the deferred AI-policies endpoint read-only to obtain the template id; KG-15 stays deferred for coverage purposes."
+pr = "#2496"
+notes = "CP-8 already built the whole fixture and the pattern: AiSettingsApi, AiSettingsQueries and AiSettingsTest read the tenant-wide configs and write them back unchanged, and already create a throwaway organization, override its clientView, partially update it, reset it and archive the organization afterwards — these seven ops are the same operations one scope down, on the same throwaway org. That makes it the highest-value-per-line P1 in this report. Both reset mutations and the update are per-organization, so nothing tenant-wide is touched and the archive at the end disposes of the evidence. The guardrails inherit/override model is what to assert: organizationGuardrails reports inheritDefault true with the *tenant* rules showing through while the org has no policy of its own, update materializes an org policy from a template plus per-operation overrides keyed by GuardrailRule.naturalKey, and resetOrganizationGuardrails puts inheritDefault back to true — so the round trip is provable without knowing the rule set. Guardrails refusals come back as userErrors on OrganizationGuardrailsPayload; SecurityApprovalLevel is ALLOW/ASK_USER/ASK_TECHNICIAN/DENY in declaration order. resetOrganizationClientAiQuickActions is narrower than resetOrganizationClientAiConfig — reset the quick actions alone and assert the rest of the config survives, which is the only thing that distinguishes the two ops. Owner decision 2026-10-01: borrow the deferred AI-policies endpoint read-only to obtain the template id; KG-15 stays deferred for coverage purposes. Done 2026-10-01 (#2496): AiSettingsTest on a throwaway organization; the guardrail template id is read from the deferred policies endpoint; proved by the matrix."
 
 [[items]]
 id = "CP-31"
 title = "User onboarding progress"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = [
   "query:userOnboardingProgress", "mutation:completeUserOnboardingStep", "mutation:completeUserOnboarding",
@@ -516,7 +525,8 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "report 2026-09-30 #9"
-notes = "The one thing that makes this safe and that the tenant flow (CP-32) lacks: resetUserOnboarding exists and is specified as 'reset personal onboarding to a clean state (no steps, not skipped, not completed)', so the whole walk is reversible and the record is per (userId, tenantId) — scoped to the suite's own admin, invisible to anyone else on a shared tenant. Reset first, walk the six UserOnboardingStep values through completeUserOnboardingStep asserting idempotence (the schema says idempotent, so calling one twice must not duplicate it in completedSteps), finish with completeUserOnboarding and assert completed plus completedAt, then reset and assert the clean state; skipUserOnboarding sets skipped/skippedAt and is cleared by reset. No order guarantee on completedSteps, so compare as a set. Every mutation returns the full progress object and no userErrors wrapper, so one round trip per assertion and refusals would be top-level errors. Nothing here is derived: the schema is explicit that the store is the single source of truth and that 'a customer exists / a device exists' are frontend auto-complete triggers only — so a test must not expect a step to complete itself."
+pr = "#2489"
+notes = "The one thing that makes this safe and that the tenant flow (CP-32) lacks: resetUserOnboarding exists and is specified as 'reset personal onboarding to a clean state (no steps, not skipped, not completed)', so the whole walk is reversible and the record is per (userId, tenantId) — scoped to the suite's own admin, invisible to anyone else on a shared tenant. Reset first, walk the six UserOnboardingStep values through completeUserOnboardingStep asserting idempotence (the schema says idempotent, so calling one twice must not duplicate it in completedSteps), finish with completeUserOnboarding and assert completed plus completedAt, then reset and assert the clean state; skipUserOnboarding sets skipped/skippedAt and is cleared by reset. No order guarantee on completedSteps, so compare as a set. Every mutation returns the full progress object and no userErrors wrapper, so one round trip per assertion and refusals would be top-level errors. Nothing here is derived: the schema is explicit that the store is the single source of truth and that 'a customer exists / a device exists' are frontend auto-complete triggers only — so a test must not expect a step to complete itself. Done 2026-10-01 (#2489): OnboardingTest, 10 cases; restores the shared user's progress (its original skippedAt stamp could not be written back); proved by the matrix."
 
 [[items]]
 id = "CP-32"
@@ -542,7 +552,7 @@ ops = ["query:notificationSettings", "mutation:updateNotificationSettings"]
 test_class = "NotificationsTest"
 tags = ["saas", "feature"]
 depends_on = ["CP-5"]
-needs = []
+needs = ["product fix: NotificationSettingGroup.INSIGHTS (added in #2363, a8fec8dd2) is missing from notification-settings.graphqls, so notificationSettings fails on qa; the cases are in PR #2486 and stay red until the schema has the value"]
 source = "report 2026-09-30 (unplanned-gap sweep)"
 notes = "Cheapest item in the batch and it extends a class that is already done (CP-5), in the area whose read/delete half is fully covered. Follow the CP-8 write-back-unchanged pattern, which suits this contract exactly: notificationSettings returns every NotificationSettingGroup exactly once with defaults already resolved, so the round trip is read → flip one group → assert only that group moved → write the original back. Two things to pin: 'the modal saves full state; omitting typeSettings keeps the stored group overrides', so a call with enabled alone must leave typeSettings untouched — that is the negative case; and NotificationTypeSetting.label is server-rendered caption text the client never maps from the enum, so assert it is non-blank rather than matching a string. enabled is a master switch over in-app and push alike, so leave it true and restore it in a finally — a run that dies with it false mutes the inbox the CP-5 cases depend on."
 
@@ -563,7 +573,7 @@ notes = "Read-only and needs no tenant state at all — no device, no organizati
 [[items]]
 id = "CP-35"
 title = "Dialog unread counter and mode"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = ["mutation:markDialogMessagesRead", "PATCH api/v1/dialogs/{}/mode", "PATCH api/v1/dialogs/{}/status"]
 test_class = "DialogsTest"
@@ -571,7 +581,8 @@ tags = ["saas", "feature"]
 depends_on = ["CP-16"]
 needs = []
 source = "report 2026-09-30 (unplanned-gap sweep)"
-notes = "Extends DialogsTest (CP-16, done), whose own note records the trap to avoid: DialogApi's REST path constant DIALOGS shadowed the GraphQL document of the same name, so the document is DIALOGS_QUERY — the same collision is waiting for the two PATCH endpoints added here. markDialogMessagesRead returns DialogPayload { dialog, userErrors } and takes DialogIdInput { id }, the same input as archiveDialog/unarchiveDialog which the class already drives. PATCH api/v1/dialogs/{id}/mode is the newer of the two (2026-08-27) and is called from the tickets screen; PATCH .../status is gap-api and rides along on the same client. Read the two controller signatures at the pinned SHA before writing the DTOs — this item's contract is the one in the batch that was not verified for this report. Owner decision 2026-10-01: mint the unread message from the client side through a Fae dialog on vm115982, then mark it read."
+pr = "#2495"
+notes = "Extends DialogsTest (CP-16, done), whose own note records the trap to avoid: DialogApi's REST path constant DIALOGS shadowed the GraphQL document of the same name, so the document is DIALOGS_QUERY — the same collision is waiting for the two PATCH endpoints added here. markDialogMessagesRead returns DialogPayload { dialog, userErrors } and takes DialogIdInput { id }, the same input as archiveDialog/unarchiveDialog which the class already drives. PATCH api/v1/dialogs/{id}/mode is the newer of the two (2026-08-27) and is called from the tickets screen; PATCH .../status is gap-api and rides along on the same client. Read the two controller signatures at the pinned SHA before writing the DTOs — this item's contract is the one in the batch that was not verified for this report. Owner decision 2026-10-01: mint the unread message from the client side through a Fae dialog on vm115982, then mark it read. Done 2026-10-01 (#2495): DialogsTest via a Fae CLIENT dialog on vm115982 in DIRECT mode; proved by the matrix."
 
 [[items]]
 id = "CP-36"
@@ -592,7 +603,7 @@ notes = "Read the whole controller first — it is small and the matrix is wrong
 [[items]]
 id = "CP-37"
 title = "Item assignment"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = [
   "query:assignedItems", "query:assignedItemCounts",
@@ -603,7 +614,8 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "report 2026-09-30 (unplanned-gap sweep)"
-notes = "A small generic join table over things the suite already creates, which is what makes it cheap: AssignmentItemType is TICKET / KNOWLEDGE_ARTICLE / INSIGHT and AssignmentTargetType is ORGANIZATION / DEVICE / TICKET / KNOWLEDGE_ARTICLE, so TicketsTest and KnowledgeBaseTest fixtures supply both ends and nothing new has to be minted. Every id is a Relay global id (itemId, targetId, and ItemAssignment.id). assignItem returns ItemAssignment; unassignItem and unassignAllByType return plain Boolean, so the idempotence question — is the second unassign false? — is the negative case, the same shape as deleteTimeEntry in CP-6. assignedItemCounts is a per-targetType roll-up of assignedItems and the two must agree: that cross-check is the assertion worth writing. Oldest surface in this batch (2026-05-01) and the only one of the three assignment ops the UI calls that has sat uncovered for five months. Note the federation seam: assignment.graphqls declares its own trimmed Ticket type with a TODO to delete it after the Apollo Federation migration, so a Ticket read through this schema carries fewer fields than the same ticket read on the ai-agent side — do not reuse the ai-agent Ticket DTO here."
+pr = "#2490"
+notes = "A small generic join table over things the suite already creates, which is what makes it cheap: AssignmentItemType is TICKET / KNOWLEDGE_ARTICLE / INSIGHT and AssignmentTargetType is ORGANIZATION / DEVICE / TICKET / KNOWLEDGE_ARTICLE, so TicketsTest and KnowledgeBaseTest fixtures supply both ends and nothing new has to be minted. Every id is a Relay global id (itemId, targetId, and ItemAssignment.id). assignItem returns ItemAssignment; unassignItem and unassignAllByType return plain Boolean, so the idempotence question — is the second unassign false? — is the negative case, the same shape as deleteTimeEntry in CP-6. assignedItemCounts is a per-targetType roll-up of assignedItems and the two must agree: that cross-check is the assertion worth writing. Oldest surface in this batch (2026-05-01) and the only one of the three assignment ops the UI calls that has sat uncovered for five months. Note the federation seam: assignment.graphqls declares its own trimmed Ticket type with a TODO to delete it after the Apollo Federation migration, so a Ticket read through this schema carries fewer fields than the same ticket read on the ai-agent side — do not reuse the ai-agent Ticket DTO here. Done 2026-10-01 (#2490): AssignmentsTest, 11 cases; unassignAllByType is called only on the class's own article; proved by the matrix."
 
 [[items]]
 id = "CP-38"
@@ -623,7 +635,7 @@ notes = "Both pairs sit behind the settings screen and both are read/write pairs
 [[items]]
 id = "CP-39"
 title = "Assistant AI configuration (REST)"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = ["GET api/v1/ai-configuration", "POST api/v1/ai-configuration", "POST api/v1/ai-configuration/test"]
 test_class = "AiSettingsTest"
@@ -631,12 +643,13 @@ tags = ["saas", "feature"]
 depends_on = ["CP-8"]
 needs = []
 source = "report 2026-09-30 (unplanned-gap sweep)"
-notes = "The sibling GET api/v1/ai-configuration/supported-models is already covered — the AI suites reach it through a helper during the model-switch cases — so the client class and the auth path exist and only these three mappings are missing. Same controller, same base path, so this is a small extension rather than a new client. The GET is a safe read and can ship alone. Read AIConfigurationController at the pinned SHA for the DTO names; not verified for this report. The GraphQL twins of this surface (adminAiConfig/clientAiConfig) are covered by CP-8, so if the two representations disagree about a tenant's configuration, this item is what would show it. Owner decision 2026-10-01: cover GET, supported-models and POST /test (a fake key costs nothing) everywhere; save the configuration only on pipeline-registered tenants, where reloading the assistant affects nobody else."
+pr = "#2496"
+notes = "The sibling GET api/v1/ai-configuration/supported-models is already covered — the AI suites reach it through a helper during the model-switch cases — so the client class and the auth path exist and only these three mappings are missing. Same controller, same base path, so this is a small extension rather than a new client. The GET is a safe read and can ship alone. Read AIConfigurationController at the pinned SHA for the DTO names; not verified for this report. The GraphQL twins of this surface (adminAiConfig/clientAiConfig) are covered by CP-8, so if the two representations disagree about a tenant's configuration, this item is what would show it. Owner decision 2026-10-01: cover GET, supported-models and POST /test (a fake key costs nothing) everywhere; save the configuration only on pipeline-registered tenants, where reloading the assistant affects nobody else. Done 2026-10-01 (#2496): AiSettingsTest; the save case is pipeline-only and writes the config back with the platform key; proved by the matrix."
 
 [[items]]
 id = "CP-40"
 title = "Ad-hoc script and command dispatch"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = [
   "mutation:runScript", "mutation:batchRunScript", "mutation:runCommand",
@@ -647,7 +660,8 @@ tags = ["saas", "feature", "needs-device"]
 depends_on = []
 needs = []
 source = "report 2026-09-30 (unplanned-gap sweep)"
-notes = "ScriptApi.runScript already exists and no enabled test calls it — it is one of the 25 unreached client methods, and the only one of them whose operation is an open UI-used gap. So mutation:runScript is the cheapest single op left in the matrix: the fixture is written and waiting for an assertion. The other four need new methods. runScript/batchRunScript are called from the scripts screen (batchRunScript since 2026-06-23, runScript since 2026-06-17); runCommand (2026-06-02) is the ad-hoc terminal and is UI-used, while batchRunCommand and cancelExecution are gap-api and ride along on the same client. Closing these also gives CP-17's script-execution history real rows to read instead of borrowing whatever the AI suites happened to leave behind, so sequence it before any further execution-history work. Owner decision 2026-10-01: allowed: harmless commands (an echo) dispatched on vm115982."
+pr = "#2497"
+notes = "ScriptApi.runScript already exists and no enabled test calls it — it is one of the 25 unreached client methods, and the only one of them whose operation is an open UI-used gap. So mutation:runScript is the cheapest single op left in the matrix: the fixture is written and waiting for an assertion. The other four need new methods. runScript/batchRunScript are called from the scripts screen (batchRunScript since 2026-06-23, runScript since 2026-06-17); runCommand (2026-06-02) is the ad-hoc terminal and is UI-used, while batchRunCommand and cancelExecution are gap-api and ride along on the same client. Closing these also gives CP-17's script-execution history real rows to read instead of borrowing whatever the AI suites happened to leave behind, so sequence it before any further execution-history work. Owner decision 2026-10-01: allowed: harmless commands (an echo) dispatched on vm115982. Done 2026-10-01 (#2497): ScriptsTest echo dispatch on vm115982; cancelExecution asserts the dispatch contract only, the agent ignored the cancel; proved by the matrix."
 
 [[items]]
 id = "CP-41"
@@ -744,7 +758,7 @@ notes = "InvitationController.listInvitations: GET /invitations?page=0&size=20 (
 [[items]]
 id = "CP-46"
 title = "Transfer tenant ownership"
-status = "proposed"
+status = "done"
 priority = "P3"
 ops = ["POST users/{}/transfer-ownership"]
 test_class = "UserTest"
@@ -752,7 +766,8 @@ tags = ["oss", "feature"]
 depends_on = []
 needs = []
 source = "analyser fix 2026-09-30 (unplanned UI gaps, settings)"
-notes = "UserController.transferOwnership: POST /users/{id}/transfer-ownership, 204, @PreAuthorize(\"hasAuthority('OWNER')\"). UserService.transferOwnership: requester must hold OWNER (else OperationNotAllowedException); transferring to yourself returns without change; target must exist (UserNotFoundException) and be ACTIVE (else OperationNotAllowedException); then target roles := [OWNER], requester roles := [ADMIN], and sendOwnershipTransferEmail (a mail failure does not fail the transfer). Negative cases that change nothing and can land before the decision: transfer to self → 204 and roles unchanged; to a fabricated id → not found; to a user with a pending, not-yet-accepted invitation → refused; called by a non-owner → 403. First check whether the suite's API user is the OWNER (UserTest.testDeleteOwner finds the owner via getUsers(UserRole.OWNER)). Missing: UserApi.transferOwnership. Owner decision 2026-10-01: full round trip (transfer to a throwaway user and back from its session) on pipeline-registered tenants only; the negative cases may run everywhere."
+pr = "#2494"
+notes = "UserController.transferOwnership: POST /users/{id}/transfer-ownership, 204, @PreAuthorize(\"hasAuthority('OWNER')\"). UserService.transferOwnership: requester must hold OWNER (else OperationNotAllowedException); transferring to yourself returns without change; target must exist (UserNotFoundException) and be ACTIVE (else OperationNotAllowedException); then target roles := [OWNER], requester roles := [ADMIN], and sendOwnershipTransferEmail (a mail failure does not fail the transfer). Negative cases that change nothing and can land before the decision: transfer to self → 204 and roles unchanged; to a fabricated id → not found; to a user with a pending, not-yet-accepted invitation → refused; called by a non-owner → 403. First check whether the suite's API user is the OWNER (UserTest.testDeleteOwner finds the owner via getUsers(UserRole.OWNER)). Missing: UserApi.transferOwnership. Owner decision 2026-10-01: full round trip (transfer to a throwaway user and back from its session) on pipeline-registered tenants only; the negative cases may run everywhere. Done 2026-10-01 (#2494): UserTest negative cases; the round trip is pipeline-only (PipelineContext.hasRegisteredTenant) and has not run yet; proved by the matrix."
 
 [[items]]
 id = "CP-47"
@@ -785,7 +800,7 @@ notes = "tool.graphqls: integratedTools(filter: ToolFilterInput, search: String,
 [[items]]
 id = "CP-49"
 title = "Frontend feature flags and dashboard activity events"
-status = "proposed"
+status = "done"
 priority = "P3"
 ops = ["query:feFeatureFlags", "POST events"]
 test_class = "FrontendSupportTest"
@@ -793,7 +808,8 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "analyser fix 2026-09-30 (unplanned UI gaps, UI plumbing)"
-notes = "Two small calls the UI shell makes on every session. feFeatureFlags(names: [String!]): [FeFeatureFlag!]! (module openframe-fe-feature-flags) — 'unknown flags default to false': request one fabricated name and assert it comes back with enabled false, plus one real flag name read from the frontend's hooks. POST /events is TenantEventController in openframe-saas-api (202 ACCEPTED, TenantEventRequest{eventType, subtype, repeatMode}). TenantEventService allows only eventType DASHBOARD_ACTIVITY, requires a non-blank subtype and a repeatMode; each violation is IllegalArgumentException → 400, thrown before anything is published — three safe negative cases. Idempotency key is userId:subtype (ONCE) or with a timestamp (MULTI). Missing: a Queries constant, client methods, and a TenantEventRequest DTO. Split into two classes if the owner prefers; they share no fixture. Owner decision 2026-10-01: allowed, including one real DASHBOARD_ACTIVITY publish for the test user."
+pr = "#2492"
+notes = "Two small calls the UI shell makes on every session. feFeatureFlags(names: [String!]): [FeFeatureFlag!]! (module openframe-fe-feature-flags) — 'unknown flags default to false': request one fabricated name and assert it comes back with enabled false, plus one real flag name read from the frontend's hooks. POST /events is TenantEventController in openframe-saas-api (202 ACCEPTED, TenantEventRequest{eventType, subtype, repeatMode}). TenantEventService allows only eventType DASHBOARD_ACTIVITY, requires a non-blank subtype and a repeatMode; each violation is IllegalArgumentException → 400, thrown before anything is published — three safe negative cases. Idempotency key is userId:subtype (ONCE) or with a timestamp (MULTI). Missing: a Queries constant, client methods, and a TenantEventRequest DTO. Split into two classes if the owner prefers; they share no fixture. Owner decision 2026-10-01: allowed, including one real DASHBOARD_ACTIVITY publish for the test user. Done 2026-10-01 (#2492): FrontendSupportTest, 7 cases, one real DASHBOARD_ACTIVITY publish; proved by the matrix."
 
 # ── Added 2026-10-01 after wave 1 ───────────────────────────────────────────────────────────────────
 # CP-51 is the device half split out of CP-24; CP-50 is query:deviceLogs, which the analyser fix turned
@@ -802,7 +818,7 @@ notes = "Two small calls the UI shell makes on every session. feFeatureFlags(nam
 [[items]]
 id = "CP-50"
 title = "Device logs"
-status = "proposed"
+status = "done"
 priority = "P2"
 ops = ["query:deviceLogs"]
 test_class = "DeviceLogsTest"
@@ -810,12 +826,13 @@ tags = ["saas", "feature"]
 depends_on = []
 needs = []
 source = "analyser fix 2026-09-30 (deviceLogs was four phantom rows)"
-notes = "device-log.graphqls: deviceLogs(machineId: String @deprecated, machineIds: [String!], filter: DeviceLogFilterInput, first: Int, after: String): DeviceLogConnection!, newest first, always scoped to the current tenant. Omitting machineIds reads every device in the tenant, so the tenant-wide cases need no device; an empty machineIds list is rejected, and at most 50 ids are allowed. DeviceLogFilterInput: levels (DEBUG/INFO/WARN/ERROR), contains/excludes (case-insensitive literal terms, max 5 of 256 characters), from/to (inclusive; from defaults to 7 days before to with a device named, 24 hours without; the range may not exceed 30 days). first is 1-500, default 100; page older entries with after. DeviceLogEntry: timestamp (ingestion, nanosecond precision, the sort key), agentTimestamp, level, message, machineId, hostname, count. Cases: tenant-wide page sorted newest first; levels filter returns only those levels; contains/excludes honoured; first/after pages without overlap; a range over 30 days and an empty machineIds list are refused; one case naming the enrolled box's machineId (tag needs-device on that case only) returns only its lines. The devices UI gates the logs tab behind useDeviceLogsGate, so check the gate before calling the feature live."
+pr = "#2488"
+notes = "device-log.graphqls: deviceLogs(machineId: String @deprecated, machineIds: [String!], filter: DeviceLogFilterInput, first: Int, after: String): DeviceLogConnection!, newest first, always scoped to the current tenant. Omitting machineIds reads every device in the tenant, so the tenant-wide cases need no device; an empty machineIds list is rejected, and at most 50 ids are allowed. DeviceLogFilterInput: levels (DEBUG/INFO/WARN/ERROR), contains/excludes (case-insensitive literal terms, max 5 of 256 characters), from/to (inclusive; from defaults to 7 days before to with a device named, 24 hours without; the range may not exceed 30 days). first is 1-500, default 100; page older entries with after. DeviceLogEntry: timestamp (ingestion, nanosecond precision, the sort key), agentTimestamp, level, message, machineId, hostname, count. Cases: tenant-wide page sorted newest first; levels filter returns only those levels; contains/excludes honoured; first/after pages without overlap; a range over 30 days and an empty machineIds list are refused; one case naming the enrolled box's machineId (tag needs-device on that case only) returns only its lines. The devices UI gates the logs tab behind useDeviceLogsGate, so check the gate before calling the feature live. Done 2026-10-01 (#2488): DeviceLogsTest, 7 cases; the vm115982 case is needs-device; proved by the matrix."
 
 [[items]]
 id = "CP-51"
 title = "Remote-access policy: device scope"
-status = "proposed"
+status = "done"
 priority = "P1"
 ops = ["mutation:setDeviceRemoteAccessMode"]
 test_class = "RemoteAccessPolicyTest"
@@ -823,4 +840,5 @@ tags = ["saas", "feature", "needs-device"]
 depends_on = ["CP-24"]
 needs = []
 source = "split from CP-24, 2026-10-01"
-notes = "setDeviceRemoteAccessMode(machineId: String!, mode: RemoteAccessMode): Machine! sets a per-device override; refusals (DEVICE_NOT_FOUND, REMOTE_ACCESS_DISABLED) are GraphQL errors with extensions.code, unlike the userErrors of the tenant and organization mutations. The override reads back on Machine.remoteAccess { mode effectiveMode effectiveScope } (an extension on the oss-lib Machine type, so DeviceQueries needs the selection); RemoteAccessPolicyScope is DEVICE|ORGANIZATION|TENANT|DEFAULTS. Use the enrolled box in its real organization (a throwaway organization has no devices): with no override, effectiveScope is ORGANIZATION or TENANT; set an override and assert mode, effectiveMode and effectiveScope DEVICE; clear it with mode null and assert the previous scope returns. Negative: a fabricated machineId raises DEVICE_NOT_FOUND. The override changes how remote sessions to that box behave for everyone, so keep it short, clear it in @AfterAll, and do not run it alongside other remote-access cases."
+pr = "#2491"
+notes = "setDeviceRemoteAccessMode(machineId: String!, mode: RemoteAccessMode): Machine! sets a per-device override; refusals (DEVICE_NOT_FOUND, REMOTE_ACCESS_DISABLED) are GraphQL errors with extensions.code, unlike the userErrors of the tenant and organization mutations. The override reads back on Machine.remoteAccess { mode effectiveMode effectiveScope } (an extension on the oss-lib Machine type, so DeviceQueries needs the selection); RemoteAccessPolicyScope is DEVICE|ORGANIZATION|TENANT|DEFAULTS. Use the enrolled box in its real organization (a throwaway organization has no devices): with no override, effectiveScope is ORGANIZATION or TENANT; set an override and assert mode, effectiveMode and effectiveScope DEVICE; clear it with mode null and assert the previous scope returns. Negative: a fabricated machineId raises DEVICE_NOT_FOUND. The override changes how remote sessions to that box behave for everyone, so keep it short, clear it in @AfterAll, and do not run it alongside other remote-access cases. Done 2026-10-01 (#2491): RemoteAccessPolicyTest device cases on vm115982; the override is set to the mode it already resolves to, then cleared; proved by the matrix."
