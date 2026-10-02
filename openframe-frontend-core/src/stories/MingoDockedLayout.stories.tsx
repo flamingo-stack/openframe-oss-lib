@@ -379,7 +379,7 @@ function RealMingo({
   canClose,
   close,
   collapse,
-  mode,
+  collapsesTo,
   thread,
 }: AppLayoutSidePanelRenderState & { thread: 'conversation' | 'new' }) {
   return (
@@ -392,7 +392,8 @@ function RealMingo({
           if (!open) close();
         }}
         appearance="v2"
-        onCollapse={mode === 'overlay' ? undefined : collapse}
+        onCollapse={collapsesTo ? collapse : undefined}
+        collapseTo={collapsesTo === 'column' ? 'column' : 'list'}
         defaultActiveMode="mingo"
         showInternalTrigger={false}
         mingoState={thread === 'new' ? NEW_CHAT_STATE : MINGO_STATE}

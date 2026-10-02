@@ -101,7 +101,7 @@ export function AppLayout({
           isMingoAIActive: sidePanelState.isOpen,
           mingoAICloseWhenActive: true,
         };
-  const contentCovered = sidePanelState?.mode === 'full';
+  const contentCovered = sidePanelState?.coversContent === true;
 
   // Mirrors `mobileMenuOpen` so the toggle callback can stay identity-stable.
   // Refreshed after every commit rather than in the render body: the only
@@ -193,6 +193,9 @@ export function AppLayout({
                     className={cn(
                       'ods-content-area min-w-0 flex-1 overflow-y-auto',
                       contentCovered && 'hidden',
+                      // While the panel is drawn over the page, keep the page's own
+                      // z-indexed layers (sticky headers, fixed bars) under it.
+                      sidePanelState?.overlapsContent && 'isolate',
                       mainClassName,
                     )}
                   >

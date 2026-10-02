@@ -36,7 +36,13 @@ export interface AppLayoutSidePanelRenderState {
   canClose: boolean;
   /** Put the panel away again; a no-op while it is docked. */
   close: () => void;
-  /** Shrink the panel to its minimum width (e.g. back to a list alone). */
+  /**
+   * Where `collapse` takes the panel, one step back at a time: from the whole
+   * area to the column it was in before (`column`), from the column to its
+   * minimum (`minimum`, e.g. a list alone). Null when there is no step back.
+   */
+  collapsesTo: 'column' | 'minimum' | null;
+  /** Step the panel back (see `collapsesTo`), animated. */
   collapse: () => void;
 }
 
@@ -70,6 +76,9 @@ export interface AppLayoutSidePanelConfig {
 /** Inset of the docked card from the window edge and the header. */
 export const SIDE_PANEL_INSET = 16;
 const MOBILE_QUERY = '(max-width: 799.98px)';
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+/** Length of the docked <-> full morph; keep in step with `duration-300` below. */
+const MORPH_MS = 300;
 const STORAGE_EVENT = 'of:side-panel-size';
 
 export interface SidePanelSize {
@@ -98,6 +107,8 @@ export interface SidePanelLayout {
   canDock: boolean;
   /** Widest docked width; one pixel more takes the whole area. */
   maxDockedWidth: number;
+  /** Width the panel docks at, kept while it is full so it can return there. */
+  dockedWidth: number;
 }
 
 /**
@@ -124,12 +135,13 @@ export function resolveSidePanelLayout({
   else if (!canDock) mode = isOpen ? 'full' : 'hidden';
   else mode = size.expanded ? 'full' : 'docked';
 
+  const dockedWidth = Math.min(Math.max(size.width, minWidth), maxDockedWidth);
   let width: number;
-  if (mode === 'docked') width = Math.min(Math.max(size.width, minWidth), maxDockedWidth);
+  if (mode === 'docked') width = dockedWidth;
   else if (mode === 'overlay') width = rowWidth;
   else width = Math.max(0, rowWidth - 2 * SIDE_PANEL_INSET);
 
-  return { mode, width, canDock, maxDockedWidth };
+  return { mode, width, canDock, maxDockedWidth, dockedWidth };
 }
 
 function parseSize(raw: string | null): SidePanelSize | null {
@@ -191,13 +203,41 @@ function useStoredSize(storageKey: string | undefined, fallback: SidePanelSize) 
   return [size, setSize] as const;
 }
 
+/**
+ * The panel is growing into the whole area (`expand`), shrinking back into the
+ * column (`collapse`) or narrowing within it (`narrow`). While it grows the
+ * content stays where it is under it, and is hidden only once the panel covers
+ * it; while it shrinks the content is already laid out at its new width.
+ */
+export type SidePanelMorph = 'expand' | 'collapse' | 'narrow';
+
 export interface AppLayoutSidePanelState extends SidePanelLayout {
   minWidth: number;
   /** Opened from the header while it cannot dock. */
   isOpen: boolean;
+  morph: SidePanelMorph | null;
+  /**
+   * Dragged back out of the whole area and not yet let go: the panel follows
+   * the pointer over the content, laid out at its narrowest beneath it.
+   */
+  peekWidth: number | null;
+  /** The panel covers the content area: the content can be hidden. */
+  coversContent: boolean;
+  /** The panel is drawn over part of the content (a morph or a peek). */
+  overlapsContent: boolean;
+  endMorph: () => void;
+  collapsesTo: AppLayoutSidePanelRenderState['collapsesTo'];
+  collapse: () => void;
   toggle: () => void;
   close: () => void;
   resize: (next: number) => void;
+  /**
+   * A pointer drag to `next`. One that started in the whole area (`fromFull`)
+   * follows the pointer while it is wider than any column could be.
+   */
+  drag: (next: number, fromFull: boolean) => void;
+  /** The drag ended at `next`: a panel left between the two snaps to the nearer. */
+  release: (next: number, fromFull: boolean) => void;
 }
 
 /**
@@ -225,6 +265,9 @@ export function useAppLayoutSidePanel(
   }, [enabled, row]);
 
   const isMobile = useMediaQuery(MOBILE_QUERY) === true;
+  const reduceMotion = useMediaQuery(REDUCED_MOTION_QUERY) === true;
+  const [morph, setMorph] = useState<SidePanelMorph | null>(null);
+  const [liveWidth, setLiveWidth] = useState<number | null>(null);
   const [storedSize, setStoredSize] = useStoredSize(config?.storageKey, minimum);
   const [ownIsOpen, setOwnIsOpen] = useState(false);
   const isOpen = config?.open ?? ownIsOpen;
@@ -268,17 +311,86 @@ export function useAppLayoutSidePanel(
 
   if (!enabled) return null;
 
+  const animate = (next: SidePanelMorph) => {
+    if (!reduceMotion) setMorph(next);
+  };
+  const fullWidth = Math.max(0, rowWidth - 2 * SIDE_PANEL_INSET);
+  // Only while the drag holds the panel in the whole area: anything that moved
+  // it elsewhere (the room went, a phone) drops the peek.
+  const peekWidth = layout.mode === 'full' && layout.canDock ? liveWidth : null;
+  const dock = (next: number) => setSize({ width: Math.max(minWidth, Math.round(next)), expanded: false });
+
+  const resize = (next: number) => {
+    // Past the content's minimum the panel takes the whole area; dragging
+    // back under it docks again at the dragged width.
+    const expand = next > layout.maxDockedWidth;
+    // Crossing between the column and the whole area is animated, not a
+    // jump. Only for a resize: a page load or room coming back just lands.
+    if (layout.canDock) {
+      if (expand && layout.mode === 'docked') animate('expand');
+      else if (!expand && layout.mode === 'full') animate('collapse');
+    }
+    if (expand) setSize({ width: size.width, expanded: true });
+    else dock(next);
+  };
+
+  let collapsesTo: AppLayoutSidePanelRenderState['collapsesTo'] = null;
+  if (layout.mode === 'full' && layout.canDock) collapsesTo = layout.dockedWidth > minWidth ? 'column' : 'minimum';
+  else if (layout.mode === 'docked' && layout.width > minWidth) collapsesTo = 'minimum';
+
   return {
     ...layout,
     minWidth,
     isOpen,
+    morph,
+    peekWidth,
+    coversContent: layout.mode === 'full' && morph !== 'expand' && peekWidth === null,
+    overlapsContent: morph !== null || peekWidth !== null,
+    endMorph: () => setMorph(null),
+    collapsesTo,
+    collapse: () => {
+      if (collapsesTo === null) return;
+      if (layout.mode === 'full') {
+        // Back to the column it left, at the width it had there.
+        animate('collapse');
+        setSize({ width: size.width, expanded: false });
+      } else {
+        animate('narrow');
+        setSize({ width: minWidth, expanded: false });
+      }
+    },
     toggle: () => setIsOpen(!isOpen),
     close: () => setIsOpen(false),
-    resize: next => {
-      // Past the content's minimum the panel takes the whole area; dragging
-      // back under it docks again at the dragged width.
-      if (next > layout.maxDockedWidth) setSize({ width: size.width, expanded: true });
-      else setSize({ width: Math.max(minWidth, Math.round(next)), expanded: false });
+    resize,
+    drag: (next, fromFull) => {
+      if (!fromFull || !layout.canDock) {
+        resize(next);
+        return;
+      }
+      if (next > layout.maxDockedWidth) {
+        // Wider than a column can be: follow the pointer over the content, which
+        // is laid out at its narrowest (the widest column) underneath.
+        if (!size.expanded || size.width !== layout.maxDockedWidth) {
+          setSize({ width: layout.maxDockedWidth, expanded: true });
+        }
+        setLiveWidth(Math.min(Math.round(next), fullWidth));
+        return;
+      }
+      // Into the column: an ordinary resize that picks up where the peek was.
+      setLiveWidth(null);
+      dock(next);
+    },
+    release: (next, fromFull) => {
+      if (!fromFull || !layout.canDock || next <= layout.maxDockedWidth) return;
+      setLiveWidth(null);
+      // Settle on the nearer of the two: back into the whole area, or the widest
+      // column. Either way from where the pointer left it, animated.
+      if (next > (layout.maxDockedWidth + fullWidth) / 2) {
+        animate('expand');
+      } else {
+        animate('collapse');
+        dock(layout.maxDockedWidth);
+      }
     },
   };
 }
@@ -290,8 +402,8 @@ interface SidePanelResizeHandleProps {
 }
 
 function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandleProps) {
-  const { width, minWidth, maxDockedWidth, mode, resize } = state;
-  const startRef = useRef<{ x: number; width: number } | null>(null);
+  const { width, minWidth, maxDockedWidth, mode, peekWidth, resize, drag, release } = state;
+  const startRef = useRef<{ x: number; width: number; fromFull: boolean } | null>(null);
   // Pointer moves outpace frames; resize once per frame with the latest one.
   const frameRef = useRef<number | null>(null);
   const pendingRef = useRef<number | null>(null);
@@ -307,19 +419,23 @@ function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandle
     [],
   );
 
-  const scheduleResize = (next: number) => {
+  const scheduleDrag = (next: number, fromFull: boolean) => {
     pendingRef.current = next;
     if (frameRef.current !== null) return;
     frameRef.current = requestAnimationFrame(() => {
       frameRef.current = null;
-      if (pendingRef.current !== null) resize(pendingRef.current);
+      if (pendingRef.current !== null) drag(pendingRef.current, fromFull);
     });
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 && event.pointerType === 'mouse') return;
     event.preventDefault();
-    startRef.current = { x: event.clientX, width: current };
+    // From the whole area the drag starts at the panel's real width, so its
+    // edge stays under the pointer instead of jumping to the widest column.
+    const fromFull = mode === 'full' && measured;
+    startRef.current = { x: event.clientX, width: fromFull ? (peekWidth ?? width) : current, fromFull };
+    pendingRef.current = null;
     event.currentTarget.setPointerCapture(event.pointerId);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
@@ -329,12 +445,21 @@ function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandle
     const start = startRef.current;
     if (!start) return;
     // The handle sits on the panel's left edge: dragging left widens it.
-    scheduleResize(start.width - (event.clientX - start.x));
+    scheduleDrag(start.width - (event.clientX - start.x), start.fromFull);
   };
 
   const endDrag = (event: PointerEvent<HTMLDivElement>) => {
-    if (!startRef.current) return;
+    const start = startRef.current;
+    if (!start) return;
     startRef.current = null;
+    // Land the last move before deciding where the panel settles.
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+      if (pendingRef.current !== null) drag(pendingRef.current, start.fromFull);
+    }
+    if (pendingRef.current !== null) release(pendingRef.current, start.fromFull);
+    pendingRef.current = null;
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {
@@ -391,9 +516,22 @@ interface AppLayoutSidePanelProps {
 
 export function AppLayoutSidePanel({ config, state }: AppLayoutSidePanelProps) {
   const panelId = useId();
-  const { mode, width, canDock, isOpen, close } = state;
+  const { mode, width, dockedWidth, canDock, isOpen, close, morph, endMorph, peekWidth } = state;
+
+  // A safety net only: `transitionend` does not fire when the width ends up
+  // unchanged (a resize that lands where it started). Generous, so a busy or
+  // throttled page still finishes the animation before the content is hidden.
+  useEffect(() => {
+    if (!morph) return undefined;
+    const timer = window.setTimeout(endMorph, MORPH_MS * 3);
+    return () => window.clearTimeout(timer);
+  }, [morph, endMorph]);
+
   if (mode === 'hidden') return null;
   const label = config.label ?? 'Side panel';
+  // The column's footprint: docked, and while growing over the content, which
+  // stays laid out at its width until the panel covers it.
+  const inColumn = mode === 'docked' || morph === 'expand' || peekWidth !== null;
 
   // Opened from the header: Escape puts it away again.
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -408,29 +546,47 @@ export function AppLayoutSidePanel({ config, state }: AppLayoutSidePanelProps) {
       aria-label={label}
       onKeyDown={handleKeyDown}
       className={cn(
-        'relative flex min-w-0',
+        'relative min-w-0',
         // Docked is decided before the viewport is known (server render, first
         // paint): keep it off phones until JS says otherwise.
-        mode === 'docked' && 'hidden shrink-0 py-[var(--spacing-system-mf)] pr-[var(--spacing-system-mf)] md:flex',
-        mode === 'full' && 'flex-1 p-[var(--spacing-system-mf)]',
+        mode !== 'overlay' && inColumn && 'hidden shrink-0 md:block',
+        mode !== 'overlay' && !inColumn && 'flex-1',
         mode === 'overlay' && 'absolute inset-0 z-[103] bg-ods-bg',
       )}
-      style={mode === 'docked' ? { width: width + SIDE_PANEL_INSET } : undefined}
+      style={mode !== 'overlay' && inColumn ? { width: dockedWidth + SIDE_PANEL_INSET } : undefined}
     >
-      {canDock && <SidePanelResizeHandle state={state} label={`Resize ${label}`} controls={panelId} />}
+      {/* Pinned to the right edge with an explicit width, so the move between
+          the column and the whole area is one animated width. */}
       <div
+        onTransitionEnd={event => {
+          if (event.target === event.currentTarget) endMorph();
+        }}
+        onTransitionCancel={event => {
+          if (event.target === event.currentTarget) endMorph();
+        }}
         className={cn(
-          'flex min-h-0 min-w-0 flex-1 overflow-hidden bg-ods-bg',
-          mode !== 'overlay' && 'rounded-md border border-ods-border',
+          'absolute flex',
+          mode === 'overlay' ? 'inset-0' : 'inset-y-[var(--spacing-system-mf)] right-[var(--spacing-system-mf)] z-[1]',
+          morph && 'transition-[width] duration-300 ease-in-out motion-reduce:transition-none',
         )}
+        style={mode === 'overlay' ? undefined : { width: peekWidth ?? width }}
       >
-        {config.children({
-          width,
-          mode,
-          canClose: mode === 'overlay' || (mode === 'full' && !canDock),
-          close,
-          collapse: () => state.resize(state.minWidth),
-        })}
+        {canDock && <SidePanelResizeHandle state={state} label={`Resize ${label}`} controls={panelId} />}
+        <div
+          className={cn(
+            'flex min-h-0 min-w-0 flex-1 overflow-hidden bg-ods-bg',
+            mode !== 'overlay' && 'rounded-md border border-ods-border',
+          )}
+        >
+          {config.children({
+            width,
+            mode,
+            canClose: mode === 'overlay' || (mode === 'full' && !canDock),
+            close,
+            collapsesTo: state.collapsesTo,
+            collapse: state.collapse,
+          })}
+        </div>
       </div>
     </aside>
   );

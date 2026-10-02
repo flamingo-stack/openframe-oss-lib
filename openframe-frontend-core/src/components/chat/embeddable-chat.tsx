@@ -352,10 +352,16 @@ export interface EmbeddableChatProps {
   appearance?: ChatAppearance;
 
   /**
-   * v2: collapse the chat back to the list alone (the host shrinks its panel to
-   * the list's width). Adds the →| control while the list and the chat both fit.
+   * v2: the →| control, shown while the list and the chat both fit. The host
+   * steps its panel back one size (see `collapseTo`).
    */
   onCollapse?: () => void;
+  /**
+   * v2: what `onCollapse` leaves room for. `list` (default): the list alone, so
+   * an open chat is closed first. `column`: a narrower panel that still shows
+   * the open chat, which stays open.
+   */
+  collapseTo?: 'list' | 'column';
 
   /** v2: the status glyph at the end of a chat's row (working / unread / approval). */
   dialogStatusOf?: (dialog: DialogItem) => MingoDialogStatus | undefined;
@@ -1015,6 +1021,7 @@ function EmbeddableChatInner({
   closable = true,
   appearance = CHAT_APPEARANCE.CLASSIC,
   onCollapse,
+  collapseTo = 'list',
   dialogStatusOf,
   userDisplayName,
   userAvatarUrl,
@@ -2336,7 +2343,7 @@ function EmbeddableChatInner({
               ? () => {
                   // The minimum is the list alone: a conversation left open
                   // would take the narrow panel instead.
-                  if (hasConversation) headerOnBack();
+                  if (collapseTo === 'list' && hasConversation) headerOnBack();
                   onCollapse();
                 }
               : undefined

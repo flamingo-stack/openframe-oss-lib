@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppLayout } from '../app-layout';
 
@@ -6,6 +6,25 @@ import { AppLayout } from '../app-layout';
 // content and the panel share has a size to decide on.
 function setLayoutWidth(width: number) {
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+}
+
+// No animation: the panel lands in the whole area at once.
+function preferReducedMotion() {
+  const original = window.matchMedia;
+  vi.spyOn(window, 'matchMedia').mockImplementation(query =>
+    query.includes('prefers-reduced-motion')
+      ? ({
+          matches: true,
+          media: query,
+          onchange: null,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+          addListener: () => undefined,
+          removeListener: () => undefined,
+          dispatchEvent: () => false,
+        } as MediaQueryList)
+      : original(query),
+  );
 }
 
 function renderLayout(collapsed = false) {
@@ -51,6 +70,7 @@ describe('AppLayout side panel', () => {
   });
 
   it('resizes from the keyboard and takes the whole area past the content minimum', () => {
+    preferReducedMotion();
     setLayoutWidth(1224);
     renderLayout();
     const handle = screen.getByRole('separator', { name: 'Resize Mingo' });
@@ -61,6 +81,84 @@ describe('AppLayout side panel', () => {
     expect(screen.getByRole('main', { hidden: true })).toHaveClass('hidden');
     fireEvent.keyDown(handle, { key: 'Home' });
     expect(screen.getByText('panel docked 296')).toBeInTheDocument();
+  });
+
+  it('grows over the content before hiding it, and shows it again at once on the way back', () => {
+    vi.useFakeTimers();
+    try {
+      setLayoutWidth(1224);
+      renderLayout();
+      const handle = screen.getByRole('separator', { name: 'Resize Mingo' });
+      fireEvent.keyDown(handle, { key: 'End' });
+      expect(screen.getByText(/panel full/)).toBeInTheDocument();
+      // Still laid out under the growing panel, with its layers kept below it.
+      expect(screen.getByRole('main')).not.toHaveClass('hidden');
+      expect(screen.getByRole('main')).toHaveClass('isolate');
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByRole('main', { hidden: true })).toHaveClass('hidden');
+
+      fireEvent.keyDown(handle, { key: 'Home' });
+      expect(screen.getByText('panel docked 296')).toBeInTheDocument();
+      expect(screen.getByRole('main')).not.toHaveClass('hidden');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('follows the pointer out of the whole area and settles on the nearer of the two', async () => {
+    preferReducedMotion();
+    // jsdom has no pointer capture.
+    Object.assign(HTMLElement.prototype, { setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() });
+    window.localStorage.setItem('test:side-panel', JSON.stringify({ width: 520, expanded: true }));
+    setLayoutWidth(1224);
+    renderLayout();
+    const handle = screen.getByRole('separator', { name: 'Resize Mingo' });
+    const fullWidth = 1224 - 2 * 16;
+    const widestColumn = 1224 - 400 - 16;
+
+    // Barely moved: the panel narrows under the pointer, the content shows
+    // beneath it, and letting go returns it to the whole area.
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 100 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 150 });
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: 150 });
+    expect(screen.getByText(`panel full ${fullWidth}`)).toBeInTheDocument();
+
+    // Past halfway to the widest column: it settles there.
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 100 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 400 });
+    // Moves land once per frame.
+    await act(() => new Promise(resolve => requestAnimationFrame(() => resolve(undefined))));
+    expect(screen.getByRole('main')).not.toHaveClass('hidden');
+    expect(screen.getByText(`panel full ${fullWidth}`)).toBeInTheDocument();
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: 400 });
+    expect(screen.getByText(`panel docked ${widestColumn}`)).toBeInTheDocument();
+  });
+
+  it('collapses one step at a time: the whole area back to its column, then the minimum', () => {
+    preferReducedMotion();
+    window.localStorage.setItem('test:side-panel', JSON.stringify({ width: 520, expanded: true }));
+    setLayoutWidth(1224);
+    render(
+      <AppLayout
+        sidebarConfig={{ items: [], onNavigate: () => undefined }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        sidePanel={{
+          label: 'Mingo',
+          storageKey: 'test:side-panel',
+          children: ({ mode, width, collapsesTo, collapse }) => (
+            <button type="button" onClick={collapse}>
+              {`${mode} ${width} to ${collapsesTo ?? 'none'}`}
+            </button>
+          ),
+        }}
+      >
+        <h1>Page</h1>
+      </AppLayout>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^full \d+ to column$/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'docked 520 to minimum' }));
+    expect(screen.getByRole('button', { name: 'docked 296 to none' })).toBeInTheDocument();
   });
 
   it('moves behind the header button without room to dock', () => {
