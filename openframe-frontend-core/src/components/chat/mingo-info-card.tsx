@@ -7,6 +7,7 @@ import { personInitials } from '../../utils/format';
 import { Ellipsis01Icon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
 import { tagVariants, type TagProps } from '../ui/tag';
+import { Button } from '@flamingo-stack/openframe-frontend-core';
 
 // =============================================================================
 // Types
@@ -198,9 +199,9 @@ export function MingoInfoCard({
           {content}
         </a>
       ) : onClick ? (
-        <button type="button" onClick={onClick} className={contentClass}>
+        <Button variant="ghost" onClick={onClick} className={contentClass}>
           {content}
-        </button>
+        </Button>
       ) : (
         <span className={contentClass}>{content}</span>
       )}

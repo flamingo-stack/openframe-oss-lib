@@ -22,6 +22,7 @@
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Button } from '@flamingo-stack/openframe-frontend-core';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { PackagePlusIcon } from '../icons-v2-generated/coding/package-plus-icon';
@@ -341,10 +342,14 @@ export function ChatContextPicker({
       ) : activeType ? (
         /* Level 2 — Back + search + HOST-rendered items (Figma 31:29102). */
         <>
-          <button type="button" onClick={backToTypes} className={cn(CONTEXT_BACK_CLASS, 'sticky top-0 z-10')}>
+          <Button
+            variant="ghost"
+            onClick={backToTypes}
+            className={cn(CONTEXT_BACK_CLASS, 'sticky top-0 z-10')}
+          >
             <Chevron02LeftIcon size={24} className="shrink-0" />
             <span className="truncate">Back</span>
-          </button>
+          </Button>
 
           <div className="flex shrink-0 items-center gap-2 border-b border-ods-border bg-ods-card p-3">
             <SearchIcon className="size-4 shrink-0 text-ods-text-secondary md:size-6" />
