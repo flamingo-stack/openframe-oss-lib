@@ -89,4 +89,18 @@ class ForceClientUninstallServiceTest {
         verifyNoInteractions(clientUninstallNatsPublisher);
         assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.PROCESSED);
     }
+
+    @Test
+    void process_flagOnUninstallAlreadyAcknowledged_notDispatchedAgain() {
+        // setup
+        machine.setStatus(DeviceStatus.PENDING_DELETION);
+        when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UNINSTALL)).thenReturn(true);
+
+        // execution
+        ForceClientUninstallResponse response = service.process(request);
+
+        // verifications
+        verifyNoInteractions(deliveryDispatcher, clientUninstallNatsPublisher);
+        assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.PROCESSED);
+    }
 }

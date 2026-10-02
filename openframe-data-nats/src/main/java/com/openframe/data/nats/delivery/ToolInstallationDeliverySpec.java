@@ -1,8 +1,6 @@
 package com.openframe.data.nats.delivery;
 
-import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
@@ -42,11 +40,6 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
     }
 
     @Override
-    public boolean canDispatch(ToolInstallationDeliverySeed seed) {
-        return true;
-    }
-
-    @Override
     public DeliveryRequest<ToolInstallationMessage> request(ToolInstallationDeliverySeed seed) {
         IntegratedToolAgent toolAgent = seed.getToolAgent();
         ToolInstallationMessage message = buildMessage(toolAgent, seed.getTool(), seed.isReinstall());
@@ -61,16 +54,6 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
     @Override
     public String subject(String machineId) {
         return format(SUBJECT_TEMPLATE, machineId);
-    }
-
-    @Override
-    public void onAcked(MachineDelivery delivery) {
-        // nothing to do: an install in progress changes nothing on the machine document
-    }
-
-    @Override
-    public void onFailed(MachineDelivery delivery, DeliveryFailure failure) {
-        // nothing to compensate: a failed install leaves the machine as it was
     }
 
     private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {

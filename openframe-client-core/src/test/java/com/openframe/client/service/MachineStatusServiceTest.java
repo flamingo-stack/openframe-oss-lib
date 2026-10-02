@@ -224,4 +224,69 @@ class MachineStatusServiceTest {
         verify(machineRepository, never()).save(any(Machine.class));
         verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
+
+    @Test
+    void markDeletionAcknowledged_machineInService_pendingDeletion() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId(MACHINE);
+        machine.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
+
+        // execution
+        service.markDeletionAcknowledged(MACHINE);
+
+        // verifications
+        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
+        verify(machineRepository).save(machine);
+    }
+
+    @Test
+    void markDeletionAcknowledged_machineAlreadyDeleted_untouched() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId(MACHINE);
+        machine.setStatus(DeviceStatus.DELETED);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
+
+        // execution
+        service.markDeletionAcknowledged(MACHINE);
+
+        // verifications
+        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.DELETED);
+        verify(machineRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelPendingDeletion_machinePendingDeletion_offlineAndTrue() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId(MACHINE);
+        machine.setStatus(DeviceStatus.PENDING_DELETION);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
+
+        // execution
+        boolean handedBack = service.cancelPendingDeletion(MACHINE);
+
+        // verifications
+        assertThat(handedBack).isTrue();
+        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        verify(machineRepository).save(machine);
+    }
+
+    @Test
+    void cancelPendingDeletion_machineNotPendingDeletion_falseAndUntouched() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId(MACHINE);
+        machine.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
+
+        // execution
+        boolean handedBack = service.cancelPendingDeletion(MACHINE);
+
+        // verifications
+        assertThat(handedBack).isFalse();
+        verify(machineRepository, never()).save(any());
+    }
 }

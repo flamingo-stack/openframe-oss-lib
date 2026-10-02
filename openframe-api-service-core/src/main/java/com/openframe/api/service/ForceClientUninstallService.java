@@ -63,9 +63,8 @@ public class ForceClientUninstallService {
                 return buildResponseItem(machineId, ForceAgentStatus.FAILED);
             }
 
-            // the machine leaves service on the agent's ACK (spec.onAcked), not here: the sweep needs its real status to retry
             if (deliveryProperties.isEnabled(DeliveryType.CLIENT_UNINSTALL)) {
-                deliveryDispatcher.dispatch(new ClientUninstallDeliverySeed(machineId));
+                dispatch(machine);
                 return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
             }
 
@@ -78,6 +77,17 @@ public class ForceClientUninstallService {
             log.error("Failed to publish client uninstall command for machine {}", machineId, e);
             return buildResponseItem(machineId, ForceAgentStatus.FAILED);
         }
+    }
+
+    // the machine leaves service when the agent acknowledges (client-service, on DeliveryAckedEvent), not here: the sweep
+    // needs its real status to retry. PENDING_DELETION therefore means an uninstall is already on the machine
+    private void dispatch(Machine machine) {
+        String machineId = machine.getMachineId();
+        if (machine.getStatus() == PENDING_DELETION) {
+            log.info("Client uninstall already in progress for machine {}", machineId);
+            return;
+        }
+        deliveryDispatcher.dispatch(new ClientUninstallDeliverySeed(machineId));
     }
 
     private void markPendingDeletion(Machine machine) {
