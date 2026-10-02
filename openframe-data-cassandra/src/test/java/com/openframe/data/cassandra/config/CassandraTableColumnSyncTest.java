@@ -8,7 +8,6 @@ import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,18 +39,14 @@ class CassandraTableColumnSyncTest {
 
     private static final String KEYSPACE = "openframe_test";
     private static final Duration SCHEMA_CHANGE_TIMEOUT = Duration.ofSeconds(30);
-    private static final CqlIdentifier UNIFIED_LOGS = CqlIdentifier.fromCql("unified_logs");
-    private static final String[] COLUMNS_BEFORE_RUN_ORIGIN = {
-            "user_id", "device_id", "hostname", "nickname", "organization_id", "organization_name",
-            "severity", "message", "debezium_message", "details"};
-    private static final String[] ALL_COLUMNS = {
-            "user_id", "device_id", "hostname", "nickname", "execution_source", "script_creation_source",
-            "organization_id", "organization_name", "severity", "message", "debezium_message", "details"};
+    private static final CqlIdentifier SYNCED_ROWS = CqlIdentifier.fromCql("synced_rows");
+    private static final String[] COLUMNS_BEFORE_THE_ADDED_ONES = {"kept_column"};
+    private static final String[] ALL_COLUMNS = {"kept_column", "added_column", "other_added_column"};
 
     @Mock private CqlSession session;
     @Mock private Metadata metadata;
     @Mock private KeyspaceMetadata keyspace;
-    @Mock private TableMetadata unifiedLogs;
+    @Mock private TableMetadata syncedRows;
     @Mock private ColumnMetadata column;
 
     @Captor private ArgumentCaptor<SimpleStatement> statementCaptor;
@@ -61,7 +56,7 @@ class CassandraTableColumnSyncTest {
     @BeforeEach
     void setUp() {
         CassandraMappingContext mappingContext = new CassandraMappingContext();
-        mappingContext.setInitialEntitySet(Set.of(UnifiedLogEvent.class));
+        mappingContext.setInitialEntitySet(Set.of(SyncedRow.class));
         mappingContext.afterPropertiesSet();
         MappingCassandraConverter converter = new MappingCassandraConverter(mappingContext);
         converter.afterPropertiesSet();
@@ -70,10 +65,10 @@ class CassandraTableColumnSyncTest {
     }
 
     @Test
-    void afterSingletonsInstantiated_runOriginColumnsMissing_addsEachWithIfNotExists() {
+    void afterSingletonsInstantiated_columnsMissing_addsEachWithIfNotExists() {
         // setup
         stubKeyspace();
-        stubUnifiedLogs(COLUMNS_BEFORE_RUN_ORIGIN);
+        stubSyncedRows(COLUMNS_BEFORE_THE_ADDED_ONES);
 
         // execution
         sync.afterSingletonsInstantiated();
@@ -83,15 +78,15 @@ class CassandraTableColumnSyncTest {
         assertThat(statementCaptor.getAllValues())
                 .extracting(SimpleStatement::getQuery)
                 .containsExactlyInAnyOrder(
-                        "ALTER TABLE openframe_test.unified_logs ADD IF NOT EXISTS execution_source text",
-                        "ALTER TABLE openframe_test.unified_logs ADD IF NOT EXISTS script_creation_source text");
+                        "ALTER TABLE openframe_test.synced_rows ADD IF NOT EXISTS added_column text",
+                        "ALTER TABLE openframe_test.synced_rows ADD IF NOT EXISTS other_added_column text");
     }
 
     @Test
     void afterSingletonsInstantiated_columnAdded_usesSchemaChangeTimeout() {
         // setup
         stubKeyspace();
-        stubUnifiedLogs(COLUMNS_BEFORE_RUN_ORIGIN);
+        stubSyncedRows(COLUMNS_BEFORE_THE_ADDED_ONES);
 
         // execution
         sync.afterSingletonsInstantiated();
@@ -107,7 +102,7 @@ class CassandraTableColumnSyncTest {
     void afterSingletonsInstantiated_allColumnsPresent_altersNothing() {
         // setup
         stubKeyspace();
-        stubUnifiedLogs(ALL_COLUMNS);
+        stubSyncedRows(ALL_COLUMNS);
 
         // execution
         sync.afterSingletonsInstantiated();
@@ -121,7 +116,7 @@ class CassandraTableColumnSyncTest {
     void afterSingletonsInstantiated_tableNotCreatedYet_skipsIt() {
         // setup
         stubKeyspace();
-        when(keyspace.getTable(UNIFIED_LOGS)).thenReturn(Optional.empty());
+        when(keyspace.getTable(SYNCED_ROWS)).thenReturn(Optional.empty());
 
         // execution
         sync.afterSingletonsInstantiated();
@@ -149,7 +144,7 @@ class CassandraTableColumnSyncTest {
     void afterSingletonsInstantiated_alterTimesOut_startupSurvives() {
         // setup
         stubKeyspace();
-        stubUnifiedLogs(COLUMNS_BEFORE_RUN_ORIGIN);
+        stubSyncedRows(COLUMNS_BEFORE_THE_ADDED_ONES);
         when(session.execute(any(SimpleStatement.class))).thenThrow(new DriverTimeoutException("Query timed out after PT2S"));
 
         // execution & verifications
@@ -161,10 +156,10 @@ class CassandraTableColumnSyncTest {
         when(metadata.getKeyspace(KEYSPACE)).thenReturn(Optional.of(keyspace));
     }
 
-    private void stubUnifiedLogs(String... existingColumns) {
+    private void stubSyncedRows(String... existingColumns) {
         Map<CqlIdentifier, ColumnMetadata> columns = Stream.of(existingColumns)
                 .collect(Collectors.toMap(CqlIdentifier::fromCql, existing -> column));
-        when(keyspace.getTable(UNIFIED_LOGS)).thenReturn(Optional.of(unifiedLogs));
-        when(unifiedLogs.getColumns()).thenReturn(columns);
+        when(keyspace.getTable(SYNCED_ROWS)).thenReturn(Optional.of(syncedRows));
+        when(syncedRows.getColumns()).thenReturn(columns);
     }
 }

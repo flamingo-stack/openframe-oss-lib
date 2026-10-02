@@ -2,9 +2,10 @@ package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
-import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
+import com.openframe.data.loki.client.LokiClient;
+import com.openframe.data.loki.toolevent.ToolEventLog;
+import com.openframe.data.loki.toolevent.ToolEventLogRepository;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.IntegratedToolEvent;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
@@ -14,14 +15,17 @@ import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Captor;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.util.unit.DataSize;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,43 +35,35 @@ class LogEventExecutionSourcePropagationTest {
     private static final String MACHINE_ID = "6d925893-702a-4223-b62f-2f80b927cbaa";
     private static final String ADMIN_ID = "admin-7";
 
-    @Mock private UnifiedLogEventRepository repository;
+    @Spy private ToolEventLogRepository repository = new ToolEventLogRepository(mock(LokiClient.class));
     @Mock private OssTenantRetryingKafkaProducer producer;
 
-    @Captor private ArgumentCaptor<UnifiedLogEvent> logEventCaptor;
+    @Captor private ArgumentCaptor<ToolEventLog> logEventCaptor;
     @Captor private ArgumentCaptor<IntegratedToolEvent> toolEventCaptor;
 
     @Test
-    @DisplayName("Cassandra sink: executionSource, scriptCreationSource and the initiator reach unified_logs")
-    void cassandraHandler_writesRunOriginFields() {
-        // setup
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
-
+    @DisplayName("Loki sink: executionSource, scriptCreationSource and the initiator reach the saved log")
+    void handle_scriptRunWithOrigin_writesOriginAndInitiatorToLoki() {
         // execution
-        handler.handle(message(), enriched("AI_ASSISTANT", "MANUAL"));
+        lokiHandler().handle(message(), enriched("AI_ASSISTANT", "MANUAL"));
 
         // verifications
         verify(repository).save(logEventCaptor.capture());
         assertThat(logEventCaptor.getValue())
-                .extracting(UnifiedLogEvent::getExecutionSource, UnifiedLogEvent::getScriptCreationSource, UnifiedLogEvent::getUserId)
+                .extracting(ToolEventLog::getExecutionSource, ToolEventLog::getScriptCreationSource, ToolEventLog::getUserId)
                 .containsExactly("AI_ASSISTANT", "MANUAL", ADMIN_ID);
     }
 
     @Test
-    @DisplayName("Cassandra sink: a non-script event leaves both origin fields null")
-    void cassandraHandler_noOrigin_writesNulls() {
-        // setup
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
-
+    @DisplayName("Loki sink: a non-script event leaves both origin fields null")
+    void handle_eventWithoutOrigin_writesNullOriginToLoki() {
         // execution
-        handler.handle(message(), enriched(null, null));
+        lokiHandler().handle(message(), enriched(null, null));
 
         // verifications
         verify(repository).save(logEventCaptor.capture());
         assertThat(logEventCaptor.getValue())
-                .extracting(UnifiedLogEvent::getExecutionSource, UnifiedLogEvent::getScriptCreationSource)
+                .extracting(ToolEventLog::getExecutionSource, ToolEventLog::getScriptCreationSource)
                 .containsExactly(null, null);
     }
 
@@ -86,6 +82,11 @@ class LogEventExecutionSourcePropagationTest {
         assertThat(toolEventCaptor.getValue())
                 .extracting(IntegratedToolEvent::getExecutionSource, IntegratedToolEvent::getScriptCreationSource)
                 .containsExactly("SCHEDULED", "AI_ASSISTANT");
+    }
+
+    private DebeziumLokiMessageHandler lokiHandler() {
+        return new DebeziumLokiMessageHandler(
+                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator(), DataSize.ofKilobytes(256));
     }
 
     private static DeserializedDebeziumMessage message() {

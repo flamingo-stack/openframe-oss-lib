@@ -5,11 +5,17 @@ import com.openframe.data.loki.model.LokiLogEntry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.util.HashMap;
@@ -24,8 +30,8 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class LokiClientTest {
@@ -88,25 +94,37 @@ class LokiClientTest {
         server.verify();
     }
 
-    @Test
-    @DisplayName("a rejected query is not a server fault: retrying it unchanged would hit the same limit")
-    void reportsAFourHundredAsARejectionRatherThanAFailure() {
+    @ParameterizedTest
+    @ValueSource(ints = {400, 404, 413, 429, 499})
+    void queryRange_lokiAnswersAClientError_throwsRejectedWithStatusAndReason(int status) {
         server.expect(requestTo(startsWith("http://loki.test/")))
-                .andRespond(withBadRequest().body("the query would read too many bytes"));
+                .andRespond(withStatus(HttpStatusCode.valueOf(status)).body("the query would read too many bytes"));
 
         assertThatThrownBy(() -> client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD))
-                .isInstanceOf(LokiQueryRejectedException.class)
-                .hasMessageContaining("too many bytes");
+                .isExactlyInstanceOf(LokiQueryRejectedException.class)
+                .hasMessage("Loki query failed with HTTP " + status + ": the query would read too many bytes")
+                .hasCauseInstanceOf(RestClientResponseException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {500, 502, 503, 504})
+    void queryRange_lokiAnswersAServerError_throwsPlainQueryFailureWithStatusAndReason(int status) {
+        server.expect(requestTo(startsWith("http://loki.test/")))
+                .andRespond(withStatus(HttpStatusCode.valueOf(status)).body("ingester unavailable"));
+
+        assertThatThrownBy(() -> client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD))
+                .isExactlyInstanceOf(LokiQueryException.class)
+                .hasMessage("Loki query failed with HTTP " + status + ": ingester unavailable")
+                .hasCauseInstanceOf(RestClientResponseException.class);
     }
 
     @Test
-    void reportsAServerErrorAsAPlainFailure() {
+    void queryRange_errorBodyOf501Chars_keepsTheFirst500() {
         server.expect(requestTo(startsWith("http://loki.test/")))
-                .andRespond(withServerError().body("ingester unavailable"));
+                .andRespond(withStatus(HttpStatusCode.valueOf(400)).body("a".repeat(500) + "b"));
 
         assertThatThrownBy(() -> client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD))
-                .isInstanceOf(LokiQueryException.class)
-                .isNotInstanceOf(LokiQueryRejectedException.class);
+                .hasMessage("Loki query failed with HTTP 400: " + "a".repeat(500) + "...");
     }
 
     @Test
@@ -145,14 +163,111 @@ class LokiClientTest {
     }
 
     @Test
-    void wrapsLokiErrorsWithStatusAndBody() {
+    void queryRange_connectionFails_throwsQueryFailureWithTheCause() {
         server.expect(requestTo(startsWith("http://loki.test/")))
-                .andRespond(withBadRequest().body("parse error at line 1").contentType(MediaType.TEXT_PLAIN));
+                .andRespond(withException(new IOException("connection refused")));
 
-        assertThatThrownBy(() -> client.queryRange("{", 0, 1, 1, LokiDirection.BACKWARD))
-                .isInstanceOf(LokiQueryException.class)
-                .hasMessageContaining("HTTP 400")
-                .hasMessageContaining("parse error");
+        assertThatThrownBy(() -> client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD))
+                .isExactlyInstanceOf(LokiQueryException.class)
+                .hasMessageStartingWith("Loki query failed: I/O error on GET request")
+                .hasMessageEndingWith("connection refused")
+                .hasCauseInstanceOf(ResourceAccessException.class);
+    }
+
+    @Test
+    void queryRange_resultIsNotLogStreams_throwsQueryFailureNamingTheType() {
+        server.expect(requestTo(startsWith("http://loki.test/")))
+                .andRespond(withSuccess("{\"status\":\"success\",\"data\":{\"resultType\":\"matrix\",\"result\":[]}}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD))
+                .isExactlyInstanceOf(LokiQueryException.class)
+                .hasMessage("Expected a log query result, got: matrix");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"status\":\"success\"}",
+            "{\"status\":\"success\",\"data\":{\"resultType\":\"streams\"}}"})
+    void queryRange_responseWithoutResult_returnsNoEntries(String response) {
+        server.expect(requestTo(startsWith("http://loki.test/")))
+                .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
+
+        assertThat(client.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD)).isEmpty();
+    }
+
+    @Test
+    void queryRange_forwardDirection_asksForwardAndReturnsOldestFirst() {
+        server.expect(requestTo(startsWith("http://loki.test/loki/api/v1/query_range")))
+                .andExpect(request -> assertThat(queryParams(request.getURI())).containsEntry("direction", "forward"))
+                .andRespond(withSuccess("""
+                        {"status":"success","data":{"resultType":"streams","result":[
+                          {"stream":{"level":"INFO"},"values":[["300","c"],["100","a"]]},
+                          {"stream":{"level":"ERROR"},"values":[["200","b"]]}
+                        ]}}
+                        """, MediaType.APPLICATION_JSON));
+
+        List<LokiLogEntry> entries = client.queryRange("{job=\"x\"}", 0, 400, 10, LokiDirection.FORWARD);
+
+        assertThat(entries).extracting(LokiLogEntry::line).containsExactly("a", "b", "c");
+    }
+
+    @Test
+    void queryRange_entriesShareATimestamp_ordersThemByLabelsThenLine() {
+        server.expect(requestTo(startsWith("http://loki.test/")))
+                .andRespond(withSuccess("""
+                        {"status":"success","data":{"resultType":"streams","result":[
+                          {"stream":{"level":"INFO"},"values":[["100","z"],["100","y"]]},
+                          {"stream":{"level":"ERROR"},"values":[["100","x"]]}
+                        ]}}
+                        """, MediaType.APPLICATION_JSON));
+
+        List<LokiLogEntry> entries = client.queryRange("{job=\"x\"}", 0, 400, 10, LokiDirection.BACKWARD);
+
+        assertThat(entries).extracting(LokiLogEntry::line).containsExactly("x", "y", "z");
+    }
+
+    @Test
+    void queryRange_streamWithoutValuesOrLabelsOrWithAShortValue_keepsOnlyCompleteEntries() {
+        server.expect(requestTo(startsWith("http://loki.test/")))
+                .andRespond(withSuccess("""
+                        {"status":"success","data":{"resultType":"streams","result":[
+                          {"stream":{"level":"INFO"}},
+                          {"values":[["100","kept"],["200"],null]}
+                        ]}}
+                        """, MediaType.APPLICATION_JSON));
+
+        List<LokiLogEntry> entries = client.queryRange("{job=\"x\"}", 0, 400, 10, LokiDirection.BACKWARD);
+
+        assertThat(entries).containsExactly(new LokiLogEntry(100, "kept", Map.of()));
+    }
+
+    @Test
+    void queryRange_byteCapWithSpacesAround_sendsItTrimmed() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://loki.test");
+        MockRestServiceServer capped = MockRestServiceServer.bindTo(builder).build();
+        LokiClient cappedClient = new LokiClient(builder.build(), " 5GB ");
+        capped.expect(requestTo(startsWith("http://loki.test/loki/api/v1/query_range")))
+                .andExpect(header(LokiHttpApi.QUERY_LIMITS_HEADER, "{\"maxQueryBytesRead\":\"5GB\"}"))
+                .andRespond(withSuccess(EMPTY_RESPONSE, MediaType.APPLICATION_JSON));
+
+        cappedClient.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD);
+
+        capped.verify();
+    }
+
+    @Test
+    void queryRange_blankByteCap_sendsNoLimitsHeader() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://loki.test");
+        MockRestServiceServer uncapped = MockRestServiceServer.bindTo(builder).build();
+        LokiClient uncappedClient = new LokiClient(builder.build(), " ");
+        uncapped.expect(requestTo(startsWith("http://loki.test/loki/api/v1/query_range")))
+                .andExpect(headerDoesNotExist(LokiHttpApi.QUERY_LIMITS_HEADER))
+                .andRespond(withSuccess(EMPTY_RESPONSE, MediaType.APPLICATION_JSON));
+
+        uncappedClient.queryRange("{job=\"x\"}", 0, 1, 1, LokiDirection.BACKWARD);
+
+        uncapped.verify();
     }
 
     private static Map<String, String> queryParams(URI uri) {

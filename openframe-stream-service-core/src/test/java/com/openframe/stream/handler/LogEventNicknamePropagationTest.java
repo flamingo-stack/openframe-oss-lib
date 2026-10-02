@@ -1,9 +1,11 @@
 package com.openframe.stream.handler;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
-import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
+import com.openframe.data.loki.client.LokiClient;
+import com.openframe.data.loki.toolevent.ToolEventLog;
+import com.openframe.data.loki.toolevent.ToolEventLogRepository;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.IntegratedToolEvent;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
@@ -13,15 +15,17 @@ import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.util.unit.DataSize;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 /**
- * The two log sinks must agree: whatever enrichment resolved has to reach both the Cassandra
+ * The two log sinks must agree: whatever enrichment resolved has to reach both the Loki
  * detail row and the Kafka message that Pinot ingests, or the list and detail views disagree.
  */
 class LogEventNicknamePropagationTest {
@@ -32,7 +36,7 @@ class LogEventNicknamePropagationTest {
     private static final String NICKNAME = "Reception iMac";
 
     private static DeserializedDebeziumMessage message() {
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setOperation("c");
         return DeserializedDebeziumMessage.builder()
                 .payload(payload)
@@ -55,36 +59,37 @@ class LogEventNicknamePropagationTest {
         return enriched;
     }
 
-    @Test
-    @DisplayName("Cassandra sink: hostname and nickname are both written to unified_logs")
-    void cassandraHandlerWritesBothNameFields() {
-        UnifiedLogEventRepository repository = mock(UnifiedLogEventRepository.class);
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
-
-        handler.handle(message(), enriched(NICKNAME));
-
-        ArgumentCaptor<UnifiedLogEvent> captor = ArgumentCaptor.forClass(UnifiedLogEvent.class);
-        verify(repository).save(captor.capture());
-        UnifiedLogEvent saved = captor.getValue();
-        assertThat(saved.getHostname()).isEqualTo(HOSTNAME);
-        assertThat(saved.getNickname()).isEqualTo(NICKNAME);
+    private static DebeziumLokiMessageHandler lokiHandler(ToolEventLogRepository repository) {
+        return new DebeziumLokiMessageHandler(
+                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator(), DataSize.ofKilobytes(256));
     }
 
     @Test
-    @DisplayName("Cassandra sink: a machine with no nickname writes a null nickname, not the hostname")
-    void cassandraHandlerWritesNullNicknameWhenAbsent() {
-        UnifiedLogEventRepository repository = mock(UnifiedLogEventRepository.class);
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+    @DisplayName("Loki sink: hostname and nickname are both written to the saved log")
+    void handle_machineWithNickname_writesHostnameAndNicknameToLoki() {
+        ToolEventLogRepository repository = spy(new ToolEventLogRepository(mock(LokiClient.class)));
 
-        handler.handle(message(), enriched(null));
+        lokiHandler(repository).handle(message(), enriched(NICKNAME));
 
-        ArgumentCaptor<UnifiedLogEvent> captor = ArgumentCaptor.forClass(UnifiedLogEvent.class);
+        ArgumentCaptor<ToolEventLog> captor = ArgumentCaptor.forClass(ToolEventLog.class);
         verify(repository).save(captor.capture());
-        UnifiedLogEvent saved = captor.getValue();
-        assertThat(saved.getHostname()).isEqualTo(HOSTNAME);
-        assertThat(saved.getNickname()).isNull();
+        assertThat(captor.getValue())
+                .extracting(ToolEventLog::getHostname, ToolEventLog::getNickname)
+                .containsExactly(HOSTNAME, NICKNAME);
+    }
+
+    @Test
+    @DisplayName("Loki sink: a machine with no nickname writes a null nickname, not the hostname")
+    void handle_machineWithoutNickname_writesNullNicknameToLoki() {
+        ToolEventLogRepository repository = spy(new ToolEventLogRepository(mock(LokiClient.class)));
+
+        lokiHandler(repository).handle(message(), enriched(null));
+
+        ArgumentCaptor<ToolEventLog> captor = ArgumentCaptor.forClass(ToolEventLog.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue())
+                .extracting(ToolEventLog::getHostname, ToolEventLog::getNickname)
+                .containsExactly(HOSTNAME, null);
     }
 
     @Test

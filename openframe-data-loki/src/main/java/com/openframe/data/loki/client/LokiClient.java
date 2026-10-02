@@ -2,7 +2,9 @@ package com.openframe.data.loki.client;
 
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
+import com.openframe.data.loki.model.LokiPushRequest;
 import com.openframe.data.loki.model.LokiQueryResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
@@ -74,17 +76,38 @@ public class LokiClient {
         return toEntries(response, direction);
     }
 
+    public void push(Map<String, String> labels, long timestampNanos, String line, Map<String, String> metadata) {
+        try {
+            api.push(LokiPushRequest.ofSingleEntry(labels, timestampNanos, line, metadata));
+        } catch (RestClientResponseException e) {
+            throw translatePush(e);
+        } catch (RestClientException e) {
+            throw new LokiPushException("Loki push failed: " + e.getMessage(), e);
+        }
+    }
+
+    private static LokiPushException translatePush(RestClientResponseException e) {
+        String message = failureMessage("push", e);
+        return e.getStatusCode().isSameCodeAs(HttpStatus.BAD_REQUEST)
+                ? new LokiPushRejectedException(message, e)
+                : new LokiPushException(message, e);
+    }
+
     /**
      * A 4xx means Loki rejected the request rather than failed on it: over a limit, or - our bug - malformed LogQL.
      * Either way the caller should not retry it unchanged, which a 5xx would invite.
      */
     private static LokiQueryException translate(RestClientResponseException e) {
-        String body = abbreviate(e.getResponseBodyAsString());
-        String message = "Loki query failed with HTTP " + e.getStatusCode().value() + ": " + body;
+        String message = failureMessage("query", e);
         if (e.getStatusCode().is4xxClientError()) {
             return new LokiQueryRejectedException(message, e);
         }
         return new LokiQueryException(message, e);
+    }
+
+    private static String failureMessage(String action, RestClientResponseException e) {
+        return "Loki " + action + " failed with HTTP " + e.getStatusCode().value() + ": "
+                + abbreviate(e.getResponseBodyAsString());
     }
 
     private static List<LokiLogEntry> toEntries(LokiQueryResponse response, LokiDirection direction) {

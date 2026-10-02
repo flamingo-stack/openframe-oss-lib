@@ -1,6 +1,6 @@
 # OpenFrame Data Cassandra
 
-Cassandra integration for OpenFrame services with auto-configuration, health monitoring, and unified log event storage.
+Cassandra integration for OpenFrame services with auto-configuration, health monitoring, and RMM command result storage.
 
 ## Features
 
@@ -8,7 +8,7 @@ Cassandra integration for OpenFrame services with auto-configuration, health mon
 - Auto-creation of keyspace with configurable replication factor
 - Automatic keyspace name normalization (dashes to underscores for tenant IDs)
 - Health indicator for Cassandra connectivity
-- Unified log event model optimized for time-series queries
+- RMM command result model keyed by execution and machine
 
 ## Configuration
 
@@ -37,8 +37,10 @@ spring:
 
 ### Data Model
 
-- **UnifiedLogEvent** - Stored in `unified_logs` table with composite primary key: `ingest_day` + `tool_type` (partition), `event_type` + `event_timestamp` + `tool_event_id` (clustering). Optimized for time-series queries by day and tool type.
-- **UnifiedLogEventRepository** - Spring Data Cassandra repository for CRUD operations on unified log events.
+- **CommandResult** - Stored in `command_results` table with primary key: `execution_id` (partition), `machine_id` (clustering).
+- **CommandResultRepository** - Spring Data Cassandra repository for RMM command results.
+
+Tool event details (the former `unified_logs` table) live in Loki: see `ToolEventLogRepository` in `openframe-data-loki`.
 
 ## Usage
 

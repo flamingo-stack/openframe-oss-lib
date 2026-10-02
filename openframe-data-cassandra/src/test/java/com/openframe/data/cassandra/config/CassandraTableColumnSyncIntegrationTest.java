@@ -1,7 +1,6 @@
 package com.openframe.data.cassandra.config;
 
 import com.datastax.oss.driver.api.core.CqlSession;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,13 +18,8 @@ class CassandraTableColumnSyncIntegrationTest extends BaseCassandraIntegrationTe
 
     private static final String KEYSPACE = "of_column_sync_test";
     private static final int TTL_SECONDS = 60;
-    private static final String CREATE_UNIFIED_LOGS_BEFORE_RUN_ORIGIN = """
-            CREATE TABLE %s.unified_logs (
-                ingest_day text, tool_type text, tenant_id text, event_type text, event_timestamp timestamp,
-                tool_event_id text, user_id text, device_id text, hostname text, nickname text,
-                organization_id text, organization_name text, severity text, message text,
-                debezium_message text, details text,
-                PRIMARY KEY ((ingest_day, tool_type), tenant_id, event_type, event_timestamp, tool_event_id))
+    private static final String CREATE_SYNCED_ROWS_BEFORE_THE_ADDED_COLUMNS = """
+            CREATE TABLE %s.synced_rows (id text PRIMARY KEY, kept_column text)
             """;
 
     private CqlSessionFactoryBean sessionFactory;
@@ -38,11 +32,11 @@ class CassandraTableColumnSyncIntegrationTest extends BaseCassandraIntegrationTe
         sessionFactory = config.cassandraSession();
         sessionFactory.afterPropertiesSet();
         session = sessionFactory.getObject();
-        session.execute("DROP TABLE IF EXISTS " + KEYSPACE + ".unified_logs");
-        session.execute(CREATE_UNIFIED_LOGS_BEFORE_RUN_ORIGIN.formatted(KEYSPACE));
+        session.execute("DROP TABLE IF EXISTS " + KEYSPACE + ".synced_rows");
+        session.execute(CREATE_SYNCED_ROWS_BEFORE_THE_ADDED_COLUMNS.formatted(KEYSPACE));
 
         CassandraMappingContext mappingContext = new CassandraMappingContext();
-        mappingContext.setInitialEntitySet(Set.of(UnifiedLogEvent.class));
+        mappingContext.setInitialEntitySet(Set.of(SyncedRow.class));
         mappingContext.afterPropertiesSet();
         MappingCassandraConverter converter = new MappingCassandraConverter(mappingContext);
         converter.afterPropertiesSet();
@@ -58,7 +52,7 @@ class CassandraTableColumnSyncIntegrationTest extends BaseCassandraIntegrationTe
     }
 
     @Test
-    void afterSingletonsInstantiated_tableProvisionedBeforeRunOriginColumns_addsThem() {
+    void afterSingletonsInstantiated_tableProvisionedBeforeTheAddedColumns_addsThem() {
         // setup
         List<String> before = columnNames();
 
@@ -66,8 +60,8 @@ class CassandraTableColumnSyncIntegrationTest extends BaseCassandraIntegrationTe
         sync.afterSingletonsInstantiated();
 
         // verifications
-        assertThat(before).doesNotContain("execution_source", "script_creation_source");
-        assertThat(columnNames()).contains("execution_source", "script_creation_source");
+        assertThat(before).doesNotContain("added_column", "other_added_column");
+        assertThat(columnNames()).contains("added_column", "other_added_column");
     }
 
     @Test
@@ -85,7 +79,7 @@ class CassandraTableColumnSyncIntegrationTest extends BaseCassandraIntegrationTe
 
     private List<String> columnNames() {
         return session.execute(
-                        "SELECT column_name FROM system_schema.columns WHERE keyspace_name = ? AND table_name = 'unified_logs'",
+                        "SELECT column_name FROM system_schema.columns WHERE keyspace_name = ? AND table_name = 'synced_rows'",
                         KEYSPACE)
                 .all().stream()
                 .map(row -> row.getString("column_name"))
