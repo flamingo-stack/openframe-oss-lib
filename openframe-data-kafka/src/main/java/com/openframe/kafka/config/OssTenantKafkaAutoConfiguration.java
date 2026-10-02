@@ -59,6 +59,8 @@ public class OssTenantKafkaAutoConfiguration {
             template.setDefaultTopic(templateProperties.getDefaultTopic());
         }
 
+        template.setObservationEnabled(true);
+
         return template;
     }
 
@@ -111,6 +113,8 @@ public class OssTenantKafkaAutoConfiguration {
         if (listenerProperties.getLogContainerConfig() != null) {
             factory.getContainerProperties().setLogContainerConfig(listenerProperties.getLogContainerConfig());
         }
+
+        factory.getContainerProperties().setObservationEnabled(true);
 
         return factory;
     }
