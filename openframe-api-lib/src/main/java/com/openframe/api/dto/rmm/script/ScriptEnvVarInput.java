@@ -22,12 +22,7 @@ public class ScriptEnvVarInput {
 
     private String value;
 
-    /**
-     * Whether {@link #value} is sensitive (passwords, API keys, tokens).
-     *
-     * <p>TODO: until the secret-management story (encryption at rest +
-     * secure delivery to agents) lands, secret values are stored in plaintext.
-     * UI / logs / audit are responsible for masking and redaction in the meantime.
-     */
+    // TODO: secret values are stored in plaintext until secret management lands; UI/logs/audit must mask.
     private boolean secret;
 }
+

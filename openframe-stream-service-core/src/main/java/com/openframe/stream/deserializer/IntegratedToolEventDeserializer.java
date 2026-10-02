@@ -62,7 +62,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
                     .unifiedEventType(getEventType(sourceEventType, messageType.getIntegratedToolType()))
                     .message(getMessage(after).orElse(null))
                     .integratedToolType(messageType.getIntegratedToolType())
-                    .debeziumMessage(getDebeziumMessage(after))
+                    .debeziumMessage(getDebeziumMessage(after).orElse(null))
                     .details(detailsJson)
                     .eventTimestamp(eventTimestamp)
                     .skipProcessing(getSkipProcessing(sourceEventType))
@@ -74,9 +74,6 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
         }
     }
 
-    /**
-     * Builds complete details JSON combining error, result, and additional dynamic fields
-     */
     private String buildDetailsJson(JsonNode after) {
         try {
             ObjectNode detailsNode = mapper.createObjectNode();
@@ -143,10 +140,6 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
         return !eventsInvisible.contains(sourceEventType);
     }
 
-    /**
-     * Extract event timestamp from the source data. Override to provide tool-specific implementation.
-     * Returns empty if no timestamp field is available in the event.
-     */
     protected Optional<Long> getSourceEventTimestamp(JsonNode afterField) {
         return Optional.empty();
     }
@@ -155,13 +148,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
         return Optional.empty();
     }
 
-    /**
-     * Tenant discriminator for Fleet CDC rows under shared-DB multitenancy: the {@code team_id}
-     * column stamped by the Fleet fork. Fleet deserializers return it from
-     * {@link #getTenantId(JsonNode)}; the shared cluster's {@code ClusterTenantIdResolver}
-     * maps it to the canonical tenant. Empty for rows written with the flag off (in per-tenant
-     * clusters the enrichment overwrites the tenant from the deployment identity anyway).
-     */
+    // team_id is Fleet's shared-DB multitenancy discriminator; empty here just means the flag is off.
     protected static Optional<String> extractFleetTeamId(JsonNode afterField) {
         if (afterField == null) {
             return Optional.empty();
@@ -173,19 +160,11 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
         return Optional.of(teamId.asText());
     }
 
-    /**
-     * Get effective timestamp for the event - uses event timestamp from source data if available,
-     * falls back to Debezium processing timestamp
-     */
     private long getEffectiveTimestamp(CommonDebeziumMessage message, JsonNode after) {
         return getSourceEventTimestamp(after)
                 .orElse(message.getPayload().getTimestamp());
     }
 
-    /**
-     * Generates composite ID: tool_table_id_value or tool_table_hash_value for missing PKs
-     * Returns deterministic UUID for idempotency
-     */
     private String generateCompositeId(CommonDebeziumMessage message, MessageType messageType, JsonNode after) {
         String toolName = messageType.getIntegratedToolType().name().toLowerCase();
         String tableName = extractTableName(message);
@@ -207,10 +186,6 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
         return uuid.toString();
     }
 
-    /**
-     * Extracts table name from Debezium source metadata
-     * Handles different database types: PostgreSQL/MySQL use "table", MongoDB uses "collection"
-     */
     private String extractTableName(CommonDebeziumMessage message) {
         return Optional.ofNullable(message)
                 .map(CommonDebeziumMessage::getPayload)
@@ -229,51 +204,27 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
                 .orElse(DEFAULT_TABLE_NAME);
     }
 
-    /**
-     * Convert all fields from JsonNode after to Map<String, String>
-     * This method extracts all key-value pairs from the after field and converts them to strings
-     */
-    protected String getDebeziumMessage(JsonNode after) {
+    protected Optional<String> getDebeziumMessage(JsonNode after) {
         if (after == null || after.isNull()) {
-            return null;
+            return Optional.empty();
         }
-        return after.toString();
+        return Optional.of(after.toString());
     }
 
-    /**
-     * Extract standard error details from the event
-     * Override in specific deserializers to populate error information
-     *
-     * @return JSON string for error field, or null if no error information
-     */
     protected String getError(JsonNode after) {
         return null;
     }
 
-    /**
-     * Extract standard result details from the event
-     * Override in specific deserializers to populate result information
-     *
-     * @return JSON string for result field, or null if no result information
-     */
     protected String getResult(JsonNode after) {
         return null;
     }
 
-    /**
-     * Extract additional details that don't fit into error/result
-     * These will be stored as dynamic fields in LogDetails
-     */
     abstract protected String getDetails(JsonNode after);
 
     private UnifiedEventType getEventType(String sourceEventType, IntegratedToolType toolType) {
         return EventTypeMapper.mapToUnifiedType(toolType, sourceEventType);
     }
 
-    /**
-     * Safely extract a string field from a JsonNode.
-     * Shared utility method for consistent field parsing across all deserializers.
-     */
     protected Optional<String> parseStringField(JsonNode node, String fieldName) {
         return Optional.ofNullable(node)
                 .map(n -> n.get(fieldName))
@@ -282,9 +233,6 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
                 .filter(StringUtils::isNotBlank);
     }
 
-    /**
-     * Put a value into an ObjectNode if the value is not null.
-     */
     protected static void putIfPresent(ObjectNode node, String key, Object value) {
         if (value == null) {
             return;
