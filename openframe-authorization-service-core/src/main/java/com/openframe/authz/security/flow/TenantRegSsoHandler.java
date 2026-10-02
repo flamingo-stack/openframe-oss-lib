@@ -9,6 +9,7 @@ import com.openframe.authz.util.SsoAuthentication;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
 import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
+import com.openframe.core.exception.AuthFlowException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,6 +23,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
+import static com.openframe.core.exception.AuthErrorCode.EMAIL_MISMATCH;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_INVALID;
 import static org.springframework.util.StringUtils.hasText;
 
 
@@ -50,7 +53,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         String email = requireEmail(user);
 
         SsoTenantRegCookiePayload payload = ssoCookieCodec.decodeTenant(cookie.getValue())
-                .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
+                .orElseThrow(() -> new AuthFlowException(SSO_SESSION_INVALID, "SSO session is invalid. Please try again."));
 
         requireEmailMatchesForm(payload.email(), email);
         // Provider from the authenticated token, falling back to the flow cookie — never null, so
@@ -95,7 +98,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
             return;
         }
         if (!formEmail.trim().equalsIgnoreCase(ssoEmail)) {
-            throw new IllegalStateException(
+            throw AuthFlowException.withDetail(EMAIL_MISMATCH,
                     "This account's email (" + ssoEmail + ") doesn't match the email you entered ("
                             + formEmail.trim() + "). Please sign up with the account that matches the form email.");
         }
