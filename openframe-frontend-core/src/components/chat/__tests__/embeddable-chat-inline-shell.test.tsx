@@ -92,4 +92,50 @@ describe('EmbeddableChat inline shell', () => {
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Close chat' })).not.toBeInTheDocument();
   });
+
+  it('v2: the chat list as its own screen when narrow and nothing is open', () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ChatRuntimeContext.Provider value={runtime}>
+          <EmbeddableChat
+            shell="inline"
+            appearance="v2"
+            closable={false}
+            open
+            onOpenChange={vi.fn()}
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+            mingoState={createState()}
+          />
+        </ChatRuntimeContext.Provider>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole('complementary', { name: 'Mingo chats' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start New Chat' })).toBeInTheDocument();
+  });
+
+  it('v2: the v2 header over a conversation', () => {
+    const state = createState();
+    state.messages = [{ id: 'm-1', role: 'user', content: 'hello', timestamp: new Date('2026-01-01T00:00:00Z') }];
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ChatRuntimeContext.Provider value={runtime}>
+          <EmbeddableChat
+            shell="inline"
+            appearance="v2"
+            closable={false}
+            open
+            onOpenChange={vi.fn()}
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+            mingoState={state}
+          />
+        </ChatRuntimeContext.Provider>
+      </QueryClientProvider>,
+    );
+    // jsdom measures the panel at 0px: the narrow layout, where the list
+    // toggle is the way back and there is no collapse arrow.
+    expect(screen.getByRole('button', { name: 'Show chat list' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Collapse chat' })).not.toBeInTheDocument();
+  });
 });

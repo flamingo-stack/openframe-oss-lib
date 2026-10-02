@@ -21,6 +21,10 @@ export interface ChatNavSidebarProps extends HTMLAttributes<HTMLElement> {
   items: ChatNavSidebarItem[];
   /** Caption over the list (e.g. "Your Current Chats"). */
   sectionLabel?: string;
+  /** Control at the caption's end (e.g. a ⋯ menu that filters or searches the list). */
+  sectionActions?: ReactNode;
+  /** Pinned between the caption and the list (e.g. a search field). */
+  listHeader?: ReactNode;
   /** The list itself, typically `ChatListItem` rows or an empty state. Scrolls
    *  on its own; everything above it stays put. */
   children?: ReactNode;
@@ -35,7 +39,7 @@ export interface ChatNavSidebarProps extends HTMLAttributes<HTMLElement> {
  * does belong to the host.
  */
 const ChatNavSidebar = forwardRef<HTMLElement, ChatNavSidebarProps>(
-  ({ className, logo, items, sectionLabel, children, footer, ...props }, ref) => {
+  ({ className, logo, items, sectionLabel, sectionActions, listHeader, children, footer, ...props }, ref) => {
     const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>();
 
     return (
@@ -57,10 +61,12 @@ const ChatNavSidebar = forwardRef<HTMLElement, ChatNavSidebarProps>(
 
           <div className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
             {sectionLabel && (
-              <p className="shrink-0 px-[var(--spacing-system-xs)] pt-[var(--spacing-system-xs)] text-ods-text-secondary text-h5">
-                {sectionLabel}
-              </p>
+              <div className="flex shrink-0 items-end gap-[var(--spacing-system-m)] px-[var(--spacing-system-xs)] pt-[var(--spacing-system-xs)]">
+                <p className="min-w-0 flex-1 text-ods-text-secondary text-h5">{sectionLabel}</p>
+                {sectionActions}
+              </div>
             )}
+            {listHeader && <div className="shrink-0">{listHeader}</div>}
             <div className="relative flex min-h-0 flex-1 flex-col">
               <div
                 ref={scrollRef}

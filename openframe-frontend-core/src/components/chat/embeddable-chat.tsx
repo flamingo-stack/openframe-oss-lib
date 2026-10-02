@@ -85,7 +85,9 @@ import { useEmptyStateConfig } from './hooks/use-empty-state-config';
 import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands';
 import type { ChatSource, UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
+import { MingoChatHeader } from './mingo-chat-header';
 import { ChatDialogModals } from './mingo-chat-modals';
+import { MingoChatRail, type MingoDialogStatus } from './mingo-chat-rail';
 import { MingoHistoryRail } from './mingo-history-rail';
 import { MingoOnboardingCard } from './mingo-onboarding-card';
 import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton';
@@ -93,7 +95,8 @@ import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { SourceActionButton } from './source-action-button';
-import type { ChatInputRef, SlashCommandActionId } from './types/component.types';
+import { CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
+import type { ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { MessageSegment, Message } from './types/message.types';
 import type {
@@ -123,6 +126,8 @@ import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row
  * self-contained — the host wires nothing.
  */
 const HISTORY_RAIL_WIDTH = 320;
+/** The v2 chat list (`MingoChatRail`, Figma `chat-sidebar`). */
+const MINGO_V2_RAIL_WIDTH = 296;
 const CHAT_BLOCK_MIN_WIDTH = 400;
 const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 
@@ -338,6 +343,22 @@ export interface EmbeddableChatProps {
   closable?: boolean;
 
   /**
+   * `'v2'`: the Mingo v2 layout (Figma openframe - mingo) — the chat list as a
+   * full-height `MingoChatRail` beside the chat, the `MingoChatHeader` over the
+   * chat only, Mingo's cyan-tinted surface. Default `'classic'`.
+   */
+  appearance?: ChatAppearance;
+
+  /**
+   * v2: collapse the chat back to the list alone (the host shrinks its panel to
+   * the list's width). Adds the →| control while the list and the chat both fit.
+   */
+  onCollapse?: () => void;
+
+  /** v2: the status glyph at the end of a chat's row (working / unread / approval). */
+  dialogStatusOf?: (dialog: DialogItem) => MingoDialogStatus | undefined;
+
+  /**
    * Display name of the signed-in user, shown as the sub-line under the chat
    * title in the panel header. The server-resolved chat identity
    * (`useChatIdentity().user.name`) always wins when present; this is the
@@ -538,22 +559,29 @@ function useRailPresence(open: boolean): { mounted: boolean; active: boolean } {
 function RailSlot({
   active,
   innerClassName,
+  className,
+  narrow = false,
   children,
 }: {
   active: boolean;
   innerClassName?: string;
+  className?: string;
+  /** The v2 rail's 296px instead of 320px. */
+  narrow?: boolean;
   children: React.ReactNode;
 }) {
+  const width = narrow ? 'w-[296px]' : 'w-80';
   return (
     <div
       className={cn(
         // Border on the OUTER so the rail/chat divider tracks the animating
         // boundary (and fades out with the panel) instead of vanishing early.
         'shrink-0 overflow-hidden border-r border-ods-border transition-[width,opacity] ease-out',
-        active ? 'duration-[240ms] w-80 opacity-100' : 'duration-[300ms] w-0 opacity-0',
+        active ? cn('duration-[240ms] opacity-100', width) : 'duration-[300ms] w-0 opacity-0',
+        className,
       )}
     >
-      <div className={cn('h-full w-80', innerClassName)}>{children}</div>
+      <div className={cn('h-full', width, innerClassName)}>{children}</div>
     </div>
   );
 }
@@ -983,6 +1011,9 @@ function EmbeddableChatInner({
   defaultActiveMode,
   shell = 'drawer',
   closable = true,
+  appearance = CHAT_APPEARANCE.CLASSIC,
+  onCollapse,
+  dialogStatusOf,
   userDisplayName,
   userAvatarUrl,
   mingoWelcome,
@@ -1000,6 +1031,7 @@ function EmbeddableChatInner({
   // concerns are unconditional in this codebase — gate them off here so
   // we don't double-up with the host's behaviour.
   const shellLess = shell !== 'drawer';
+  const isV2 = appearance === CHAT_APPEARANCE.V2;
   const runtime = useRequiredChatRuntime();
   // Optional on embedders (platform-agnostic); '' is a harmless sentinel for the
   // `ask-ai:open-with-ref` event filter below. Deliberately NOT the hub's
@@ -2019,7 +2051,7 @@ function EmbeddableChatInner({
   // right chat block stays put), and only falls back to the full-panel archive
   // when stacked/collapsed.
   const splitEligible = historyListMode;
-  const canSplit = panelWidth >= SPLIT_MIN_WIDTH;
+  const canSplit = panelWidth >= (isV2 ? MINGO_V2_RAIL_WIDTH : HISTORY_RAIL_WIDTH) + CHAT_BLOCK_MIN_WIDTH;
   // Embedded previews (hero demo tabs) always use the compact single-column
   // header, never the two-column split — so `previewMode` opts out of `wideMingo`.
   const wideMingo = splitEligible && canSplit && !previewMode;
@@ -2243,6 +2275,73 @@ function EmbeddableChatInner({
         onOpenArchive: headerOnOpenArchive,
       };
 
+  // v2 list + header (see `appearance`). The list stays on screen while the
+  // archive opens beside it, so picking a chat from it leaves the archive.
+  const leaveArchiveThen =
+    (action: () => void): (() => void) =>
+    () => {
+      if (archiveOpen) closeArchive();
+      action();
+    };
+  const mingoRailProps = {
+    dialogs,
+    activeDialogId: activeDialogId ?? undefined,
+    onSelectDialog: (id: string) => leaveArchiveThen(() => handleSelectDialog(id))(),
+    onNewChat: leaveArchiveThen(handleNewChat),
+    onOpenArchive: headerOnOpenArchive,
+    archiveActive: archiveOpen,
+    // The suggestions a new chat opens on.
+    onWhatToAsk: leaveArchiveThen(handleNewChat),
+    statusOf: dialogStatusOf,
+    onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
+    onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,
+    onRequestCopyLink: mingoCaps.onCopyLink,
+    onRequestCompact: mingoCaps.compactDialog,
+    scope: dialogScope,
+    onScopeChange: setDialogScope,
+    searchQuery: mingoCaps.searchQuery,
+    onSearchChange: mingoCaps.onSearchChange,
+    hasMore: hasMoreDialogs,
+    isLoadingMore: isDialogsLoading && dialogs.length > 0,
+    onLoadMore: () => {
+      void loadMoreDialogs();
+    },
+    isLoadingHistory: dialogsInitialLoading,
+    loadError: dialogsLoadError,
+    onRetry: reloadDialogs,
+  };
+  // Over the chat column only; none on the narrow list (it is its own screen)
+  // or over the archive (it brings its own back bar).
+  const v2Header =
+    isV2 && !stackedListView && !archiveOpen ? (
+      <div className="col-start-2 row-start-1 min-w-0">
+        <MingoChatHeader
+          title={headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+          subtitle={headerPersonName}
+          avatar={headerAvatar}
+          // Wide: shows / hides the list beside the chat. Narrow: back to the
+          // list, the only one of the two that fits.
+          onToggleList={wideMingo ? toggleRailCollapsed : headerShowBack ? headerOnBack : () => setComposeOpen(false)}
+          listOpen={splitActive}
+          menuItems={headerShowBack && !isViewingArchived ? splitHeaderMenuItems : []}
+          onRestore={isViewingArchived ? headerOnRestore : undefined}
+          // Only while the list and the chat both fit: narrow, the toggle is
+          // already the way back to the list.
+          onCollapse={
+            wideMingo && onCollapse
+              ? () => {
+                  // The minimum is the list alone: a conversation left open
+                  // would take the narrow panel instead.
+                  if (hasConversation) headerOnBack();
+                  onCollapse();
+                }
+              : undefined
+          }
+          onClose={closeControl}
+        />
+      </div>
+    ) : null;
+
   // Chat body — defined once, then rendered inside whichever shell applies.
   // Radix overlays (⋯ menus, tooltips) portal into `portalHost` — a node inside
   // this panel — so they inherit the drawer's stacking context and need only a
@@ -2266,8 +2365,10 @@ function EmbeddableChatInner({
                 dark surface instead of following the archive. */}
         <div
           ref={setPanelNode}
+          // v2: one surface for the list and the chat, Mingo's cyan-tinted bg.
+          data-surface={isV2 ? 'mingo' : undefined}
           className={`flex h-full flex-col overflow-hidden transition-colors duration-200 ${
-            (archiveOpen && !splitActive) || stackedListView ? 'bg-ods-card' : 'bg-ods-bg'
+            !isV2 && ((archiveOpen && !splitActive) || stackedListView) ? 'bg-ods-card' : 'bg-ods-bg'
           } ${previewMode ? 'pointer-events-none select-none' : ''}`}
         >
           {/* Archive-page ↔ chat-panel swap fades in (200ms) to match the
@@ -2290,8 +2391,28 @@ function EmbeddableChatInner({
               />
             </div>
           ) : (
-            <div key="chat-view" className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0">
-              {showWideHeader ? (
+            <div
+              key="chat-view"
+              className={cn(
+                'min-h-0 flex-1 duration-200 animate-in fade-in-0',
+                // v2: the list runs the full height beside a column of header,
+                // banner and chat; each child below takes its cell explicitly.
+                isV2 ? 'grid grid-cols-[auto_minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)]' : 'flex flex-col',
+              )}
+            >
+              {isV2 && railPresence.mounted && (
+                <RailSlot
+                  active={railPresence.active}
+                  narrow
+                  className="col-start-1 row-span-3 row-start-1"
+                  innerClassName="flex min-h-0 flex-col"
+                >
+                  <MingoChatRail {...mingoRailProps} className="w-full border-r-0" />
+                </RailSlot>
+              )}
+              {isV2 ? (
+                v2Header
+              ) : showWideHeader ? (
                 // Wide Mingo header (Figma 113:60931 / 113:63630). Split: a
                 // two-cell bar — the "Current Chats" rail header (search /
                 // archive / collapse) over the 320px rail + the chat-block header
@@ -2439,15 +2560,17 @@ function EmbeddableChatInner({
                   the banner contrasts the temporary Guide session against the
                   default chat, so it's meaningless in a guide-only setup. */}
               {activeMode === 'guide' && hasMingoMode && (
-                <GuideModeBanner className="duration-200 animate-in fade-in-0" />
+                <GuideModeBanner
+                  className={cn('duration-200 animate-in fade-in-0', isV2 && 'col-start-2 row-start-2')}
+                />
               )}
 
               {/* Chat-panel row. In the wide Mingo layout (`splitActive`) the
                   dialog history is hoisted into a fixed 320px "Current Chats"
                   rail on the left; the stacked layout keeps it inline in the
                   Mingo empty state (`<MingoChatHistory>` via `<MingoWelcome>`). */}
-              <div className="flex min-h-0 flex-1 overflow-hidden">
-                {railPresence.mounted && (
+              <div className={cn('flex min-h-0 flex-1 overflow-hidden', isV2 && 'col-start-2 row-start-3 min-w-0')}>
+                {!isV2 && railPresence.mounted && (
                   <RailSlot active={railPresence.active} innerClassName="flex flex-col min-h-0 bg-ods-card">
                     {archiveOpen ? (
                       // Archive list inside the rail (header lives in the split
@@ -2488,8 +2611,28 @@ function EmbeddableChatInner({
                     )}
                   </RailSlot>
                 )}
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                  {stackedListView ? (
+                <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col', isV2 && 'ods-glow-accent-corner')}>
+                  {isV2 && archiveOpen ? (
+                    // v2: the archive opens in the chat column; the list stays.
+                    <ChatArchivePage
+                      dialogs={archivedDialogs}
+                      onSelectDialog={handleArchivedSelect}
+                      onBack={closeArchive}
+                      onClose={closeControl}
+                      isLoading={archivedLoading}
+                      isFetching={archivedPending}
+                      hasMore={archivedCursor != null}
+                      onLoadMore={() => {
+                        void loadArchivedPage(archivedCursor ?? undefined);
+                      }}
+                    />
+                  ) : stackedListView && isV2 ? (
+                    <MingoChatRail
+                      {...mingoRailProps}
+                      onNewChat={() => setComposeOpen(true)}
+                      className="w-full border-r-0 duration-200 animate-in fade-in-0"
+                    />
+                  ) : stackedListView ? (
                     // Narrow "Current Chats" list (Figma 341:36190) — the default
                     // single-column view. No composer here; "Start New Chat" opens
                     // the compose view.

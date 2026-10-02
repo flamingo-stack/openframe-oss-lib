@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useContext, useState } from 'react';
 import { fn } from 'storybook/test';
 
+import { EmbeddableChat } from '../components/chat/embeddable-chat';
+import type { UnifiedChatMessage, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import {
   BracketCurlyIcon,
   ChartDonutIcon,
@@ -16,6 +19,7 @@ import { Button } from '../components/ui/button';
 import { DashboardInfoCard } from '../components/ui/dashboard-info-card';
 import { type ColumnDef, DataTable, useDataTable } from '../components/ui/data-table';
 import { Tag } from '../components/ui/tag';
+import { type ChatRuntime, ChatRuntimeContext } from '../contexts/chat-runtime-context';
 import { ContentAreaWidthContext, useContentBreakpoint } from '../hooks/ui/use-content-breakpoint';
 import type { NavigationSidebarConfig } from '../types/navigation';
 import { cn } from '../utils/cn';
@@ -241,7 +245,116 @@ function MockMingo({ width, mode }: AppLayoutSidePanelRenderState) {
   );
 }
 
-function Screen({ collapsed, page }: { collapsed: boolean; page: 'dashboard' | 'devices' }) {
+const RUNTIME: ChatRuntime = {
+  endpoints: {
+    chatStreamUrl: '/__story__/chat',
+    approvalToolUrl: '/__story__/confirm-tool',
+    commandsUrl: '/__story__/commands',
+    buildListUrl: () => null,
+    attachmentUploadUrl: '/__story__/upload',
+    attachmentViewUrlPrefix: '/__story__/view/',
+    identityUrl: '/__story__/identity',
+  },
+  navigation: { mode: 'embed', defaultContentOrigin: 'https://example.com' },
+  source: 'storybook',
+};
+const QUERY_CLIENT = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+const AT = new Date('2026-10-02T14:47:00');
+const MINGO_MESSAGES: UnifiedChatMessage[] = [
+  {
+    id: 'm1',
+    role: 'user',
+    name: 'Roman Smith',
+    authorType: 'admin',
+    content: 'why is osqueryd.exe cert expiring in 3 days?',
+    timestamp: AT,
+  },
+  {
+    id: 'm2',
+    role: 'assistant',
+    name: 'Mingo',
+    authorType: 'mingo',
+    content:
+      "The renewal job ran ~6 hours ago but didn't complete. osqueryd.exe cert expires in 3 days - if it's not renewed before then, the agent will fail signature validation and stop reporting.\n\nWant me to trigger a manual renewal or check what blocked the last attempt?",
+    timestamp: AT,
+  },
+];
+
+/** A static Mingo thread through the `mingoState` injection path: no transport. */
+function createMingoState(): UnifiedChatState {
+  const noop = () => {};
+  const asyncNoop = async () => {};
+  return {
+    messages: MINGO_MESSAGES,
+    isLoading: false,
+    streamingPhase: 'idle',
+    sendMessage: asyncNoop,
+    stopMessage: noop,
+    clearMessages: noop,
+    discussRef: noop,
+    displayRef: noop,
+    currentProvider: 'anthropic',
+    currentModelLabel: 'Claude Opus 4.1',
+    currentContextWindowMaxTokens: 50000,
+    currentInputTokens: 300,
+    currentOutputTokens: 72,
+    currentCacheHitRatePct: null,
+    currentUsageBreakdown: null,
+    dialogs: [{ id: 'd-0', title: 'osquery check' }, ...CHATS.map((title, i) => ({ id: `d-${i + 1}`, title }))],
+    activeDialogId: 'd-0',
+    selectDialog: noop,
+    startNewDialog: async () => null,
+    deleteDialog: asyncNoop,
+    renameDialog: asyncNoop,
+    archiveDialog: asyncNoop,
+    isDialogsLoading: false,
+    dialogsError: false,
+    reloadDialogs: noop,
+    isMessagesLoading: false,
+    hasMoreDialogs: false,
+    loadMoreDialogs: asyncNoop,
+    hasMoreMessages: false,
+    loadMoreMessages: asyncNoop,
+    approveRequest: asyncNoop,
+    rejectRequest: asyncNoop,
+    dialogTokenUsage: null,
+    connectionState: 'connected',
+  };
+}
+const MINGO_STATE = createMingoState();
+
+/** The real chat panel, as openframe-frontend docks it. */
+function RealMingo({ canClose, close, collapse, mode }: AppLayoutSidePanelRenderState) {
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <EmbeddableChat
+        shell="inline"
+        closable={canClose}
+        open
+        onOpenChange={open => {
+          if (!open) close();
+        }}
+        appearance="v2"
+        onCollapse={mode === 'overlay' ? undefined : collapse}
+        defaultActiveMode="mingo"
+        showInternalTrigger={false}
+        mingoState={MINGO_STATE}
+        mingoDialogCapabilities={{ canRename: true, canArchive: true }}
+      />
+    </div>
+  );
+}
+
+function Screen({
+  collapsed,
+  page,
+  panel,
+}: {
+  collapsed: boolean;
+  page: 'dashboard' | 'devices';
+  panel: 'mingo' | 'mock';
+}) {
   return (
     <AppLayout
       sidebarConfig={{ items: NAV_ITEMS, onNavigate: fn(), onToggleMinimized: fn() }}
@@ -251,7 +364,7 @@ function Screen({ collapsed, page }: { collapsed: boolean; page: 'dashboard' | '
         label: 'Mingo',
         storageKey: 'storybook:mingo-docked-width',
         collapsed,
-        children: state => <MockMingo {...state} />,
+        children: state => (panel === 'mock' ? <MockMingo {...state} /> : <RealMingo {...state} />),
       }}
     >
       {page === 'devices' ? <DevicesPage /> : <Dashboard />}
@@ -262,6 +375,15 @@ function Screen({ collapsed, page }: { collapsed: boolean; page: 'dashboard' | '
 const meta: Meta<typeof Screen> = {
   title: 'Navigation/Mingo Docked Layout',
   component: Screen,
+  decorators: [
+    Story => (
+      <QueryClientProvider client={QUERY_CLIENT}>
+        <ChatRuntimeContext.Provider value={RUNTIME}>
+          <Story />
+        </ChatRuntimeContext.Provider>
+      </QueryClientProvider>
+    ),
+  ],
   parameters: {
     layout: 'fullscreen',
     docs: {
@@ -271,8 +393,13 @@ const meta: Meta<typeof Screen> = {
       },
     },
   },
-  args: { collapsed: false, page: 'dashboard' },
+  args: { collapsed: false, page: 'dashboard', panel: 'mingo' },
   argTypes: {
+    panel: {
+      control: 'inline-radio',
+      options: ['mingo', 'mock'],
+      description: 'The real EmbeddableChat, or a stand-in.',
+    },
     page: { control: 'inline-radio', options: ['dashboard', 'devices'] },
     collapsed: { control: 'boolean', description: 'Page that needs the full width: drop the panel to its minimum.' },
   },

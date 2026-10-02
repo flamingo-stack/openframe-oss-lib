@@ -36,6 +36,8 @@ export interface AppLayoutSidePanelRenderState {
   canClose: boolean;
   /** Put the panel away again; a no-op while it is docked. */
   close: () => void;
+  /** Shrink the panel to its minimum width (e.g. back to a list alone). */
+  collapse: () => void;
 }
 
 export interface AppLayoutSidePanelConfig {
@@ -422,7 +424,13 @@ export function AppLayoutSidePanel({ config, state }: AppLayoutSidePanelProps) {
           mode !== 'overlay' && 'rounded-md border border-ods-border',
         )}
       >
-        {config.children({ width, mode, canClose: mode === 'overlay' || (mode === 'full' && !canDock), close })}
+        {config.children({
+          width,
+          mode,
+          canClose: mode === 'overlay' || (mode === 'full' && !canDock),
+          close,
+          collapse: () => state.resize(state.minWidth),
+        })}
       </div>
     </aside>
   );
