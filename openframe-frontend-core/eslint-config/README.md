@@ -71,6 +71,19 @@ Two rules are deliberately **absent** from the base and belong in a repo's local
 - `@typescript-eslint/naming-convention` — Biome's equivalent produced 1 715 findings in
   multi-platform-hub alone and was never enforced.
 
+## WebKit performance rules
+
+`base` carries two rules from `./webview-performance.js` for patterns that are cheap in Chrome and
+expensive in WebKit (Safari, and the WKWebView the desktop and iOS shells run in). They are not
+applied to tests or stories.
+
+- `flamingo/no-inline-style-element`: no `<style>` element in JSX. React rewrites its text on
+  re-render, and each rewrite makes WebKit restyle and relayout the whole document.
+- `flamingo/no-whole-store-subscription`: a `use…Store` hook called with no selector, or with
+  `s => s`, re-renders on every write to the store. The rule goes by the name, so a `use…Store`
+  hook that is not a zustand subscription (a context getter, say) is a false positive: carry it in
+  a named `files:` block.
+
 ## Why not ESLint 10
 
 ESLint 10 is out, and `eslint@9` is marked deprecated on npm. It still does not work here:
