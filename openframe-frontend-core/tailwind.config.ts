@@ -79,6 +79,28 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
 });
 
 /**
+ * Content-area breakpoints: `content-md:` (720px) and `content-lg:` (1024px)
+ * apply by the width of the nearest `.ods-content-area`, not the viewport.
+ * They are the viewport `md` / `lg` steps less the navigation sidebar, so a
+ * page with nothing docked beside it switches where it did before.
+ *
+ * Outside a content area (apps without a side panel, overlays portalled to
+ * <body>) each falls back to its viewport step, so a component can switch to
+ * them without changing anywhere else it renders.
+ */
+const odsContentAreaPlugin = plugin(({ addVariant }) => {
+  const outsideContentArea = '&:where(:not(.ods-content-area *))';
+  addVariant('content-md', [
+    '@container ods-content (min-width: 720px)',
+    `@media (min-width: 800px) { ${outsideContentArea} }`,
+  ]);
+  addVariant('content-lg', [
+    '@container ods-content (min-width: 1024px)',
+    `@media (min-width: 1280px) { ${outsideContentArea} }`,
+  ]);
+});
+
+/**
  * Make Tailwind opacity modifiers (`bg-ods-error/10`, `hover:bg-ods-accent/90`, …)
  * actually work on var()-based ODS tokens. Without `<alpha-value>` in the color
  * definition Tailwind v3 silently generates NOTHING for `ods-*\/N` classes — the
@@ -410,7 +432,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [tailwindcssAnimate, odsTypographyPlugin, containerQueries],
+  plugins: [tailwindcssAnimate, odsTypographyPlugin, odsContentAreaPlugin, containerQueries],
 };
 
 export default config;

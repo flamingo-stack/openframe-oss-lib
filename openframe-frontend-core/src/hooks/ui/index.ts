@@ -1,5 +1,6 @@
 // UI Hooks exports
 export * from './use-auto-limit-tags';
+export * from './use-content-breakpoint';
 export * from './use-debounce';
 export * from './use-deferred-error';
 export * from './use-drag-and-drop-enabled';
