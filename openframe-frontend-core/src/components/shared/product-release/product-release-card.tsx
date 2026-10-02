@@ -2,10 +2,10 @@
 
 import { AlertTriangle, Eye, Package, Play, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 import type React from 'react';
+import { EMPTY_AUTHOR_PLACEHOLDER, EntityAuthorCard } from '../../chat/entity-cards/entity-author-card';
 import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
 import { InteractiveCard } from '../../ui/interactive-card';
-import { SquareAvatar } from '../../ui/square-avatar';
 import { StatusBadge } from '../../ui/status-badge';
 
 /**
@@ -17,8 +17,8 @@ import { StatusBadge } from '../../ui/status-badge';
  *   investor-update related-content section. Three zones — hero (16:9 cover
  *   + version pill + title + summary), changelog stats strip (icons +
  *   counts), metadata grid footer (Type · Status · Released · Author). The
- *   grid mirrors the hub's `<EntityAuthorCard>` byte-for-byte (see lg
- *   branch comment).
+ *   Author cell reuses the sibling `<EntityAuthorCard>` component directly
+ *   (see lg branch comment).
  *
  * - `sm`: compact horizontal layout (~80px tall) for inline rendering inside
  *   chat messages and other tight surfaces. Drops `<h3>` (block-only,
@@ -138,15 +138,11 @@ export function ProductReleaseCard({
   //   1. Hero — cover image LEFT, version pill + title + summary RIGHT.
   //   2. Changelog strip — icons + counts (hidden when total === 0).
   //   3. Metadata grid footer — bordered grid of [Type | Status | Released
-  //      | Author] cells. This grid INLINES the hub's <EntityAuthorCard>
-  //      visual treatment by hand (SAME bordered grid with value-cell +
-  //      author-cell shapes, byte-for-byte). The OSS lib has zero hub
-  //      coupling by design; we cannot import the hub's
-  //      <EntityAuthorCard>. This is the SAME inline-duplication policy
-  //      documented for the COMPACT_CARD_* string set in the chat-card
-  //      file. If the hub's <EntityAuthorCard> visual changes (cell
-  //      padding, divider styles, avatar size, etc.), update this branch
-  //      in lockstep.
+  //      | Author] cells. The Author cell reuses the sibling
+  //      `<EntityAuthorCard>` component (components/chat/entity-cards/
+  //      entity-author-card.tsx) directly instead of hand-rolling the
+  //      same visual treatment — it lives in this same package, so
+  //      there's no hub-coupling concern here.
   if (size === 'lg') {
     const totalChangelog =
       (changelogCounts?.features ?? 0) +
@@ -154,13 +150,12 @@ export function ProductReleaseCard({
       (changelogCounts?.improvements ?? 0) +
       (changelogCounts?.breaking ?? 0);
 
-    // Build the metadata-grid cell array — mirrors the hub's
-    // EntityAuthorCard composition. ALWAYS render all 3 value cells
-    // (Type / Status / Released) — missing values render as a plain
-    // em-dash + label so the grid keeps a fixed 4-cell shape (matching
-    // the skeleton). The Author cell is also always rendered below
-    // (effectiveAuthor falls back to a placeholder shape). This is
-    // load-to-resolve baseline parity: any conditional cell would
+    // Build the metadata-grid value-cell array. ALWAYS render all 3
+    // value cells (Type / Status / Released) — missing values render as
+    // a plain em-dash + label so the grid keeps a fixed 4-cell shape
+    // (matching the skeleton). The Author cell is rendered via
+    // <EntityAuthorCard>, which owns its own placeholder fallback. This
+    // is load-to-resolve baseline parity: any conditional cell would
     // introduce a reflow when the skeleton resolves.
     //
     // Plan note: em-dash placeholders read as plain text (NOT a colored
@@ -196,12 +191,10 @@ export function ProductReleaseCard({
           }
         : { value: '—', label: 'Released', uppercase: false },
     ];
-    // EMPTY_AUTHOR_PLACEHOLDER shape — mirrors the hub's
-    // EMPTY_AUTHOR_PLACEHOLDER constant exported from
-    // components/shared/entity-author-card.tsx (hub can't be imported
-    // here; the two are kept in lockstep per the inline-duplication
-    // policy documented in the catalog branch comment above).
-    const effectiveAuthor = author?.full_name ? author : { full_name: '—', avatar_url: null, job_title: 'Unknown' };
+    // Author cell falls back to the shared EMPTY_AUTHOR_PLACEHOLDER
+    // (imported from EntityAuthorCard's own module) instead of a
+    // locally re-declared shape.
+    const effectiveAuthor = author?.full_name ? author : EMPTY_AUTHOR_PLACEHOLDER;
     // Fixed 4-cell grid (Type / Status / Released / Author) so the
     // skeleton's shape matches the loaded card exactly. The earlier
     // dynamic `gridColsClass` ternary collapsed missing cells and
@@ -315,8 +308,9 @@ export function ProductReleaseCard({
             Released / Author) so the skeleton mirrors the loaded card
             exactly. Empty value cells render em-dash + label (plain
             text, no colored badge — em-dash badges read as broken next
-            to populated ones); the Author cell falls back to the
-            EMPTY_AUTHOR_PLACEHOLDER shape declared above. */}
+            to populated ones); the Author cell is rendered via the
+            shared <EntityAuthorCard> sibling component, which owns its
+            own empty-author placeholder fallback. */}
         <div
           className={cn(
             'grid grid-cols-1',
@@ -351,19 +345,7 @@ export function ProductReleaseCard({
               </div>
             </div>
           ))}
-          <div className="flex items-center gap-3 bg-ods-card p-4">
-            <SquareAvatar
-              src={effectiveAuthor.avatar_url ?? undefined}
-              alt={effectiveAuthor.full_name}
-              fallback={effectiveAuthor.full_name.charAt(0).toUpperCase()}
-              size="md"
-              variant="round"
-            />
-            <div className="flex min-w-0 flex-1 flex-col gap-0">
-              <p className="truncate tracking-[-0.36px] text-ods-text-primary text-h3">{effectiveAuthor.full_name}</p>
-              <p className="text-ods-text-secondary text-h6">{effectiveAuthor.job_title || 'Author'}</p>
-            </div>
-          </div>
+          <EntityAuthorCard author={effectiveAuthor} />
         </div>
 
         {typeof viewCount === 'number' && viewCount > 0 && (
@@ -491,7 +473,7 @@ export function ProductReleaseCard({
                   NBSP; ASCII space here would let React collapse the
                   child to zero content, breaking baseline parity with
                   the skeleton. Keep these in lockstep. */}
-              {summary || ' '}
+              {summary || ' '}
             </span>
           </span>
         </span>

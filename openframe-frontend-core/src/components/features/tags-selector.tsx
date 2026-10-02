@@ -3,7 +3,7 @@
 import { Search, X, Plus, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../utils';
-import { Button } from '../ui';
+import { Button, Input } from '../ui';
 
 interface Tag {
   id: number;
@@ -122,24 +122,24 @@ export function TagsSelector({
             >
               {tag.name}
               {!disabled && (
-                <button
+                <Button
+                  variant="transparent"
                   type="button"
                   onClick={e => {
                     e.preventDefault();
                     e.stopPropagation();
                     handleTagRemove(tag.id);
                   }}
-                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-ods-text-secondary transition-colors hover:bg-ods-accent/20 hover:text-ods-text-primary"
+                  leftIcon={<X className="h-3 w-3" />}
+                  className="inline-flex h-4 min-h-0 w-4 min-w-0 items-center justify-center rounded-full p-0 text-ods-text-secondary hover:bg-ods-accent/20 hover:text-ods-text-primary"
                   aria-label={`Remove ${tag.name}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
+                />
               )}
             </span>
           ))}
 
           {/* Search Input - Takes remaining space */}
-          <input
+          <Input
             type="text"
             value={searchQuery}
             onChange={e => {

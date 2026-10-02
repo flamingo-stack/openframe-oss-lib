@@ -20,8 +20,7 @@ const IconsBlock = forwardRef<HTMLDivElement, IconsBlockProps>(
       <div className={cn('flex items-center gap-2', className)} ref={ref} {...props}>
         {icons.map((icon, index) => (
           <div key={index} className={cn('rounded-md bg-secondary p-1', sizeClasses[size])}>
-            {/* Icon placeholder */}
-            <div className="h-full w-full rounded-sm bg-primary/20" />
+            <img src={icon} alt="" className="h-full w-full rounded-sm object-contain" />
           </div>
         ))}
       </div>
