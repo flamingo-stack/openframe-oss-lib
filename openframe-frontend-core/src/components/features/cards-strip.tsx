@@ -94,6 +94,11 @@ interface CardsStripEngineProps {
    *  default around 100px/s; 60 keeps drift lively while cards stay easy to
    *  hover-target. 60px/s ≈ 1px per 60Hz frame, the smoothest integer step. */
   autoScrollSpeed?: number;
+  /** Reverse the marquee: the cards travel RIGHT instead of left. For a strip
+   *  stacked under another one, so the two rows drift in opposite directions.
+   *  Only the auto-scroll direction changes: chevrons, wheel, drag, the seam
+   *  wrap and reduced motion behave exactly as on a forward strip. */
+  reverse?: boolean;
   /** Pause the marquee while a CARD is hovered (resumes as soon as the
    *  pointer leaves the card — strip whitespace/heading never pauses). */
   pauseOnHover?: boolean;
@@ -221,6 +226,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     headerSlot,
     autoScroll = true,
     autoScrollSpeed = 60,
+    reverse = false,
     pauseOnHover = true,
     showChevrons = true,
     prevLabel = 'Previous items',
@@ -484,6 +490,20 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     return Math.max(0, Math.min(200, half / 4, half - viewport - TRACK_GAP_PX - 1));
   }, []);
 
+  // Engine position <-> scrollLeft. Forward they are the same number. Reversed,
+  // the engine still counts UP (it only knows one direction) while the scroller
+  // counts DOWN: `scrollLeft = 2*min + size - pos`, the mirror of the position
+  // inside the wrap range [min, min + size). The mirror is its own inverse, so
+  // the same function reads the scroller back into engine space.
+  const mirror = useCallback(
+    (value: number) => {
+      if (!reverse) return value;
+      const size = singleCopyWidthRef.current;
+      return size > 0 ? 2 * seamBuffer() + size - value : value;
+    },
+    [reverse, seamBuffer],
+  );
+
   const { posRef: marqueePosRef, glideBy } = useMarqueeEngine({
     // Viewport gates `active` (the rAF fully stops off-screen — a paused
     // engine would keep scheduling frames forever), same treatment as
@@ -498,9 +518,9 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     getWrapMin: seamBuffer,
     apply: pos => {
       const scroller = scrollerRef.current;
-      if (scroller) scroller.scrollLeft = pos;
+      if (scroller) scroller.scrollLeft = mirror(pos);
     },
-    readBack: () => scrollerRef.current?.scrollLeft ?? 0,
+    readBack: () => mirror(scrollerRef.current?.scrollLeft ?? 0),
     onAfterFrame: syncHoverIfScrolled,
   });
 
@@ -596,13 +616,15 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       if (marqueeActiveRef.current) {
         // Wrap-aware glide via the rAF engine (see engine comment) — clicks
         // accumulate distance instead of racing browser smooth-scroll targets.
-        glideBy(dir * step);
+        // The glide is in ENGINE space: on a reversed strip "next" (scroller
+        // moves right) is a step BACK along the engine's axis.
+        glideBy((reverse ? -dir : dir) * step);
       } else {
         // No clones/seam without the marquee — native smooth scroll is safe.
         scroller.scrollBy({ left: dir * step, behavior: 'smooth' });
       }
     },
-    [glideBy],
+    [glideBy, reverse],
   );
 
   const onUserScrollIntent = useCallback(() => {
@@ -651,13 +673,13 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     if (sl >= half + buffer) {
       sl -= half;
       scroller.scrollLeft = sl;
-      marqueePosRef.current = sl;
+      marqueePosRef.current = mirror(sl);
     } else if (sl < buffer) {
       sl += half;
       scroller.scrollLeft = sl;
-      marqueePosRef.current = sl;
+      marqueePosRef.current = mirror(sl);
     }
-  }, [syncHoverIfScrolled, seamBuffer, marqueePosRef]);
+  }, [syncHoverIfScrolled, seamBuffer, marqueePosRef, mirror]);
 
   // ---- render ----------------------------------------------------------------
 
