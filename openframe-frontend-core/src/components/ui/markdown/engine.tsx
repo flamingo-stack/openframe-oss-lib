@@ -195,19 +195,23 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     [additionalRemarkPlugins],
   );
 
-  const rehypePlugins = useMemo<PluggableList>(() => {
+  const { rehypePlugins, liveRehypePlugins } = useMemo(() => {
     const schema = buildSanitizeSchema({
       extraAllowedHtmlTags: extraTagsKey ? extraTagsKey.split('|') : undefined,
     });
-    return [
-      // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
-      // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
-      // defense-in-depth (srcset scanning, iframe[srcdoc]); highlight last.
-      rehypeRaw,
-      [rehypeSanitize, schema],
-      rehypeStripUnsafe,
-      [rehypeHighlight, { detect: true, ignoreMissing: true }],
-    ];
+    // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
+    // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
+    // defense-in-depth (srcset scanning, iframe[srcdoc]); highlight last.
+    const safe: PluggableList = [rehypeRaw, [rehypeSanitize, schema], rehypeStripUnsafe];
+    return {
+      rehypePlugins: [...safe, [rehypeHighlight, { detect: true, ignoreMissing: true }]] as PluggableList,
+      // The streaming tail re-parses on every chunk, and a code fence being
+      // typed is one tail block — highlighting it (with language detection)
+      // every chunk was the costliest step of a streamed reply. It is
+      // highlighted once it completes: every block before the tail and the
+      // final parse use `rehypePlugins`.
+      liveRehypePlugins: safe,
+    };
   }, [extraTagsKey]);
 
   const components: Components = useMemo(
@@ -238,7 +242,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     // spam (polite + additions). Streaming caret/pulse affordances live in
     // chat components and honor prefers-reduced-motion there.
     <div aria-live="polite" aria-relevant="additions text">
-      {streamingBlocks.map(block => (
+      {streamingBlocks.map((block, i) => (
         // Each unit is parsed on its own, so hast positions restart at 1;
         // the offset maps them back onto the document-wide heading-id map.
         <HeadingLineOffsetContext.Provider key={block.index} value={block.startLine - 1}>
@@ -252,7 +256,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
           ) : (
             <ReactMarkdown
               remarkPlugins={remarkPlugins}
-              rehypePlugins={rehypePlugins}
+              rehypePlugins={i === streamingBlocks.length - 1 ? liveRehypePlugins : rehypePlugins}
               urlTransform={cardAwareUrlTransform}
               components={components}
             >
