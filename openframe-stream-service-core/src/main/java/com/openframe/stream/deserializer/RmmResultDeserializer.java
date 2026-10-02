@@ -1,5 +1,6 @@
 package com.openframe.stream.deserializer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -164,6 +165,14 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
             log.error("Failed to build details JSON for command result", e);
             return null;
         }
+    }
+
+    protected ObjectNode toObjectNode(String json) throws JsonProcessingException {
+        if (json == null) {
+            return mapper.createObjectNode();
+        }
+        JsonNode parsed = mapper.readTree(json);
+        return parsed.isObject() ? (ObjectNode) parsed : mapper.createObjectNode();
     }
 
     private static void putIntOrString(ObjectNode node, String key, String value) {
