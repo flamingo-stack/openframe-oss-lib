@@ -8,6 +8,7 @@ import {
   type ComponentRef,
   type KeyboardEvent,
   type PointerEvent,
+  type RefObject,
   createContext,
   forwardRef,
   useCallback,
@@ -299,7 +300,7 @@ function useContainedResizableSize({
     }
   }, [enabled, size, storageKey]);
 
-  return { size, setSize };
+  return { size, setSize, clampSize: clampToContainer };
 }
 
 interface AppLayoutDrawerResizeHandleProps {
@@ -308,6 +309,10 @@ interface AppLayoutDrawerResizeHandleProps {
   minSize: number;
   maxSize: number;
   onSize: (next: number) => void;
+  /** Clamp a candidate size to the min/max and the container. */
+  clampSize: (next: number) => number;
+  /** The panel the size applies to — written directly while dragging. */
+  panelRef: RefObject<HTMLDivElement | null>;
   ariaLabel?: string;
 }
 
@@ -317,10 +322,14 @@ function AppLayoutDrawerResizeHandle({
   minSize,
   maxSize,
   onSize,
+  clampSize,
+  panelRef,
   ariaLabel,
 }: AppLayoutDrawerResizeHandleProps) {
   const isHorizontal = HORIZONTAL_SIDES.has(side);
   const startRef = useRef<{ x: number; y: number; size: number } | null>(null);
+  // Size reached by the drag in progress, committed to React state on release.
+  const dragSizeRef = useRef<number | null>(null);
 
   const direction = side === 'right' || side === 'bottom' ? -1 : 1;
 
@@ -333,16 +342,31 @@ function AppLayoutDrawerResizeHandle({
     document.body.style.userSelect = 'none';
   };
 
+  // The drag writes the panel's size straight to the DOM and commits it to
+  // state once, on release. Committing every pointermove re-rendered the
+  // drawer per event — ~16% of a drag's CPU in WebKit on top of the reflow the
+  // resize itself costs. ResizeObserver consumers inside the panel still see
+  // every change. A re-render of the drawer mid-drag (e.g. a streamed chunk)
+  // does not undo the write: React diffs against its previous render, where
+  // the size is unchanged, so it leaves the style alone.
   const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const start = startRef.current;
-    if (!start) return;
+    const panel = panelRef.current;
+    if (!start || !panel) return;
     const delta = isHorizontal ? e.clientX - start.x : e.clientY - start.y;
-    onSize(start.size + delta * direction);
+    const next = clampSize(start.size + delta * direction);
+    dragSizeRef.current = next;
+    panel.style[isHorizontal ? 'width' : 'height'] = `${next}px`;
+    e.currentTarget.setAttribute('aria-valuenow', String(Math.round(next)));
   };
 
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     if (!startRef.current) return;
     startRef.current = null;
+    if (dragSizeRef.current !== null) {
+      onSize(dragSizeRef.current);
+      dragSizeRef.current = null;
+    }
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
@@ -585,7 +609,8 @@ const AppLayoutDrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Co
       return () => mq.removeEventListener('change', update);
     }, [mobileBreakpoint]);
 
-    const { size, setSize } = useContainedResizableSize({
+    const panelRef = useRef<HTMLDivElement>(null);
+    const { size, setSize, clampSize } = useContainedResizableSize({
       enabled: resizable,
       isHorizontal,
       minSize,
@@ -670,10 +695,13 @@ const AppLayoutDrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Co
               minSize={minSize}
               maxSize={maxSize}
               onSize={setSize}
+              clampSize={clampSize}
+              panelRef={panelRef}
               ariaLabel={resizeAriaLabel}
             />
           ) : null}
           <div
+            ref={panelRef}
             className={cn(
               appLayoutDrawerPanelVariants({ side, flush }),
               // Mobile: fill the container (the side already pins one axis) and
