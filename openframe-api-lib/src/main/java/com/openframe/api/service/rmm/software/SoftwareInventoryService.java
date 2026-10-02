@@ -352,29 +352,11 @@ public class SoftwareInventoryService {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, filter, search);
-        if (fleetPaging) {
-            PageResult<SoftwareResponse> result = paginateList(rows.stream().sorted(order).toList(), page, perPage);
-            // counts are read for this page only, so a devicesCount sort here orders by name
-            fillDevicesCount(result.items());
-            return result;
+        if (!fleetPaging) {
+            enrichDevicesCountFromHosts(rows);
         }
-        enrichDevicesCountFromHosts(rows);
         List<SoftwareResponse> ordered = rows.stream().sorted(order).toList();
         return paginateList(ordered, page, perPage);
-    }
-
-    private void fillDevicesCount(List<SoftwareResponse> rows) {
-        List<Integer> counts = FleetCalls.inParallel(rows, this::fleetDevicesCount);
-        for (int i = 0; i < rows.size(); i++) {
-            rows.get(i).setDevicesCount(counts.get(i));
-        }
-    }
-
-    private Integer fleetDevicesCount(SoftwareResponse row) {
-        return parseNumericId(row.getId())
-                .map(fleet()::getSoftwareTitle)
-                .map(SoftwareTitle::getHostsCount)
-                .orElse(null);
     }
 
     public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
