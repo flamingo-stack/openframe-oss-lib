@@ -322,9 +322,13 @@ export interface EmbeddableChatProps {
    *     suppressed — those are Drawer-shell concerns. The consumer is
    *     responsible for mount/unmount and for opening/closing via the
    *     `open` / `onOpenChange` props (which the in-body close button still
-   *     drives).
+   *     drives). The host must provide the Radix Dialog it sits in.
+   *   - `'inline'`: like `'none'`, for a host that is NOT a dialog (a panel
+   *     docked into the page layout): no Radix Dialog is expected, so the
+   *     panel names itself through the host's region rather than a
+   *     `Dialog.Title`.
    */
-  shell?: 'drawer' | 'none';
+  shell?: 'drawer' | 'none' | 'inline';
 
   /**
    * Whether the panel offers a close button. `false` for a chat that is part
@@ -991,11 +995,11 @@ function EmbeddableChatInner({
   contextMemory,
   handleRef,
 }: EmbeddableChatProps & { handleRef?: React.Ref<EmbeddableChatHandle> }) {
-  // `shell === 'none'` means the consumer hosts us inside their own panel
+  // `shell` 'none' / 'inline' means the consumer hosts us inside their own panel
   // (e.g. AppLayoutDrawer in openframe-frontend). Several drawer-shell
   // concerns are unconditional in this codebase — gate them off here so
   // we don't double-up with the host's behaviour.
-  const shellLess = shell === 'none';
+  const shellLess = shell !== 'drawer';
   const runtime = useRequiredChatRuntime();
   // Optional on embedders (platform-agnostic); '' is a harmless sentinel for the
   // `ask-ai:open-with-ref` event filter below. Deliberately NOT the hub's
@@ -2803,9 +2807,11 @@ function EmbeddableChatInner({
           accessible name — Radix warns when a Dialog.Content has no Title. The
           panel supplies its own visually-hidden title here, mirroring the
           drawer-shell branch below, so it's accessible regardless of host. */}
-      <VisuallyHidden>
-        <DialogPrimitive.Title>{sourceLabel} AI Assistant</DialogPrimitive.Title>
-      </VisuallyHidden>
+      {shell === 'none' && (
+        <VisuallyHidden>
+          <DialogPrimitive.Title>{sourceLabel} AI Assistant</DialogPrimitive.Title>
+        </VisuallyHidden>
+      )}
       {body}
     </ChatPanelContext.Provider>
   ) : (
