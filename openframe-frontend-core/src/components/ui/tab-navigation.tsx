@@ -365,7 +365,7 @@ const TabBar = memo(function TabBarImpl({
                 <div className="relative flex items-center justify-center">
                   <tab.icon
                     className={cn(
-                      'h-4 w-4 transition-colors md:h-6 md:w-6',
+                      'h-4 w-4 transition-colors content-md:h-6 content-md:w-6',
                       isActive ? 'text-ods-accent' : 'text-ods-text-secondary',
                     )}
                   />

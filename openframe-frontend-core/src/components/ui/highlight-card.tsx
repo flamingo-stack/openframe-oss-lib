@@ -18,11 +18,11 @@ export function HighlightCard({ item, className = '' }: HighlightCardProps) {
   const desktopWidth = item.category.length * 14;
 
   return (
-    <div className={`relative bg-ods-bg p-6 md:p-10 ${className}`}>
+    <div className={`relative bg-ods-bg p-6 content-md:p-10 ${className}`}>
       <div className="relative">
         {/* Mobile highlight */}
         <div
-          className="absolute left-[80px] top-0 h-8 rounded-md md:hidden"
+          className="absolute left-[80px] top-0 h-8 rounded-md content-md:hidden"
           style={{
             backgroundColor: item.highlightBg,
             width: `${mobileWidth}px`,
@@ -30,7 +30,7 @@ export function HighlightCard({ item, className = '' }: HighlightCardProps) {
         />
         {/* Desktop highlight */}
         <div
-          className="absolute left-[95px] top-0 hidden h-10 rounded-md md:block"
+          className="absolute left-[95px] top-0 hidden h-10 rounded-md content-md:block"
           style={{
             backgroundColor: item.highlightBg,
             width: `${desktopWidth}px`,
@@ -57,7 +57,7 @@ export function HighlightCardGrid({
   className = '',
   cardClassName = 'bg-ods-card border border-ods-border rounded-lg p-0 overflow-hidden',
 }: HighlightCardGridProps) {
-  const gridCols = columns === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3';
+  const gridCols = columns === 2 ? 'grid-cols-1 content-md:grid-cols-2' : 'grid-cols-1 content-md:grid-cols-3';
   const itemsPerRow = columns;
   const rows = Math.ceil(items.length / itemsPerRow);
 
@@ -68,7 +68,7 @@ export function HighlightCardGrid({
     if (!isLastInRow) {
       // On mobile (1 column), never show right border
       // On desktop (2/3 columns), show right border except for last in row
-      classes += ' md:border-r border-ods-border';
+      classes += ' content-md:border-r border-ods-border';
     }
 
     // Bottom border logic
@@ -81,10 +81,10 @@ export function HighlightCardGrid({
 
     // Desktop: override mobile border, show bottom border for all rows except last
     if (!isLastRow) {
-      classes += ' md:border-b border-ods-border';
+      classes += ' content-md:border-b border-ods-border';
     } else {
       // Last row on desktop - remove bottom border
-      classes += ' md:border-b-0';
+      classes += ' content-md:border-b-0';
     }
 
     return classes;

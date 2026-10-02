@@ -168,7 +168,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
             <p className="text-ods-text-secondary text-h6">Drag to reorder</p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 content-md:grid-cols-2">
             {media.map((item, index) => (
               <div
                 key={index}

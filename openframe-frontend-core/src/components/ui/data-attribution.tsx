@@ -18,12 +18,12 @@ export interface DataAttributionProps {
  */
 export function DataAttribution({ icon, source, lastUpdated }: DataAttributionProps) {
   return (
-    <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] text-ods-text-primary text-h6 sm:flex-row sm:items-center sm:gap-[var(--spacing-system-sf)]">
+    <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] text-ods-text-primary text-h6 content-sm:flex-row content-sm:items-center content-sm:gap-[var(--spacing-system-sf)]">
       <div className="flex items-center gap-[var(--spacing-system-xsf)]">
         {icon}
         <span>Data synced from {source}</span>
       </div>
-      <span className="hidden text-ods-text-secondary sm:inline" aria-hidden="true">
+      <span className="hidden text-ods-text-secondary content-sm:inline" aria-hidden="true">
         &middot;
       </span>
       <span className="text-ods-text-secondary">Last updated: {lastUpdated ? formatDate(lastUpdated) : 'Never'}</span>

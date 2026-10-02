@@ -79,25 +79,41 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
 });
 
 /**
- * Content-area breakpoints: `content-md:` (720px) and `content-lg:` (1024px)
- * apply by the width of the nearest `.ods-content-area`, not the viewport.
- * They are the viewport `md` / `lg` steps less the navigation sidebar, so a
- * page with nothing docked beside it switches where it did before.
+ * Content-area breakpoints: `content-md:` and friends apply by the width of the
+ * nearest `.ods-content-area`, not the viewport. Each step is the viewport
+ * step less the navigation sidebar (`sm` is phone-only, where there is none),
+ * so a page with nothing docked beside it switches where it did before.
  *
  * Outside a content area (apps without a side panel, overlays portalled to
  * <body>) each falls back to its viewport step, so a component can switch to
  * them without changing anywhere else it renders.
+ *
+ * Registered `max-*` first and then ascending, like Tailwind's own screens, so
+ * a wider step wins over a narrower one on the same property.
  */
+const CONTENT_STEPS = [
+  { name: 'sm', content: 640, viewport: 640 },
+  { name: 'md', content: 720, viewport: 800 },
+  { name: 'lg', content: 1024, viewport: 1280 },
+  { name: 'xl', content: 1216, viewport: 1440 },
+  { name: '2xl', content: 1312, viewport: 1536 },
+] as const;
+
 const odsContentAreaPlugin = plugin(({ addVariant }) => {
   const outsideContentArea = '&:where(:not(.ods-content-area *))';
-  addVariant('content-md', [
-    '@container ods-content (min-width: 720px)',
-    `@media (min-width: 800px) { ${outsideContentArea} }`,
-  ]);
-  addVariant('content-lg', [
-    '@container ods-content (min-width: 1024px)',
-    `@media (min-width: 1280px) { ${outsideContentArea} }`,
-  ]);
+  for (const { name, content, viewport } of CONTENT_STEPS) {
+    if (name !== 'md' && name !== 'lg') continue;
+    addVariant(`content-max-${name}`, [
+      `@container ods-content (max-width: ${content - 0.02}px)`,
+      `@media (max-width: ${viewport - 0.02}px) { ${outsideContentArea} }`,
+    ]);
+  }
+  for (const { name, content, viewport } of CONTENT_STEPS) {
+    addVariant(`content-${name}`, [
+      `@container ods-content (min-width: ${content}px)`,
+      `@media (min-width: ${viewport}px) { ${outsideContentArea} }`,
+    ]);
+  }
 });
 
 /**
@@ -128,6 +144,8 @@ const config: Config = {
     'lg:hidden',
     'md:flex',
     'lg:flex',
+    // ...and their content-area forms (DataTable `hideAt`)
+    ...['md', 'lg', 'xl', '2xl'].flatMap(step => [`content-${step}:hidden`, `content-${step}:flex`]),
   ],
   theme: {
     container: {

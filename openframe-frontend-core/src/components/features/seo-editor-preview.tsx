@@ -120,7 +120,7 @@ export function SEOEditorPreview({
           both columns share one label-row geometry; badges + the char counter
           ride the label row (labelExtras / labelEnd) instead of adding stray
           rows that misalign siblings. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 content-lg:grid-cols-2">
         <div className="space-y-2">
           <Field
             label="SEO Title"
@@ -194,7 +194,7 @@ export function SEOEditorPreview({
       </div>
 
       {/* SEO Description & OG Image - Same Row */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 content-lg:grid-cols-2">
         <div className="space-y-2">
           <Field
             label="SEO Description"

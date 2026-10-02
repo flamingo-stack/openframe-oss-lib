@@ -31,10 +31,10 @@ interface DeliveryTableProps {
  */
 function SkeletonRow() {
   return (
-    <div className="border-b border-ods-border p-[12px] last:border-b-0 md:p-[16px]">
-      <div className="flex w-full flex-col items-start justify-between gap-[12px] md:flex-row md:gap-[16px]">
+    <div className="border-b border-ods-border p-[12px] last:border-b-0 content-md:p-[16px]">
+      <div className="flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]">
         {/* Left: Title, subtitle, and description skeleton */}
-        <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] md:w-auto md:gap-[16px]">
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]">
           {/* Title skeleton - responsive */}
           <div className="flex min-h-[24px] items-center">
             <div className="h-[20px] w-full animate-pulse rounded bg-ods-border"></div>

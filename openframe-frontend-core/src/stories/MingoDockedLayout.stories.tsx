@@ -9,10 +9,13 @@ import {
   MonitorIcon,
   Settings02Icon,
 } from '../components/icons-v2-generated';
+import { PageLayout } from '../components/layout/page-layout';
 import { AppLayout } from '../components/navigation/app-layout';
 import type { AppLayoutSidePanelRenderState } from '../components/navigation/app-layout-side-panel';
 import { Button } from '../components/ui/button';
 import { DashboardInfoCard } from '../components/ui/dashboard-info-card';
+import { type ColumnDef, DataTable, useDataTable } from '../components/ui/data-table';
+import { Tag } from '../components/ui/tag';
 import { ContentAreaWidthContext, useContentBreakpoint } from '../hooks/ui/use-content-breakpoint';
 import type { NavigationSidebarConfig } from '../types/navigation';
 import { cn } from '../utils/cn';
@@ -102,6 +105,62 @@ function Dashboard() {
   );
 }
 
+interface DeviceRow {
+  id: string;
+  hostname: string;
+  ip: string;
+  os: string;
+  status: 'Online' | 'Offline';
+  owner: string;
+  lastSeen: string;
+}
+
+const DEVICES: DeviceRow[] = Array.from({ length: 12 }, (_, i) => ({
+  id: `d-${i}`,
+  hostname: `ACME-FIN-LAPTOP-${String(i + 1).padStart(2, '0')}`,
+  ip: `10.0.4.${20 + i}`,
+  os: i % 3 === 0 ? 'macOS' : i % 3 === 1 ? 'Windows' : 'Linux',
+  status: i % 4 === 0 ? 'Offline' : 'Online',
+  owner: ['Ada Lovelace', 'Alan Turing', 'Grace Hopper'][i % 3] ?? '',
+  lastSeen: `${i + 2} min ago`,
+}));
+
+const DEVICE_COLUMNS: ColumnDef<DeviceRow>[] = [
+  { accessorKey: 'hostname', header: 'Hostname', meta: { width: 'flex-1 min-w-[200px]' } },
+  {
+    accessorKey: 'status',
+    header: 'Status',
+    cell: ({ row }) => (
+      <Tag variant={row.original.status === 'Online' ? 'success' : 'grey'} label={row.original.status} />
+    ),
+    meta: { width: 'w-[120px] shrink-0' },
+  },
+  { accessorKey: 'os', header: 'OS', meta: { width: 'w-[120px] shrink-0', hideAt: 'md' } },
+  { accessorKey: 'ip', header: 'IP', meta: { width: 'w-[140px] shrink-0', hideAt: 'lg' } },
+  { accessorKey: 'owner', header: 'Owner', meta: { width: 'w-[180px] shrink-0', hideAt: ['md', 'lg'] } },
+  { accessorKey: 'lastSeen', header: 'Last seen', meta: { width: 'w-[140px] shrink-0', hideAt: ['md', 'lg'] } },
+];
+
+function DevicesPage() {
+  const table = useDataTable<DeviceRow>({ data: DEVICES, columns: DEVICE_COLUMNS, getRowId: row => row.id });
+  return (
+    <PageLayout
+      title="Devices"
+      subtitle="12 devices"
+      actions={[
+        { label: 'Add Device', onClick: fn(), variant: 'primary' },
+        { label: 'Export', onClick: fn(), variant: 'outline' },
+      ]}
+    >
+      <ContentProbe />
+      <DataTable table={table}>
+        <DataTable.Header />
+        <DataTable.Body />
+      </DataTable>
+    </PageLayout>
+  );
+}
+
 function ChatList({ active, onOpen }: { active: number | null; onOpen: (index: number) => void }) {
   return (
     <nav
@@ -182,7 +241,7 @@ function MockMingo({ width, mode }: AppLayoutSidePanelRenderState) {
   );
 }
 
-function Screen({ collapsed }: { collapsed: boolean }) {
+function Screen({ collapsed, page }: { collapsed: boolean; page: 'dashboard' | 'devices' }) {
   return (
     <AppLayout
       sidebarConfig={{ items: NAV_ITEMS, onNavigate: fn(), onToggleMinimized: fn() }}
@@ -195,7 +254,7 @@ function Screen({ collapsed }: { collapsed: boolean }) {
         children: state => <MockMingo {...state} />,
       }}
     >
-      <Dashboard />
+      {page === 'devices' ? <DevicesPage /> : <Dashboard />}
     </AppLayout>
   );
 }
@@ -212,8 +271,9 @@ const meta: Meta<typeof Screen> = {
       },
     },
   },
-  args: { collapsed: false },
+  args: { collapsed: false, page: 'dashboard' },
   argTypes: {
+    page: { control: 'inline-radio', options: ['dashboard', 'devices'] },
     collapsed: { control: 'boolean', description: 'Page that needs the full width: drop the panel to its minimum.' },
   },
 };
@@ -222,3 +282,6 @@ export default meta;
 type Story = StoryObj<typeof Screen>;
 
 export const Docked: Story = {};
+
+/** A list page: PageLayout header and a DataTable whose `hideAt` columns follow the content width. */
+export const ListPage: Story = { args: { page: 'devices' } };

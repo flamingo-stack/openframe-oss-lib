@@ -98,7 +98,7 @@ function DirectoryRow({
 
         {/* No audience entity (scope=all "other" group) → no chip. */}
         {audienceLabel && (
-          <StatusBadge text={`For ${audienceLabel}`} singleLine className="hidden shrink-0 sm:inline-flex" />
+          <StatusBadge text={`For ${audienceLabel}`} singleLine className="hidden shrink-0 content-sm:inline-flex" />
         )}
 
         {/* Hosts stay visible on mobile too — the facepile is the row's "who
@@ -106,7 +106,7 @@ function DirectoryRow({
             collapse on narrow widths. */}
         <AvatarStack people={link.hosts} max={3} size="md" label="Hosts" className="flex shrink-0" />
 
-        <div className="hidden w-44 shrink-0 flex-col items-end justify-center md:flex">
+        <div className="hidden w-44 shrink-0 flex-col items-end justify-center content-md:flex">
           <p className="text-ods-text-secondary text-h6">Next available</p>
           <p className="min-h-5 text-ods-text-primary text-h6">
             {link.nextAvailableMs == null ? 'No times published' : (nextLabel ?? ' ')}
@@ -130,9 +130,9 @@ export function MeetingSchedulerDirectoryRowSkeleton() {
         <Skeleton className="h-5 w-1/2" />
         <Skeleton className="h-4 w-1/3" />
       </div>
-      <Skeleton className="hidden h-6 w-28 shrink-0 sm:block" />
+      <Skeleton className="hidden h-6 w-28 shrink-0 content-sm:block" />
       <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
-      <div className="hidden w-44 shrink-0 flex-col items-end gap-1 md:flex">
+      <div className="hidden w-44 shrink-0 flex-col items-end gap-1 content-md:flex">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-5 w-32" />
       </div>

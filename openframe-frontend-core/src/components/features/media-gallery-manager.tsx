@@ -243,7 +243,7 @@ export function MediaGalleryManager({
             <h3 className="text-ods-text-primary text-h3">Media Gallery ({media.length})</h3>
             <p className="text-ods-text-secondary text-h6">Drag to reorder</p>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 content-md:grid-cols-2 content-lg:grid-cols-3">
             {media.map((item, index) => renderMediaItem(item, index))}
           </div>
         </div>

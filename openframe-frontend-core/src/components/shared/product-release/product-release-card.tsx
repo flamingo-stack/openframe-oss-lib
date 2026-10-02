@@ -206,8 +206,8 @@ export function ProductReleaseCard({
     // skeleton's shape matches the loaded card exactly. The earlier
     // dynamic `gridColsClass` ternary collapsed missing cells and
     // caused 28-56px reflow on resolve.
-    const gridColsClass = 'md:grid-cols-4';
-    const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border';
+    const gridColsClass = 'content-md:grid-cols-4';
+    const dividerClass = 'border-b content-md:border-b-0 content-md:border-r border-ods-border';
 
     const frameClass = cn(
       'group overflow-hidden rounded-lg border border-ods-border bg-ods-card',
@@ -222,8 +222,8 @@ export function ProductReleaseCard({
     const innerLayout = (
       <>
         {/* HERO ZONE — cover LEFT + version pill + title + summary RIGHT */}
-        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className="w-full flex-shrink-0 md:w-[256px]">
+        <div className="flex flex-col gap-4 content-md:flex-row content-md:gap-6">
+          <div className="w-full flex-shrink-0 content-md:w-[256px]">
             <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-lg bg-ods-bg">
               {coverImage ? (
                 <Image
@@ -254,8 +254,8 @@ export function ProductReleaseCard({
                 1-line titles don't shrink and the catalog skeleton-to-
                 content transition is shift-free. Mirrors the
                 onboarding-guide catalog card. */}
-            <div className="mb-3 flex min-h-[60px] items-start md:min-h-[72px]">
-              <h3 className="line-clamp-2 font-['Azeret_Mono'] text-xl font-semibold leading-tight text-ods-text-primary md:text-2xl">
+            <div className="mb-3 flex min-h-[60px] items-start content-md:min-h-[72px]">
+              <h3 className="line-clamp-2 font-['Azeret_Mono'] text-xl font-semibold leading-tight text-ods-text-primary content-md:text-2xl">
                 {title}
               </h3>
             </div>
@@ -263,10 +263,10 @@ export function ProductReleaseCard({
                 summaries at 3 lines; `min-h` reserves the same vertical
                 space when content is shorter, so the catalog grid stays
                 row-consistent regardless of per-card content length.
-                Heights derived from text-sm md:text-base × leading-relaxed
+                Heights derived from text-sm content-md:text-base × leading-relaxed
                 (1.625): 14×1.625×3 ≈ 68 px mobile, 16×1.625×3 ≈ 78 px desktop. */}
-            <div className="min-h-[68px] md:min-h-[78px]">
-              <p className="line-clamp-3 font-['DM_Sans'] text-sm leading-relaxed text-ods-text-secondary md:text-base">
+            <div className="min-h-[68px] content-md:min-h-[78px]">
+              <p className="line-clamp-3 font-['DM_Sans'] text-sm leading-relaxed text-ods-text-secondary content-md:text-base">
                 {summary ?? ''}
               </p>
             </div>
