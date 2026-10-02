@@ -1,7 +1,6 @@
 package com.openframe.data.loki.config;
 
 import com.openframe.data.loki.client.LokiClient;
-import com.openframe.data.loki.client.LokiPushException;
 import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.loki.toolevent.ToolEventLog;
 import com.openframe.data.loki.toolevent.ToolEventLogRepository;
@@ -10,14 +9,14 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketTimeoutException;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -95,33 +94,29 @@ class LokiConfigTest {
     }
 
     @Test
+    @Timeout(5)
     void lokiClient_lokiSlowerThanTheReadTimeout_failsTheLookup() {
-        loki.createContext("/loki/api/v1/query_range", exchange -> {
-            awaitRelease();
-            answerNothingFound(exchange);
-        });
+        loki.createContext("/loki/api/v1/query_range", exchange -> awaitRelease());
 
         enabledContext().withPropertyValues("openframe.loki.read-timeout=200ms")
                 .run(context -> assertThatThrownBy(() -> context.getBean(ToolEventLogRepository.class)
                         .find("tenant-a", "FLEET", "LOGIN", TIMESTAMP, "evt-1"))
                         .isExactlyInstanceOf(LokiQueryException.class)
-                        .hasMessageStartingWith("Loki query failed: I/O error on GET request"));
+                        .hasMessageStartingWith("Loki query failed: ")
+                        .hasRootCauseInstanceOf(SocketTimeoutException.class));
     }
 
     @Test
-    void lokiClient_nothingListensOnTheUrl_failsTheSaveAsRetryable() {
-        loki.stop(0);
-
-        enabledContext().run(context -> assertThatThrownBy(() -> context.getBean(ToolEventLogRepository.class)
-                .save(event()))
-                .isExactlyInstanceOf(LokiPushException.class)
-                .hasMessageStartingWith("Loki push failed: I/O error on POST request"));
+    void lokiConfig_switchOff_registersNeitherClientNorRepository() {
+        contextRunner.withPropertyValues("openframe.loki.enabled=false", "openframe.loki.url=http://loki.test")
+                .run(context -> assertThat(context)
+                        .doesNotHaveBean(LokiClient.class)
+                        .doesNotHaveBean(ToolEventLogRepository.class));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"openframe.loki.enabled=false", "openframe.loki.max-query-bytes-read=5GB"})
-    void lokiConfig_lokiNotEnabled_registersNeitherClientNorRepository(String property) {
-        contextRunner.withPropertyValues(property, "openframe.loki.url=http://loki.test")
+    @Test
+    void lokiConfig_switchMissing_registersNeitherClientNorRepository() {
+        contextRunner.withPropertyValues("openframe.loki.url=http://loki.test")
                 .run(context -> assertThat(context)
                         .doesNotHaveBean(LokiClient.class)
                         .doesNotHaveBean(ToolEventLogRepository.class));

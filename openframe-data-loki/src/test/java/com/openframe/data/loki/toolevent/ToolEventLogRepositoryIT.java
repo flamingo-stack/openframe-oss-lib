@@ -32,30 +32,32 @@ class ToolEventLogRepositoryIT {
 
     private static final Instant MOMENT = Instant.now().minus(Duration.ofMinutes(5)).truncatedTo(ChronoUnit.MILLIS);
 
+    private static final ToolEventLog SAVED_FOR_EXACT_LOOKUPS =
+            event("tenant-exact", "evt-1", MOMENT, "{\"ip\":\"10.0.0.1\"}");
+
     private static ToolEventLogRepository repository;
 
     @BeforeAll
-    static void startLoki() {
+    static void startLokiAndSaveTheEventForExactLookups() {
         LOKI.start();
         repository = new ToolEventLogRepository(new LokiClient(RestClient.builder()
                 .baseUrl("http://" + LOKI.getHost() + ":" + LOKI.getMappedPort(3100))
                 .build()));
+        repository.save(SAVED_FOR_EXACT_LOOKUPS);
+        awaitFound(SAVED_FOR_EXACT_LOOKUPS);
     }
 
     @Test
     void find_savedEvent_returnsItWithEveryField() {
-        ToolEventLog event = event("tenant-round-trip", "evt-1", MOMENT, "{\"ip\":\"10.0.0.1\"}");
-
-        repository.save(event);
-
-        awaitFound(event);
+        awaitFound(SAVED_FOR_EXACT_LOOKUPS);
     }
 
     @Test
-    void find_sameEventSavedTwice_returnsItWithTheSameDetails() {
+    void save_sameEventSentAgainAfterALaterEvent_isAcceptedAndTheEventIsStillFound() {
         ToolEventLog event = event("tenant-twice", "evt-1", MOMENT, "{\"ip\":\"10.0.0.1\"}");
 
         repository.save(event);
+        repository.save(event("tenant-twice", "evt-2", MOMENT.plusMillis(1), "{\"ip\":\"10.0.0.2\"}"));
         repository.save(event);
 
         awaitFound(event);
@@ -98,11 +100,16 @@ class ToolEventLogRepositoryIT {
     @MethodSource("lookupsDifferingFromTheSavedEventInOnePart")
     void find_lookupDiffersFromTheSavedEventInOnePart_returnsEmpty(String tenantId, String toolType, String eventType,
                                                                     Instant timestamp, String toolEventId) {
-        ToolEventLog saved = event("tenant-exact", "evt-1", MOMENT, "{\"ip\":\"10.0.0.1\"}");
-        repository.save(saved);
-        awaitFound(saved);
-
         Optional<ToolEventLog> found = repository.find(tenantId, toolType, eventType, timestamp, toolEventId);
+
+        assertThat(found).isEmpty();
+    }
+
+    @ParameterizedTest
+    @MethodSource("lookupsWithAValueWrittenToWidenTheQuery")
+    void find_lookupValueWrittenToWidenTheQuery_returnsEmpty(String tenantId, String toolType, String eventType,
+                                                             String toolEventId) {
+        Optional<ToolEventLog> found = repository.find(tenantId, toolType, eventType, MOMENT, toolEventId);
 
         assertThat(found).isEmpty();
     }
@@ -128,7 +135,7 @@ class ToolEventLogRepositoryIT {
     }
 
     @Test
-    void find_heldEventRefusedWhenSentAgain_stillReturnsIt() {
+    void save_heldEventSentAgainTooFarBehind_isRefusedAndTheEventIsStillFound() {
         ToolEventLog held = event("tenant-held", "evt-1", MOMENT.minus(Duration.ofHours(2)), "{\"ip\":\"10.0.0.1\"}");
         repository.save(held);
         repository.save(event("tenant-held", "evt-2", MOMENT, "{\"ip\":\"10.0.0.2\"}"));
@@ -148,11 +155,15 @@ class ToolEventLogRepositoryIT {
                 arguments("tenant-exact", "RMM", "SCRIPT_FAILED", MOMENT, "evt-1"),
                 arguments("tenant-exact", "RMM", "SCRIPT_EXECUTED", MOMENT.plusMillis(1), "evt-1"),
                 arguments("tenant-exact", "RMM", "SCRIPT_EXECUTED", MOMENT.minusMillis(1), "evt-1"),
-                arguments("tenant-exact", "RMM", "SCRIPT_EXECUTED", MOMENT, "evt-2"),
-                arguments("tenant-exact", "RMM", "SCRIPT_EXECUTED", MOMENT, "evt-2\" or tool_event_id=~\".+"),
-                arguments("tenant-exact", "RMM", "SCRIPT_FAILED\" or event_type=~\".+", MOMENT, "evt-1"),
-                arguments("tenant-other\"} or {tenant_id=~\".+", "RMM", "SCRIPT_EXECUTED", MOMENT, "evt-1"),
-                arguments("tenant-other", "RMM\", tenant_id=~\".+", "SCRIPT_EXECUTED", MOMENT, "evt-1"));
+                arguments("tenant-exact", "RMM", "SCRIPT_EXECUTED", MOMENT, "evt-2"));
+    }
+
+    private static Stream<Arguments> lookupsWithAValueWrittenToWidenTheQuery() {
+        return Stream.of(
+                arguments("tenant-exact", "RMM", "SCRIPT_EXECUTED", "evt-2\" or tool_event_id=~\".+"),
+                arguments("tenant-exact", "RMM", "SCRIPT_FAILED\" or event_type=~\".+", "evt-1"),
+                arguments("tenant-other\"} or {tenant_id=~\".+", "RMM", "SCRIPT_EXECUTED", "evt-1"),
+                arguments("tenant-exact", "RMM\"} #", "SCRIPT_EXECUTED", "evt-2"));
     }
 
     private static void awaitFound(ToolEventLog event) {

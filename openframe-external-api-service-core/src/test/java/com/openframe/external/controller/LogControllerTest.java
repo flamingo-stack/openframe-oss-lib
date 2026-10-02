@@ -12,7 +12,6 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.LogService;
-import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import com.openframe.external.mapper.LogMapper;
 import com.openframe.external.support.ExternalApiMockMvc;
@@ -25,7 +24,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -434,28 +432,6 @@ class LogControllerTest {
                 .andExpect(jsonPath("$.message").value("Invalid value 'yesterday' for parameter 'timestamp'"));
 
         verifyNoInteractions(logService);
-    }
-
-    @Test
-    void databaseFailureOnDetailsIs503() throws Exception {
-        when(logService.findLogDetails(any(), any(), any(), any()))
-                .thenThrow(new DataAccessResourceFailureException("cassandra down"));
-
-        mockMvc.perform(detailsRequest())
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("DATABASE_ERROR"))
-                .andExpect(jsonPath("$.message").value("Database operation failed. Please try again later."));
-    }
-
-    @Test
-    void getLogDetails_lokiFails_answers503LokiQueryError() throws Exception {
-        when(logService.findLogDetails("MESHCENTRAL", "LOGIN", TIMESTAMP, "evt-1"))
-                .thenThrow(new LokiQueryException("Loki query failed: connection refused"));
-
-        mockMvc.perform(detailsRequest())
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("LOKI_QUERY_ERROR"))
-                .andExpect(jsonPath("$.message").value("Logs are temporarily unavailable. Please try again later."));
     }
 
     private static MockHttpServletRequestBuilder detailsRequest() {

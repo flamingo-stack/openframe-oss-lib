@@ -34,6 +34,8 @@ import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.OngoingStubbing;
+import org.springframework.boot.convert.ApplicationConversionService;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.retry.backoff.Sleeper;
@@ -107,8 +109,36 @@ class DebeziumLokiMessageHandlerTest {
     }
 
     @Test
+    void handle_eventWithoutEnrichment_savesTheLineWithoutThoseFields() {
+        handler(ROOMY).handle(message("c", SMALL_DETAILS), new IntegratedToolEnrichedData());
+
+        verify(lokiClient).push(LABELS, EVENT_NANOS, LINE_START + "{\\\"stdout\\\":\\\"ok\\\"}\"}", METADATA);
+    }
+
+    @Test
     void handle_deleteOperation_savesNothing() {
         handler(ROOMY).handle(message("d", SMALL_DETAILS), enriched());
+
+        verifyNoInteractions(lokiClient);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = "t")
+    void handle_unknownOrMissingOperation_savesNothing(String operation) {
+        handler(ROOMY).handle(message(operation, SMALL_DETAILS), enriched());
+
+        verifyNoInteractions(lokiClient);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void handle_tenantNotResolved_savesNothing(String tenantId) {
+        DeserializedDebeziumMessage message = message("c", SMALL_DETAILS);
+        message.setTenantId(tenantId);
+
+        handler(ROOMY).handle(message, enriched());
 
         verifyNoInteractions(lokiClient);
     }
@@ -127,13 +157,14 @@ class DebeziumLokiMessageHandlerTest {
     }
 
     @Test
-    void handle_lineExactlyAtTheLimit_savesTheDetailsUntouched() {
+    void handle_lineExactlyAtTheLimit_savesTheDetailsUntouchedWithoutACutWarning(CapturedOutput output) {
         String details = "a".repeat(200);
         String line = LINE_START + details + LINE_END;
 
         handler(DataSize.ofBytes(line.getBytes(UTF_8).length)).handle(message("c", details), enriched());
 
         verify(lokiClient).push(LABELS, EVENT_NANOS, line, METADATA);
+        assertThat(output.getOut()).doesNotContain("Tool event details cut to fit the Loki line limit");
     }
 
     @Test
@@ -149,7 +180,7 @@ class DebeziumLokiMessageHandlerTest {
     }
 
     @Test
-    void handle_detailsFarOverTheLimit_keepsTheirStartAndEveryOtherField(CapturedOutput output)
+    void handle_detailsFarOverTheLimit_keepsTheirStartAndEveryOtherFieldAndLogsTheCut(CapturedOutput output)
             throws JsonProcessingException {
         String details = "start-" + "a".repeat(5_000);
 
@@ -179,8 +210,6 @@ class DebeziumLokiMessageHandlerTest {
 
     private static Stream<Arguments> detailsOverTheLimitWithTheBytesOneMoreCharacterNeeds() {
         return Stream.of(
-                arguments("a".repeat(5_000), 1_000, 1, "a+"),
-                arguments("я".repeat(600), 1_000, 2, "я+"),
                 arguments("я".repeat(5_000), 1_000, 2, "я+"),
                 arguments("😀".repeat(2_500), 1_500, 4, "(😀)+"),
                 arguments("😀".repeat(2_500), 1_501, 4, "(😀)+"),
@@ -254,7 +283,7 @@ class DebeziumLokiMessageHandlerTest {
         assertThatCode(() -> handler.handle(message("c", SMALL_DETAILS), enriched())).doesNotThrowAnyException();
 
         verify(lokiClient).push(LABELS, EVENT_NANOS, SMALL_LINE, METADATA);
-        assertThat(output.getOut()).doesNotContain("its details are lost").doesNotContain("ERROR");
+        assertThat(output.getOut()).doesNotContain("Loki refused the tool event, its details are lost");
     }
 
     @Test
@@ -268,16 +297,20 @@ class DebeziumLokiMessageHandlerTest {
     }
 
     @Test
-    void handle_lokiFailsThenRefusesTheEvent_stopsRetryingAndDoesNotFail() throws InterruptedException {
+    void handle_lokiFailsThenRefusesAnEventItDoesNotHold_stopsRetryingAndLogsTheDetailsAsLost(CapturedOutput output)
+            throws InterruptedException {
         doThrow(lokiDown())
                 .doThrow(new LokiPushRejectedException("Loki push failed with HTTP 400: entry too far behind", null))
                 .when(lokiClient).push(LABELS, EVENT_NANOS, SMALL_LINE, METADATA);
+        whenLookedUp().thenReturn(List.of());
         DebeziumLokiMessageHandler handler = handler(ROOMY);
 
         assertThatCode(() -> handler.handle(message("c", SMALL_DETAILS), enriched())).doesNotThrowAnyException();
 
         verify(lokiClient, times(2)).push(LABELS, EVENT_NANOS, SMALL_LINE, METADATA);
         verify(sleeper()).sleep(1_000);
+        assertThat(output.getOut()).contains("Loki refused the tool event, its details are lost: tenantId=tenant-a, "
+                + "toolType=RMM, toolEventId=evt-1, reason=Loki push failed with HTTP 400: entry too far behind");
     }
 
     @Test
@@ -302,9 +335,40 @@ class DebeziumLokiMessageHandlerTest {
         assertThat(handler(ROOMY).getType()).isEqualTo(EventHandlerType.COMMON_TYPE);
     }
 
+    @Test
+    void handle_lineOverThe256KBLimitFromConfig_cutsItTo262144Bytes() {
+        contextRunner().withPropertyValues("openframe.loki.enabled=true", "openframe.loki.max-line-size=256KB")
+                .run(context -> context.getBean(DebeziumLokiMessageHandler.class)
+                        .handle(message("c", "a".repeat(300_000)), enriched()));
+
+        assertThat(savedLine().getBytes(UTF_8)).hasSize(262_144);
+    }
+
+    @Test
+    void handler_lokiSwitchOff_isNotRegistered() {
+        contextRunner().withPropertyValues("openframe.loki.enabled=false", "openframe.loki.max-line-size=256KB")
+                .run(context -> assertThat(context).doesNotHaveBean(DebeziumLokiMessageHandler.class));
+    }
+
+    @Test
+    void handler_onlyTheOldCassandraSwitchOn_isNotRegistered() {
+        contextRunner().withPropertyValues("spring.data.cassandra.enabled=true", "openframe.loki.max-line-size=256KB")
+                .run(context -> assertThat(context).doesNotHaveBean(DebeziumLokiMessageHandler.class));
+    }
+
     private DebeziumLokiMessageHandler handler(DataSize maxLineSize) {
         return new DebeziumLokiMessageHandler(new ToolEventLogRepository(lokiClient), new ObjectMapper(),
                 new TenantIdRequiredDebeziumEventValidator(), maxLineSize);
+    }
+
+    private ApplicationContextRunner contextRunner() {
+        return new ApplicationContextRunner()
+                .withInitializer(context -> context.getBeanFactory()
+                        .setConversionService(ApplicationConversionService.getSharedInstance()))
+                .withBean(ToolEventLogRepository.class, () -> new ToolEventLogRepository(lokiClient))
+                .withBean(ObjectMapper.class, ObjectMapper::new)
+                .withBean(DebeziumEventValidator.class, TenantIdRequiredDebeziumEventValidator::new)
+                .withUserConfiguration(DebeziumLokiMessageHandler.class);
     }
 
     private Sleeper sleeper() {

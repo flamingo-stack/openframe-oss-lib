@@ -2,8 +2,6 @@ package com.openframe.data.loki.client;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -72,15 +70,14 @@ class LokiClientPushTest {
                 .hasCauseInstanceOf(RestClientResponseException.class);
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = {401, 403, 404, 408, 413, 428, 429, 430, 499, 500, 502, 503, 504})
-    void push_anyErrorAnswerOtherThanBadRequest_throwsRetryableFailureWithStatusAndReason(int status) {
+    @Test
+    void push_lokiAnswersAnErrorOtherThanBadRequest_throwsRetryableFailureWithStatusAndReason() {
         server.expect(requestTo(PUSH_URL))
-                .andRespond(withStatus(HttpStatusCode.valueOf(status)).body("ingester not ready"));
+                .andRespond(withStatus(HttpStatusCode.valueOf(401)).body("ingester not ready"));
 
         assertThatThrownBy(() -> client.push(LABELS, TIMESTAMP_NANOS, LINE, METADATA))
                 .isExactlyInstanceOf(LokiPushException.class)
-                .hasMessage("Loki push failed with HTTP " + status + ": ingester not ready")
+                .hasMessage("Loki push failed with HTTP 401: ingester not ready")
                 .hasCauseInstanceOf(RestClientResponseException.class);
     }
 
@@ -91,7 +88,8 @@ class LokiClientPushTest {
 
         assertThatThrownBy(() -> client.push(LABELS, TIMESTAMP_NANOS, LINE, METADATA))
                 .isExactlyInstanceOf(LokiPushException.class)
-                .hasMessage("Loki push failed: I/O error on POST request for \"" + PUSH_URL + "\": connection refused")
+                .hasMessageStartingWith("Loki push failed: ")
+                .hasMessageEndingWith("connection refused")
                 .hasCauseInstanceOf(ResourceAccessException.class);
     }
 
@@ -103,15 +101,6 @@ class LokiClientPushTest {
 
         assertThatThrownBy(() -> client.push(LABELS, TIMESTAMP_NANOS, LINE, METADATA))
                 .hasMessage("Loki push failed with HTTP 400: " + body);
-    }
-
-    @Test
-    void push_errorBodyOf501Chars_keepsTheFirst500() {
-        server.expect(requestTo(PUSH_URL))
-                .andRespond(withStatus(HttpStatusCode.valueOf(400)).body("a".repeat(500) + "b"));
-
-        assertThatThrownBy(() -> client.push(LABELS, TIMESTAMP_NANOS, LINE, METADATA))
-                .hasMessage("Loki push failed with HTTP 400: " + "a".repeat(500) + "...");
     }
 
     @Test

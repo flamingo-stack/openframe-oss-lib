@@ -38,14 +38,14 @@ class LogServiceLogDetailsTest {
     private LogService service;
 
     @Test
-    void findLogDetails_eventStoredForTheCallersTenant_mapsEveryField() {
+    void findLogDetails_eventStoredForTheCallersTenant_mapsEveryFieldOfTheStoredEvent() {
         whenLookedUpForTheCallersTenant().thenReturn(Optional.of(ToolEventLog.builder()
                 .tenantId("tenant-a")
-                .toolType("FLEET")
-                .eventType("LOGIN")
-                .toolEventId("evt-1")
+                .toolType("RMM")
+                .eventType("SCRIPT_EXECUTED")
+                .toolEventId("evt-stored")
                 .ingestDay("2026-10-01")
-                .eventTimestamp(1_790_848_800_123L)
+                .eventTimestamp(1_790_848_800_456L)
                 .severity("WARNING")
                 .message("User logged in")
                 .details("{\"ip\":\"10.0.0.1\"}")
@@ -62,11 +62,11 @@ class LogServiceLogDetailsTest {
         Optional<LogDetails> details = service.findLogDetails("FLEET", "LOGIN", TIMESTAMP, "evt-1");
 
         assertThat(details).contains(LogDetails.builder()
-                .id("1790848800123_evt-1")
-                .toolEventId("evt-1")
-                .eventType("LOGIN")
+                .id("1790848800456_evt-stored")
+                .toolEventId("evt-stored")
+                .eventType("SCRIPT_EXECUTED")
                 .ingestDay("2026-10-01")
-                .toolType("FLEET")
+                .toolType("RMM")
                 .severity("WARNING")
                 .userId("user-7")
                 .deviceId("device-7")
@@ -77,7 +77,7 @@ class LogServiceLogDetailsTest {
                 .organizationId("org-7")
                 .organizationName("Acme")
                 .summary("User logged in")
-                .timestamp(TIMESTAMP)
+                .timestamp(Instant.parse("2026-10-01T10:00:00.456Z"))
                 .message("User logged in")
                 .details("{\"ip\":\"10.0.0.1\"}")
                 .build());

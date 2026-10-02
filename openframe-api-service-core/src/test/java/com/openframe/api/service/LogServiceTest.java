@@ -214,13 +214,23 @@ class LogServiceTest {
     }
 
     @Test
-    void queryLogs_blankSortFieldWithoutDirection_sortsByTheDefaultFieldDescending() {
-        SortInput sort = SortInput.builder().field("  ").build();
+    void queryLogs_blankSortField_sortsByTheDefaultField() {
+        SortInput sort = SortInput.builder().field("  ").direction(SortDirection.ASC).build();
 
         service.queryLogs(LogFilterCriteria.builder().build(), page(), null, sort);
 
         verify(pinotLogRepository).findLogs("t1", null, null, null, null, null, null, null, null, null, null, 21,
-                "eventTimestamp", "DESC");
+                "eventTimestamp", "ASC");
+    }
+
+    @Test
+    void queryLogs_sortWithoutDirection_sortsDescending() {
+        SortInput sort = SortInput.builder().field("severity").build();
+
+        service.queryLogs(LogFilterCriteria.builder().build(), page(), null, sort);
+
+        verify(pinotLogRepository).findLogs("t1", null, null, null, null, null, null, null, null, null, null, 21,
+                "severity", "DESC");
     }
 
     @ParameterizedTest

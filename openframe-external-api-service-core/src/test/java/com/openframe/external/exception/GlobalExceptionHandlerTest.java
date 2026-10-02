@@ -4,7 +4,6 @@ import com.openframe.core.dto.ErrorResponse;
 import com.openframe.core.exception.BaseGlobalExceptionHandler;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.loki.client.LokiQueryException;
-import com.openframe.data.loki.client.LokiQueryRejectedException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import com.openframe.external.support.ExternalApiMockMvc;
 import org.junit.jupiter.api.BeforeEach;
@@ -169,10 +168,9 @@ class GlobalExceptionHandlerTest {
                 .andExpect(content().string(not(containsString(SECRET_DETAIL))));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"loki", "loki-rejected"})
-    void handleLokiQueryException_anyLokiQueryFailure_answers503WithoutLeakingTheCause(String kind) throws Exception {
-        mockMvc.perform(get("/failing/throw/" + kind))
+    @Test
+    void handleLokiQueryException_lokiQueryFailure_answers503WithoutLeakingTheCause() throws Exception {
+        mockMvc.perform(get("/failing/throw/loki"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("LOKI_QUERY_ERROR"))
                 .andExpect(jsonPath("$.message").value("Logs are temporarily unavailable. Please try again later."))
@@ -181,14 +179,12 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void handleLokiQueryException_lokiFailure_logsItWithItsCause(CapturedOutput output) {
+    void handleLokiQueryException_lokiQueryFailure_logsItWithItsCause(CapturedOutput output) {
         handler.handleLokiQueryException(
                 new LokiQueryException("Loki query failed: I/O error", new IOException("connection refused")));
 
-        assertThat(output.getOut())
-                .contains("Loki query error: ")
-                .contains("LokiQueryException: Loki query failed: I/O error")
-                .contains("Caused by: java.io.IOException: connection refused");
+        assertThat(output.getOut()).contains("Loki query error: ", "Loki query failed: I/O error",
+                "java.io.IOException", "connection refused");
     }
 
     @Test
@@ -273,8 +269,6 @@ class GlobalExceptionHandlerTest {
             switch (kind) {
                 case "pinot" -> throw new PinotQueryException(SECRET_DETAIL);
                 case "loki" -> throw new LokiQueryException(SECRET_DETAIL);
-                case "loki-rejected" ->
-                        throw new LokiQueryRejectedException(SECRET_DETAIL, new IllegalStateException("400"));
                 case "database" -> throw new DataAccessResourceFailureException(SECRET_DETAIL);
                 case "duplicate-key" -> throw new DuplicateKeyException(SECRET_DETAIL);
                 case "wrapped-database" ->

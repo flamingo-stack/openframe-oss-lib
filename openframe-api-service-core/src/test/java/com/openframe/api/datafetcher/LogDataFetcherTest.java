@@ -24,8 +24,6 @@ import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -111,16 +109,14 @@ class LogDataFetcherTest {
 
     @Test
     void logEventId_event_returnsItsRelayGlobalId() {
-        DgsDataFetchingEnvironment environment = mock(DgsDataFetchingEnvironment.class);
-        when(environment.getSource()).thenReturn(LogEvent.builder().id("1790848800123_evt-1").build());
+        DgsDataFetchingEnvironment environment = environmentOf(LogEvent.builder().id("1790848800123_evt-1").build());
 
         assertThat(fetcher.logEventId(environment)).isEqualTo("TG9nRXZlbnQ6MTc5MDg0ODgwMDEyM19ldnQtMQ");
     }
 
     @Test
     void logDetailsId_details_returnsTheirRelayGlobalId() {
-        DgsDataFetchingEnvironment environment = mock(DgsDataFetchingEnvironment.class);
-        when(environment.getSource()).thenReturn(LogDetails.builder().id("1790848800123_evt-1").build());
+        DgsDataFetchingEnvironment environment = environmentOf(LogDetails.builder().id("1790848800123_evt-1").build());
 
         assertThat(fetcher.logDetailsId(environment)).isEqualTo("TG9nRGV0YWlsczoxNzkwODQ4ODAwMTIzX2V2dC0x");
     }
@@ -133,13 +129,26 @@ class LogDataFetcherTest {
                         .hasSingleBean(LogService.class));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"openframe.loki.enabled=false", "spring.data.cassandra.enabled=true"})
-    void logsSection_lokiNotEnabled_registersNeitherTheFetcherNorItsService(String property) {
-        logsSectionContext().withPropertyValues(property)
+    @Test
+    void logsSection_lokiSwitchOff_registersNeitherTheFetcherNorItsService() {
+        logsSectionContext().withPropertyValues("openframe.loki.enabled=false")
                 .run(context -> assertThat(context)
                         .doesNotHaveBean(LogDataFetcher.class)
                         .doesNotHaveBean(LogService.class));
+    }
+
+    @Test
+    void logsSection_onlyTheOldCassandraSwitchOn_registersNeitherTheFetcherNorItsService() {
+        logsSectionContext().withPropertyValues("spring.data.cassandra.enabled=true")
+                .run(context -> assertThat(context)
+                        .doesNotHaveBean(LogDataFetcher.class)
+                        .doesNotHaveBean(LogService.class));
+    }
+
+    private static DgsDataFetchingEnvironment environmentOf(Object source) {
+        DgsDataFetchingEnvironment environment = mock(DgsDataFetchingEnvironment.class);
+        when(environment.getSource()).thenReturn(source);
+        return environment;
     }
 
     private static ApplicationContextRunner logsSectionContext() {

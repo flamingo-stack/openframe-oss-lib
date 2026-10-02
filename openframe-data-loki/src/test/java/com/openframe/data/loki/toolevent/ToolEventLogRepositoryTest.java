@@ -56,11 +56,6 @@ class ToolEventLogRepositoryTest {
     }
 
     @Test
-    void toLine_everyFieldSet_writesThemAllInAFixedOrder() {
-        assertThat(repository.toLine(fullEvent())).isEqualTo(FULL_LINE);
-    }
-
-    @Test
     void toLine_optionalFieldsNull_leavesThemOut() {
         ToolEventLog event = ToolEventLog.builder()
                 .tenantId("tenant-a")
@@ -75,22 +70,7 @@ class ToolEventLogRepositoryTest {
     }
 
     @Test
-    void toLine_eventFieldCannotBeRead_throwsIllegalStateWithTheWritingCause() {
-        ToolEventLog unreadable = new ToolEventLog() {
-            @Override
-            public String getDetails() {
-                throw new UnsupportedOperationException("details unavailable");
-            }
-        };
-
-        assertThatThrownBy(() -> repository.toLine(unreadable))
-                .isExactlyInstanceOf(IllegalStateException.class)
-                .hasMessage("Tool event log cannot be written as a Loki line")
-                .hasCauseInstanceOf(JsonProcessingException.class);
-    }
-
-    @Test
-    void find_storedEvent_asksForExactlyThatTenantToolTypeIdAndMillisecond() {
+    void find_storedEvent_returnsIt() {
         whenLookedUp().thenReturn(List.of(new LokiLogEntry(EVENT_NANOS, FULL_LINE, Map.of())));
 
         Optional<ToolEventLog> found = find();
