@@ -2,6 +2,7 @@
 
 import { useEffect, useReducer } from 'react';
 import { embedAuthedFetch, needsBearerAssetFetch } from '../utils/embed-authed-fetch';
+import { useIsomorphicLayoutEffect } from './ui/use-isomorphic-layout-effect';
 
 /**
  * Resolve ANY asset URL the browser would load natively — `<img src>`,
@@ -121,7 +122,10 @@ export function useAuthedAssetSrc(src?: string | null, accept = '*/*'): string |
   const bearerSrc = src && needsBearerAssetFetch(src) ? src : null;
   const [, rerender] = useReducer((c: number) => c + 1, 0);
 
-  useEffect(() => {
+  // Layout, not passive: this render hands out the cached blob URL, and a
+  // release timer firing before a passive effect ran would revoke it under
+  // the committed <img>.
+  useIsomorphicLayoutEffect(() => {
     if (!bearerSrc) return undefined;
     acquire(bearerSrc);
     return () => release(bearerSrc);

@@ -303,6 +303,21 @@ function useContainedResizableSize({
   return { size, setSize, clampSize: clampToContainer };
 }
 
+/** Ends a drawer resize drag: commits the size it reached and restores the
+ *  page's cursor and text selection. No-op when no drag is in progress. */
+function finishDrag(
+  startRef: RefObject<{ x: number; y: number; size: number } | null>,
+  dragSizeRef: RefObject<number | null>,
+  commit: (size: number) => void,
+): void {
+  if (!startRef.current) return;
+  startRef.current = null;
+  if (dragSizeRef.current !== null) commit(dragSizeRef.current);
+  dragSizeRef.current = null;
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+}
+
 interface AppLayoutDrawerResizeHandleProps {
   side: DrawerSide;
   size: number;
@@ -330,6 +345,14 @@ function AppLayoutDrawerResizeHandle({
   const startRef = useRef<{ x: number; y: number; size: number } | null>(null);
   // Size reached by the drag in progress, committed to React state on release.
   const dragSizeRef = useRef<number | null>(null);
+  const onSizeRef = useRef(onSize);
+  useEffect(() => {
+    onSizeRef.current = onSize;
+  }, [onSize]);
+  // The handle can unmount mid-drag (a persist-mode drawer closing), and then
+  // no pointer event ends the drag: end it here, or the panel keeps a width
+  // React state never received and the page keeps the resize cursor.
+  useEffect(() => () => finishDrag(startRef, dragSizeRef, onSizeRef.current), []);
 
   const direction = side === 'right' || side === 'bottom' ? -1 : 1;
 
@@ -362,18 +385,12 @@ function AppLayoutDrawerResizeHandle({
 
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     if (!startRef.current) return;
-    startRef.current = null;
-    if (dragSizeRef.current !== null) {
-      onSize(dragSizeRef.current);
-      dragSizeRef.current = null;
-    }
+    finishDrag(startRef, dragSizeRef, onSize);
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
       // ignore — pointer may already be released
     }
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -429,6 +446,7 @@ function AppLayoutDrawerResizeHandle({
       onPointerMove={handlePointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
       onKeyDown={handleKeyDown}
       className={cn(
         'group absolute z-20 flex touch-none select-none',

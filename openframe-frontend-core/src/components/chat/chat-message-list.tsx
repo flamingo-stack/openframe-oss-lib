@@ -57,6 +57,9 @@ const FOLLOW_RETAIN_MS = 350;
  *  short enough that an idle open drawer stops waking the page every frame. */
 const GROWTH_WATCH_IDLE_MS = 10_000;
 
+/** Media events after which the thread's height can have changed. */
+const MEDIA_SETTLE_EVENTS = ['load', 'error', 'loadedmetadata'] as const;
+
 /*
  * Stick-to-bottom: `use-stick-to-bottom` (stackblitz-labs)
  *
@@ -452,7 +455,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // GROWTH_WATCH_IDLE_MS — polled every frame forever it kept an idle open
       // drawer rendering at 60fps (~5% of a core in WebKit) — and `kick`
       // restarts it on everything that can grow the thread: new messages and
-      // typing-state changes (the effect below), scroll, and the observer.
+      // typing-state changes (the effect below), scroll, the observer, and
+      // media inside the thread settling (an image loading or failing, a video
+      // learning its size) — that can land well after the last message, when
+      // the observer may be watching a detached node.
       let growthRaf = 0;
       let lastScrollHeight = scroller.scrollHeight;
       let lastGrowthAt = performance.now();
@@ -603,6 +609,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       scroller.addEventListener('touchmove', onTouchMove, { passive: true });
       window.addEventListener('pointerdown', onPointerDown, winCapture);
       scroller.addEventListener('scroll', onScroll, { passive: true });
+      // Media events do not bubble — capture them from the elements inside.
+      for (const type of MEDIA_SETTLE_EVENTS) scroller.addEventListener(type, kick, { capture: true, passive: true });
       window.addEventListener('pointerup', endPointer, winCapture);
       window.addEventListener('pointercancel', endPointer, winCapture);
       // Bubble phase, NOT capture — see the note above.
@@ -619,6 +627,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // `capture` must match the add call or the listener is not removed.
         window.removeEventListener('pointerdown', onPointerDown, { capture: true });
         scroller.removeEventListener('scroll', onScroll);
+        for (const type of MEDIA_SETTLE_EVENTS) scroller.removeEventListener(type, kick, { capture: true });
         window.removeEventListener('pointerup', endPointer, { capture: true });
         window.removeEventListener('pointercancel', endPointer, { capture: true });
         // Added WITHOUT capture — the remove must match.

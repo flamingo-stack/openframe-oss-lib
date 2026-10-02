@@ -1,6 +1,5 @@
 'use client';
 
-import type { Element, Root } from 'hast';
 /**
  * MarkdownEngine — THE one react-markdown pipeline for every surface
  * (chat messages, blog, docs, KB articles, legal, releases, admin previews).
@@ -18,10 +17,12 @@ import type { Element, Root } from 'hast';
  *   → escapeUnknownHtmlTags (text pre-pass, React 19 crash guard)
  *   → remark: remarkGfm, remarkBreaks, ...additionalRemarkPlugins
  *   → rehype: rehypeRaw → rehypeSanitize(schema) → rehypeStripUnsafe
- *       → rehypeHighlight
+ *       → rehypeLabelBareFences → rehypeHighlight (not on the streaming tail)
  *   → urlTransform: cardAwareUrlTransform
  *   → components: buildBaseComponents(...) spread-last componentOverrides
  */
+
+import type { Element, Root } from 'hast';
 import type React from 'react';
 import { memo, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
@@ -65,14 +66,16 @@ export type { ResolveLinkResult };
  */
 export const NO_BROKEN_LINKS: readonly string[] = [];
 
+const BARE_FENCE_LANGUAGE = 'code';
+
 /**
  * Gives a fenced code block written without a language the `language-code`
  * class. The `code` renderer tells a fenced block from inline code only by a
  * `language-*` class, which unlabelled fences used to get from
  * rehype-highlight's language detection; without detection (and on the
  * streaming tail, which is not highlighted at all) they would render as
- * inline-code pills. `code` is no highlight.js grammar, so `ignoreMissing`
- * leaves the block unhighlighted, and the block header reads "code".
+ * inline-code pills. `code` is in rehype-highlight's `plainText` list, so
+ * the block is left unhighlighted, and its header reads "code".
  */
 function rehypeLabelBareFences() {
   const visit = (node: Root | Element) => {
@@ -83,7 +86,7 @@ function rehypeLabelBareFences() {
           if (code.type !== 'element' || code.tagName !== 'code') continue;
           const classes = Array.isArray(code.properties.className) ? code.properties.className : [];
           if (!classes.some(c => String(c).startsWith('language-'))) {
-            code.properties.className = [...classes, 'language-code'];
+            code.properties.className = [...classes, `language-${BARE_FENCE_LANGUAGE}`];
           }
         }
       }
@@ -230,13 +233,18 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     });
     // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
     // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
-    // defense-in-depth (srcset scanning, iframe[srcdoc]); highlight last.
+    // defense-in-depth (srcset scanning, iframe[srcdoc]); the fence label
+    // goes on after sanitizing and before highlight, which runs last.
     const safe: PluggableList = [rehypeRaw, [rehypeSanitize, schema], rehypeStripUnsafe, rehypeLabelBareFences];
-    return {
+    const highlighted: PluggableList = [
+      ...safe,
       // No language detection: it ran highlightAuto over every registered
       // grammar for each unlabelled fence (~2.5x the cost of opening a
       // thread) and often guessed wrong (PowerShell shown as "VBNET").
-      rehypePlugins: [...safe, [rehypeHighlight, { ignoreMissing: true }]] as PluggableList,
+      [rehypeHighlight, { plainText: [BARE_FENCE_LANGUAGE] }],
+    ];
+    return {
+      rehypePlugins: highlighted,
       // The streaming tail re-parses on every chunk, and a code fence being
       // typed is one tail block — highlighting it every chunk was the
       // costliest step of a streamed reply. It is highlighted once it
