@@ -286,7 +286,7 @@ export function MingoChatRail({
             initialValue={searchQuery}
             onSearchChange={onSearchChange}
             onCollapse={() => setSearchOpen(false)}
-            className="rounded-md border border-ods-border"
+            className="h-10 rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-xs)]"
           />
         ) : undefined
       }
