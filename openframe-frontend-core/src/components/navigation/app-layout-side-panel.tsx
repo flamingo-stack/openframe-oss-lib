@@ -1,6 +1,15 @@
 'use client';
 
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { useMediaQuery } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
@@ -29,66 +38,164 @@ export interface AppLayoutSidePanelConfig {
   minWidth?: number;
   /** Narrowest the content may get before the panel takes over. Default 400. */
   minContentWidth?: number;
-  /** localStorage key for the chosen width. */
+  /** localStorage key for the chosen width. Without it the width lasts the session. */
   storageKey?: string;
   /**
-   * Pages that need the whole content width set this: the panel drops back to
-   * its minimum when it turns on. The user can still widen it.
+   * Pages that need the whole content width set this: the panel starts at its
+   * minimum there. The user can still widen it; the width they chose
+   * elsewhere is kept for the other pages.
    */
   collapsed?: boolean;
-  /** Accessible name of the panel region. */
+  /** Accessible name of the panel region. Default "Side panel". */
   label?: string;
 }
 
-// The docked card's inset from the window edge, top and bottom.
-const PANEL_INSET = 16;
+/** Inset of the docked card from the window edge and the header. */
+export const SIDE_PANEL_INSET = 16;
 const MOBILE_QUERY = '(max-width: 799.98px)';
+const STORAGE_EVENT = 'of:side-panel-size';
 
-interface StoredSize {
+export interface SidePanelSize {
+  /** Docked width the user chose. */
   width: number;
+  /** Dragged past the content minimum: the panel takes the whole area. */
   expanded: boolean;
 }
 
-function readStored(storageKey: string | undefined, minWidth: number): StoredSize {
-  const fallback = { width: minWidth, expanded: false };
-  if (!storageKey || typeof window === 'undefined') return fallback;
+export interface SidePanelLayoutInput {
+  /** Width of the row the content and the panel share; 0 before it is measured. */
+  rowWidth: number;
+  isMobile: boolean;
+  /** Opened from the header (only meaningful while it cannot dock). */
+  isOpen: boolean;
+  size: SidePanelSize;
+  minWidth: number;
+  minContentWidth: number;
+}
+
+export interface SidePanelLayout {
+  mode: AppLayoutSidePanelMode;
+  /** Width the panel body is drawn at. */
+  width: number;
+  /** The panel can sit beside the content. */
+  canDock: boolean;
+  /** Widest docked width; one pixel more takes the whole area. */
+  maxDockedWidth: number;
+}
+
+/**
+ * Where the panel goes for a given room. Pure, so the rules read in one place:
+ * a phone gets the overlay; a row with room for both minimums docks (or is
+ * full when dragged past); otherwise it hides until opened from the header.
+ * An unmeasured row docks, so the first paint matches the common case.
+ */
+export function resolveSidePanelLayout({
+  rowWidth,
+  isMobile,
+  isOpen,
+  size,
+  minWidth,
+  minContentWidth,
+}: SidePanelLayoutInput): SidePanelLayout {
+  const measured = rowWidth > 0;
+  const room = rowWidth - minContentWidth - SIDE_PANEL_INSET;
+  const canDock = !isMobile && (!measured || room >= minWidth);
+  const maxDockedWidth = measured ? Math.max(minWidth, room) : Number.POSITIVE_INFINITY;
+
+  let mode: AppLayoutSidePanelMode;
+  if (isMobile) mode = isOpen ? 'overlay' : 'hidden';
+  else if (!canDock) mode = isOpen ? 'full' : 'hidden';
+  else mode = size.expanded ? 'full' : 'docked';
+
+  let width: number;
+  if (mode === 'docked') width = Math.min(Math.max(size.width, minWidth), maxDockedWidth);
+  else if (mode === 'overlay') width = rowWidth;
+  else width = Math.max(0, rowWidth - 2 * SIDE_PANEL_INSET);
+
+  return { mode, width, canDock, maxDockedWidth };
+}
+
+function parseSize(raw: string | null): SidePanelSize | null {
+  if (!raw) return null;
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? 'null') as Partial<StoredSize> | null;
-    if (!parsed || !Number.isFinite(parsed.width)) return fallback;
-    return { width: Number(parsed.width), expanded: parsed.expanded === true };
+    const parsed = JSON.parse(raw) as Partial<SidePanelSize> | null;
+    if (!parsed || typeof parsed.width !== 'number' || !Number.isFinite(parsed.width)) return null;
+    return { width: parsed.width, expanded: parsed.expanded === true };
   } catch {
-    return fallback;
+    return null;
   }
 }
 
-export interface AppLayoutSidePanelState {
-  mode: AppLayoutSidePanelMode;
-  /** Width of the panel body in the current mode. */
-  width: number;
+function subscribeToStoredSize(onChange: () => void) {
+  window.addEventListener('storage', onChange);
+  window.addEventListener(STORAGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener('storage', onChange);
+    window.removeEventListener(STORAGE_EVENT, onChange);
+  };
+}
+
+/**
+ * The persisted size, read through `useSyncExternalStore` so the server and
+ * the hydrating client both render the default and the stored width arrives
+ * on the render after: a size in the first render would be a hydration
+ * mismatch on the panel's inline width.
+ */
+function useStoredSize(storageKey: string | undefined, fallback: SidePanelSize) {
+  const raw = useSyncExternalStore(
+    subscribeToStoredSize,
+    () => {
+      if (!storageKey) return null;
+      try {
+        return window.localStorage.getItem(storageKey);
+      } catch {
+        return null;
+      }
+    },
+    () => null,
+  );
+  const [sessionSize, setSessionSize] = useState<SidePanelSize | null>(null);
+  const size = (storageKey ? parseSize(raw) : sessionSize) ?? fallback;
+
+  const setSize = (next: SidePanelSize) => {
+    if (!storageKey) {
+      setSessionSize(next);
+      return;
+    }
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {
+      // Storage refused (quota, privacy mode): keep it for the session.
+      setSessionSize(next);
+    }
+    window.dispatchEvent(new Event(STORAGE_EVENT));
+  };
+
+  return [size, setSize] as const;
+}
+
+export interface AppLayoutSidePanelState extends SidePanelLayout {
   minWidth: number;
-  /** Widest the panel can dock before it takes the whole content area. */
-  maxDockedWidth: number;
-  /** The panel can sit beside the content (else the header toggles it). */
-  canDock: boolean;
   /** Opened from the header while it cannot dock. */
   isOpen: boolean;
   toggle: () => void;
+  close: () => void;
   resize: (next: number) => void;
 }
 
 /**
  * Owns the side panel's geometry. Lives in `AppLayout`, not the panel, because
- * the header's toggle reads it too.
+ * the header's toggle reads it too. Returns null without a config.
  */
 export function useAppLayoutSidePanel(
   config: AppLayoutSidePanelConfig | undefined,
   row: HTMLElement | null,
 ): AppLayoutSidePanelState | null {
+  const enabled = config !== undefined;
   const minWidth = config?.minWidth ?? 296;
   const minContentWidth = config?.minContentWidth ?? 400;
-  const storageKey = config?.storageKey;
   const collapsed = config?.collapsed ?? false;
-  const enabled = config !== undefined;
+  const minimum: SidePanelSize = { width: minWidth, expanded: false };
 
   const [rowWidth, setRowWidth] = useState(0);
   useIsomorphicLayoutEffect(() => {
@@ -101,66 +208,44 @@ export function useAppLayoutSidePanel(
   }, [enabled, row]);
 
   const isMobile = useMediaQuery(MOBILE_QUERY) === true;
-  const [stored, setStored] = useState<StoredSize>(() => readStored(storageKey, minWidth));
+  const [storedSize, setStoredSize] = useStoredSize(config?.storageKey, minimum);
   const [isOpen, setIsOpen] = useState(false);
 
-  const measured = rowWidth > 0;
-  const maxDockedWidth = rowWidth - minContentWidth - PANEL_INSET;
-  const canDock = !isMobile && (!measured || maxDockedWidth >= minWidth);
-
-  // Room came back (the navigation collapsed, the window widened): return to
-  // the column. Dropping the header-open flag means losing the room again
-  // hides the panel rather than throwing it over the content.
-  const [prevCanDock, setPrevCanDock] = useState(canDock);
-  if (canDock !== prevCanDock) {
-    setPrevCanDock(canDock);
-    setIsOpen(false);
-  }
-
   // A page that needs the full width starts the panel at its minimum without
-  // touching the width the user chose elsewhere: a drag there is kept only
-  // until the page lets go.
-  const [collapsedSize, setCollapsedSize] = useState<StoredSize | null>(null);
+  // touching the width the user chose elsewhere: a drag there lasts until the
+  // page lets go.
+  const [collapsedSize, setCollapsedSize] = useState<SidePanelSize | null>(null);
   const [prevCollapsed, setPrevCollapsed] = useState(collapsed);
   if (collapsed !== prevCollapsed) {
     setPrevCollapsed(collapsed);
     setCollapsedSize(null);
   }
-  const size = collapsed ? (collapsedSize ?? { width: minWidth, expanded: false }) : stored;
-  const setSize = collapsed ? setCollapsedSize : setStored;
+  const size = collapsed ? (collapsedSize ?? minimum) : storedSize;
+  const setSize = collapsed ? setCollapsedSize : setStoredSize;
 
-  useEffect(() => {
-    if (!enabled || !storageKey) return;
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(stored));
-    } catch {
-      // ignore quota / disabled storage
-    }
-  }, [enabled, storageKey, stored]);
+  const layout = resolveSidePanelLayout({ rowWidth, isMobile, isOpen, size, minWidth, minContentWidth });
 
-  if (!config) return null;
+  // Room came back (the navigation collapsed, the window widened): return to
+  // the column. Dropping the header-open flag means losing the room again
+  // hides the panel rather than throwing it over the content.
+  const [prevCanDock, setPrevCanDock] = useState(layout.canDock);
+  if (layout.canDock !== prevCanDock) {
+    setPrevCanDock(layout.canDock);
+    setIsOpen(false);
+  }
 
-  let mode: AppLayoutSidePanelMode;
-  if (isMobile) mode = isOpen ? 'overlay' : 'hidden';
-  else if (!canDock) mode = isOpen ? 'full' : 'hidden';
-  else mode = size.expanded ? 'full' : 'docked';
-
-  const dockedWidth = Math.min(Math.max(size.width, minWidth), Math.max(minWidth, maxDockedWidth));
-  const width =
-    mode === 'docked' ? dockedWidth : mode === 'overlay' ? rowWidth : Math.max(0, rowWidth - 2 * PANEL_INSET);
+  if (!enabled) return null;
 
   return {
-    mode,
-    width,
+    ...layout,
     minWidth,
-    maxDockedWidth: Math.max(minWidth, maxDockedWidth),
-    canDock,
     isOpen,
     toggle: () => setIsOpen(open => !open),
+    close: () => setIsOpen(false),
     resize: next => {
       // Past the content's minimum the panel takes the whole area; dragging
       // back under it docks again at the dragged width.
-      if (next > maxDockedWidth) setSize({ width: size.width, expanded: true });
+      if (next > layout.maxDockedWidth) setSize({ width: size.width, expanded: true });
       else setSize({ width: Math.max(minWidth, Math.round(next)), expanded: false });
     },
   };
@@ -169,16 +254,40 @@ export function useAppLayoutSidePanel(
 interface SidePanelResizeHandleProps {
   state: AppLayoutSidePanelState;
   label: string;
+  controls: string;
 }
 
-function SidePanelResizeHandle({ state, label }: SidePanelResizeHandleProps) {
-  const startRef = useRef<{ x: number; width: number } | null>(null);
+function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandleProps) {
   const { width, minWidth, maxDockedWidth, mode, resize } = state;
+  const startRef = useRef<{ x: number; width: number } | null>(null);
+  // Pointer moves outpace frames; resize once per frame with the latest one.
+  const frameRef = useRef<number | null>(null);
+  const pendingRef = useRef<number | null>(null);
+  // Unmeasured row (first paint): no upper bound to announce or jump to yet.
+  const measured = Number.isFinite(maxDockedWidth);
+  // The width a drag starts from: in `full`, one past the docked maximum.
+  const current = mode === 'full' && measured ? maxDockedWidth + 1 : width;
+
+  useEffect(
+    () => () => {
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    },
+    [],
+  );
+
+  const scheduleResize = (next: number) => {
+    pendingRef.current = next;
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      if (pendingRef.current !== null) resize(pendingRef.current);
+    });
+  };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 && event.pointerType === 'mouse') return;
     event.preventDefault();
-    startRef.current = { x: event.clientX, width };
+    startRef.current = { x: event.clientX, width: current };
     event.currentTarget.setPointerCapture(event.pointerId);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
@@ -188,7 +297,7 @@ function SidePanelResizeHandle({ state, label }: SidePanelResizeHandleProps) {
     const start = startRef.current;
     if (!start) return;
     // The handle sits on the panel's left edge: dragging left widens it.
-    resize(start.width - (event.clientX - start.x));
+    scheduleResize(start.width - (event.clientX - start.x));
   };
 
   const endDrag = (event: PointerEvent<HTMLDivElement>) => {
@@ -206,10 +315,10 @@ function SidePanelResizeHandle({ state, label }: SidePanelResizeHandleProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const step = event.shiftKey ? 40 : 16;
     let next: number | null = null;
-    if (event.key === 'ArrowLeft') next = width + step;
-    else if (event.key === 'ArrowRight') next = (mode === 'full' ? maxDockedWidth : width) - step;
+    if (event.key === 'ArrowLeft') next = current + step;
+    else if (event.key === 'ArrowRight') next = Math.min(current, maxDockedWidth) - step;
     else if (event.key === 'Home') next = minWidth;
-    else if (event.key === 'End') next = maxDockedWidth + 1;
+    else if (event.key === 'End' && measured) next = maxDockedWidth + 1;
     if (next === null) return;
     event.preventDefault();
     resize(next);
@@ -219,11 +328,13 @@ function SidePanelResizeHandle({ state, label }: SidePanelResizeHandleProps) {
     <div
       role="separator"
       tabIndex={0}
+      aria-controls={controls}
       aria-orientation="vertical"
       aria-label={label}
-      aria-valuenow={Math.round(mode === 'full' ? maxDockedWidth + 1 : width)}
+      aria-valuenow={Math.round(current)}
       aria-valuemin={minWidth}
-      aria-valuemax={maxDockedWidth + 1}
+      aria-valuemax={measured ? Math.round(maxDockedWidth + 1) : undefined}
+      aria-valuetext={mode === 'full' ? 'Full width' : `${Math.round(width)} pixels`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={endDrag}
@@ -233,7 +344,7 @@ function SidePanelResizeHandle({ state, label }: SidePanelResizeHandleProps) {
     >
       <span
         aria-hidden
-        className="flex h-8 w-4 items-center justify-center rounded-sm border border-ods-border bg-ods-card text-ods-text-secondary transition-colors group-hover:border-ods-border-hover group-focus-visible:border-ods-accent"
+        className="flex h-8 w-4 items-center justify-center rounded-sm border border-ods-border bg-ods-card text-ods-text-secondary transition-colors group-hover:border-ods-border-hover group-focus-visible:border-ods-accent group-focus-visible:text-ods-accent"
       >
         <Menu01Icon size={12} />
       </span>
@@ -247,22 +358,34 @@ interface AppLayoutSidePanelProps {
 }
 
 export function AppLayoutSidePanel({ config, state }: AppLayoutSidePanelProps) {
-  const { mode, width, canDock } = state;
+  const panelId = useId();
+  const { mode, width, canDock, isOpen, close } = state;
   if (mode === 'hidden') return null;
   const label = config.label ?? 'Side panel';
 
+  // Opened from the header: Escape puts it away again.
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Escape' || !isOpen || event.defaultPrevented) return;
+    event.preventDefault();
+    close();
+  };
+
   return (
     <aside
+      id={panelId}
       aria-label={label}
+      onKeyDown={handleKeyDown}
       className={cn(
         'relative flex min-w-0',
-        mode === 'docked' && 'shrink-0 py-[var(--spacing-system-mf)] pr-[var(--spacing-system-mf)]',
+        // Docked is decided before the viewport is known (server render, first
+        // paint): keep it off phones until JS says otherwise.
+        mode === 'docked' && 'hidden shrink-0 py-[var(--spacing-system-mf)] pr-[var(--spacing-system-mf)] md:flex',
         mode === 'full' && 'flex-1 p-[var(--spacing-system-mf)]',
         mode === 'overlay' && 'absolute inset-0 z-[103] bg-ods-bg',
       )}
-      style={mode === 'docked' ? { width: width + PANEL_INSET } : undefined}
+      style={mode === 'docked' ? { width: width + SIDE_PANEL_INSET } : undefined}
     >
-      {canDock && <SidePanelResizeHandle state={state} label={`Resize ${label}`} />}
+      {canDock && <SidePanelResizeHandle state={state} label={`Resize ${label}`} controls={panelId} />}
       <div
         className={cn(
           'flex min-h-0 min-w-0 flex-1 overflow-hidden bg-ods-bg',

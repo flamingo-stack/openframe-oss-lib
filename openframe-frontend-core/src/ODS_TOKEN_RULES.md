@@ -109,6 +109,32 @@ for it on badges and chips instead of a raw `text-[10px]`; anything a user reads
 `text-h5`/`text-h6` or larger. Stamps are fixed on purpose — growing them on desktop is what
 balloons a badge out of the row it sits in.
 
+## Content area breakpoints
+
+The tokens and `md:` / `lg:` above follow the **viewport**. When `AppLayout` has a `sidePanel` (the
+docked Mingo chat), the panel narrows the content without the viewport changing, so the content lays
+out by **its own width** instead. `<main>` becomes an `.ods-content-area` container, and:
+
+| Content width | Layout | Tokens (`text-h*`, `--spacing-system-*`) |
+|---------------|--------|-------------------------------------------|
+| < 720px | mobile | mobile values |
+| 720-1023px | tablet (`content-md:`) | the viewport's (desktop sizes on a desktop) |
+| ≥ 1024px | desktop (`content-lg:`) | the viewport's |
+
+- **Tokens need nothing.** `ods-content-area.css` re-declares the mobile values on the content
+  scope while it is narrower than 720px; every `text-h*` and spacing var below it follows.
+- **Layout switches in page content use `content-md:` / `content-lg:`**, not `md:` / `lg:` — e.g.
+  `grid-cols-2 content-lg:grid-cols-4`. Outside a content area (apps without a side panel, overlays
+  portalled to `<body>`) they fall back to the viewport `md` / `lg` steps, so a shared component can
+  switch to them without changing anywhere else it renders.
+- **Keep `md:` / `lg:` for chrome and overlays** that follow the window: header, navigation,
+  modals, dropdowns, toasts. Never mix `md:` and `content-md:` on one property of one element.
+- **JS layout decisions** use `useContentBreakpoint()` / `useContentMdUp()` / `useContentLgUp()`
+  from `hooks` instead of `useMdUp()` / `useLgUp()` — the same steps, the same viewport fallback.
+- **Things that measure the window** (`vw`, `w-screen`, `fixed left-0 right-0`, a `resize` listener
+  on `window`) do not see the panel. Measure the element (`ResizeObserver`) or the container
+  (`cqw`) instead.
+
 ## General
 
 - Convert hardcoded values to ODS tokens even when copying patterns from existing code.
