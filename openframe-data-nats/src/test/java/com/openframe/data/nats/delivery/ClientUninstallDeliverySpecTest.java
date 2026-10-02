@@ -65,15 +65,6 @@ class ClientUninstallDeliverySpecTest {
     }
 
     @Test
-    void targetId_anySeed_theClientItself() {
-        // execution
-        String targetId = spec.targetId(new ClientUninstallDeliverySeed(MACHINE_ID));
-
-        // verifications
-        assertThat(targetId).isEqualTo(TARGET_ID);
-    }
-
-    @Test
     void canDispatch_machineInService_true() {
         // setup
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));

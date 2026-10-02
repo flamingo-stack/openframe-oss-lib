@@ -14,4 +14,9 @@ public class TestSeed implements DeliverySeed {
     public DeliveryType getType() {
         return DeliveryType.TOOL_INSTALLATION;
     }
+
+    @Override
+    public String getTargetId() {
+        return "fleetmdm-agent";
+    }
 }

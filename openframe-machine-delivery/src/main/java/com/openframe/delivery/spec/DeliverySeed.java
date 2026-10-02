@@ -6,5 +6,7 @@ public interface DeliverySeed {
 
     DeliveryType getType();
 
+    String getTargetId();
+
     String getMachineId();
 }

@@ -97,11 +97,9 @@ class DeliveryTrackerTest {
     }
 
     @Test
-    void done_seed_keyResolvedThroughSpecAndCompletableRowMarkedDone() {
+    void done_seed_completableRowOfTheSeedKeyMarkedDone() {
         // setup
         TestSeed seed = new TestSeed(MACHINE_ID);
-        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
-        when(spec.targetId(seed)).thenReturn(TARGET_ID);
         when(repository.markDone(eq(DELIVERY_ID), eq(DeliveryStatus.COMPLETABLE), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
 
         // execution

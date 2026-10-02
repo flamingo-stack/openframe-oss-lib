@@ -24,8 +24,6 @@ import static java.lang.String.format;
 @ConditionalOnProperty("spring.cloud.stream.enabled")
 public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstallDeliverySeed, ClientUninstallMessage> {
 
-    private static final String TARGET_ID = "openframe-client";
-
     private static final String SUBJECT_TEMPLATE = "machine.%s.client-uninstall";
 
     private final MachineRepository machineRepository;
@@ -38,11 +36,6 @@ public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstall
     @Override
     public Class<ClientUninstallMessage> getPayloadClass() {
         return ClientUninstallMessage.class;
-    }
-
-    @Override
-    public String targetId(ClientUninstallDeliverySeed seed) {
-        return TARGET_ID;
     }
 
     // PENDING_DELETION means an earlier uninstall was acknowledged: its open row and the watchdog own the outcome
@@ -64,7 +57,7 @@ public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstall
         message.setIssuedAt(Instant.now().toString());
         return DeliveryRequest.<ClientUninstallMessage>builder()
                 .type(DeliveryType.CLIENT_UNINSTALL)
-                .targetId(targetId(seed))
+                .targetId(seed.getTargetId())
                 .machineId(seed.getMachineId())
                 .payload(message)
                 .build();

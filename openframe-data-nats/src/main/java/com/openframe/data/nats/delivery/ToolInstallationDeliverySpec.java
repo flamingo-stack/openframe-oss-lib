@@ -41,12 +41,6 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
         return ToolInstallationMessage.class;
     }
 
-    // must equal the agentType the agent sends in installed-agent, or done() never finds the row
-    @Override
-    public String targetId(ToolInstallationDeliverySeed seed) {
-        return seed.getToolAgent().getKey();
-    }
-
     @Override
     public boolean canDispatch(ToolInstallationDeliverySeed seed) {
         return true;
@@ -58,7 +52,7 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
         ToolInstallationMessage message = buildMessage(toolAgent, seed.getTool(), seed.isReinstall());
         return DeliveryRequest.<ToolInstallationMessage>builder()
                 .type(DeliveryType.TOOL_INSTALLATION)
-                .targetId(targetId(seed))
+                .targetId(seed.getTargetId())
                 .machineId(seed.getMachineId())
                 .payload(message)
                 .build();

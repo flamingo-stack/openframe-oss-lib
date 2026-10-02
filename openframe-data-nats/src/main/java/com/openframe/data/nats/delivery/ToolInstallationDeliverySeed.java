@@ -20,4 +20,9 @@ public class ToolInstallationDeliverySeed implements DeliverySeed {
     public DeliveryType getType() {
         return DeliveryType.TOOL_INSTALLATION;
     }
+
+    @Override
+    public String getTargetId() {
+        return toolAgent.getKey();
+    }
 }

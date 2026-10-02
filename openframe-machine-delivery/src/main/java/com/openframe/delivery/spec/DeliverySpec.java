@@ -10,8 +10,6 @@ public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload>
 
     Class<P> getPayloadClass();
 
-    String targetId(S seed);
-
     boolean canDispatch(S seed);
 
     DeliveryRequest<P> request(S seed);
