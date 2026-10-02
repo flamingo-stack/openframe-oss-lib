@@ -51,6 +51,12 @@ const BOTTOM_THRESHOLD_PX = 70;
  *  finishing against the target captured when the call was made. */
 const FOLLOW_RETAIN_MS = 350;
 
+/** How long the scrollHeight poll keeps running after the thread last grew,
+ *  in ms. Long enough for the async growth that lands after a message —
+ *  images settling, entity cards resolving out of their skeletons — and
+ *  short enough that an idle open drawer stops waking the page every frame. */
+const GROWTH_WATCH_IDLE_MS = 10_000;
+
 /*
  * Stick-to-bottom: `use-stick-to-bottom` (stackblitz-labs)
  *
@@ -252,6 +258,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // because that call also re-sets the library's `isAtBottom`, a lost
     // lock self-heals instead of being permanent.
     const followBottomRef = useRef(false);
+    // Restarts the follow effect's scrollHeight poll; null while it is not
+    // installed.
+    const kickGrowthWatchRef = useRef<(() => void) | null>(null);
 
     // Drives the jump-to-bottom affordance. Derived from GEOMETRY, not
     // from the library's `isAtBottom`: that flag is the one this list
@@ -425,11 +434,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         measure();
       };
 
-      const ro = new ResizeObserver(reassert);
-      ro.observe(content); // tokens, entity cards, images
-      ro.observe(scroller); // streaming loader / source chips below it
-
-      // GROWTH WATCH — the load-bearing one, because the ResizeObserver above
+      // GROWTH WATCH — the load-bearing one, because the ResizeObserver below
       // is not reliable for this list.
       //
       // `content` is a SNAPSHOT taken when this effect installed, and the deps
@@ -443,20 +448,39 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // A poll on `scrollHeight` sidesteps the whole question of WHICH node is
       // live: it reads the scroller (always mounted, it owns the listeners)
       // and reacts to growth from any source — tokens, images settling, cards
-      // resolving. Gated on the intent, so it costs one rAF-tick comparison
-      // per frame only while actually following, and stops the moment a
-      // gesture disarms.
+      // resolving. It stops once the thread has not grown for
+      // GROWTH_WATCH_IDLE_MS — polled every frame forever it kept an idle open
+      // drawer rendering at 60fps (~5% of a core in WebKit) — and `kick`
+      // restarts it on everything that can grow the thread: new messages and
+      // typing-state changes (the effect below), scroll, and the observer.
       let growthRaf = 0;
       let lastScrollHeight = scroller.scrollHeight;
-      const watchGrowth = () => {
-        growthRaf = requestAnimationFrame(watchGrowth);
-
+      let lastGrowthAt = performance.now();
+      const watchGrowth = (now: number) => {
         const height = scroller.scrollHeight;
-        if (height === lastScrollHeight) return;
-        lastScrollHeight = height;
-        reassert();
+        if (height !== lastScrollHeight) {
+          lastScrollHeight = height;
+          lastGrowthAt = now;
+          reassert();
+        } else if (now - lastGrowthAt > GROWTH_WATCH_IDLE_MS) {
+          growthRaf = 0;
+          return;
+        }
+        growthRaf = requestAnimationFrame(watchGrowth);
       };
-      growthRaf = requestAnimationFrame(watchGrowth);
+      const kick = () => {
+        lastGrowthAt = performance.now();
+        if (!growthRaf) growthRaf = requestAnimationFrame(watchGrowth);
+      };
+      kick();
+      kickGrowthWatchRef.current = kick;
+
+      const ro = new ResizeObserver(() => {
+        kick();
+        reassert();
+      });
+      ro.observe(content); // tokens, entity cards, images
+      ro.observe(scroller); // streaming loader / source chips below it
 
       // --- user-intent disarm ---------------------------------------
       // Only a deliberate move AWAY from the bottom releases the lock.
@@ -543,6 +567,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         rearmIfAtBottom();
       };
       const onScroll = () => {
+        kick();
         const st = scroller.scrollTop;
         if (pointerDown && st < lastScrollTop) disarm();
         lastScrollTop = st;
@@ -586,6 +611,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       return () => {
         ro.disconnect();
         cancelAnimationFrame(growthRaf);
+        kickGrowthWatchRef.current = null;
         scroller.removeEventListener('wheel', onWheel);
         scroller.removeEventListener('keydown', onKeyDown);
         scroller.removeEventListener('touchstart', onTouchStart);
@@ -610,6 +636,12 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // dialog) also swaps the scroller element, so the stale closure kept
       // observing and listening on DETACHED nodes.
     }, [autoScroll, scrollRef, contentRef, scrollToBottom, stopScroll, isLoading]);
+
+    // Restart the growth watch (see GROWTH WATCH above) whenever the thread
+    // can be about to grow; it stops itself again once growth settles.
+    useEffect(() => {
+      kickGrowthWatchRef.current?.();
+    }, [messages, isTyping]);
 
     // ---- Passive-demo hard pin (pinBottom) ---------------------------
     // Scripted in-page replays (the Fae/Mingo demos) have no human at the
