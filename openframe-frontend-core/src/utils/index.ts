@@ -438,6 +438,7 @@ export {
   programDateInstant,
   programMetaFormatters,
   programMetaLine,
+  eventAudience,
   programStr,
   webinarTiming,
 } from './program-instant';

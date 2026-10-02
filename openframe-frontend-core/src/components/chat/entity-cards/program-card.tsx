@@ -544,7 +544,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   // why this asks for an unlabelled webinar value. Restating the dispatch is
   // how the two ended up with three conditions that disagreed: the podcast one
   // dropped the `> 0` check, and the event one dropped the non-empty check.
-  const { typeMeta: defaultTypeMeta } = programMetaLine(
+  const { typeMeta: defaultTypeMeta, audience: defaultAudience } = programMetaLine(
     item,
     config.type,
     programMetaFormatters(PROGRAM_META_RENDERERS, { withZoneLabel: false }),
@@ -564,7 +564,8 @@ export function ProgramCard<T extends BaseProgramItem>({
     // differently — one silent, one confidently "TBD" — is the drift this
     // shared dispatch exists to end.
     if (config.type === 'event') {
-      return defaultTypeMeta ? <span className="font-body text-ods-text-secondary">{defaultTypeMeta}</span> : null;
+      const eventMeta = [defaultTypeMeta, defaultAudience].filter(Boolean).join(' · ');
+      return eventMeta ? <span className="font-body text-ods-text-secondary">{eventMeta}</span> : null;
     }
     if (config.type === 'webinar' && (defaultTypeMeta || zonedDate.timezone)) {
       return (
