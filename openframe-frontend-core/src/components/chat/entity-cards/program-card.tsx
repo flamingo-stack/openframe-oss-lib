@@ -65,7 +65,56 @@ import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
 type CardSize = 'default' | 'sm' | 'portrait' | 'feature' | 'row';
 
-export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
+// The editorial pair's boxes, read by the card AND its skeleton (`ProgramCardSkeleton`
+// size `feature` / `row`), so the two cannot drift. Every text row keeps its space
+// (`min-h-[Nlh]` in its own typography), so a card is one height whatever its copy.
+const EDITORIAL_FRAME = 'overflow-hidden rounded-lg border border-ods-border bg-transparent';
+const EDITORIAL_ROW_GRID =
+  'grid grid-cols-[88px_minmax(0,1fr)] items-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)] sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-[var(--spacing-system-l)]';
+const EDITORIAL_ROW_THUMB = 'relative block aspect-square w-full overflow-hidden rounded-md';
+const EDITORIAL_ROW_TEXT = 'flex min-w-0 flex-col gap-[var(--spacing-system-xs)]';
+const EDITORIAL_FEATURE_COVER = 'relative block aspect-video w-full overflow-hidden';
+const EDITORIAL_FEATURE_BODY = 'flex flex-col gap-[var(--spacing-system-s)] p-[var(--spacing-system-l)]';
+const EDITORIAL_META_ROW =
+  'flex h-[1lh] min-w-0 items-center gap-x-[var(--spacing-system-s)] overflow-hidden whitespace-nowrap text-h6';
+const EDITORIAL_PERSON_ROW = 'flex h-8 min-w-0 items-center gap-[var(--spacing-system-s)]';
+
+export function ProgramCardSkeleton({ size = 'default', eyebrow = true }: { size?: CardSize; eyebrow?: boolean }) {
+  // The editorial pair: the card's own boxes (EDITORIAL_*), each text row a bar of
+  // that row's line height.
+  if (size === 'row') {
+    return (
+      <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID, 'animate-pulse')}>
+        <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-border/20')} />
+        <span className={EDITORIAL_ROW_TEXT}>
+          <span className="block h-[2lh] w-full rounded bg-ods-border text-h3" />
+          <span className={EDITORIAL_META_ROW}>
+            <span className="block h-[1lh] w-40 rounded bg-ods-border" />
+          </span>
+          <span className="block h-[2lh] w-full rounded bg-ods-border text-h6" />
+        </span>
+      </span>
+    );
+  }
+  if (size === 'feature') {
+    return (
+      <span className={cn(EDITORIAL_FRAME, 'flex animate-pulse flex-col')}>
+        <span className={cn(EDITORIAL_FEATURE_COVER, 'bg-ods-border/20')} />
+        <span className={EDITORIAL_FEATURE_BODY}>
+          {eyebrow && <span className="block h-[1lh] w-28 rounded bg-ods-border text-h5" />}
+          <span className="block h-[2lh] w-full rounded bg-ods-border text-h3" />
+          <span className={EDITORIAL_META_ROW}>
+            <span className="block h-[1lh] w-40 rounded bg-ods-border" />
+          </span>
+          <span className="block h-[3lh] w-full rounded bg-ods-border text-h4" />
+          <span className={EDITORIAL_PERSON_ROW}>
+            <span className="block h-8 w-8 shrink-0 rounded-full bg-ods-border" />
+            <span className="block h-[1lh] w-40 rounded bg-ods-border text-h6" />
+          </span>
+        </span>
+      </span>
+    );
+  }
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
@@ -260,10 +309,9 @@ function ProgramEditorialCard({
   // The cover is shown WHOLE on its own edge colour: the fill AdminContentCard
   // and the portrait card use, so square artwork is never cropped or boxed.
   const edgeColor = useImageEdgeColor(feature ? cover : null, 'transparent');
-  const frame =
-    'group overflow-hidden rounded-lg border border-ods-border bg-transparent no-underline transition-colors duration-200 hover:border-ods-accent';
+  const frame = cn(EDITORIAL_FRAME, 'group no-underline transition-colors duration-200 hover:border-ods-accent');
   const meta = (
-    <div className="flex flex-wrap items-center gap-x-[var(--spacing-system-s)] gap-y-[var(--spacing-system-xxs)] text-h6">
+    <div className={EDITORIAL_META_ROW}>
       {date && <span className="text-ods-flamingo-pink">{date}</span>}
       {[typeMeta, feature ? null : profile?.name]
         .filter((part): part is string => !!part)
@@ -283,20 +331,16 @@ function ProgramEditorialCard({
         target={target}
         rel={rel}
         aria-label={`Open ${title}`}
-        className={cn(
-          frame,
-          'grid grid-cols-[88px_minmax(0,1fr)] items-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)] sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-[var(--spacing-system-l)]',
-          className,
-        )}
+        className={cn(frame, EDITORIAL_ROW_GRID, className)}
       >
-        <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-ods-bg">
+        <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
           {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
           {playable && cover && <CardHoverPlay size="md" />}
         </span>
-        <span className="flex min-w-0 flex-col gap-[var(--spacing-system-xs)]">
-          <span className="line-clamp-2 text-ods-text-primary text-h3">{title}</span>
+        <span className={EDITORIAL_ROW_TEXT}>
+          <span className="line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3">{title}</span>
           {meta}
-          {description && <span className="line-clamp-2 text-ods-text-secondary text-h6">{description}</span>}
+          <span className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">{description}</span>
         </span>
       </a>
     );
@@ -311,7 +355,7 @@ function ProgramEditorialCard({
       className={cn(frame, 'flex flex-col', className)}
     >
       <span
-        className="relative block aspect-video w-full overflow-hidden transition-colors duration-300"
+        className={cn(EDITORIAL_FEATURE_COVER, 'transition-colors duration-300')}
         style={{ backgroundColor: edgeColor }}
       >
         {cover && (
@@ -326,26 +370,29 @@ function ProgramEditorialCard({
         )}
         {playable && cover && <CardHoverPlay size="lg" />}
       </span>
-      <span className="flex flex-col gap-[var(--spacing-system-s)] p-[var(--spacing-system-l)]">
-        {eyebrow && <span className="text-ods-text-secondary text-h5">{eyebrow}</span>}
-        <span className="line-clamp-2 text-ods-text-primary text-h3">{title}</span>
+      <span className={EDITORIAL_FEATURE_BODY}>
+        {eyebrow && <span className="block h-[1lh] text-ods-text-secondary text-h5">{eyebrow}</span>}
+        <span className="line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3">{title}</span>
         {meta}
-        {description && <span className="line-clamp-3 text-ods-text-secondary text-h4">{description}</span>}
-        {profile && (
-          <span className="flex min-w-0 items-center gap-[var(--spacing-system-s)] pt-[var(--spacing-system-xs)]">
-            <SquareAvatar
-              variant="round"
-              src={profile.avatarUrl || undefined}
-              alt={profile.name}
-              fallback={profile.name.charAt(0).toUpperCase()}
-              size="sm"
-            />
-            <span className="truncate text-h6">
-              <span className="text-ods-text-primary">{profile.name}</span>
-              {profile.subtitle && <span className="text-ods-text-secondary"> · {profile.subtitle}</span>}
-            </span>
-          </span>
-        )}
+        <span className="line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h4">{description}</span>
+        {/* The person row keeps its space with or without a person (the skeleton draws it). */}
+        <span className={EDITORIAL_PERSON_ROW}>
+          {profile && (
+            <>
+              <SquareAvatar
+                variant="round"
+                src={profile.avatarUrl || undefined}
+                alt={profile.name}
+                fallback={profile.name.charAt(0).toUpperCase()}
+                size="sm"
+              />
+              <span className="truncate text-h6">
+                <span className="text-ods-text-primary">{profile.name}</span>
+                {profile.subtitle && <span className="text-ods-text-secondary"> · {profile.subtitle}</span>}
+              </span>
+            </>
+          )}
+        </span>
       </span>
     </a>
   );

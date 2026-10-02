@@ -42,6 +42,12 @@ interface AdminContentCardProps {
    * `AdminContentCardGrid` and `AdminContentCardSkeleton` reserve. Default false.
    */
   reserveRows?: boolean;
+  /**
+   * Whether this KIND of card has a subtitle line at all. A card type that never
+   * carries one (an employee entry) passes false, and `reserveRows` then keeps no
+   * empty line for it; its skeleton passes the same. Default true.
+   */
+  subtitleRow?: boolean;
   /** Additional class names */
   className?: string;
 }
@@ -57,6 +63,7 @@ export function AdminContentCard({
   meta,
   actions,
   reserveRows = false,
+  subtitleRow = true,
   className,
 }: AdminContentCardProps) {
   const [imageError, setImageError] = useState(false);
@@ -120,7 +127,7 @@ export function AdminContentCard({
         </h3>
 
         {/* Subtitle (optional) */}
-        {(subtitle || reserveRows) && (
+        {(subtitle || (reserveRows && subtitleRow)) && (
           <p className={cn('truncate text-ods-text-secondary text-h6', reserveRows && 'min-h-[1lh]')}>{subtitle}</p>
         )}
 

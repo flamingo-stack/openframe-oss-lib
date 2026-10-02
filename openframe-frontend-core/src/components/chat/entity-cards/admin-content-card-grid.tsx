@@ -15,7 +15,17 @@ export const ADMIN_CONTENT_CARD_GRID_CLASS =
  * reserved slot are the same height at every breakpoint. `p-5` has no ODS token
  * (20px); it is the card's own padding and must match it exactly.
  */
-export function AdminContentCardSkeleton({ className }: { className?: string }) {
+export function AdminContentCardSkeleton({
+  className,
+  actions = true,
+  subtitleRow = true,
+}: {
+  className?: string;
+  /** Matches the card's `subtitleRow`: off for a card type that has no subtitle line. */
+  subtitleRow?: boolean;
+  /** The bordered actions row. Off for a card rendered without `actions` (a read-only rail card). */
+  actions?: boolean;
+}) {
   return (
     <div
       className={cn(
@@ -26,20 +36,22 @@ export function AdminContentCardSkeleton({ className }: { className?: string }) 
       <div className="aspect-[3/2] w-full shrink-0 bg-ods-border/20" />
       <div className="flex flex-1 flex-col gap-[var(--spacing-system-sf)] p-5">
         <div className="h-[2lh] w-full rounded bg-ods-border text-h3" />
-        <div className="h-[1lh] w-1/2 rounded bg-ods-border text-h6" />
+        {subtitleRow && <div className="h-[1lh] w-1/2 rounded bg-ods-border text-h6" />}
         <div className="h-[2lh] w-full rounded bg-ods-border text-h6" />
         <div className="flex h-7 items-center gap-[var(--spacing-system-xsf)]">
           <div className="h-5 w-20 rounded-full bg-ods-border" />
           <div className="h-5 w-24 rounded-full bg-ods-border" />
         </div>
         <div className="h-[1lh] w-32 rounded bg-ods-border text-h6" />
-        <div className="mt-auto flex items-center justify-between border-t border-ods-border pt-[var(--spacing-system-sf)]">
-          <div className="h-10 w-24 rounded bg-ods-border" />
-          <div className="flex gap-[var(--spacing-system-xsf)]">
-            <div className="h-10 w-20 rounded bg-ods-border" />
-            <div className="h-10 w-20 rounded bg-ods-border" />
+        {actions && (
+          <div className="mt-auto flex items-center justify-between border-t border-ods-border pt-[var(--spacing-system-sf)]">
+            <div className="h-10 w-24 rounded bg-ods-border" />
+            <div className="flex gap-[var(--spacing-system-xsf)]">
+              <div className="h-10 w-20 rounded bg-ods-border" />
+              <div className="h-10 w-20 rounded bg-ods-border" />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
