@@ -46,26 +46,29 @@ public class ForceClientUninstallService {
     private ForceClientUninstallResponseItem processMachine(String machineId) {
         try {
             Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
-            if (foundMachine.isEmpty()) {
-                log.warn("Skipping client uninstall for unknown machine {}", machineId);
-                return buildResponseItem(machineId, ForceAgentStatus.FAILED);
-            }
-
-            Machine machine = foundMachine.get();
-            if (machine.getStatus() == DELETED) {
-                log.warn("Skipping client uninstall for already deleted machine {}", machineId);
-                return buildResponseItem(machineId, ForceAgentStatus.FAILED);
-            }
-
-            clientUninstallNatsPublisher.publish(machineId);
-
-            markPendingDeletion(machine);
-
-            return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
+            return foundMachine
+                    .map(machine -> processFoundMachine(machineId, machine))
+                    .orElseGet(() -> {
+                        log.warn("Skipping client uninstall for unknown machine {}", machineId);
+                        return buildResponseItem(machineId, ForceAgentStatus.FAILED);
+                    });
         } catch (Exception e) {
             log.error("Failed to publish client uninstall command for machine {}", machineId, e);
             return buildResponseItem(machineId, ForceAgentStatus.FAILED);
         }
+    }
+
+    private ForceClientUninstallResponseItem processFoundMachine(String machineId, Machine machine) {
+        if (machine.getStatus() == DELETED) {
+            log.warn("Skipping client uninstall for already deleted machine {}", machineId);
+            return buildResponseItem(machineId, ForceAgentStatus.FAILED);
+        }
+
+        clientUninstallNatsPublisher.publish(machineId);
+
+        markPendingDeletion(machine);
+
+        return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
     }
 
     private void markPendingDeletion(Machine machine) {
