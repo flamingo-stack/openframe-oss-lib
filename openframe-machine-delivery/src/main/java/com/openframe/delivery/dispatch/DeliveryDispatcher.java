@@ -20,9 +20,8 @@ import java.util.UUID;
 public class DeliveryDispatcher {
 
     private final DeliverySpecRegistry registry;
-    private final DeliveryRecorder recorder;
-    // ObjectProvider: the dispatcher boots in services without NATS, where no publisher bean exists
-    private final ObjectProvider<DeliveryPublisher> publisher;
+    // ObjectProvider: the dispatcher boots in services with neither NATS nor Kafka, where no sink bean exists
+    private final ObjectProvider<DeliverySink> sink;
 
     public void dispatch(DeliverySeed seed) {
         DeliveryType type = seed.type();
@@ -33,11 +32,6 @@ public class DeliveryDispatcher {
         String targetId = request.getTargetId();
         DeliveryRef delivery = new DeliveryRef(type, targetId, dispatchId);
         payload.setDelivery(delivery);
-        recorder.record(request);
-        String machineId = request.getMachineId();
-        String subject = spec.subject(machineId);
-        publisher.getObject().publish(subject, payload);
-        log.info("Delivery dispatched: type={} targetId={} machineId={} dispatchId={}",
-                type, request.getTargetId(), machineId, dispatchId);
+        sink.getObject().accept(request);
     }
 }

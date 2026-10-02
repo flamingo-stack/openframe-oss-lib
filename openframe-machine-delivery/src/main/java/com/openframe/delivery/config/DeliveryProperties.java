@@ -38,6 +38,9 @@ public class DeliveryProperties {
     // a type not listed here is off: every environment switches each type on explicitly
     private Map<DeliveryType, Boolean> enabled = new EnumMap<>(DeliveryType.class);
 
+    // Kafka topic client-service reads dispatches from; set where the Kafka hand-off or its consumer runs
+    private String dispatchTopic;
+
     public boolean isEnabled(DeliveryType type) {
         return enabled.getOrDefault(type, FALSE);
     }

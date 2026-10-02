@@ -20,7 +20,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DeliveryRecorderTest {
@@ -49,6 +51,18 @@ class DeliveryRecorderTest {
                 .payload(payload)
                 .build();
         recorder = new DeliveryRecorder(repository, DeliveryTestPolicies.properties(), new ObjectMapper());
+    }
+
+    @Test
+    void record_rowOfThisDispatchAlreadyThere_false() {
+        // setup
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(false);
+
+        // execution
+        boolean recorded = recorder.record(request);
+
+        // verifications
+        assertThat(recorded).isFalse();
     }
 
     @Test
