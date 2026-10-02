@@ -26,6 +26,10 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-api-lib</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-loki</artifactId>
+        </dependency>
 
         <!-- Spring Boot / Web -->
         <dependency>

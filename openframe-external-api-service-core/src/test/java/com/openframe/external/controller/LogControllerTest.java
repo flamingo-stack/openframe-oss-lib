@@ -24,7 +24,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -351,7 +350,7 @@ class LogControllerTest {
 
     @Test
     void logDetailsAreReturnedForTheRequestedKey() throws Exception {
-        when(logService.findLogDetails("2024-01-15", "MESHCENTRAL", "LOGIN", TIMESTAMP, "evt-1"))
+        when(logService.findLogDetails("MESHCENTRAL", "LOGIN", TIMESTAMP, "evt-1"))
                 .thenReturn(Optional.of(LogDetails.builder()
                         .toolEventId("evt-1")
                         .eventType("LOGIN")
@@ -392,7 +391,7 @@ class LogControllerTest {
 
     @Test
     void unknownLogIs404WithLogNotFoundCode() throws Exception {
-        when(logService.findLogDetails("2024-01-15", "MESHCENTRAL", "LOGIN", TIMESTAMP, "evt-1"))
+        when(logService.findLogDetails("MESHCENTRAL", "LOGIN", TIMESTAMP, "evt-1"))
                 .thenReturn(Optional.empty());
 
         mockMvc.perform(detailsRequest())
@@ -433,17 +432,6 @@ class LogControllerTest {
                 .andExpect(jsonPath("$.message").value("Invalid value 'yesterday' for parameter 'timestamp'"));
 
         verifyNoInteractions(logService);
-    }
-
-    @Test
-    void databaseFailureOnDetailsIs503() throws Exception {
-        when(logService.findLogDetails(any(), any(), any(), any(), any()))
-                .thenThrow(new DataAccessResourceFailureException("cassandra down"));
-
-        mockMvc.perform(detailsRequest())
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("DATABASE_ERROR"))
-                .andExpect(jsonPath("$.message").value("Database operation failed. Please try again later."));
     }
 
     private static MockHttpServletRequestBuilder detailsRequest() {

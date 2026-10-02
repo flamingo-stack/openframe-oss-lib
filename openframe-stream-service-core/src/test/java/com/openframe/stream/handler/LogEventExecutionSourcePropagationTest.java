@@ -2,9 +2,7 @@ package com.openframe.stream.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
-import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.IntegratedToolEvent;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
@@ -29,47 +27,12 @@ class LogEventExecutionSourcePropagationTest {
 
     private static final String TENANT_ID = "tenant-a";
     private static final String MACHINE_ID = "6d925893-702a-4223-b62f-2f80b927cbaa";
-    private static final String ADMIN_ID = "admin-7";
+    private static final String EXECUTION_SOURCE = "SCHEDULED";
+    private static final String SCRIPT_CREATION_SOURCE = "AI_ASSISTANT";
 
-    @Mock private UnifiedLogEventRepository repository;
     @Mock private OssTenantRetryingKafkaProducer producer;
 
-    @Captor private ArgumentCaptor<UnifiedLogEvent> logEventCaptor;
     @Captor private ArgumentCaptor<IntegratedToolEvent> toolEventCaptor;
-
-    @Test
-    @DisplayName("Cassandra sink: executionSource, scriptCreationSource and the initiator reach unified_logs")
-    void cassandraHandler_writesRunOriginFields() {
-        // setup
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
-
-        // execution
-        handler.handle(message(), enriched("AI_ASSISTANT", "MANUAL"));
-
-        // verifications
-        verify(repository).save(logEventCaptor.capture());
-        assertThat(logEventCaptor.getValue())
-                .extracting(UnifiedLogEvent::getExecutionSource, UnifiedLogEvent::getScriptCreationSource, UnifiedLogEvent::getUserId)
-                .containsExactly("AI_ASSISTANT", "MANUAL", ADMIN_ID);
-    }
-
-    @Test
-    @DisplayName("Cassandra sink: a non-script event leaves both origin fields null")
-    void cassandraHandler_noOrigin_writesNulls() {
-        // setup
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
-
-        // execution
-        handler.handle(message(), enriched(null, null));
-
-        // verifications
-        verify(repository).save(logEventCaptor.capture());
-        assertThat(logEventCaptor.getValue())
-                .extracting(UnifiedLogEvent::getExecutionSource, UnifiedLogEvent::getScriptCreationSource)
-                .containsExactly(null, null);
-    }
 
     @Test
     @DisplayName("Kafka/Pinot sink: executionSource and scriptCreationSource reach the published message")
@@ -79,13 +42,13 @@ class LogEventExecutionSourcePropagationTest {
                 producer, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
 
         // execution
-        handler.handle(message(), enriched("SCHEDULED", "AI_ASSISTANT"));
+        handler.handle(message(), enriched());
 
         // verifications
         verify(producer).publish(isNull(), anyString(), toolEventCaptor.capture());
         assertThat(toolEventCaptor.getValue())
                 .extracting(IntegratedToolEvent::getExecutionSource, IntegratedToolEvent::getScriptCreationSource)
-                .containsExactly("SCHEDULED", "AI_ASSISTANT");
+                .containsExactly(EXECUTION_SOURCE, SCRIPT_CREATION_SOURCE);
     }
 
     private static DeserializedDebeziumMessage message() {
@@ -103,13 +66,12 @@ class LogEventExecutionSourcePropagationTest {
                 .build();
     }
 
-    private static IntegratedToolEnrichedData enriched(String executionSource, String scriptCreationSource) {
+    private static IntegratedToolEnrichedData enriched() {
         IntegratedToolEnrichedData enriched = new IntegratedToolEnrichedData();
         enriched.setTenantId(TENANT_ID);
         enriched.setMachineId(MACHINE_ID);
-        enriched.setUserId(ADMIN_ID);
-        enriched.setExecutionSource(executionSource);
-        enriched.setScriptCreationSource(scriptCreationSource);
+        enriched.setExecutionSource(EXECUTION_SOURCE);
+        enriched.setScriptCreationSource(SCRIPT_CREATION_SOURCE);
         return enriched;
     }
 }

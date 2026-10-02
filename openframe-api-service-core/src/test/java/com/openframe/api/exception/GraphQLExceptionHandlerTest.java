@@ -178,7 +178,7 @@ class GraphQLExceptionHandlerTest {
                         "This log search covers too much data. Narrow the time range, or filter by device or level.",
                         "LOKI_QUERY_REJECTED", 400),
                 arguments(new LokiQueryException("loki down"),
-                        "Device logs are temporarily unavailable. Please try again later.", "LOKI_QUERY_ERROR", 503),
+                        "Logs are temporarily unavailable. Please try again later.", "LOKI_QUERY_ERROR", 503),
                 arguments(new DataAccessResourceFailureException("mongo down"),
                         "Database operation failed. Please try again later.", "DATABASE_ERROR", 503),
                 arguments(new RuntimeException("boom"), UNEXPECTED, "INTERNAL_ERROR", 500),
