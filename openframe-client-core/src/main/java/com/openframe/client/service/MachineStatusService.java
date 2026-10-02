@@ -16,6 +16,7 @@ import java.time.Instant;
 import static com.openframe.data.document.device.DeviceStatus.OFFLINE;
 import static com.openframe.data.document.device.DeviceStatus.ONLINE;
 import static com.openframe.data.document.device.DeviceStatus.PENDING;
+import static com.openframe.data.document.device.DeviceStatus.PENDING_DELETION;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +36,31 @@ public class MachineStatusService {
 
     public void processHeartbeat(String machineId, Instant eventTimestamp) {
         update(machineId, ONLINE, eventTimestamp);
+    }
+
+    // the agent holds its uninstall command: from here on status events are ignored until the machine is gone
+    public void markDeletionAcknowledged(String machineId) {
+        machineRepository.findByMachineId(machineId).ifPresent(machine -> {
+            if (isDeletionInProgress(machine)) {
+                return;
+            }
+            machine.setStatus(PENDING_DELETION);
+            machineRepository.save(machine);
+            log.info("Machine {} marked PENDING_DELETION: uninstall acknowledged by the agent", machineId);
+        });
+    }
+
+    // the uninstall did not happen: hand the machine back as OFFLINE, the next heartbeat sets ONLINE again
+    public boolean cancelPendingDeletion(String machineId) {
+        return machineRepository.findByMachineId(machineId)
+                .filter(machine -> machine.getStatus() == PENDING_DELETION)
+                .map(machine -> {
+                    machine.setStatus(OFFLINE);
+                    machineRepository.save(machine);
+                    log.warn("Machine {} returned to OFFLINE: pending deletion cancelled", machineId);
+                    return true;
+                })
+                .orElse(false);
     }
 
     private void update(String machineId, DeviceStatus newStatus, Instant eventTimestamp) {

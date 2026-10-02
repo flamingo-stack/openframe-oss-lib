@@ -163,6 +163,27 @@ class CustomMachineDeliveryRepositoryImplTest {
     }
 
     @Test
+    void markDone_withoutDispatchId_completableRowClosedPayloadDropped() {
+        // setup
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
+
+        // execution
+        boolean done = repository.markDone(ID, DeliveryStatus.COMPLETABLE, now, now);
+
+        // verifications
+        assertThat(done).isTrue();
+        assertThat(queryCaptor.getValue().getQueryObject().toString())
+                .contains(ID)
+                .contains("PENDING")
+                .contains("FAILED")
+                .doesNotContain("dispatchId");
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("DONE")
+                .contains("payloadJson");
+    }
+
+    @Test
     void postponeAfterError_pendingRow_errorCountedAndDueMoved() {
         // setup
         UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
