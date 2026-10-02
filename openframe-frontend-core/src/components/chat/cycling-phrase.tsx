@@ -14,14 +14,6 @@ interface CyclingPhraseProps {
   holdMs?: number;
 }
 
-// Idempotent keyframe — multiple component instances share the same
-// CSS rule, no duplication issues.
-const BLINK_KEYFRAMES = `
-  @keyframes cyclingCursorBlink {
-    50% { opacity: 0; }
-  }
-`;
-
 /**
  * Terminal-style cycling word: a fixed-size block cursor walks left-
  * to-right through the word, overwriting the previous word's char at
@@ -99,21 +91,19 @@ export function CyclingPhrase({ words, className, charMs = 60, holdMs = 4500 }: 
   const cursorBlock = (
     <span
       aria-hidden
-      className="inline-block bg-current align-baseline"
+      className="inline-block animate-cursor-blink bg-current align-baseline"
       style={{
         width: '0.6em',
         height: '1em',
         verticalAlign: '-0.1em',
         marginLeft: '1px',
         marginRight: '1px',
-        animation: 'cyclingCursorBlink 1s steps(1) infinite',
       }}
     />
   );
 
   return (
     <span className={cn('relative inline-block whitespace-nowrap', className)}>
-      <style dangerouslySetInnerHTML={{ __html: BLINK_KEYFRAMES }} />
       {/* Invisible placeholder — pins width to longest word + "..." */}
       <span aria-hidden className="invisible">
         {placeholder}...
