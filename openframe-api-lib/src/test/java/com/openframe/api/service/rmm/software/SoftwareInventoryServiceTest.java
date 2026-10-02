@@ -244,6 +244,44 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
+    @DisplayName("listDevicesForSoftware: a machine with several versions or several Fleet hosts is one row listing its versions")
+    void listDevices_oneRowPerMachine_versionsJoined() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setName("pip");
+        SoftwareTitleVersion older = new SoftwareTitleVersion();
+        older.setId(10L);
+        older.setVersion("21.2.4");
+        SoftwareTitleVersion newer = new SoftwareTitleVersion();
+        newer.setId(11L);
+        newer.setVersion("26.1.2");
+        title.setVersions(List.of(newer, older));
+        when(fleet.getSoftwareTitle(103L)).thenReturn(title);
+        // host 1 and host 2 are the same machine (a duplicate Fleet host); host 3 is another machine
+        when(fleet.searchHosts(any(HostSearchRequest.class))).thenAnswer(inv ->
+                ((HostSearchRequest) inv.getArgument(0)).getSoftwareVersionId() == 10L
+                        ? List.of(host(1L, "u1", "mac"), host(2L, "u1", "mac"))
+                        : List.of(host(1L, "u1", "mac"), host(3L, "u3", "pc")));
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        Machine mac = new Machine();
+        mac.setMachineId("m-mac");
+        mac.setHostname("mac");
+        Machine pc = new Machine();
+        pc.setMachineId("m-pc");
+        pc.setHostname("pc");
+        when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(1L, mac, 2L, mac, 3L, pc));
+
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("103", null, null, 0, 50);
+
+        assertThat(result.items())
+                .extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getSoftwareVersion)
+                .containsExactlyInAnyOrder(tuple("m-mac", "21.2.4, 26.1.2"), tuple("m-pc", "26.1.2"));
+        assertThat(result.filteredCount()).isEqualTo(2);
+        int counted = service.getSoftwareDeviceFilters("103", null).getStatuses().stream()
+                .mapToInt(SoftwareFilterOption::getCount).sum();
+        assertThat(counted).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("listDevicesForSoftware: the status filter keeps only devices whose status is selected")
     void listDevices_statusFilter() {
         SoftwareTitle title = new SoftwareTitle();

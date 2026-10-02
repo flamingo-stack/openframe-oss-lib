@@ -402,11 +402,24 @@ const config: Config = {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        // Chat streaming affordances. Defined here, not in an inline <style>
+        // the component renders: those tags were rewritten on every render,
+        // i.e. every streamed chunk, and each rewrite made WebKit restyle and
+        // relayout the whole document.
+        'cursor-blink': {
+          '50%': { opacity: '0' },
+        },
+        'dot-pulse': {
+          '0%, 80%, 100%': { transform: 'scale(1)', opacity: '0.7' },
+          '40%': { transform: 'scale(1.5)', opacity: '1' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'fade-in': 'fade-in 0.3s ease-out',
+        'cursor-blink': 'cursor-blink 1s steps(1) infinite',
+        'dot-pulse': 'dot-pulse 1.4s ease-in-out infinite',
       },
     },
   },

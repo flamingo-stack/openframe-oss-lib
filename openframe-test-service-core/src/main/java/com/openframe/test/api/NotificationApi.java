@@ -3,6 +3,8 @@ package com.openframe.test.api;
 import com.openframe.test.data.dto.notification.Notification;
 import com.openframe.test.data.dto.notification.NotificationConnection;
 import com.openframe.test.data.dto.notification.NotificationFilterInput;
+import com.openframe.test.data.dto.notification.NotificationSettings;
+import com.openframe.test.data.dto.notification.NotificationTypeSettingInput;
 import com.openframe.test.data.dto.notification.UnreadCategoryCount;
 import io.restassured.path.json.JsonPath;
 
@@ -17,7 +19,9 @@ import static com.openframe.test.api.graphql.NotificationQueries.MARK_ALL_NOTIFI
 import static com.openframe.test.api.graphql.NotificationQueries.MARK_NOTIFICATIONS_READ_FOR_ENTITY;
 import static com.openframe.test.api.graphql.NotificationQueries.MARK_NOTIFICATION_AS_READ;
 import static com.openframe.test.api.graphql.NotificationQueries.NOTIFICATIONS;
+import static com.openframe.test.api.graphql.NotificationQueries.NOTIFICATION_SETTINGS;
 import static com.openframe.test.api.graphql.NotificationQueries.UNREAD_COUNTS_BY_CATEGORY;
+import static com.openframe.test.api.graphql.NotificationQueries.UPDATE_NOTIFICATION_SETTINGS;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
@@ -93,6 +97,33 @@ public class NotificationApi {
     public static long markReadForEntity(String entityType, String entityId) {
         return count(MARK_NOTIFICATIONS_READ_FOR_ENTITY, "markNotificationsReadForEntity",
                 Map.of("entityType", entityType, "entityId", entityId));
+    }
+
+    public static NotificationSettings getSettings() {
+        return object(NOTIFICATION_SETTINGS, "notificationSettings", Map.of(), NotificationSettings.class);
+    }
+
+    // typeSettings null omits the argument, which keeps the stored group overrides.
+    public static NotificationSettings updateSettings(boolean enabled, List<NotificationTypeSettingInput> typeSettings) {
+        return object(UPDATE_NOTIFICATION_SETTINGS, "updateNotificationSettings", settingsVariables(enabled, typeSettings),
+                NotificationSettings.class);
+    }
+
+    // A settings write for teardown: returns the HTTP status instead of asserting on the answer.
+    public static int attemptUpdateSettings(boolean enabled, List<NotificationTypeSettingInput> typeSettings) {
+        Map<String, Object> body = Map.of("query", UPDATE_NOTIFICATION_SETTINGS, "variables", settingsVariables(enabled, typeSettings));
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().extract().statusCode();
+    }
+
+    private static Map<String, Object> settingsVariables(boolean enabled, List<NotificationTypeSettingInput> typeSettings) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("enabled", enabled);
+        if (typeSettings != null) {
+            variables.put("typeSettings", typeSettings);
+        }
+        return variables;
     }
 
     // ---- plumbing ----

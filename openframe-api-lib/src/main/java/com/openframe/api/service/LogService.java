@@ -205,6 +205,8 @@ public class LogService {
                 .deviceId(log.deviceId)
                 .hostname(log.hostname)
                 .nickname(log.nickname)
+                .executionSource(log.executionSource)
+                .scriptCreationSource(log.scriptCreationSource)
                 .organizationId(log.organizationId)
                 .organizationName(log.organizationName)
                 .build();
@@ -225,6 +227,8 @@ public class LogService {
                 .deviceId(logEvent.getDeviceId())
                 .hostname(logEvent.getHostname())
                 .nickname(logEvent.getNickname())
+                .executionSource(logEvent.getExecutionSource())
+                .scriptCreationSource(logEvent.getScriptCreationSource())
                 .organizationId(logEvent.getOrganizationId())
                 .organizationName(logEvent.getOrganizationName())
                 .summary(logEvent.getMessage())

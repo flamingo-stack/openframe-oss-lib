@@ -85,6 +85,15 @@ public class DeviceApi {
                 .extract().jsonPath().getObject("data.device", Machine.class);
     }
 
+    // The device's reported state for one package manager (brew, winget or choco); null when it never reported one.
+    public static String getPackageManagerState(String machineId, String manager) {
+        Map<String, Object> body = Map.of("query", DEVICE_PACKAGE_MANAGERS, "variables", Map.of("machineId", machineId));
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getString("data.device.packageManagers." + manager);
+    }
+
     /** Sets or, with a null {@code nickname}, clears the device's nickname; returns the updated device. */
     public static Machine updateDeviceNickname(String machineId, String nickname) {
         Map<String, Object> variables = new HashMap<>();

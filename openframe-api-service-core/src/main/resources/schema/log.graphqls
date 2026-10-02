@@ -10,7 +10,7 @@ extend type Query {
         search: String
         sort: LogSortInput
     ): LogConnection!
-    
+
     # Get full audit details from Cassandra when user clicks on a audit
     # Requires complete composite key for efficient Cassandra lookup
     logDetails(
@@ -79,6 +79,8 @@ type LogEvent implements Node {
     deviceId: String
     hostname: String
     nickname: String
+    executionSource: String
+    scriptCreationSource: String
     organizationId: String
     organizationName: String
     summary: String
@@ -97,10 +99,12 @@ type LogDetails implements Node {
     deviceId: String
     hostname: String
     nickname: String
+    executionSource: String
+    scriptCreationSource: String
     organizationId: String
     organizationName: String
     message: String
     timestamp: Instant!
     # Details as JSON string
     details: String
-} 
+}

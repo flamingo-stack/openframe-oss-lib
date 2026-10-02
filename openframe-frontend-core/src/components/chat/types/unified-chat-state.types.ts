@@ -16,6 +16,7 @@
  * `sources`). In the off-mode they're null/undefined.
  */
 
+import type { ChatProgress } from '../../../chat-protocol/progress';
 import type { ChatRef } from '../chat-ref.types';
 import type { ChatAttachment } from '../utils/chat-attachment-markdown';
 import type { AuthorType } from './chat.types';
@@ -334,6 +335,11 @@ export interface UnifiedChatState {
 
   /** Granular phase for the "Thinking..."/"Streaming..." status row above input. */
   streamingPhase: StreamingPhase;
+
+  /** What the pending turn is doing before its first token ("searching 28
+   *  sources"), when the transport reports it. Optional: a transport with no
+   *  stages leaves it out and the status row keeps its generic phrase. */
+  streamingProgress?: ChatProgress | null;
 
   /** True while the adapter is rebuilding the message list from the
    *  server-side transcript store (SSE/Guide mount-time hydration). Optional —

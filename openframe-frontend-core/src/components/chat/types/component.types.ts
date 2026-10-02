@@ -255,6 +255,8 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   dialogId?: string;
   isLoading?: boolean;
   isTyping?: boolean;
+  /** The line shown beside the pending-turn loader: what the turn is doing right
+   *  now ("Searching 28 sources"). Omitted, the loader cycles its generic phrases. */
   typingMessage?: string;
   smoothScroll?: boolean;
   autoScroll?: boolean;
