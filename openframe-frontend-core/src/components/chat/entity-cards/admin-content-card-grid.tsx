@@ -19,7 +19,7 @@ export function AdminContentCardSkeleton({ className }: { className?: string }) 
   return (
     <div
       className={cn(
-        'flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-ods-border bg-ods-card',
+        'flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-ods-border bg-transparent',
         className,
       )}
     >

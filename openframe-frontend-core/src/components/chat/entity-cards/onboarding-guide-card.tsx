@@ -17,11 +17,12 @@
  * mounted → same-tab + same-origin relative placeholder.
  */
 
-import { Clock, ExternalLink, GraduationCap, Play } from 'lucide-react';
+import { Clock, ExternalLink, GraduationCap } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { formatDurationMMSS } from '../../../utils/format';
+import { CardHoverPlay } from '../../features/video-center-badge';
 import type { OnboardingGuide } from '../types/entities/onboarding-guide';
 import {
   COMPACT_CARD_OUTER,
@@ -253,11 +254,7 @@ export function OnboardingGuideCard({
                     className="absolute inset-0"
                   />
                 )}
-                {hasVideoCover && coverImage && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <Play className="h-10 w-10 text-ods-text-on-dark" fill="white" />
-                  </span>
-                )}
+                {hasVideoCover && coverImage && <CardHoverPlay size="md" />}
                 {durationLabel && (
                   <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-ods-text-on-dark text-code">
                     <Clock className="h-3 w-3" />
@@ -315,11 +312,7 @@ export function OnboardingGuideCard({
               <GraduationCap className="h-4 w-4" />
             </span>
           )}
-          {hasVideoCover && compactCover && (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
-            </span>
-          )}
+          {hasVideoCover && compactCover && <CardHoverPlay size="sm" />}
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>

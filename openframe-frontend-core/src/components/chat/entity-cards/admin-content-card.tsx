@@ -73,11 +73,15 @@ export function AdminContentCard({
   return (
     <article
       className={cn(
-        'group h-full overflow-hidden rounded-2xl',
-        'border border-ods-border bg-ods-card',
+        // `isolate`: the cover scales on hover, and without its own stacking
+        // context the rounded clip is dropped for the length of that transition
+        // (the top corners turn square). The surface is the page's own: a card
+        // is its border, never a second background.
+        'group isolate h-full overflow-hidden rounded-2xl',
+        'border border-ods-border bg-transparent',
         'flex flex-col',
-        'transition-all duration-300 ease-out',
-        'hover:-translate-y-1 hover:shadow-lg hover:shadow-ods-accent/[0.08]',
+        'transition-[border-color,box-shadow] duration-300 ease-out',
+        'hover:shadow-lg hover:shadow-ods-accent/[0.08]',
         'hover:border-ods-accent',
         className,
       )}

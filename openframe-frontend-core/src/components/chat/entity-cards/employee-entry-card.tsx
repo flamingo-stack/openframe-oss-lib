@@ -135,7 +135,7 @@ export function EmployeeEntryCardSkeleton({ className }: { className?: string })
   // row. Shape mirrors EmployeeEntryCard's AdminContentCard (rounded-2xl, 3:2 cover).
   return (
     <div
-      className={`group flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-ods-border bg-ods-card ${className ?? ''}`}
+      className={`group flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-ods-border bg-transparent ${className ?? ''}`}
     >
       <div className="aspect-[3/2] bg-ods-bg" />
       <div className="flex flex-grow flex-col space-y-3 p-4">

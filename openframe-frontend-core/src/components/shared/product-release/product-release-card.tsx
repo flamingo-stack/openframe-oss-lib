@@ -1,9 +1,10 @@
 'use client';
 
-import { AlertTriangle, Eye, Package, Play, Sparkles, TrendingUp, Wrench } from 'lucide-react';
+import { AlertTriangle, Eye, Package, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
+import { CardHoverPlay } from '../../features/video-center-badge';
 import { InteractiveCard } from '../../ui/interactive-card';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { StatusBadge } from '../../ui/status-badge';
@@ -239,11 +240,7 @@ export function ProductReleaseCard({
                   <Package className="h-8 w-8" />
                 </div>
               )}
-              {hasVideoCover && coverImage && (
-                <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <Play className="h-10 w-10 text-ods-text-on-dark" fill="white" />
-                </span>
-              )}
+              {hasVideoCover && coverImage && <CardHoverPlay size="md" />}
             </div>
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
@@ -456,11 +453,7 @@ export function ProductReleaseCard({
           ) : (
             <Package className="h-5 w-5" />
           )}
-          {hasVideoCover && coverImage && (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
-            </span>
-          )}
+          {hasVideoCover && coverImage && <CardHoverPlay size="sm" />}
         </span>
         {/* Text column structure must mirror the hub's
             `COMPACT_CARD_TEXT_COL` + `COMPACT_CARD_TITLE_ROW` +

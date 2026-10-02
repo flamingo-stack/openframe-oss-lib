@@ -8,8 +8,10 @@
  * one item: `feature` (cover on top, label, title, date, description, person)
  * beside `row`s (square cover, title, date · length · person, two lines).
  *
- * The cover is never tinted: a program's artwork carries its own marks, and a
- * play glyph over a dimmed cover hid them. The whole card is the link.
+ * The cover is never tinted, and a podcast's play glyph (`CardHoverPlay`)
+ * shows only while the card is hovered or focused: a program's artwork carries
+ * its own marks. In the editorial pair the whole card is the link, and the
+ * cover sits whole on its own edge colour (the fill every entity card uses).
  *
  * `portrait` exists because mixed-content rails MUST share ONE card anatomy
  * (2026 card-UI practice: a rail mixes content types, never card layouts —
@@ -34,6 +36,7 @@ import { formatProgramDate } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
+import { CardHoverPlay } from '../../features/video-center-badge';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -61,9 +64,6 @@ import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
 type CardSize = 'default' | 'sm' | 'portrait' | 'feature' | 'row';
-
-/** Sources narrower than this are contained on an edge-colour fill, never cropped. */
-const MIN_WIDE_RATIO = 1.3;
 
 export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
   if (size === 'sm') {
@@ -240,6 +240,7 @@ function ProgramEditorialCard({
   date,
   typeMeta,
   profile,
+  playable,
   className,
 }: {
   feature: boolean;
@@ -253,13 +254,14 @@ function ProgramEditorialCard({
   date: string | null;
   typeMeta: string | null | undefined;
   profile: ReturnType<typeof programItemToStripProfile>;
+  playable: boolean;
   className?: string;
 }) {
-  const [measured, setMeasured] = useState<{ src: string | null; isWide: boolean } | null>(null);
-  const isWide = measured?.src === cover ? measured.isWide : null;
-  const edgeColor = useImageEdgeColor(feature && isWide === false ? cover : null, 'var(--color-bg-surface)');
+  // The cover is shown WHOLE on its own edge colour: the fill AdminContentCard
+  // and the portrait card use, so square artwork is never cropped or boxed.
+  const edgeColor = useImageEdgeColor(feature ? cover : null, 'transparent');
   const frame =
-    'group overflow-hidden rounded-lg border border-ods-border bg-ods-card no-underline transition-colors duration-200 hover:border-ods-accent';
+    'group overflow-hidden rounded-lg border border-ods-border bg-transparent no-underline transition-colors duration-200 hover:border-ods-accent';
   const meta = (
     <div className="flex flex-wrap items-center gap-x-[var(--spacing-system-s)] gap-y-[var(--spacing-system-xxs)] text-h6">
       {date && <span className="text-ods-flamingo-pink">{date}</span>}
@@ -289,6 +291,7 @@ function ProgramEditorialCard({
       >
         <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-ods-bg">
           {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
+          {playable && cover && <CardHoverPlay size="md" />}
         </span>
         <span className="flex min-w-0 flex-col gap-[var(--spacing-system-xs)]">
           <span className="line-clamp-2 text-ods-text-primary text-h3">{title}</span>
@@ -308,8 +311,8 @@ function ProgramEditorialCard({
       className={cn(frame, 'flex flex-col', className)}
     >
       <span
-        className="relative block aspect-video w-full overflow-hidden bg-ods-bg transition-colors duration-300"
-        style={isWide === false ? { backgroundColor: edgeColor } : undefined}
+        className="relative block aspect-video w-full overflow-hidden transition-colors duration-300"
+        style={{ backgroundColor: edgeColor }}
       >
         {cover && (
           <Image
@@ -317,16 +320,11 @@ function ProgramEditorialCard({
             alt=""
             fill
             sizes="(min-width: 1024px) 640px, 100vw"
-            className={isWide === false ? 'object-contain' : 'object-cover'}
+            className="object-contain"
             unoptimized
-            onLoad={e => {
-              const img = e.currentTarget;
-              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                setMeasured({ src: cover, isWide: img.naturalWidth / img.naturalHeight >= MIN_WIDE_RATIO });
-              }
-            }}
           />
         )}
+        {playable && cover && <CardHoverPlay size="lg" />}
       </span>
       <span className="flex flex-col gap-[var(--spacing-system-s)] p-[var(--spacing-system-l)]">
         {eyebrow && <span className="text-ods-text-secondary text-h5">{eyebrow}</span>}
@@ -384,6 +382,9 @@ export function ProgramCard<T extends BaseProgramItem>({
   const images = media.filter(m => isImageMedia(m));
   const hosts = getHosts(item.hosts);
   const accentColor = 'var(--color-accent-primary)';
+  // A published podcast episode plays; a scheduled one has nothing to play yet.
+  // (`status` lives on the concrete program shapes, not on `BaseProgramItem`.)
+  const isPlayable = config.type === 'podcast' && !('status' in item && item.status === 'scheduled');
 
   // The compact meta line, built by the ONE shared function — the chat card
   // renders the same string from the same code rather than mirroring it.
@@ -439,6 +440,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         date={formatProgramDate(zonedDate, 'weekday')}
         typeMeta={compactTypeMetaValue}
         profile={programItemToStripProfile(item)}
+        playable={isPlayable}
         className={className}
       />
     );
@@ -452,7 +454,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       (s): s is string => typeof s === 'string' && s.length > 0,
     );
     return (
-      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
+      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, 'group', className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
             <Image src={compactCover} alt={item.title} fill sizes="56px" className="object-contain" unoptimized />
@@ -467,6 +469,7 @@ export function ProgramCard<T extends BaseProgramItem>({
               )}
             </span>
           )}
+          {isPlayable && compactCover && <CardHoverPlay size="sm" />}
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
@@ -542,6 +545,7 @@ export function ProgramCard<T extends BaseProgramItem>({
                 className="h-auto w-full rounded-lg object-contain"
                 unoptimized
               />
+              {isPlayable && <CardHoverPlay size="md" />}
             </div>
           </div>
         )}

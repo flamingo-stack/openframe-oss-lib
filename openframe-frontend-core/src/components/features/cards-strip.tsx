@@ -107,6 +107,11 @@ interface CardsStripEngineProps {
   /** Chevron aria-labels. */
   prevLabel?: string;
   nextLabel?: string;
+  /** An overflowing strip runs edge to edge of the PAGE (not of its container)
+   *  and dissolves at both ends; a strip whose cards all fit stays in its
+   *  container. The page edge is the nearest clipping ancestor or a sibling
+   *  column beside the strip (a sidebar), else the viewport. Default true. */
+  bleed?: boolean;
   /** Merged into the engine's wrapper ref (e.g. `useVideoWarmup().ref`). */
   rootRef?: (el: HTMLDivElement | null) => void;
   className?: string;
@@ -154,6 +159,66 @@ const USER_SCROLL_SUPPRESS_MS = 3000;
 export const STRIP_CELL_MAX_WIDTH = '90vw';
 
 const EMPTY_CHILDREN: ReadonlyArray<React.ReactNode> = [];
+
+// Full-bleed geometry.
+interface BleedInsets {
+  left: number;
+  right: number;
+}
+const NO_BLEED: BleedInsets = { left: 0, right: 0 };
+// The edge dissolve: as wide as the gutter the strip bled into, within these bounds.
+const FADE_MIN_PX = 32;
+const FADE_MAX_PX = 160;
+// A chevron sits in the gutter, this far outside the container's edge.
+const CHEVRON_GUTTER_PX = 56;
+const CHEVRON_EDGE_PX = 8;
+// Siblings checked per ancestor when looking for a column beside the strip.
+const MAX_SIBLINGS_PER_LEVEL = 60;
+
+/**
+ * How far the strip may run past its container on each side: out to the
+ * nearest ancestor that clips horizontally, stopping earlier at a sibling
+ * column that sits BESIDE the strip (a sidebar, an aside), else to the
+ * viewport. Measured, because no CSS length knows where a page's content ends.
+ */
+function measureBleedInsets(el: HTMLElement): BleedInsets {
+  const rect = el.getBoundingClientRect();
+  if (rect.width === 0) return NO_BLEED;
+  let boundLeft = 0;
+  let boundRight = document.documentElement.clientWidth;
+  const viewportHeight = window.innerHeight;
+  let node: HTMLElement = el;
+  let parent = el.parentElement;
+  while (parent) {
+    const siblings = parent.children;
+    for (let i = 0; i < siblings.length && i < MAX_SIBLINGS_PER_LEVEL; i++) {
+      const sibling = siblings[i];
+      if (sibling === node) continue;
+      const box = sibling.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      const position = getComputedStyle(sibling).position;
+      // A pinned column (a fixed or sticky sidebar) is beside the strip wherever
+      // the page is scrolled; anything else must share the strip's rows.
+      const pinned = (position === 'fixed' || position === 'sticky') && box.height >= viewportHeight / 2;
+      if (!pinned && (box.bottom <= rect.top || box.top >= rect.bottom)) continue;
+      if (box.right <= rect.left + 1) boundLeft = Math.max(boundLeft, box.right);
+      else if (box.left >= rect.right - 1) boundRight = Math.min(boundRight, box.left);
+    }
+    if (getComputedStyle(parent).overflowX !== 'visible') {
+      const box = parent.getBoundingClientRect();
+      const inner = box.left + parent.clientLeft;
+      boundLeft = Math.max(boundLeft, inner);
+      boundRight = Math.min(boundRight, inner + parent.clientWidth);
+      break;
+    }
+    node = parent;
+    parent = parent.parentElement;
+  }
+  return {
+    left: Math.max(0, Math.floor(rect.left - boundLeft)),
+    right: Math.max(0, Math.floor(boundRight - rect.right)),
+  };
+}
 
 // =============================================================================
 // Children-mode managed cell
@@ -229,6 +294,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     reverse = false,
     pauseOnHover = true,
     showChevrons = true,
+    bleed = true,
     prevLabel = 'Previous items',
     nextLabel = 'Next items',
     rootRef,
@@ -311,28 +377,44 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   const [marqueeEligible, setMarqueeEligible] = useState(false);
   const singleCopyWidthRef = useRef(0);
   const marqueeActive = autoScroll && !reducedMotion && marqueeEligible && items.length > 0;
+  // How far an overflowing strip runs past its container (see `bleed`).
+  const [insets, setInsets] = useState<BleedInsets>(NO_BLEED);
 
   const measure = useCallback(() => {
-    const scroller = scrollerRef.current;
+    const wrapper = wrapperRef.current;
     const track = trackRef.current;
-    if (!scroller || !track) return;
+    if (!wrapper || !track) return;
     // When clones are rendered the track is 2× one copy (+ one joining gap).
     const copies = track.dataset.copies === '2' ? 2 : 1;
     const singleCopy = copies === 2 ? (track.scrollWidth - TRACK_GAP_PX) / 2 + TRACK_GAP_PX : track.scrollWidth;
     singleCopyWidthRef.current = singleCopy;
-    setOverflows(singleCopy > scroller.clientWidth + 1);
-    setMarqueeEligible(singleCopy > scroller.clientWidth + TRACK_GAP_PX);
-  }, []);
+    // "Overflows" is judged against the CONTAINER (the wrapper never bleeds), so
+    // the bleed it switches on cannot feed back into it. The marquee is judged
+    // against the width the strip will actually occupy: its loop needs one copy
+    // to be wider than what is on screen.
+    const containerWidth = wrapper.clientWidth;
+    const over = singleCopy > containerWidth + 1;
+    const next = bleed && over ? measureBleedInsets(wrapper) : NO_BLEED;
+    setOverflows(over);
+    setInsets(prev => (prev.left === next.left && prev.right === next.right ? prev : next));
+    setMarqueeEligible(singleCopy > containerWidth + next.left + next.right + TRACK_GAP_PX);
+  }, [bleed]);
 
   useEffect(() => {
     measure();
-    const scroller = scrollerRef.current;
+    const wrapper = wrapperRef.current;
     const track = trackRef.current;
-    if (!scroller || !track || typeof ResizeObserver === 'undefined') return undefined;
+    if (!wrapper || !track || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(measure);
-    ro.observe(scroller);
+    ro.observe(wrapper);
     ro.observe(track);
-    return () => ro.disconnect();
+    // The page's own width moves the bleed edges without resizing the wrapper
+    // (a centered max-width container keeps its width while its gutters grow).
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
   }, [measure, items.length, marqueeActive, isMobile]);
 
   // ---- pause-reason set + suppress timestamps ---------------------------------
@@ -698,6 +780,14 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
 
   const copies = marqueeActive ? 2 : 1;
 
+  // An overflowing strip runs to the page's edges and dissolves there. While it
+  // is not a marquee its cards REST aligned with the container (the gutters are
+  // scroll padding), so the first card is never under the dissolve.
+  const bled = overflows && (insets.left > 0 || insets.right > 0);
+  const fadeOf = (inset: number) => Math.min(FADE_MAX_PX, Math.max(FADE_MIN_PX, inset));
+  const edgeFade = `linear-gradient(90deg, transparent, #000 ${fadeOf(insets.left)}px, #000 calc(100% - ${fadeOf(insets.right)}px), transparent)`;
+  const chevronOffset = (inset: number) => Math.max(CHEVRON_EDGE_PX, inset - CHEVRON_GUTTER_PX);
+
   return (
     <div
       ref={node => {
@@ -709,10 +799,21 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       {showTitle && title && <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{title}</h2>}
       {headerSlot}
 
-      <div className="relative">
+      <div className="relative" style={bled ? { marginLeft: -insets.left, marginRight: -insets.right } : undefined}>
         <div
           ref={scrollerRef}
-          className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          // Vertical room (padding cancelled by the margin) so a card's hover
+          // lift, border and shadow are never cut by the scroller's clip.
+          className="-my-3 overflow-x-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={
+            overflows
+              ? {
+                  maskImage: edgeFade,
+                  WebkitMaskImage: edgeFade,
+                  ...(marqueeActive ? null : { paddingLeft: insets.left, paddingRight: insets.right }),
+                }
+              : undefined
+          }
           onWheel={onWheelIntent}
           onTouchStart={onUserScrollIntent}
           onPointerDown={onPointerDownIntent}
@@ -764,7 +865,8 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
               size="icon"
               aria-label={prevLabel}
               onClick={() => scrollByCard(-1)}
-              className="absolute left-2 top-1/2 z-10 -translate-y-1/2"
+              className="absolute top-1/2 z-10 -translate-y-1/2"
+              style={{ left: chevronOffset(insets.left) }}
               leftIcon={<Chevron02LeftIcon />}
             />
             <Button
@@ -773,7 +875,8 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
               size="icon"
               aria-label={nextLabel}
               onClick={() => scrollByCard(1)}
-              className="absolute right-2 top-1/2 z-10 -translate-y-1/2"
+              className="absolute top-1/2 z-10 -translate-y-1/2"
+              style={{ right: chevronOffset(insets.right) }}
               leftIcon={<Chevron02RightIcon />}
             />
           </>

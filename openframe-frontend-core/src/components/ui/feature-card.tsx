@@ -39,8 +39,10 @@ export function FeatureCardGrid({
   items,
   columns = 3,
   className = '',
-  cardClassName = 'bg-ods-card border border-ods-border rounded-lg p-0 overflow-hidden',
-  itemClassName = 'bg-ods-bg p-10',
+  // The grid is its hairlines: no outer frame and no surface of its own, so it
+  // sits on whatever band it is placed in.
+  cardClassName = 'bg-transparent border-0 shadow-none rounded-none p-0',
+  itemClassName = 'bg-transparent p-10',
   showBorders = true,
   roundedCorners = false,
   cardGap = '',
@@ -114,7 +116,7 @@ export function FeatureCardGrid({
               if (item.noBackground) {
                 finalItemClassName = finalItemClassName.replace('bg-ods-bg', 'bg-transparent');
               } else if (item.customBackground) {
-                finalItemClassName = finalItemClassName.replace('bg-ods-bg', item.customBackground);
+                finalItemClassName = finalItemClassName.replace(/bg-ods-bg|bg-transparent/, item.customBackground);
               }
 
               // Handle border removal
