@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
 import static com.openframe.core.exception.AuthErrorCode.EMAIL_MISMATCH;
+import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_INVALID;
 import static org.springframework.util.StringUtils.hasText;
 
@@ -67,7 +68,7 @@ public class TenantRegSsoHandler implements SsoFlowHandler {
         String familyName = names[1];
 
         if (payload.tenantName() == null || payload.tenantDomain() == null) {
-            throw new IllegalStateException("Missing registration details. Please start the registration again.");
+            throw new AuthFlowException(REGISTRATION_FAILED, "Missing registration details. Please start the registration again.");
         }
 
         TenantRegistrationRequest reg = TenantRegistrationRequest.builder()
