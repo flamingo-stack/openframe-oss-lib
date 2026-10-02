@@ -59,7 +59,7 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
         return DeliveryRequest.<ToolInstallationMessage>builder()
                 .type(DeliveryType.TOOL_INSTALLATION)
                 .targetId(targetId(seed))
-                .machineId(seed.machineId())
+                .machineId(seed.getMachineId())
                 .payload(message)
                 .build();
     }

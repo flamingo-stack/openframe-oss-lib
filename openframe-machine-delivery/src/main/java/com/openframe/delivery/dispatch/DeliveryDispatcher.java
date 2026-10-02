@@ -25,10 +25,10 @@ public class DeliveryDispatcher {
     private final ObjectProvider<DeliveryPublisher> publisher;
 
     public void dispatch(DeliverySeed seed) {
-        DeliveryType type = seed.type();
+        DeliveryType type = seed.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         if (!spec.canDispatch(seed)) {
-            log.debug("Delivery declined by spec: type={} machineId={}", type, seed.machineId());
+            log.debug("Delivery declined by spec: type={} machineId={}", type, seed.getMachineId());
             return;
         }
         DeliveryRequest<DeliveryPayload> request = spec.request(seed);

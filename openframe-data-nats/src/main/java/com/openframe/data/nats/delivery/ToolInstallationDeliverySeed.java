@@ -17,12 +17,7 @@ public class ToolInstallationDeliverySeed implements DeliverySeed {
     private final boolean reinstall;
 
     @Override
-    public DeliveryType type() {
+    public DeliveryType getType() {
         return DeliveryType.TOOL_INSTALLATION;
-    }
-
-    @Override
-    public String machineId() {
-        return machineId;
     }
 }

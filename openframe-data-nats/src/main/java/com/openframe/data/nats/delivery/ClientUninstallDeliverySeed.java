@@ -12,12 +12,7 @@ public class ClientUninstallDeliverySeed implements DeliverySeed {
     private final String machineId;
 
     @Override
-    public DeliveryType type() {
+    public DeliveryType getType() {
         return DeliveryType.CLIENT_UNINSTALL;
-    }
-
-    @Override
-    public String machineId() {
-        return machineId;
     }
 }

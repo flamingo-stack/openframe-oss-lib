@@ -48,7 +48,7 @@ public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstall
     // PENDING_DELETION means an earlier uninstall was acknowledged: its open row and the watchdog own the outcome
     @Override
     public boolean canDispatch(ClientUninstallDeliverySeed seed) {
-        String machineId = seed.machineId();
+        String machineId = seed.getMachineId();
         boolean inProgress = machineRepository.findByMachineId(machineId)
                 .map(machine -> machine.getStatus() == DeviceStatus.PENDING_DELETION)
                 .orElse(false);
@@ -65,7 +65,7 @@ public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstall
         return DeliveryRequest.<ClientUninstallMessage>builder()
                 .type(DeliveryType.CLIENT_UNINSTALL)
                 .targetId(targetId(seed))
-                .machineId(seed.machineId())
+                .machineId(seed.getMachineId())
                 .payload(message)
                 .build();
     }

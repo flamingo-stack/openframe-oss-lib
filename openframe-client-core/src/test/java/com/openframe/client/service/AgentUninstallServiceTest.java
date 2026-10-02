@@ -61,7 +61,7 @@ class AgentUninstallServiceTest {
         assertThat(machine.getStatus()).isEqualTo(DeviceStatus.DELETED);
         verify(machineRepository).save(machine);
         verify(deliveryTracker).done(seedCaptor.capture());
-        assertThat(seedCaptor.getValue().machineId()).isEqualTo(MACHINE_ID);
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(MACHINE_ID);
     }
 
     @Test

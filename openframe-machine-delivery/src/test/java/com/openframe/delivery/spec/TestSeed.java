@@ -11,12 +11,7 @@ public class TestSeed implements DeliverySeed {
     private final String machineId;
 
     @Override
-    public DeliveryType type() {
+    public DeliveryType getType() {
         return DeliveryType.TOOL_INSTALLATION;
-    }
-
-    @Override
-    public String machineId() {
-        return machineId;
     }
 }

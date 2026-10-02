@@ -4,7 +4,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 
 public interface DeliverySeed {
 
-    DeliveryType type();
+    DeliveryType getType();
 
-    String machineId();
+    String getMachineId();
 }

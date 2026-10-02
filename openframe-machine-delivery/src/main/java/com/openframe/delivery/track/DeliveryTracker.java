@@ -64,10 +64,10 @@ public class DeliveryTracker {
 
     // seed = what we asked for; used when the server learns the outcome outside the result channel, e.g. the agent's own uninstall call
     public void done(DeliverySeed seed) {
-        DeliveryType type = seed.type();
+        DeliveryType type = seed.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         String targetId = spec.targetId(seed);
-        String machineId = seed.machineId();
+        String machineId = seed.getMachineId();
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Instant expiresAt = expiresAt(type, now);
