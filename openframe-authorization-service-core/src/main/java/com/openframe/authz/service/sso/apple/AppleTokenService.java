@@ -15,7 +15,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
-import java.util.Optional;
+import java.util.NoSuchElementException;
 
 import static com.openframe.authz.config.oidc.AppleSSOProperties.APPLE;
 import static com.openframe.authz.service.auth.strategy.AppleClientSecretFactory.APPLE_ISSUER;
@@ -112,8 +112,13 @@ public class AppleTokenService {
         }
     }
 
-    public Optional<AppleUserToken> findByUserId(String userId) {
-        return tokenRepository.findByUserId(userId);
+    public boolean existsByUserId(String userId) {
+        return tokenRepository.findByUserId(userId).isPresent();
+    }
+
+    public AppleUserToken getByUserId(String userId) {
+        return tokenRepository.findByUserId(userId)
+                .orElseThrow(() -> new NoSuchElementException("Apple user token not found for userId: " + userId));
     }
 
     private String revokeUrl() {
