@@ -2,9 +2,14 @@
 
 /**
  * ProgramCard (pure presentation). Generic card for podcasts / webinars /
- * events. Three densities — `default` (wide horizontal detail, archive
- * pages), `sm` (compact horizontal for chat-inline), and `portrait`
- * (vertical rail/strip card).
+ * events. Five densities — `default` (wide horizontal detail, archive
+ * pages), `sm` (compact horizontal for chat-inline), `portrait` (vertical
+ * rail/strip card), and the editorial pair a page section uses to lead with
+ * one item: `feature` (cover on top, label, title, date, description, person)
+ * beside `row`s (square cover, title, date · length · person, two lines).
+ *
+ * The cover is never tinted: a program's artwork carries its own marks, and a
+ * play glyph over a dimmed cover hid them. The whole card is the link.
  *
  * `portrait` exists because mixed-content rails MUST share ONE card anatomy
  * (2026 card-UI practice: a rail mixes content types, never card layouts —
@@ -23,6 +28,7 @@ import { ExternalLink, Clock, Play, Video } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
 import { formatProgramDate } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
@@ -54,7 +60,10 @@ import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-type CardSize = 'default' | 'sm' | 'portrait';
+type CardSize = 'default' | 'sm' | 'portrait' | 'feature' | 'row';
+
+/** Sources narrower than this are contained on an edge-colour fill, never cropped. */
+const MIN_WIDE_RATIO = 1.3;
 
 export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
   if (size === 'sm') {
@@ -127,6 +136,8 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   /** OG placeholder URL used by the compact branch when no cover. */
   placeholderUrl?: string | null;
   wholeCardClickable?: boolean;
+  /** `feature` density: the label above the title ("Latest episode"). */
+  eyebrow?: string;
   className?: string;
 }
 
@@ -211,6 +222,137 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
   );
 }
 
+/**
+ * The editorial pair. `feature`: the cover across the top (a wide cover fills
+ * it, square artwork is contained on its own edge colour), then label, title,
+ * date · length, description and the person. `row`: a square cover beside the
+ * title, date · length · person and two lines of description.
+ */
+function ProgramEditorialCard({
+  feature,
+  href,
+  target,
+  rel,
+  title,
+  description,
+  cover,
+  eyebrow,
+  date,
+  typeMeta,
+  profile,
+  className,
+}: {
+  feature: boolean;
+  href: string;
+  target?: '_blank';
+  rel?: string;
+  title: string;
+  description?: string | null;
+  cover: string | null;
+  eyebrow?: string;
+  date: string | null;
+  typeMeta: string | null | undefined;
+  profile: ReturnType<typeof programItemToStripProfile>;
+  className?: string;
+}) {
+  const [measured, setMeasured] = useState<{ src: string | null; isWide: boolean } | null>(null);
+  const isWide = measured?.src === cover ? measured.isWide : null;
+  const edgeColor = useImageEdgeColor(feature && isWide === false ? cover : null, 'var(--color-bg-surface)');
+  const frame =
+    'group overflow-hidden rounded-lg border border-ods-border bg-ods-card no-underline transition-colors duration-200 hover:border-ods-accent';
+  const meta = (
+    <div className="flex flex-wrap items-center gap-x-[var(--spacing-system-s)] gap-y-[var(--spacing-system-xxs)] text-h6">
+      {date && <span className="text-ods-flamingo-pink">{date}</span>}
+      {[typeMeta, feature ? null : profile?.name]
+        .filter((part): part is string => !!part)
+        .map(part => (
+          <span key={part} className="flex items-center gap-[var(--spacing-system-s)] text-ods-text-secondary">
+            <span aria-hidden="true">•</span>
+            {part}
+          </span>
+        ))}
+    </div>
+  );
+
+  if (!feature) {
+    return (
+      <a
+        href={href}
+        target={target}
+        rel={rel}
+        aria-label={`Open ${title}`}
+        className={cn(
+          frame,
+          'grid grid-cols-[88px_minmax(0,1fr)] items-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)] sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-[var(--spacing-system-l)]',
+          className,
+        )}
+      >
+        <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-ods-bg">
+          {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
+        </span>
+        <span className="flex min-w-0 flex-col gap-[var(--spacing-system-xs)]">
+          <span className="line-clamp-2 text-ods-text-primary text-h3">{title}</span>
+          {meta}
+          {description && <span className="line-clamp-2 text-ods-text-secondary text-h6">{description}</span>}
+        </span>
+      </a>
+    );
+  }
+
+  return (
+    <a
+      href={href}
+      target={target}
+      rel={rel}
+      aria-label={`Open ${title}`}
+      className={cn(frame, 'flex flex-col', className)}
+    >
+      <span
+        className="relative block aspect-video w-full overflow-hidden bg-ods-bg transition-colors duration-300"
+        style={isWide === false ? { backgroundColor: edgeColor } : undefined}
+      >
+        {cover && (
+          <Image
+            src={cover}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 640px, 100vw"
+            className={isWide === false ? 'object-contain' : 'object-cover'}
+            unoptimized
+            onLoad={e => {
+              const img = e.currentTarget;
+              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                setMeasured({ src: cover, isWide: img.naturalWidth / img.naturalHeight >= MIN_WIDE_RATIO });
+              }
+            }}
+          />
+        )}
+      </span>
+      <span className="flex flex-col gap-[var(--spacing-system-s)] p-[var(--spacing-system-l)]">
+        {eyebrow && <span className="text-ods-text-secondary text-h5">{eyebrow}</span>}
+        <span className="line-clamp-2 text-ods-text-primary text-h3">{title}</span>
+        {meta}
+        {description && <span className="line-clamp-3 text-ods-text-secondary text-h4">{description}</span>}
+        {profile && (
+          <span className="flex min-w-0 items-center gap-[var(--spacing-system-s)] pt-[var(--spacing-system-xs)]">
+            <SquareAvatar
+              variant="round"
+              src={profile.avatarUrl || undefined}
+              alt={profile.name}
+              fallback={profile.name.charAt(0).toUpperCase()}
+              size="sm"
+            />
+            <span className="truncate text-h6">
+              <span className="text-ods-text-primary">{profile.name}</span>
+              {profile.subtitle && <span className="text-ods-text-secondary"> · {profile.subtitle}</span>}
+            </span>
+          </span>
+        )}
+      </span>
+    </a>
+  );
+}
+
 export function ProgramCard<T extends BaseProgramItem>({
   config,
   item,
@@ -224,6 +366,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   wholeCardClickable = false,
+  eyebrow,
   className,
 }: ProgramCardProps<T>) {
   const { target, rel } = useEntityCardLink({
@@ -235,17 +378,12 @@ export function ProgramCard<T extends BaseProgramItem>({
   const placeholderUrl = useEntityCardPlaceholder({
     title: item.title,
     placeholderUrl: placeholderUrlProp,
-    aspect: size === 'sm' ? 'square' : 'wide',
+    aspect: size === 'sm' || size === 'row' ? 'square' : 'wide',
   });
   const coverImage = item.cover_url;
   const images = media.filter(m => isImageMedia(m));
   const hosts = getHosts(item.hosts);
   const accentColor = 'var(--color-accent-primary)';
-  // `status` / `duration_seconds` / `location_name` / `start_at` … live on the
-  // concrete program shapes (PodcastItem / EventItem / WebinarItem), not on
-  // `BaseProgramItem`. The `in` guards narrow them to `unknown`, so each read
-  // below is followed by a real type check instead of a cast.
-  const isScheduled = 'status' in item && item.status === 'scheduled';
 
   // The compact meta line, built by the ONE shared function — the chat card
   // renders the same string from the same code rather than mirroring it.
@@ -287,6 +425,25 @@ export function ProgramCard<T extends BaseProgramItem>({
     );
   }
 
+  if (size === 'feature' || size === 'row') {
+    return (
+      <ProgramEditorialCard
+        feature={size === 'feature'}
+        href={href}
+        target={target}
+        rel={rel}
+        title={item.title}
+        description={item.description}
+        cover={coverImage || placeholderUrl || null}
+        eyebrow={eyebrow}
+        date={formatProgramDate(zonedDate, 'weekday')}
+        typeMeta={compactTypeMetaValue}
+        profile={programItemToStripProfile(item)}
+        className={className}
+      />
+    );
+  }
+
   if (size === 'sm') {
     const itemDate = compactDate;
     const compactCover = coverImage || placeholderUrl || null;
@@ -308,11 +465,6 @@ export function ProgramCard<T extends BaseProgramItem>({
               ) : (
                 <Clock className="h-4 w-4" />
               )}
-            </span>
-          )}
-          {config.type === 'podcast' && !isScheduled && compactCover && (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
             </span>
           )}
         </span>
@@ -390,11 +542,6 @@ export function ProgramCard<T extends BaseProgramItem>({
                 className="h-auto w-full rounded-lg object-contain"
                 unoptimized
               />
-              {config.type === 'podcast' && !isScheduled && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Play className="h-10 w-10 text-ods-text-on-dark" fill="white" />
-                </div>
-              )}
             </div>
           </div>
         )}

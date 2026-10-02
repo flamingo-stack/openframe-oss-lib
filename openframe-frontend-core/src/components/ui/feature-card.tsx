@@ -8,6 +8,10 @@ export interface FeatureCardItem {
   icon?: React.ComponentType<{ size?: number; color?: string; className?: string }>;
   iconColor?: string;
   title: string;
+  /** Small label above the title (a number such as "01", a category). */
+  eyebrow?: string;
+  /** One accent line under the title (a tagline). */
+  subtitle?: string;
   badge?: {
     text: string;
     variant?: 'card' | 'button';
@@ -153,9 +157,19 @@ export function FeatureCardGrid({
                       </div>
                     )}
 
-                    <h3 className="whitespace-pre-line tracking-[-0.64px] text-ods-text-primary text-h2">
-                      {item.title}
-                    </h3>
+                    {item.eyebrow || item.subtitle ? (
+                      <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
+                        {item.eyebrow && <span className="text-ods-text-secondary text-h5">{item.eyebrow}</span>}
+                        <h3 className="whitespace-pre-line tracking-[-0.64px] text-ods-text-primary text-h2">
+                          {item.title}
+                        </h3>
+                        {item.subtitle && <p className="text-ods-flamingo-pink text-h4">{item.subtitle}</p>}
+                      </div>
+                    ) : (
+                      <h3 className="whitespace-pre-line tracking-[-0.64px] text-ods-text-primary text-h2">
+                        {item.title}
+                      </h3>
+                    )}
 
                     {item.content}
                   </div>

@@ -78,6 +78,11 @@ export interface DashboardInfoCardProps {
   valueClassName?: string;
   /** Secondary text rendered beside the value (e.g. an entry/item count). */
   subValue?: ReactNode;
+  /**
+   * One line UNDER the value (what the number counts). A card with a caption
+   * grows to fit it instead of holding the fixed stat-tile height.
+   */
+  caption?: ReactNode;
 }
 
 export function DashboardInfoCard({
@@ -97,6 +102,7 @@ export function DashboardInfoCard({
   tooltip,
   valueClassName,
   subValue,
+  caption,
 }: DashboardInfoCardProps) {
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : value;
 
@@ -204,6 +210,8 @@ export function DashboardInfoCard({
             </FloatingTooltip>
           )}
         </div>
+
+        {caption && <p className="text-ods-text-secondary text-h6">{caption}</p>}
       </div>
 
       {/* Progress indicator */}
@@ -218,12 +226,16 @@ export function DashboardInfoCard({
   const baseClassName =
     'bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-xsf)] md:p-[var(--spacing-system-m)] h-16 md:h-[104px] flex gap-[var(--spacing-system-s)] md:gap-[var(--spacing-system-m)] items-center transition-all';
 
+  // A caption is a third line: the fixed stat-tile height would clip it.
+  const captionClassName = caption ? 'h-auto md:h-auto' : undefined;
+
   if (href) {
     return (
       <Link
         href={href}
         className={cn(
           baseClassName,
+          captionClassName,
           'group cursor-pointer',
           'hover:border-ods-border-hover hover:bg-ods-card-hover',
           className,
@@ -234,5 +246,5 @@ export function DashboardInfoCard({
     );
   }
 
-  return <div className={cn(baseClassName, className)}>{cardContent}</div>;
+  return <div className={cn(baseClassName, captionClassName, className)}>{cardContent}</div>;
 }
