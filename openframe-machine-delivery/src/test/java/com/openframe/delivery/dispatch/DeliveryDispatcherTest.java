@@ -57,6 +57,7 @@ class DeliveryDispatcherTest {
     void dispatch_seed_dispatchIdSetThenRecordedThenPublishedToSpecSubject() {
         // setup
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.canDispatch(seed)).thenReturn(true);
         when(spec.request(seed)).thenReturn(request);
         when(spec.subject(MACHINE_ID)).thenReturn("machine.mach-42.test");
         when(publisherProvider.getObject()).thenReturn(publisher);
@@ -70,6 +71,19 @@ class DeliveryDispatcherTest {
         assertThat(payload.getDelivery().getDispatchId()).isNotBlank();
         verify(recorder).record(request);
         verify(publisher).publish("machine.mach-42.test", payload);
+    }
+
+    @Test
+    void dispatch_specDeclines_nothingRecordedOrPublished() {
+        // setup
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.canDispatch(seed)).thenReturn(false);
+
+        // execution
+        dispatcher.dispatch(seed);
+
+        // verifications
+        verifyNoInteractions(recorder, publisherProvider);
     }
 
     @Test

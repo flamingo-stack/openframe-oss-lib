@@ -74,6 +74,31 @@ class ClientUninstallDeliverySpecTest {
     }
 
     @Test
+    void canDispatch_machineInService_true() {
+        // setup
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
+
+        // execution
+        boolean allowed = spec.canDispatch(new ClientUninstallDeliverySeed(MACHINE_ID));
+
+        // verifications
+        assertThat(allowed).isTrue();
+    }
+
+    @Test
+    void canDispatch_uninstallAlreadyAcknowledged_false() {
+        // setup
+        machine.setStatus(DeviceStatus.PENDING_DELETION);
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
+
+        // execution
+        boolean allowed = spec.canDispatch(new ClientUninstallDeliverySeed(MACHINE_ID));
+
+        // verifications
+        assertThat(allowed).isFalse();
+    }
+
+    @Test
     void subject_machineId_machineClientUninstallSubject() {
         // execution
         String subject = spec.subject(MACHINE_ID);

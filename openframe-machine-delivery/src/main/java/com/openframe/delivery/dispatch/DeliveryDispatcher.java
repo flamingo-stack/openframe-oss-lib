@@ -27,6 +27,10 @@ public class DeliveryDispatcher {
     public void dispatch(DeliverySeed seed) {
         DeliveryType type = seed.type();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        if (!spec.canDispatch(seed)) {
+            log.debug("Delivery declined by spec: type={} machineId={}", type, seed.machineId());
+            return;
+        }
         DeliveryRequest<DeliveryPayload> request = spec.request(seed);
         DeliveryPayload payload = request.getPayload();
         String dispatchId = UUID.randomUUID().toString();

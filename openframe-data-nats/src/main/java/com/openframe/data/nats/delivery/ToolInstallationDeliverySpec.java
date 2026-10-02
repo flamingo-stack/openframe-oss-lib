@@ -48,6 +48,11 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
     }
 
     @Override
+    public boolean canDispatch(ToolInstallationDeliverySeed seed) {
+        return true;
+    }
+
+    @Override
     public DeliveryRequest<ToolInstallationMessage> request(ToolInstallationDeliverySeed seed) {
         IntegratedToolAgent toolAgent = seed.getToolAgent();
         ToolInstallationMessage message = buildMessage(toolAgent, seed.getTool(), seed.isReinstall());

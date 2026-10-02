@@ -12,6 +12,8 @@ public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload>
 
     String targetId(S seed);
 
+    boolean canDispatch(S seed);
+
     DeliveryRequest<P> request(S seed);
 
     String subject(String machineId);
