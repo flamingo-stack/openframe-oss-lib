@@ -101,4 +101,45 @@ describe('AppLayout side panel', () => {
     );
     expect(screen.getByText('panel docked 520')).toBeInTheDocument();
   });
+
+  it('lets a host open it and tells the body when it can close', () => {
+    setLayoutWidth(648);
+    const onOpenChange = vi.fn();
+    render(
+      <AppLayout
+        sidebarConfig={{ items: [], onNavigate: () => undefined }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        sidePanel={{
+          label: 'Mingo',
+          open: true,
+          onOpenChange,
+          children: ({ mode, canClose, close }) => (
+            <button type="button" onClick={close}>
+              {mode} {canClose ? 'closable' : 'fixed'}
+            </button>
+          ),
+        }}
+      >
+        <h1>Page</h1>
+      </AppLayout>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'full closable' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('cannot be closed while docked', () => {
+    setLayoutWidth(1224);
+    render(
+      <AppLayout
+        sidebarConfig={{ items: [], onNavigate: () => undefined }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        sidePanel={{ label: 'Mingo', children: ({ mode, canClose }) => <p>{`${mode} ${canClose}`}</p> }}
+      >
+        <h1>Page</h1>
+      </AppLayout>,
+    );
+    expect(screen.getByText('docked false')).toBeInTheDocument();
+  });
 });

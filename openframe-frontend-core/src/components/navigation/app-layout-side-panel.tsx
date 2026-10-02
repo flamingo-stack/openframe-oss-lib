@@ -29,6 +29,13 @@ export interface AppLayoutSidePanelRenderState {
   /** Width the panel body is drawn at, in px. */
   width: number;
   mode: AppLayoutSidePanelMode;
+  /**
+   * The panel was opened from the header (no room to dock, or a phone) and can
+   * be put away again: offer a close control. A docked panel cannot close.
+   */
+  canClose: boolean;
+  /** Put the panel away again; a no-op while it is docked. */
+  close: () => void;
 }
 
 export interface AppLayoutSidePanelConfig {
@@ -48,6 +55,14 @@ export interface AppLayoutSidePanelConfig {
   collapsed?: boolean;
   /** Accessible name of the panel region. Default "Side panel". */
   label?: string;
+  /**
+   * Opened from the header while it cannot dock (or on a phone). Pass it to
+   * open the panel from elsewhere (a deep link, a "send to chat" action);
+   * omit to let the header own it. Docked, it has no effect.
+   */
+  open?: boolean;
+  /** Called whenever the header-open state should change. */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /** Inset of the docked card from the window edge and the header. */
@@ -209,7 +224,13 @@ export function useAppLayoutSidePanel(
 
   const isMobile = useMediaQuery(MOBILE_QUERY) === true;
   const [storedSize, setStoredSize] = useStoredSize(config?.storageKey, minimum);
-  const [isOpen, setIsOpen] = useState(false);
+  const [ownIsOpen, setOwnIsOpen] = useState(false);
+  const isOpen = config?.open ?? ownIsOpen;
+  const onOpenChange = config?.onOpenChange;
+  const setIsOpen = (next: boolean) => {
+    if (config?.open === undefined) setOwnIsOpen(next);
+    onOpenChange?.(next);
+  };
 
   // A page that needs the full width starts the panel at its minimum without
   // touching the width the user chose elsewhere: a drag there lasts until the
@@ -231,8 +252,17 @@ export function useAppLayoutSidePanel(
   const [prevCanDock, setPrevCanDock] = useState(layout.canDock);
   if (layout.canDock !== prevCanDock) {
     setPrevCanDock(layout.canDock);
-    setIsOpen(false);
+    setOwnIsOpen(false);
   }
+  // A controlled host hears about the return after the commit (a parent's
+  // setState cannot run in this render), and only on the transition: a host
+  // may open the panel while it is docked (a deep link), which is not undone.
+  const prevCanDockRef = useRef(layout.canDock);
+  useEffect(() => {
+    const couldDock = prevCanDockRef.current;
+    prevCanDockRef.current = layout.canDock;
+    if (!couldDock && layout.canDock && config?.open) onOpenChange?.(false);
+  }, [layout.canDock, config?.open, onOpenChange]);
 
   if (!enabled) return null;
 
@@ -240,7 +270,7 @@ export function useAppLayoutSidePanel(
     ...layout,
     minWidth,
     isOpen,
-    toggle: () => setIsOpen(open => !open),
+    toggle: () => setIsOpen(!isOpen),
     close: () => setIsOpen(false),
     resize: next => {
       // Past the content's minimum the panel takes the whole area; dragging
@@ -392,7 +422,7 @@ export function AppLayoutSidePanel({ config, state }: AppLayoutSidePanelProps) {
           mode !== 'overlay' && 'rounded-md border border-ods-border',
         )}
       >
-        {config.children({ width, mode })}
+        {config.children({ width, mode, canClose: mode === 'overlay' || (mode === 'full' && !canDock), close })}
       </div>
     </aside>
   );

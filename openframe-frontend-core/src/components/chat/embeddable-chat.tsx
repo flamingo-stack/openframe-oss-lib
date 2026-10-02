@@ -327,6 +327,13 @@ export interface EmbeddableChatProps {
   shell?: 'drawer' | 'none';
 
   /**
+   * Whether the panel offers a close button. `false` for a chat that is part
+   * of the layout rather than an overlay (docked beside the page): every
+   * header leaves its close control out. Default `true`.
+   */
+  closable?: boolean;
+
+  /**
    * Display name of the signed-in user, shown as the sub-line under the chat
    * title in the panel header. The server-resolved chat identity
    * (`useChatIdentity().user.name`) always wins when present; this is the
@@ -971,6 +978,7 @@ function EmbeddableChatInner({
   aiAgentConfigUrl: aiAgentConfigUrlProp,
   defaultActiveMode,
   shell = 'drawer',
+  closable = true,
   userDisplayName,
   userAvatarUrl,
   mingoWelcome,
@@ -1524,6 +1532,8 @@ function EmbeddableChatInner({
   const resolvedBaseRoute = baseRoute || (source === 'flamingo' ? '/knowledge-base' : '/data-room');
 
   const handleClose = useCallback(() => setIsOpen(false), [setIsOpen]);
+  // What the header close controls call; absent on a panel that cannot close.
+  const closeControl = closable ? handleClose : undefined;
 
   const handleNavigationClose = useCallback(() => {
     navigatingAwayRef.current = true;
@@ -2200,12 +2210,12 @@ function EmbeddableChatInner({
           avatar: headerAvatar,
           backAriaLabel: 'Back to chats',
           onBack: () => setComposeOpen(false),
-          onClose: handleClose,
+          onClose: closeControl,
         }
       : {
           showBack: false,
           title: 'Current Chats',
-          onClose: handleClose,
+          onClose: closeControl,
           onOpenArchive: headerOnOpenArchive,
           onToggleSearch: mingoCaps.onSearchChange ? () => setRailSearchOpen(o => !o) : undefined,
           searchActive: railSearchOpen,
@@ -2220,7 +2230,7 @@ function EmbeddableChatInner({
         backAriaLabel: headerBackAriaLabel,
         isArchivedView: isViewingArchived,
         onBack: headerOnBack,
-        onClose: handleClose,
+        onClose: closeControl,
         onRestore: headerOnRestore,
         onRename: headerOnRename,
         onArchive: headerOnArchive,
@@ -2266,7 +2276,7 @@ function EmbeddableChatInner({
                 dialogs={archivedDialogs}
                 onSelectDialog={handleArchivedSelect}
                 onBack={closeArchive}
-                onClose={handleClose}
+                onClose={closeControl}
                 isLoading={archivedLoading}
                 isFetching={archivedPending}
                 hasMore={archivedCursor != null}
@@ -2404,9 +2414,11 @@ function EmbeddableChatInner({
                         }
                       />
                     )}
-                    <ChatHeaderIconButton onClick={handleClose} aria-label="Close">
-                      <XmarkIcon size={24} />
-                    </ChatHeaderIconButton>
+                    {closeControl && (
+                      <ChatHeaderIconButton onClick={closeControl} aria-label="Close">
+                        <XmarkIcon size={24} />
+                      </ChatHeaderIconButton>
+                    )}
                   </div>
                 </div>
               ) : (
