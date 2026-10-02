@@ -27,11 +27,15 @@ public class DeliveryRecorder {
     private final DeliveryProperties properties;
     private final ObjectMapper objectMapper;
 
-    public void record(DeliveryRequest<?> request) {
+    // false = a row for this very dispatch already exists: the hand-off was replayed, nothing to do
+    public boolean record(DeliveryRequest<?> request) {
         MachineDelivery delivery = pendingRow(request);
-        repository.upsertPending(delivery);
-        log.info("Delivery recorded: type={} targetId={} machineId={}",
-                request.getType(), request.getTargetId(), request.getMachineId());
+        boolean written = repository.upsertPending(delivery);
+        if (written) {
+            log.info("Delivery recorded: type={} targetId={} machineId={}",
+                    request.getType(), request.getTargetId(), request.getMachineId());
+        }
+        return written;
     }
 
     private MachineDelivery pendingRow(DeliveryRequest<?> request) {

@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.convert.MongoConverter;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -71,19 +73,39 @@ class CustomMachineDeliveryRepositoryImplTest {
     @Test
     void upsertPending_row_setsEveryFieldAndTenantWithinScopedUpsert() {
         // setup
-        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).build();
+        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).dispatchId(DISPATCH_ID).build();
         when(mongoTemplate.getConverter()).thenReturn(converter);
         when(mongoTemplate.tenantId()).thenReturn(TENANT_ID);
 
         // execution
-        repository.upsertPending(delivery);
+        boolean written = repository.upsertPending(delivery);
 
         // verifications
+        assertThat(written).isTrue();
         verify(mongoTemplate).upsert(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class));
-        assertThat(queryCaptor.getValue().getQueryObject().toString()).contains(ID);
+        assertThat(queryCaptor.getValue().getQueryObject().toString())
+                .contains(ID)
+                .contains("dispatchId")
+                .contains("$ne");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("$set")
                 .contains("tenantId=" + TENANT_ID);
+    }
+
+    @Test
+    void upsertPending_rowOfThisDispatchAlreadyThere_insertCollidesAndFalse() {
+        // setup
+        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).dispatchId(DISPATCH_ID).build();
+        when(mongoTemplate.getConverter()).thenReturn(converter);
+        when(mongoTemplate.tenantId()).thenReturn(TENANT_ID);
+        when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(MachineDelivery.class)))
+                .thenThrow(new DuplicateKeyException("E11000 duplicate key"));
+
+        // execution
+        boolean written = repository.upsertPending(delivery);
+
+        // verifications
+        assertThat(written).isFalse();
     }
 
     @Test

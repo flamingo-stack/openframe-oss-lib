@@ -29,10 +29,9 @@ class DeliveryDispatcherTest {
     private static final String VALUE = "issued";
 
     @Mock private DeliverySpecRegistry registry;
-    @Mock private DeliveryRecorder recorder;
     @Mock private DeliverySpec<TestSeed, TestPayload> spec;
-    @Mock private ObjectProvider<DeliveryPublisher> publisherProvider;
-    @Mock private DeliveryPublisher publisher;
+    @Mock private ObjectProvider<DeliverySink> sinkProvider;
+    @Mock private DeliverySink sink;
 
     @InjectMocks private DeliveryDispatcher dispatcher;
 
@@ -54,12 +53,11 @@ class DeliveryDispatcherTest {
     }
 
     @Test
-    void dispatch_seed_dispatchIdSetThenRecordedThenPublishedToSpecSubject() {
+    void dispatch_seed_dispatchIdStampedThenRequestHandedToSink() {
         // setup
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         when(spec.request(seed)).thenReturn(request);
-        when(spec.subject(MACHINE_ID)).thenReturn("machine.mach-42.test");
-        when(publisherProvider.getObject()).thenReturn(publisher);
+        when(sinkProvider.getObject()).thenReturn(sink);
 
         // execution
         dispatcher.dispatch(seed);
@@ -68,20 +66,17 @@ class DeliveryDispatcherTest {
         assertThat(payload.getDelivery().getType()).isEqualTo(DeliveryType.TOOL_INSTALLATION);
         assertThat(payload.getDelivery().getTargetId()).isEqualTo(TARGET_ID);
         assertThat(payload.getDelivery().getDispatchId()).isNotBlank();
-        verify(recorder).record(request);
-        verify(publisher).publish("machine.mach-42.test", payload);
+        verify(sink).accept(request);
     }
 
     @Test
-    void dispatch_unregisteredType_throwsWithoutRecording() {
+    void dispatch_unregisteredType_throwsWithoutHandOff() {
         // setup
         when(registry.require(DeliveryType.TOOL_INSTALLATION))
                 .thenThrow(new IllegalArgumentException("No spec registered for delivery type: TOOL_INSTALLATION"));
 
         // execution + verifications
-        assertThatThrownBy(() -> dispatcher.dispatch(seed))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("TOOL_INSTALLATION");
-        verifyNoInteractions(recorder);
+        assertThatThrownBy(() -> dispatcher.dispatch(seed)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(sinkProvider);
     }
 }

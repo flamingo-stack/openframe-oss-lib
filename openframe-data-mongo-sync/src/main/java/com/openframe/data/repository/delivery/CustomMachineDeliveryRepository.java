@@ -12,7 +12,7 @@ public interface CustomMachineDeliveryRepository {
 
     List<MachineDelivery> findDue(DeliveryStatus status, Instant before, int limit);
 
-    void upsertPending(MachineDelivery delivery);
+    boolean upsertPending(MachineDelivery delivery);
 
     boolean markRepublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, int attempts, Instant dueAt);
 
