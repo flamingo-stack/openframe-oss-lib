@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { MingoArchiveList } from '../mingo-archive-list';
 import { MingoChatHeader } from '../mingo-chat-header';
 import { MingoChatRail } from '../mingo-chat-rail';
 
@@ -40,6 +41,13 @@ describe('MingoChatRail', () => {
     expect(onSelectDialog).toHaveBeenCalledWith('c');
   });
 
+  it('marks a chat being started at the top', () => {
+    render(<MingoChatRail dialogs={DIALOGS} draftTitle="New Chat" />);
+    const rows = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('New Chat');
+  });
+
   it('shows the empty state without chats', () => {
     render(<MingoChatRail dialogs={[]} />);
     expect(screen.getByText('No Current Chats')).toBeInTheDocument();
@@ -66,5 +74,24 @@ describe('MingoChatHeader', () => {
     expect(onCollapse).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Chat actions' })).not.toBeInTheDocument();
+  });
+});
+
+describe('MingoArchiveList', () => {
+  it('opens an archived chat', () => {
+    const onSelectDialog = vi.fn();
+    render(
+      <MingoArchiveList
+        dialogs={[{ id: 'x', title: 'VPN review', owner: { name: 'Roman Smith' } }]}
+        onSelectDialog={onSelectDialog}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /VPN review/ }));
+    expect(onSelectDialog).toHaveBeenCalledWith('x');
+  });
+
+  it('says when nothing is archived', () => {
+    render(<MingoArchiveList dialogs={[]} />);
+    expect(screen.getByText('No Archived Chats')).toBeInTheDocument();
   });
 });

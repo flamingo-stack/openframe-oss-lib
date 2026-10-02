@@ -40,6 +40,9 @@ export interface MingoChatRailProps {
   dialogs: ReadonlyArray<DialogItem>;
   activeDialogId?: string;
   onSelectDialog?: (id: string) => void;
+  /** A chat being started and not saved yet: a selected row at the top
+   *  (e.g. "New Chat"), so the list says what the chat beside it is. */
+  draftTitle?: string;
   onNewChat?: () => void;
   /** Open the archive. `archiveActive` marks it as the view on screen. */
   onOpenArchive?: () => void;
@@ -90,6 +93,7 @@ export function MingoChatRail({
   dialogs,
   activeDialogId,
   onSelectDialog,
+  draftTitle,
   onNewChat,
   onOpenArchive,
   archiveActive = false,
@@ -203,7 +207,7 @@ export function MingoChatRail({
     list = Array.from({ length: 6 }, (_, i) => (
       <div key={i} className="h-10 shrink-0 animate-pulse rounded-md bg-ods-skeleton" aria-hidden />
     ));
-  } else if (dialogs.length === 0) {
+  } else if (dialogs.length === 0 && !draftTitle) {
     list = hasSearch ? (
       <p className="px-[var(--spacing-system-xs)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h6">
         No chats found
@@ -218,6 +222,7 @@ export function MingoChatRail({
   } else {
     list = (
       <>
+        {draftTitle && <ChatListItem active title={draftTitle} tabIndex={-1} className="cursor-default" />}
         {dialogs.map(dialog => (
           <MingoChatRailRow
             key={dialog.id}

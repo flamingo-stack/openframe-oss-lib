@@ -271,12 +271,41 @@ const MINGO_MESSAGES: UnifiedChatMessage[] = [
     timestamp: AT,
   },
   {
+    id: 'm1b',
+    role: 'assistant',
+    name: 'Mingo',
+    authorType: 'mingo',
+    content: [{ type: 'thinking', text: 'Checking the renewal job history for osqueryd on this device.' }],
+    timestamp: AT,
+  },
+  {
     id: 'm2',
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo',
     content:
       "The renewal job ran ~6 hours ago but didn't complete. osqueryd.exe cert expires in 3 days - if it's not renewed before then, the agent will fail signature validation and stop reporting.\n\nWant me to trigger a manual renewal or check what blocked the last attempt?",
+    timestamp: AT,
+  },
+  {
+    id: 'm3',
+    role: 'assistant',
+    name: 'Mingo',
+    authorType: 'mingo',
+    content: [
+      {
+        type: 'approval_request',
+        data: {
+          command: '$today = (Get-Date).Date\n$logs = Get-WinEvent -FilterHashtable @{ LogName = "System" }',
+          explanation:
+            'Collects all events from System, Application, and Security logs for today and exports them to a CSV file at C:\\Logs\\today_logs.csv.',
+          approvalRequestId: 'ar-1',
+        },
+        status: 'pending',
+        onApprove: () => undefined,
+        onReject: () => undefined,
+      },
+    ],
     timestamp: AT,
   },
 ];
@@ -323,9 +352,36 @@ function createMingoState(): UnifiedChatState {
   };
 }
 const MINGO_STATE = createMingoState();
+const NEW_CHAT_STATE: UnifiedChatState = { ...MINGO_STATE, messages: [], activeDialogId: null };
+
+const ARCHIVED = [
+  'Exchange hybrid migration planning',
+  'VPN split-tunnel configuration review',
+  'Decommissioning legacy file server',
+];
+const MINGO_CAPABILITIES = {
+  canRename: true,
+  canArchive: true,
+  onSearchChange: () => undefined,
+  fetchArchivedDialogs: async () => ({
+    dialogs: ARCHIVED.map((title, i) => ({
+      id: `arch-${i}`,
+      title,
+      timestamp: new Date(Date.now() - (i + 1) * 5 * 60_000),
+      owner: { name: 'Roman Smith' },
+    })),
+    nextCursor: null,
+  }),
+};
 
 /** The real chat panel, as openframe-frontend docks it. */
-function RealMingo({ canClose, close, collapse, mode }: AppLayoutSidePanelRenderState) {
+function RealMingo({
+  canClose,
+  close,
+  collapse,
+  mode,
+  thread,
+}: AppLayoutSidePanelRenderState & { thread: 'conversation' | 'new' }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <EmbeddableChat
@@ -339,8 +395,8 @@ function RealMingo({ canClose, close, collapse, mode }: AppLayoutSidePanelRender
         onCollapse={mode === 'overlay' ? undefined : collapse}
         defaultActiveMode="mingo"
         showInternalTrigger={false}
-        mingoState={MINGO_STATE}
-        mingoDialogCapabilities={{ canRename: true, canArchive: true }}
+        mingoState={thread === 'new' ? NEW_CHAT_STATE : MINGO_STATE}
+        mingoDialogCapabilities={MINGO_CAPABILITIES}
       />
     </div>
   );
@@ -350,10 +406,12 @@ function Screen({
   collapsed,
   page,
   panel,
+  thread,
 }: {
   collapsed: boolean;
   page: 'dashboard' | 'devices';
   panel: 'mingo' | 'mock';
+  thread: 'conversation' | 'new';
 }) {
   return (
     <AppLayout
@@ -364,7 +422,7 @@ function Screen({
         label: 'Mingo',
         storageKey: 'storybook:mingo-docked-width',
         collapsed,
-        children: state => (panel === 'mock' ? <MockMingo {...state} /> : <RealMingo {...state} />),
+        children: state => (panel === 'mock' ? <MockMingo {...state} /> : <RealMingo {...state} thread={thread} />),
       }}
     >
       {page === 'devices' ? <DevicesPage /> : <Dashboard />}
@@ -393,7 +451,7 @@ const meta: Meta<typeof Screen> = {
       },
     },
   },
-  args: { collapsed: false, page: 'dashboard', panel: 'mingo' },
+  args: { collapsed: false, page: 'dashboard', panel: 'mingo', thread: 'conversation' },
   argTypes: {
     panel: {
       control: 'inline-radio',
@@ -412,3 +470,6 @@ export const Docked: Story = {};
 
 /** A list page: PageLayout header and a DataTable whose `hideAt` columns follow the content width. */
 export const ListPage: Story = { args: { page: 'devices' } };
+
+/** A new chat: Mingo's welcome in the chat column. */
+export const NewChat: Story = { args: { thread: 'new' } };
