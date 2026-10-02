@@ -18,7 +18,7 @@ public class DeviceHeartbeatOfflineDetectionService {
 
     private final MachineRepository machineRepository;
 
-    @Value("${openframe.device.heartbeat.offline-threshold-seconds:130}")
+    @Value("${openframe.device.heartbeat.offline-threshold-seconds}")
     private long offlineThresholdSeconds;
 
     public void markStaleDevicesOffline() {

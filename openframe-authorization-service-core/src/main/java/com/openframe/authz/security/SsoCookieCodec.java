@@ -22,7 +22,7 @@ public class SsoCookieCodec {
 
     private final ObjectMapper objectMapper;
 
-    @Value("${openframe.sso.registration-cookie.secret:change-me-in-config}")
+    @Value("${openframe.sso.registration-cookie.secret}")
     private String hmacSecret;
 
     public String encode(SsoCookiePayload payload) {
@@ -60,11 +60,7 @@ public class SsoCookieCodec {
         return decode(token, SsoLoginCookiePayload.class);
     }
 
-    /**
-     * The OAuth state of ANY flow cookie, without knowing which flow wrote it — every payload
-     * shares the {@link SsoCookiePayload} shape, and Jackson ignores the flow-specific fields.
-     * Signature and expiry are enforced exactly as in the typed decodes.
-     */
+    // Works across any flow cookie shape since Jackson ignores flow-specific fields.
     public Optional<String> decodeState(String token) {
         return decode(token, FlowStatePayload.class).map(FlowStatePayload::s);
     }

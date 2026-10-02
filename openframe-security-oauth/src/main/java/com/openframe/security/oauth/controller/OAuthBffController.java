@@ -38,19 +38,19 @@ public class OAuthBffController {
     private final CookieService cookieService;
     private final RedirectTargetResolver redirectTargetResolver;
 
-    @Value("${openframe.gateway.oauth.state-cookie-ttl-seconds:180}")
+    @Value("${openframe.gateway.oauth.state-cookie-ttl-seconds}")
     private int stateCookieTtlSeconds;
-    @Value("${openframe.gateway.oauth.dev-ticket-enabled:true}")
+    @Value("${openframe.gateway.oauth.dev-ticket-enabled}")
     private boolean devTicketEnabled;
-    @Value("${openframe.gateway.oauth.mobile-auth-enabled:true}")
+    @Value("${openframe.gateway.oauth.mobile-auth-enabled}")
     private boolean mobileAuthEnabled;
     @Value("${openframe.auth.error-url}")
     private String authErrorUrl;
     /** Web continuation page a non-allow-listed signup handoff falls back to. */
-    @Value("${openframe.gateway.oauth.signup-continue-page:/auth/sso-continue}")
+    @Value("${openframe.gateway.oauth.signup-continue-page}")
     private String signupContinuePage;
     /** Web page a mobile consent-page cancel falls back to when redirectTo is not allow-listed. */
-    @Value("${openframe.gateway.oauth.join-cancel-page:/auth/login}")
+    @Value("${openframe.gateway.oauth.join-cancel-page}")
     private String joinCancelPage;
 
     @GetMapping("/login")
@@ -393,3 +393,4 @@ public class OAuthBffController {
     }
 
 }
+
