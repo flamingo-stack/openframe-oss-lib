@@ -247,9 +247,14 @@ jobs:
         # the next patch number instead of failing; a snapshot's number is a
         # timestamp, so it never retries.
         run: |
+          # The verdict below is npm's exit status, not tee's (`shell: bash` sets this too; stated here so it cannot be lost).
+          set -o pipefail
           for attempt in 1 2 3 4 5; do
             if npm publish --tag "$PUBLISH_TAG" --access public 2>&1 | tee publish.log; then
-              echo "Published $(jq -r '.version' package.json)"
+              PUBLISHED=$(jq -r '.version' package.json)
+              # What was published, for the summary and any later step (it differs from the computed number after a skip).
+              echo "NEW_VERSION=$PUBLISHED" >> "$GITHUB_ENV"
+              echo "Published $PUBLISHED" | tee -a "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             if [ "$PUBLISH_TAG" != "latest" ] || ! grep -qE "previously (staged|published) version" publish.log; then
