@@ -214,14 +214,32 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
-      - name: Publish ${{ env.NEW_VERSION }} (pr-${{ github.event.pull_request.number }} tag)
+      # ONE tarball, packed from the build above (.github/scripts/pack-package.sh).
+      - name: Pack ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
         run: |
           npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
-          npm publish --tag "pr-${{ github.event.pull_request.number }}" --ignore-scripts
+          bash "$GITHUB_WORKSPACE/.github/scripts/pack-package.sh"
+
+      # A pull request's build goes to pkg.pr.new first: installable when this step
+      # ends, addressed by the PR's head commit (.github/scripts/preview-publish.sh).
+      - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
+
+      # ...and to npmjs under the PR's dist-tag, as before, for consumers that
+      # still install from it. Same tarball; no waiting on npm's scan.
+      - name: Publish ${{ env.NEW_VERSION }} (pr-${{ github.event.pull_request.number }} tag) to npmjs
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "pr-${{ github.event.pull_request.number }}"
 
 
   # `lint:cycles` gets its OWN job, purely for wall-clock. It is graph-wide —
