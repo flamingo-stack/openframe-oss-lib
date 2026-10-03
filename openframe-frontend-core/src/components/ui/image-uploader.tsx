@@ -5,6 +5,7 @@ import { type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode, u
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
 import { cn } from '../../utils/cn';
+import { fileMediaType, IMAGE_FILE_ACCEPT } from '../../utils/media-type';
 import { ImagePlusIcon } from '../icons-v2-generated/audio-and-visual/image-plus-icon';
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
 import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02-vr-icon';
@@ -70,7 +71,10 @@ function matchesAccept(file: File, accept: string): boolean {
   const fileName = file.name.toLowerCase();
   return patterns.some(pattern => {
     if (pattern.startsWith('.')) return fileName.endsWith(pattern);
-    if (pattern.endsWith('/*')) return fileType.startsWith(pattern.slice(0, -1));
+    // `image/*` / `video/*`: the shared rule (MIME type, else extension), so a HEIC
+    // photo the browser states no type for is still a picture.
+    if (pattern.endsWith('/*'))
+      return fileType.startsWith(pattern.slice(0, -1)) || fileMediaType(file) === pattern.slice(0, -2);
     return fileType === pattern;
   });
 }
@@ -79,7 +83,7 @@ export function ImageUploader({
   value,
   onChange,
   onRemove,
-  accept = 'image/*',
+  accept = IMAGE_FILE_ACCEPT,
   maxSize = DEFAULT_MAX_SIZE,
   label = 'Cover Image',
   description = '(Click Here or Drag and Drop)',

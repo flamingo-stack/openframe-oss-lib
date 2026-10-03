@@ -13,6 +13,7 @@
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import { cn } from '../../../utils/cn';
 import { getProxiedImageUrl } from '../../../utils/image-proxy';
 import { FigmaIcon } from '../../icons/figma-icon';
 import { ImageIcon } from '../../icons/image-icon';
@@ -35,6 +36,7 @@ import {
   COMPACT_CARD_TITLE_ROW,
   safeHref,
 } from '../utils/compact-card-classes';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { RoadmapVoteButton } from './roadmap-vote-button';
 import { TaskTypeIcon } from './task-type-icon';
 
@@ -66,28 +68,33 @@ export function RoadmapCardSkeleton({ size = 'default' }: { size?: CardSize }) {
     );
   }
   return (
-    <div className="flex h-full animate-pulse flex-col gap-4 rounded-[6px] border border-ods-border bg-ods-card p-[24px]">
+    <div
+      className={cn(
+        CONTENT_CARD_SKELETON_FRAME_CLASS,
+        'flex h-full animate-pulse flex-col gap-4 p-[var(--spacing-system-lf)]',
+      )}
+    >
       <div className="flex items-center gap-4">
-        <div className="h-16 w-16 flex-shrink-0 rounded-lg bg-ods-bg" />
+        <div className="h-16 w-16 flex-shrink-0 rounded-lg bg-ods-border" />
         <div className="flex-1 space-y-2">
-          <div className="h-5 w-3/4 rounded bg-ods-bg" />
-          <div className="h-3 w-1/2 rounded bg-ods-bg/60" />
+          <div className="h-5 w-3/4 rounded bg-ods-border" />
+          <div className="h-3 w-1/2 rounded bg-ods-border" />
         </div>
-        <div className="h-6 w-16 rounded bg-ods-bg" />
+        <div className="h-6 w-16 rounded bg-ods-border" />
       </div>
       <div className="space-y-2">
-        <div className="h-3 w-full rounded bg-ods-bg/60" />
-        <div className="h-3 w-5/6 rounded bg-ods-bg/60" />
-        <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
+        <div className="h-3 w-full rounded bg-ods-border" />
+        <div className="h-3 w-5/6 rounded bg-ods-border" />
+        <div className="h-3 w-4/5 rounded bg-ods-border" />
       </div>
       <div className="flex-1" />
       <div className="flex items-center justify-between">
-        <div className="h-12 w-32 rounded bg-ods-bg" />
+        <div className="h-12 w-32 rounded bg-ods-border" />
         <div className="flex items-center gap-2">
           {/* assignee-stack placeholder — matches the xs AvatarStack in
               the loaded card's action row */}
-          <div className="h-6 w-14 rounded-full bg-ods-bg/60" />
-          <div className="h-8 w-20 rounded bg-ods-bg" />
+          <div className="h-6 w-14 rounded-full bg-ods-border" />
+          <div className="h-8 w-20 rounded bg-ods-border" />
         </div>
       </div>
     </div>
@@ -262,7 +269,11 @@ export function RoadmapCard({
   return (
     <div
       id={id}
-      className={`flex h-full scroll-mt-24 flex-col gap-[16px] rounded-[6px] border border-ods-border bg-ods-card p-[24px] transition-all hover:border-ods-accent ${className ?? ''}`}
+      className={cn(
+        CONTENT_CARD_FRAME_CLASS,
+        'flex h-full scroll-mt-24 flex-col gap-[var(--spacing-system-mf)] p-[var(--spacing-system-lf)]',
+        className,
+      )}
     >
       <div className="flex w-full items-center gap-[16px]">
         <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg">

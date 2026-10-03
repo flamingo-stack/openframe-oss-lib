@@ -39,7 +39,7 @@ import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected
 import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
 import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown';
-import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../layout/page-heading';
 import {
   Button,
   type ButtonProps,
@@ -266,7 +266,7 @@ export function ContactForm({
     >
       {(title || subtitle) && (
         <div className="mb-6 md:mb-8">
-          {title && <h2 className={`${SECTION_HEADING_CLASS} mb-3 md:mb-4`}>{title}</h2>}
+          {title && <h2 className={`${SECTION_HEADING_CLASS} mb-3 md:mb-4`}>{accentSentenceMarks(title)}</h2>}
           {subtitle && <p className="text-ods-text-primary text-h4">{subtitle}</p>}
         </div>
       )}
