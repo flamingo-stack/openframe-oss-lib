@@ -201,7 +201,6 @@ export function MediaGalleryManager({
             onClick={() => fileInputRef.current?.click()}
             disabled={busy}
             leftIcon={<Plus className="h-4 w-4" />}
-            className="font-bold text-h6"
           >
             {busy ? 'Uploading...' : 'Select Files'}
           </Button>
