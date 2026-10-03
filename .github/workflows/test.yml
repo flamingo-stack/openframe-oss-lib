@@ -216,6 +216,18 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
+      # Where OUR apps install a pull request's build from: installable when this
+      # step ends, addressed by the PR's head commit (.github/scripts/preview-publish.sh).
+      - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        env:
+          PREVIEW_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
+          bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
+
       - name: Publish ${{ env.NEW_VERSION }} (pr-${{ github.event.pull_request.number }} tag)
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
@@ -226,7 +238,7 @@ jobs:
         # THE publish (.github/scripts/npm-publish.sh): it takes its turn behind any
         # other publish of this package and ends when npm serves the version.
         run: |
-          npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
+          npm version "${{ env.NEW_VERSION }}" --no-git-tag-version --allow-same-version
           bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "pr-${{ github.event.pull_request.number }}" --ignore-scripts
 
 

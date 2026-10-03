@@ -237,6 +237,15 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
+      # Where OUR apps install the library from: installable when this step ends,
+      # addressed by commit (.github/scripts/preview-publish.sh tells why). It runs
+      # BEFORE the npm publish, which can take an hour to be served.
+      - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
+
       - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
