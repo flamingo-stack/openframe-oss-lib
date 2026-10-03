@@ -37,6 +37,7 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useCoverImageFallback } from './use-cover-image-fallback';
 import { useEntityCardLink } from './use-entity-card-link';
@@ -90,16 +91,16 @@ export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm'
     );
   }
   return (
-    <article className="group flex h-full animate-pulse flex-col overflow-hidden rounded-lg border border-ods-border bg-ods-card">
-      <div className="aspect-[1200/630] bg-ods-bg" />
+    <article className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'group flex h-full animate-pulse flex-col')}>
+      <div className="aspect-[1200/630] bg-ods-border" />
       <div className="flex flex-grow flex-col space-y-3 p-4">
-        <div className="h-5 w-3/4 rounded bg-ods-bg" />
-        <div className="h-5 w-1/2 rounded bg-ods-bg" />
-        <div className="h-3 w-full rounded bg-ods-bg/60" />
-        <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
+        <div className="h-5 w-3/4 rounded bg-ods-border" />
+        <div className="h-5 w-1/2 rounded bg-ods-border" />
+        <div className="h-3 w-full rounded bg-ods-border" />
+        <div className="h-3 w-4/5 rounded bg-ods-border" />
         <div className="mt-auto flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-ods-bg" />
-          <div className="h-3 w-24 rounded bg-ods-bg/60" />
+          <div className="h-8 w-8 rounded-full bg-ods-border" />
+          <div className="h-3 w-24 rounded bg-ods-border" />
         </div>
       </div>
     </article>
@@ -207,17 +208,7 @@ export function BlogCard({
   // Default: full vertical card.
   const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
   return (
-    <article
-      className={cn(
-        'group overflow-hidden rounded-lg border border-ods-border bg-ods-card',
-        'transition-all duration-300 ease-out',
-        'transform hover:translate-y-[-2px]',
-        'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',
-        'flex h-full flex-col',
-        className,
-      )}
-      role="article"
-    >
+    <article className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col', className)} role="article">
       <a
         href={href}
         target={target}

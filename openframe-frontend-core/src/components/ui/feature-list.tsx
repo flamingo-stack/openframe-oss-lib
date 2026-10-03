@@ -3,18 +3,44 @@
 import type React from 'react';
 
 export interface FeatureListItemData {
-  icon: React.ReactNode;
+  /** Shown in the boxed slot. Not used by the `numbered` variant. */
+  icon?: React.ReactNode;
   title: string;
   description: string;
 }
 
 export interface FeatureListProps {
-  items: FeatureListItemData[];
+  items: readonly FeatureListItemData[];
   className?: string;
   iconBoxSize?: number;
+  /**
+   * `boxed` (default): one bordered card, a boxed icon per row.
+   * `numbered`: an ordered list of open rows separated by hairlines, each led
+   * by its two-digit number (process steps).
+   */
+  variant?: 'boxed' | 'numbered';
 }
 
-export function FeatureList({ items, className = '', iconBoxSize = 72 }: FeatureListProps) {
+export function FeatureList({ items, className = '', iconBoxSize = 72, variant = 'boxed' }: FeatureListProps) {
+  if (variant === 'numbered') {
+    return (
+      <ol className={`flex flex-col ${className}`}>
+        {items.map((item, index) => (
+          <li
+            key={index}
+            className="grid grid-cols-[48px_minmax(0,1fr)] gap-[var(--spacing-system-m)] border-t border-ods-border py-[var(--spacing-system-l)] last:border-b"
+          >
+            <span className="text-ods-flamingo-pink text-h5">{String(index + 1).padStart(2, '0')}</span>
+            <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
+              <h3 className="text-ods-text-primary text-h3">{item.title}</h3>
+              <p className="text-ods-text-secondary text-h4">{item.description}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    );
+  }
+
   return (
     <div className={`flex flex-col overflow-hidden rounded-[6px] border border-ods-border bg-ods-bg ${className}`}>
       {items.map((item, index) => (

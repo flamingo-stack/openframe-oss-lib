@@ -41,7 +41,6 @@ export * from './platform-badge';
 export * from './platform-filter';
 export * from './provider-button';
 export * from './push-button-selector';
-export * from './release-media-manager';
 export * from './section-selector';
 export * from './select-button';
 export * from './seo-editor-preview';
