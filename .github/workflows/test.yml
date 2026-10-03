@@ -214,6 +214,15 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
+      # ONE tarball, packed from the build above (.github/scripts/pack-package.sh).
+      - name: Pack ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        run: |
+          npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
+          bash "$GITHUB_WORKSPACE/.github/scripts/pack-package.sh"
+
       # A pull request's build goes to pkg.pr.new ONLY (never npmjs): installable
       # when this step ends, addressed by the PR's head commit
       # (.github/scripts/preview-publish.sh). npmjs gets real releases alone.
@@ -221,11 +230,7 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         shell: bash
-        env:
-          PREVIEW_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
-          bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
 
 
   # `lint:cycles` gets its OWN job, purely for wall-clock. It is graph-wide —

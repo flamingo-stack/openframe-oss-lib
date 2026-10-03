@@ -235,9 +235,16 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
+      # ONE tarball for every registry (.github/scripts/pack-package.sh).
+      - name: Pack ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/pack-package.sh"
+
       # Where OUR apps install the library from: installable when this step ends,
       # addressed by commit (.github/scripts/preview-publish.sh tells why). It runs
-      # BEFORE the npm publish, which can take an hour to be served.
+      # BEFORE the npm upload, so nothing of ours depends on npmjs.
       - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
@@ -245,17 +252,24 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
 
       # npmjs gets REAL RELEASES only, as the public, versioned copy (a main-push or
-      # branch snapshot lives on pkg.pr.new alone). The script moves a release past
-      # a number npm already holds and does not wait for npm's scan.
+      # branch snapshot lives on pkg.pr.new alone). The script uploads the same
+      # tarball, moves a release past a number npm already holds and does not wait
+      # for npm's scan.
       - name: Publish ${{ env.NEW_VERSION }} to npmjs
         if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && !inputs.snapshot
         working-directory: ${{ matrix.path }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "$PUBLISH_TAG" --access public
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" latest --access public
         shell: bash
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PUBLISH_TAG: latest
 
+      # Only after a number skip: pkg.pr.new gets the tarball npm was given, so the
+      # two registries hold the same version of this commit.
+      - name: Preview registry (pkg.pr.new) again under ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true' && env.REPACKED == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
 
   release-rust:
     name: Release Rust

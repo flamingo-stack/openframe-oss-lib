@@ -73,8 +73,7 @@ jobs:
               ],
               "openframe-frontend-core": [
                 "openframe-frontend-core/**",
-                ".github/scripts/npm-publish.sh",
-                ".github/scripts/preview-publish.sh"
+                ".github/scripts/**"
               ],
               "rust": [
                 "clients/**",
