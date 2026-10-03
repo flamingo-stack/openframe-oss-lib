@@ -33,6 +33,21 @@ export interface FeatureCardGridProps {
   showBorders?: boolean;
   roundedCorners?: boolean; // Flag to enable rounded corners
   cardGap?: string; // Gap between cards (e.g., 'gap-4', 'gap-6')
+  /**
+   * The items are still being fetched: the SAME grid, each item's eyebrow, title
+   * and subtitle drawn as bars of their own line heights (pass placeholder items
+   * for the count and a placeholder `content`).
+   */
+  loading?: boolean;
+  /** Added to every item's title (and its placeholder): e.g. a `min-h-[Nlh]` that keeps rows one height. */
+  titleClassName?: string;
+  /** Added to every item's subtitle (and its placeholder). */
+  subtitleClassName?: string;
+}
+
+/** A text row's placeholder: a bar exactly one line of its element's own typography tall. */
+function LineBar({ width }: { width: string }) {
+  return <span className={`block h-[1lh] ${width} animate-pulse rounded bg-ods-border`} />;
 }
 
 export function FeatureCardGrid({
@@ -46,6 +61,9 @@ export function FeatureCardGrid({
   showBorders = true,
   roundedCorners = false,
   cardGap = '',
+  loading = false,
+  titleClassName = '',
+  subtitleClassName = '',
 }: FeatureCardGridProps) {
   const gridCols = columns === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3';
   const itemsPerRow = columns;
@@ -161,11 +179,21 @@ export function FeatureCardGrid({
 
                     {item.eyebrow || item.subtitle ? (
                       <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
-                        {item.eyebrow && <span className="text-ods-text-secondary text-h5">{item.eyebrow}</span>}
-                        <h3 className="whitespace-pre-line tracking-[-0.64px] text-ods-text-primary text-h2">
-                          {item.title}
+                        {item.eyebrow && (
+                          <span className="text-ods-text-secondary text-h5">
+                            {loading ? <LineBar width="w-6" /> : item.eyebrow}
+                          </span>
+                        )}
+                        <h3
+                          className={`whitespace-pre-line tracking-[-0.64px] text-ods-text-primary text-h2 ${titleClassName}`}
+                        >
+                          {loading ? <LineBar width="w-1/2" /> : item.title}
                         </h3>
-                        {item.subtitle && <p className="text-ods-flamingo-pink text-h4">{item.subtitle}</p>}
+                        {item.subtitle && (
+                          <p className={`text-ods-flamingo-pink text-h4 ${subtitleClassName}`}>
+                            {loading ? <LineBar width="w-3/4" /> : item.subtitle}
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <h3 className="whitespace-pre-line tracking-[-0.64px] text-ods-text-primary text-h2">

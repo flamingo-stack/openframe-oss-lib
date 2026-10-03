@@ -153,9 +153,11 @@ export interface PhotoWallProps {
   fadeColor?: string;
   /** Sizing lives here: the wall needs a height (e.g. `h-[420px] md:h-[560px]`). */
   className?: string;
+  /** The pictures are still being fetched: show the wall's own placeholder frames. */
+  loading?: boolean;
 }
 
-export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, className }: PhotoWallProps) {
+export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, className, loading = false }: PhotoWallProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
@@ -192,14 +194,19 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
     });
   }, [orientations, images, columns, box]);
 
-  if (images.length === 0) return null;
+  if (images.length === 0 && !loading) return null;
+  // Until the pictures arrive AND their sizes are known, the same placeholder frames.
+  const columnsToDraw = loading ? null : layout;
 
-  const gridStyle = { gridTemplateColumns: `repeat(${layout?.length || columns}, minmax(0, 1fr))`, gap: COLUMN_GAP_PX };
+  const gridStyle = {
+    gridTemplateColumns: `repeat(${columnsToDraw?.length || columns}, minmax(0, 1fr))`,
+    gap: COLUMN_GAP_PX,
+  };
 
   return (
     <div ref={rootRef} aria-hidden="true" className={cn('grid overflow-hidden', className)} style={gridStyle}>
-      {layout
-        ? layout.map((column, index) => (
+      {columnsToDraw
+        ? columnsToDraw.map((column, index) => (
             <MarqueeWall
               key={index}
               axis="y"

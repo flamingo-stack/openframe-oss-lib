@@ -79,7 +79,27 @@ const EDITORIAL_META_ROW =
   'flex h-[1lh] min-w-0 items-center gap-x-[var(--spacing-system-s)] overflow-hidden whitespace-nowrap text-h6';
 const EDITORIAL_PERSON_ROW = 'flex h-8 min-w-0 items-center gap-[var(--spacing-system-s)]';
 
-export function ProgramCardSkeleton({ size = 'default', eyebrow = true }: { size?: CardSize; eyebrow?: boolean }) {
+// The default card's boxes, shared by the card and its skeleton: a fixed cover frame
+// (the image is contained in it, whatever its shape), a two-line title, the date and
+// meta rows (stacked on a phone, one line from md) and a three-line description, so a
+// card is one height whatever its copy and cover.
+const DEFAULT_COVER_FRAME =
+  'relative flex h-[180px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg md:w-[180px]';
+const DEFAULT_TITLE = 'mb-3 line-clamp-2 flex min-h-[2lh] items-center text-ods-text-primary text-h2';
+const DEFAULT_META_ROW =
+  'mb-4 flex min-h-[calc(2lh+0.5rem)] flex-col gap-2 text-h6 md:min-h-[1lh] md:flex-row md:items-center md:gap-4';
+const DEFAULT_DESCRIPTION = 'line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h6';
+
+export function ProgramCardSkeleton({
+  size = 'default',
+  eyebrow = true,
+  media = 0,
+}: {
+  size?: CardSize;
+  eyebrow?: boolean;
+  /** `default` size: how many gallery thumbnails the card shows (`MediaGallery`'s row). 0 = no gallery. */
+  media?: number;
+}) {
   // The editorial pair: the card's own boxes (EDITORIAL_*), each text row a bar of
   // that row's line height.
   if (size === 'row') {
@@ -143,22 +163,40 @@ export function ProgramCardSkeleton({ size = 'default', eyebrow = true }: { size
     >
       <div className="flex-1 p-6">
         <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className="h-[180px] w-full flex-shrink-0 rounded-lg bg-ods-bg md:w-[180px]" />
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
-            <div className="h-7 w-3/4 rounded bg-ods-bg" />
-            <div className="h-7 w-1/2 rounded bg-ods-bg" />
-            <div className="h-4 w-1/3 rounded bg-ods-bg/60" />
-            <div className="space-y-2">
-              <div className="h-3 w-full rounded bg-ods-bg/60" />
-              <div className="h-3 w-5/6 rounded bg-ods-bg/60" />
-              <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
+          <div className={`${DEFAULT_COVER_FRAME} bg-ods-bg`} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className={DEFAULT_TITLE}>
+              <span className="block h-[1lh] w-3/4 rounded bg-ods-bg" />
+            </div>
+            <div className={DEFAULT_META_ROW}>
+              <span className="block h-[1lh] w-32 rounded bg-ods-bg/60" />
+              <span className="block h-[1lh] w-40 rounded bg-ods-bg/60" />
+            </div>
+            <div className="flex-1">
+              <div className={`${DEFAULT_DESCRIPTION} flex flex-col gap-1`}>
+                <span className="block h-3 w-full rounded bg-ods-bg/60" />
+                <span className="block h-3 w-5/6 rounded bg-ods-bg/60" />
+                <span className="block h-3 w-4/5 rounded bg-ods-bg/60" />
+              </div>
             </div>
           </div>
         </div>
       </div>
+      {media > 0 && (
+        // MediaGallery's own boxes: p-6 pt-4, mb-4 row, 96px thumbnails, gap-3, pb-2.
+        <div className="p-6 pt-4">
+          <div className="mb-4">
+            <div className="flex gap-3 pb-2">
+              {Array.from({ length: media }, (_, i) => (
+                <div key={i} className="h-24 w-24 flex-shrink-0 rounded-md bg-ods-bg" />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mt-auto p-6 pt-0">
         <div className="border-t border-ods-border pt-4">
-          <div className="h-9 w-40 rounded bg-ods-bg" />
+          <div className="h-10 w-40 rounded bg-ods-bg" />
         </div>
       </div>
     </div>
@@ -583,30 +621,24 @@ export function ProgramCard<T extends BaseProgramItem>({
     <div className="flex-1 border-ods-border p-6">
       <div className="flex flex-col gap-4 md:flex-row md:gap-6">
         {coverImage && (
-          <div className="flex w-full flex-shrink-0 items-center md:w-[180px]">
-            <div className="relative overflow-hidden rounded-lg">
-              <Image
-                src={coverImage}
-                alt={item.title}
-                width={180}
-                height={180}
-                className="h-auto w-full rounded-lg object-contain"
-                unoptimized
-              />
-              {isPlayable && <CardHoverPlay size="md" />}
-            </div>
+          <div className={DEFAULT_COVER_FRAME}>
+            <Image
+              src={coverImage}
+              alt={item.title}
+              width={180}
+              height={180}
+              className="h-full w-full rounded-lg object-contain"
+              unoptimized
+            />
+            {isPlayable && <CardHoverPlay size="md" />}
           </div>
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <h3 className="mb-3 line-clamp-2 flex min-h-[3rem] items-center text-ods-text-primary text-h2 md:min-h-[3.5rem]">
-            {item.title}
-          </h3>
+          <h3 className={DEFAULT_TITLE}>{item.title}</h3>
 
-          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-            <span className="text-h6" style={{ color: accentColor }}>
-              {dateFormat}
-            </span>
+          <div className={DEFAULT_META_ROW}>
+            <span style={{ color: accentColor }}>{dateFormat}</span>
             {renderMeta ? (
               <>
                 <span className="hidden text-ods-text-secondary md:inline">•</span>
@@ -623,7 +655,7 @@ export function ProgramCard<T extends BaseProgramItem>({
           </div>
 
           <div className="flex-1">
-            <p className="line-clamp-3 min-h-[4.5rem] text-ods-text-secondary text-h6">{item.description}</p>
+            <p className={DEFAULT_DESCRIPTION}>{item.description}</p>
           </div>
         </div>
 

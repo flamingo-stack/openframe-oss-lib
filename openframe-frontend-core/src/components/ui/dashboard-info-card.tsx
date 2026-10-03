@@ -83,6 +83,11 @@ export interface DashboardInfoCardProps {
    * grows to fit it instead of holding the fixed stat-tile height.
    */
   caption?: ReactNode;
+  /**
+   * The figure is still being fetched: the SAME card, its title, value and caption
+   * drawn as bars of their own line heights, so the loaded card replaces it in place.
+   */
+  loading?: boolean;
 }
 
 export function DashboardInfoCard({
@@ -103,6 +108,7 @@ export function DashboardInfoCard({
   valueClassName,
   subValue,
   caption,
+  loading = false,
 }: DashboardInfoCardProps) {
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : value;
 
@@ -193,13 +199,21 @@ export function DashboardInfoCard({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Title row: caption and/or tag (Figma "status" variant) */}
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
-          {titleSlot ?? (title !== undefined && <p className="truncate text-ods-text-secondary text-h5">{title}</p>)}
+          {loading ? (
+            <p className="text-h5">
+              <span className="block h-[1lh] w-20 animate-pulse rounded bg-ods-border" />
+            </p>
+          ) : (
+            (titleSlot ?? (title !== undefined && <p className="truncate text-ods-text-secondary text-h5">{title}</p>))
+          )}
           {titleTag}
         </div>
 
         {/* Value and percentage */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
-          <p className={cn('truncate text-ods-text-primary text-h3 md:text-h2', valueClassName)}>{formattedValue}</p>
+          <p className={cn('truncate text-ods-text-primary text-h3 md:text-h2', valueClassName)}>
+            {loading ? <span className="block h-[1lh] w-24 animate-pulse rounded bg-ods-border" /> : formattedValue}
+          </p>
           {subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
           {renderPercentage()}
           {tooltip && (
@@ -211,7 +225,12 @@ export function DashboardInfoCard({
           )}
         </div>
 
-        {caption && <p className="text-ods-text-secondary text-h6">{caption}</p>}
+        {/* Two lines kept for the caption, loading or loaded, so a narrow tile is one height. */}
+        {caption && (
+          <p className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">
+            {loading ? <span className="block h-[1lh] w-32 animate-pulse rounded bg-ods-border" /> : caption}
+          </p>
+        )}
       </div>
 
       {/* Progress indicator */}
