@@ -238,9 +238,33 @@ jobs:
       - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm publish --tag ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }} --access public
+        # A release number can be TAKEN without being published: npm accepts an
+        # upload (202, "being processed") and holds the number while the version
+        # is not yet, or never, in the registry. `latest` then still names the
+        # previous release, the next run computes the same number and npm
+        # refuses it ("Cannot publish over previously staged version", or
+        # "previously published versions" once it lands). A release moves on to
+        # the next patch number instead of failing; a snapshot's number is a
+        # timestamp, so it never retries.
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npm publish --tag "$PUBLISH_TAG" --access public 2>&1 | tee publish.log; then
+              echo "Published $(jq -r '.version' package.json)"
+              exit 0
+            fi
+            if [ "$PUBLISH_TAG" != "latest" ] || ! grep -qE "previously (staged|published) version" publish.log; then
+              exit 1
+            fi
+            TAKEN=$(jq -r '.version' package.json)
+            npm version patch --no-git-tag-version > /dev/null
+            echo "::warning::npm already holds $TAKEN (staged or published); publishing $(jq -r '.version' package.json) instead"
+          done
+          echo "No free version number after 5 attempts"
+          exit 1
+        shell: bash
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PUBLISH_TAG: ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }}
 
 
   release-rust:
