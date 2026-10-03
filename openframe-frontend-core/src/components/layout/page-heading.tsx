@@ -69,6 +69,7 @@ export function PageHeading({
 
 /** A sentence mark inside a title: `.`, `:`, `?` or `!` that ends a sentence (followed by a space or the end). */
 const SENTENCE_MARK = /([.:?!]+)(?=\s|$)/g;
+const ONLY_MARKS = /^\s*[.:?!]+\s*$/;
 
 /**
  * A title with EVERY sentence mark in the accent colour, not only the last one:
@@ -79,6 +80,8 @@ const SENTENCE_MARK = /([.:?!]+)(?=\s|$)/g;
  */
 export function accentSentenceMarks(node: ReactNode, accentClassName = 'text-ods-accent'): ReactNode {
   if (typeof node === 'string') {
+    // A string that is ONLY marks is one a caller already wrapped in its own colour: keep it.
+    if (ONLY_MARKS.test(node)) return node;
     const parts = node.split(SENTENCE_MARK);
     if (parts.length === 1) return node;
     return parts.map((part, index) =>

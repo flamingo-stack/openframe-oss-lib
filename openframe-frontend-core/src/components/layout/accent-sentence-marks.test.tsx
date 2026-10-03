@@ -28,6 +28,18 @@ describe('accentSentenceMarks', () => {
     );
   });
 
+  it('keeps a mark the caller already coloured', () => {
+    expect(
+      html(
+        accentSentenceMarks(
+          <>
+            Six rules<span className="pink">.</span> No fine print
+          </>,
+        ),
+      ),
+    ).toBe('Six rules<span class="pink">.</span> No fine print');
+  });
+
   it('the section heading colours the marks inside its title and its closing mark', () => {
     expect(html(<SectionHeading title="Remote all year. Together once a year" />)).toContain(
       `Remote all year${mark('.')} Together once a year${mark('.')}`,

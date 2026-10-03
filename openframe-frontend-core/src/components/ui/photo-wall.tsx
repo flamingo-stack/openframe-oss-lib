@@ -163,7 +163,13 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return undefined;
-    const read = () => setBox({ width: root.clientWidth, height: root.clientHeight });
+    // The same size again (a resize of something else on the page) keeps the state, so nothing re-lays out.
+    const read = () =>
+      setBox(previous =>
+        previous?.width === root.clientWidth && previous.height === root.clientHeight
+          ? previous
+          : { width: root.clientWidth, height: root.clientHeight },
+      );
     read();
     if (typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(read);
@@ -171,15 +177,22 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
     return () => observer.disconnect();
   }, []);
 
-  const urls = useMemo(() => Array.from(new Set(images.map(image => image.url))), [images]);
+  // One frame per picture: a url listed twice is its first entry.
+  const unique = useMemo(() => {
+    const byUrl = new Map<string, PhotoWallImage>();
+    for (const image of images) if (!byUrl.has(image.url)) byUrl.set(image.url, image);
+    return Array.from(byUrl.values());
+  }, [images]);
+  const urls = useMemo(() => unique.map(image => image.url), [unique]);
   const orientations = usePhotoOrientations(urls);
 
   const layout = useMemo(() => {
     if (!orientations) return null;
-    const seen = new Set<string>();
-    const photos = images
-      .filter(image => orientations.has(image.url) && !seen.has(image.url) && Boolean(seen.add(image.url)))
-      .map(image => ({ ...image, orientation: orientations.get(image.url) ?? 'wide' }));
+    // A picture the browser refused has no orientation and no place on the wall.
+    const photos = unique.flatMap(image => {
+      const orientation = orientations.get(image.url);
+      return orientation ? [{ ...image, orientation }] : [];
+    });
     const arranged = arrangePhotoWall(photos, Math.min(columns, Math.max(1, photos.length)));
     const count = arranged.length || 1;
     const columnWidth = box ? Math.max(1, (box.width - COLUMN_GAP_PX * (count - 1)) / count) : 0;
@@ -192,7 +205,7 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
       const repeats = height > 0 ? Math.min(MAX_REPEATS, Math.ceil((box.height * FILL_FACTOR) / height)) : 1;
       return Array.from({ length: Math.max(1, repeats) }, () => column).flat();
     });
-  }, [orientations, images, columns, box]);
+  }, [orientations, unique, columns, box]);
 
   if (images.length === 0 && !loading) return null;
   // Until the pictures arrive AND their sizes are known, the same placeholder frames.
@@ -231,8 +244,9 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
                     src={photo.url}
                     alt={photo.alt ?? ''}
                     fill
-                    sizes="(max-width: 768px) 50vw, 360px"
                     className="object-cover"
+                    // The caller hands over the url it wants drawn (already sized by its
+                    // own image service), so the loader is skipped and no `sizes` applies.
                     unoptimized
                   />
                 </div>
