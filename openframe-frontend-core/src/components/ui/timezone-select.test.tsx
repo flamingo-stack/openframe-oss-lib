@@ -24,4 +24,25 @@ describe('BackButton', () => {
     expect(link).toContain('Back to list');
     expect(renderToStaticMarkup(<BackButton label="Back" />)).toMatch(/^<button type="button"/);
   });
+
+  it('a link keeps the attributes a caller passes, minus the button-only ones', () => {
+    const link = renderToStaticMarkup(
+      <BackButton
+        label="Back"
+        href="/list"
+        id="back"
+        title="Go back"
+        data-testid="back"
+        aria-label="Back to list"
+        disabled
+        name="x"
+      />,
+    );
+    expect(link).toContain('id="back"');
+    expect(link).toContain('title="Go back"');
+    expect(link).toContain('data-testid="back"');
+    expect(link).toContain('aria-label="Back to list"');
+    expect(link).not.toContain('disabled');
+    expect(link).not.toContain('name=');
+  });
 });

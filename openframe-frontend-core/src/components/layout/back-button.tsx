@@ -39,8 +39,26 @@ export function BackButton({ label = 'Back', className, type = 'button', href, .
     </>
   );
   if (href) {
+    // A link takes everything a button and an anchor share (id, title, data-*, aria-*,
+    // handlers); what only a button understands is left off.
+    const {
+      disabled: _disabled,
+      form: _form,
+      formAction: _formAction,
+      formEncType: _formEncType,
+      formMethod: _formMethod,
+      formNoValidate: _formNoValidate,
+      formTarget: _formTarget,
+      name: _name,
+      value: _value,
+      ...shared
+    } = props;
     return (
-      <Link href={href} className={cn(BACK_BUTTON_CLASS, className)} aria-label={props['aria-label']}>
+      <Link
+        {...(shared as unknown as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
+        href={href}
+        className={cn(BACK_BUTTON_CLASS, className)}
+      >
         {content}
       </Link>
     );
