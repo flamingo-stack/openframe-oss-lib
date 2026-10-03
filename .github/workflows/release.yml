@@ -3,6 +3,8 @@ name: OpenFrame OSS Libs Release
 permissions:
   contents: read
   packages: write
+  # The publish step reads the other runs' steps to take its turn.
+  actions: read
 
 on:
   push:
@@ -238,37 +240,14 @@ jobs:
       - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        # A release number can be TAKEN without being published: npm accepts an
-        # upload (202, "being processed") and holds the number while the version
-        # is not yet, or never, in the registry. `latest` then still names the
-        # previous release, the next run computes the same number and npm
-        # refuses it ("Cannot publish over previously staged version", or
-        # "previously published versions" once it lands). A release moves on to
-        # the next patch number instead of failing; a snapshot's number is a
-        # timestamp, so it never retries.
-        run: |
-          # The verdict below is npm's exit status, not tee's (`shell: bash` sets this too; stated here so it cannot be lost).
-          set -o pipefail
-          for attempt in 1 2 3 4 5; do
-            if npm publish --tag "$PUBLISH_TAG" --access public 2>&1 | tee publish.log; then
-              PUBLISHED=$(jq -r '.version' package.json)
-              # What was published, for the summary and any later step (it differs from the computed number after a skip).
-              echo "NEW_VERSION=$PUBLISHED" >> "$GITHUB_ENV"
-              echo "Published $PUBLISHED" | tee -a "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            if [ "$PUBLISH_TAG" != "latest" ] || ! grep -qE "previously (staged|published) version" publish.log; then
-              exit 1
-            fi
-            TAKEN=$(jq -r '.version' package.json)
-            npm version patch --no-git-tag-version > /dev/null
-            echo "::warning::npm already holds $TAKEN (staged or published); publishing $(jq -r '.version' package.json) instead"
-          done
-          echo "No free version number after 5 attempts"
-          exit 1
+        # THE publish: it takes its turn behind any other publish of this package,
+        # moves a release past a number npm already holds, and ends only when npm
+        # serves the version (.github/scripts/npm-publish.sh tells why).
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "$PUBLISH_TAG" --access public
         shell: bash
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PUBLISH_TAG: ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }}
 
 
