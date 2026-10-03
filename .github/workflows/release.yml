@@ -3,8 +3,6 @@ name: OpenFrame OSS Libs Release
 permissions:
   contents: read
   packages: write
-  # The publish step reads the other runs' steps to take its turn.
-  actions: read
 
 on:
   push:
@@ -249,14 +247,12 @@ jobs:
       - name: Publish ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        # THE publish: it takes its turn behind any other publish of this package,
-        # moves a release past a number npm already holds, and ends only when npm
-        # serves the version (.github/scripts/npm-publish.sh tells why).
+        # The public mirror (.github/scripts/npm-publish.sh): it moves a release past
+        # a number npm already holds and does not wait for npm's scan.
         run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "$PUBLISH_TAG" --access public
         shell: bash
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          GH_TOKEN: ${{ github.token }}
           PUBLISH_TAG: ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }}
 
 

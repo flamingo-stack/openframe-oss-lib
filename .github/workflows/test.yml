@@ -2,8 +2,6 @@ name: OpenFrame OSS Libs Test
 
 permissions:
   contents: read
-  # The publish step reads the other runs' steps to take its turn.
-  actions: read
   pull-requests: read
 
 on:
@@ -233,10 +231,8 @@ jobs:
         working-directory: ${{ matrix.path }}
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          GH_TOKEN: ${{ github.token }}
         shell: bash
-        # THE publish (.github/scripts/npm-publish.sh): it takes its turn behind any
-        # other publish of this package and ends when npm serves the version.
+        # The public mirror (.github/scripts/npm-publish.sh); it does not wait for npm's scan.
         run: |
           npm version "${{ env.NEW_VERSION }}" --no-git-tag-version --allow-same-version
           bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "pr-${{ github.event.pull_request.number }}" --ignore-scripts
