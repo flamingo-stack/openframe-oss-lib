@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Publishes the packed package (PACKAGE_TARBALL, from pack-package.sh) to
-# pkg.pr.new: the registry OUR OWN apps install this library from.
+# pkg.pr.new: THE registry of this package. Releases, main-push snapshots and
+# pull request builds all live there and nowhere else.
 #
-# Why. Since 2026-07 npm scans every upload before it serves it; for this package
-# that is minutes at best and two hours at worst, with no way to opt out. A
+# Why not npmjs. Since 2026-07 npm scans every upload before it serves it; for
+# this package that was minutes at best and two hours at worst, with no way to
+# opt out, and a release pinned by a consumer was not installable in between. A
 # pkg.pr.new build is installable the moment this step ends, needs no token, and
 # is addressed by the commit it was built from:
 #
 #   https://pkg.pr.new/<owner>/<repo>/<package>@<commit sha>
 #
-# A consumer pins that URL in its package.json. npmjs still gets every real
-# release (npm-publish.sh) for everyone else.
+# A consumer pins that URL in its package.json (the run summary prints the line).
 #
 # How, by pkg.pr.new's own guidance:
 #  - the CLI is a pinned devDependency run with `npm exec`, never `npx` (a release
@@ -26,8 +27,8 @@
 # month: a pin moves forward, it is never restored from an old commit.
 #
 # Needs the pkg.pr.new GitHub App on the repository
-# (https://github.com/apps/pkg-pr-new). Until it is installed this step warns
-# and passes, so it cannot block a pull request or a release.
+# (https://github.com/apps/pkg-pr-new); without it the upload is refused and this
+# step fails.
 set -uo pipefail
 
 TARBALL="${PACKAGE_TARBALL:?run pack-package.sh first}"
@@ -40,10 +41,6 @@ npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --j
 STATUS=${PIPESTATUS[0]}
 
 if [ "$STATUS" -ne 0 ]; then
-  if grep -qiE "not installed|install the (github )?app" preview-publish.log; then
-    echo "::warning::pkg.pr.new is not installed on ${GITHUB_REPOSITORY:-this repository} (https://github.com/apps/pkg-pr-new): no build was published."
-    exit 0
-  fi
   echo "::error::pkg.pr.new refused the build of $PKG@$VERSION"
   exit "$STATUS"
 fi
