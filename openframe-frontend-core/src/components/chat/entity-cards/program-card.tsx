@@ -60,7 +60,7 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
-import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
+import { CONTENT_CARD_SKELETON_FRAME_CLASS, ContentCardFrame } from './content-card-frame';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
@@ -346,7 +346,6 @@ function ProgramEditorialCard({
   // The cover is shown WHOLE on its own edge colour: the fill AdminContentCard
   // and the portrait card use, so square artwork is never cropped or boxed.
   const edgeColor = useImageEdgeColor(feature ? cover : null, 'transparent');
-  const frame = cn(CONTENT_CARD_FRAME_CLASS, 'no-underline');
   const meta = (
     <div className={EDITORIAL_META_ROW}>
       {date && <span className="text-ods-flamingo-pink">{date}</span>}
@@ -363,12 +362,13 @@ function ProgramEditorialCard({
 
   if (!feature) {
     return (
-      <a
+      <ContentCardFrame
+        as="a"
         href={href}
         target={target}
         rel={rel}
         aria-label={`Open ${title}`}
-        className={cn(frame, EDITORIAL_ROW_GRID, className)}
+        className={cn(EDITORIAL_ROW_GRID, className)}
       >
         <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
           {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
@@ -379,17 +379,18 @@ function ProgramEditorialCard({
           {meta}
           <span className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">{description}</span>
         </span>
-      </a>
+      </ContentCardFrame>
     );
   }
 
   return (
-    <a
+    <ContentCardFrame
+      as="a"
       href={href}
       target={target}
       rel={rel}
       aria-label={`Open ${title}`}
-      className={cn(frame, 'flex flex-col', className)}
+      className={cn('flex flex-col', className)}
     >
       <span
         className={cn(EDITORIAL_FEATURE_COVER, 'transition-colors duration-300')}
@@ -431,7 +432,7 @@ function ProgramEditorialCard({
           )}
         </span>
       </span>
-    </a>
+    </ContentCardFrame>
   );
 }
 
@@ -685,16 +686,17 @@ export function ProgramCard<T extends BaseProgramItem>({
     </div>
   );
 
-  const cardFrameClass = cn(CONTENT_CARD_FRAME_CLASS, DEFAULT_BODY, className);
+  const cardFrameClass = cn(DEFAULT_BODY, className);
   const actionLabel = `View ${config.labels.singular.toLowerCase()}`;
 
   if (wholeCardClickable) {
     return (
-      <a
+      <ContentCardFrame
+        as="a"
         href={href}
         target={target}
         rel={rel}
-        className={cn(cardFrameClass, 'no-underline')}
+        className={cardFrameClass}
         aria-label={`Open ${item.title}`}
       >
         {cardHeader}
@@ -708,12 +710,12 @@ export function ProgramCard<T extends BaseProgramItem>({
             <ArrowRight className="h-5 w-5" />
           </span>
         </div>
-      </a>
+      </ContentCardFrame>
     );
   }
 
   return (
-    <div className={cardFrameClass}>
+    <ContentCardFrame as="div" className={cardFrameClass}>
       <a href={href} target={target} rel={rel} className="block" aria-label={`Open ${item.title}`}>
         {cardHeader}
       </a>
@@ -728,6 +730,6 @@ export function ProgramCard<T extends BaseProgramItem>({
           {actionLabel}
         </Button>
       </div>
-    </div>
+    </ContentCardFrame>
   );
 }

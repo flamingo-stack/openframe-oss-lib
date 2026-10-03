@@ -8,6 +8,7 @@ import { cn } from '../../utils/cn';
 import {
   fileContentKey,
   fileMediaType,
+  IMAGE_FILE_ACCEPT,
   isVideoMedia,
   MEDIA_FILE_ACCEPT,
   mediaNameKey,
@@ -39,26 +40,218 @@ export interface MediaGalleryManagerProps {
   className?: string;
 }
 
-/** Whether a picked file is already in the gallery: the name it was uploaded under, or its stored file name. */
-function isInGallery(file: File, media: ReadonlyArray<MediaItem>): boolean {
+/** What the intake compares a picked file with: an item's stored URL and the name it was uploaded under. */
+export interface MediaIntakeExisting {
+  media_url?: string | null;
+  title?: string | null;
+}
+
+/** Whether a picked file is already there: the name it was uploaded under, or its stored file name. */
+function isAlreadyThere(file: File, existing: ReadonlyArray<MediaIntakeExisting>): boolean {
   const key = mediaNameKey(file.name);
   if (!key) return false;
-  return media.some(
-    item => (item.title ? mediaNameKey(item.title) === key : false) || mediaNameKey(item.media_url) === key,
+  return existing.some(
+    item =>
+      (item.title ? mediaNameKey(item.title) === key : false) ||
+      (item.media_url ? mediaNameKey(item.media_url) === key : false),
   );
 }
 
 const isFileDrag = (event: React.DragEvent) => Array.from(event.dataTransfer.types).includes('Files');
 const isVideoItem = (item: MediaItem) => isVideoMedia(item) || item.media_type === 'demo';
 
+const MEDIA_KIND_ACCEPT = { image: IMAGE_FILE_ACCEPT, video: 'video/*', both: MEDIA_FILE_ACCEPT } as const;
+const MEDIA_KIND_COPY = {
+  image: { noun: 'pictures', refusal: 'Not a picture' },
+  video: { noun: 'videos', refusal: 'Not a video' },
+  both: { noun: 'pictures and videos', refusal: 'Not a picture or a video' },
+} as const;
+
+export interface MediaIntakeOptions {
+  /** What is already there (a gallery, a library): a file whose name matches one of these is skipped. */
+  existing: ReadonlyArray<MediaIntakeExisting>;
+  /**
+   * Stores one file and answers its URL (or any non-empty reference when the
+   * caller keeps the record itself). An empty answer or a throw means it was not stored.
+   */
+  onUpload: (file: File, mediaType: PublishableMediaType) => Promise<string>;
+  /** Called after each file is stored. */
+  onUploaded?: (stored: { file: File; mediaType: PublishableMediaType; url: string }) => void;
+  /** Which files are taken. Default both. */
+  kinds?: 'image' | 'video' | 'both';
+}
+
+/**
+ * THE media intake: any number of files from a picker or a drop, uploaded one
+ * after another, never the same file twice. The same bytes picked twice in one
+ * batch (SHA-256) and a file whose name is already in `existing` are skipped,
+ * and `notice` says which. `MediaGalleryManager` and every other screen that
+ * takes media (`MediaUploadArea`) run on it.
+ */
+export function useMediaIntake({ existing, onUpload, onUploaded, kinds = 'both' }: MediaIntakeOptions) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  // What is there NOW, for an upload batch that outlives the render that started it.
+  const existingRef = useRef(existing);
+  useEffect(() => {
+    existingRef.current = existing;
+  }, [existing]);
+  const [dropActive, setDropActive] = useState(false);
+  const [pending, setPending] = useState<string[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const addFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
+      const duplicates: string[] = [];
+      const unsupported: string[] = [];
+      const failed: string[] = [];
+      const seen = new Set<string>();
+      const accepted: Array<{ file: File; mediaType: PublishableMediaType }> = [];
+      for (const file of files) {
+        const mediaType = fileMediaType(file);
+        if (!mediaType || (kinds !== 'both' && mediaType !== kinds)) {
+          unsupported.push(file.name);
+          continue;
+        }
+        const contentKey = await fileContentKey(file).catch(() => `${file.name}:${file.size}`);
+        if (seen.has(contentKey) || isAlreadyThere(file, existingRef.current)) {
+          duplicates.push(file.name);
+          continue;
+        }
+        seen.add(contentKey);
+        accepted.push({ file, mediaType });
+      }
+
+      setPending(accepted.map(entry => entry.file.name));
+      for (const { file, mediaType } of accepted) {
+        try {
+          const url = await onUpload(file, mediaType);
+          if (!url) throw new Error('no URL');
+          onUploaded?.({ file, mediaType, url });
+        } catch (error) {
+          console.error('Upload failed:', error);
+          failed.push(file.name);
+        }
+        setPending(names => names.slice(1));
+      }
+
+      const parts = [
+        duplicates.length > 0 ? `Already there, skipped: ${duplicates.join(', ')}` : null,
+        unsupported.length > 0 ? `${MEDIA_KIND_COPY[kinds].refusal}, skipped: ${unsupported.join(', ')}` : null,
+        failed.length > 0 ? `Could not upload: ${failed.join(', ')}` : null,
+      ].filter(Boolean);
+      setNotice(parts.length > 0 ? parts.join('. ') : null);
+      if (inputRef.current) inputRef.current.value = '';
+    },
+    [kinds, onUpload, onUploaded],
+  );
+
+  return {
+    kinds,
+    pending,
+    notice,
+    busy: pending.length > 0,
+    dropActive,
+    open: () => inputRef.current?.click(),
+    /** Spread on the element files may be dropped on (the area itself, or a whole gallery). */
+    dropHandlers: {
+      onDragOver: (event: React.DragEvent) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        setDropActive(true);
+      },
+      onDragLeave: () => setDropActive(false),
+      onDrop: (event: React.DragEvent) => {
+        if (!isFileDrag(event)) return;
+        event.preventDefault();
+        setDropActive(false);
+        void addFiles(Array.from(event.dataTransfer.files));
+      },
+    },
+    /** Spread on the hidden `<input type="file">`. */
+    inputProps: {
+      ref: inputRef,
+      type: 'file' as const,
+      multiple: true,
+      'aria-label': 'Select media files',
+      accept: MEDIA_KIND_ACCEPT[kinds],
+      className: 'hidden',
+      onChange: (event: React.ChangeEvent<HTMLInputElement>) => void addFiles(Array.from(event.target.files ?? [])),
+    },
+  };
+}
+
+export type MediaIntake = ReturnType<typeof useMediaIntake>;
+
+/**
+ * The drop area of a media intake: drop files on it or pick any number of them.
+ * `ownDrop` makes the area the drop target (a screen with no gallery around it);
+ * a gallery spreads the intake's `dropHandlers` on itself instead.
+ */
+export function MediaUploadArea({
+  intake,
+  title = 'Upload Media',
+  ownDrop = false,
+  disabled = false,
+  className,
+}: {
+  intake: MediaIntake;
+  title?: string;
+  ownDrop?: boolean;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const { busy, pending } = intake;
+  return (
+    <div
+      {...(ownDrop ? intake.dropHandlers : {})}
+      className={cn(
+        'rounded-lg border-2 border-dashed p-6 text-center transition-colors hover:border-ods-accent/50',
+        intake.dropActive ? 'border-ods-accent bg-ods-accent/5' : 'border-ods-border',
+        className,
+      )}
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ods-card">
+          {busy ? (
+            <Loader2 className="h-6 w-6 animate-spin text-ods-accent" />
+          ) : (
+            <Upload className="h-6 w-6 text-ods-accent" />
+          )}
+        </div>
+        <div>
+          <h3 className="mb-1 text-ods-text-primary text-h3">
+            {busy ? `Uploading ${pending.length} ${pending.length === 1 ? 'file' : 'files'}...` : title}
+          </h3>
+          <p className="text-ods-text-secondary text-h6">
+            Drop {MEDIA_KIND_COPY[intake.kinds].noun} here, or select any number of them
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={intake.open}
+          disabled={busy || disabled}
+          leftIcon={<Plus className="h-4 w-4" />}
+        >
+          {busy ? 'Uploading...' : 'Select Files'}
+        </Button>
+        {intake.notice && (
+          <p role="status" className="text-ods-warning text-h6">
+            {intake.notice}
+          </p>
+        )}
+      </div>
+      <input {...intake.inputProps} disabled={busy || disabled} />
+    </div>
+  );
+}
+
 /**
  * THE media gallery editor: pick or drop any number of pictures and videos,
  * reorder them by dragging, remove them. Every gallery (events, releases,
- * People Hub entries, design docs, categories) is this component.
- *
- * A file is never added twice: a pick that repeats another pick of the same
- * batch (same bytes) or a picture already in the gallery (same name) is
- * skipped, and the notice under the drop area says which.
+ * People Hub entries, design docs, categories) is this component, on the one
+ * intake (`useMediaIntake`), so a file is never added twice.
  */
 export function MediaGalleryManager({
   media,
@@ -68,74 +261,37 @@ export function MediaGalleryManager({
   columns = 3,
   className = '',
 }: MediaGalleryManagerProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   // The gallery as it is NOW, for an upload batch that outlives the render that started it.
   const mediaRef = useRef(media);
   useEffect(() => {
     mediaRef.current = media;
   }, [media]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dropActive, setDropActive] = useState(false);
-  const [pending, setPending] = useState<string[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
-  const busy = pending.length > 0;
-
-  const addFiles = useCallback(
-    async (files: File[]) => {
-      if (files.length === 0) return;
-      const duplicates: string[] = [];
-      const unsupported: string[] = [];
-      const failed: string[] = [];
-      const seen = new Set<string>();
-      const accepted: Array<{ file: File; kind: PublishableMediaType }> = [];
-      for (const file of files) {
-        const kind = fileMediaType(file);
-        if (!kind) {
-          unsupported.push(file.name);
-          continue;
-        }
-        const contentKey = await fileContentKey(file).catch(() => `${file.name}:${file.size}`);
-        if (seen.has(contentKey) || isInGallery(file, mediaRef.current)) {
-          duplicates.push(file.name);
-          continue;
-        }
-        seen.add(contentKey);
-        accepted.push({ file, kind });
-      }
-
-      setPending(accepted.map(entry => entry.file.name));
-      let current = mediaRef.current;
-      for (const { file, kind } of accepted) {
-        try {
-          const url = await onUpload(file, kind);
-          if (!url) throw new Error('no URL');
-          current = [
-            ...current,
-            {
-              media_type: kind === 'image' ? 'screenshot' : 'demo',
-              media_url: url,
-              title: file.name,
-              display_order: current.length,
-            },
-          ];
-          onChange(current);
-        } catch (error) {
-          console.error('Upload failed:', error);
-          failed.push(file.name);
-        }
-        setPending(names => names.slice(1));
-      }
-
-      const parts = [
-        duplicates.length > 0 ? `Already in the gallery, skipped: ${duplicates.join(', ')}` : null,
-        unsupported.length > 0 ? `Not a picture or a video, skipped: ${unsupported.join(', ')}` : null,
-        failed.length > 0 ? `Could not upload: ${failed.join(', ')}` : null,
-      ].filter(Boolean);
-      setNotice(parts.length > 0 ? parts.join('. ') : null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+  const batchRef = useRef<MediaItem[] | null>(null);
+  const intake = useMediaIntake({
+    existing: media,
+    onUpload,
+    onUploaded: ({ file, mediaType, url }) => {
+      // Files of one batch land one after another: each is appended to the list the
+      // previous one produced, which the parent may not have rendered back yet.
+      const base = batchRef.current ?? mediaRef.current;
+      const next: MediaItem[] = [
+        ...base,
+        {
+          media_type: mediaType === 'image' ? 'screenshot' : 'demo',
+          media_url: url,
+          title: file.name,
+          display_order: base.length,
+        },
+      ];
+      batchRef.current = next;
+      onChange(next);
     },
-    [onChange, onUpload],
-  );
+  });
+  const { pending, busy } = intake;
+  useEffect(() => {
+    if (!busy) batchRef.current = null;
+  }, [busy]);
 
   const update = (index: number, patch: Partial<MediaItem>) =>
     onChange(media.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -155,73 +311,10 @@ export function MediaGalleryManager({
     setDraggedIndex(null);
   };
 
-  const dropHandlers = {
-    onDragOver: (event: React.DragEvent) => {
-      if (!isFileDrag(event)) return;
-      event.preventDefault();
-      setDropActive(true);
-    },
-    onDragLeave: () => setDropActive(false),
-    onDrop: (event: React.DragEvent) => {
-      if (!isFileDrag(event)) return;
-      event.preventDefault();
-      setDropActive(false);
-      void addFiles(Array.from(event.dataTransfer.files));
-    },
-  };
-
   return (
-    <div className={`space-y-6 ${className}`} {...dropHandlers}>
-      {/* Drop area: drop files anywhere on the gallery, or pick any number of them. */}
-      <div
-        className={cn(
-          'rounded-lg border-2 border-dashed p-6 text-center transition-colors hover:border-ods-accent/50',
-          dropActive ? 'border-ods-accent bg-ods-accent/5' : 'border-ods-border',
-        )}
-      >
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ods-card">
-            {busy ? (
-              <Loader2 className="h-6 w-6 animate-spin text-ods-accent" />
-            ) : (
-              <Upload className="h-6 w-6 text-ods-accent" />
-            )}
-          </div>
-          <div>
-            <h3 className="mb-1 text-ods-text-primary text-h3">
-              {busy ? `Uploading ${pending.length} ${pending.length === 1 ? 'file' : 'files'}...` : 'Upload Media'}
-            </h3>
-            <p className="text-ods-text-secondary text-h6">
-              Drop pictures and videos here, or select any number of them
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={busy}
-            leftIcon={<Plus className="h-4 w-4" />}
-          >
-            {busy ? 'Uploading...' : 'Select Files'}
-          </Button>
-          {notice && (
-            <p role="status" className="text-ods-warning text-h6">
-              {notice}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        aria-label="Select media files"
-        accept={MEDIA_FILE_ACCEPT}
-        onChange={event => void addFiles(Array.from(event.target.files ?? []))}
-        className="hidden"
-        disabled={busy}
-      />
+    <div className={`space-y-6 ${className}`} {...intake.dropHandlers}>
+      {/* Drop files anywhere on the gallery, or pick any number of them. */}
+      <MediaUploadArea intake={intake} />
 
       {media.length === 0 && !busy ? (
         <div className="py-8 text-center">

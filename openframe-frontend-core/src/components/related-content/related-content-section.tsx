@@ -65,6 +65,7 @@ import { buildSuggestionUrl } from '../../utils/suggestion-url';
 // Type-only — erased at build, no runtime dependency on the dispatch module.
 import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
 import { decideNewTab } from '../chat/utils/decide-new-tab';
+import { accentSentenceMarks } from '../layout/page-heading';
 import { Pagination } from '../pagination';
 // The per-type card dispatch — one registry entry per content type, each
 // carrying its OWN row type — plus the DEEP card imports that keep this
@@ -653,7 +654,7 @@ export function RelatedContentSection({
       const skeletonType = includeTypes?.[0] ?? entityType ?? 'blog_post_existing';
       return (
         <div className="space-y-8">
-          <h2 className="text-ods-text-primary text-h2">{title}</h2>
+          <h2 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h2>
           <div className={gridClassFor(columns)}>
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i}>{renderSkeletonForType(skeletonType, 'default', adminCampaignCard)}</div>
@@ -664,7 +665,7 @@ export function RelatedContentSection({
     }
     return (
       <div className="space-y-8">
-        <h2 className="text-2xl font-bold text-ods-text-primary">{title}</h2>
+        <h2 className="text-2xl font-bold text-ods-text-primary">{accentSentenceMarks(title)}</h2>
         {emptyState ?? <p className="text-ods-text-secondary">{emptyStateText}</p>}
       </div>
     );
@@ -697,7 +698,7 @@ export function RelatedContentSection({
 
   return (
     <div className="space-y-8">
-      <h2 className="text-ods-text-primary text-h2">{title}</h2>
+      <h2 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h2>
       {orderedTypes.map(type => (
         <ContentGroup
           key={type}

@@ -23,13 +23,19 @@ export const CONTENT_CARD_FRAME_CLASS = cn(
 export const CONTENT_CARD_SKELETON_FRAME_CLASS = 'overflow-hidden rounded-2xl border border-ods-border bg-transparent';
 
 export interface ContentCardFrameProps extends React.HTMLAttributes<HTMLElement> {
-  /** The element: an `article` for a card that stands alone, a `div` inside a list item. */
-  as?: 'article' | 'div' | 'li';
+  /**
+   * The element: an `article` for a card that stands alone, a `div` inside a list
+   * item, an `a` for a card that IS its link (it takes `href`, `target`, `rel`).
+   */
+  as?: 'article' | 'div' | 'li' | 'a';
+  href?: string;
+  target?: React.HTMLAttributeAnchorTarget;
+  rel?: string;
 }
 
 export function ContentCardFrame({ as: Tag = 'article', className, children, ...rest }: ContentCardFrameProps) {
   return (
-    <Tag className={cn(CONTENT_CARD_FRAME_CLASS, className)} {...rest}>
+    <Tag className={cn(CONTENT_CARD_FRAME_CLASS, Tag === 'a' && 'no-underline', className)} {...rest}>
       {children}
     </Tag>
   );

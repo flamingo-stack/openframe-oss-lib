@@ -22,9 +22,12 @@ describe('accentSentenceMarks', () => {
     expect(html(accentSentenceMarks('The $6.7M seed and v1.5.0'))).toBe('The $6.7M seed and v1.5.0');
   });
 
-  it('walks fragments and elements', () => {
-    expect(html(accentSentenceMarks(<p>Try it. Break it.</p>, 'pink'))).toBe(
-      '<p>Try it<span class="pink">.</span> Break it<span class="pink">.</span></p>',
+  it('walks fragments and elements, in the accent of the platform it is given', () => {
+    expect(html(accentSentenceMarks(<p>Try it. Break it.</p>, 'flamingo'))).toBe(
+      '<p>Try it<span class="text-ods-flamingo-pink">.</span> Break it<span class="text-ods-flamingo-pink">.</span></p>',
+    );
+    expect(html(accentSentenceMarks('Open source.', 'openframe'))).toBe(
+      'Open source<span class="text-ods-open-yellow">.</span>',
     );
   });
 
@@ -38,6 +41,14 @@ describe('accentSentenceMarks', () => {
         ),
       ),
     ).toBe('Six rules<span class="pink">.</span> No fine print');
+  });
+
+  it('the section heading takes a platform for its eyebrow, marks and closing mark', () => {
+    const out = html(<SectionHeading eyebrow="Trust" title="Open. Audited" platform="flamingo" />);
+    expect(out).toContain('<span class="text-h5 text-ods-flamingo-pink">Trust</span>');
+    expect(out).toContain(
+      'Open<span class="text-ods-flamingo-pink">.</span> Audited<span class="text-ods-flamingo-pink">.</span>',
+    );
   });
 
   it('the section heading colours the marks inside its title and its closing mark', () => {
