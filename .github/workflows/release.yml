@@ -27,6 +27,11 @@ on:
         required: false
         type: boolean
         default: false
+      release_tag:
+        description: 'Internal. Set by a release run when it starts itself again on the version tag, so pkg.pr.new serves the build under the version. Leave empty.'
+        required: false
+        type: string
+        default: ''
 
 env:
   REGISTRY: "com.openframe.oss"
@@ -139,6 +144,11 @@ jobs:
     name: Release Node (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [changes]
+    permissions:
+      # A release pushes its version tag and starts this workflow on it.
+      contents: write
+      actions: write
+      packages: write
     # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s 
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
@@ -209,7 +219,14 @@ jobs:
         working-directory: ${{ matrix.path }}
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
+          # The run on the version tag rebuilds the version the release run chose.
+          if [ -n "$RELEASE_TAG" ]; then
+            npm version "$RELEASE_TAG" --no-git-tag-version --allow-same-version
+            echo "NEW_VERSION=$RELEASE_TAG" >> $GITHUB_ENV
+            exit 0
+          fi
           OLD_BASE="${{ env.OLD_VERSION }}"
           [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
           IFS='.' read -r old_major old_minor old_patch <<< "$OLD_BASE"
@@ -249,6 +266,9 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         shell: bash
+        env:
+          # On the version tag's run: also check and print the version-named address.
+          RELEASE_REF: ${{ inputs.release_tag }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
 
       # npmjs keeps getting every version too (a release as `latest`, a snapshot as
@@ -256,7 +276,7 @@ jobs:
       # the same tarball, moves a release past a number npm already holds and does
       # not wait for npm's scan.
       - name: Publish ${{ env.NEW_VERSION }} to npmjs
-        if: steps.should_run.outputs.run == 'true'
+        if: steps.should_run.outputs.run == 'true' && inputs.release_tag == ''
         working-directory: ${{ matrix.path }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "$PUBLISH_TAG" --access public
         shell: bash
@@ -271,6 +291,34 @@ jobs:
         working-directory: ${{ matrix.path }}
         shell: bash
         run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
+
+      # A RELEASE gets an address named after its version:
+      #   https://pkg.pr.new/<owner>/<repo>/<package>@<x.y.z>
+      # pkg.pr.new names a build after the git ref of the run that published it, so
+      # the release is tagged `<x.y.z>` and this workflow is started once more on
+      # that tag (`release_tag`), where it builds the same commit under the same
+      # version and publishes to pkg.pr.new only. A consumer pins that URL.
+      - name: Publish the version address for ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && !inputs.snapshot && inputs.release_tag == ''
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION=$(jq -r '.version' package.json)
+          git tag "$VERSION" "$GITHUB_SHA"
+          git push origin "refs/tags/$VERSION"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f target=node -f release_tag="$VERSION"
+          {
+            echo "### Release $VERSION"
+            echo
+            echo "Tagged \`$VERSION\`. Its version-named address is live when the run on that tag finishes (a few minutes):"
+            echo
+            echo '```json'
+            echo "\"$(jq -r '.name' package.json)\": \"https://pkg.pr.new/${GITHUB_REPOSITORY}/$(jq -r '.name' package.json)@${VERSION}\""
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
   release-rust:
     name: Release Rust
