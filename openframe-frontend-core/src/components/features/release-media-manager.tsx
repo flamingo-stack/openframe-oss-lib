@@ -4,7 +4,7 @@ import { Trash2, Plus, Image as ImageIcon, Video as VideoIcon, Upload, Loader2, 
 import { useState, useRef } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import Image from '../../embed-shims/next-image';
-import { isVideoMedia } from '../../utils/media-type';
+import { MEDIA_FILE_ACCEPT, fileMediaType, isVideoMedia } from '../../utils/media-type';
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
 
 import { Video } from './video';
@@ -35,9 +35,9 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
 
     // Determine media type
     let mediaType: 'image' | 'video' | 'screenshot' | 'demo';
-    if (file.type.startsWith('image/')) {
+    if (fileMediaType(file) === 'image') {
       mediaType = 'screenshot';
-    } else if (file.type.startsWith('video/')) {
+    } else if (fileMediaType(file) === 'video') {
       mediaType = 'demo';
     } else {
       return;
@@ -154,7 +154,7 @@ export function ReleaseMediaManager({ media, onChange, onUpload, className = '' 
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,video/*"
+        accept={MEDIA_FILE_ACCEPT}
         onChange={handleFileSelect}
         className="hidden"
         disabled={uploadingIndex !== null}

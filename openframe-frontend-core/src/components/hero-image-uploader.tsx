@@ -6,6 +6,7 @@ import type { ChangeEvent } from 'react';
 import Image from '../embed-shims/next-image';
 import { useToast } from '../hooks/use-toast';
 import { errorMessage } from '../utils/common';
+import { IMAGE_FILE_ACCEPT } from '../utils/media-type';
 import { Button } from './ui/button';
 
 interface HeroImageUploaderProps {
@@ -213,7 +214,7 @@ export function HeroImageUploader({
       )}
 
       {/* hidden input */}
-      <input ref={inputRef} type="file" accept="image/*" onChange={handleSelect} className="hidden" />
+      <input ref={inputRef} type="file" accept={IMAGE_FILE_ACCEPT} onChange={handleSelect} className="hidden" />
     </div>
   );
 }
