@@ -23,7 +23,7 @@ on:
         type: string
         default: ''
       snapshot:
-        description: 'Publish a SNAPSHOT from the selected ref instead of a release (does not move the latest tag). Use this to test an unmerged branch live.'
+        description: 'Build the selected ref as a SNAPSHOT instead of a release: it goes to pkg.pr.new only (nothing on npmjs). Use this to test an unmerged branch live.'
         required: false
         type: boolean
         default: false
@@ -244,16 +244,17 @@ jobs:
         shell: bash
         run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
 
-      - name: Publish ${{ env.NEW_VERSION }}
-        if: steps.should_run.outputs.run == 'true'
+      # npmjs gets REAL RELEASES only, as the public, versioned copy (a main-push or
+      # branch snapshot lives on pkg.pr.new alone). The script moves a release past
+      # a number npm already holds and does not wait for npm's scan.
+      - name: Publish ${{ env.NEW_VERSION }} to npmjs
+        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && !inputs.snapshot
         working-directory: ${{ matrix.path }}
-        # The public mirror (.github/scripts/npm-publish.sh): it moves a release past
-        # a number npm already holds and does not wait for npm's scan.
         run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "$PUBLISH_TAG" --access public
         shell: bash
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PUBLISH_TAG: ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }}
+          PUBLISH_TAG: latest
 
 
   release-rust:

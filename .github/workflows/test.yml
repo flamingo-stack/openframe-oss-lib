@@ -214,8 +214,9 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
-      # Where OUR apps install a pull request's build from: installable when this
-      # step ends, addressed by the PR's head commit (.github/scripts/preview-publish.sh).
+      # A pull request's build goes to pkg.pr.new ONLY (never npmjs): installable
+      # when this step ends, addressed by the PR's head commit
+      # (.github/scripts/preview-publish.sh). npmjs gets real releases alone.
       - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
@@ -225,17 +226,6 @@ jobs:
         run: |
           npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
           bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
-
-      - name: Publish ${{ env.NEW_VERSION }} (pr-${{ github.event.pull_request.number }} tag)
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        shell: bash
-        # The public mirror (.github/scripts/npm-publish.sh); it does not wait for npm's scan.
-        run: |
-          npm version "${{ env.NEW_VERSION }}" --no-git-tag-version --allow-same-version
-          bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "pr-${{ github.event.pull_request.number }}" --ignore-scripts
 
 
   # `lint:cycles` gets its OWN job, purely for wall-clock. It is graph-wide —

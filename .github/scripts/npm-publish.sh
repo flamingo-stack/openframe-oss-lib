@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# THE npmjs publish of this repository's packages: every workflow that publishes
-# (a release, a main-push snapshot, a pull request's prerelease) calls this from
-# the package's directory.
+# THE npmjs publish of this repository's packages, called from the package's
+# directory. Only a REAL RELEASE is published to npmjs; a main-push snapshot and
+# a pull request's build go to pkg.pr.new alone.
 #
 #   npm-publish.sh <dist-tag> [extra `npm publish` arguments]
 #
