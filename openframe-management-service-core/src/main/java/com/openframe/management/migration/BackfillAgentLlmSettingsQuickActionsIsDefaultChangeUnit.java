@@ -50,5 +50,9 @@ public class BackfillAgentLlmSettingsQuickActionsIsDefaultChangeUnit {
 
     @RollbackExecution
     public void rollback() {
+        // No-op by design: this migration only backfills a derived field on records that lack it.
+        // Removing the field on rollback would be purely cosmetic (the field is recomputed
+        // idempotently on re-run) and risks racing with concurrent reads/writes that already rely
+        // on it being present, so we intentionally leave backfilled data in place.
     }
 }

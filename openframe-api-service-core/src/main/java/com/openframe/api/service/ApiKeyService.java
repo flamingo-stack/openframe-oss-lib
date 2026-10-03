@@ -108,10 +108,14 @@ public class ApiKeyService {
         List<ApiKey> expiredKeys = apiKeyRepository.findExpiredKeys(Instant.now());
 
         for (ApiKey key : expiredKeys) {
-            key.setEnabled(false);
-            key.setUpdatedAt(Instant.now());
-            apiKeyRepository.save(key);
-            log.info("Disabled expired API key: {}", key.getKeyId());
+            try {
+                key.setEnabled(false);
+                key.setUpdatedAt(Instant.now());
+                apiKeyRepository.save(key);
+                log.info("Disabled expired API key: {}", key.getKeyId());
+            } catch (Exception e) {
+                log.error("Failed to disable expired API key: {}", key.getKeyId(), e);
+            }
         }
     }
 

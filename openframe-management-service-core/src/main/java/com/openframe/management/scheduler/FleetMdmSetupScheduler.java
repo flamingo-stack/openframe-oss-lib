@@ -24,9 +24,16 @@ public class FleetMdmSetupScheduler {
     public void runSetupIfNeeded() {
         try {
             toolRepository.findByKey(FLEETMDM_SERVER)
-                    .ifPresent(fleetMdmSetupService::setupAndSaveApiToken);
+                    .ifPresent(tool -> {
+                        try {
+                            fleetMdmSetupService.setupAndSaveApiToken(tool);
+                        } catch (Exception e) {
+                            log.error("Fleet MDM setup failed for tool, will retry on next tick: {}", e.getMessage(), e);
+                        }
+                    });
         } catch (Exception e) {
-            log.error("Fleet MDM setup failed, will retry on next tick: {}", e.getMessage(), e);
+            log.error("Fleet MDM tool lookup failed, will retry on next tick: {}", e.getMessage(), e);
         }
     }
 }
+
