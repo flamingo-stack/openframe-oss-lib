@@ -94,7 +94,8 @@ export function FadePreview({
   toggle = true,
   children,
 }: FadePreviewProps) {
-  const itemMode = visibleItems != null && visibleItems > 0;
+  const visible = visibleItems ?? 0;
+  const itemMode = visible > 0;
   const fixed = fixedHeight || itemMode || fill;
   // The height of the first `visibleItems` items, measured (item mode only).
   const [itemsHeight, setItemsHeight] = useState<number | null>(null);
@@ -146,7 +147,7 @@ export function FadePreview({
       const items = el.firstElementChild?.children;
       const count = items?.length ?? 0;
       if (count !== itemCount) setItemCount(count);
-      const last = count >= (visibleItems as number) ? items?.[(visibleItems as number) - 1] : undefined;
+      const last = count >= visible ? items?.[visible - 1] : undefined;
       if (last) {
         const next = Math.round(last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop);
         if (next !== itemsHeight) setItemsHeight(next);
@@ -169,17 +170,17 @@ export function FadePreview({
       setOverflows(el.scrollHeight > el.clientHeight + 1);
       // Item mode: the items re-wrap at a new width, so their height is re-read.
       const items = itemMode ? el.firstElementChild?.children : undefined;
-      const last = items && items.length >= (visibleItems as number) ? items[(visibleItems as number) - 1] : undefined;
+      const last = items && items.length >= visible ? items[visible - 1] : undefined;
       if (last)
         setItemsHeight(Math.round(last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop));
     });
     observer.observe(el);
     if (itemMode && el.firstElementChild) observer.observe(el.firstElementChild);
     return () => observer.disconnect();
-  }, [fixed, itemMode, visibleItems, expanded]);
+  }, [fixed, itemMode, visible, expanded]);
 
   const needsFade = fixed ? overflows : hiddenCount > 0;
-  const hidden = itemMode && hiddenCount <= 0 ? Math.max(0, itemCount - (visibleItems as number)) : hiddenCount;
+  const hidden = itemMode && hiddenCount <= 0 ? Math.max(0, itemCount - visible) : hiddenCount;
 
   // No disclosure needed → no clamp wrapper at all. (Keeping the wrapper
   // with a `scrollHeight ?? 2000` max-height would clip tall content on
