@@ -59,8 +59,26 @@ export interface FadePreviewProps {
    * items, `collapsedHeight` (or the height last measured) is kept.
    */
   visibleItems?: number;
+  /**
+   * Take the height of the cell it sits in instead of a collapsed height: a
+   * column beside a taller card, where the grid row's height comes from that
+   * card. The content is laid out absolutely inside the cell (so it never makes
+   * the row taller), clipped there, and fades out when it overflows. `'md'` /
+   * `'lg'`: only from that width up (below it the columns stack, the content
+   * shows whole and nothing fades). `true`: at every width.
+   */
+  fill?: boolean | 'md' | 'lg';
+  /** Render the "Show more / Show less" row. `false` for a preview that only fades (another link leads to the rest). Default true. */
+  toggle?: boolean;
   children: React.ReactNode;
 }
+
+/** The content's box in fill mode, per breakpoint (spelled out: Tailwind only emits classes it can read). */
+const FILL_CLASSES: Record<string, string> = {
+  true: 'absolute inset-0',
+  md: 'md:absolute md:inset-0',
+  lg: 'lg:absolute lg:inset-0',
+};
 
 const cssLength = (value: number | string) => (typeof value === 'number' ? `${value}px` : value);
 
@@ -72,10 +90,12 @@ export function FadePreview({
   labels,
   toggleClassName,
   visibleItems,
+  fill = false,
+  toggle = true,
   children,
 }: FadePreviewProps) {
   const itemMode = visibleItems != null && visibleItems > 0;
-  const fixed = fixedHeight || itemMode;
+  const fixed = fixedHeight || itemMode || fill;
   // The height of the first `visibleItems` items, measured (item mode only).
   const [itemsHeight, setItemsHeight] = useState<number | null>(null);
   const [itemCount, setItemCount] = useState(0);
@@ -132,7 +152,8 @@ export function FadePreview({
         if (next !== itemsHeight) setItemsHeight(next);
       }
     }
-    el.style.height = expanded ? `${el.scrollHeight}px` : cssLength(collapsed);
+    // Fill mode: the parent decides the height (CSS), only overflow is read.
+    if (!fill) el.style.height = expanded ? `${el.scrollHeight}px` : cssLength(collapsed);
     if (!expanded) {
       const next = el.scrollHeight > el.clientHeight + 1;
       if (next !== overflows) setOverflows(next);
@@ -173,14 +194,17 @@ export function FadePreview({
     <div className="relative">
       <div
         ref={contentRef}
-        className="overflow-hidden transition-[max-height,height] duration-500"
+        className={cn(
+          'overflow-hidden transition-[max-height,height] duration-500',
+          fill && FILL_CLASSES[String(fill)],
+        )}
         style={{
           transitionTimingFunction: 'cubic-bezier(0.33, 1, 0.68, 1)',
           // Fixed mode renders the collapsed height INTO the markup, so the
           // server-rendered block is already clamped and hydration never shrinks
           // it. The expanded value is a live DOM measurement, so the layout
           // effect above owns it (and `maxHeight` in the counted mode).
-          ...(fixed && !expanded ? { height: cssLength(collapsed) } : {}),
+          ...(fixed && !fill && !expanded ? { height: cssLength(collapsed) } : {}),
           ...(!expanded && needsFade
             ? {
                 maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
@@ -194,20 +218,22 @@ export function FadePreview({
       {/* The shared Button's quiet text-action variant. Fixed mode ALWAYS renders
           the row so the block keeps its height; it is just not visible or
           focusable while there is nothing to disclose. */}
-      <Button
-        type="button"
-        variant="link"
-        size="compact"
-        noPaddingX
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-        aria-hidden={showToggle ? undefined : true}
-        tabIndex={showToggle ? undefined : -1}
-        rightIcon={<ChevronDown className={cn('transition-transform duration-300', expanded && 'rotate-180')} />}
-        className={cn('mt-[var(--spacing-system-mf)]', !showToggle && 'invisible', toggleClassName)}
-      >
-        {expanded ? lessLabel : moreLabel}
-      </Button>
+      {toggle ? (
+        <Button
+          type="button"
+          variant="link"
+          size="compact"
+          noPaddingX
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-hidden={showToggle ? undefined : true}
+          tabIndex={showToggle ? undefined : -1}
+          rightIcon={<ChevronDown className={cn('transition-transform duration-300', expanded && 'rotate-180')} />}
+          className={cn('mt-[var(--spacing-system-mf)]', !showToggle && 'invisible', toggleClassName)}
+        >
+          {expanded ? lessLabel : moreLabel}
+        </Button>
+      ) : null}
     </div>
   );
 }
