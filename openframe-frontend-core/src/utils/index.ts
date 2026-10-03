@@ -131,6 +131,7 @@ export {
   urlPathLooksLikeSvg,
   shouldProxyImage,
   generateImageSizes,
+  skipsImageOptimizer,
 } from './image-proxy';
 
 // Number / byte / duration / time / UTC date / initials / metric /
