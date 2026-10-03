@@ -153,6 +153,7 @@ export {
   VIEWER_TIMEZONE,
   formatWebinarTimeMeta,
   formatProgramDate,
+  formatProgramDateRange,
   formatProgramTimeRange,
   type ZonedDateStyle,
   formatDurationFromRange,
