@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Children, Fragment, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
 /**
  * THE page-title style — the ODS `text-h1` token (`--font-size-h1-title` =
@@ -67,6 +67,44 @@ export function PageHeading({
   );
 }
 
+/** A sentence mark inside a title: `.`, `:`, `?` or `!` that ends a sentence (followed by a space or the end). */
+const SENTENCE_MARK = /([.:?!]+)(?=\s|$)/g;
+
+/**
+ * A title with EVERY sentence mark in the accent colour, not only the last one:
+ * "Remote all year. Together once a year." has two accent dots. Text is walked
+ * through fragments and elements (a highlighted `<span>` keeps its own colour for
+ * its letters). A mark inside a number or a version (`$6.7M`, `v1.5.0`) is not a
+ * sentence mark and is left alone.
+ */
+export function accentSentenceMarks(node: ReactNode, accentClassName = 'text-ods-accent'): ReactNode {
+  if (typeof node === 'string') {
+    const parts = node.split(SENTENCE_MARK);
+    if (parts.length === 1) return node;
+    return parts.map((part, index) =>
+      // `split` with one capture group alternates text, mark, text, mark...
+      index % 2 === 1 ? (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
+        <span key={index} className={accentClassName}>
+          {part}
+        </span>
+      ) : (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
+        <Fragment key={index}>{part}</Fragment>
+      ),
+    );
+  }
+  if (Array.isArray(node)) {
+    return Children.map(node as ReactNode[], child => accentSentenceMarks(child, accentClassName));
+  }
+  if (isValidElement(node)) {
+    const element = node as ReactElement<{ children?: ReactNode }>;
+    if (element.props.children === undefined) return node;
+    return cloneElement(element, undefined, accentSentenceMarks(element.props.children, accentClassName));
+  }
+  return node;
+}
+
 const SECTION_HEADING_LAYOUT = {
   page: {
     stack: 'flex flex-col gap-[var(--spacing-system-lf)]',
@@ -83,7 +121,7 @@ const SECTION_HEADING_LAYOUT = {
 export interface SectionHeadingProps {
   /** The small label above the heading (Azeret Mono, uppercase, accent colour). */
   eyebrow?: ReactNode;
-  /** The heading text; a node when part of it is highlighted. */
+  /** The heading text; a node when part of it is highlighted. Every sentence mark in it is drawn in the accent colour. */
   title: ReactNode;
   /** The accent mark that closes the heading (`.`, `:`, `?`). `null` for none. Default `.`. */
   punctuation?: string | null;
@@ -124,7 +162,7 @@ export function SectionHeading({
     <div className={layout.stack}>
       {eyebrow ? <span className={`text-h5 ${accentClassName}`}>{eyebrow}</span> : null}
       <Tag className={layout.heading}>
-        {title}
+        {accentSentenceMarks(title, accentClassName)}
         {punctuation ? <span className={accentClassName}>{punctuation}</span> : null}
       </Tag>
       {intro ? <div className={layout.intro}>{intro}</div> : null}

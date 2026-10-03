@@ -49,7 +49,7 @@ import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
-import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { Button } from '../ui/button';
 
 // =============================================================================
@@ -796,7 +796,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
       }}
       className={cn('flex w-full min-w-0 flex-col gap-6', className)}
     >
-      {showTitle && title && <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{title}</h2>}
+      {showTitle && title && <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{accentSentenceMarks(title)}</h2>}
       {headerSlot}
 
       <div className="relative" style={bled ? { marginLeft: -insets.left, marginRight: -insets.right } : undefined}>
