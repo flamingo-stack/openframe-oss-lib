@@ -9,8 +9,13 @@
 #
 #   https://pkg.pr.new/<owner>/<repo>/<package>@<commit sha>
 #
-# A consumer pins that URL in its package.json. npmjs still gets every version
-# too (npm-publish.sh), for everyone else.
+# A RELEASE is also served under its version, the address a consumer pins:
+#
+#   https://pkg.pr.new/<owner>/<repo>/<package>@<x.y.z>
+#
+# (pkg.pr.new names a build after the git ref of the run that published it; the
+# release workflow runs once more on the version tag for that.) npmjs still gets
+# every version too (npm-publish.sh), for everyone else.
 #
 # How, by pkg.pr.new's own guidance:
 #  - the CLI is a pinned devDependency run with `npm exec`, never `npx` (a release
@@ -65,3 +70,23 @@ if [ "$code" != "200" ]; then
   exit 1
 fi
 if [ -n "${GITHUB_ENV:-}" ]; then echo "PREVIEW_URL=$URL" >> "$GITHUB_ENV"; fi
+
+# On a release's version tag (RELEASE_REF): pkg.pr.new also serves this build
+# under the ref of the run, which is the version. That is the address a consumer
+# pins, so it is checked and printed too.
+if [ -n "${RELEASE_REF:-}" ]; then
+  NAMED="https://pkg.pr.new/${GITHUB_REPOSITORY}/${PKG}@${RELEASE_REF}"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -L "$NAMED" || echo 000)
+  {
+    echo
+    echo "### Release $RELEASE_REF"
+    echo
+    echo '```json'
+    echo "\"$PKG\": \"$NAMED\""
+    echo '```'
+  } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+  if [ "$code" != "200" ]; then
+    echo "::error::pkg.pr.new does not serve $NAMED (HTTP $code)"
+    exit 1
+  fi
+fi
