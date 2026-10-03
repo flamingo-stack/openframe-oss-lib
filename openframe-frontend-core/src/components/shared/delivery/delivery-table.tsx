@@ -19,6 +19,7 @@
 
 import type { DeliveryItem } from '../../../types/delivery';
 import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
+import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../../chat/entity-cards/content-card-frame';
 import { DeliveryRow } from './delivery-row';
 
 interface DeliveryTableProps {
@@ -71,7 +72,7 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
   // Show skeletons while loading
   if (isLoading) {
     return (
-      <div className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
+      <div className={`w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
         <div className="w-full">
           {[1, 2, 3, 4, 5].map(i => (
             <SkeletonRow key={i} />
@@ -84,14 +85,14 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
   // Empty state
   if (items.length === 0) {
     return (
-      <div className="w-full rounded-[6px] border border-ods-border bg-ods-card p-[40px] text-center">
+      <div className={`w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS} p-[var(--spacing-system-xlf)] text-center`}>
         <p className="text-ods-text-secondary text-h6">No tasks available</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
+    <div className={`w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
       <div className="w-full">
         {items.map(item => (
           // DOM id lives on DeliveryRow's own outer element (no wrapper

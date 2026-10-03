@@ -4,6 +4,10 @@ import { AlertTriangle, Eye, Package, Sparkles, TrendingUp, Wrench } from 'lucid
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
 import { cn } from '../../../utils/cn';
+import {
+  CONTENT_CARD_FRAME_CLASS,
+  CONTENT_CARD_SKELETON_FRAME_CLASS,
+} from '../../chat/entity-cards/content-card-frame';
 import { CardHoverPlay } from '../../features/video-center-badge';
 import { InteractiveCard } from '../../ui/interactive-card';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -210,11 +214,12 @@ export function ProductReleaseCard({
     const gridColsClass = 'md:grid-cols-4';
     const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border';
 
+    // THE shared card frame: interactive (accent border on hover) when the card
+    // links or clicks, the static frame when it does neither.
+    const interactive = !!anchorProps || !!onClick;
     const frameClass = cn(
-      'group overflow-hidden rounded-lg border border-ods-border bg-ods-card',
+      interactive ? CONTENT_CARD_FRAME_CLASS : CONTENT_CARD_SKELETON_FRAME_CLASS,
       'flex flex-col gap-4 p-6',
-      'transform transition-all duration-300 ease-out hover:translate-y-[-2px]',
-      'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',
       'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-bg',
       'no-underline',
       className,
@@ -322,7 +327,7 @@ export function ProductReleaseCard({
           )}
         >
           {valueCells.map((cell, i) => (
-            <div key={`${cell.label}-${i}`} className={cn('flex flex-col gap-3 bg-ods-card p-4', dividerClass)}>
+            <div key={`${cell.label}-${i}`} className={cn('flex flex-col gap-3 p-4', dividerClass)}>
               <div className="flex flex-col gap-0">
                 {cell.colorScheme ? (
                   <StatusBadge
@@ -348,7 +353,7 @@ export function ProductReleaseCard({
               </div>
             </div>
           ))}
-          <div className="flex items-center gap-3 bg-ods-card p-4">
+          <div className="flex items-center gap-3 p-4">
             <SquareAvatar
               src={effectiveAuthor.avatar_url ?? undefined}
               alt={effectiveAuthor.full_name}
@@ -389,13 +394,9 @@ export function ProductReleaseCard({
         </InteractiveCard>
       );
     }
-    // Non-interactive fallback — strip the hover lift / accent-border so
-    // the cursor doesn't lie about clickability.
-    return (
-      <div className={cn(frameClass.replace('hover:border-ods-accent', '').replace('hover:translate-y-[-2px]', ''))}>
-        {innerLayout}
-      </div>
-    );
+    // Non-interactive fallback: the static frame (no hover), so the cursor
+    // doesn't lie about clickability.
+    return <div className={frameClass}>{innerLayout}</div>;
   }
 
   // ----- COMPACT branch (chat / tight surfaces) ------------------------------

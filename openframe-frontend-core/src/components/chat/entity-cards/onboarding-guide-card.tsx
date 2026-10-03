@@ -112,19 +112,19 @@ export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'cata
           {[0, 1].map(i => (
             <div
               key={`cell-${i}`}
-              className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r"
+              className="flex flex-col gap-3 border-b border-ods-border p-4 md:border-b-0 md:border-r"
             >
               <div className="flex flex-col gap-2">
-                <div className="h-6 w-32 rounded bg-ods-bg" />
-                <div className="h-3 w-20 rounded bg-ods-bg/60" />
+                <div className="h-6 w-32 rounded bg-ods-border" />
+                <div className="h-3 w-20 rounded bg-ods-border" />
               </div>
             </div>
           ))}
-          <div className="flex items-center gap-3 bg-ods-card p-4">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-bg" />
+          <div className="flex items-center gap-3 p-4">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-border" />
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <div className="h-4 w-3/4 rounded bg-ods-bg" />
-              <div className="h-3 w-1/2 rounded bg-ods-bg/60" />
+              <div className="h-4 w-3/4 rounded bg-ods-border" />
+              <div className="h-3 w-1/2 rounded bg-ods-border" />
             </div>
           </div>
         </div>
