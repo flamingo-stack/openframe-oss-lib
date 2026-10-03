@@ -4,7 +4,7 @@ import { Upload, Image as ImageIcon, Video as VideoIcon, Trash2, Loader2, GripVe
 import type React from 'react';
 import { useState, useRef, useCallback } from 'react';
 import Image from '../../embed-shims/next-image';
-import { isVideoMedia } from '../../utils/media-type';
+import { fileMediaType, isVideoMedia, MEDIA_FILE_ACCEPT } from '../../utils/media-type';
 import { Button, Card } from '../ui';
 
 import { Video } from './video';
@@ -49,15 +49,9 @@ export function MediaGalleryManager({
       const file = event.target.files?.[0];
       if (!file) return;
 
-      // Determine media type
-      let mediaType: 'image' | 'video';
-      if (file.type.startsWith('image/')) {
-        mediaType = 'image';
-      } else if (file.type.startsWith('video/')) {
-        mediaType = 'video';
-      } else {
-        return;
-      }
+      // One rule for what a picked file is (MIME type, else extension: a HEIC photo may state none).
+      const mediaType = fileMediaType(file);
+      if (!mediaType) return;
 
       try {
         const url = await onUpload(file, mediaType);
@@ -224,7 +218,7 @@ export function MediaGalleryManager({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,video/*"
+        accept={MEDIA_FILE_ACCEPT}
         onChange={handleFileSelect}
         className="hidden"
         disabled={isUploading}

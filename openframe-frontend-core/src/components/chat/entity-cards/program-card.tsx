@@ -26,13 +26,13 @@
  * and pass the resolved detail URL via `href`.
  */
 
-import { ExternalLink, Clock, Play, Video } from 'lucide-react';
+import { ArrowRight, ExternalLink, Clock, Play, Video } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
-import { formatProgramDate } from '../../../utils/format';
+import { formatProgramDate, formatProgramDateRange } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
@@ -40,6 +40,7 @@ import { CardHoverPlay } from '../../features/video-center-badge';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
+import { Tag } from '../../ui/tag';
 import {
   programItemToStripProfile,
   type BaseProgramItem,
@@ -80,26 +81,38 @@ const EDITORIAL_META_ROW =
   'flex h-[1lh] min-w-0 items-center gap-x-[var(--spacing-system-s)] overflow-hidden whitespace-nowrap text-h6';
 const EDITORIAL_PERSON_ROW = 'flex h-8 min-w-0 items-center gap-[var(--spacing-system-s)]';
 
-// The default card's boxes, shared by the card and its skeleton: a fixed cover frame
-// (the image is contained in it, whatever its shape), a two-line title, the date and
-// meta rows (stacked on a phone, one line from md) and a three-line description, so a
-// card is one height whatever its copy and cover.
+// The default card's boxes, shared by the card and its skeleton: a large SQUARE cover
+// (the picture fills it), a display title, the date and meta row (stacked on a phone,
+// one line from md), a three-line description, a tag row, the gallery and the action,
+// so a card is one height whatever its copy and cover.
+const DEFAULT_BODY =
+  'flex flex-col gap-[var(--spacing-system-lf)] p-[var(--spacing-system-lf)] md:p-[var(--spacing-system-xlf)]';
+const DEFAULT_HEADER = 'flex flex-col gap-[var(--spacing-system-lf)] md:flex-row md:gap-[var(--spacing-system-xlf)]';
 const DEFAULT_COVER_FRAME =
-  'relative flex h-[180px] w-full flex-shrink-0 items-center justify-center overflow-hidden rounded-lg md:w-[180px]';
-const DEFAULT_TITLE = 'mb-3 line-clamp-2 flex min-h-[2lh] items-center text-ods-text-primary text-h2';
+  'relative aspect-square w-full flex-shrink-0 overflow-hidden rounded-lg md:w-[240px] lg:w-[320px] xl:w-[400px]';
+const DEFAULT_TEXT = 'flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-mf)]';
+const DEFAULT_TITLE = 'line-clamp-2 text-ods-text-primary text-h1';
 const DEFAULT_META_ROW =
-  'mb-4 flex min-h-[calc(2lh+0.5rem)] flex-col gap-2 text-h6 md:min-h-[1lh] md:flex-row md:items-center md:gap-4';
-const DEFAULT_DESCRIPTION = 'line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h6';
+  'flex min-h-[calc(2lh+0.5rem)] flex-col gap-2 text-h4 md:min-h-[1lh] md:flex-row md:items-center md:gap-4';
+const DEFAULT_DESCRIPTION = 'line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h4';
+const DEFAULT_TAG_ROW = 'flex flex-wrap gap-[var(--spacing-system-xsf)]';
+const DEFAULT_GALLERY_ROW = 'flex gap-[var(--spacing-system-mf)]';
+const DEFAULT_GALLERY_THUMB =
+  'relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg md:h-40 md:w-40 xl:h-[200px] xl:w-[200px]';
+const DEFAULT_FOOTER = 'flex justify-end border-t border-ods-border pt-[var(--spacing-system-lf)]';
 
 export function ProgramCardSkeleton({
   size = 'default',
   eyebrow = true,
   media = 0,
+  tags = false,
 }: {
   size?: CardSize;
   eyebrow?: boolean;
   /** `default` size: how many gallery thumbnails the card shows (`MediaGallery`'s row). 0 = no gallery. */
   media?: number;
+  /** `default` size: the card shows a tag row. */
+  tags?: boolean;
 }) {
   // The editorial pair: the card's own boxes (EDITORIAL_*), each text row a bar of
   // that row's line height.
@@ -158,44 +171,37 @@ export function ProgramCardSkeleton({
     );
   }
   return (
-    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex animate-pulse flex-col')}>
-      <div className="flex-1 p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className={`${DEFAULT_COVER_FRAME} bg-ods-border`} />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className={DEFAULT_TITLE}>
-              <span className="block h-[1lh] w-3/4 rounded bg-ods-border" />
-            </div>
-            <div className={DEFAULT_META_ROW}>
-              <span className="block h-[1lh] w-32 rounded bg-ods-border" />
-              <span className="block h-[1lh] w-40 rounded bg-ods-border" />
-            </div>
-            <div className="flex-1">
-              <div className={`${DEFAULT_DESCRIPTION} flex flex-col gap-1`}>
-                <span className="block h-3 w-full rounded bg-ods-border" />
-                <span className="block h-3 w-5/6 rounded bg-ods-border" />
-                <span className="block h-3 w-4/5 rounded bg-ods-border" />
-              </div>
-            </div>
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DEFAULT_BODY, 'animate-pulse')}>
+      <div className={DEFAULT_HEADER}>
+        <div className={`${DEFAULT_COVER_FRAME} bg-ods-border`} />
+        <div className={DEFAULT_TEXT}>
+          <div className={DEFAULT_TITLE}>
+            <span className="block h-[1lh] w-3/4 rounded bg-ods-border" />
           </div>
+          <div className={DEFAULT_META_ROW}>
+            <span className="block h-[1lh] w-32 rounded bg-ods-border" />
+            <span className="block h-[1lh] w-40 rounded bg-ods-border" />
+          </div>
+          <div className={DEFAULT_DESCRIPTION}>
+            <span className="block h-[3lh] w-full rounded bg-ods-border" />
+          </div>
+          {tags && (
+            <div className={DEFAULT_TAG_ROW}>
+              <span className="block h-8 w-24 rounded bg-ods-border" />
+              <span className="block h-8 w-24 rounded bg-ods-border" />
+            </div>
+          )}
         </div>
       </div>
       {media > 0 && (
-        // MediaGallery's own boxes: p-6 pt-4, mb-4 row, 96px thumbnails, gap-3, pb-2.
-        <div className="p-6 pt-4">
-          <div className="mb-4">
-            <div className="flex gap-3 pb-2">
-              {Array.from({ length: media }, (_, i) => (
-                <div key={i} className="h-24 w-24 flex-shrink-0 rounded-md bg-ods-border" />
-              ))}
-            </div>
-          </div>
+        <div className={DEFAULT_GALLERY_ROW}>
+          {Array.from({ length: media }, (_, i) => (
+            <div key={i} className={`${DEFAULT_GALLERY_THUMB} bg-ods-border`} />
+          ))}
         </div>
       )}
-      <div className="mt-auto p-6 pt-0">
-        <div className="border-t border-ods-border pt-4">
-          <div className="h-10 w-40 rounded bg-ods-border" />
-        </div>
+      <div className={DEFAULT_FOOTER}>
+        <div className="h-10 w-40 rounded bg-ods-border" />
       </div>
     </div>
   );
@@ -223,6 +229,8 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   wholeCardClickable?: boolean;
   /** `feature` density: the label above the title ("Latest episode"). */
   eyebrow?: string;
+  /** `default` density: the item's tags, drawn under the description. */
+  tags?: string[];
   className?: string;
 }
 
@@ -269,32 +277,25 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
   };
   return (
     <>
-      <div className="p-6 pt-4">
-        <div className="mb-4 overflow-x-auto">
-          <div className="flex gap-3 pb-2" style={{ width: 'max-content' }}>
-            {images.map((mediaItem, index) => (
-              <div
-                key={mediaItem.id}
-                className="group/thumb relative h-24 w-24 flex-shrink-0 cursor-pointer overflow-hidden rounded-md"
-                onClick={e => openImageModal(index, e)}
-              >
-                <Image
-                  src={mediaItem.media_url}
-                  alt={`${title} photo ${index + 1}`}
-                  fill
-                  className="object-cover transition-transform duration-200 group-hover/thumb:scale-105"
-                  sizes="96px"
-                  loading="lazy"
-                  unoptimized
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity duration-200 group-hover/thumb:opacity-100">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/90">
-                    <span className="text-sm text-black">+</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="overflow-x-auto">
+        <div className={DEFAULT_GALLERY_ROW} style={{ width: 'max-content' }}>
+          {images.map((mediaItem, index) => (
+            <div
+              key={mediaItem.id}
+              className={cn(DEFAULT_GALLERY_THUMB, 'group/thumb cursor-pointer')}
+              onClick={e => openImageModal(index, e)}
+            >
+              <Image
+                src={mediaItem.media_url}
+                alt={`${title} photo ${index + 1}`}
+                fill
+                className="object-cover transition-transform duration-200 group-hover/thumb:scale-105"
+                sizes="200px"
+                loading="lazy"
+                unoptimized
+              />
+            </div>
+          ))}
         </div>
       </div>
       <ImageGalleryModal
@@ -448,6 +449,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   placeholderUrl: placeholderUrlProp,
   wholeCardClickable = false,
   eyebrow,
+  tags = [],
   className,
 }: ProgramCardProps<T>) {
   const { target, rel } = useEntityCardLink({
@@ -615,69 +617,76 @@ export function ProgramCard<T extends BaseProgramItem>({
     return null;
   };
 
+  // An event that spans days reads as its range ("Aug 14 – 20, 2026").
+  const endAt = 'end_at' in item && typeof item.end_at === 'string' ? item.end_at : null;
+  const dateLabel = formatProgramDateRange(zonedDate, endAt) ?? dateFormat;
+
   const cardHeader = (
-    <div className="flex-1 border-ods-border p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-        {coverImage && (
-          <div className={DEFAULT_COVER_FRAME}>
-            <Image
-              src={coverImage}
-              alt={item.title}
-              width={180}
-              height={180}
-              className="h-full w-full rounded-lg object-contain"
-              unoptimized
-            />
-            {isPlayable && <CardHoverPlay size="md" />}
-          </div>
-        )}
+    <div className={DEFAULT_HEADER}>
+      {coverImage && (
+        <div className={DEFAULT_COVER_FRAME}>
+          <Image
+            src={coverImage}
+            alt={item.title}
+            fill
+            sizes="(min-width: 1280px) 400px, (min-width: 768px) 320px, 100vw"
+            className="object-cover"
+            unoptimized
+          />
+          {isPlayable && <CardHoverPlay size="md" />}
+        </div>
+      )}
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <h3 className={DEFAULT_TITLE}>{item.title}</h3>
+      <div className={DEFAULT_TEXT}>
+        <h3 className={DEFAULT_TITLE}>{item.title}</h3>
 
-          <div className={DEFAULT_META_ROW}>
-            <span style={{ color: accentColor }}>{dateFormat}</span>
-            {renderMeta ? (
+        <div className={DEFAULT_META_ROW}>
+          <span style={{ color: accentColor }}>{dateLabel}</span>
+          {renderMeta ? (
+            <>
+              <span className="hidden text-ods-text-secondary md:inline">•</span>
+              {renderMeta(item)}
+            </>
+          ) : (
+            defaultRenderMeta() && (
               <>
                 <span className="hidden text-ods-text-secondary md:inline">•</span>
-                {renderMeta(item)}
+                <div className="flex items-center gap-2">{defaultRenderMeta()}</div>
               </>
-            ) : (
-              defaultRenderMeta() && (
-                <>
-                  <span className="hidden text-ods-text-secondary md:inline">•</span>
-                  <div className="flex items-center gap-2">{defaultRenderMeta()}</div>
-                </>
-              )
-            )}
-          </div>
-
-          <div className="flex-1">
-            <p className={DEFAULT_DESCRIPTION}>{item.description}</p>
-          </div>
+            )
+          )}
         </div>
 
-        {hosts.length > 0 && (
-          <div className="md:text-right">
-            <div className="flex flex-wrap gap-2 md:justify-end">
-              {hosts.map((host, index) => (
-                <SquareAvatar
-                  variant="round"
-                  key={`${item.id}-host-${index}`}
-                  src={host.avatar || undefined}
-                  alt={host.name}
-                  fallback={host.name.charAt(0).toUpperCase()}
-                  size="sm"
-                />
-              ))}
-            </div>
+        <p className={DEFAULT_DESCRIPTION}>{item.description}</p>
+
+        {tags.length > 0 && (
+          <div className={DEFAULT_TAG_ROW}>
+            {tags.map(tag => (
+              <Tag key={tag} as="span" label={tag} variant="outline" />
+            ))}
           </div>
         )}
       </div>
+
+      {hosts.length > 0 && (
+        <div className="flex flex-wrap gap-2 md:justify-end">
+          {hosts.map((host, index) => (
+            <SquareAvatar
+              variant="round"
+              key={`${item.id}-host-${index}`}
+              src={host.avatar || undefined}
+              alt={host.name}
+              fallback={host.name.charAt(0).toUpperCase()}
+              size="sm"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 
-  const cardFrameClass = cn(CONTENT_CARD_FRAME_CLASS, 'flex flex-col', className);
+  const cardFrameClass = cn(CONTENT_CARD_FRAME_CLASS, DEFAULT_BODY, className);
+  const actionLabel = `View ${config.labels.singular.toLowerCase()}`;
 
   if (wholeCardClickable) {
     return (
@@ -690,16 +699,14 @@ export function ProgramCard<T extends BaseProgramItem>({
       >
         {cardHeader}
         {images.length > 0 && <MediaGallery images={images} title={item.title} />}
-        <div className="mt-auto p-6 pt-0">
-          <div className="border-t border-ods-border pt-4">
-            <span
-              className="inline-flex items-center gap-2 rounded-md border border-ods-accent px-4 py-2 text-ods-accent text-h6"
-              aria-hidden="true"
-            >
-              View {config.labels.singular} Details
-              <ExternalLink className="h-5 w-5" />
-            </span>
-          </div>
+        <div className={DEFAULT_FOOTER}>
+          <span
+            className="inline-flex items-center gap-2 rounded-md border border-ods-border px-4 py-2 text-ods-text-primary text-h4"
+            aria-hidden="true"
+          >
+            {actionLabel}
+            <ArrowRight className="h-5 w-5" />
+          </span>
         </div>
       </a>
     );
@@ -711,18 +718,15 @@ export function ProgramCard<T extends BaseProgramItem>({
         {cardHeader}
       </a>
       {images.length > 0 && <MediaGallery images={images} title={item.title} />}
-      <div className="mt-auto p-6 pt-0">
-        <div className="border-t border-ods-border pt-4">
-          <Button
-            variant="outline"
-            size="small-legacy"
-            href={href}
-            openInNewTab={target === '_blank'}
-            rightIcon={<ExternalLink className="h-5 w-5" />}
-          >
-            View {config.labels.singular} Details
-          </Button>
-        </div>
+      <div className={DEFAULT_FOOTER}>
+        <Button
+          variant="outline"
+          href={href}
+          openInNewTab={target === '_blank'}
+          rightIcon={<ArrowRight className="h-5 w-5" />}
+        >
+          {actionLabel}
+        </Button>
       </div>
     </div>
   );
