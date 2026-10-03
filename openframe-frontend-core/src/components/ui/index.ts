@@ -4,6 +4,7 @@
 export * from './allowed-domains-input';
 export * from './announcement-bar-view';
 export * from './autocomplete';
+export * from './timezone-select';
 export * from './button';
 export * from './card';
 export * from './checkbox';
