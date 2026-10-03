@@ -19,6 +19,7 @@ export { BlogImagePlaceholder } from './blog-image-placeholder';
 export { EntityPortraitCard, type EntityPortraitCardProps, type EntityPortraitPerson } from './entity-portrait-card';
 export { useCoverImageFallback, hideOnError, type CoverImageFallback } from './use-cover-image-fallback';
 export { AdminContentCard } from './admin-content-card';
+export { CONTENT_CARD_FRAME_CLASS, ContentCardFrame, type ContentCardFrameProps } from './content-card-frame';
 export {
   AdminContentCardGrid,
   AdminContentCardSkeleton,

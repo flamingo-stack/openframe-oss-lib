@@ -66,3 +66,77 @@ export function PageHeading({
     </>
   );
 }
+
+const SECTION_HEADING_LAYOUT = {
+  page: {
+    stack: 'flex flex-col gap-[var(--spacing-system-lf)]',
+    heading: PAGE_HEADING_CLASS,
+    intro: 'max-w-[600px] text-h4 text-ods-text-primary',
+  },
+  section: {
+    stack: 'flex max-w-[640px] flex-col gap-[var(--spacing-system-sf)]',
+    heading: SECTION_HEADING_CLASS,
+    intro: 'text-h4 text-ods-text-secondary',
+  },
+} as const;
+
+export interface SectionHeadingProps {
+  /** The small label above the heading (Azeret Mono, uppercase, accent colour). */
+  eyebrow?: ReactNode;
+  /** The heading text; a node when part of it is highlighted. */
+  title: ReactNode;
+  /** The accent mark that closes the heading (`.`, `:`, `?`). `null` for none. Default `.`. */
+  punctuation?: string | null;
+  /** The supporting copy under the heading. */
+  intro?: ReactNode;
+  /** Something at the far end of the heading's row (a "See all" link). */
+  action?: ReactNode;
+  /** `page` = the page's `<h1>` (a hero); `section` = an `<h2>`. Default `section`. */
+  level?: 'page' | 'section';
+  /**
+   * The accent colour of the eyebrow and the punctuation. Defaults to the
+   * platform's accent; a section that shows ANOTHER product's brand passes it.
+   */
+  accentClassName?: string;
+  /** Extra classes on the outer row. */
+  className?: string;
+}
+
+/**
+ * THE heading block of a page section or hero: an eyebrow, the heading with its
+ * accent punctuation, an intro, and an optional action at the end of the row.
+ * Every section on every site composes this, so a change to the layout lands
+ * everywhere at once.
+ */
+export function SectionHeading({
+  eyebrow,
+  title,
+  punctuation = '.',
+  intro,
+  action,
+  level = 'section',
+  accentClassName = 'text-ods-accent',
+  className,
+}: SectionHeadingProps) {
+  const layout = SECTION_HEADING_LAYOUT[level];
+  const Tag = level === 'page' ? 'h1' : 'h2';
+  const stack = (
+    <div className={layout.stack}>
+      {eyebrow ? <span className={`text-h5 ${accentClassName}`}>{eyebrow}</span> : null}
+      <Tag className={layout.heading}>
+        {title}
+        {punctuation ? <span className={accentClassName}>{punctuation}</span> : null}
+      </Tag>
+      {intro ? <div className={layout.intro}>{intro}</div> : null}
+    </div>
+  );
+  if (!action) return className ? <div className={className}>{stack}</div> : stack;
+  return (
+    <div
+      className={`flex flex-wrap items-end justify-between gap-[var(--spacing-system-mf)]${className ? ` ${className}` : ''}`}
+    >
+      {stack}
+      {action}
+    </div>
+  );
+}

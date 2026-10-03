@@ -12,6 +12,11 @@ export interface FeatureCardItem {
   eyebrow?: string;
   /** One accent line under the title (a tagline). */
   subtitle?: string;
+  /**
+   * A picture beside the title block (a logo, an avatar). The item then reads
+   * as a row: media on the left, eyebrow, title, subtitle and content beside it.
+   */
+  media?: React.ReactNode;
   badge?: {
     text: string;
     variant?: 'card' | 'button';
@@ -26,7 +31,8 @@ export interface FeatureCardItem {
 
 export interface FeatureCardGridProps {
   items: FeatureCardItem[];
-  columns?: 2 | 3;
+  /** Items per row from the widest breakpoint (4 shows two per row at `md`). */
+  columns?: 2 | 3 | 4;
   className?: string;
   cardClassName?: string;
   itemClassName?: string;
@@ -43,6 +49,32 @@ export interface FeatureCardGridProps {
   titleClassName?: string;
   /** Added to every item's subtitle (and its placeholder). */
   subtitleClassName?: string;
+  /** The subtitle's colour. Defaults to the platform accent. */
+  accentClassName?: string;
+}
+
+const GRID_COLUMNS = {
+  2: 'grid-cols-1 md:grid-cols-2',
+  3: 'grid-cols-1 md:grid-cols-3',
+  4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
+} as const;
+
+/**
+ * The hairlines of a four-column row, which is two per row at `md`: a right
+ * line between neighbours at each width, a bottom line under every row but the
+ * last at each width. Spelled out, never assembled: Tailwind only emits a class
+ * it can read in the source.
+ */
+function fourColumnBorders(index: number, count: number): string {
+  const classes = ['border-ods-border'];
+  if (index < count - 1) classes.push('border-b');
+  const mdRows = Math.ceil(count / 2);
+  const lgRows = Math.ceil(count / 4);
+  classes.push(index % 2 === 0 && index < count - 1 ? 'md:border-r' : 'md:border-r-0');
+  classes.push(Math.floor(index / 2) < mdRows - 1 ? 'md:border-b' : 'md:border-b-0');
+  classes.push(index % 4 !== 3 && index < count - 1 ? 'lg:border-r' : 'lg:border-r-0');
+  classes.push(Math.floor(index / 4) < lgRows - 1 ? 'lg:border-b' : 'lg:border-b-0');
+  return ` ${classes.join(' ')}`;
 }
 
 /** A text row's placeholder: a bar exactly one line of its element's own typography tall. */
@@ -64,13 +96,15 @@ export function FeatureCardGrid({
   loading = false,
   titleClassName = '',
   subtitleClassName = '',
+  accentClassName = 'text-ods-accent',
 }: FeatureCardGridProps) {
-  const gridCols = columns === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3';
+  const gridCols = GRID_COLUMNS[columns];
   const itemsPerRow = columns;
   const rows = Math.ceil(items.length / itemsPerRow);
 
   const getBorderClasses = (isLastRow: boolean, isLastInRow: boolean, globalIndex: number) => {
     if (!showBorders) return '';
+    if (columns === 4) return fourColumnBorders(globalIndex, items.length);
 
     let classes = '';
 
@@ -177,31 +211,47 @@ export function FeatureCardGrid({
                       </div>
                     )}
 
-                    {item.eyebrow || item.subtitle ? (
+                    {item.media ? (
+                      <div className="flex gap-[var(--spacing-system-lf)]">
+                        <div className="shrink-0">{item.media}</div>
+                        <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xsf)]">
+                          {item.eyebrow && (
+                            <span className="text-ods-text-secondary text-h5">
+                              {loading ? <LineBar width="w-6" /> : item.eyebrow}
+                            </span>
+                          )}
+                          <h3 className={`text-ods-text-primary text-h2 ${titleClassName}`}>
+                            {loading ? <LineBar width="w-1/2" /> : item.title}
+                          </h3>
+                          {item.subtitle && (
+                            <p className={`text-h4 ${accentClassName} ${subtitleClassName}`}>
+                              {loading ? <LineBar width="w-3/4" /> : item.subtitle}
+                            </p>
+                          )}
+                          {item.content}
+                        </div>
+                      </div>
+                    ) : item.eyebrow || item.subtitle ? (
                       <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
                         {item.eyebrow && (
                           <span className="text-ods-text-secondary text-h5">
                             {loading ? <LineBar width="w-6" /> : item.eyebrow}
                           </span>
                         )}
-                        <h3
-                          className={`whitespace-pre-line tracking-[-0.64px] text-ods-text-primary text-h2 ${titleClassName}`}
-                        >
+                        <h3 className={`whitespace-pre-line text-ods-text-primary text-h2 ${titleClassName}`}>
                           {loading ? <LineBar width="w-1/2" /> : item.title}
                         </h3>
                         {item.subtitle && (
-                          <p className={`text-ods-flamingo-pink text-h4 ${subtitleClassName}`}>
+                          <p className={`text-h4 ${accentClassName} ${subtitleClassName}`}>
                             {loading ? <LineBar width="w-3/4" /> : item.subtitle}
                           </p>
                         )}
                       </div>
                     ) : (
-                      <h3 className="whitespace-pre-line tracking-[-0.64px] text-ods-text-primary text-h2">
-                        {item.title}
-                      </h3>
+                      <h3 className="whitespace-pre-line text-ods-text-primary text-h2">{item.title}</h3>
                     )}
 
-                    {item.content}
+                    {!item.media && item.content}
                   </div>
                 </div>
               );

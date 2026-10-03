@@ -59,6 +59,7 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
@@ -68,7 +69,7 @@ type CardSize = 'default' | 'sm' | 'portrait' | 'feature' | 'row';
 // The editorial pair's boxes, read by the card AND its skeleton (`ProgramCardSkeleton`
 // size `feature` / `row`), so the two cannot drift. Every text row keeps its space
 // (`min-h-[Nlh]` in its own typography), so a card is one height whatever its copy.
-const EDITORIAL_FRAME = 'overflow-hidden rounded-lg border border-ods-border bg-transparent';
+const EDITORIAL_FRAME = CONTENT_CARD_SKELETON_FRAME_CLASS;
 const EDITORIAL_ROW_GRID =
   'grid grid-cols-[88px_minmax(0,1fr)] items-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)] sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-[var(--spacing-system-l)]';
 const EDITORIAL_ROW_THUMB = 'relative block aspect-square w-full overflow-hidden rounded-md';
@@ -157,26 +158,23 @@ export function ProgramCardSkeleton({
     );
   }
   return (
-    <div
-      className="flex animate-pulse flex-col overflow-hidden rounded-lg border border-ods-border"
-      style={{ backgroundColor: 'var(--ods-system-greys-black)' }}
-    >
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex animate-pulse flex-col')}>
       <div className="flex-1 p-6">
         <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className={`${DEFAULT_COVER_FRAME} bg-ods-bg`} />
+          <div className={`${DEFAULT_COVER_FRAME} bg-ods-border`} />
           <div className="flex min-w-0 flex-1 flex-col">
             <div className={DEFAULT_TITLE}>
-              <span className="block h-[1lh] w-3/4 rounded bg-ods-bg" />
+              <span className="block h-[1lh] w-3/4 rounded bg-ods-border" />
             </div>
             <div className={DEFAULT_META_ROW}>
-              <span className="block h-[1lh] w-32 rounded bg-ods-bg/60" />
-              <span className="block h-[1lh] w-40 rounded bg-ods-bg/60" />
+              <span className="block h-[1lh] w-32 rounded bg-ods-border" />
+              <span className="block h-[1lh] w-40 rounded bg-ods-border" />
             </div>
             <div className="flex-1">
               <div className={`${DEFAULT_DESCRIPTION} flex flex-col gap-1`}>
-                <span className="block h-3 w-full rounded bg-ods-bg/60" />
-                <span className="block h-3 w-5/6 rounded bg-ods-bg/60" />
-                <span className="block h-3 w-4/5 rounded bg-ods-bg/60" />
+                <span className="block h-3 w-full rounded bg-ods-border" />
+                <span className="block h-3 w-5/6 rounded bg-ods-border" />
+                <span className="block h-3 w-4/5 rounded bg-ods-border" />
               </div>
             </div>
           </div>
@@ -188,7 +186,7 @@ export function ProgramCardSkeleton({
           <div className="mb-4">
             <div className="flex gap-3 pb-2">
               {Array.from({ length: media }, (_, i) => (
-                <div key={i} className="h-24 w-24 flex-shrink-0 rounded-md bg-ods-bg" />
+                <div key={i} className="h-24 w-24 flex-shrink-0 rounded-md bg-ods-border" />
               ))}
             </div>
           </div>
@@ -196,7 +194,7 @@ export function ProgramCardSkeleton({
       )}
       <div className="mt-auto p-6 pt-0">
         <div className="border-t border-ods-border pt-4">
-          <div className="h-10 w-40 rounded bg-ods-bg" />
+          <div className="h-10 w-40 rounded bg-ods-border" />
         </div>
       </div>
     </div>
@@ -347,7 +345,7 @@ function ProgramEditorialCard({
   // The cover is shown WHOLE on its own edge colour: the fill AdminContentCard
   // and the portrait card use, so square artwork is never cropped or boxed.
   const edgeColor = useImageEdgeColor(feature ? cover : null, 'transparent');
-  const frame = cn(EDITORIAL_FRAME, 'group no-underline transition-colors duration-200 hover:border-ods-accent');
+  const frame = cn(CONTENT_CARD_FRAME_CLASS, 'no-underline');
   const meta = (
     <div className={EDITORIAL_META_ROW}>
       {date && <span className="text-ods-flamingo-pink">{date}</span>}
@@ -679,11 +677,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     </div>
   );
 
-  const cardFrameClass = cn(
-    'group flex flex-col overflow-hidden rounded-lg border border-ods-border transition-all duration-200',
-    className,
-  );
-  const cardFrameStyle = { backgroundColor: 'var(--ods-system-greys-black)' } as const;
+  const cardFrameClass = cn(CONTENT_CARD_FRAME_CLASS, 'flex flex-col', className);
 
   if (wholeCardClickable) {
     return (
@@ -691,8 +685,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         href={href}
         target={target}
         rel={rel}
-        className={cn(cardFrameClass, 'no-underline hover:border-ods-accent/50')}
-        style={cardFrameStyle}
+        className={cn(cardFrameClass, 'no-underline')}
         aria-label={`Open ${item.title}`}
       >
         {cardHeader}
@@ -713,7 +706,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   }
 
   return (
-    <div className={cardFrameClass} style={cardFrameStyle}>
+    <div className={cardFrameClass}>
       <a href={href} target={target} rel={rel} className="block" aria-label={`Open ${item.title}`}>
         {cardHeader}
       </a>

@@ -50,6 +50,15 @@ export interface FadePreviewProps {
   labels?: { more: string; less: string };
   /** Classes for the toggle button (e.g. its spacing inside a bordered box). */
   toggleClassName?: string;
+  /**
+   * Collapse to the first N ITEMS of a list instead of a length: the single child
+   * is the list, its children are the items, and the collapsed height is
+   * MEASURED to the bottom of item N (at every width). Implies `fixedHeight`, so
+   * the block keeps that height loading or loaded, and "Show N more" counts the
+   * items past N unless `hiddenCount` says otherwise. Until the list holds N
+   * items, `collapsedHeight` (or the height last measured) is kept.
+   */
+  visibleItems?: number;
   children: React.ReactNode;
 }
 
@@ -57,13 +66,23 @@ const cssLength = (value: number | string) => (typeof value === 'number' ? `${va
 
 export function FadePreview({
   hiddenCount = 0,
-  collapsedHeight = 120,
+  collapsedHeight: collapsedHeightProp,
   resetKey,
   fixedHeight = false,
   labels,
   toggleClassName,
+  visibleItems,
   children,
 }: FadePreviewProps) {
+  const itemMode = visibleItems != null && visibleItems > 0;
+  const fixed = fixedHeight || itemMode;
+  // The height of the first `visibleItems` items, measured (item mode only).
+  const [itemsHeight, setItemsHeight] = useState<number | null>(null);
+  const [itemCount, setItemCount] = useState(0);
+  // Item mode holds its natural height until the first measure (no clamp a
+  // server render could show and hydration then shrink); otherwise 120px.
+  const collapsedHeight = collapsedHeightProp ?? (itemMode ? 'auto' : 120);
+  const collapsed = itemMode && itemsHeight != null ? itemsHeight : collapsedHeight;
   const [expanded, setExpanded] = useState(false);
   // Overflow is a MEASUREMENT (text wraps to the live width), so it is unknown
   // until the first layout pass. Nothing about the block's HEIGHT depends on it:
@@ -96,14 +115,24 @@ export function FadePreview({
   useIsomorphicLayoutEffect(() => {
     const el = contentRef.current;
     if (!el) return;
-    if (!fixedHeight) {
+    if (!fixed) {
       el.style.maxHeight = expanded ? `${el.scrollHeight}px` : cssLength(collapsedHeight);
       return;
     }
     // Fixed mode sets `height`, not `max-height`, so short content keeps the
     // collapsed height too. Overflow is read while collapsed (content taller
     // than the box), which is the only state the fade and the toggle depend on.
-    el.style.height = expanded ? `${el.scrollHeight}px` : cssLength(collapsedHeight);
+    if (itemMode) {
+      const items = el.firstElementChild?.children;
+      const count = items?.length ?? 0;
+      if (count !== itemCount) setItemCount(count);
+      const last = count >= (visibleItems as number) ? items?.[(visibleItems as number) - 1] : undefined;
+      if (last) {
+        const next = Math.round(last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop);
+        if (next !== itemsHeight) setItemsHeight(next);
+      }
+    }
+    el.style.height = expanded ? `${el.scrollHeight}px` : cssLength(collapsed);
     if (!expanded) {
       const next = el.scrollHeight > el.clientHeight + 1;
       if (next !== overflows) setOverflows(next);
@@ -113,24 +142,31 @@ export function FadePreview({
   // A width change re-wraps text without a React commit; re-measure then too.
   useEffect(() => {
     const el = contentRef.current;
-    if (!fixedHeight || !el || typeof ResizeObserver === 'undefined') return undefined;
+    if (!fixed || !el || typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(() => {
       if (expanded) return;
       setOverflows(el.scrollHeight > el.clientHeight + 1);
+      // Item mode: the items re-wrap at a new width, so their height is re-read.
+      const items = itemMode ? el.firstElementChild?.children : undefined;
+      const last = items && items.length >= (visibleItems as number) ? items[(visibleItems as number) - 1] : undefined;
+      if (last)
+        setItemsHeight(Math.round(last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop));
     });
     observer.observe(el);
+    if (itemMode && el.firstElementChild) observer.observe(el.firstElementChild);
     return () => observer.disconnect();
-  }, [fixedHeight, expanded]);
+  }, [fixed, itemMode, visibleItems, expanded]);
 
-  const needsFade = fixedHeight ? overflows : hiddenCount > 0;
+  const needsFade = fixed ? overflows : hiddenCount > 0;
+  const hidden = itemMode && hiddenCount <= 0 ? Math.max(0, itemCount - (visibleItems as number)) : hiddenCount;
 
   // No disclosure needed → no clamp wrapper at all. (Keeping the wrapper
   // with a `scrollHeight ?? 2000` max-height would clip tall content on
   // the first render, before the ref measures.)
-  if (!fixedHeight && !needsFade) return <>{children}</>;
+  if (!fixed && !needsFade) return <>{children}</>;
 
   const showToggle = needsFade || expanded;
-  const moreLabel = labels?.more ?? `Show ${hiddenCount} more`;
+  const moreLabel = labels?.more ?? `Show ${hidden} more`;
   const lessLabel = labels?.less ?? 'Show less';
 
   return (
@@ -144,7 +180,7 @@ export function FadePreview({
           // server-rendered block is already clamped and hydration never shrinks
           // it. The expanded value is a live DOM measurement, so the layout
           // effect above owns it (and `maxHeight` in the counted mode).
-          ...(fixedHeight && !expanded ? { height: cssLength(collapsedHeight) } : {}),
+          ...(fixed && !expanded ? { height: cssLength(collapsed) } : {}),
           ...(!expanded && needsFade
             ? {
                 maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',

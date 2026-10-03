@@ -37,6 +37,7 @@ import {
   COMPACT_CARD_ROW_FILLER,
 } from '../utils/compact-card-classes';
 import { BlogImagePlaceholder } from './blog-image-placeholder';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { EntityAuthorCard } from './entity-author-card';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
@@ -93,7 +94,7 @@ const HORIZONTAL_SIZE_TOKENS = {
 export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'catalog' | 'default' | 'sm' }) {
   if (size === 'catalog') {
     return (
-      <div className="flex animate-pulse flex-col gap-4 overflow-hidden rounded-lg border border-ods-border bg-ods-card p-6">
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex animate-pulse flex-col gap-4 p-6')}>
         <div className="flex flex-col gap-4 md:flex-row md:gap-6">
           <div className="aspect-[1200/630] w-full flex-shrink-0 rounded-lg bg-ods-border md:w-[256px]" />
           <div className="flex min-w-0 flex-1 flex-col">
@@ -224,14 +225,7 @@ export function OnboardingGuideCard({
         target={target}
         rel={rel}
         prefetch={false}
-        className={cn(
-          'group block bg-ods-card no-underline',
-          'overflow-hidden rounded-lg border border-ods-border',
-          'transition-all duration-300 ease-out',
-          'transform hover:translate-y-[-2px]',
-          'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',
-          className,
-        )}
+        className={cn(CONTENT_CARD_FRAME_CLASS, 'block no-underline', className)}
         aria-label={`Open ${guide.title}`}
       >
         <div className="flex flex-col gap-4 p-6">

@@ -29,6 +29,7 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { hideOnError } from './use-cover-image-fallback';
 import { useEntityCardLink } from './use-entity-card-link';
@@ -73,18 +74,18 @@ export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' |
     );
   }
   return (
-    <div className="flex animate-pulse flex-col gap-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card p-6">
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex animate-pulse flex-col gap-6 p-6')}>
       {/* Skeleton aspect matches the real card's image slot (OG 1200×630) */}
-      <div className="aspect-[1200/630] w-full rounded-sm bg-ods-bg" />
+      <div className="aspect-[1200/630] w-full rounded-sm bg-ods-border" />
       <div className="flex h-[72px] flex-col gap-2">
-        <div className="h-5 w-3/4 rounded bg-ods-bg" />
-        <div className="h-5 w-1/2 rounded bg-ods-bg" />
+        <div className="h-5 w-3/4 rounded bg-ods-border" />
+        <div className="h-5 w-1/2 rounded bg-ods-border" />
       </div>
       <div className="flex h-[60px] items-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-ods-bg" />
+        <div className="h-12 w-12 rounded-full bg-ods-border" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 w-2/3 rounded bg-ods-bg" />
-          <div className="h-3 w-1/2 rounded bg-ods-bg/60" />
+          <div className="h-4 w-2/3 rounded bg-ods-border" />
+          <div className="h-3 w-1/2 rounded bg-ods-border" />
         </div>
       </div>
     </div>
@@ -173,7 +174,7 @@ export function CaseStudyCard({
 
   return (
     <a href={href} target={target} rel={rel} className={cn('block h-full', className)}>
-      <Card className="flex flex-col gap-6 overflow-hidden border border-ods-border bg-ods-card p-6 transition-colors hover:border-ods-accent">
+      <Card className={cn(CONTENT_CARD_FRAME_CLASS, 'flex flex-col gap-6 p-6')}>
         {/* Fixed aspect ratio matches the standard OG card source aspect
             (1200×630 = 1.91:1), so the image fits with near-zero CSS-side
             cropping. Subject anchoring is then a function of the source

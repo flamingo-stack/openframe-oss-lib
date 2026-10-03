@@ -6,6 +6,7 @@ import Image from '../../../embed-shims/next-image';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
 import { PlatformBadge } from '../../features/platform-badge';
+import { CONTENT_CARD_FRAME_CLASS } from './content-card-frame';
 
 interface PlatformInfo {
   platform_id?: string;
@@ -78,21 +79,7 @@ export function AdminContentCard({
   const imageBgColor = useImageEdgeColor(displayUrl || null, 'transparent');
 
   return (
-    <article
-      className={cn(
-        // `isolate`: the cover scales on hover, and without its own stacking
-        // context the rounded clip is dropped for the length of that transition
-        // (the top corners turn square). The surface is the page's own: a card
-        // is its border, never a second background.
-        'group isolate h-full overflow-hidden rounded-2xl',
-        'border border-ods-border bg-transparent',
-        'flex flex-col',
-        'transition-[border-color,box-shadow] duration-300 ease-out',
-        'hover:shadow-lg hover:shadow-ods-accent/[0.08]',
-        'hover:border-ods-accent',
-        className,
-      )}
-    >
+    <article className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col', className)}>
       {/* Cover Image — 3:2 aspect ratio, centered with edge-color fill */}
       <div className="relative aspect-[3/2] w-full shrink-0 overflow-hidden" style={{ backgroundColor: imageBgColor }}>
         {displayUrl ? (
