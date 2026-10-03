@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 # Publishes the packed package (PACKAGE_TARBALL, from pack-package.sh) to
-# pkg.pr.new: THE registry of this package. Releases, main-push snapshots and
-# pull request builds all live there and nowhere else.
+# pkg.pr.new: the registry OUR OWN apps install this library from.
 #
-# Why not npmjs. Since 2026-07 npm scans every upload before it serves it; for
-# this package that was minutes at best and two hours at worst, with no way to
-# opt out, and a release pinned by a consumer was not installable in between. A
+# Why. Since 2026-07 npm scans every upload before it serves it; for this package
+# that is minutes at best and two hours at worst, with no way to opt out. A
 # pkg.pr.new build is installable the moment this step ends, needs no token, and
 # is addressed by the commit it was built from:
 #
 #   https://pkg.pr.new/<owner>/<repo>/<package>@<commit sha>
 #
-# A consumer pins that URL in its package.json (the run summary prints the line).
+# A consumer pins that URL in its package.json. npmjs still gets every version
+# too (npm-publish.sh), for everyone else.
 #
 # How, by pkg.pr.new's own guidance:
 #  - the CLI is a pinned devDependency run with `npm exec`, never `npx` (a release

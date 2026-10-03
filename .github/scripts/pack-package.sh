@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Packs the BUILT package in the current directory and records the tarball as
-# PACKAGE_TARBALL, the file preview-publish.sh uploads.
+# Packs the BUILT package in the current directory ONCE, and records the tarball
+# as PACKAGE_TARBALL. Every registry is then given that same file
+# (preview-publish.sh, npm-publish.sh), so what our apps install and what npmjs
+# mirrors are the same bytes.
 #
 # `--ignore-scripts`: the Build step already ran. Without it `prepack` builds the
-# whole package a second time.
+# whole package again for every registry it is packed for.
 set -euo pipefail
 
 FILE=$(npm pack --ignore-scripts --json | jq -r '.[0].filename')
