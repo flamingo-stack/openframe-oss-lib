@@ -26,6 +26,11 @@ export interface ToolBadgeProps {
    * badges on a card.
    */
   variant?: 'inline' | 'chip';
+  /**
+   * Where the tool is described (its page in a directory). The badge becomes a
+   * link that opens it in a new tab; without it the badge is plain text.
+   */
+  href?: string | null;
   /** Additional CSS classes */
   className?: string;
   iconClassName?: string;
@@ -41,17 +46,29 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
   label,
   icon,
   variant = 'inline',
+  href,
   className,
   iconClassName,
 }) => {
   const text = label ?? (toolType ? getToolLabel(toolType) : '');
   const mark = icon ?? (toolType ? <ToolIcon toolType={toolType} className={iconClassName} size={16} /> : null);
 
+  // One rule for both variants: with an `href` the badge is a link.
+  const linked = (node: React.ReactElement, linkClassName: string) =>
+    href ? (
+      <a href={href} target="_blank" rel="noopener noreferrer" title={text || undefined} className={linkClassName}>
+        {node}
+      </a>
+    ) : (
+      node
+    );
+
   if (variant === 'chip') {
-    return (
+    return linked(
       <span
         className={cn(
           'inline-flex h-7 items-center gap-1.5 rounded-md border border-ods-border px-2 text-ods-text-secondary text-h6',
+          href && 'transition-colors hover:border-ods-border-hover hover:text-ods-text-primary',
           className,
         )}
       >
@@ -61,16 +78,16 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
           </span>
         )}
         {text && <span className="whitespace-nowrap">{text}</span>}
-      </span>
+      </span>,
+      'inline-flex rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
     );
   }
 
-  return (
+  return linked(
     <div className={cn('flex items-center gap-1 text-ods-text-secondary', className)}>
       {mark}
       <span className="text-ods-text-primary text-h4">{text}</span>
-    </div>
+    </div>,
+    'inline-flex rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
   );
 };
-
-ToolBadge.displayName = 'ToolBadge';
