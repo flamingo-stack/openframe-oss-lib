@@ -228,6 +228,14 @@ export * from './filter-pill-row';
 
 // Viewport-gated mounting for heavy previews (players, large images)
 export { LazyMount, type LazyMountProps } from './lazy-mount';
+
+// Product-demo stage primitives (marketing pages): window + phone chrome, the
+// incident feed, the swipe carousel and the sticky call-to-action bar.
+export * from './app-window-frame';
+export * from './phone-frame';
+export * from './incident-feed';
+export * from './snap-carousel';
+export * from './sticky-action-bar';
 export { RequiredMark } from './required-mark';
 export { IconTile } from './icon-tile';
 export { PolicyLink } from './policy-link';

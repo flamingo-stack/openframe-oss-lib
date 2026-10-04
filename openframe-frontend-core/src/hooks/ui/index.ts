@@ -27,3 +27,5 @@ export * from './use-window-size';
 // hub/app consumers have one import path; lib internals may import the
 // package directly (npm dedupes to one module instance either way).
 export { usePreventScroll } from '@react-aria/overlays';
+export * from './use-prefers-reduced-motion';
+export * from './use-in-view';

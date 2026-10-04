@@ -23,6 +23,11 @@ export interface FeatureCardItem {
     colorScheme?: 'cyan' | 'pink' | 'yellow' | 'green' | 'purple' | 'default';
   };
   content: React.ReactNode; // Allow any content to be injected
+  /**
+   * Pinned to the bottom of the cell, under the content (a row of badges, a
+   * link). Cells in one row end on the same line however long their copy is.
+   */
+  footer?: React.ReactNode;
   // Card-level customization props
   removeAllBorders?: boolean; // Remove all borders for this card
   noBackground?: boolean; // Remove default background
@@ -187,7 +192,15 @@ export function FeatureCardGrid({
                   className={`${finalItemClassName}${finalBorderClasses} relative`}
                   style={item.customBackground ? { backgroundColor: item.customBackground } : undefined}
                 >
-                  <div className={!item.icon && !item.title ? 'flex h-full flex-col' : 'space-y-6'}>
+                  <div
+                    className={
+                      !item.icon && !item.title
+                        ? 'flex h-full flex-col'
+                        : item.footer
+                          ? 'flex h-full flex-col gap-6'
+                          : 'space-y-6'
+                    }
+                  >
                     {item.icon && (
                       <div className="flex items-start justify-between">
                         <item.icon size={80} color={item.iconColor} />
@@ -252,6 +265,8 @@ export function FeatureCardGrid({
                     )}
 
                     {!item.media && item.content}
+
+                    {item.footer && <div className="mt-auto">{item.footer}</div>}
                   </div>
                 </div>
               );

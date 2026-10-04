@@ -20,6 +20,9 @@ export * from './nats/use-nats-client';
 // Viewport / lazy-mount primitive (shared IO singleton)
 export * from './use-near-viewport';
 
+// The clock of a looping scripted demo (scenarios x steps, hold, pause, jump)
+export * from './use-scenario-player';
+
 // Access code integration — pairs with the standalone helpers in
 // `utils/access-code-client`. Lives in `hooks/` so the createContext
 // pulled in via EndpointsRuntimeContext doesn't end up in the

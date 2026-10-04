@@ -95,3 +95,6 @@ export * from './remote-session';
 export * from './board';
 export * from './sortable-list';
 export * from './ticket-status-config-list';
+
+// A request and its outcome as two turns and a "your part" footer
+export * from './conversation-card';

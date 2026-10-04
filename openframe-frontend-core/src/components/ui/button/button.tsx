@@ -30,6 +30,7 @@ const buttonVariants = cva(
         transparent: buttonSurfaceClasses.transparent,
         destructive: buttonSurfaceClasses.destructive,
         warning: buttonSurfaceClasses.warning,
+        inverted: buttonSurfaceClasses.inverted,
         glyph: buttonSurfaceClasses.glyph,
         overlay: buttonSurfaceClasses.overlay,
         link: buttonSurfaceClasses.link,
