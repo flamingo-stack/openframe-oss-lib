@@ -4,7 +4,6 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
-import com.openframe.authz.config.tenant.TenantForwardedPrefixFilter;
 import com.openframe.authz.keys.TenantKeyService;
 import com.openframe.authz.security.ProviderAwareAuthenticationEntryPoint;
 import com.openframe.authz.security.grant.AppleNativeGrantAuthenticationConverter;
@@ -22,10 +21,8 @@ import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -59,7 +56,6 @@ import org.springframework.security.oauth2.server.authorization.token.JwtEncodin
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
-import org.springframework.web.filter.ForwardedHeaderFilter;
 
 import java.util.Locale;
 
@@ -128,20 +124,6 @@ public class AuthorizationServerConfig {
                         new MediaTypeRequestMatcher(MediaType.TEXT_HTML)))
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))
                 .build();
-    }
-
-    @Bean
-    public FilterRegistrationBean<ForwardedHeaderFilter> forwardedHeaderFilter() {
-        var reg = new FilterRegistrationBean<>(new ForwardedHeaderFilter());
-        reg.setOrder(Ordered.HIGHEST_PRECEDENCE + 20);
-        return reg;
-    }
-
-    @Bean
-    public FilterRegistrationBean<TenantForwardedPrefixFilter> tenantForwardedPrefixFilter() {
-        var reg = new FilterRegistrationBean<>(new TenantForwardedPrefixFilter());
-        reg.setOrder(Ordered.HIGHEST_PRECEDENCE + 15);
-        return reg;
     }
 
     @Bean
