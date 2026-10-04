@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Publishes the packed package (PACKAGE_TARBALL, from pack-package.sh) to
-# pkg.pr.new: the registry OUR OWN apps install this library from.
+# pkg.pr.new: THE registry of this package. Releases, main-push snapshots and
+# pull request builds all live there and nowhere else.
 #
 # Why. Since 2026-07 npm scans every upload before it serves it; for this package
 # that is minutes at best and two hours at worst, with no way to opt out. A
@@ -14,8 +15,8 @@
 #   https://pkg.pr.new/<owner>/<repo>/<package>@<x.y.z>
 #
 # (pkg.pr.new names a build after the git ref of the run that published it; the
-# release workflow runs once more on the version tag for that.) npmjs still gets
-# every version too (npm-publish.sh), for everyone else.
+# release workflow runs once more on the version tag for that.) Nothing is
+# published to npmjs: the versions already there stay, no new one is added.
 #
 # How, by pkg.pr.new's own guidance:
 #  - the CLI is a pinned devDependency run with `npm exec`, never `npx` (a release

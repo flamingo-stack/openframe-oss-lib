@@ -23,7 +23,7 @@ on:
         type: string
         default: ''
       snapshot:
-        description: 'Publish a SNAPSHOT from the selected ref instead of a release (does not move the latest tag). Use this to test an unmerged branch live.'
+        description: 'Publish a SNAPSHOT from the selected ref instead of a release (no version tag). Use this to test an unmerged branch live.'
         required: false
         type: boolean
         default: false
@@ -194,12 +194,9 @@ jobs:
       - name: Get Previous Version
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # The release history is this repository's version tags (.github/scripts/latest-release.sh).
         run: |
-          PKG_NAME=$(jq -r '.name' package.json)
-          OLD_VERSION=$(npm view "$PKG_NAME" dist-tags.latest 2>/dev/null || echo "0.0.0")
-          OLD_VERSION=${OLD_VERSION:-0.0.0}
+          OLD_VERSION=$(bash "$GITHUB_WORKSPACE/.github/scripts/latest-release.sh")
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
 
@@ -252,16 +249,15 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
-      # ONE tarball for every registry (.github/scripts/pack-package.sh).
+      # The tarball that is published, packed from the build above (.github/scripts/pack-package.sh).
       - name: Pack ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         shell: bash
         run: bash "$GITHUB_WORKSPACE/.github/scripts/pack-package.sh"
 
-      # Where OUR apps install the library from: installable when this step ends,
-      # addressed by commit (.github/scripts/preview-publish.sh tells why). It runs
-      # BEFORE the npm upload, so nothing of ours depends on npmjs.
+      # THE registry of this package: pkg.pr.new (.github/scripts/preview-publish.sh
+      # tells why). Installable when this step ends. Nothing is published to npmjs.
       - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
@@ -269,27 +265,6 @@ jobs:
         env:
           # On the version tag's run: also check and print the version-named address.
           RELEASE_REF: ${{ inputs.release_tag }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
-
-      # npmjs keeps getting every version too (a release as `latest`, a snapshot as
-      # `snapshot`), for consumers that still install from it. The script uploads
-      # the same tarball, moves a release past a number npm already holds and does
-      # not wait for npm's scan.
-      - name: Publish ${{ env.NEW_VERSION }} to npmjs
-        if: steps.should_run.outputs.run == 'true' && inputs.release_tag == ''
-        working-directory: ${{ matrix.path }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "$PUBLISH_TAG" --access public
-        shell: bash
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PUBLISH_TAG: ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }}
-
-      # Only after a number skip: pkg.pr.new gets the tarball npm was given, so the
-      # two registries hold the same version of this commit.
-      - name: Preview registry (pkg.pr.new) again under ${{ env.NEW_VERSION }}
-        if: steps.should_run.outputs.run == 'true' && env.REPACKED == 'true'
-        working-directory: ${{ matrix.path }}
-        shell: bash
         run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
 
       # A RELEASE gets an address named after its version:
