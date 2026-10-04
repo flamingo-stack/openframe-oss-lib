@@ -7,7 +7,7 @@ import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import { ErrorMessageDisplay } from '../error-message-display';
 
 describe('chat appearance', () => {
-  it('an agent turn is a bubble with the agent mark beside it and no name', () => {
+  it('an assistant turn is plain text under the agent mark, with no written name', () => {
     render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" />);
     expect(screen.getByText('Hi')).toBeTruthy();
     expect(screen.getByRole('img', { name: 'Fae' })).toBeTruthy();
@@ -15,20 +15,26 @@ describe('chat appearance', () => {
     expect(screen.queryByText('Fae:')).toBeNull();
   });
 
-  it('v2 draws the same bubble, with no name', () => {
+  it('v2 draws the same, with no written name', () => {
     render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" appearance="v2" />);
     expect(screen.getByText('Hi')).toBeTruthy();
     expect(screen.queryByText('Fae')).toBeNull();
   });
 
-  it('a user turn is a bubble with no name, in a v2 thread too', () => {
+  it('a user turn is a bubble under their face, with no written name, in a v2 thread too', () => {
     render(
       <ChatAppearanceContext.Provider value="v2">
         <ChatMessageEnhanced role="user" name="John Smith" content="Hi" />
       </ChatAppearanceContext.Provider>,
     );
     expect(screen.getByText('Hi')).toBeTruthy();
+    expect(screen.getByTitle('John Smith')).toBeTruthy();
     expect(screen.queryByText('John Smith')).toBeNull();
+  });
+
+  it('a turn can hide its face', () => {
+    render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" showAvatar={false} />);
+    expect(screen.queryByRole('img')).toBeNull();
   });
 
   it('a technician in the thread keeps a name caption', () => {

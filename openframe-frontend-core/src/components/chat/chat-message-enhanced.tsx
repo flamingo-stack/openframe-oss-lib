@@ -515,58 +515,41 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       });
     };
 
-    const getAvatarProps = () => {
-      const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
-      const isMingo = assistantType === 'mingo';
-
-      return {
-        src: avatar || undefined,
-        alt: `${displayName} avatar`,
-        // Pass the FULL name — SquareAvatar derives first+last initials itself
-        // (passing pre-joined initials like "PS" would collapse to one letter,
-        // since getFirstLastInitials treats it as a single word).
-        fallback: displayName,
-        // v2 (fae chat v2): a 24px face that sits on the name's line height.
-        size: isV2 ? ('xs' as const) : ('sm' as const),
-        variant: 'round' as const,
-        // User avatar: compact 20×20 with 2px padding and a subtle gray fill
-        // (`bg-ods-card`) so the `border-ods-border` ring stays visible — the
-        // brand fill reads poorly for a user. Assistant/Fae keep their brand
-        // fill. Initials are smaller + muted gray for the user placeholder.
-        ...(isUser ? { initialsClassName: 'text-[9px] text-ods-text-secondary' } : {}),
-        className: cn(
-          'flex-shrink-0',
-          isUser ? 'h-5 w-5 bg-ods-card p-0.5' : isMingo ? 'bg-ods-flamingo-cyan' : 'bg-ods-flamingo-pink',
-        ),
-      };
-    };
-
-    const avatarProps = getAvatarProps();
-
     const isSystem = authorType === 'system';
 
-    // A named caption is kept only where the name is the information: a system
-    // line and a human technician in a shared ticket thread. Every other turn
-    // is a bubble with its author's face beside it, no name.
+    // A thread can hold several people (a user, a colleague, a technician, two
+    // agents), so every turn says who is speaking with a FACE. The face sits on
+    // its own short line above the message (on the right for the user), never
+    // beside it: a face in the row indents every line of the message by its
+    // width. The NAME is written only where it is the information itself: a
+    // system line and a human technician. Every face carries its name for
+    // assistive tech and on hover.
     const showName = isSystem || authorType === 'admin';
     const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
-    // One size in every appearance: a 20px badge clears the bubble's text.
-    const avatarBox = 'h-5 w-5';
-    // Who is speaking, drawn once per message on its first bubble's corner:
-    //   - a user: their picture, only when one arrived;
-    //   - an assistant: the host's icon, else its picture, else the agent's own
-    //     packaged mark (Fae's face, Mingo's glyph), never initials.
-    const avatarNode: ReactNode =
-      !showAvatar || isSystem || (isUser && !avatar) ? null : !isUser && !avatar && assistantIcon ? (
-        <div className={cn('flex flex-shrink-0 items-center justify-center', avatarBox)}>{assistantIcon}</div>
+    const faceBox = 'h-5 w-5 flex-shrink-0';
+    const face: ReactNode =
+      !showAvatar || isSystem ? null : !isUser && !avatar && assistantIcon ? (
+        <span title={displayName} className={cn('flex items-center justify-center', faceBox)}>
+          {assistantIcon}
+        </span>
       ) : !isUser && !avatar && assistantType ? (
-        <span role="img" aria-label={displayName} className={cn('inline-flex flex-shrink-0', avatarBox)}>
+        // An agent with no picture shows its packaged mark, never initials.
+        <span role="img" aria-label={displayName} title={displayName} className={cn('inline-flex', faceBox)}>
           <AgentMark agent={assistantType} className="h-full w-full rounded-full" />
         </span>
       ) : (
-        <SquareAvatar {...avatarProps} size="xs" sizePx={20} className="flex-shrink-0" />
+        <span title={displayName} className="inline-flex flex-shrink-0">
+          <SquareAvatar
+            src={avatar || undefined}
+            alt={displayName}
+            fallback={displayName}
+            variant="round"
+            size="xs"
+            sizePx={20}
+            initialsClassName="text-[9px] text-ods-text-secondary"
+          />
+        </span>
       );
-    const firstTextIndex = segments.findIndex(segment => segment.type === 'text');
 
     // v2 draws a system line (e.g. a technician joining) as an in-thread
     // receipt card rather than as an author row with no body.
@@ -608,11 +591,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             vs ~9ms as grid (Chrome: ~2ms either way). Same gap and stretch,
             no margin collapsing — visually identical. */}
           <div className="grid min-w-0 grid-cols-1 gap-[var(--spacing-system-xxs)]">
-            {showName && (
-              <div className="flex items-center gap-[var(--spacing-system-xs)]">
-                <span className="min-w-0 flex-1 truncate text-ods-open-yellow text-h6">{displayName}</span>
-                {timestamp && (
-                  <span className="shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
+            {(face || showName) && (
+              <div className={cn('flex items-center gap-[var(--spacing-system-xs)]', isUser && 'justify-end')}>
+                {face}
+                {showName && <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>}
+                {showName && timestamp && (
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
                     {formatMessageTimestamp(timestamp)}
                   </span>
                 )}
@@ -630,32 +614,29 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   // the engine does one authoritative whole-document parse.
                   const segmentIsStreaming = index === segments.length - 1 && !!isTyping;
                   if (segment.type === 'text') {
-                    // A bubble: the user's on the right, everyone else's on the
-                    // left, each as wide as the thread allows. The author's face
-                    // is a BADGE on the bubble's outer bottom corner, half over
-                    // the bubble's own padding and half in the thread's side
-                    // padding, so it never takes a column of its own: a face in
-                    // the row indents every line of every message by its width.
-                    const badged = index === firstTextIndex && avatarNode !== null;
-                    return (
-                      <div key={index} className={cn('flex min-w-0', isUser && 'justify-end', badged && 'mb-2.5')}>
-                        <div
-                          className={cn(
-                            'relative min-w-0 max-w-[92%] break-words rounded-xl px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h4',
-                            isError
-                              ? 'border border-ods-error text-ods-error'
-                              : isUser
-                                ? 'bg-ods-bg-active text-ods-text-primary'
-                                : 'border border-ods-border bg-ods-card text-ods-text-primary',
-                          )}
-                        >
-                          {renderSegmentBody(index, segment.text, segmentIsStreaming)}
-                          {badged && (
-                            <span className={cn('absolute -bottom-2.5', isUser ? '-right-2.5' : '-left-2.5')}>
-                              {avatarNode}
-                            </span>
-                          )}
+                    // The layout of Claude and ChatGPT: what the USER said is a
+                    // bubble on the right; what anyone else says is plain text
+                    // across the thread's full width, with no bubble. Nothing
+                    // takes a column, so every line gets the whole width (the
+                    // speaker's face is the short line above).
+                    if (isUser) {
+                      return (
+                        <div key={index} className="flex min-w-0 justify-end">
+                          <div className="min-w-0 max-w-[85%] break-words rounded-xl bg-ods-bg-active px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-ods-text-primary text-h4">
+                            {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                          </div>
                         </div>
+                      );
+                    }
+                    return (
+                      <div
+                        key={index}
+                        className={cn(
+                          'w-full min-w-0 break-words text-h4',
+                          isError ? 'text-ods-error' : 'text-ods-text-primary',
+                        )}
+                      >
+                        {renderSegmentBody(index, segment.text, segmentIsStreaming)}
                       </div>
                     );
                   } else if (segment.type === 'ask') {
