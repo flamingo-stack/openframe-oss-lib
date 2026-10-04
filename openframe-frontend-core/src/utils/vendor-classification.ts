@@ -6,9 +6,16 @@
  * mark and ONE word, everywhere: a tag on a card, a filter in the catalog.
  *
  *   - `openframe_selected`: a tool OpenFrame is built on, picked by the team.
+ *   - `openframe_shipped`: a tool or OpenFrame product that is in the released product today.
  *   - `openframe_connect`: a service OpenFrame connects to and manages.
  */
-export const VENDOR_CLASSIFICATIONS = ['open_source', 'commercial', 'openframe_selected', 'openframe_connect'] as const;
+export const VENDOR_CLASSIFICATIONS = [
+  'open_source',
+  'commercial',
+  'openframe_selected',
+  'openframe_shipped',
+  'openframe_connect',
+] as const;
 
 export type VendorClassificationValue = (typeof VENDOR_CLASSIFICATIONS)[number];
 
@@ -29,6 +36,11 @@ export const OPENFRAME_CLASSIFICATIONS: Record<OpenFrameClassification, OpenFram
     label: 'OpenFrame Selected',
     description:
       'OpenFrame is a unified platform that integrates multiple open-source IT and security tools into a single dashboard for MSPs. This filter shows vendors selected by our team for their excellence, community support, and MSP-specific value.',
+  },
+  openframe_shipped: {
+    word: 'Shipped',
+    label: 'OpenFrame Shipped',
+    description: 'Tools and OpenFrame products that are in the released OpenFrame product today, not on the roadmap.',
   },
   openframe_connect: {
     word: 'Connect',

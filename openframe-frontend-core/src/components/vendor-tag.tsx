@@ -24,6 +24,7 @@ export interface VendorTagProps {
     | 'manual'
     | 'openframe_selected'
     | 'openframe_connect'
+    | 'openframe_shipped'
     | 'placeholder'
     | 'api'
     | 'data'
@@ -228,6 +229,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
       }
       case 'openframe_selected':
       case 'openframe_connect':
+      case 'openframe_shipped':
         return openFrameTag(type, text);
       default:
         return {
