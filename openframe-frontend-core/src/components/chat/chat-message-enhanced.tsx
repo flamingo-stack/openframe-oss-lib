@@ -550,8 +550,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // is a bubble with its author's face beside it, no name.
     const showName = isSystem || authorType === 'admin';
     const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
-    const avatarBox = isV2 ? 'h-6 w-6' : 'h-8 w-8';
-    // Who is speaking, drawn once per message beside its first bubble:
+    // One size in every appearance: a 20px badge clears the bubble's text.
+    const avatarBox = 'h-5 w-5';
+    // Who is speaking, drawn once per message on its first bubble's corner:
     //   - a user: their picture, only when one arrived;
     //   - an assistant: the host's icon, else its picture, else the agent's own
     //     packaged mark (Fae's face, Mingo's glyph), never initials.
@@ -563,7 +564,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           <AgentMark agent={assistantType} className="h-full w-full rounded-full" />
         </span>
       ) : (
-        <SquareAvatar {...avatarProps} className="flex-shrink-0" />
+        <SquareAvatar {...avatarProps} size="xs" sizePx={20} className="flex-shrink-0" />
       );
     const firstTextIndex = segments.findIndex(segment => segment.type === 'text');
 
@@ -630,19 +631,17 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   const segmentIsStreaming = index === segments.length - 1 && !!isTyping;
                   if (segment.type === 'text') {
                     // A bubble: the user's on the right, everyone else's on the
-                    // left; the author's face sits beside the message's first one.
-                    const leads = index === firstTextIndex;
+                    // left, each as wide as the thread allows. The author's face
+                    // is a BADGE on the bubble's outer bottom corner, half over
+                    // the bubble's own padding and half in the thread's side
+                    // padding, so it never takes a column of its own: a face in
+                    // the row indents every line of every message by its width.
+                    const badged = index === firstTextIndex && avatarNode !== null;
                     return (
-                      <div
-                        key={index}
-                        className={cn('flex min-w-0 items-end gap-[var(--spacing-system-xs)]', isUser && 'justify-end')}
-                      >
-                        {!isUser &&
-                          avatarNode &&
-                          (leads ? avatarNode : <span className={cn('flex-shrink-0', avatarBox)} />)}
+                      <div key={index} className={cn('flex min-w-0', isUser && 'justify-end', badged && 'mb-2.5')}>
                         <div
                           className={cn(
-                            'min-w-0 max-w-[80%] break-words rounded-xl px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h4',
+                            'relative min-w-0 max-w-[92%] break-words rounded-xl px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h4',
                             isError
                               ? 'border border-ods-error text-ods-error'
                               : isUser
@@ -651,10 +650,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                           )}
                         >
                           {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                          {badged && (
+                            <span className={cn('absolute -bottom-2.5', isUser ? '-right-2.5' : '-left-2.5')}>
+                              {avatarNode}
+                            </span>
+                          )}
                         </div>
-                        {isUser &&
-                          avatarNode &&
-                          (leads ? avatarNode : <span className={cn('flex-shrink-0', avatarBox)} />)}
                       </div>
                     );
                   } else if (segment.type === 'ask') {
