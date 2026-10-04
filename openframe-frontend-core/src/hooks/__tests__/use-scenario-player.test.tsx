@@ -19,7 +19,10 @@ const OPTIONS = { scenarioCount: 2, lastStep: 8, stepMs: 1700, holdMs: 4200 };
 
 /** Each tick schedules the next one from an effect, so time moves one beat per act. */
 function beats(count: number) {
-  for (let i = 0; i < count; i++) act(() => vi.advanceTimersByTime(1700));
+  for (let i = 0; i < count; i++)
+    act(() => {
+      vi.advanceTimersByTime(1700);
+    });
 }
 
 describe('useScenarioPlayer', () => {
@@ -37,19 +40,27 @@ describe('useScenarioPlayer', () => {
     expect(result.current).toMatchObject({ scenario: 0, step: 0 });
 
     for (let beat = 1; beat <= 8; beat++) {
-      act(() => vi.advanceTimersByTime(1700));
+      act(() => {
+        vi.advanceTimersByTime(1700);
+      });
       expect(result.current).toMatchObject({ scenario: 0, step: beat });
     }
 
     // The last step holds: nothing changes just before the hold ends.
-    act(() => vi.advanceTimersByTime(4199));
+    act(() => {
+      vi.advanceTimersByTime(4199);
+    });
     expect(result.current).toMatchObject({ scenario: 0, step: 8 });
-    act(() => vi.advanceTimersByTime(1));
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
     expect(result.current).toMatchObject({ scenario: 1, step: 0 });
 
     // And the second scenario wraps back to the first.
     beats(8);
-    act(() => vi.advanceTimersByTime(4200));
+    act(() => {
+      vi.advanceTimersByTime(4200);
+    });
     expect(result.current).toMatchObject({ scenario: 0, step: 0 });
   });
 
@@ -59,21 +70,33 @@ describe('useScenarioPlayer', () => {
     beats(3);
     expect(result.current.step).toBe(3);
 
-    act(() => result.current.go(1));
+    act(() => {
+      result.current.go(1);
+    });
     expect(result.current).toMatchObject({ scenario: 1, step: 0 });
-    act(() => result.current.go(1));
-    act(() => vi.advanceTimersByTime(1700));
+    act(() => {
+      result.current.go(1);
+    });
+    act(() => {
+      vi.advanceTimersByTime(1700);
+    });
     expect(result.current).toMatchObject({ scenario: 1, step: 1 });
   });
 
   it('jumps to a step and keeps playing from there', () => {
     stubReducedMotion(false);
     const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
-    act(() => result.current.setStep(7));
+    act(() => {
+      result.current.setStep(7);
+    });
     expect(result.current.step).toBe(7);
-    act(() => vi.advanceTimersByTime(1700));
+    act(() => {
+      vi.advanceTimersByTime(1700);
+    });
     expect(result.current.step).toBe(8);
-    act(() => result.current.setStep(99));
+    act(() => {
+      result.current.setStep(99);
+    });
     expect(result.current.step).toBe(8);
   });
 
@@ -82,16 +105,26 @@ describe('useScenarioPlayer', () => {
     const { result, rerender } = renderHook(({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled }), {
       initialProps: { enabled: false },
     });
-    act(() => vi.advanceTimersByTime(10_000));
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
     expect(result.current.step).toBe(0);
 
     rerender({ enabled: true });
-    act(() => result.current.setPaused(true));
-    act(() => vi.advanceTimersByTime(10_000));
+    act(() => {
+      result.current.setPaused(true);
+    });
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
     expect(result.current.step).toBe(0);
 
-    act(() => result.current.setPaused(false));
-    act(() => vi.advanceTimersByTime(1700));
+    act(() => {
+      result.current.setPaused(false);
+    });
+    act(() => {
+      vi.advanceTimersByTime(1700);
+    });
     expect(result.current.step).toBe(1);
   });
 
@@ -99,9 +132,13 @@ describe('useScenarioPlayer', () => {
     stubReducedMotion(true);
     const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
     expect(result.current).toMatchObject({ scenario: 0, step: 8, reducedMotion: true });
-    act(() => vi.advanceTimersByTime(60_000));
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
     expect(result.current).toMatchObject({ scenario: 0, step: 8 });
-    act(() => result.current.go(1));
+    act(() => {
+      result.current.go(1);
+    });
     expect(result.current).toMatchObject({ scenario: 1, step: 8 });
   });
 });

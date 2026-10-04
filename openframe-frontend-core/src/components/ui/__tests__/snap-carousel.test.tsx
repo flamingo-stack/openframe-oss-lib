@@ -46,7 +46,7 @@ describe('SnapCarousel', () => {
       scrolledTo.push(left);
       Object.defineProperty(this, 'scrollLeft', { configurable: true, value: left });
       fireEvent.scroll(this);
-    } as typeof HTMLElement.prototype.scrollTo;
+    };
   });
 
   afterEach(() => {
@@ -60,8 +60,8 @@ describe('SnapCarousel', () => {
   it('says where it is and disables the arrow at each end', () => {
     renderCarousel();
     expect(screen.getByText('1 / 3')).toBeTruthy();
-    expect((screen.getByLabelText('Previous') as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByLabelText('Next') as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByLabelText<HTMLButtonElement>('Previous').disabled).toBe(true);
+    expect(screen.getByLabelText<HTMLButtonElement>('Next').disabled).toBe(false);
     expect(screen.getByRole('group', { name: 'Example requests' }).getAttribute('aria-roledescription')).toBe(
       'carousel',
     );
@@ -69,21 +69,31 @@ describe('SnapCarousel', () => {
 
   it('advances every 5s only while it is in view, and wraps', () => {
     renderCarousel();
-    act(() => vi.advanceTimersByTime(20_000));
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
     expect(scrolledTo).toEqual([]);
 
     setInView(true);
-    act(() => vi.advanceTimersByTime(5000));
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(scrolledTo).toEqual([STEP]);
     expect(screen.getByText('2 / 3')).toBeTruthy();
 
     setInView(false);
-    act(() => vi.advanceTimersByTime(20_000));
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
     expect(scrolledTo).toEqual([STEP]);
 
     setInView(true);
-    act(() => vi.advanceTimersByTime(5000));
-    act(() => vi.advanceTimersByTime(5000));
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(scrolledTo).toEqual([STEP, STEP * 2, 0]);
   });
 
@@ -91,12 +101,16 @@ describe('SnapCarousel', () => {
     renderCarousel();
     setInView(true);
     fireEvent.pointerDown(screen.getByRole('group', { name: 'Example requests' }));
-    act(() => vi.advanceTimersByTime(60_000));
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
     expect(scrolledTo).toEqual([]);
 
     fireEvent.click(screen.getByLabelText('Next'));
     expect(scrolledTo).toEqual([STEP]);
-    act(() => vi.advanceTimersByTime(60_000));
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
     expect(scrolledTo).toEqual([STEP]);
   });
 });
