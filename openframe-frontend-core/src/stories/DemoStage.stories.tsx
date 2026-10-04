@@ -1,17 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { AgentMark } from '../components/agent-mark';
 import { ConversationCard } from '../components/features/conversation-card';
+import { ApprovalRequestNotificationTile } from '../components/features/notifications/approval-request-notification-tile';
+import { MINGO_APPROVAL_REQUEST_TYPE } from '../components/features/notifications/types';
 import { ToolBadge } from '../components/platform/ToolBadge';
 import { AppWindowFrame } from '../components/ui/app-window-frame';
 import { FeatureCardGrid } from '../components/ui/feature-card';
 import { FeatureList } from '../components/ui/feature-list';
 import { IncidentFeed, type IncidentFeedItem, type IncidentStatus } from '../components/ui/incident-feed';
-import {
-  PhoneApprovalActions,
-  PhoneFrame,
-  PhoneNotification,
-  PhoneNotificationResult,
-} from '../components/ui/phone-frame';
+import { PhoneFrame } from '../components/ui/phone-frame';
 import { SnapCarousel } from '../components/ui/snap-carousel';
 import { TabNavigation } from '../components/ui/tab-navigation';
 import { useScenarioPlayer } from '../hooks/use-scenario-player';
@@ -119,25 +116,27 @@ function Stage() {
         </AppWindowFrame>
         <PhoneFrame dateLabel="Thursday, October 1" timeLabel="5:09" className="h-[540px]">
           {step >= 5 && (
-            <PhoneNotification
+            <ApprovalRequestNotificationTile
               key="approval"
-              appLabel="Mingo · Needs you"
-              icon={<AgentMark agent="mingo" className="h-full w-full" />}
-              title="Lock Sam's account?"
-              body="New-country sign-in at 5:08 AM. Your rule: ask first."
-            >
-              {waiting ? (
-                <PhoneApprovalActions
-                  approveLabel="Approve"
-                  declineLabel="Decline"
-                  approvePressed={step >= 6}
-                  interactive
-                  onApprove={() => setStep(7)}
-                />
-              ) : (
-                <PhoneNotificationResult label="Approved. Account locked." />
-              )}
-            </PhoneNotification>
+              titleLines={2}
+              notification={{
+                id: 'approval',
+                icon: <AgentMark agent="mingo" />,
+                title: "Lock Sam's account?",
+                description: 'New-country sign-in at 5:08 AM. Your rule: ask first.',
+                createdAt: 0,
+                read: true,
+                meta: {
+                  notificationType: MINGO_APPROVAL_REQUEST_TYPE,
+                  approvalRequestId: 'approval',
+                  resolution: waiting ? null : 'APPROVED',
+                  toolCalls: [{ toolName: 'Lock account', toolTitle: 'Lock account', requiresApproval: true }],
+                },
+              }}
+              onApprove={() => setStep(7)}
+              onReject={() => undefined}
+              onComplete={() => undefined}
+            />
           )}
         </PhoneFrame>
       </div>
