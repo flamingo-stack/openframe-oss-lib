@@ -59,7 +59,7 @@ public class TenantDiscoveryController {
 
         // Cheap local lookup first, so an already-registered address never triggers the
         // domain policy's external disposable-domain call.
-        boolean taken = userService.findActiveByEmail(normalizedEmail).isPresent();
+        boolean taken = userService.existsActiveByEmail(normalizedEmail);
         if (taken) {
             return EmailAvailabilityResponse.builder()
                     .available(false)

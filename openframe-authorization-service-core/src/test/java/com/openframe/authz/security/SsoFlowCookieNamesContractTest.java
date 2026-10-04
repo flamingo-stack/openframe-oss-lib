@@ -20,8 +20,8 @@ class SsoFlowCookieNamesContractTest {
 
     private static final List<SsoFlowHandler> HANDLERS = List.of(
             new TenantRegSsoHandler(null, null, null),
-            new InviteSsoHandler(null, null),
-            new LoginSsoHandler(null, null, null, null, null, null, null, null));
+            new InviteSsoHandler(null, null, null),
+            new LoginSsoHandler(null, null, null, null, null, null, null, null, null));
 
     @Test
     void shouldListExactlyTheCookiesOfTheFlowHandlers() {

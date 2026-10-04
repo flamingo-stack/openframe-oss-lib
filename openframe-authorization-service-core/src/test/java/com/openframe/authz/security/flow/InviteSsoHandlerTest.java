@@ -1,6 +1,7 @@
 package com.openframe.authz.security.flow;
 
 import com.openframe.authz.dto.InvitationRegistrationRequest;
+import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.security.SsoRegistrationConstants;
@@ -39,6 +40,8 @@ class InviteSsoHandlerTest {
 
     @Mock
     private InvitationRegistrationService invitationRegistrationService;
+    @Mock
+    private SessionPrincipalBinder sessionPrincipalBinder;
 
     private final SsoCookieCodec codec = cookieCodec();
     private InviteSsoHandler handler;
@@ -47,7 +50,7 @@ class InviteSsoHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new InviteSsoHandler(codec, invitationRegistrationService);
+        handler = new InviteSsoHandler(codec, invitationRegistrationService, sessionPrincipalBinder);
     }
 
     @AfterEach

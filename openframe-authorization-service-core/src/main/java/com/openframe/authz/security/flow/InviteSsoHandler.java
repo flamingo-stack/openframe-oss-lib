@@ -3,6 +3,7 @@ package com.openframe.authz.security.flow;
 import com.openframe.core.constants.SsoFlowCookieNames;
 
 import com.openframe.authz.dto.InvitationRegistrationRequest;
+import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.service.user.InvitationRegistrationService;
@@ -24,6 +25,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
 
     private final SsoCookieCodec ssoCookieCodec;
     private final InvitationRegistrationService invitationRegistrationService;
+    private final SessionPrincipalBinder sessionPrincipalBinder;
 
     /**
      * Frontend "one last step" consent page. When set, a NEW member joining via SSO is sent here
@@ -72,6 +74,8 @@ public class InviteSsoHandler implements SsoFlowHandler {
 
         var userCreated = invitationRegistrationService.registerByInvitation(req);
         String targetTenantId = userCreated.getTenantId();
+        // Sign in as the invited account, which may differ from the IdP email that accepted it.
+        sessionPrincipalBinder.bind(authentication, userCreated, request, response);
 
         // Clear SSO flow cookie but KEEP session to allow OAuth continue
         clearFlowCookieAndRedirect(response, cookie, targetTenantId, payload.redirectTo(), payload.authMobile());

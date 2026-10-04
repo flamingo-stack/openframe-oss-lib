@@ -1,6 +1,7 @@
 package com.openframe.authz.security;
 
 import com.openframe.authz.security.flow.SsoFlowHandler;
+import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.core.constants.SsoFlowCookieNames;
@@ -37,6 +38,8 @@ class SsoFlowSuccessHandlerTest {
     @Mock
     private AuthErrorResponder authErrorResponder;
     @Mock
+    private SsoOidcUserService ssoOidcUserService;
+    @Mock
     private AppleWebTokenCapture appleWebTokenCapture;
     @Mock
     private MicrosoftLoginEmailGate microsoftLoginEmailGate;
@@ -55,7 +58,7 @@ class SsoFlowSuccessHandlerTest {
         inviteHandler = new RecordingHandler(SsoFlowCookieNames.OF_SSO_INVITE, "invite-state");
         loginHandler = new RecordingHandler(SsoFlowCookieNames.OF_SSO_LOGIN, "login-state");
         successHandler = new SsoFlowSuccessHandler(List.of(loginHandler, inviteHandler), authErrorResponder,
-                appleWebTokenCapture, microsoftLoginEmailGate, ssoIdentityCapture);
+                appleWebTokenCapture, microsoftLoginEmailGate, ssoIdentityCapture, ssoOidcUserService);
     }
 
     private static MockHttpServletRequest callback(String state, Cookie... cookies) {

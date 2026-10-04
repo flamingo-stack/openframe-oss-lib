@@ -6,6 +6,7 @@ import com.openframe.data.document.user.UserRole;
 import com.openframe.data.repository.auth.AuthUserRepository;
 import com.openframe.authz.service.processor.UserEmailVerifiedProcessor;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ import static java.util.UUID.randomUUID;
  * Simplified User Service for Authorization Server
  * Only essential operations needed for authentication and user management
  */
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -55,8 +57,25 @@ public class UserService {
                 .anyMatch(u -> !u.getTenantId().equals(tenantId));
     }
 
+    /**
+     * The single ACTIVE account for an email, across tenants. A duplicate (the global
+     * single-active-email invariant broken by data) is reported as a readable error instead of
+     * Spring's non-unique-result exception, so the user sees what is wrong and the log names it.
+     */
     public Optional<AuthUser> findActiveByEmail(String email) {
-        return userRepository.findByEmailAndStatus(email, ACTIVE);
+        List<AuthUser> active = userRepository.findAllByEmailAndStatus(email, ACTIVE);
+        if (active.size() > 1) {
+            log.warn("event=duplicate-active-email userIds={} tenantIds={}",
+                    active.stream().map(AuthUser::getId).toList(),
+                    active.stream().map(AuthUser::getTenantId).toList());
+            throw new IllegalStateException(
+                    "This email has active accounts in more than one organization. Please contact support.");
+        }
+        return active.stream().findFirst();
+    }
+
+    public boolean existsActiveByEmail(String email) {
+        return !userRepository.findAllByEmailAndStatus(email, ACTIVE).isEmpty();
     }
 
     public Optional<AuthUser> findActiveByEmailAndTenant(String email, String tenantId) {

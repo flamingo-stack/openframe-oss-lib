@@ -3,6 +3,7 @@ package com.openframe.authz.security.flow;
 import com.openframe.core.constants.SsoFlowCookieNames;
 
 import com.openframe.authz.security.EmailTrustPolicy;
+import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.service.sso.SSOConfigService;
@@ -52,6 +53,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
     private final UserService userService;
     private final TenantService tenantService;
     private final SSOConfigService ssoConfigService;
+    private final SessionPrincipalBinder sessionPrincipalBinder;
 
     /**
      * Frontend page that continues an unknown SSO identity into registration (org name + domain).
@@ -134,6 +136,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
         // active). A link written before these checks would outlive a REJECTED login and later
         // count as proof of trust.
         ssoIdentityService.link(provider, user.getClaims(), authUser);
+        // A link-first match may be an account whose email differs from the one the IdP asserts now.
+        sessionPrincipalBinder.bind(authentication, authUser, request, response);
 
         clearFlowCookieAndRedirect(response, cookie, tenantId, payload.redirectTo(), payload.authMobile());
     }

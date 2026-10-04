@@ -38,8 +38,7 @@ public class TenantRegistrationService {
             throw new IllegalArgumentException("This domain is already in use. Please try a different one.");
         }
 
-        boolean hasActiveUser = userService.findActiveByEmail(userEmail)
-                .isPresent();
+        boolean hasActiveUser = userService.existsActiveByEmail(userEmail);
 
         if (hasActiveUser) {
             throw new IllegalArgumentException("This account already belongs to another tenant.");
