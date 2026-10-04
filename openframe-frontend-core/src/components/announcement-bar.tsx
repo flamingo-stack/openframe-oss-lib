@@ -69,6 +69,7 @@ export function AnnouncementBar({
   initialAnnouncement,
   previewMode = false,
   dismissible = true,
+  pathname,
   className,
 }: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
@@ -139,7 +140,12 @@ export function AnnouncementBar({
   );
 
   // Preview always mirrors the draft directly (storage is not consulted there).
-  const expanded = previewMode ? announcement != null : announcement != null && expandedState && !dismissed;
+  // A page that shows the news itself (a hero's news pill) is listed in the
+  // announcement's `excluded_paths`; the bar stays collapsed there.
+  const excludedHere = pathname != null && (announcement?.excluded_paths ?? []).includes(pathname);
+  const expanded = previewMode
+    ? announcement != null
+    : announcement != null && expandedState && !dismissed && !excludedHere;
 
   // Cleanup of the pre-refactor localStorage announcement cache. Keyed on
   // `platform` rather than `[]`: the cache is per-platform, so a platform

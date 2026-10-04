@@ -6,8 +6,11 @@ import { usePrefersReducedMotionState } from './ui/use-prefers-reduced-motion';
 export interface UseScenarioPlayerOptions {
   /** How many scenarios (tabs) the stage cycles through. */
   scenarioCount: number;
-  /** The last step of a scenario; steps run 0..lastStep. */
-  lastStep: number;
+  /**
+   * The last step of a scenario; steps run 0..lastStep. A function when the
+   * scenarios are not all the same length: it is asked for the one being shown.
+   */
+  lastStep: number | ((scenario: number) => number);
   /** How long each step shows before the next one. */
   stepMs: number;
   /** How long the last step holds before the next scenario starts. */
@@ -47,7 +50,7 @@ export interface UseScenarioPlayerResult {
  */
 export function useScenarioPlayer({
   scenarioCount,
-  lastStep,
+  lastStep: lastStepOption,
   stepMs,
   holdMs,
   enabled = true,
@@ -59,6 +62,7 @@ export function useScenarioPlayer({
   const [scenario, setScenario] = useState(initialScenario);
   const [rawStep, setRawStep] = useState(0);
   const [paused, setPaused] = useState(false);
+  const lastStep = typeof lastStepOption === 'function' ? lastStepOption(scenario) : lastStepOption;
 
   // Under reduced motion the stage shows the finished scenario.
   const step = reducedMotion ? lastStep : Math.min(rawStep, lastStep);
