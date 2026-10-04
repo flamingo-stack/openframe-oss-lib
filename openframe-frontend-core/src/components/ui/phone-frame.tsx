@@ -6,14 +6,16 @@ export interface PhoneFrameProps {
   dateLabel?: string;
   /** Lock-screen clock, e.g. "5:09". */
   timeLabel?: string;
-  /** The notification slot at the bottom of the lock screen. One at a time. */
+  /** The notification slot, directly under the clock. One at a time. */
   children?: ReactNode;
   className?: string;
 }
 
 /**
- * A phone lock screen: island, date, clock and one notification slot pinned
- * to the bottom. Decorative chrome for showing what lands on a phone.
+ * A phone lock screen: island, date, clock, and one notification slot directly
+ * under the clock, where a notification that has just arrived is read first
+ * (it drops in from the top of the screen). Decorative chrome for showing what
+ * lands on a phone.
  *
  * It is sized by its class (default 236 x 480), never scaled, so the text
  * inside stays the size the page set.
@@ -27,11 +29,11 @@ export function PhoneFrame({ dateLabel, timeLabel, children, className }: PhoneF
         <span className="h-6 w-20 rounded-full bg-black" aria-hidden />
         {dateLabel && <span className="mt-4 text-ods-text-secondary text-h6">{dateLabel}</span>}
         {timeLabel && (
-          <span className="mb-auto text-[56px] font-medium leading-[60px] tracking-tight text-ods-text-primary">
+          <span className="text-[56px] font-medium leading-[60px] tracking-tight text-ods-text-primary">
             {timeLabel}
           </span>
         )}
-        <div className={cn('flex w-full flex-col gap-1.5', !timeLabel && 'mt-auto')}>{children}</div>
+        <div className="mt-4 flex min-h-0 w-full flex-1 flex-col gap-1.5">{children}</div>
       </div>
     </div>
   );
