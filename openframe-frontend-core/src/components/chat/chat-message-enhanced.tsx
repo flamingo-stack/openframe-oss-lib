@@ -1,10 +1,11 @@
 'use client';
 
-import React, { forwardRef, memo, useEffect, useMemo, useRef } from 'react';
+import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
 import { formatDate, formatTime } from '../../utils/format-date';
+import { AgentMark } from '../agent-mark';
 import type { MdRenderProps } from '../ui/markdown/base-components';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -544,6 +545,28 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
     const isSystem = authorType === 'system';
 
+    // A named caption is kept only where the name is the information: a system
+    // line and a human technician in a shared ticket thread. Every other turn
+    // is a bubble with its author's face beside it, no name.
+    const showName = isSystem || authorType === 'admin';
+    const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
+    const avatarBox = isV2 ? 'h-6 w-6' : 'h-8 w-8';
+    // Who is speaking, drawn once per message beside its first bubble:
+    //   - a user: their picture, only when one arrived;
+    //   - an assistant: the host's icon, else its picture, else the agent's own
+    //     packaged mark (Fae's face, Mingo's glyph), never initials.
+    const avatarNode: ReactNode =
+      !showAvatar || isSystem || (isUser && !avatar) ? null : !isUser && !avatar && assistantIcon ? (
+        <div className={cn('flex flex-shrink-0 items-center justify-center', avatarBox)}>{assistantIcon}</div>
+      ) : !isUser && !avatar && assistantType ? (
+        <span role="img" aria-label={displayName} className={cn('inline-flex flex-shrink-0', avatarBox)}>
+          <AgentMark agent={assistantType} className="h-full w-full rounded-full" />
+        </span>
+      ) : (
+        <SquareAvatar {...avatarProps} className="flex-shrink-0" />
+      );
+    const firstTextIndex = segments.findIndex(segment => segment.type === 'text');
+
     // v2 draws a system line (e.g. a technician joining) as an in-thread
     // receipt card rather than as an author row with no body.
     if (isV2 && isSystem && name) {
@@ -584,68 +607,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             vs ~9ms as grid (Chrome: ~2ms either way). Same gap and stretch,
             no margin collapsing — visually identical. */}
           <div className="grid min-w-0 grid-cols-1 gap-[var(--spacing-system-xxs)]">
-            {/* Avatar + Name + Timestamp Row.
-              Sizing rationale (per design-token measurements):
-                - Name uses `text-h3` = 14px mobile / 18px desktop.
-                - Avatar uses `SquareAvatar size="sm"` = 32px — the
-                  canonical primitive at the smallest preset, giving a
-                  ~1.78x ratio against the 18px name text (Material
-                  Design 3 + Apple HIG inline-avatar standard).
-                - Gap is `var(--spacing-system-xs)` = 8px, the standard
-                  inline-component separator across this design system.
-              For the `assistantIcon` branch (host supplies a JSX icon
-              like the Mingo logo), the wrapper matches `SquareAvatar
-              size="sm"` (h-8 w-8 = 32px) so BOTH branches present at
-              the same visual weight. Host-supplied icons render
-              inside via `flex items-center justify-center` — they
-              should be sized at ~50-60% of the wrapper (h-4 w-4 =
-              16px works well for a 32px circle). */}
-            <div
-              className={cn(
-                'flex items-center',
-                isV2 ? 'gap-[var(--spacing-system-xxs)]' : 'gap-[var(--spacing-system-xs)]',
-              )}
-            >
-              {/* Avatar rules:
-                - Assistant/Fae always show an avatar — host brand icon when no
-                  image is supplied, else the filled SquareAvatar.
-                - User shows the SquareAvatar ONLY when an avatar image actually
-                  arrived. With no user avatar we hide the block entirely (just
-                  the name), instead of an initials placeholder. TEMPORARY —
-                  restore the user placeholder when user avatars ship. */}
-              {showAvatar &&
-                !isSystem &&
-                !(isUser && !avatar) &&
-                (!isUser && assistantIcon && !avatar ? (
-                  // Host-supplied brand icon (e.g. Mingo): render it directly,
-                  // no filled pill — the icon carries its own brand accent.
-                  <div className="flex flex-shrink-0 items-center justify-center">{assistantIcon}</div>
-                ) : (
-                  <SquareAvatar {...avatarProps} />
-                ))}
-              <span
-                className={cn(
-                  'min-w-0 flex-1 truncate !font-mono !font-medium text-h3',
-                  authorType === 'system'
-                    ? 'text-ods-open-yellow'
-                    : authorType === 'admin'
-                      ? 'text-ods-open-yellow'
-                      : authorType === 'mingo'
-                        ? 'text-ods-flamingo-cyan'
-                        : authorType === 'fae'
-                          ? 'text-ods-flamingo-pink'
-                          : 'text-ods-text-secondary',
+            {showName && (
+              <div className="flex items-center gap-[var(--spacing-system-xs)]">
+                <span className="min-w-0 flex-1 truncate text-ods-open-yellow text-h6">{displayName}</span>
+                {timestamp && (
+                  <span className="shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
+                    {formatMessageTimestamp(timestamp)}
+                  </span>
                 )}
-              >
-                {name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae')}
-                {!isSystem && !isV2 && ':'}
-              </span>
-              {timestamp && (
-                <span className="shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
-                  {formatMessageTimestamp(timestamp)}
-                </span>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Message segments — hidden for system messages without content */}
             {(!isSystem || segments.length > 0) && (
@@ -658,15 +629,32 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   // the engine does one authoritative whole-document parse.
                   const segmentIsStreaming = index === segments.length - 1 && !!isTyping;
                   if (segment.type === 'text') {
+                    // A bubble: the user's on the right, everyone else's on the
+                    // left; the author's face sits beside the message's first one.
+                    const leads = index === firstTextIndex;
                     return (
                       <div
                         key={index}
-                        className={cn(
-                          'w-full min-w-0 break-words text-h4',
-                          isError ? 'text-ods-error' : 'text-ods-text-primary',
-                        )}
+                        className={cn('flex min-w-0 items-end gap-[var(--spacing-system-xs)]', isUser && 'justify-end')}
                       >
-                        {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                        {!isUser &&
+                          avatarNode &&
+                          (leads ? avatarNode : <span className={cn('flex-shrink-0', avatarBox)} />)}
+                        <div
+                          className={cn(
+                            'min-w-0 max-w-[80%] break-words rounded-xl px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h4',
+                            isError
+                              ? 'border border-ods-error text-ods-error'
+                              : isUser
+                                ? 'bg-ods-bg-active text-ods-text-primary'
+                                : 'border border-ods-border bg-ods-card text-ods-text-primary',
+                          )}
+                        >
+                          {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                        </div>
+                        {isUser &&
+                          avatarNode &&
+                          (leads ? avatarNode : <span className={cn('flex-shrink-0', avatarBox)} />)}
                       </div>
                     );
                   } else if (segment.type === 'ask') {
@@ -740,6 +728,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   return null;
                 })}
               </div>
+            )}
+
+            {timestamp && !showName && (
+              <span className={cn('text-ods-text-secondary text-h6', isUser && 'justify-self-end')}>
+                {formatMessageTimestamp(timestamp)}
+              </span>
             )}
 
             {/* Attached entity-context chips (user bubbles). Read-only — no

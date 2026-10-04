@@ -123,7 +123,7 @@ export function IncidentFeed({ items, statusLabels, emptyLabel, anchor = 'top', 
             </div>
             <span className="flex items-start gap-2.5">
               {item.avatar}
-              <span className="min-w-0 text-ods-text-primary text-h3">{item.title}</span>
+              <span className="min-w-0 text-ods-text-primary text-h4">{item.title}</span>
             </span>
             {item.detail && (
               <p
