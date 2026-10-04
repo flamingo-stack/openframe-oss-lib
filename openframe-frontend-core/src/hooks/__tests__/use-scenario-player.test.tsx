@@ -64,7 +64,7 @@ describe('useScenarioPlayer', () => {
     expect(result.current).toMatchObject({ scenario: 0, step: 0 });
   });
 
-  it('restarts a scenario from step 0 when it is chosen', () => {
+  it('restarts a scenario from step 0 when it is chosen, plays it out, then stops', () => {
     stubReducedMotion(false);
     const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
     beats(3);
@@ -73,14 +73,28 @@ describe('useScenarioPlayer', () => {
     act(() => {
       result.current.go(1);
     });
-    expect(result.current).toMatchObject({ scenario: 1, step: 0 });
+    expect(result.current).toMatchObject({ scenario: 1, step: 0, paused: false });
+    beats(8);
+    expect(result.current).toMatchObject({ scenario: 1, step: 8 });
+
+    // The visitor chose it: it does not rotate on to the next scenario.
     act(() => {
-      result.current.go(1);
+      vi.advanceTimersByTime(4200);
+    });
+    expect(result.current).toMatchObject({ scenario: 1, step: 8, paused: true });
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(result.current).toMatchObject({ scenario: 1, step: 8 });
+
+    // Play hands the rotation back.
+    act(() => {
+      result.current.setPaused(false);
     });
     act(() => {
-      vi.advanceTimersByTime(1700);
+      vi.advanceTimersByTime(4200);
     });
-    expect(result.current).toMatchObject({ scenario: 1, step: 1 });
+    expect(result.current).toMatchObject({ scenario: 0, step: 0, paused: false });
   });
 
   it('jumps to a step and keeps playing from there', () => {
@@ -98,6 +112,90 @@ describe('useScenarioPlayer', () => {
       result.current.setStep(99);
     });
     expect(result.current.step).toBe(8);
+  });
+
+  it('holds while keyboard focus is inside the stage, and on hover when asked', () => {
+    stubReducedMotion(false);
+    const { result } = renderHook(() => useScenarioPlayer({ ...OPTIONS, holdOnHover: true }));
+    const pointer = (pointerType: string) => ({ pointerType }) as never;
+
+    act(() => {
+      result.current.holdProps.onPointerEnter(pointer('mouse'));
+    });
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(result.current.step).toBe(0);
+    act(() => {
+      result.current.holdProps.onPointerLeave(pointer('mouse'));
+    });
+    beats(1);
+    expect(result.current.step).toBe(1);
+
+    // A touch never holds: it has no "leave".
+    act(() => {
+      result.current.holdProps.onPointerEnter(pointer('touch'));
+    });
+    beats(1);
+    expect(result.current.step).toBe(2);
+
+    const inside = document.createElement('button');
+    const container = document.createElement('div');
+    container.append(inside);
+    inside.matches = () => true;
+    act(() => {
+      result.current.holdProps.onFocusCapture({ target: inside, currentTarget: container } as never);
+    });
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(result.current.step).toBe(2);
+    act(() => {
+      result.current.holdProps.onBlurCapture({ currentTarget: container, relatedTarget: null } as never);
+    });
+    beats(1);
+    expect(result.current.step).toBe(3);
+  });
+
+  it('does not hold on hover unless asked', () => {
+    stubReducedMotion(false);
+    const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
+    act(() => {
+      result.current.holdProps.onPointerEnter({ pointerType: 'mouse' } as never);
+    });
+    beats(1);
+    expect(result.current.step).toBe(1);
+  });
+
+  it('holds while the browser tab is hidden', () => {
+    stubReducedMotion(false);
+    const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
+    const visibility = vi.spyOn(document, 'visibilityState', 'get');
+    visibility.mockReturnValue('hidden');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(result.current.step).toBe(0);
+    visibility.mockReturnValue('visible');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    beats(1);
+    expect(result.current.step).toBe(1);
+    visibility.mockRestore();
+  });
+
+  it('can start on the last step, then rotates from there', () => {
+    stubReducedMotion(false);
+    const { result } = renderHook(() => useScenarioPlayer({ ...OPTIONS, startAtEnd: true }));
+    expect(result.current).toMatchObject({ scenario: 0, step: 8 });
+    act(() => {
+      vi.advanceTimersByTime(4200);
+    });
+    expect(result.current).toMatchObject({ scenario: 1, step: 0 });
   });
 
   it('does not advance while paused or disabled', () => {
