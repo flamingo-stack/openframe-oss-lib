@@ -131,6 +131,7 @@ export {
   urlPathLooksLikeSvg,
   shouldProxyImage,
   generateImageSizes,
+  skipsImageOptimizer,
 } from './image-proxy';
 
 // Number / byte / duration / time / UTC date / initials / metric /
@@ -153,6 +154,7 @@ export {
   VIEWER_TIMEZONE,
   formatWebinarTimeMeta,
   formatProgramDate,
+  formatProgramDateRange,
   formatProgramTimeRange,
   type ZonedDateStyle,
   formatDurationFromRange,
@@ -438,6 +440,7 @@ export {
   programDateInstant,
   programMetaFormatters,
   programMetaLine,
+  eventAudience,
   programStr,
   webinarTiming,
 } from './program-instant';

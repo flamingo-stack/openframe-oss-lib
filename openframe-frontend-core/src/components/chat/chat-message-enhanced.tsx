@@ -625,7 +625,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 ))}
               <span
                 className={cn(
-                  'flex-1 !font-mono !font-medium text-h3',
+                  'min-w-0 flex-1 truncate !font-mono !font-medium text-h3',
                   authorType === 'system'
                     ? 'text-ods-open-yellow'
                     : authorType === 'admin'

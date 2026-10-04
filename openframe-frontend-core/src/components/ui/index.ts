@@ -4,6 +4,7 @@
 export * from './allowed-domains-input';
 export * from './announcement-bar-view';
 export * from './autocomplete';
+export * from './timezone-select';
 export * from './button';
 export * from './card';
 export * from './checkbox';
@@ -221,6 +222,7 @@ export * from './ticket-attachments-list';
 export * from './ticket-note-card';
 export * from './ticket-notes-section';
 export * from './marquee-wall';
+export * from './photo-wall';
 export * from './markdown';
 export * from './filter-pill-row';
 
