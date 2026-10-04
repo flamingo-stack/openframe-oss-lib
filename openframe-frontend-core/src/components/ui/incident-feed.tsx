@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
-import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
+import { StatusLine, type StatusLineTone } from './status-line';
 
 /** Where one incident stands. `waiting` is the only state that needs a person. */
 export type IncidentStatus = 'working' | 'fixed' | 'waiting' | 'approved';
@@ -17,27 +17,15 @@ export interface IncidentStatusLineProps {
  * flight, the warning colour when a person is needed, a success check once it
  * is done (on its own or after an approval).
  */
+const INCIDENT_TONE: Record<IncidentStatus, StatusLineTone> = {
+  working: 'working',
+  waiting: 'waiting',
+  fixed: 'success',
+  approved: 'success',
+};
+
 export function IncidentStatusLine({ status, label, className }: IncidentStatusLineProps) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 whitespace-nowrap text-h6',
-        status === 'waiting' ? 'text-ods-warning' : 'text-ods-text-primary',
-        className,
-      )}
-    >
-      {status === 'working' && (
-        <span
-          className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-ods-flamingo-cyan motion-reduce:animate-none"
-          aria-hidden
-        />
-      )}
-      {(status === 'fixed' || status === 'approved') && (
-        <CheckCircleIcon size={16} className="shrink-0 text-ods-success" aria-hidden />
-      )}
-      {label}
-    </span>
-  );
+  return <StatusLine tone={INCIDENT_TONE[status]} label={label} className={className} />;
 }
 
 export interface IncidentFeedItem {

@@ -234,6 +234,7 @@ export { LazyMount, type LazyMountProps } from './lazy-mount';
 export * from './app-window-frame';
 export * from './phone-frame';
 export * from './incident-feed';
+export * from './status-line';
 export * from './snap-carousel';
 export * from './sticky-action-bar';
 export { RequiredMark } from './required-mark';
