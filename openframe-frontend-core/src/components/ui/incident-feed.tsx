@@ -30,8 +30,8 @@ export function IncidentStatusLine({ status, label, className }: IncidentStatusL
 
 export interface IncidentFeedItem {
   id: string;
-  /** Where it was found, shown as a tag ("Patch logs"). */
-  source: string;
+  /** Where it was found, shown as a tag ("Patch logs"). Omitted: no tag. */
+  source?: string;
   title: string;
   /** One line under the title of the open item. */
   detail?: string;
@@ -64,6 +64,17 @@ function SourceTag({ children }: { children: ReactNode }) {
   );
 }
 
+/** The row above an item's title: where it was found and when. Nothing to show: no row. */
+function ItemMeta({ item }: { item: IncidentFeedItem }) {
+  if (!item.source && !item.time) return null;
+  return (
+    <div className="flex items-center justify-between gap-3">
+      {item.source ? <SourceTag>{item.source}</SourceTag> : <span />}
+      {item.time && <span className="shrink-0 text-ods-text-secondary text-h6">{item.time}</span>}
+    </div>
+  );
+}
+
 /**
  * A feed of incidents an agent found and handled: the newest one is open
  * (source tag, title, one line of detail, status); the ones before it collapse
@@ -89,10 +100,7 @@ export function IncidentFeed({ items, statusLabels, emptyLabel, anchor = 'top', 
               key={item.id}
               className="flex flex-col gap-2 rounded-md border border-ods-border bg-ods-bg px-3.5 py-2.5"
             >
-              <div className="flex items-center justify-between gap-3">
-                <SourceTag>{item.source}</SourceTag>
-                {item.time && <span className="shrink-0 text-ods-text-secondary text-h6">{item.time}</span>}
-              </div>
+              <ItemMeta item={item} />
               <div className="flex items-center justify-between gap-3">
                 <span className="min-w-0 truncate text-ods-text-primary text-h4">{item.title}</span>
                 <IncidentStatusLine status={item.status} label={statusLabels[item.status]} />
@@ -105,10 +113,7 @@ export function IncidentFeed({ items, statusLabels, emptyLabel, anchor = 'top', 
             key={item.id}
             className="flex flex-col gap-1.5 rounded-md border border-ods-border bg-ods-bg px-4 py-3.5 duration-300 animate-in fade-in motion-reduce:animate-none"
           >
-            <div className="flex items-center justify-between gap-3">
-              <SourceTag>{item.source}</SourceTag>
-              {item.time && <span className="shrink-0 text-ods-text-secondary text-h6">{item.time}</span>}
-            </div>
+            <ItemMeta item={item} />
             <span className="flex items-start gap-2.5">
               {item.avatar}
               <span className="min-w-0 text-ods-text-primary text-h4">{item.title}</span>
