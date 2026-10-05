@@ -101,59 +101,6 @@ describe('useScenarioPlayer', () => {
     expect(result.current.step).toBe(8);
   });
 
-  it('holds while keyboard focus is inside the stage, and on hover when asked', () => {
-    stubReducedMotion(false);
-    const { result } = renderHook(() => useScenarioPlayer({ ...OPTIONS, holdOnHover: true }));
-    const pointer = (pointerType: string) => ({ pointerType }) as never;
-
-    act(() => {
-      result.current.holdProps.onPointerEnter(pointer('mouse'));
-    });
-    act(() => {
-      vi.advanceTimersByTime(10_000);
-    });
-    expect(result.current.step).toBe(0);
-    act(() => {
-      result.current.holdProps.onPointerLeave(pointer('mouse'));
-    });
-    beats(1);
-    expect(result.current.step).toBe(1);
-
-    // A touch never holds: it has no "leave".
-    act(() => {
-      result.current.holdProps.onPointerEnter(pointer('touch'));
-    });
-    beats(1);
-    expect(result.current.step).toBe(2);
-
-    const inside = document.createElement('button');
-    const container = document.createElement('div');
-    container.append(inside);
-    inside.matches = () => true;
-    act(() => {
-      result.current.holdProps.onFocusCapture({ target: inside, currentTarget: container } as never);
-    });
-    act(() => {
-      vi.advanceTimersByTime(10_000);
-    });
-    expect(result.current.step).toBe(2);
-    act(() => {
-      result.current.holdProps.onBlurCapture({ currentTarget: container, relatedTarget: null } as never);
-    });
-    beats(1);
-    expect(result.current.step).toBe(3);
-  });
-
-  it('does not hold on hover unless asked', () => {
-    stubReducedMotion(false);
-    const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
-    act(() => {
-      result.current.holdProps.onPointerEnter({ pointerType: 'mouse' } as never);
-    });
-    beats(1);
-    expect(result.current.step).toBe(1);
-  });
-
   it('holds while the browser tab is hidden', () => {
     stubReducedMotion(false);
     const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
@@ -213,38 +160,32 @@ describe('useScenarioPlayer', () => {
     expect(result.current.step).toBe(1);
   });
 
-  it("plays a visitor's click out even when focus holds it or it is not enabled", () => {
+  it('picks up where it was every time it comes back on screen', () => {
     stubReducedMotion(false);
-    const { result } = renderHook(({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled }), {
-      initialProps: { enabled: false },
+    const { result, rerender } = renderHook(({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled }), {
+      initialProps: { enabled: true },
     });
-    act(() => {
-      vi.advanceTimersByTime(10_000);
-    });
-    expect(result.current.step).toBe(0);
+    beats(4);
+    expect(result.current.step).toBe(4);
 
-    // A click on a step: the pointer goes down, the button takes focus, the step is set.
-    const inside = document.createElement('button');
-    const container = document.createElement('div');
-    container.append(inside);
-    inside.matches = () => true;
+    // Scrolled away, however long, whatever was clicked or focused before: it waits.
     act(() => {
-      result.current.holdProps.onPointerDownCapture({} as never);
-      result.current.holdProps.onFocusCapture({ target: inside, currentTarget: container } as never);
-      result.current.setStep(5);
+      result.current.setStep(4);
     });
-    beats(3);
-    expect(result.current).toMatchObject({ scenario: 0, step: 8 });
+    rerender({ enabled: false });
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+    expect(result.current.step).toBe(4);
 
-    // Once it has played out, the usual rule is back: not enabled, no rotation.
-    act(() => {
-      vi.advanceTimersByTime(4200);
-    });
-    expect(result.current).toMatchObject({ scenario: 1, step: 0 });
-    act(() => {
-      vi.advanceTimersByTime(10_000);
-    });
-    expect(result.current).toMatchObject({ scenario: 1, step: 0 });
+    // Back on screen: it runs again, with nothing else asked of the visitor.
+    rerender({ enabled: true });
+    beats(2);
+    expect(result.current.step).toBe(6);
+    rerender({ enabled: false });
+    rerender({ enabled: true });
+    beats(1);
+    expect(result.current.step).toBe(7);
   });
 
   it('parks on the last step under reduced motion and never advances', () => {
