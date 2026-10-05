@@ -50,8 +50,8 @@ export interface AppLayoutSidePanelRenderState {
 export interface AppLayoutSidePanelConfig {
   /** Panel body. Told its width so it can choose what fits. */
   children: (state: AppLayoutSidePanelRenderState) => ReactNode;
-  /** Narrowest docked width, and the width it starts at. Default 296. */
-  minWidth?: number;
+  /** Narrowest docked width, and the width it starts at: the narrowest its content draws. */
+  minWidth: number;
   /** Narrowest the content may get before the panel takes over. Default 400. */
   minContentWidth?: number;
   /** localStorage key for the chosen width. Without it the width lasts the session. */
@@ -253,7 +253,7 @@ export function useAppLayoutSidePanel(
   row: HTMLElement | null,
 ): AppLayoutSidePanelState | null {
   const enabled = config !== undefined;
-  const minWidth = config?.minWidth ?? 296;
+  const minWidth = config?.minWidth ?? 0;
   const minContentWidth = config?.minContentWidth ?? 400;
   const collapsed = config?.collapsed ?? false;
   const minimum: SidePanelSize = { width: minWidth, expanded: false };

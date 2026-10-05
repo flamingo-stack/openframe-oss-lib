@@ -98,5 +98,6 @@ export {
   EmbeddableChat,
   type EmbeddableChatHandle,
   type EmbeddableChatProps,
+  MINGO_V2_RAIL_WIDTH,
 } from './embeddable-chat';
 export * from './proxy-credentials-panel';
