@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Collation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.util.StringUtils;
@@ -27,6 +28,14 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String ID_FIELD = "_id";
 
+    /**
+     * The order folders are listed in: case-insensitive, and digits by their value, so "apple"
+     * sorts before "Zebra" and "Folder 2" before "Folder 10". Mongo's default comparison is by
+     * code point and gets both wrong. The keyset comparison runs under the same collation as the
+     * sort, and so must the indexes that serve it — see MongoIndexConfig.
+     */
+    public static final Collation FOLDER_NAME_COLLATION = Collation.of("en").strength(2).numericOrdering(true);
+
     private final MongoTemplate mongoTemplate;
 
     public CustomKnowledgeBaseItemRepositoryImpl(MongoTemplate mongoTemplate) {
@@ -42,6 +51,7 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
                 Sort.Order.asc(FIELD_NAME),
                 Sort.Order.desc(ID_FIELD)
         ));
+        query.collation(FOLDER_NAME_COLLATION);
         query.limit(limit);
         return mongoTemplate.find(query, KnowledgeBaseItem.class);
     }
@@ -169,7 +179,8 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     }
 
     /**
-     * Folders after the cursor in (name asc, _id desc) order.
+     * Folders after the cursor in (name asc, _id desc) order. "After" and "same name" are decided by
+     * the query's collation, so names that differ only in case tie and fall back to the id.
      *
      * Every branch returns an operator criteria (a null key), never a bare field one: the folder
      * query already holds criteria on name (the search) and may hold one on _id (the tag filter),

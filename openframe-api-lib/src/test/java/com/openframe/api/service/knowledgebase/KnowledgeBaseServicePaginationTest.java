@@ -251,7 +251,7 @@ class KnowledgeBaseServicePaginationTest {
         verify(repository, never()).findFolderLinks();
     }
 
-    // ------------------------------------------------------------ no scope: the rules that predate it
+    // ------------------------------------------------------------ no scope given
 
     @Test
     @DisplayName("no scope, plain listing: one level")
@@ -266,42 +266,72 @@ class KnowledgeBaseServicePaginationTest {
     }
 
     @Test
-    @DisplayName("no scope, search: the matching articles of the whole subtree and no folders")
-    void withoutScopeASearchReturnsSubtreeArticlesOnly() {
+    @DisplayName("no scope, search: folders and articles of the whole subtree, to the same depth")
+    void withoutScopeASearchReadsTheSubtreeForFoldersAndArticles() {
         stubRepository(items("f", 2, KnowledgeBaseItemType.FOLDER), items("a", 2, KnowledgeBaseItemType.ARTICLE));
 
         CountedGenericQueryResult<KnowledgeBaseItem> page =
                 query(KnowledgeBaseFilterCriteria.builder().build(), "vpn", null, 20);
 
-        assertThat(page.getItems()).extracting(KnowledgeBaseItem::getId).containsExactly("a0", "a1");
-        assertThat(page.getFilteredCount()).isEqualTo(2);
+        assertThat(page.getItems()).extracting(KnowledgeBaseItem::getId).containsExactly("f0", "f1", "a0", "a1");
+        assertThat(page.getFilteredCount()).isEqualTo(4);
+        assertThat(folderParent()).isEqualTo(KnowledgeBaseParentFilter.any());
         assertThat(articleParent()).isEqualTo(KnowledgeBaseParentFilter.any());
-        verify(repository, never()).findFolders(any(), any(), any(), any(), anyInt());
-        verify(repository, never()).countFolders(any(), any(), any());
     }
 
     @Test
-    @DisplayName("no scope, tags inside a folder: the tagged articles of that folder's subtree and no folders")
-    void withoutScopeATagFilterInsideAFolderReturnsSubtreeArticlesOnly() {
+    @DisplayName("no scope, search inside a folder: nothing above or beside that folder is read")
+    void withoutScopeASearchInsideAFolderStaysInsideIt() {
+        stubRepository(items("f", 1, KnowledgeBaseItemType.FOLDER), items("a", 1, KnowledgeBaseItemType.ARTICLE));
+        when(repository.findFolderLinks()).thenReturn(List.of(
+                folder("p", null), folder("c1", "p"), folder("sibling", null), folder("s1", "sibling")));
+
+        query(KnowledgeBaseFilterCriteria.builder().parentId("p").build(), "vpn", null, 20);
+
+        KnowledgeBaseParentFilter parent = folderParent();
+        assertThat(parent.unrestricted()).isFalse();
+        assertThat(parent.parentIds()).containsExactlyInAnyOrder("p", "c1");
+        assertThat(articleParent()).isEqualTo(parent);
+    }
+
+    @Test
+    @DisplayName("no scope, FOLDER search: folders of the whole subtree, not of one level")
+    void withoutScopeAFolderSearchReadsTheSubtree() {
         stubRepository(items("f", 2, KnowledgeBaseItemType.FOLDER), items("a", 2, KnowledgeBaseItemType.ARTICLE));
+        KnowledgeBaseFilterCriteria filter = KnowledgeBaseFilterCriteria.builder()
+                .type(KnowledgeBaseItemType.FOLDER)
+                .build();
+
+        CountedGenericQueryResult<KnowledgeBaseItem> page = query(filter, "vpn", null, 20);
+
+        assertThat(page.getItems()).extracting(KnowledgeBaseItem::getId).containsExactly("f0", "f1");
+        assertThat(folderParent()).isEqualTo(KnowledgeBaseParentFilter.any());
+        verify(repository, never()).findArticles(any(), any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("no scope, tags: the subtree, with the tag filter applied to folders and articles alike")
+    void withoutScopeATagFilterReadsTheSubtree() {
+        stubRepository(List.of(), items("a", 1, KnowledgeBaseItemType.ARTICLE));
         when(tagService.findItemIdsByTags(List.of("t1"))).thenReturn(List.of("a0"));
         when(repository.findFolderLinks()).thenReturn(List.of(folder("p", null), folder("c1", "p")));
 
         query(KnowledgeBaseFilterCriteria.builder().parentId("p").tagIds(List.of("t1")).build(), null, null, 20);
 
-        assertThat(articleParent().parentIds()).containsExactlyInAnyOrder("p", "c1");
-        verify(repository, never()).findFolders(any(), any(), any(), any(), anyInt());
+        KnowledgeBaseParentFilter parent = articleParent();
+        assertThat(parent.parentIds()).containsExactlyInAnyOrder("p", "c1");
+        verify(repository).findFolders(eq(parent), isNull(), eq(List.of("a0")), isNull(), anyInt());
     }
 
     @Test
-    @DisplayName("no scope, tags at the root: root folders, and the tagged articles of every level")
-    void withoutScopeATagFilterAtTheRootReadsArticlesFromEveryLevel() {
+    @DisplayName("no scope, tags at the root: the whole knowledge base")
+    void withoutScopeATagFilterAtTheRootReadsEveryLevel() {
         stubRepository(List.of(), items("a", 1, KnowledgeBaseItemType.ARTICLE));
         when(tagService.findItemIdsByTags(List.of("t1"))).thenReturn(List.of("a0"));
 
         query(KnowledgeBaseFilterCriteria.builder().tagIds(List.of("t1")).build(), null, null, 20);
 
-        assertThat(folderParent()).isEqualTo(KnowledgeBaseParentFilter.root());
+        assertThat(folderParent()).isEqualTo(KnowledgeBaseParentFilter.any());
         assertThat(articleParent()).isEqualTo(KnowledgeBaseParentFilter.any());
     }
 

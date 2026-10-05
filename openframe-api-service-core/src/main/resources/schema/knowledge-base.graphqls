@@ -23,9 +23,8 @@ input KnowledgeBaseFilterInput {
     type: KnowledgeBaseItemType
     tagIds: [ID]
     """
-    How far below parentId to look. Omitted, the listing keeps the rules that predate this
-    argument: one level, except that a search or a tag filter returns the matching articles of the
-    whole subtree and no folders.
+    How far below parentId to look, for folders and articles alike. Omitted: CHILDREN, or
+    DESCENDANTS when the listing carries a search or tagIds.
     """
     scope: KnowledgeBaseScope
 }
@@ -33,7 +32,7 @@ input KnowledgeBaseFilterInput {
 """
 The reach of a knowledgeBaseItems listing. An absent parentId cannot say it on its own: it already
 means the root level, so it cannot also mean every level. In both scopes folders come first, by
-name, then articles, most recently updated first.
+name (case-insensitive, digits by value), then articles, most recently updated first.
 """
 enum KnowledgeBaseScope {
     "The items directly under parentId; the root level when there is none."

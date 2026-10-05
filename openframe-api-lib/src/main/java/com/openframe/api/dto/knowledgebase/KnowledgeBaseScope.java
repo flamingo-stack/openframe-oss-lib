@@ -7,8 +7,8 @@ package com.openframe.api.dto.knowledgebase;
  * CHILDREN — the items directly under parentId (the root level without one).
  * DESCENDANTS — everything under parentId at any depth (the whole knowledge base without one).
  *
- * A listing asked without a scope keeps the rules that predate it: one level, except that a search
- * or a tag filter returns the matching articles of the whole subtree and no folders.
+ * Folders and articles always share the scope. A listing asked without one reads CHILDREN, or
+ * DESCENDANTS when it carries a search or a tag filter.
  */
 public enum KnowledgeBaseScope {
     CHILDREN,

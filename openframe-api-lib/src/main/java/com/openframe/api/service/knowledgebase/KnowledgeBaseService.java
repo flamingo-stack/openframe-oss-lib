@@ -64,7 +64,12 @@ public class KnowledgeBaseService {
         int limit = normalized.getLimit();
 
         List<String> restrictToItemIds = resolveTagFilter(filter.getTagIds());
-        ItemStreams streams = resolveStreams(filter, search, restrictToItemIds != null);
+        boolean wantsFolders = filter.getType() != KnowledgeBaseItemType.ARTICLE;
+        boolean wantsArticles = filter.getType() != KnowledgeBaseItemType.FOLDER;
+        // Folders and articles always read from the same parents: a search that reaches three
+        // levels down for articles reaches three levels down for folders too.
+        KnowledgeBaseParentFilter parent = parentFilter(
+                filter.getParentId(), effectiveScope(filter, search, restrictToItemIds != null));
 
         // A folder cursor continues the folder stream; an article cursor means the folders have
         // already been served.
@@ -74,11 +79,11 @@ public class KnowledgeBaseService {
         List<KnowledgeBaseItem> folders = List.of();
         long folderCount = 0;
         boolean hasNextPage = false;
-        if (streams.folders() != null) {
-            folderCount = repository.countFolders(streams.folders(), search, restrictToItemIds);
+        if (wantsFolders) {
+            folderCount = repository.countFolders(parent, search, restrictToItemIds);
             if (!pastFolders) {
                 List<KnowledgeBaseItem> raw = repository.findFolders(
-                        streams.folders(), search, restrictToItemIds, cursor, limit + 1);
+                        parent, search, restrictToItemIds, cursor, limit + 1);
                 hasNextPage = raw.size() > limit;
                 folders = hasNextPage ? raw.subList(0, limit) : raw;
             }
@@ -86,12 +91,12 @@ public class KnowledgeBaseService {
 
         List<KnowledgeBaseItem> articles = List.of();
         long articleCount = 0;
-        if (streams.articles() != null) {
+        if (wantsArticles) {
             articleCount = repository.countArticles(
-                    streams.articles(), search, restrictToItemIds, filter.getStatuses());
+                    parent, search, restrictToItemIds, filter.getStatuses());
             int articleLimit = limit - folders.size();
             if (articleLimit > 0) {
-                PagedArticles paged = fetchArticlesPage(streams.articles(), search, restrictToItemIds,
+                PagedArticles paged = fetchArticlesPage(parent, search, restrictToItemIds,
                         filter.getStatuses(), pastFolders ? cursor : null, articleLimit);
                 articles = paged.items();
                 hasNextPage = paged.hasNextPage();
@@ -314,32 +319,19 @@ public class KnowledgeBaseService {
         return repository.save(item);
     }
 
-    /** The parents each stream of a listing reads from; null when that stream is not part of it. */
-    private record ItemStreams(KnowledgeBaseParentFilter folders, KnowledgeBaseParentFilter articles) {
-    }
-
-    private ItemStreams resolveStreams(KnowledgeBaseFilterCriteria filter, String search, boolean tagFiltered) {
-        boolean wantsFolders = filter.getType() != KnowledgeBaseItemType.ARTICLE;
-        boolean wantsArticles = filter.getType() != KnowledgeBaseItemType.FOLDER;
-        String parentId = filter.getParentId();
-
+    /**
+     * A listing that names no scope reads one level — unless it narrows by a search or by tags,
+     * then it reads the whole subtree. Narrowing a single level is rarely what is meant: the match
+     * a user is looking for is usually further down.
+     */
+    private static KnowledgeBaseScope effectiveScope(KnowledgeBaseFilterCriteria filter, String search,
+                                                     boolean tagFiltered) {
         if (filter.getScope() != null) {
-            KnowledgeBaseParentFilter parent = parentFilter(parentId, filter.getScope());
-            return new ItemStreams(wantsFolders ? parent : null, wantsArticles ? parent : null);
+            return filter.getScope();
         }
-
-        // No scope: the rules that predate the argument, kept exactly for the callers that do not
-        // send it (released app bundles, the external API, the AI agent). Folders are one level.
-        // Articles are one level too, unless a search or a tag filter is present — then they come
-        // from the whole subtree, and under a search or inside a folder they come alone.
-        boolean searching = StringUtils.hasText(search);
-        boolean articlesOnly = wantsArticles && (searching || (StringUtils.hasText(parentId) && tagFiltered));
-        KnowledgeBaseParentFilter level = parentFilter(parentId, KnowledgeBaseScope.CHILDREN);
-        KnowledgeBaseParentFilter articles = null;
-        if (wantsArticles) {
-            articles = searching || tagFiltered ? parentFilter(parentId, KnowledgeBaseScope.DESCENDANTS) : level;
-        }
-        return new ItemStreams(wantsFolders && !articlesOnly ? level : null, articles);
+        return StringUtils.hasText(search) || tagFiltered
+                ? KnowledgeBaseScope.DESCENDANTS
+                : KnowledgeBaseScope.CHILDREN;
     }
 
     private KnowledgeBaseParentFilter parentFilter(String parentId, KnowledgeBaseScope scope) {

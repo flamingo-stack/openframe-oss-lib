@@ -52,6 +52,20 @@ class KnowledgeBaseItemKeysetQueryTest {
     }
 
     @Test
+    @DisplayName("folders: the name is compared case-insensitively and with digits by value")
+    void foldersAreOrderedUnderTheNameCollation() {
+        repo.findFolders(KnowledgeBaseParentFilter.root(), null, null, null, 21);
+
+        // Sort and keyset comparison both follow the query's collation.
+        assertThat(capturedFind().getCollation())
+                .contains(CustomKnowledgeBaseItemRepositoryImpl.FOLDER_NAME_COLLATION);
+        assertThat(CustomKnowledgeBaseItemRepositoryImpl.FOLDER_NAME_COLLATION.toDocument())
+                .containsEntry("locale", "en")
+                .containsEntry("strength", 2)
+                .containsEntry("numericOrdering", true);
+    }
+
+    @Test
     @DisplayName("articles: sorted by updatedAt desc / _id desc, limited, continued after the cursor")
     void articlesArePagedByUpdatedAtThenId() {
         Instant updatedAt = Instant.ofEpochMilli(1_760_000_000_000L);
@@ -70,6 +84,8 @@ class KnowledgeBaseItemKeysetQueryTest {
         List<?> tie = (List<?>) ((Document) position.get(1)).get("$and");
         assertThat(((Document) tie.get(0)).get("updatedAt")).isEqualTo(updatedAt);
         assertThat(((Document) tie.get(1)).get("_id")).isEqualTo(new Document("$lt", new ObjectId(ID)));
+        // Articles are ordered by a date: no collation, so the plain indexes stay usable.
+        assertThat(query.getCollation()).isEmpty();
     }
 
     @Test

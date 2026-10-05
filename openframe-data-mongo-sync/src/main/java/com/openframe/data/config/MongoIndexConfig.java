@@ -1,6 +1,7 @@
 package com.openframe.data.config;
 
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,6 +94,35 @@ public class MongoIndexConfig {
                         .named(SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX)
                         .partial(PartialIndexFilter.of(Criteria.where("status")
                                 .in(ScriptStatus.ACTIVE.name(), ScriptStatus.ARCHIVED.name()))));
+
+        initKnowledgeBaseFolderIndexes();
+    }
+
+    /**
+     * Knowledge base folders are listed by name under a collation (case-insensitive, digits by
+     * value). A query that names a collation can use an index only if the index was built with the
+     * same one — for the sort, and for the string equalities on tenantId/parentId/type in front of
+     * it. So these two are created here, from the very constant the query uses, rather than by a
+     * @CompoundIndex that would have to restate it. The first serves a level or a subtree, the
+     * second the whole knowledge base.
+     */
+    private void initKnowledgeBaseFolderIndexes() {
+        mongoTemplate.indexOps("knowledge_base_items").ensureIndex(
+                new Index().on("tenantId", Sort.Direction.ASC)
+                        .on("parentId", Sort.Direction.ASC)
+                        .on("type", Sort.Direction.ASC)
+                        .on("name", Sort.Direction.ASC)
+                        .on("_id", Sort.Direction.DESC)
+                        .named("knowledge_base_items_parent_type_name_collated")
+                        .collation(CustomKnowledgeBaseItemRepositoryImpl.FOLDER_NAME_COLLATION));
+
+        mongoTemplate.indexOps("knowledge_base_items").ensureIndex(
+                new Index().on("tenantId", Sort.Direction.ASC)
+                        .on("type", Sort.Direction.ASC)
+                        .on("name", Sort.Direction.ASC)
+                        .on("_id", Sort.Direction.DESC)
+                        .named("knowledge_base_items_type_name_collated")
+                        .collation(CustomKnowledgeBaseItemRepositoryImpl.FOLDER_NAME_COLLATION));
     }
 
     private void dropStaleIndex(String collection, String indexName) {

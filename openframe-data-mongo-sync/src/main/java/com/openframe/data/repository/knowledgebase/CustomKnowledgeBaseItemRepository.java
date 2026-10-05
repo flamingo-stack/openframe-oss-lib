@@ -7,7 +7,10 @@ import java.util.List;
 
 public interface CustomKnowledgeBaseItemRepository {
 
-    /** Folders after {@code cursor} (null = from the start), ordered by name asc, _id desc. */
+    /**
+     * Folders after {@code cursor} (null = from the start), ordered by name asc, _id desc — the name
+     * compared case-insensitively and with digits by value.
+     */
     List<KnowledgeBaseItem> findFolders(KnowledgeBaseParentFilter parent, String search, List<String> itemIds,
                                         KnowledgeBaseItemCursor cursor, int limit);
 
