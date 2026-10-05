@@ -17,11 +17,12 @@
  * mounted → same-tab + same-origin relative placeholder.
  */
 
-import { Clock, ExternalLink, GraduationCap, Play } from 'lucide-react';
+import { Clock, ExternalLink, GraduationCap } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { formatDurationMMSS } from '../../../utils/format';
+import { CardHoverPlay } from '../../features/video-center-badge';
 import type { OnboardingGuide } from '../types/entities/onboarding-guide';
 import {
   COMPACT_CARD_OUTER,
@@ -36,6 +37,7 @@ import {
   COMPACT_CARD_ROW_FILLER,
 } from '../utils/compact-card-classes';
 import { BlogImagePlaceholder } from './blog-image-placeholder';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { EntityAuthorCard } from './entity-author-card';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
@@ -92,7 +94,7 @@ const HORIZONTAL_SIZE_TOKENS = {
 export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'catalog' | 'default' | 'sm' }) {
   if (size === 'catalog') {
     return (
-      <div className="flex animate-pulse flex-col gap-4 overflow-hidden rounded-lg border border-ods-border bg-ods-card p-6">
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex animate-pulse flex-col gap-4 p-6')}>
         <div className="flex flex-col gap-4 md:flex-row md:gap-6">
           <div className="aspect-[1200/630] w-full flex-shrink-0 rounded-lg bg-ods-border md:w-[256px]" />
           <div className="flex min-w-0 flex-1 flex-col">
@@ -110,19 +112,19 @@ export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'cata
           {[0, 1].map(i => (
             <div
               key={`cell-${i}`}
-              className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r"
+              className="flex flex-col gap-3 border-b border-ods-border p-4 md:border-b-0 md:border-r"
             >
               <div className="flex flex-col gap-2">
-                <div className="h-6 w-32 rounded bg-ods-bg" />
-                <div className="h-3 w-20 rounded bg-ods-bg/60" />
+                <div className="h-6 w-32 rounded bg-ods-border" />
+                <div className="h-3 w-20 rounded bg-ods-border" />
               </div>
             </div>
           ))}
-          <div className="flex items-center gap-3 bg-ods-card p-4">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-bg" />
+          <div className="flex items-center gap-3 p-4">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-border" />
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <div className="h-4 w-3/4 rounded bg-ods-bg" />
-              <div className="h-3 w-1/2 rounded bg-ods-bg/60" />
+              <div className="h-4 w-3/4 rounded bg-ods-border" />
+              <div className="h-3 w-1/2 rounded bg-ods-border" />
             </div>
           </div>
         </div>
@@ -223,14 +225,7 @@ export function OnboardingGuideCard({
         target={target}
         rel={rel}
         prefetch={false}
-        className={cn(
-          'group block bg-ods-card no-underline',
-          'overflow-hidden rounded-lg border border-ods-border',
-          'transition-all duration-300 ease-out',
-          'transform hover:translate-y-[-2px]',
-          'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',
-          className,
-        )}
+        className={cn(CONTENT_CARD_FRAME_CLASS, 'block no-underline', className)}
         aria-label={`Open ${guide.title}`}
       >
         <div className="flex flex-col gap-4 p-6">
@@ -253,11 +248,7 @@ export function OnboardingGuideCard({
                     className="absolute inset-0"
                   />
                 )}
-                {hasVideoCover && coverImage && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <Play className="h-10 w-10 text-ods-text-on-dark" fill="white" />
-                  </span>
-                )}
+                {hasVideoCover && coverImage && <CardHoverPlay size="md" />}
                 {durationLabel && (
                   <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-ods-text-on-dark text-code">
                     <Clock className="h-3 w-3" />
@@ -315,11 +306,7 @@ export function OnboardingGuideCard({
               <GraduationCap className="h-4 w-4" />
             </span>
           )}
-          {hasVideoCover && compactCover && (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
-            </span>
-          )}
+          {hasVideoCover && compactCover && <CardHoverPlay size="sm" />}
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>

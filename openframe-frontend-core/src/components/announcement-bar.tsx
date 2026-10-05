@@ -13,6 +13,7 @@ import {
 } from '../utils/announcement-storage';
 import { getAppType } from '../utils/app-config';
 import { pickReadableTextColor } from '../utils/color-analysis';
+import { pathMatchesAny } from '../utils/path-pattern';
 import { EntityIcon } from './icon-display';
 import { AnnouncementBarView } from './ui/announcement-bar-view';
 import { Button } from './ui/button';
@@ -69,6 +70,7 @@ export function AnnouncementBar({
   initialAnnouncement,
   previewMode = false,
   dismissible = true,
+  pathname,
   className,
 }: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
@@ -139,7 +141,12 @@ export function AnnouncementBar({
   );
 
   // Preview always mirrors the draft directly (storage is not consulted there).
-  const expanded = previewMode ? announcement != null : announcement != null && expandedState && !dismissed;
+  // A page that shows the news itself (a hero's news pill) is listed in the
+  // announcement's `excluded_paths` (path patterns); the bar stays collapsed there.
+  const excludedHere = pathname != null && pathMatchesAny(pathname, announcement?.excluded_paths);
+  const expanded = previewMode
+    ? announcement != null
+    : announcement != null && expandedState && !dismissed && !excludedHere;
 
   // Cleanup of the pre-refactor localStorage announcement cache. Keyed on
   // `platform` rather than `[]`: the cache is per-platform, so a platform

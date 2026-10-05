@@ -188,15 +188,13 @@ class SoftwareInventoryServiceFleetPagingTest {
     }
 
     @Test
-    void listSoftwareForDevice_devicesCountReadForPageRowsOnly() {
+    void listSoftwareForDevice_noFleetCallPerRow() {
         // setup
         when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.of(
                 List.of(title(10L, "Google Chrome", "apps", "120.0"),
                         title(11L, "node", "homebrew_packages", "20.1"),
                         title(12L, "zsh", "homebrew_packages", "5.9")),
                 List.of()));
-        when(fleet.getSoftwareTitle(10L)).thenReturn(fleetTitle("Google Chrome", 10L, 4));
-        when(fleet.getSoftwareTitle(11L)).thenReturn(fleetTitle("node", 11L, 9));
 
         // execution
         PageResult<SoftwareResponse> result = service.listSoftwareForDevice(MACHINE_ID, null, null, 0, 2, null);
@@ -204,11 +202,9 @@ class SoftwareInventoryServiceFleetPagingTest {
         // verifications
         assertThat(result.items())
                 .extracting(SoftwareResponse::getName, SoftwareResponse::getDevicesCount)
-                .containsExactly(tuple("Google Chrome", 4), tuple("node", 9));
+                .containsExactly(tuple("Google Chrome", null), tuple("node", null));
         assertThat(result.filteredCount()).isEqualTo(3);
-        verify(fleet, never()).getSoftwareTitle(12L);
-        verify(fleet, never()).listSoftwareTitles(any(SoftwareTitleRequest.class));
-        verifyNoInteractions(deviceCountEnricher);
+        verifyNoInteractions(fleet, deviceCountEnricher);
     }
 
     @Test

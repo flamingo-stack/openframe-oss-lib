@@ -121,3 +121,20 @@ export function shouldProxyImage(imageUrl: string | null, proxyPrefix?: string):
 export function generateImageSizes(_url: string): string {
   return `(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw`;
 }
+
+/**
+ * Whether an image must be served as it is, past the host's image optimizer
+ * (`<Image unoptimized>`): a Google-hosted avatar (the optimizer's fetch of it is
+ * refused, and Google already serves it at the size its URL asks for) and an SVG
+ * (a vector has nothing to resize). The one rule for every avatar and logo.
+ */
+export function skipsImageOptimizer(url: string | null | undefined): boolean {
+  if (!url) return false;
+  if (urlPathLooksLikeSvg(url)) return true;
+  try {
+    const hostname = new URL(url.startsWith('//') ? `https:${url}` : url).hostname.toLowerCase();
+    return hostname === 'googleusercontent.com' || hostname.endsWith('.googleusercontent.com');
+  } catch {
+    return false;
+  }
+}

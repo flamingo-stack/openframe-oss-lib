@@ -7,6 +7,7 @@ import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -64,6 +65,8 @@ class ScriptExecutedEnrichmentIntegrationTest {
     private ScriptExecutionRepository scriptExecutionRepository;
     @Mock
     private ScriptRepository scriptRepository;
+    @Mock
+    private CommandExecutionRepository commandExecutionRepository;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -125,7 +128,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
         // Same RmmResultEvent envelope shape as a script result — commands and scripts share it.
         CommonDebeziumMessage inbound = inboundScriptResult();
 
-        CommandResultDeserializer deserializer = new CommandResultDeserializer(mapper);
+        CommandResultDeserializer deserializer = new CommandResultDeserializer(mapper, commandExecutionRepository);
         DeserializedDebeziumMessage deserialized = deserializer.deserialize(inbound, MessageType.COMMAND_EXECUTED);
         assertThat(deserialized.getAgentId())
                 .as("CommandResultDeserializer must use machineId as agentId — the key the native enrichment looks up")
