@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { cn } from '../../../utils/cn';
 import { ApprovalBatchMessage, ApprovalStatusTag } from '../../chat/approval-batch-message';
 import { ExpandChevron } from '../../chat/expand-chevron';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
@@ -26,6 +27,11 @@ export interface ApprovalRequestNotificationTileProps {
    * two full-width, thumb-sized buttons and no command drawer.
    */
   presentation?: 'card' | 'lockscreen';
+  /**
+   * Show Approve as being pressed (a scripted demo's "the tap lands" beat):
+   * the button dims for as long as this is true. No effect once resolved.
+   */
+  approvePressed?: boolean;
 }
 
 export function ApprovalRequestNotificationTile({
@@ -39,6 +45,7 @@ export function ApprovalRequestNotificationTile({
   className,
   titleLines,
   presentation = 'card',
+  approvePressed = false,
 }: ApprovalRequestNotificationTileProps) {
   const lockscreen = presentation === 'lockscreen';
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -105,7 +112,12 @@ export function ApprovalRequestNotificationTile({
                 size="small"
                 onClick={() => resolve('approved', onApprove)}
                 disabled={processing}
-                className={lockscreen ? 'h-11 flex-1' : undefined}
+                data-pressed={approvePressed || undefined}
+                className={cn(
+                  'ease-[cubic-bezier(.2,0,0,1)] transition-[filter,transform] duration-200 motion-reduce:transition-none',
+                  lockscreen && 'h-11 flex-1',
+                  approvePressed && 'scale-[0.98] brightness-75',
+                )}
               >
                 Approve
               </Button>
