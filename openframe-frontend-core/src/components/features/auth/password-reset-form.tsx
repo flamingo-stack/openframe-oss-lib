@@ -3,6 +3,7 @@
 import type { KeyboardEvent } from 'react';
 import { useDeferredError } from '../../../hooks/ui/use-deferred-error';
 import { cn } from '../../../utils/cn';
+import { accentSentenceMarks } from '../../layout/page-heading';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { BackToLoginLink } from './back-to-login-link';
@@ -86,7 +87,7 @@ export function PasswordResetForm({
     >
       {/* Header */}
       <div className="flex flex-col">
-        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
+        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>
         <p className="text-ods-text-secondary text-h4">{subtitle}</p>
       </div>
 

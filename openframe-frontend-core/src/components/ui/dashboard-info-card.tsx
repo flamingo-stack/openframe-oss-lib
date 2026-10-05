@@ -78,6 +78,16 @@ export interface DashboardInfoCardProps {
   valueClassName?: string;
   /** Secondary text rendered beside the value (e.g. an entry/item count). */
   subValue?: ReactNode;
+  /**
+   * One line UNDER the value (what the number counts). A card with a caption
+   * grows to fit it instead of holding the fixed stat-tile height.
+   */
+  caption?: ReactNode;
+  /**
+   * The figure is still being fetched: the SAME card, its title, value and caption
+   * drawn as bars of their own line heights, so the loaded card replaces it in place.
+   */
+  loading?: boolean;
 }
 
 export function DashboardInfoCard({
@@ -97,6 +107,8 @@ export function DashboardInfoCard({
   tooltip,
   valueClassName,
   subValue,
+  caption,
+  loading = false,
 }: DashboardInfoCardProps) {
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : value;
 
@@ -191,14 +203,20 @@ export function DashboardInfoCard({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Title row: caption and/or tag (Figma "status" variant) */}
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
-          {titleSlot ?? (title !== undefined && <p className="truncate text-ods-text-secondary text-h5">{title}</p>)}
+          {loading ? (
+            <p className="text-h5">
+              <span className="block h-[1lh] w-20 animate-pulse rounded bg-ods-border" />
+            </p>
+          ) : (
+            (titleSlot ?? (title !== undefined && <p className="truncate text-ods-text-secondary text-h5">{title}</p>))
+          )}
           {titleTag}
         </div>
 
         {/* Value and percentage */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
           <p className={cn('truncate text-ods-text-primary text-h3 content-md:text-h2', valueClassName)}>
-            {formattedValue}
+            {loading ? <span className="block h-[1lh] w-24 animate-pulse rounded bg-ods-border" /> : formattedValue}
           </p>
           {subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
           {renderPercentage()}
@@ -210,6 +228,13 @@ export function DashboardInfoCard({
             </FloatingTooltip>
           )}
         </div>
+
+        {/* Two lines kept for the caption, loading or loaded, so a narrow tile is one height. */}
+        {caption && (
+          <p className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">
+            {loading ? <span className="block h-[1lh] w-32 animate-pulse rounded bg-ods-border" /> : caption}
+          </p>
+        )}
       </div>
 
       {/* Progress indicator */}
@@ -224,12 +249,16 @@ export function DashboardInfoCard({
   const baseClassName =
     'bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-xsf)] content-md:p-[var(--spacing-system-m)] h-16 content-md:h-[104px] flex gap-[var(--spacing-system-s)] content-md:gap-[var(--spacing-system-m)] items-center transition-all';
 
+  // A caption is a third line: the fixed stat-tile height would clip it.
+  const captionClassName = caption ? 'h-auto content-md:h-auto' : undefined;
+
   if (href) {
     return (
       <Link
         href={href}
         className={cn(
           baseClassName,
+          captionClassName,
           'group cursor-pointer',
           'hover:border-ods-border-hover hover:bg-ods-card-hover',
           className,
@@ -240,5 +269,5 @@ export function DashboardInfoCard({
     );
   }
 
-  return <div className={cn(baseClassName, className)}>{cardContent}</div>;
+  return <div className={cn(baseClassName, captionClassName, className)}>{cardContent}</div>;
 }

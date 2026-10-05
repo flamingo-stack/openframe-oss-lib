@@ -5,6 +5,7 @@ import type { KeyboardEvent } from 'react';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon } from '../icons-v2-generated';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
+import { CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
 import type { ThinkingDisplayProps } from './types';
@@ -74,7 +75,7 @@ const ThinkingDisplay = forwardRef<HTMLDivElement, ThinkingDisplayProps>(
     };
 
     return (
-      <div ref={ref} className={cn('rounded-[6px] border border-ods-border bg-ods-card p-1.5', className)} {...props}>
+      <div ref={ref} className={cn(CHAT_BLOCK_FRAME_CLASS, 'p-1.5', className)} {...props}>
         <div
           role="button"
           tabIndex={canToggle ? 0 : -1}

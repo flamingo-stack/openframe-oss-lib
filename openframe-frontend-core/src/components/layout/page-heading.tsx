@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { Children, Fragment, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { getPlatformBrandClasses } from '../../utils/platform-identity';
 
 /**
  * THE page-title style — the ODS `text-h1` token (`--font-size-h1-title` =
@@ -61,8 +62,141 @@ export function PageHeading({
   const hasDescription = description != null && description !== '' && typeof description !== 'boolean';
   return (
     <>
-      <Tag className={headingClass}>{children}</Tag>
+      <Tag className={headingClass}>{accentSentenceMarks(children)}</Tag>
       {hasDescription && <p className={descClass}>{description}</p>}
     </>
+  );
+}
+
+/** A sentence mark inside a title: `.`, `:`, `?` or `!` that ends a sentence (followed by a space or the end). */
+const SENTENCE_MARK = /([.:?!]+)(?=\s|$)/g;
+const ONLY_MARKS = /^\s*[.:?!]+\s*$/;
+
+/**
+ * The accent a heading's marks take, as an ODS class: a named platform's brand
+ * accent (`getPlatformBrandClasses`, the one platform → token table), else the
+ * accent of the platform the page runs on (`text-ods-accent`).
+ */
+export function headingAccentClass(platform?: string | null): string {
+  return platform ? getPlatformBrandClasses(platform).accentText : 'text-ods-accent';
+}
+
+/**
+ * A title with EVERY sentence mark in the accent colour, not only the last one:
+ * "Remote all year. Together once a year." has two accent dots. Every heading
+ * goes through it (`SectionHeading`, `PageHeading`, and any title set by hand).
+ * `platform` names the brand whose accent is used, for a section that shows
+ * another product; omitted, it is the platform the page runs on.
+ *
+ * Text is walked through fragments and elements (a highlighted `<span>` keeps
+ * its own colour for its letters). A mark inside a number or a version
+ * (`$6.7M`, `v1.5.0`) is not a sentence mark and is left alone.
+ */
+export function accentSentenceMarks(node: ReactNode, platform?: string | null): ReactNode {
+  return accentMarks(node, headingAccentClass(platform));
+}
+
+function accentMarks(node: ReactNode, accentClassName: string): ReactNode {
+  if (typeof node === 'string') {
+    // A string that is ONLY marks is one a caller already wrapped in its own colour: keep it.
+    if (ONLY_MARKS.test(node)) return node;
+    const parts = node.split(SENTENCE_MARK);
+    if (parts.length === 1) return node;
+    return parts.map((part, index) =>
+      // `split` with one capture group alternates text, mark, text, mark...
+      index % 2 === 1 ? (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
+        <span key={index} className={accentClassName}>
+          {part}
+        </span>
+      ) : (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
+        <Fragment key={index}>{part}</Fragment>
+      ),
+    );
+  }
+  if (Array.isArray(node)) {
+    return Children.map(node as ReactNode[], child => accentMarks(child, accentClassName));
+  }
+  if (isValidElement(node)) {
+    const element = node as ReactElement<{ children?: ReactNode }>;
+    if (element.props.children === undefined) return node;
+    return cloneElement(element, undefined, accentMarks(element.props.children, accentClassName));
+  }
+  return node;
+}
+
+const SECTION_HEADING_LAYOUT = {
+  page: {
+    stack: 'flex flex-col gap-[var(--spacing-system-lf)]',
+    heading: PAGE_HEADING_CLASS,
+    intro: 'max-w-[600px] text-h4 text-ods-text-primary',
+  },
+  section: {
+    stack: 'flex max-w-[640px] flex-col gap-[var(--spacing-system-sf)]',
+    heading: SECTION_HEADING_CLASS,
+    intro: 'text-h4 text-ods-text-secondary',
+  },
+} as const;
+
+export interface SectionHeadingProps {
+  /** The small label above the heading (Azeret Mono, uppercase, accent colour). */
+  eyebrow?: ReactNode;
+  /** The heading text; a node when part of it is highlighted. Every sentence mark in it is drawn in the accent colour. */
+  title: ReactNode;
+  /** The accent mark that closes the heading (`.`, `:`, `?`). `null` for none. Default `.`. */
+  punctuation?: string | null;
+  /** The supporting copy under the heading. */
+  intro?: ReactNode;
+  /** Something at the far end of the heading's row (a "See all" link). */
+  action?: ReactNode;
+  /** `page` = the page's `<h1>` (a hero); `section` = an `<h2>`. Default `section`. */
+  level?: 'page' | 'section';
+  /**
+   * The brand whose accent the eyebrow and the sentence marks take, for a section
+   * that shows ANOTHER product. Omitted: the platform the page runs on.
+   */
+  platform?: string | null;
+  /** Extra classes on the outer row. */
+  className?: string;
+}
+
+/**
+ * THE heading block of a page section or hero: an eyebrow, the heading with its
+ * accent punctuation, an intro, and an optional action at the end of the row.
+ * Every section on every site composes this, so a change to the layout lands
+ * everywhere at once.
+ */
+export function SectionHeading({
+  eyebrow,
+  title,
+  punctuation = '.',
+  intro,
+  action,
+  level = 'section',
+  platform,
+  className,
+}: SectionHeadingProps) {
+  const accentClassName = headingAccentClass(platform);
+  const layout = SECTION_HEADING_LAYOUT[level];
+  const Tag = level === 'page' ? 'h1' : 'h2';
+  const stack = (
+    <div className={layout.stack}>
+      {eyebrow ? <span className={`text-h5 ${accentClassName}`}>{eyebrow}</span> : null}
+      <Tag className={layout.heading}>
+        {accentSentenceMarks(title, platform)}
+        {punctuation ? <span className={accentClassName}>{punctuation}</span> : null}
+      </Tag>
+      {intro ? <div className={layout.intro}>{intro}</div> : null}
+    </div>
+  );
+  if (!action) return className ? <div className={className}>{stack}</div> : stack;
+  return (
+    <div
+      className={`flex flex-wrap items-end justify-between gap-[var(--spacing-system-mf)]${className ? ` ${className}` : ''}`}
+    >
+      {stack}
+      {action}
+    </div>
   );
 }

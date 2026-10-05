@@ -1,7 +1,6 @@
 package com.openframe.stream.deserializer;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -119,14 +118,6 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
             log.warn("Failed to attach the script input to the script-result block", e);
             return baseResult;
         }
-    }
-
-    private ObjectNode toObjectNode(String json) throws JsonProcessingException {
-        if (json == null) {
-            return mapper.createObjectNode();
-        }
-        JsonNode parsed = mapper.readTree(json);
-        return parsed.isObject() ? (ObjectNode) parsed : mapper.createObjectNode();
     }
 
     private Optional<Script> findScript(JsonNode after) {

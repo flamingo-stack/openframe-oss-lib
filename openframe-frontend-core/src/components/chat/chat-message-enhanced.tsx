@@ -1,10 +1,11 @@
 'use client';
 
-import React, { forwardRef, memo, useEffect, useMemo, useRef } from 'react';
+import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
 import { formatDate, formatTime } from '../../utils/format-date';
+import { AgentMark } from '../agent-mark';
 import type { MdRenderProps } from '../ui/markdown/base-components';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -514,35 +515,41 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       });
     };
 
-    const getAvatarProps = () => {
-      const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
-      const isMingo = assistantType === 'mingo';
-
-      return {
-        src: avatar || undefined,
-        alt: `${displayName} avatar`,
-        // Pass the FULL name — SquareAvatar derives first+last initials itself
-        // (passing pre-joined initials like "PS" would collapse to one letter,
-        // since getFirstLastInitials treats it as a single word).
-        fallback: displayName,
-        // v2 (fae chat v2): a 24px face that sits on the name's line height.
-        size: isV2 ? ('xs' as const) : ('sm' as const),
-        variant: 'round' as const,
-        // User avatar: compact 20×20 with 2px padding and a subtle gray fill
-        // (`bg-ods-card`) so the `border-ods-border` ring stays visible — the
-        // brand fill reads poorly for a user. Assistant/Fae keep their brand
-        // fill. Initials are smaller + muted gray for the user placeholder.
-        ...(isUser ? { initialsClassName: 'text-[9px] text-ods-text-secondary' } : {}),
-        className: cn(
-          'flex-shrink-0',
-          isUser ? 'h-5 w-5 bg-ods-card p-0.5' : isMingo ? 'bg-ods-flamingo-cyan' : 'bg-ods-flamingo-pink',
-        ),
-      };
-    };
-
-    const avatarProps = getAvatarProps();
-
     const isSystem = authorType === 'system';
+
+    // A thread can hold several people (a user, a colleague, a technician, two
+    // agents), so every turn says who is speaking with a FACE. The face sits on
+    // its own short line above the message (on the right for the user), never
+    // beside it: a face in the row indents every line of the message by its
+    // width. The NAME is written only where it is the information itself: a
+    // system line and a human technician. Every face carries its name for
+    // assistive tech and on hover.
+    const showName = isSystem || authorType === 'admin';
+    const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
+    const faceBox = 'h-5 w-5 flex-shrink-0';
+    const face: ReactNode =
+      !showAvatar || isSystem ? null : !isUser && !avatar && assistantIcon ? (
+        <span title={displayName} className={cn('flex items-center justify-center', faceBox)}>
+          {assistantIcon}
+        </span>
+      ) : !isUser && !avatar && assistantType ? (
+        // An agent with no picture shows its packaged mark, never initials.
+        <span role="img" aria-label={displayName} title={displayName} className={cn('inline-flex', faceBox)}>
+          <AgentMark agent={assistantType} className="h-full w-full rounded-full" />
+        </span>
+      ) : (
+        <span title={displayName} className="inline-flex flex-shrink-0">
+          <SquareAvatar
+            src={avatar || undefined}
+            alt={displayName}
+            fallback={displayName}
+            variant="round"
+            size="xs"
+            sizePx={20}
+            initialsClassName="text-[9px] text-ods-text-secondary"
+          />
+        </span>
+      );
 
     // v2 draws a system line (e.g. a technician joining) as an in-thread
     // receipt card rather than as an author row with no body.
@@ -584,68 +591,17 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             vs ~9ms as grid (Chrome: ~2ms either way). Same gap and stretch,
             no margin collapsing — visually identical. */}
           <div className="grid min-w-0 grid-cols-1 gap-[var(--spacing-system-xxs)]">
-            {/* Avatar + Name + Timestamp Row.
-              Sizing rationale (per design-token measurements):
-                - Name uses `text-h3` = 14px mobile / 18px desktop.
-                - Avatar uses `SquareAvatar size="sm"` = 32px — the
-                  canonical primitive at the smallest preset, giving a
-                  ~1.78x ratio against the 18px name text (Material
-                  Design 3 + Apple HIG inline-avatar standard).
-                - Gap is `var(--spacing-system-xs)` = 8px, the standard
-                  inline-component separator across this design system.
-              For the `assistantIcon` branch (host supplies a JSX icon
-              like the Mingo logo), the wrapper matches `SquareAvatar
-              size="sm"` (h-8 w-8 = 32px) so BOTH branches present at
-              the same visual weight. Host-supplied icons render
-              inside via `flex items-center justify-center` — they
-              should be sized at ~50-60% of the wrapper (h-4 w-4 =
-              16px works well for a 32px circle). */}
-            <div
-              className={cn(
-                'flex items-center',
-                isV2 ? 'gap-[var(--spacing-system-xxs)]' : 'gap-[var(--spacing-system-xs)]',
-              )}
-            >
-              {/* Avatar rules:
-                - Assistant/Fae always show an avatar — host brand icon when no
-                  image is supplied, else the filled SquareAvatar.
-                - User shows the SquareAvatar ONLY when an avatar image actually
-                  arrived. With no user avatar we hide the block entirely (just
-                  the name), instead of an initials placeholder. TEMPORARY —
-                  restore the user placeholder when user avatars ship. */}
-              {showAvatar &&
-                !isSystem &&
-                !(isUser && !avatar) &&
-                (!isUser && assistantIcon && !avatar ? (
-                  // Host-supplied brand icon (e.g. Mingo): render it directly,
-                  // no filled pill — the icon carries its own brand accent.
-                  <div className="flex flex-shrink-0 items-center justify-center">{assistantIcon}</div>
-                ) : (
-                  <SquareAvatar {...avatarProps} />
-                ))}
-              <span
-                className={cn(
-                  'flex-1 !font-mono !font-medium text-h3',
-                  authorType === 'system'
-                    ? 'text-ods-open-yellow'
-                    : authorType === 'admin'
-                      ? 'text-ods-open-yellow'
-                      : authorType === 'mingo'
-                        ? 'text-ods-flamingo-cyan'
-                        : authorType === 'fae'
-                          ? 'text-ods-flamingo-pink'
-                          : 'text-ods-text-secondary',
+            {(face || showName) && (
+              <div className={cn('flex items-center gap-[var(--spacing-system-xs)]', isUser && 'justify-end')}>
+                {face}
+                {showName && <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>}
+                {showName && timestamp && (
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
+                    {formatMessageTimestamp(timestamp)}
+                  </span>
                 )}
-              >
-                {name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae')}
-                {!isSystem && !isV2 && ':'}
-              </span>
-              {timestamp && (
-                <span className="shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
-                  {formatMessageTimestamp(timestamp)}
-                </span>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Message segments — hidden for system messages without content */}
             {(!isSystem || segments.length > 0) && (
@@ -658,6 +614,20 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   // the engine does one authoritative whole-document parse.
                   const segmentIsStreaming = index === segments.length - 1 && !!isTyping;
                   if (segment.type === 'text') {
+                    // The layout of Claude and ChatGPT: what the USER said is a
+                    // bubble on the right; what anyone else says is plain text
+                    // across the thread's full width, with no bubble. Nothing
+                    // takes a column, so every line gets the whole width (the
+                    // speaker's face is the short line above).
+                    if (isUser) {
+                      return (
+                        <div key={index} className="flex min-w-0 justify-end">
+                          <div className="min-w-0 max-w-[85%] break-words rounded-xl bg-ods-bg-active px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-ods-text-primary text-h4">
+                            {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <div
                         key={index}
@@ -740,6 +710,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   return null;
                 })}
               </div>
+            )}
+
+            {timestamp && !showName && (
+              <span className={cn('text-ods-text-secondary text-h6', isUser && 'justify-self-end')}>
+                {formatMessageTimestamp(timestamp)}
+              </span>
             )}
 
             {/* Attached entity-context chips (user bubbles). Read-only — no

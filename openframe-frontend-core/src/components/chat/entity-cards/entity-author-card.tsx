@@ -87,7 +87,7 @@ export function EntityMetadataValueCell({
   uppercase?: boolean;
 }) {
   return (
-    <div className={`flex flex-col gap-3 bg-ods-card p-4 ${className ?? ''}`}>
+    <div className={`flex flex-col gap-3 p-4 ${className ?? ''}`}>
       <div className="flex flex-col gap-0">
         {typeof value === 'string' ? (
           <p className="text-ods-text-primary text-h4">{uppercase ? value.toLocaleUpperCase() : value}</p>
@@ -121,7 +121,7 @@ export function EntityMetadataAuthorCell({
   const trimmedName = typeof author.full_name === 'string' ? author.full_name.trim() : '';
   const fullName = trimmedName || 'Unknown Author';
   return (
-    <div className={`flex items-center gap-3 bg-ods-card p-4 ${className ?? ''}`}>
+    <div className={`flex items-center gap-3 p-4 ${className ?? ''}`}>
       <SquareAvatar
         src={author.avatar_url || ''}
         alt={fullName}
