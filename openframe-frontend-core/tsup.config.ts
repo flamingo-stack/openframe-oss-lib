@@ -105,7 +105,6 @@ export default defineConfig([
     format: ['esm', 'cjs'],
     dts: false,
     splitting: false,
-    sourcemap: true,
     external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
     treeshake: true,
   },
@@ -178,7 +177,6 @@ export default defineConfig([
     format: ['esm', 'cjs'],
     dts: false,
     splitting: true,
-    sourcemap: true,
     external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
     banner: {
       js: '"use client";',
