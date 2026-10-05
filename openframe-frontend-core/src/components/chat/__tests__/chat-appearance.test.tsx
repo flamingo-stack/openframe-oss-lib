@@ -7,24 +7,39 @@ import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import { ErrorMessageDisplay } from '../error-message-display';
 
 describe('chat appearance', () => {
-  it('classic keeps the colon after the author name', () => {
+  it('an assistant turn is plain text under the agent mark, with no written name', () => {
     render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" />);
-    expect(screen.getByText('Fae:')).toBeTruthy();
-  });
-
-  it('v2 drops the colon after the author name', () => {
-    render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" appearance="v2" />);
-    expect(screen.getByText('Fae')).toBeTruthy();
+    expect(screen.getByText('Hi')).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Fae' })).toBeTruthy();
+    expect(screen.queryByText('Fae')).toBeNull();
     expect(screen.queryByText('Fae:')).toBeNull();
   });
 
-  it('a row inherits v2 from the thread context', () => {
+  it('v2 draws the same, with no written name', () => {
+    render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" appearance="v2" />);
+    expect(screen.getByText('Hi')).toBeTruthy();
+    expect(screen.queryByText('Fae')).toBeNull();
+  });
+
+  it('a user turn is a bubble under their face, with no written name, in a v2 thread too', () => {
     render(
       <ChatAppearanceContext.Provider value="v2">
         <ChatMessageEnhanced role="user" name="John Smith" content="Hi" />
       </ChatAppearanceContext.Provider>,
     );
-    expect(screen.getByText('John Smith')).toBeTruthy();
+    expect(screen.getByText('Hi')).toBeTruthy();
+    expect(screen.getByTitle('John Smith')).toBeTruthy();
+    expect(screen.queryByText('John Smith')).toBeNull();
+  });
+
+  it('a turn can hide its face', () => {
+    render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" showAvatar={false} />);
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('a technician in the thread keeps a name caption', () => {
+    render(<ChatMessageEnhanced role="assistant" authorType="admin" name="Roman Smith" content="On it" />);
+    expect(screen.getByText('Roman Smith')).toBeTruthy();
   });
 
   it('v2 blocks sit on the page surface', () => {

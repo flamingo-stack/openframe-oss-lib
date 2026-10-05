@@ -25,6 +25,7 @@ import {
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
 import { AdminContentCard } from './admin-content-card';
+import { CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
@@ -67,13 +68,13 @@ export function InvestorUpdateCardSkeleton({ size = 'default' }: { size?: 'defau
     );
   }
   return (
-    <div className="h-full animate-pulse overflow-hidden rounded-lg border border-ods-border bg-ods-card">
-      <div className="aspect-[1200/630] bg-ods-bg" />
+    <div className={`h-full animate-pulse ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
+      <div className="aspect-[1200/630] bg-ods-border" />
       <div className="space-y-3 p-4">
-        <div className="h-5 w-3/4 rounded bg-ods-bg" />
-        <div className="h-3 w-full rounded bg-ods-bg/60" />
-        <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
-        <div className="h-4 w-1/3 rounded bg-ods-bg/60" />
+        <div className="h-5 w-3/4 rounded bg-ods-border" />
+        <div className="h-3 w-full rounded bg-ods-border" />
+        <div className="h-3 w-4/5 rounded bg-ods-border" />
+        <div className="h-4 w-1/3 rounded bg-ods-border" />
       </div>
     </div>
   );

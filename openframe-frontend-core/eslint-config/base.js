@@ -6,6 +6,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 import { ignores } from './ignores.js';
+import { webviewPerformancePlugin } from './webview-performance.js';
 
 /**
  * Promote every `warn` in a third-party config to `error`.
@@ -289,6 +290,20 @@ export const base = [
     name: 'flamingo/base/jsx-pragma',
     files: ['**/*.{jsx,tsx}'],
     languageOptions: { parserOptions: { jsxPragma: null } },
+  },
+
+  // Patterns measured to be cheap in Chrome and expensive in WebKit (Safari and
+  // the desktop/iOS shells' WKWebView) — see ./webview-performance.js. Tests and
+  // stories are not render paths users sit on.
+  {
+    name: 'flamingo/base/webview-performance',
+    files: ['**/*.{js,mjs,jsx,ts,mts,tsx}'],
+    ignores: ['**/*.{test,spec}.{js,mjs,jsx,ts,mts,tsx}', '**/__tests__/**', '**/*.stories.{js,jsx,ts,tsx,mdx}'],
+    plugins: { flamingo: webviewPerformancePlugin },
+    rules: {
+      'flamingo/no-inline-style-element': 'error',
+      'flamingo/no-whole-store-subscription': 'error',
+    },
   },
 
   // Type declaration files describe other people's shapes; most of the base

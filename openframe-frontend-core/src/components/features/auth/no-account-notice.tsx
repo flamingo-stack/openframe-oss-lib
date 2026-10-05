@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
+import { accentSentenceMarks } from '../../layout/page-heading';
 import { Button } from '../../ui/button';
 
 export interface NoAccountNoticeProps {
@@ -31,7 +32,7 @@ export function NoAccountNotice({
     >
       <div className="flex w-full max-w-[600px] flex-col gap-[var(--spacing-system-l)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xl)]">
         <div className="flex flex-col">
-          <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
+          <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>
           <p className="text-ods-text-secondary text-h4">{description}</p>
         </div>
         <Button type="button" variant="outline" fullWidth onClick={onBackToLogin}>

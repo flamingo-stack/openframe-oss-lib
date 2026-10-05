@@ -10,6 +10,10 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.service.AssignmentService;
+import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
+import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.assignment.AssignmentTargetType;
@@ -139,14 +143,14 @@ public class KnowledgeBaseService {
         log.info("Deleting folder {} (childrenAction={}, moveTarget={})", id, action, moveTargetFolderId);
         KnowledgeBaseItem folder = getById(id);
         if (folder.getType() != KnowledgeBaseItemType.FOLDER) {
-            throw new IllegalStateException("Only folders can be deleted via deleteFolder. Use archiveArticle for articles.");
+            throw new ConflictException(ErrorCode.CONFLICT, "Only folders can be deleted via deleteFolder. Use archiveArticle for articles.");
         }
 
         List<KnowledgeBaseItem> children = repository.findByParentId(id);
 
         if (!children.isEmpty()) {
             if (action == null) {
-                throw new IllegalArgumentException(
+                throw new ValidationException(
                         "Folder has children — childrenAction (MOVE or ARCHIVE) is required.");
             }
             switch (action) {
@@ -209,7 +213,7 @@ public class KnowledgeBaseService {
         log.info("Publishing article {}", id);
         KnowledgeBaseItem article = getById(id);
         if (article.getType() != KnowledgeBaseItemType.ARTICLE) {
-            throw new IllegalStateException("Only articles can be published.");
+            throw new ConflictException(ErrorCode.CONFLICT, "Only articles can be published.");
         }
         article.setStatus(KnowledgeBaseArticleStatus.PUBLISHED);
         return repository.save(article);
@@ -220,7 +224,7 @@ public class KnowledgeBaseService {
         log.info("Unpublishing article {}", id);
         KnowledgeBaseItem article = getById(id);
         if (article.getType() != KnowledgeBaseItemType.ARTICLE) {
-            throw new IllegalStateException("Only articles can be unpublished.");
+            throw new ConflictException(ErrorCode.CONFLICT, "Only articles can be unpublished.");
         }
         article.setStatus(KnowledgeBaseArticleStatus.DRAFT);
         return repository.save(article);
@@ -231,7 +235,7 @@ public class KnowledgeBaseService {
         log.info("Archiving article {}", id);
         KnowledgeBaseItem item = getById(id);
         if (item.getType() != KnowledgeBaseItemType.ARTICLE) {
-            throw new IllegalStateException("Only articles can be archived. Folders must be deleted via deleteFolder.");
+            throw new ConflictException(ErrorCode.CONFLICT, "Only articles can be archived. Folders must be deleted via deleteFolder.");
         }
         item.setStatus(KnowledgeBaseArticleStatus.ARCHIVED);
         return repository.save(item);
@@ -242,10 +246,10 @@ public class KnowledgeBaseService {
         log.info("Unarchiving article {} into folder {}", id, parentId);
         KnowledgeBaseItem item = getById(id);
         if (item.getType() != KnowledgeBaseItemType.ARTICLE) {
-            throw new IllegalStateException("Only articles can be unarchived.");
+            throw new ConflictException(ErrorCode.CONFLICT, "Only articles can be unarchived.");
         }
         if (item.getStatus() != KnowledgeBaseArticleStatus.ARCHIVED) {
-            throw new IllegalStateException("Item is not archived: " + id);
+            throw new ConflictException(ErrorCode.CONFLICT, "Item is not archived: " + id);
         }
         validateParentIsFolder(parentId);
         item.setParentId(parentId);
@@ -260,11 +264,11 @@ public class KnowledgeBaseService {
 
         if (parentId != null) {
             if (parentId.equals(id)) {
-                throw new IllegalArgumentException("Cannot move item to itself.");
+                throw new ValidationException("Cannot move item to itself.");
             }
             validateParentIsFolder(parentId);
             if (item.getType() == KnowledgeBaseItemType.FOLDER && isDescendantOf(parentId, id)) {
-                throw new IllegalArgumentException("Cannot move folder into its own descendant.");
+                throw new ConflictException(ErrorCode.CONFLICT, "Cannot move folder into its own descendant.");
             }
         }
 
@@ -455,11 +459,11 @@ public class KnowledgeBaseService {
     private void moveChildren(List<KnowledgeBaseItem> children, String targetFolderId, String currentFolderId) {
         if (targetFolderId != null) {
             if (targetFolderId.equals(currentFolderId)) {
-                throw new IllegalArgumentException("Cannot move children to the folder being deleted.");
+                throw new ValidationException("Cannot move children to the folder being deleted.");
             }
             validateParentIsFolder(targetFolderId);
             if (isDescendantOf(targetFolderId, currentFolderId)) {
-                throw new IllegalArgumentException(
+                throw new ConflictException(ErrorCode.CONFLICT,
                         "Move target must not be a descendant of the folder being deleted.");
             }
         }
@@ -495,9 +499,9 @@ public class KnowledgeBaseService {
             return;
         }
         KnowledgeBaseItem parent = repository.findById(parentId)
-                .orElseThrow(() -> new IllegalArgumentException("Parent folder not found: " + parentId));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Parent folder not found: " + parentId));
         if (parent.getType() != KnowledgeBaseItemType.FOLDER) {
-            throw new IllegalStateException("Parent must be a folder: " + parentId);
+            throw new ConflictException(ErrorCode.CONFLICT, "Parent must be a folder: " + parentId);
         }
     }
 
@@ -535,7 +539,7 @@ public class KnowledgeBaseService {
 
     private KnowledgeBaseItem getById(String id) {
         return repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Knowledge base item not found: " + id));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Knowledge base item not found: " + id));
     }
 
     private void addTags(String articleId, List<String> tagIds) {

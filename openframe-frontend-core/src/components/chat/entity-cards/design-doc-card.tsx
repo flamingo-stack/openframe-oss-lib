@@ -8,6 +8,7 @@
  */
 
 import type { DesignDoc } from '../../../types/design-doc';
+import { cn } from '../../../utils/cn';
 import { formatDateShort } from '../../../utils/date-formatters';
 import {
   DESIGN_DOC_READINESS_DISPLAY,
@@ -18,6 +19,7 @@ import { InteractiveSkeleton, MediaSkeleton, TextSkeleton } from '../../loading/
 import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { StatusBadge } from '../../ui/status-badge';
 import { safeHref } from '../utils/compact-card-classes';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 
 /** The people behind a doc: the DRI first, then the implementation owners (display only). */
 export function designDocPeople(doc: Pick<DesignDoc, 'author' | 'feature_leads'>): AvatarStackPerson[] {
@@ -55,7 +57,10 @@ export interface DesignDocCardProps {
 export function DesignDocCardSkeleton() {
   return (
     <div
-      className="flex h-full flex-col gap-[16px] rounded-[6px] border border-ods-border bg-ods-card p-[24px]"
+      className={cn(
+        CONTENT_CARD_SKELETON_FRAME_CLASS,
+        'flex h-full flex-col gap-[var(--spacing-system-mf)] p-[var(--spacing-system-lf)]',
+      )}
       role="status"
       aria-label="Loading design doc"
     >
@@ -118,7 +123,11 @@ export function DesignDocCard({ doc, href, target, rel, className }: DesignDocCa
       </div>
     </>
   );
-  const outer = `flex h-full flex-col gap-[16px] rounded-[6px] border border-ods-border bg-ods-card p-[24px] transition-all hover:border-ods-accent ${className ?? ''}`;
+  const outer = cn(
+    CONTENT_CARD_FRAME_CLASS,
+    'flex h-full flex-col gap-[var(--spacing-system-mf)] p-[var(--spacing-system-lf)]',
+    className,
+  );
   return link ? (
     <a href={link} target={target} rel={rel} className={outer}>
       {body}

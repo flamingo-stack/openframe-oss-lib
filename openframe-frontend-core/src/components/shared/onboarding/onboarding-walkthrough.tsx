@@ -3,7 +3,7 @@
 import React, { useRef, useCallback } from 'react';
 import { useOnboardingState, type OnboardingStepConfig } from '../../../hooks/ui/use-onboarding-state';
 import { cn } from '../../../utils/cn';
-import { SECTION_HEADING_CLASS } from '../../layout/page-heading';
+import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../../layout/page-heading';
 import { Button } from '../../ui/button';
 import { OnboardingStepCard } from './onboarding-step-card';
 
@@ -191,7 +191,7 @@ export function OnboardingWalkthrough({
     <div className={cn('w-full space-y-4', className)}>
       {/* Header - responsive: stacks on mobile */}
       <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center md:gap-0">
-        <h2 className={SECTION_HEADING_CLASS}>{title}</h2>
+        <h2 className={SECTION_HEADING_CLASS}>{accentSentenceMarks(title)}</h2>
 
         {isLoadingCompletion ? (
           <div className="h-[48px] w-full animate-pulse rounded-[6px] bg-ods-border md:w-[160px]" />

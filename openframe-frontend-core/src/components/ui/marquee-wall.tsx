@@ -13,6 +13,8 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { useAutoplay } from '../../hooks/ui/use-autoplay';
+import { useInView } from '../../hooks/ui/use-in-view';
 import { useMarqueeEngine } from '../../hooks/ui/use-marquee-engine';
 import { useMediaQuery } from '../../hooks/ui/use-media-query';
 import { useResetOnPageHidden } from '../../hooks/ui/use-reset-on-page-hidden';
@@ -469,16 +471,19 @@ export function MarqueeWall({
   // scrolling a wall back into view resumes at cruise speed instantly — a
   // pause-reason resume would ramp 0→speed over ~250ms, a visible
   // stopped-then-start on every slide/section entry.
-  const [nearViewport, setNearViewport] = useState(true);
+  //
+  // WHEN it may move at all is the shared rule (`useAutoplay`): near the
+  // viewport, tab visible, motion allowed. Hover and drag below are pause
+  // REASONS on top of it, for content a pointer is on.
+  const { ref: observe, inView: nearViewport } = useInView<HTMLDivElement>({
+    rootMargin: NEAR_VIEWPORT_ROOT_MARGIN,
+    initial: true,
+  });
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
-    const io = new IntersectionObserver(entries => setNearViewport(entries[0]?.isIntersecting ?? true), {
-      rootMargin: NEAR_VIEWPORT_ROOT_MARGIN,
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    observe(containerRef.current);
+    return () => observe(null);
+  }, [observe]);
+  const autoplay = useAutoplay(nearViewport);
 
   // ---- pause-reason set ------------------------------------------------------
   const pointerInsideRef = useRef(false);
@@ -596,13 +601,10 @@ export function MarqueeWall({
   }, [sync, member]);
 
   const { posRef, wrap } = useMarqueeEngine({
-    active: marqueeActive && nearViewport && isDriver,
+    active: marqueeActive && autoplay.playing && isDriver,
     speed,
     isPaused: now =>
-      (pauseOnHover && pointerInsideRef.current) ||
-      draggingRef.current ||
-      now < dragSuppressUntilRef.current ||
-      document.visibilityState === 'hidden',
+      (pauseOnHover && pointerInsideRef.current) || draggingRef.current || now < dragSuppressUntilRef.current,
     getWrapSize: () => wrapSizeRef.current,
     apply: applyPos,
     // Synced pairs: a re-elected driver resumes from the pair's live position
