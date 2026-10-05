@@ -235,7 +235,9 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
           mirrored there as INSET_TRANSITION_MS — it delays the app's
           scroll-the-focused-field re-assert until this transition settles. */}
         <div
-          className="fixed inset-0 z-[1300] flex items-end justify-center transition-[padding] duration-200 md:items-center"
+          // `ods-viewport-layer`: a modal follows the window, so a modal opened from a
+          // narrow content area takes the window's tokens, not the area's mobile ones.
+          className="ods-viewport-layer fixed inset-0 z-[1300] flex items-end justify-center transition-[padding] duration-200 md:items-center"
           style={{ paddingBottom: 'var(--of-keyboard-inset, 0px)' }}
         >
           <div

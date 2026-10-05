@@ -1,7 +1,14 @@
 /* Open Design System – Responsive Design Tokens */
 /* Mobile-first approach: base = mobile, then scale up with min-width */
+/*
+ * `.ods-viewport-layer` restates the same values on an element: chrome that
+ * follows the WINDOW (a modal, a drawer) but renders inside a narrow content
+ * area, whose scope re-declares the mobile values (ods-content-area.css), gets
+ * the viewport's tokens back for its own subtree.
+ */
 
-:root {
+:root,
+.ods-viewport-layer {
   /* =================================================== */
   /* DEVICE CONTEXT */
   /* =================================================== */
@@ -77,7 +84,8 @@
 /* =================================================== */
 
 @media (min-width: 800px) {
-  :root {
+  :root,
+  .ods-viewport-layer {
     /* Device Context */
     --device-type: tablet;
     --device-screen-width: 50rem;
@@ -122,7 +130,8 @@
 /* =================================================== */
 
 @media (min-width: 1280px) {
-  :root {
+  :root,
+  .ods-viewport-layer {
     /* Device Context */
     --device-type: desktop;
     --device-screen-width: 80rem;

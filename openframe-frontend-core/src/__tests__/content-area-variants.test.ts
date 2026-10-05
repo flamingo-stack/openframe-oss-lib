@@ -105,7 +105,8 @@ describe('content-* variants', () => {
 /** `--name: value` declared directly in rules matching `selector` under `atRule` (or at the top level). */
 function declarations(root: Root, selector: string, atRule?: string) {
   const found = new Map<string, string>();
-  root.walkRules(selector, rule => {
+  root.walkRules(rule => {
+    if (!rule.selectors.includes(selector)) return;
     const parent = rule.parent as AtRule | Root;
     const params = parent.type === 'atrule' ? `@${parent.name} ${parent.params}` : undefined;
     if (params !== atRule) return;
@@ -127,6 +128,14 @@ describe('content-area tokens', () => {
       rule.walkDecls(decl => void decls.push(`${decl.prop}: ${decl.value}`)),
     );
     expect(decls).toEqual(['container: ods-content / inline-size']);
+  });
+
+  it('restates every viewport token on .ods-viewport-layer, for window chrome inside a content area', () => {
+    for (const atRule of [undefined, '@media (min-width: 800px)', '@media (min-width: 1280px)']) {
+      const onRoot = declarations(responsive, ':root', atRule);
+      expect(onRoot.size).toBeGreaterThan(0);
+      expect(declarations(responsive, '.ods-viewport-layer', atRule)).toEqual(onRoot);
+    }
   });
 
   it('re-declares, under 720px of content, the mobile value of every token the viewport steps change', () => {

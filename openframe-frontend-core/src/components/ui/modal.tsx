@@ -61,7 +61,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(({ isOpen, onClose, childre
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1300] flex items-center justify-center">
+    <div className="ods-viewport-layer fixed inset-0 z-[1300] flex items-center justify-center">
       <div className="absolute inset-0 bg-ods-overlay" onClick={onClose} aria-hidden="true" />
       <div
         ref={ref}
