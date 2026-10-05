@@ -48,6 +48,7 @@ class MachineStatusServiceTest {
         Machine m = new Machine();
         m.setMachineId(MACHINE);
         m.setStatus(status);
+        m.setTelemetryStatus(status == DeviceStatus.OFFLINE ? TelemetryStatus.OFFLINE : TelemetryStatus.ONLINE);
         m.setLastSeen(lastSeen);
         return m;
     }
@@ -88,13 +89,13 @@ class MachineStatusServiceTest {
     }
 
     @Test
-    @DisplayName("T1: heartbeat of an already ONLINE device updates presence only, never save() (no Pinot message)")
+    @DisplayName("T1: heartbeat of an already ONLINE device updates lastSeen only, never save() (no Pinot message)")
     void onlineHeartbeat_updatesLastSeenOnly() {
         machineIs(DeviceStatus.ONLINE);
 
         service.processHeartbeat(MACHINE, LATER);
 
-        verify(machineRepository).updatePresence(MACHINE, TelemetryStatus.ONLINE, LATER);
+        verify(machineRepository).updateLastSeen(MACHINE, LATER);
         verify(machineRepository, never()).save(any(Machine.class));
     }
 
@@ -109,7 +110,7 @@ class MachineStatusServiceTest {
     }
 
     @Test
-    @DisplayName("T3: OFFLINE→ONLINE saves the machine with the new status and timestamp, never updatePresence")
+    @DisplayName("T3: OFFLINE→ONLINE saves the machine with the new status and timestamp, never updateLastSeen")
     void offlineToOnline_savesAndPublishes() {
         machineIs(DeviceStatus.OFFLINE);
 
@@ -119,31 +120,31 @@ class MachineStatusServiceTest {
         verify(machineRepository).save(saved.capture());
         assertThat(saved.getValue().getStatus()).isEqualTo(DeviceStatus.ONLINE);
         assertThat(saved.getValue().getLastSeen()).isEqualTo(LATER);
-        verify(machineRepository, never()).updatePresence(anyString(), any(), any(Instant.class));
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
         verify(eventPublisher).publishEvent(any(DeviceCameOnlineEvent.class));
     }
 
     @Test
-    @DisplayName("T4: PENDING→ONLINE goes through save(), not updatePresence")
+    @DisplayName("T4: PENDING→ONLINE goes through save(), not updateLastSeen")
     void pendingToOnline_saves() {
         machineIs(DeviceStatus.PENDING);
 
         service.updateToOnline(MACHINE, LATER);
 
         verify(machineRepository).save(any(Machine.class));
-        verify(machineRepository, never()).updatePresence(anyString(), any(), any(Instant.class));
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
         verify(eventPublisher).publishEvent(any(DeviceFirstConnectedEvent.class));
     }
 
     @Test
-    @DisplayName("T5: PENDING→OFFLINE goes through save(), not updatePresence")
+    @DisplayName("T5: PENDING→OFFLINE goes through save(), not updateLastSeen")
     void pendingToOffline_saves() {
         machineIs(DeviceStatus.PENDING);
 
         service.updateToOffline(MACHINE, LATER);
 
         verify(machineRepository).save(any(Machine.class));
-        verify(machineRepository, never()).updatePresence(anyString(), any(), any(Instant.class));
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
         verify(eventPublisher).publishEvent(any(DeviceFirstConnectedEvent.class));
     }
 
@@ -155,18 +156,18 @@ class MachineStatusServiceTest {
         service.processHeartbeat(MACHINE, LATER);
 
         verify(machineRepository).save(any(Machine.class));
-        verify(machineRepository, never()).updatePresence(anyString(), any(), any(Instant.class));
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 
     @Test
-    @DisplayName("T7: a stale event touches neither save() nor updatePresence")
+    @DisplayName("T7: a stale event touches neither save() nor updateLastSeen")
     void staleEvent_touchesNothing() {
         machineIs(DeviceStatus.ONLINE);
 
         service.processHeartbeat(MACHINE, EARLIER);
 
         verify(machineRepository, never()).save(any(Machine.class));
-        verify(machineRepository, never()).updatePresence(anyString(), any(), any(Instant.class));
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 
     @Test
@@ -177,29 +178,29 @@ class MachineStatusServiceTest {
         service.processHeartbeat(MACHINE, SEEN);
 
         verify(machineRepository, never()).save(any(Machine.class));
-        verify(machineRepository, never()).updatePresence(anyString(), any(), any(Instant.class));
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 
     @Test
-    @DisplayName("T9: updateToOffline on an already OFFLINE device updates presence only")
+    @DisplayName("T9: updateToOffline on an already OFFLINE device updates lastSeen only")
     void offlineToOffline_updatesLastSeenOnly() {
         machineIs(DeviceStatus.OFFLINE);
 
         service.updateToOffline(MACHINE, LATER);
 
-        verify(machineRepository).updatePresence(MACHINE, TelemetryStatus.OFFLINE, LATER);
+        verify(machineRepository).updateLastSeen(MACHINE, LATER);
         verify(machineRepository, never()).save(any(Machine.class));
     }
 
     @Test
-    @DisplayName("T10: an ONLINE device that has never been seen still takes the presence-only path")
+    @DisplayName("T10: an ONLINE device that has never been seen still takes the lastSeen-only path")
     void nullLastSeen_onlineDevice_updatesLastSeenOnly() {
         when(machineRepository.findByMachineId(MACHINE))
                 .thenReturn(Optional.of(machine(DeviceStatus.ONLINE, null)));
 
         service.processHeartbeat(MACHINE, LATER);
 
-        verify(machineRepository).updatePresence(MACHINE, TelemetryStatus.ONLINE, LATER);
+        verify(machineRepository).updateLastSeen(MACHINE, LATER);
         verify(machineRepository, never()).save(any(Machine.class));
     }
 
@@ -212,7 +213,7 @@ class MachineStatusServiceTest {
                 .isInstanceOf(MachineNotFoundException.class);
 
         verify(machineRepository, never()).save(any(Machine.class));
-        verify(machineRepository, never()).updatePresence(anyString(), any(), any(Instant.class));
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 
     @Test
@@ -222,18 +223,36 @@ class MachineStatusServiceTest {
 
         service.processHeartbeat(MACHINE, LATER);
 
-        verify(machineRepository).updatePresence(MACHINE, TelemetryStatus.ONLINE, LATER);
+        verify(machineRepository).updateLastSeen(MACHINE, LATER);
         verify(machineRepository, never()).save(any(Machine.class));
     }
 
     @Test
-    @DisplayName("T11b: a deleted device still records that it is not talking to us, nothing else")
-    void deleted_presenceOnly() {
-        machineIs(DeviceStatus.DELETED);
+    @DisplayName("T11b: a deleted device that disconnects records the connectivity flip, status untouched")
+    void deleted_connectivityFlipSaved() {
+        Machine machine = machine(DeviceStatus.DELETED);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
 
         service.updateToOffline(MACHINE, LATER);
 
-        verify(machineRepository).updatePresence(MACHINE, TelemetryStatus.OFFLINE, LATER);
-        verify(machineRepository, never()).save(any(Machine.class));
+        verify(machineRepository).save(machine);
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
+        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.DELETED);
+        assertThat(machine.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
+    }
+
+    @Test
+    @DisplayName("T12: the first heartbeat after the field appeared fills telemetryStatus through save()")
+    void firstHeartbeat_telemetryStillEmpty_saved() {
+        Machine machine = machine(DeviceStatus.ONLINE);
+        machine.setTelemetryStatus(null);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
+
+        service.processHeartbeat(MACHINE, LATER);
+
+        verify(machineRepository).save(machine);
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
+        assertThat(machine.getTelemetryStatus()).isEqualTo(TelemetryStatus.ONLINE);
+        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.ONLINE);
     }
 }

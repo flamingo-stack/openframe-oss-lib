@@ -1,7 +1,6 @@
 package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.rmm.script.OsType;
@@ -37,7 +36,7 @@ public interface CustomMachineRepository {
      * {@code lastSeen} is not part of the Pinot payload, so heartbeats that change nothing else must
      * not produce a Kafka message.
      */
-    void updatePresence(String machineId, TelemetryStatus telemetryStatus, Instant lastSeen);
+    void updateLastSeen(String machineId, Instant lastSeen);
 
     boolean isSortableField(String field);
 

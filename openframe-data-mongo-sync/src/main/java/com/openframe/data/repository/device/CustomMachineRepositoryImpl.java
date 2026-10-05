@@ -2,7 +2,6 @@ package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.packagesearch.PackageManagerState;
@@ -39,7 +38,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String OS_TYPE_FIELD = "osType";
     private static final String MACHINE_ID_FIELD = "machineId";
     private static final String LAST_SEEN_FIELD = "lastSeen";
-    private static final String TELEMETRY_STATUS_FIELD = "telemetryStatus";
     private static final String STATUS_FIELD = "status";
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
@@ -378,10 +376,9 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     @Override
-    public void updatePresence(String machineId, TelemetryStatus telemetryStatus, Instant lastSeen) {
+    public void updateLastSeen(String machineId, Instant lastSeen) {
         Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
-        Update update = new Update().set(TELEMETRY_STATUS_FIELD, telemetryStatus).set(LAST_SEEN_FIELD, lastSeen);
-        mongoTemplate.updateFirst(query, update, Machine.class);
+        mongoTemplate.updateFirst(query, new Update().set(LAST_SEEN_FIELD, lastSeen), Machine.class);
     }
 
     @Override

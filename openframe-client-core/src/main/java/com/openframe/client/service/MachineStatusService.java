@@ -91,13 +91,22 @@ public class MachineStatusService {
     }
 
     /**
-     * Persists the heartbeat without going through {@code save}: nothing that reaches Pinot has changed,
-     * and {@code save} would make the publishing aspect emit a duplicate message for every heartbeat.
+     * A heartbeat that changes nothing but lastSeen stays out of {@code save}: nothing that reaches Pinot has changed,
+     * and {@code save} would make the publishing aspect emit a duplicate message for every heartbeat. A connectivity
+     * flip is a real change and goes through {@code save}.
      */
     private void touchPresence(Machine machine, TelemetryStatus telemetry, Instant eventTimestamp) {
-        machineRepository.updatePresence(machine.getMachineId(), telemetry, eventTimestamp);
-        log.debug("Refreshed presence for machineId={}: telemetry={} lastSeen={} (status unchanged: {})",
-                machine.getMachineId(), telemetry, eventTimestamp, machine.getStatus());
+        if (machine.getTelemetryStatus() != telemetry) {
+            machine.setTelemetryStatus(telemetry);
+            machine.setLastSeen(eventTimestamp);
+            machineRepository.save(machine);
+            log.debug("Updated machineId={} to telemetry={} at {} (status unchanged: {})",
+                    machine.getMachineId(), telemetry, eventTimestamp, machine.getStatus());
+            return;
+        }
+        machineRepository.updateLastSeen(machine.getMachineId(), eventTimestamp);
+        log.debug("Refreshed lastSeen for machineId={} at {} (status unchanged: {})",
+                machine.getMachineId(), eventTimestamp, machine.getStatus());
     }
 
     private void logStaleEvent(Machine machine, Instant eventTimestamp) {
