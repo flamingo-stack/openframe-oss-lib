@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeComposeContentUrl } from '../../../../utils/content-href';
-import { pickFetchedCardHref, resolveFetchedCardHref } from '../resolve-fetched-card-href';
+import { pickFetchedCardHref, readFetchedCardPath, resolveFetchedCardHref } from '../resolve-fetched-card-href';
+import { resolveSourceRowCTA } from '../source-row-cta';
 
 const HUB = 'https://www.flamingo.run';
 
@@ -223,5 +224,31 @@ describe('makeComposeContentUrl — hostOverride flag', () => {
       compose({ type: 'blog_post', identifier: 'b-1', externalUrl: `${HUB}/blog/x` }).hostOverride,
     ).toBeUndefined();
     expect(compose({ type: 'blog_post', identifier: 'b-1' }).hostOverride).toBeUndefined();
+  });
+});
+
+describe('readFetchedCardPath', () => {
+  it('reads the doc-tree path a doc row carries in its metadata', () => {
+    expect(readFetchedCardPath({ id: 'd-1', url: null, metadata: { path: ' legal/ein-cp-575 ' } })).toBe(
+      'legal/ein-cp-575',
+    );
+  });
+
+  it('is null for a row with no path', () => {
+    expect(readFetchedCardPath(null)).toBeNull();
+    expect(readFetchedCardPath({ id: 'd-1' })).toBeNull();
+    expect(readFetchedCardPath({ id: 'd-1', metadata: { path: '' } })).toBeNull();
+    expect(readFetchedCardPath({ id: 'd-1', metadata: { path: 7 } })).toBeNull();
+  });
+
+  it('gives a card hydrated from a bare marker the destination its source chip has', () => {
+    const ctx = { docPlatformTargets: { data_room_doc: { platform: 'company-hub', basePath: '/data-room' } } };
+    const marker = { documentType: 'data_room_doc', id: 'd-1', title: 'd-1' };
+    // The marker alone has nothing to route: this is the card that could not be clicked.
+    expect(resolveSourceRowCTA(marker, ctx).href).toBeNull();
+    const path = readFetchedCardPath({ id: 'd-1', url: null, metadata: { path: 'legal/ein-cp-575' } });
+    const card = resolveSourceRowCTA({ ...marker, path }, ctx);
+    expect(card.href).toMatch(/\/data-room\/legal\/ein-cp-575$/);
+    expect(card.targetPlatform).toBe('company-hub');
   });
 });
