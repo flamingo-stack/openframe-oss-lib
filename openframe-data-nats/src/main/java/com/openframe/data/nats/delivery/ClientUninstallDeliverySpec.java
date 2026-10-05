@@ -9,7 +9,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -20,9 +19,6 @@ import static java.lang.String.format;
 public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstallDeliverySeed, ClientUninstallMessage> {
 
     private static final String SUBJECT_TEMPLATE = "machine.%s.client-uninstall";
-    // the uninstall is what a PENDING_DELETION machine is waiting for
-    private static final Set<DeviceStatus> LEAVING_TOO = Collections.unmodifiableSet(EnumSet.complementOf(EnumSet.of(
-            DeviceStatus.DELETED, DeviceStatus.ARCHIVED, DeviceStatus.DECOMMISSIONED)));
 
     @Override
     public DeliveryType getType() {
@@ -51,8 +47,9 @@ public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstall
         return format(SUBJECT_TEMPLATE, machineId);
     }
 
+    // the uninstall is the one command a machine marked for deletion is still waiting for
     @Override
     public Set<DeviceStatus> getDeliverableStatuses() {
-        return LEAVING_TOO;
+        return EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING, DeviceStatus.PENDING_DELETION);
     }
 }

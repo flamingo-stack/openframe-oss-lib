@@ -341,7 +341,7 @@ class DeliverySweepServiceTest {
         Set<String> both = Set.of(OTHER_MACHINE_ID, MACHINE_ID);
         when(machineOnlineStatus.statuses(both)).thenReturn(Map.of(OTHER_MACHINE_ID, DeviceStatus.ONLINE, MACHINE_ID, DeviceStatus.ONLINE));
         when(machineOnlineStatus.online(both)).thenReturn(both);
-        when(spec.getDeliverableStatuses()).thenReturn(DeliverySpec.IN_SERVICE);
+        when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING));
         stubSpec();
         when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
 
@@ -404,7 +404,7 @@ class DeliverySweepServiceTest {
         when(machineOnlineStatus.statuses(Set.of(MACHINE_ID))).thenReturn(Map.of(MACHINE_ID, status));
         when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(online ? Set.of(MACHINE_ID) : Set.of());
         lenient().doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
-        lenient().when(spec.getDeliverableStatuses()).thenReturn(DeliverySpec.IN_SERVICE);
+        lenient().when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING));
     }
 
     private void stubSpec() {

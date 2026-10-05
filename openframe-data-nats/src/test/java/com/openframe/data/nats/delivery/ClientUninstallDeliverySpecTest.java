@@ -4,7 +4,6 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.nats.model.ClientUninstallMessage;
 import com.openframe.delivery.spec.DeliveryRequest;
-import com.openframe.delivery.spec.DeliverySpec;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -41,7 +40,6 @@ class ClientUninstallDeliverySpecTest {
         // verifications
         assertThat(statuses).contains(DeviceStatus.PENDING_DELETION, DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
         assertThat(statuses).doesNotContain(DeviceStatus.DELETED, DeviceStatus.ARCHIVED, DeviceStatus.DECOMMISSIONED);
-        assertThat(DeliverySpec.IN_SERVICE).doesNotContain(DeviceStatus.PENDING_DELETION);
     }
 
     @Test
