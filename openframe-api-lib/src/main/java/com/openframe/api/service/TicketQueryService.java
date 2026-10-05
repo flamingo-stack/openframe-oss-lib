@@ -29,8 +29,14 @@ public class TicketQueryService {
     }
 
     public List<Ticket> searchTickets(TicketQueryFilter filter, String search, int limit) {
+        return searchTickets(filter, search, null, limit);
+    }
+
+    // afterTicketId is the id of the last ticket a previous call returned, or null to start from the
+    // beginning. The page order is (createdAt desc, _id desc), so that id alone resumes it.
+    public List<Ticket> searchTickets(TicketQueryFilter filter, String search, String afterTicketId, int limit) {
         Query query = ticketRepository.buildTicketQuery(filter, search, null, null);
         return ticketRepository.findTicketsWithCursor(
-                query, null, limit, SORT_FIELD_CREATED_AT, SORT_DIRECTION_DESC);
+                query, afterTicketId, limit, SORT_FIELD_CREATED_AT, SORT_DIRECTION_DESC);
     }
 }
