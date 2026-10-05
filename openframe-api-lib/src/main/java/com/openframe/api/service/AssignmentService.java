@@ -18,11 +18,15 @@ import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -113,6 +117,37 @@ public class AssignmentService {
     public void unassignItem(String itemId, AssignmentTargetType targetType, String targetId) {
         log.info("Unassigning {}:{} from item {}", targetType, targetId, itemId);
         repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
+    }
+
+    /**
+     * Makes the item's assignments of one target type exactly {@code targetIds}: assigns the missing
+     * ones, unassigns the rest and leaves the ones already there alone — (item, type, target) is
+     * unique, so assigning one twice would be refused.
+     */
+    @Transactional
+    public void replaceAssignments(String itemId, AssignmentItemType itemType,
+                                   AssignmentTargetType targetType, List<String> targetIds) {
+        Set<String> wanted = new LinkedHashSet<>(targetIds);
+        Set<String> current = repository.findByItemIdAndTargetType(itemId, targetType).stream()
+                .map(ItemAssignment::getTargetId)
+                .collect(Collectors.toSet());
+
+        current.stream()
+                .filter(targetId -> !wanted.contains(targetId))
+                .forEach(targetId -> unassignItem(itemId, targetType, targetId));
+        wanted.stream()
+                .filter(targetId -> !current.contains(targetId))
+                .forEach(targetId -> assignIfAbsent(itemId, itemType, targetType, targetId));
+    }
+
+    /** A save racing this one may have assigned the target in between; that is the wanted state, not a failure. */
+    private void assignIfAbsent(String itemId, AssignmentItemType itemType,
+                                AssignmentTargetType targetType, String targetId) {
+        try {
+            assignItem(itemId, itemType, targetType, targetId);
+        } catch (DuplicateKeyException alreadyAssigned) {
+            log.debug("{}:{} is already assigned to item {}", targetType, targetId, itemId);
+        }
     }
 
     @Transactional

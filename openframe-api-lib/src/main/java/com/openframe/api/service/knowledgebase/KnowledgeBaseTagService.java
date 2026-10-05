@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -97,6 +98,22 @@ public class KnowledgeBaseTagService {
     public void removeTagFromItem(String itemId, String tagId) {
         log.info("Removing tag {} from KB item {}", tagId, itemId);
         tagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE);
+    }
+
+    /** Makes the item's tags exactly {@code tagIds}: adds the missing ones and removes the rest. */
+    @Transactional
+    public void replaceItemTags(String itemId, List<String> tagIds) {
+        Set<String> wanted = new LinkedHashSet<>(tagIds);
+        Set<String> current = tagAssignmentRepository.findByEntityIdAndEntityType(itemId, ENTITY_TYPE).stream()
+                .map(TagAssignment::getTagId)
+                .collect(Collectors.toSet());
+
+        current.stream()
+                .filter(tagId -> !wanted.contains(tagId))
+                .forEach(tagId -> removeTagFromItem(itemId, tagId));
+        wanted.stream()
+                .filter(tagId -> !current.contains(tagId))
+                .forEach(tagId -> addTagToItem(itemId, tagId));
     }
 
     public List<List<Tag>> getTagsByItemIds(List<String> itemIds) {

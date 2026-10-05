@@ -67,9 +67,12 @@ public class GraphQLKnowledgeBaseMapper {
                 .assignedDeviceIds(decodeIds(input.getAssignedDeviceIds()))
                 .assignedTicketIds(decodeIds(input.getAssignedTicketIds()))
                 .assignedKnowledgeArticleIds(decodeIds(input.getAssignedKnowledgeArticleIds()))
+                .attachmentTempIds(input.getAttachmentTempIds())
                 .build();
     }
 
+    // Attachment ids are raw on the wire (KnowledgeBaseItemAttachment.id and TempAttachment.id are
+    // not global ids), unlike the tag and assignment-target ids beside them.
     public UpdateArticleCommand toUpdateCommand(UpdateArticleInput input) {
         return UpdateArticleCommand.builder()
                 .id(decodeId(input.getId()))
@@ -77,6 +80,15 @@ public class GraphQLKnowledgeBaseMapper {
                 .parentId(decodeId(input.getParentId()))
                 .content(input.getContent())
                 .summary(input.getSummary())
+                .moveToRoot(Boolean.TRUE.equals(input.getMoveToRoot()))
+                .status(input.getStatus())
+                .tagIds(decodeIds(input.getTagIds()))
+                .assignedOrganizationIds(decodeIds(input.getAssignedOrganizationIds()))
+                .assignedDeviceIds(decodeIds(input.getAssignedDeviceIds()))
+                .assignedTicketIds(decodeIds(input.getAssignedTicketIds()))
+                .assignedKnowledgeArticleIds(decodeIds(input.getAssignedKnowledgeArticleIds()))
+                .attachmentTempIds(input.getAttachmentTempIds())
+                .deleteAttachmentIds(input.getDeleteAttachmentIds())
                 .build();
     }
 

@@ -23,4 +23,6 @@ public class CreateArticleCommand {
     private List<String> assignedDeviceIds;
     private List<String> assignedTicketIds;
     private List<String> assignedKnowledgeArticleIds;
+    /** Uploaded temp attachments to attach. */
+    private List<String> attachmentTempIds;
 }

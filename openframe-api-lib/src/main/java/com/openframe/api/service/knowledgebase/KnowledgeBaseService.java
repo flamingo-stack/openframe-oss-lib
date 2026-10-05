@@ -20,6 +20,7 @@ import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemCursor;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
@@ -37,8 +38,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
@@ -50,6 +53,8 @@ public class KnowledgeBaseService {
     private final KnowledgeBaseItemRepository repository;
     private final KnowledgeBaseTagService knowledgeBaseTagService;
     private final AssignmentService assignmentService;
+    private final KnowledgeBaseTempAttachmentService knowledgeBaseTempAttachmentService;
+    private final KnowledgeBaseAttachmentService knowledgeBaseAttachmentService;
 
     /**
      * One page of a listing: folders first (by name), then articles (most recently updated first),
@@ -226,20 +231,60 @@ public class KnowledgeBaseService {
         createAssignments(saved.getId(), AssignmentTargetType.DEVICE, cmd.getAssignedDeviceIds());
         createAssignments(saved.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
         createAssignments(saved.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
+        knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
+                saved.getId(), cmd.getAttachmentTempIds(), currentUserId);
 
         return saved;
     }
 
+    /**
+     * One save of an article: its own fields and status and, when the command carries them, its
+     * tags, assignments and attachments. A null field or list is left as it is; an empty list
+     * means none.
+     *
+     * These live in separate collections and nothing here rolls a failed save back, so the order
+     * is what keeps a failure from leaving the article half-saved:
+     * 1. everything that can be refused is checked before the first write;
+     * 2. tags, assignments and new attachments are written first — each is safe to repeat;
+     * 3. the article itself follows, text and status in one document write, so a failure up to
+     *    here leaves it exactly as it was and never publishes text with half its tags;
+     * 4. attachments are deleted last, because that cannot be undone.
+     */
     @Transactional
     public KnowledgeBaseItem updateArticle(String currentUserId, UpdateArticleCommand cmd) {
         log.info("Updating article {} by user {}", cmd.getId(), currentUserId);
         KnowledgeBaseItem article = getById(cmd.getId());
+
+        if (cmd.getParentId() != null) {
+            if (cmd.isMoveToRoot()) {
+                throw new ValidationException("parentId and moveToRoot cannot both be set.");
+            }
+            validateParentIsFolder(cmd.getParentId());
+        }
+        if (article.getType() != KnowledgeBaseItemType.ARTICLE && carriesArticleOnlyFields(cmd)) {
+            throw new ConflictException(ErrorCode.CONFLICT,
+                    "Only articles have a status, tags, assignments and attachments.");
+        }
+        List<KnowledgeBaseItemAttachment> attachmentsToDelete =
+                knowledgeBaseAttachmentService.getArticleAttachments(article.getId(), cmd.getDeleteAttachmentIds());
+
+        if (cmd.getTagIds() != null) {
+            knowledgeBaseTagService.replaceItemTags(article.getId(), cmd.getTagIds());
+        }
+        replaceAssignments(article.getId(), AssignmentTargetType.ORGANIZATION, cmd.getAssignedOrganizationIds());
+        replaceAssignments(article.getId(), AssignmentTargetType.DEVICE, cmd.getAssignedDeviceIds());
+        replaceAssignments(article.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
+        replaceAssignments(article.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
+        List<KnowledgeBaseItemAttachment> linked = knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
+                article.getId(), cmd.getAttachmentTempIds(), currentUserId);
+
         if (cmd.getName() != null) {
             article.setName(cmd.getName());
         }
         if (cmd.getParentId() != null) {
-            validateParentIsFolder(cmd.getParentId());
             article.setParentId(cmd.getParentId());
+        } else if (cmd.isMoveToRoot()) {
+            article.setParentId(null);
         }
         if (cmd.getContent() != null) {
             article.setContent(cmd.getContent());
@@ -247,8 +292,31 @@ public class KnowledgeBaseService {
         if (cmd.getSummary() != null) {
             article.setSummary(cmd.getSummary());
         }
+        if (cmd.getStatus() != null) {
+            // Any status from any status: DRAFT/PUBLISHED on an archived article restores it as
+            // exactly that, rather than as PUBLISHED the way unarchiveArticle does.
+            article.setStatus(cmd.getStatus());
+        }
         article.setLastModifiedBy(currentUserId);
-        return repository.save(article);
+        KnowledgeBaseItem saved = repository.save(article);
+
+        // An attachment replaced by a file of the same name was just overwritten by the link
+        // above: its path now holds the new file and must survive the deletion of the old record.
+        Set<String> pathsStillInUse = linked.stream()
+                .map(KnowledgeBaseItemAttachment::getStoragePath)
+                .collect(Collectors.toSet());
+        knowledgeBaseAttachmentService.deleteAttachments(attachmentsToDelete, pathsStillInUse);
+        return saved;
+    }
+
+    /** The fields of a save that only make sense on an article; the older ones a folder has always accepted. */
+    private static boolean carriesArticleOnlyFields(UpdateArticleCommand cmd) {
+        return Stream.of(
+                        cmd.getStatus(), cmd.getTagIds(),
+                        cmd.getAssignedOrganizationIds(), cmd.getAssignedDeviceIds(),
+                        cmd.getAssignedTicketIds(), cmd.getAssignedKnowledgeArticleIds(),
+                        cmd.getAttachmentTempIds(), cmd.getDeleteAttachmentIds())
+                .anyMatch(Objects::nonNull);
     }
 
     @Transactional
@@ -440,6 +508,13 @@ public class KnowledgeBaseService {
         }
         targetIds.forEach(targetId ->
                 assignmentService.assignItem(articleId, AssignmentItemType.KNOWLEDGE_ARTICLE, targetType, targetId));
+    }
+
+    private void replaceAssignments(String articleId, AssignmentTargetType targetType, List<String> targetIds) {
+        if (targetIds == null) {
+            return;
+        }
+        assignmentService.replaceAssignments(articleId, AssignmentItemType.KNOWLEDGE_ARTICLE, targetType, targetIds);
     }
 
     private void moveChildren(List<KnowledgeBaseItem> children, String targetFolderId, String currentFolderId) {

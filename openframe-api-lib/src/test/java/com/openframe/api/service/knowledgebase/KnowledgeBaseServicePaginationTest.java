@@ -52,7 +52,8 @@ class KnowledgeBaseServicePaginationTest {
         tagService = mock(KnowledgeBaseTagService.class);
         // "No tag filter" is null, not the empty list a bare mock would answer with.
         when(tagService.findItemIdsByTags(any())).thenReturn(null);
-        service = new KnowledgeBaseService(repository, tagService, mock(AssignmentService.class));
+        service = new KnowledgeBaseService(repository, tagService, mock(AssignmentService.class),
+                mock(KnowledgeBaseTempAttachmentService.class), mock(KnowledgeBaseAttachmentService.class));
     }
 
     // ------------------------------------------------------------ paging
