@@ -32,6 +32,8 @@ export interface ApprovalRequestNotificationTileProps {
    * the button dims for as long as this is true. No effect once resolved.
    */
   approvePressed?: boolean;
+  /** See `NotificationTileProps.timeLabel`. */
+  timeLabel?: string;
 }
 
 export function ApprovalRequestNotificationTile({
@@ -46,6 +48,7 @@ export function ApprovalRequestNotificationTile({
   titleLines,
   presentation = 'card',
   approvePressed = false,
+  timeLabel,
 }: ApprovalRequestNotificationTileProps) {
   const lockscreen = presentation === 'lockscreen';
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -102,6 +105,7 @@ export function ApprovalRequestNotificationTile({
       className={className}
       titleLines={titleLines}
       presentation={presentation}
+      timeLabel={timeLabel}
       paused={pinned || processing}
       actions={
         <div className="flex w-full items-center gap-[var(--spacing-system-xs)]">

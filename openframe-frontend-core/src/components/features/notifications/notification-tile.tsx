@@ -71,6 +71,11 @@ export interface NotificationTileProps {
    * control, phone-sized corners. For a phone or watch mock.
    */
   presentation?: 'card' | 'lockscreen';
+  /**
+   * Words shown in place of the relative time ("now"). For a mock that stays
+   * on screen: its notifications have just arrived for as long as it plays.
+   */
+  timeLabel?: string;
 }
 
 export function NotificationTile({
@@ -84,6 +89,7 @@ export function NotificationTile({
   paused = false,
   titleLines = 1,
   presentation = 'card',
+  timeLabel,
 }: NotificationTileProps) {
   const lockscreen = presentation === 'lockscreen';
   const {
@@ -180,7 +186,7 @@ export function NotificationTile({
               dateTime={createdAtIso}
               className={cn('shrink-0 whitespace-nowrap text-ods-text-secondary text-h6', lockscreen && 'self-start')}
             >
-              {formatTicketRelativeTime(createdAtIso)}
+              {timeLabel ?? formatTicketRelativeTime(createdAtIso)}
             </time>
           ) : null}
 

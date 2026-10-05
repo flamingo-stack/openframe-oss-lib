@@ -15,6 +15,8 @@ export interface SnapCarouselProps<T> {
   label: string;
   /** Move to the next slide after this long. `0` turns auto-advance off. Default 5000. */
   autoAdvanceMs?: number;
+  /** After the visitor touches it, auto-advance picks up again once it has been left alone this long. Default 8000. */
+  resumeAfterMs?: number;
   /** Width of one slide. Default `basis-[300px]`. */
   slideClassName?: string;
   prevLabel?: string;
@@ -47,10 +49,12 @@ function DotFill({ durationMs }: { durationMs: number }) {
  * A native scroll-snap carousel: swipe or use the arrows; dots show the
  * position, a counter says it in words.
  *
- * It advances on its own only while at least 60% of it is on screen, and it
- * stops FOR GOOD the first time the visitor touches it (pointer, wheel, key or
- * focus): after that the visitor is driving. Under reduced motion it never
- * advances by itself. While it is auto-playing the active dot fills over the
+ * It advances on its own only while at least 60% of it is on screen. The moment
+ * the visitor touches it (pointer, wheel, key) it stops: the visitor is driving.
+ * Left alone for `resumeAfterMs` it picks up again, because a thumb that only
+ * brushed it while scrolling the page should not switch it off for good. It
+ * stays stopped for as long as keyboard focus is inside it. Under reduced
+ * motion it never advances by itself. While it is auto-playing the active dot fills over the
  * interval, so the wait is visible.
  */
 export function SnapCarousel<T>({
@@ -59,6 +63,7 @@ export function SnapCarousel<T>({
   getKey,
   label,
   autoAdvanceMs = 5000,
+  resumeAfterMs = 8000,
   slideClassName = 'basis-[300px]',
   prevLabel = 'Previous',
   nextLabel = 'Next',
@@ -94,7 +99,23 @@ export function SnapCarousel<T>({
     setIndex(Math.min(count - 1, Math.round(track.scrollLeft / step)));
   }, [count, slideStep]);
 
-  const stop = useCallback(() => setAuto(false), []);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hold = useCallback(() => {
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = null;
+    setAuto(false);
+  }, []);
+  /** The visitor touched it: stop now, pick up again once it has been left alone. */
+  const stop = useCallback(() => {
+    hold();
+    resumeTimer.current = setTimeout(() => setAuto(true), resumeAfterMs);
+  }, [hold, resumeAfterMs]);
+  useEffect(
+    () => () => {
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    },
+    [],
+  );
 
   const playing = auto && inView && reducedState === false && autoAdvanceMs > 0 && count > 1;
 
@@ -115,7 +136,20 @@ export function SnapCarousel<T>({
   if (count === 0) return null;
 
   return (
-    <div className={className} onPointerDown={stop} onTouchStart={stop} onWheel={stop} onKeyDown={stop} onFocus={stop}>
+    <div
+      className={className}
+      onPointerDown={stop}
+      onTouchStart={stop}
+      onWheel={stop}
+      onKeyDown={stop}
+      // Keyboard focus inside holds it for as long as it stays; leaving starts the idle wait.
+      onFocus={event => {
+        if (event.target.matches(':focus-visible')) hold();
+      }}
+      onBlur={event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) stop();
+      }}
+    >
       <div
         ref={setRefs}
         onScroll={onScroll}

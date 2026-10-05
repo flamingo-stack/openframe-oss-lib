@@ -97,19 +97,22 @@ describe('SnapCarousel', () => {
     expect(scrolledTo).toEqual([STEP, STEP * 2, 0]);
   });
 
-  it('stops for good once the visitor touches it', () => {
+  it('stops when the visitor touches it and picks up again once left alone', () => {
     renderCarousel();
     setInView(true);
     fireEvent.pointerDown(screen.getByRole('group', { name: 'Example requests' }));
+    // Stopped: nothing moves inside the idle wait (8s).
     act(() => {
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(7_900);
     });
     expect(scrolledTo).toEqual([]);
 
-    fireEvent.click(screen.getByLabelText('Next'));
-    expect(scrolledTo).toEqual([STEP]);
+    // Left alone past the wait: it advances again after one interval.
     act(() => {
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(100);
+    });
+    act(() => {
+      vi.advanceTimersByTime(5_000);
     });
     expect(scrolledTo).toEqual([STEP]);
   });

@@ -61,7 +61,10 @@ export function ConversationCard({
         <span className="shrink-0">{requester.avatar}</span>
         <div className="min-w-0 flex-1">
           <Who speaker={requester} />
-          <p className="m-0 mt-1 text-ods-text-primary text-h3">&ldquo;{request}&rdquo;</p>
+          {/* Every part keeps a fixed number of lines, so cards in a row or a carousel line up part by part. */}
+          <p className="m-0 mt-1 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3" title={request}>
+            &ldquo;{request}&rdquo;
+          </p>
         </div>
       </div>
       <div className="flex items-start gap-3 rounded-md border border-ods-border bg-ods-bg p-3.5">
@@ -70,7 +73,9 @@ export function ConversationCard({
           <Who speaker={responder} />
           <div className="mt-1 flex items-start gap-2 text-ods-text-secondary text-h4">
             <CheckCircleIcon size={16} className="mt-1 shrink-0 text-ods-success" aria-hidden />
-            <span className="min-w-0 flex-1">{outcome}</span>
+            <span className="line-clamp-3 min-h-[3lh] min-w-0 flex-1" title={outcome}>
+              {outcome}
+            </span>
             {outcomeAside}
           </div>
         </div>
