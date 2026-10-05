@@ -38,6 +38,7 @@ import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
 import { Card } from '../../ui/card';
 import { StatusBadge } from '../../ui/status-badge';
+import { CONTENT_CARD_FRAME_CLASS } from './content-card-frame';
 import { useCoverImageFallback } from './use-cover-image-fallback';
 
 /** Sources narrower than this are "not wide" → contained on the edge-color
@@ -107,7 +108,7 @@ export function EntityPortraitCard({
 
   return (
     <a href={href} target={target} rel={rel} className={cn('block h-full', className)} aria-label={`Open ${title}`}>
-      <Card className="flex h-full flex-col gap-6 overflow-hidden border border-ods-border bg-ods-card p-6 transition-all duration-200 hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]">
+      <Card className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col gap-6 p-6')}>
         {/* Media zone — the real cover always wins: wide → cover-fill;
             non-wide → contained on the edge-color fill (news-card treatment). */}
         <div

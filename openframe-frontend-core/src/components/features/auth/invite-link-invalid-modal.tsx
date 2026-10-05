@@ -2,6 +2,7 @@
 
 import { cn } from '../../../utils/cn';
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { accentSentenceMarks } from '../../layout/page-heading';
 import { Button } from '../../ui/button';
 
 export interface InviteLinkInvalidModalProps {
@@ -37,7 +38,7 @@ export function InviteLinkInvalidModal({
       <div className="flex w-full max-w-[600px] flex-col gap-[var(--spacing-system-l)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xl)]">
         {/* Title + close */}
         <div className="flex items-center gap-[var(--spacing-system-mf)]">
-          <h1 className="flex-1 tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
+          <h1 className="flex-1 tracking-[-0.64px] text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>
           {/* Close (X) — desktop/tablet only, per design */}
           <button
             type="button"

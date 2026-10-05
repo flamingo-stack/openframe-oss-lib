@@ -343,5 +343,36 @@ export default defineConfig([
     rules: { 'react-hooks/set-state-in-effect': 'off' },
   },
 
+  {
+    // Components that rendered a <style> element before the rule existed. None
+    // is on the chat streaming or drawer-resize paths the rule was measured on,
+    // and their re-render frequency in WebKit has not been measured. Move the
+    // CSS to the Tailwind preset or a stylesheet when touching one, and drop it
+    // from this list.
+    name: 'openframe-frontend-core/pre-existing-style-elements',
+    files: [
+      'src/components/chart.tsx',
+      'src/components/date-time-picker.tsx',
+      'src/components/icons-block.tsx',
+      'src/components/loading/openmsp-heartbeat.tsx',
+      'src/components/ui/date-picker.tsx',
+      'src/components/ui/markdown/mermaid-diagram.tsx',
+      'src/components/ui/toaster.tsx',
+    ],
+    rules: { 'flamingo/no-inline-style-element': 'off' },
+  },
+
+  {
+    // `useDataTableLoadMoreStore` reads a store object from React context; it
+    // is not a zustand subscription, so there is no selector to pass. Its
+    // updates arrive through `useSyncExternalStore` on the line that follows.
+    name: 'openframe-frontend-core/context-store-getter',
+    files: [
+      'src/components/ui/data-table/data-table-body.tsx',
+      'src/components/ui/data-table/data-table-infinite-footer.tsx',
+    ],
+    rules: { 'flamingo/no-whole-store-subscription': 'off' },
+  },
+
   ...prettierCompat,
 ]);

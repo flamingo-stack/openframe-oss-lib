@@ -10,7 +10,15 @@
     "dist",
     "src",
     "eslint-config",
-    "tailwind.config.ts"
+    "tailwind.config.ts",
+    "!dist/__tests__",
+    "!src/**/__tests__",
+    "!src/**/__fixtures__",
+    "!src/**/*.test.*",
+    "!src/stories",
+    "!src/**/*.stories.*",
+    "!src/**/.*.md",
+    "!src/components/icons-v2/**/*.svg"
   ],
   "exports": {
     ".": {
@@ -308,12 +316,6 @@
       "require": "./dist/assets/index.cjs",
       "default": "./dist/assets/index.js"
     },
-    "./fonts": {
-      "types": "./dist/fonts.d.ts",
-      "import": "./dist/fonts.js",
-      "require": "./dist/fonts.cjs",
-      "default": "./dist/fonts.js"
-    },
     "./tailwind.config.ts": {
       "types": "./dist/tailwind.config.d.ts",
       "default": "./tailwind.config.ts"
@@ -500,6 +502,7 @@
     "lint-staged": "17.3.0",
     "next": "^16.1.3",
     "nodemon": "^3.1.11",
+    "pkg-pr-new": "0.0.88",
     "prettier": "^3.9.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

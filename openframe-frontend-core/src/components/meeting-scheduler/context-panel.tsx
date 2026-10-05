@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
 import type { MeetingHost } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
-import { SquareAvatar, AvatarStack, Button, Skeleton, Autocomplete } from '../ui';
+import { SquareAvatar, AvatarStack, Button, Skeleton } from '../ui';
+import { TimezoneSelect } from '../ui/timezone-select';
 
 /**
  * ContextPanel — the "who / what / how long" side of the scheduler card
@@ -100,19 +100,6 @@ const BACK_BUTTON_CLASS = 'py-0';
  *  section headers. */
 const FIELD_LABEL_CLASS = 'text-h4 text-ods-text-primary';
 
-function zoneLabel(tz: string): string {
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      timeZoneName: 'shortOffset',
-    }).formatToParts(new Date());
-    const offset = parts.find(p => p.type === 'timeZoneName')?.value ?? '';
-    return offset ? `${tz.replace(/_/g, ' ')} (${offset})` : tz.replace(/_/g, ' ');
-  } catch {
-    return tz.replace(/_/g, ' ');
-  }
-}
-
 /**
  * Same-footprint skeleton — swaps with the loaded panel with zero shift.
  * STATIC labels ("Duration", "Timezone") render REAL; only data-driven
@@ -172,22 +159,6 @@ export function SchedulerContextPanel({
   showTimezone = true,
   className,
 }: SchedulerContextPanelProps) {
-  // All IANA zones with live GMT offsets — computed once, client-only (the
-  // panel renders the picker only after the parent resolves a zone).
-  const zoneOptions = useMemo(() => {
-    if (!timezone) return [];
-    let zones: string[];
-    try {
-      // Older lib targets don't type supportedValuesOf (ES2022) — runtime-guarded.
-      const intl = Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] };
-      zones = intl.supportedValuesOf ? intl.supportedValuesOf('timeZone') : [timezone];
-    } catch {
-      zones = [timezone];
-    }
-    if (!zones.includes(timezone)) zones = [timezone, ...zones];
-    return zones.map(tz => ({ value: tz, label: zoneLabel(tz) }));
-  }, [timezone]);
-
   return (
     <div className={cn(PANEL_STACK, className)}>
       {/* The card's ONE back edge, at every step — the caller decides where it
@@ -273,16 +244,12 @@ export function SchedulerContextPanel({
           <div className={cn(STRIP_ASIDE, locked && 'max-lg:hidden')}>
             <p className={FIELD_LABEL_CLASS}>Timezone</p>
             {timezone ? (
-              <Autocomplete
+              <TimezoneSelect
                 value={timezone}
                 disabled={disabled}
                 onChange={tz => {
                   if (tz) onTimezoneChange?.(tz);
                 }}
-                options={zoneOptions}
-                placeholder="Search timezone…"
-                noOptionsText="No matching timezone"
-                showClearAll={false}
               />
             ) : (
               <Skeleton className="h-12 w-full" />

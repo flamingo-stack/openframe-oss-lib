@@ -92,7 +92,7 @@ extend type Query {
 
     """Software installed on one device. One row = one installed title, the same node as `softwares`.
     Version fields are read in this device's scope: `currentVersion` is the version installed here.
-    `devicesCount` stays fleet-wide. Sortable fields: name, devicesCount, cveCount, highestSeverity (default: name).
+    Sortable fields: name, cveCount, highestSeverity (default: name).
     Unknown machineId → NOT_FOUND; a known device with nothing installed → empty connection."""
     deviceSoftware(
         machineId: String!,
@@ -110,7 +110,8 @@ extend type Query {
     deviceSoftwareFilters(machineId: String!, filter: SoftwareFilterInput, search: String): SoftwareFilters!
 
     """CVEs present on one device. One row = one CVE (not CVE × software), the same node as `vulnerabilities`.
-    `affectedSoftware` is scoped to this host and populated on every row; `devicesCount` stays fleet-wide.
+    `affectedSoftware` is scoped to this host and populated on every row; `devicesCount` is null here
+    (the fleet-wide count would cost one Fleet call per row).
     Sortable fields: severity (by cvssScore, unrated last), discoveredAt (default: severity DESC, cveId ASC).
     Unknown machineId → NOT_FOUND; a known device with no CVEs → empty connection."""
     deviceVulnerabilities(
@@ -151,9 +152,6 @@ type Software {
     """Additional older versions in use across the fleet, beyond currentVersion.
     Shows as "+N older versions" line in the list."""
     olderVersionsCount: Int
-
-    """Number of devices with this software installed."""
-    devicesCount: Int
 
     """Vulnerability roll-up — highest severity + CVE count for the badge."""
     vulnerabilitySummary: SoftwareVulnerabilitySummary

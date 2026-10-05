@@ -8,6 +8,7 @@ import {
   type ComponentRef,
   type KeyboardEvent,
   type PointerEvent,
+  type RefObject,
   createContext,
   forwardRef,
   useCallback,
@@ -299,7 +300,22 @@ function useContainedResizableSize({
     }
   }, [enabled, size, storageKey]);
 
-  return { size, setSize };
+  return { size, setSize, clampSize: clampToContainer };
+}
+
+/** Ends a drawer resize drag: commits the size it reached and restores the
+ *  page's cursor and text selection. No-op when no drag is in progress. */
+function finishDrag(
+  startRef: RefObject<{ x: number; y: number; size: number } | null>,
+  dragSizeRef: RefObject<number | null>,
+  commit: (size: number) => void,
+): void {
+  if (!startRef.current) return;
+  startRef.current = null;
+  if (dragSizeRef.current !== null) commit(dragSizeRef.current);
+  dragSizeRef.current = null;
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
 }
 
 interface AppLayoutDrawerResizeHandleProps {
@@ -308,6 +324,10 @@ interface AppLayoutDrawerResizeHandleProps {
   minSize: number;
   maxSize: number;
   onSize: (next: number) => void;
+  /** Clamp a candidate size to the min/max and the container. */
+  clampSize: (next: number) => number;
+  /** The panel the size applies to — written directly while dragging. */
+  panelRef: RefObject<HTMLDivElement | null>;
   ariaLabel?: string;
 }
 
@@ -317,10 +337,22 @@ function AppLayoutDrawerResizeHandle({
   minSize,
   maxSize,
   onSize,
+  clampSize,
+  panelRef,
   ariaLabel,
 }: AppLayoutDrawerResizeHandleProps) {
   const isHorizontal = HORIZONTAL_SIDES.has(side);
   const startRef = useRef<{ x: number; y: number; size: number } | null>(null);
+  // Size reached by the drag in progress, committed to React state on release.
+  const dragSizeRef = useRef<number | null>(null);
+  const onSizeRef = useRef(onSize);
+  useEffect(() => {
+    onSizeRef.current = onSize;
+  }, [onSize]);
+  // The handle can unmount mid-drag (a persist-mode drawer closing), and then
+  // no pointer event ends the drag: end it here, or the panel keeps a width
+  // React state never received and the page keeps the resize cursor.
+  useEffect(() => () => finishDrag(startRef, dragSizeRef, onSizeRef.current), []);
 
   const direction = side === 'right' || side === 'bottom' ? -1 : 1;
 
@@ -333,23 +365,32 @@ function AppLayoutDrawerResizeHandle({
     document.body.style.userSelect = 'none';
   };
 
+  // The drag writes the panel's size straight to the DOM and commits it to
+  // state once, on release. Committing every pointermove re-rendered the
+  // drawer per event — ~16% of a drag's CPU in WebKit on top of the reflow the
+  // resize itself costs. ResizeObserver consumers inside the panel still see
+  // every change. A re-render of the drawer mid-drag (e.g. a streamed chunk)
+  // does not undo the write: React diffs against its previous render, where
+  // the size is unchanged, so it leaves the style alone.
   const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const start = startRef.current;
-    if (!start) return;
+    const panel = panelRef.current;
+    if (!start || !panel) return;
     const delta = isHorizontal ? e.clientX - start.x : e.clientY - start.y;
-    onSize(start.size + delta * direction);
+    const next = clampSize(start.size + delta * direction);
+    dragSizeRef.current = next;
+    panel.style[isHorizontal ? 'width' : 'height'] = `${next}px`;
+    e.currentTarget.setAttribute('aria-valuenow', String(Math.round(next)));
   };
 
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     if (!startRef.current) return;
-    startRef.current = null;
+    finishDrag(startRef, dragSizeRef, onSize);
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
       // ignore — pointer may already be released
     }
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -405,6 +446,7 @@ function AppLayoutDrawerResizeHandle({
       onPointerMove={handlePointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
       onKeyDown={handleKeyDown}
       className={cn(
         'group absolute z-20 flex touch-none select-none',
@@ -585,7 +627,8 @@ const AppLayoutDrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Co
       return () => mq.removeEventListener('change', update);
     }, [mobileBreakpoint]);
 
-    const { size, setSize } = useContainedResizableSize({
+    const panelRef = useRef<HTMLDivElement>(null);
+    const { size, setSize, clampSize } = useContainedResizableSize({
       enabled: resizable,
       isHorizontal,
       minSize,
@@ -670,10 +713,13 @@ const AppLayoutDrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Co
               minSize={minSize}
               maxSize={maxSize}
               onSize={setSize}
+              clampSize={clampSize}
+              panelRef={panelRef}
               ariaLabel={resizeAriaLabel}
             />
           ) : null}
           <div
+            ref={panelRef}
             className={cn(
               appLayoutDrawerPanelVariants({ side, flush }),
               // Mobile: fill the container (the side already pins one axis) and

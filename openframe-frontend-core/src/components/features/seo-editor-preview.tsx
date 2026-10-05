@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import Image from '../../embed-shims/next-image';
 import { cn } from '../../utils';
+import { IMAGE_FILE_ACCEPT } from '../../utils/media-type';
 import { SEO_DESCRIPTION_MAX_LENGTH } from '../../utils/seo-description';
 // SSOT for the field cap (server-safe constant). The seo_title renders as the
 // page <title> verbatim (no brand suffix), so this is the full ~60-char budget.
@@ -310,7 +311,7 @@ export function SEOEditorPreview({
               <input
                 ref={setFileInputRef}
                 type="file"
-                accept="image/*"
+                accept={IMAGE_FILE_ACCEPT}
                 onChange={handleImageUpload}
                 className="hidden"
                 disabled={disabled || isUploading}

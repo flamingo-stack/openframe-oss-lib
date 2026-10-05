@@ -3,13 +3,24 @@ package com.openframe.stream.deserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openframe.data.document.rmm.command.CommandExecution;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.model.enums.MessageType;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit test for the RMM command-result type processing — the branching that maps
@@ -18,7 +29,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  * protected/package-private hooks directly. Routing is static (all destinations),
  * so there is no routing decision to test here.
  */
+@ExtendWith(MockitoExtension.class)
 class CommandResultDeserializerTest {
+
+    private static final String TENANT_ID = "tenant-1";
+    private static final String EXECUTION_ID = "exec-1";
+    private static final String MACHINE_ID = "machine-42";
+
+    @Mock
+    private CommandExecutionRepository commandExecutionRepository;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -26,7 +45,7 @@ class CommandResultDeserializerTest {
 
     @BeforeEach
     void setUp() {
-        deserializer = new CommandResultDeserializer(mapper);
+        deserializer = new CommandResultDeserializer(mapper, commandExecutionRepository);
     }
 
     private ObjectNode after() {
@@ -107,6 +126,82 @@ class CommandResultDeserializerTest {
 
         // No stdout / exit code / duration → nothing to report
         assertThat(deserializer.getResult(after().put("machineId", "m"))).isNull();
+    }
+
+    @Test
+    @DisplayName("getResult: the dispatched command is attached as input next to the output, read from the execution row")
+    void getResult_executionRowFound_attachesCommandAsInput() throws Exception {
+        // setup
+        ObjectNode after = after()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("machineId", MACHINE_ID)
+                .put("stdout", "hey\n").put("exitCode", 0);
+        CommandExecution execution = CommandExecution.builder()
+                .command("osascript -e 'display dialog \"hi\"'").shell(ScriptShell.BASH)
+                .privilegeLevel(PrivilegeLevel.USER).timeoutSeconds(60)
+                .build();
+        when(commandExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+                .thenReturn(Optional.of(execution));
+
+        // execution
+        JsonNode result = parse(deserializer.getResult(after));
+
+        // verifications
+        assertThat(result.get("output").asText()).isEqualTo("hey\n");
+        JsonNode input = result.get("input");
+        assertThat(input.get("command").asText()).isEqualTo("osascript -e 'display dialog \"hi\"'");
+        assertThat(input.get("shell").asText()).isEqualTo("BASH");
+        assertThat(input.get("privilegeLevel").asText()).isEqualTo("USER");
+        assertThat(input.get("timeoutSeconds").asInt()).isEqualTo(60);
+    }
+
+    @Test
+    @DisplayName("getResult: no execution row → the base result is returned untouched")
+    void getResult_executionRowMissing_keepsBaseResult() throws Exception {
+        // setup
+        ObjectNode after = after()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("machineId", MACHINE_ID)
+                .put("exitCode", 0);
+        when(commandExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+                .thenReturn(Optional.empty());
+
+        // execution
+        JsonNode result = parse(deserializer.getResult(after));
+
+        // verifications
+        assertThat(result.get("exit_code").asInt()).isZero();
+        assertThat(result.has("input")).isFalse();
+    }
+
+    @Test
+    @DisplayName("getResult: missing tenantId / executionId / machineId → no lookup, base result only")
+    void getResult_missingIdentifiers_keepsBaseResultWithoutMongoCall() throws Exception {
+        // setup
+        ObjectNode after = after().put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("exitCode", 0);
+
+        // execution
+        JsonNode result = parse(deserializer.getResult(after));
+
+        // verifications
+        assertThat(result.has("input")).isFalse();
+        verifyNoInteractions(commandExecutionRepository);
+    }
+
+    @Test
+    @DisplayName("getResult: Mongo throws → the base result survives; deserialize must not break the consumer thread")
+    void getResult_mongoFailure_keepsBaseResult() throws Exception {
+        // setup
+        ObjectNode after = after()
+                .put("tenantId", TENANT_ID).put("executionId", EXECUTION_ID).put("machineId", MACHINE_ID)
+                .put("exitCode", 0);
+        when(commandExecutionRepository.findByTenantIdAndExecutionIdAndMachineId(TENANT_ID, EXECUTION_ID, MACHINE_ID))
+                .thenThrow(new IllegalStateException("mongo down"));
+
+        // execution
+        JsonNode result = parse(deserializer.getResult(after));
+
+        // verifications
+        assertThat(result.get("exit_code").asInt()).isZero();
+        assertThat(result.has("input")).isFalse();
     }
 
     @Test

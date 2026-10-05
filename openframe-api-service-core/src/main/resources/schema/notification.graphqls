@@ -16,6 +16,7 @@ extend type Mutation {
 enum NotificationEntityType {
     TICKET
     DIALOG
+    INSIGHT
 }
 
 

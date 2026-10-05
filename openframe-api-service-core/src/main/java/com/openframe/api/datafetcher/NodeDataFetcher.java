@@ -19,9 +19,10 @@ import com.openframe.data.service.OrganizationService;
 import graphql.relay.Relay;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
+import java.util.Optional;
 
 @DgsComponent
 @RequiredArgsConstructor
@@ -40,12 +41,8 @@ public class NodeDataFetcher {
     private final ScriptExecutionService scriptExecutionService;
     private final ScheduleScriptService scheduleScriptService;
     private final ScheduleRunService scheduleRunService;
-
-    @Autowired(required = false)
-    private TenantRepository tenantRepository;
-
-    @Autowired(required = false)
-    private SoftwareBundleService softwareBundleService;
+    private final ObjectProvider<TenantRepository> tenantRepository;
+    private final ObjectProvider<SoftwareBundleService> softwareBundleService;
 
     @DgsQuery
     public Object node(@InputArgument String id) {
@@ -83,8 +80,12 @@ public class NodeDataFetcher {
             case SCRIPT_EXECUTION -> scriptExecutionService.findById(globalId.getId()).orElse(null);
             case SCRIPT_SCHEDULE -> scheduleScriptService.findById(globalId.getId()).orElse(null);
             case SCHEDULE_RUN -> scheduleRunService.findById(globalId.getId()).orElse(null);
-            case TENANT -> tenantRepository != null ? tenantRepository.findById(globalId.getId()).orElse(null) : null;
-            case SOFTWARE_BUNDLE -> softwareBundleService != null ? softwareBundleService.findById(globalId.getId()).orElse(null) : null;
+            case TENANT -> Optional.ofNullable(tenantRepository.getIfAvailable())
+                    .flatMap(repo -> repo.findById(globalId.getId()))
+                    .orElse(null);
+            case SOFTWARE_BUNDLE -> Optional.ofNullable(softwareBundleService.getIfAvailable())
+                    .flatMap(service -> service.findById(globalId.getId()))
+                    .orElse(null);
             default -> throw new IllegalArgumentException("Unsupported node type: " + globalId.getType());
         };
     }

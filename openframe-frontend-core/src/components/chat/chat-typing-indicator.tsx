@@ -16,44 +16,33 @@ const ChatTypingIndicator = forwardRef<HTMLDivElement, ChatTypingIndicatorProps>
       lg: 'h-8',
     };
 
-    const dotAnimation = `
-      @keyframes dotPulse {
-        0%, 80%, 100% {
-          transform: scale(1);
-          opacity: 0.7;
-        }
-        40% {
-          transform: scale(1.5);
-          opacity: 1;
-        }
-      }
-    `;
-
     return (
       <div ref={ref} className={cn('flex items-center gap-2', className)} {...props}>
-        <style dangerouslySetInnerHTML={{ __html: dotAnimation }} />
         {showText && <span className="text-ods-text-secondary text-h6">Assistant is typing</span>}
         <div className={cn('inline-flex items-center justify-center gap-1', containerSizeClasses[size])}>
           <div
-            className={cn(dotSizeClasses[size], 'rounded-full', dotClassName || 'bg-ods-text-primary')}
-            style={{
-              animation: 'dotPulse 1.4s ease-in-out infinite',
-              animationDelay: '0ms',
-            }}
+            className={cn(
+              dotSizeClasses[size],
+              'animate-dot-pulse rounded-full',
+              dotClassName || 'bg-ods-text-primary',
+            )}
+            style={{ animationDelay: '0ms' }}
           />
           <div
-            className={cn(dotSizeClasses[size], 'rounded-full', dotClassName || 'bg-ods-text-primary')}
-            style={{
-              animation: 'dotPulse 1.4s ease-in-out infinite',
-              animationDelay: '200ms',
-            }}
+            className={cn(
+              dotSizeClasses[size],
+              'animate-dot-pulse rounded-full',
+              dotClassName || 'bg-ods-text-primary',
+            )}
+            style={{ animationDelay: '200ms' }}
           />
           <div
-            className={cn(dotSizeClasses[size], 'rounded-full', dotClassName || 'bg-ods-text-primary')}
-            style={{
-              animation: 'dotPulse 1.4s ease-in-out infinite',
-              animationDelay: '400ms',
-            }}
+            className={cn(
+              dotSizeClasses[size],
+              'animate-dot-pulse rounded-full',
+              dotClassName || 'bg-ods-text-primary',
+            )}
+            style={{ animationDelay: '400ms' }}
           />
         </div>
       </div>

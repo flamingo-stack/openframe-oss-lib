@@ -99,6 +99,16 @@ export interface EmbedAuthAdapter {
    * remains the rule, this is the narrow exception.
    */
   allowedOrigins?: string[];
+  /**
+   * Optional: call `listener` whenever `getHeaders()` starts returning a NEW
+   * credential (a rotation the host ran on its own — e.g. a native shell's
+   * background refresh). Returns an unsubscribe. Lets a long-lived surface
+   * that stopped after a 401 retry as soon as a usable credential exists,
+   * instead of on its next backoff step. Fire only on a real change: a
+   * listener may respond with a request, and through `refresh` that request
+   * can lead the host to notify again.
+   */
+  subscribe?: (listener: () => void) => () => void;
 }
 
 /**
@@ -154,6 +164,17 @@ export function setEmbedAuthAdapter(adapter: EmbedAuthAdapter | null): void {
  */
 export function hasEmbedAuthAdapter(): boolean {
   return getRegisteredAuthAdapter() !== null;
+}
+
+/**
+ * Subscribe to the registered adapter's credential changes
+ * (`EmbedAuthAdapter.subscribe`). A no-op when no adapter is registered, or
+ * the adapter doesn't report changes. Reads the adapter once, at call time:
+ * an adapter registered (or replaced) after a subscriber starts is not
+ * picked up — register it before the surfaces that need it mount.
+ */
+export function subscribeEmbedCredentialChange(listener: () => void): () => void {
+  return getRegisteredAuthAdapter()?.subscribe?.(listener) ?? (() => {});
 }
 
 /**

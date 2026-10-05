@@ -83,4 +83,24 @@ public class NotificationQueries {
                 markNotificationsReadForEntity(entityType: $entityType, entityId: $entityId)
             }
             """;
+
+    private static final String NOTIFICATION_SETTINGS_FIELDS = """
+            fragment notificationSettingsFields on NotificationSettings {
+                enabled
+                typeSettings { group label enabled }
+            }
+            """;
+
+    public static final String NOTIFICATION_SETTINGS = """
+            query NotificationSettings {
+                notificationSettings { ...notificationSettingsFields }
+            }
+            """ + NOTIFICATION_SETTINGS_FIELDS;
+
+    // Omitting typeSettings keeps the stored group overrides; sending it replaces the muted set.
+    public static final String UPDATE_NOTIFICATION_SETTINGS = """
+            mutation UpdateNotificationSettings($enabled: Boolean!, $typeSettings: [NotificationTypeSettingInput!]) {
+                updateNotificationSettings(enabled: $enabled, typeSettings: $typeSettings) { ...notificationSettingsFields }
+            }
+            """ + NOTIFICATION_SETTINGS_FIELDS;
 }

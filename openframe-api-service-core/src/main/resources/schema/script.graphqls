@@ -90,6 +90,15 @@ enum OsType {
     MAC_OS
 }
 
+"""How the script came into existence. Stamped server-side — the client can't forge it via the API.
+Scripts created before this field existed read as MANUAL."""
+enum ScriptCreationSource {
+    "Created by a technician in the dashboard."
+    MANUAL
+    "Authored by the Mingo AI assistant through its create-script tool."
+    AI_ASSISTANT
+}
+
 type Script implements Node {
     id: ID!
     name: String!
@@ -110,6 +119,8 @@ type Script implements Node {
     updatedAt: Instant
     """The creating user (resolved from the internal createdBy id via the user DataLoader). The raw createdBy id is not exposed — filter by author via authorIds."""
     author: User
+    """How the script was created — manually in the dashboard or by the Mingo AI assistant."""
+    creationSource: ScriptCreationSource!
 }
 
 type ScriptEnvVar {

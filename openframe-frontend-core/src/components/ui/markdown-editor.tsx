@@ -6,6 +6,7 @@ import type React from 'react';
 import { useRef, useCallback, useState, useEffect } from 'react';
 import dynamic from '../../embed-shims/next-dynamic';
 import { cn } from '../../utils/cn';
+import { IMAGE_FILE_ACCEPT, fileMediaType } from '../../utils/media-type';
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
 
@@ -183,7 +184,7 @@ export function MarkdownEditor({
 
       try {
         const url = await onUploadFile(file);
-        const isImage = file.type.startsWith('image/');
+        const isImage = fileMediaType(file) === 'image';
         const markdown = isImage ? `![${file.name}](${url})` : `[${file.name}](${url})`;
         insertTextAtCursor(markdown);
         onFileUploaded?.(url, file.name);
@@ -333,7 +334,7 @@ export function MarkdownEditor({
           type="file"
           className="hidden"
           onChange={handleFileInputChange}
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt"
+          accept={`${IMAGE_FILE_ACCEPT},.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt`}
         />
       )}
 

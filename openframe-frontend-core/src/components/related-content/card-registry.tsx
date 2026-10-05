@@ -71,7 +71,7 @@ import {
 } from '../chat/entity-cards/what-i-shipped-card';
 import type { InvestorUpdate } from '../chat/types/entities/investor-update';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
-import type { BaseProgramItem, ProgramHost } from '../chat/types/entities/program-types';
+import type { BaseProgramItem, ProgramHost, ProgramMedia } from '../chat/types/entities/program-types';
 import type { RoadmapItem } from '../chat/types/entities/roadmap-item';
 
 export type CardSize = 'lg' | 'default' | 'sm';
@@ -512,6 +512,28 @@ function decodeProgramRow(row: unknown): BaseProgramItem & Record<string, unknow
   };
 }
 
+/** A program row's gallery: the entries that carry an id and a url, nothing else trusted. */
+function decodeProgramMedia(value: unknown): ProgramMedia[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap(entry => {
+    const record = asRecord(entry);
+    const id = str(record, 'id');
+    const url = str(record, 'media_url');
+    if (!id || !url) return [];
+    return [
+      {
+        id,
+        program_id: str(record, 'program_id'),
+        media_type: record.media_type === 'video' ? 'video' : record.media_type === 'audio' ? 'audio' : 'image',
+        media_url: url,
+        title: strOrNull(record, 'title'),
+        display_order: typeof record.display_order === 'number' ? record.display_order : 0,
+        created_at: str(record, 'created_at'),
+      },
+    ];
+  });
+}
+
 /** The two employee-entry cards already declare MINIMAL row shapes
  *  (`EmployeeEntryCardData` + one date column each), so their decoders read
  *  exactly the card's fields with nothing left over. */
@@ -603,6 +625,8 @@ function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRe
         <ProgramCard
           config={config}
           item={item}
+          // The row's own gallery, when its list API serves one (an event's photos).
+          media={decodeProgramMedia(item.media)}
           size={ctx.legacySize}
           href={ctx.href}
           targetPlatform={ctx.targetPlatform}
