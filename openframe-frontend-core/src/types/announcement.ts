@@ -18,7 +18,7 @@ export interface Announcement {
   is_active: boolean;
   /** A one-line form of the title for tight spots (a hero's news pill). */
   short_title?: string | null;
-  /** Paths the bar is NOT shown on (exact match, e.g. `/`): the page shows the news itself. */
+  /** Path patterns the bar is NOT shown on (regular expressions matched against the whole path): the page shows the news itself. */
   excluded_paths?: string[] | null;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
@@ -248,11 +248,6 @@ export interface AnnouncementBarProps {
    * currentPlatform()).
    */
   initialAnnouncement?: Announcement | null;
-  /**
-   * The path the bar is rendered on. When the announcement lists it in
-   * `excluded_paths`, the bar stays collapsed. Omitted: never excluded.
-   */
-  pathname?: string | null;
   /**
    * Render-only mode for the admin live preview: no fetch/revalidation, inert
    * dismiss button, and no storage side effects (never writes dismissal
