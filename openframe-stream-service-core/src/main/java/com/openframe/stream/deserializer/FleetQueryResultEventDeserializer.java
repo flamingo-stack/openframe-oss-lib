@@ -1,8 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.sdk.fleetmdm.model.Query;
@@ -55,7 +55,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
     protected Optional<String> getAgentId(JsonNode afterField) {
         // host_id represents the agent/device that executed the query
         return Optional.ofNullable(afterField.get("host_id"))
-                .map(JsonNode::asText);
+                .map(JsonNode::asString);
     }
 
     @Override
@@ -72,7 +72,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
     protected Optional<String> getEventToolId(JsonNode afterField) {
         // id is the unique identifier for this query result
         return Optional.ofNullable(afterField.get("id"))
-                .map(JsonNode::asText);
+                .map(JsonNode::asString);
     }
 
     @Override
@@ -84,14 +84,14 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
         JsonNode errorNode = afterField.get("error");
         if (errorNode != null && !errorNode.isNull()) {
             if (queryName != null) {
-                return Optional.of(String.format("Query '%s' execution failed: %s", queryName, errorNode.asText()));
+                return Optional.of(String.format("Query '%s' execution failed: %s", queryName, errorNode.asString()));
             }
-            return Optional.of("Query execution failed: " + errorNode.asText());
+            return Optional.of("Query execution failed: " + errorNode.asString());
         }
         
         // Check if data is present
         JsonNode dataNode = afterField.get("data");
-        if (dataNode != null && !dataNode.isNull() && !dataNode.asText().isEmpty()) {
+        if (dataNode != null && !dataNode.isNull() && !dataNode.asString().isEmpty()) {
             if (queryName != null) {
                 return Optional.of(String.format("Query '%s' executed successfully", queryName));
             }
@@ -108,7 +108,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
     protected String getError(JsonNode after) {
         // Check if error field is present in the event
         JsonNode errorNode = after.get("error");
-        if (errorNode == null || errorNode.isNull() || errorNode.asText().isEmpty()) {
+        if (errorNode == null || errorNode.isNull() || errorNode.asString().isEmpty()) {
             return null;
         }
 
@@ -116,7 +116,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
             ObjectNode errorJson = mapper.createObjectNode();
             
             // Try to parse error as JSON, fallback to plain text
-            String errorText = errorNode.asText();
+            String errorText = errorNode.asString();
             try {
                 JsonNode parsedError = mapper.readTree(errorText);
                 errorJson.set("output", parsedError);
@@ -143,7 +143,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
     protected String getResult(JsonNode after) {
         // Get the data field from the event
         JsonNode dataNode = after.get("data");
-        if (dataNode == null || dataNode.isNull() || dataNode.asText().isEmpty()) {
+        if (dataNode == null || dataNode.isNull() || dataNode.asString().isEmpty()) {
             return null;
         }
 
@@ -151,7 +151,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
             ObjectNode resultJson = mapper.createObjectNode();
             
             // Parse the data field as JSON
-            String dataText = dataNode.asText();
+            String dataText = dataNode.asString();
             try {
                 JsonNode parsedData = mapper.readTree(dataText);
                 resultJson.set("output", parsedData);
@@ -200,14 +200,14 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
         JsonNode queryIdNode = afterField.get("query_id");
         if (queryIdNode == null || queryIdNode.isNull()) {
             log.warn("query_id field is missing or null in query result event, host_id: {}",
-                    afterField.has("host_id") ? afterField.get("host_id").asText() : "unknown");
+                    afterField.has("host_id") ? afterField.get("host_id").asString() : "unknown");
             return null;
         }
 
         try {
             Long queryId = queryIdNode.asLong();
             log.debug("Resolving query info for query_id: {}, host_id: {}", queryId,
-                    afterField.has("host_id") ? afterField.get("host_id").asText() : "unknown");
+                    afterField.has("host_id") ? afterField.get("host_id").asString() : "unknown");
 
             Query query = fleetMdmCacheService.getQueryById(queryId, eventTenantId(afterField));
 
@@ -219,7 +219,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
 
             return query;
         } catch (Exception e) {
-            log.error("Error fetching query info for query_id: {}", queryIdNode.asText(), e);
+            log.error("Error fetching query info for query_id: {}", queryIdNode.asString(), e);
             return null;
         }
     }

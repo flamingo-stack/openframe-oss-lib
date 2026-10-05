@@ -15,8 +15,6 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
-import org.springframework.kafka.support.serializer.JsonSerializer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,9 +37,9 @@ public class OssTenantKafkaAutoConfiguration {
     @Bean("ossTenantKafkaProducerFactory")
     public ProducerFactory<String, Object> ossTenantKafkaProducerFactory(OssTenantKafkaProperties properties) {
         properties.getKafka().getProducer().setKeySerializer(StringSerializer.class);
-        properties.getKafka().getProducer().setValueSerializer(JsonSerializer.class);
-        var producerProperties = properties.getKafka().buildProducerProperties(null);
-        return new DefaultKafkaProducerFactory<>(producerProperties);
+        var producerProperties = properties.getKafka().buildProducerProperties();
+        // The value serializer is passed as an instance so messages keep the Jackson 2 compatible shape (KafkaJsonSerdes)
+        return new DefaultKafkaProducerFactory<>(producerProperties, null, KafkaJsonSerdes.valueSerializer());
     }
 
     /**
@@ -68,9 +66,9 @@ public class OssTenantKafkaAutoConfiguration {
     @Bean("ossTenantKafkaConsumerFactory")
     public ConsumerFactory<Object, Object> ossTenantKafkaConsumerFactory(OssTenantKafkaProperties properties) {
         properties.getKafka().getConsumer().setKeyDeserializer(StringDeserializer.class);
-        properties.getKafka().getConsumer().setValueDeserializer(JsonDeserializer.class);
-        var consumerProperties = properties.getKafka().buildConsumerProperties(null);
-        return new DefaultKafkaConsumerFactory<>(consumerProperties);
+        var consumerProperties = properties.getKafka().buildConsumerProperties();
+        // The key deserializer stays configured by class; the value one is passed as an instance (KafkaJsonSerdes)
+        return new DefaultKafkaConsumerFactory<>(consumerProperties, null, KafkaJsonSerdes.valueDeserializer());
     }
 
     /**

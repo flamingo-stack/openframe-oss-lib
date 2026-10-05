@@ -1,6 +1,6 @@
 package com.openframe.stream.service.rmm;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptCreationSource;
@@ -148,7 +148,7 @@ public class RmmEnrichmentService implements DataEnrichmentService<DeserializedD
         if (value == null || value.isNull()) {
             return null;
         }
-        String textValue = value.asText();
+        String textValue = value.asString();
         return textValue.isBlank() ? null : textValue;
     }
 

@@ -1,7 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
@@ -21,7 +22,7 @@ class GoogleWorkspaceAuditEventDeserializerTest {
 
     private static final long PROCESSING_TS = 1753868000000L;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new JsonMapper();
     private final GoogleWorkspaceAuditEventDeserializer deserializer = new GoogleWorkspaceAuditEventDeserializer(mapper);
 
     private static final String AUDIT_EVENT_JSON = """
@@ -112,10 +113,10 @@ class GoogleWorkspaceAuditEventDeserializerTest {
         DeserializedDebeziumMessage result = deserialize(AUDIT_EVENT_JSON);
 
         JsonNode details = mapper.readTree(result.getDetails());
-        assertEquals("USER_EMAIL", details.path("event").path("parameters").path(0).path("name").asText());
-        assertEquals("203.0.113.5", details.get("ipAddress").asText());
-        assertEquals("conn-1", details.get("connectionId").asText());
-        assertEquals("Main", details.get("connectionName").asText());
+        assertEquals("USER_EMAIL", details.path("event").path("parameters").path(0).path("name").asString());
+        assertEquals("203.0.113.5", details.get("ipAddress").asString());
+        assertEquals("conn-1", details.get("connectionId").asString());
+        assertEquals("Main", details.get("connectionName").asString());
     }
 
     @Test
