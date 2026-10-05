@@ -1,8 +1,8 @@
 package com.openframe.stream.handler.rmm;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.cassandra.model.CommandResult;
 import com.openframe.data.cassandra.repository.CommandResultRepository;
 import com.openframe.data.model.enums.Destination;
@@ -100,13 +100,13 @@ public class CommandResultCassandraMessageHandler
 
     private static String text(JsonNode after, String field) {
         JsonNode node = after.get(field);
-        return node == null || node.isNull() ? null : node.asText();
+        return node == null || node.isNull() ? null : node.asString();
     }
 
     private static void putText(ObjectNode out, JsonNode after, String field) {
         JsonNode node = after.get(field);
         if (node != null && !node.isNull()) {
-            out.put(field, node.asText());
+            out.put(field, node.asString());
         }
     }
 
@@ -120,9 +120,9 @@ public class CommandResultCassandraMessageHandler
             return;
         }
         try {
-            out.put(field, Integer.parseInt(node.asText().trim()));
+            out.put(field, Integer.parseInt(node.asString().trim()));
         } catch (NumberFormatException e) {
-            out.put(field, node.asText());
+            out.put(field, node.asString());
         }
     }
 
@@ -136,9 +136,9 @@ public class CommandResultCassandraMessageHandler
             return;
         }
         try {
-            out.put(field, Long.parseLong(node.asText().trim()));
+            out.put(field, Long.parseLong(node.asString().trim()));
         } catch (NumberFormatException e) {
-            out.put(field, node.asText());
+            out.put(field, node.asString());
         }
     }
 
@@ -151,6 +151,6 @@ public class CommandResultCassandraMessageHandler
             out.put(field, node.booleanValue());
             return;
         }
-        out.put(field, Boolean.parseBoolean(node.asText().trim()));
+        out.put(field, Boolean.parseBoolean(node.asString().trim()));
     }
 }

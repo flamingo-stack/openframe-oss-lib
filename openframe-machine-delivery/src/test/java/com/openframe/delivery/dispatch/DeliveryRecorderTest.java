@@ -1,6 +1,7 @@
 package com.openframe.delivery.dispatch;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
@@ -57,7 +58,7 @@ class DeliveryRecorderTest {
                 .machineId(MACHINE_ID)
                 .payload(payload)
                 .build();
-        recorder = new DeliveryRecorder(repository, sequences, DeliveryTestPolicies.properties(), new ObjectMapper());
+        recorder = new DeliveryRecorder(repository, sequences, DeliveryTestPolicies.properties(), new JsonMapper());
     }
 
     @Test

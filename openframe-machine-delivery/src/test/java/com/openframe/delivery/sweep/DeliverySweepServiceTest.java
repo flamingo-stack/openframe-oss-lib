@@ -1,6 +1,7 @@
 package com.openframe.delivery.sweep;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
@@ -89,7 +90,7 @@ class DeliverySweepServiceTest {
         dispatchedAt = Instant.now().minusSeconds(ACK_THRESHOLD * 2);
         delivery = row(MACHINE_ID, PAYLOAD_JSON);
         properties = DeliveryTestPolicies.properties();
-        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, publisher, new ObjectMapper());
+        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, publisher, new JsonMapper());
     }
 
     @Test

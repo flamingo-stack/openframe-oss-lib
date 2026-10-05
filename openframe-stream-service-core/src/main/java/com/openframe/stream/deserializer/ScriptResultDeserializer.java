@@ -1,9 +1,9 @@
 package com.openframe.stream.deserializer;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.software.SoftwareAction;
@@ -48,7 +48,9 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
         super(mapper);
         this.scriptExecutionRepository = scriptExecutionRepository;
         this.scriptRepository = scriptRepository;
-        this.scriptMapper = mapper.copy().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        this.scriptMapper = this.mapper.rebuild()
+                .changeDefaultPropertyInclusion(inclusion -> inclusion.withValueInclusion(JsonInclude.Include.NON_NULL))
+                .build();
     }
 
     @Override

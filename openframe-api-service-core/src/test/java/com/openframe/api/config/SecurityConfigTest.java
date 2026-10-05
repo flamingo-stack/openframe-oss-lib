@@ -22,12 +22,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.charset.StandardCharsets;
@@ -40,6 +40,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -61,7 +62,7 @@ class SecurityConfigTest {
     private static final String TRANSFER_PATH = "/users/user-2/transfer-ownership";
     private static final RSAKey UNKNOWN_KEY = generateUnknownKey();
 
-    @MockBean
+    @MockitoBean
     private UserService userService;
 
     @Autowired
@@ -80,9 +81,11 @@ class SecurityConfigTest {
         mockMvc.perform(post(TRANSFER_PATH).header(HttpHeaders.AUTHORIZATION, bearer("OWNER", "ADMIN")))
                 .andExpect(authenticated()
                         .withAuthenticationName("owner@acme.example")
-                        .withAuthorities(List.of(
-                                authority("SCOPE_openid"), authority("SCOPE_profile"),
-                                authority("OWNER"), authority("ADMIN"))));
+                        // Spring Security 7 also records how the caller authenticated (FACTOR_BEARER); only the granted ones matter here
+                        .withAuthentication(authentication -> assertThat(authentication.getAuthorities())
+                                .filteredOn(authority -> !(authority instanceof FactorGrantedAuthority))
+                                .extracting(GrantedAuthority::getAuthority)
+                                .containsExactlyInAnyOrder("SCOPE_openid", "SCOPE_profile", "OWNER", "ADMIN")));
     }
 
     @Test
@@ -183,9 +186,5 @@ class SecurityConfigTest {
         } catch (JOSEException e) {
             throw new IllegalStateException("Cannot generate the unknown test key", e);
         }
-    }
-
-    private static GrantedAuthority authority(String name) {
-        return new SimpleGrantedAuthority(name);
     }
 }

@@ -156,8 +156,8 @@ class RestProxyServiceResponseRelayTest {
 
         HttpHeaders headers = proxyPing().getHeaders();
 
-        assertThat(headers.containsKey(HttpHeaders.SET_COOKIE)).isFalse();
-        assertThat(headers.containsKey(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)).isFalse();
+        assertThat(headers.containsHeader(HttpHeaders.SET_COOKIE)).isFalse();
+        assertThat(headers.containsHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)).isFalse();
         assertThat(headers.getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
     }
 

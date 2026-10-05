@@ -1,8 +1,9 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.cassandra.model.CommandResult;
 import com.openframe.data.cassandra.repository.CommandResultRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
@@ -29,7 +30,7 @@ class CommandResultCassandraMessageHandlerTest {
     @Mock
     private CommandResultRepository commandResultRepository;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new JsonMapper();
     private CommandResultCassandraMessageHandler handler;
 
     @BeforeEach
@@ -49,16 +50,16 @@ class CommandResultCassandraMessageHandlerTest {
         assertThat(saved.getKey().getMachineId()).isEqualTo(MACHINE_ID);
 
         JsonNode result = readResult(saved.getResult());
-        assertThat(result.get("executionId").asText()).isEqualTo(EXECUTION_ID);
-        assertThat(result.get("machineId").asText()).isEqualTo(MACHINE_ID);
-        assertThat(result.get("stdout").asText()).isEqualTo("hello");
-        assertThat(result.get("stderr").asText()).isEqualTo("oops");
+        assertThat(result.get("executionId").asString()).isEqualTo(EXECUTION_ID);
+        assertThat(result.get("machineId").asString()).isEqualTo(MACHINE_ID);
+        assertThat(result.get("stdout").asString()).isEqualTo("hello");
+        assertThat(result.get("stderr").asString()).isEqualTo("oops");
         assertThat(result.get("exitCode").isInt()).isTrue();
         assertThat(result.get("exitCode").asInt()).isEqualTo(0);
         assertThat(result.get("executionTimeMs").asLong()).isEqualTo(1234L);
         assertThat(result.get("timedOut").isBoolean()).isTrue();
         assertThat(result.get("timedOut").asBoolean()).isFalse();
-        assertThat(result.get("error").asText()).isEqualTo("none");
+        assertThat(result.get("error").asString()).isEqualTo("none");
     }
 
     @Test

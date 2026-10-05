@@ -1,6 +1,6 @@
 package com.openframe.stream.handler.rmm;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.model.enums.Destination;
@@ -142,7 +142,7 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
 
     private static String stringOrNull(JsonNode node, String field) {
         JsonNode v = node.get(field);
-        return v == null || v.isNull() ? null : v.asText();
+        return v == null || v.isNull() ? null : v.asString();
     }
 
     private static Integer intOrNull(JsonNode node, String field) {

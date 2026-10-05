@@ -1,8 +1,11 @@
 package com.openframe.sdk.fleetmdm;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmArgumentException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
@@ -73,7 +76,12 @@ public class FleetMdmClient {
      * Thread-safe reusable {@link ObjectMapper}. Creating it once is cheaper than instantiating a new one
      * every request.
      */
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    // Jackson 2 behaviour (lenient primitives, declaration order), as openframe-core's Jackson2Compatibility;
+    // the SDK does not depend on it
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+            .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+            .build();
 
     /**
      * Body of a Fleet API call. It may throw checked exceptions so the call sites keep plain
@@ -430,7 +438,7 @@ public class FleetMdmClient {
                     .path("secrets");
 
             if (secretsArray.isArray() && !secretsArray.isEmpty()) {
-                return secretsArray.get(0).path("secret").asText();
+                return secretsArray.get(0).path("secret").asString();
             }
 
             throw new FleetMdmException("Failed to parse enroll secret: " + response.body());

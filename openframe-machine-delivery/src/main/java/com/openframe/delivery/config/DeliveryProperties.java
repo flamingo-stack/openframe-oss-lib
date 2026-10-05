@@ -41,11 +41,11 @@ public class DeliveryProperties {
     // Kafka topic client-service reads dispatches from; set where the Kafka hand-off or its consumer runs
     private String dispatchTopic;
 
-    public boolean isEnabled(DeliveryType type) {
+    public boolean isEnabled(@Valid DeliveryType type) {
         return enabled.getOrDefault(type, FALSE);
     }
 
-    public Policy resolve(DeliveryType type) {
+    public Policy resolve(@Valid DeliveryType type) {
         Policy override = types.get(type);
         if (override == null) {
             return defaults;
@@ -81,7 +81,7 @@ public class DeliveryProperties {
         @NotNull
         @Positive
         private Long maxRetryIntervalSeconds;
-        @NotNull
+        @NotNull @Valid
         private DeliveryOfflineBehavior offlineBehavior;
         @NotNull
         @Positive
@@ -93,7 +93,7 @@ public class DeliveryProperties {
         @Positive
         private Long ttlSeconds;
 
-        Policy mergeOver(Policy base) {
+        Policy mergeOver(@Valid Policy base) {
             Policy merged = new Policy();
             merged.ackThresholdSeconds = requireNonNullElse(ackThresholdSeconds, base.ackThresholdSeconds);
             merged.maxAttempts = requireNonNullElse(maxAttempts, base.maxAttempts);

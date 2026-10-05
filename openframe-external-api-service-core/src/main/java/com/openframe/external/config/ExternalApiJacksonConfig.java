@@ -1,14 +1,13 @@
 package com.openframe.external.config;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.module.SimpleModule;
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.ValueSerializer;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -27,14 +26,14 @@ public class ExternalApiJacksonConfig {
     private static final DateTimeFormatter ISO_INSTANT_MILLIS = new DateTimeFormatterBuilder().appendInstant(3).toFormatter();
 
     @Bean
-    public Jackson2ObjectMapperBuilderCustomizer externalApiInstantMillisCustomizer() {
+    public JsonMapperBuilderCustomizer externalApiInstantMillisCustomizer() {
         SimpleModule module = new SimpleModule("external-api-instant-millis");
-        module.addSerializer(Instant.class, new JsonSerializer<>() {
+        module.addSerializer(Instant.class, new ValueSerializer<>() {
             @Override
-            public void serialize(Instant value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            public void serialize(Instant value, JsonGenerator gen, SerializationContext serializers) {
                 gen.writeString(ISO_INSTANT_MILLIS.format(value.truncatedTo(ChronoUnit.MILLIS)));
             }
         });
-        return builder -> builder.modulesToInstall(module);
+        return builder -> builder.addModule(module);
     }
 }

@@ -57,8 +57,10 @@ public class FaeModelSwitchTest extends FaeBaseTest {
         RunResult before = prompt("Please remember this reference code for later: " + code + ". Reply with just OK.",
                 ApprovalPolicy.AUTO_REJECT);
         assertThat(before.answeringModel())
-                .as("Before the switch Fae answers on the tenant's client model %s (an organization override "
-                        + "would show here).\n%s", original.model(), before)
+                .as("""
+                        Before the switch Fae answers on the tenant's client model %s (an organization override \
+                        would show here).
+                        %s""", original.model(), before)
                 .isEqualTo(original.model());
         String dialogId = dialog.getDialogId();
 

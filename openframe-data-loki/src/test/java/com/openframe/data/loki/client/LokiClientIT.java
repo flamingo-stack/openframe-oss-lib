@@ -1,6 +1,7 @@
 package com.openframe.data.loki.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
 import org.junit.jupiter.api.BeforeAll;
@@ -33,7 +34,7 @@ class LokiClientIT {
             .waitingFor(Wait.forHttp("/ready").forPort(3100).forStatusCode(200)
                     .withStartupTimeout(Duration.ofMinutes(2)));
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = new JsonMapper();
     private static final long BASE_NANOS = toNanos(Instant.now().minus(Duration.ofMinutes(30)).truncatedTo(ChronoUnit.MILLIS));
     private static final long ONE_SECOND = 1_000_000_000L;
 

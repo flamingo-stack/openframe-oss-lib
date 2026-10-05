@@ -2,7 +2,7 @@ package com.openframe.api.integration;
 
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.mongodb.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
 public abstract class BaseMongoIntegrationTest {
@@ -15,7 +15,7 @@ public abstract class BaseMongoIntegrationTest {
         if (!MONGO.isRunning()) {
             MONGO.start();
         }
-        registry.add("spring.data.mongodb.uri",
+        registry.add("spring.mongodb.uri",
                 () -> MONGO.getConnectionString() + "/test?directConnection=true");
         registry.add("spring.data.mongodb.auto-index-creation", () -> "true");
     }

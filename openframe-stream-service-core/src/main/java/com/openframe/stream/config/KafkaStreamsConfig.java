@@ -1,6 +1,6 @@
 package com.openframe.stream.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.stream.model.fleet.ActivityMessage;
 import com.openframe.stream.model.fleet.HostActivityMessage;
 import org.apache.kafka.common.serialization.Serde;
@@ -13,9 +13,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
 import org.springframework.kafka.annotation.KafkaStreamsDefaultConfiguration;
 import org.springframework.kafka.config.KafkaStreamsConfiguration;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
-import org.springframework.kafka.support.serializer.JsonSerde;
-import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
+import org.springframework.kafka.support.serializer.JacksonJsonSerde;
+import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -51,9 +51,9 @@ public class KafkaStreamsConfig {
     @Value("${openframe.cluster-id:}")
     private String clusterId;
 
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
-    public KafkaStreamsConfig(ObjectMapper objectMapper) {
+    public KafkaStreamsConfig(JsonMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -63,8 +63,8 @@ public class KafkaStreamsConfig {
     @Bean
     public Serde<ActivityMessage> activityMessageSerde() {
         return Serdes.serdeFrom(
-            new JsonSerializer<>(objectMapper),
-            new JsonDeserializer<>(ActivityMessage.class, objectMapper)
+            new JacksonJsonSerializer<>(objectMapper),
+            new JacksonJsonDeserializer<>(ActivityMessage.class, objectMapper)
         );
     }
 
@@ -74,14 +74,15 @@ public class KafkaStreamsConfig {
     @Bean
     public Serde<HostActivityMessage> hostActivityMessageSerde() {
         return Serdes.serdeFrom(
-            new JsonSerializer<>(objectMapper),
-            new JsonDeserializer<>(HostActivityMessage.class, objectMapper)
+            new JacksonJsonSerializer<>(objectMapper),
+            new JacksonJsonDeserializer<>(HostActivityMessage.class, objectMapper)
         );
     }
 
     @Bean
     public Serde<ActivityMessage> outgoingActivityMessageSerde() {
-        JsonSerde<ActivityMessage> serde = new JsonSerde<>(ActivityMessage.class);
+        // The application's mapper, as for the other serdes here, so the outgoing messages keep their shape
+        JacksonJsonSerde<ActivityMessage> serde = new JacksonJsonSerde<>(ActivityMessage.class, objectMapper);
         serde.serializer().setAddTypeInfo(false);
         return serde;
     }

@@ -144,9 +144,12 @@ public final class ClientWritePolicy {
                     log.warn("Control write refused by the tenant guardrail — write-negative cases will be "
                             + "skipped. Reply: {}", result.finalText());
                 } else {
-                    log.warn("Control write produced no file and no policy-block message, so client writes "
-                            + "are treated as unavailable. This is not a normal refusal — U-FILE-01 is the "
-                            + "case that diagnoses it. Conversation:\n{}", result);
+                    log.warn("""
+                            Control write produced no file and no policy-block message, so client writes \
+                            are treated as unavailable. This is not a normal refusal — U-FILE-01 is the \
+                            case that diagnoses it. Conversation:
+                            {}\
+                            """, result);
                 }
                 return written;
             } finally {

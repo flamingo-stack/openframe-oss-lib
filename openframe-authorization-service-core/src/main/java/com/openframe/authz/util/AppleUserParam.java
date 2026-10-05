@@ -1,9 +1,9 @@
 package com.openframe.authz.util;
-
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.authz.config.oidc.AppleSSOProperties;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -15,7 +15,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  */
 public final class AppleUserParam {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new JsonMapper();
 
     private AppleUserParam() {
     }
@@ -65,8 +65,8 @@ public final class AppleUserParam {
         }
         try {
             JsonNode name = MAPPER.readTree(user).path("name");
-            String first = name.path("firstName").asText(null);
-            String last = name.path("lastName").asText(null);
+            String first = name.path("firstName").asString(null);
+            String last = name.path("lastName").asString(null);
             return (first == null && last == null) ? null : new String[]{first, last};
         } catch (Exception e) {
             return null;

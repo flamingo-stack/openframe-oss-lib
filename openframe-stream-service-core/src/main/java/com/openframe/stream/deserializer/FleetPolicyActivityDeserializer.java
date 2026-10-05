@@ -1,8 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.sdk.fleetmdm.model.Policy;
@@ -140,7 +140,7 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
                 JsonNode detailsNode = mapper.readTree(detailsStr);
                 JsonNode nameNode = detailsNode.get("policy_name");
                 if (nameNode != null && !nameNode.isNull()) {
-                    return nameNode.asText();
+                    return nameNode.asString();
                 }
             } catch (Exception e) {
                 log.debug("Could not parse details JSON for policy name: {}", detailsStr);

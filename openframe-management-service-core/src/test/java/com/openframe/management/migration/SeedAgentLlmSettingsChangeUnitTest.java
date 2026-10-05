@@ -66,7 +66,7 @@ class SeedAgentLlmSettingsChangeUnitTest {
     }
 
     private static ArgumentMatcher<Bson> agentTypeIs(String agentType) {
-        return bson -> bson instanceof Document && agentType.equals(((Document) bson).getString("agentType"));
+        return bson -> bson instanceof Document d && agentType.equals(d.getString("agentType"));
     }
 
     @Test

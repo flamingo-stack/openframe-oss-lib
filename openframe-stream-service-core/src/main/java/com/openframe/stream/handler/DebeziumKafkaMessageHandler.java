@@ -1,6 +1,6 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.kafka.model.IntegratedToolEvent;

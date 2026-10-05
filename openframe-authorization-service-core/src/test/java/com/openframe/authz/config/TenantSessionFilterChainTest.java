@@ -5,7 +5,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.autoconfigure.security.SecurityProperties;
+import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties;
 import org.springframework.boot.web.servlet.AbstractFilterRegistrationBean;
 import org.springframework.boot.web.servlet.DelegatingFilterProxyRegistrationBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -63,7 +63,7 @@ class TenantSessionFilterChainTest {
         assertThat(sessionOrder).isLessThan(TenantContextFilter.ORDER);
         assertThat(TenantContextFilter.ORDER).isLessThan(prefixOrder);
         assertThat(prefixOrder).isLessThan(forwarded.getOrder());
-        assertThat(forwarded.getOrder()).isLessThan(SecurityProperties.DEFAULT_FILTER_ORDER);
+        assertThat(forwarded.getOrder()).isLessThan(SecurityFilterProperties.DEFAULT_FILTER_ORDER);
     }
 
     @Test

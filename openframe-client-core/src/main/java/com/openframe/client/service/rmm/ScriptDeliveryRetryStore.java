@@ -1,6 +1,6 @@
 package com.openframe.client.service.rmm;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ScriptDeliveryRetry;
 import com.openframe.data.repository.rmm.ScriptDeliveryRetryRepository;

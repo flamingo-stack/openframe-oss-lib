@@ -1,7 +1,7 @@
 package com.openframe.client.integration;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.integration.support.CommandResultIntegrationTestApplication;
 import com.openframe.client.listener.rmm.CommandResultListener;
 import com.openframe.client.publisher.EventLogsPublisher;
@@ -118,10 +118,10 @@ class CommandResultListenerIT {
         assertThat(envelope.getValue().getPayload().getOperation()).isEqualTo("c");
 
         JsonNode after = envelope.getValue().getPayload().getAfter();
-        assertThat(after.get("tenantId").asText()).isEqualTo("tenant-it");
-        assertThat(after.get("machineId").asText()).isEqualTo("machine-42");
-        assertThat(after.get("executionId").asText()).isEqualTo("exec-1");
-        assertThat(after.get("stdout").asText()).isEqualTo("hey\n");
+        assertThat(after.get("tenantId").asString()).isEqualTo("tenant-it");
+        assertThat(after.get("machineId").asString()).isEqualTo("machine-42");
+        assertThat(after.get("executionId").asString()).isEqualTo("exec-1");
+        assertThat(after.get("stdout").asString()).isEqualTo("hey\n");
         assertThat(after.get("exitCode").asInt()).isZero();
         assertThat(after.get("executionTimeMs").asLong()).isEqualTo(12L);
         assertThat(after.get("timedOut").asBoolean()).isFalse();

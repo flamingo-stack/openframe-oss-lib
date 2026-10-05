@@ -1,7 +1,8 @@
 package com.openframe.client.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.client.service.rmm.RmmResultService;
 import com.openframe.data.model.enums.MessageType;
@@ -42,7 +43,7 @@ class RmmResultServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        rmmResultService = new RmmResultService(eventLogsPublisher, tenantIdProvider, new ObjectMapper());
+        rmmResultService = new RmmResultService(eventLogsPublisher, tenantIdProvider, new JsonMapper());
     }
 
     @Test
@@ -74,10 +75,10 @@ class RmmResultServiceTest {
 
         JsonNode after = envelope.getValue().getPayload().getAfter();
         assertThat(after).isNotNull();
-        assertThat(after.get("tenantId").asText()).isEqualTo(TENANT_ID);
-        assertThat(after.get("machineId").asText()).isEqualTo(MACHINE_ID);
-        assertThat(after.get("executionId").asText()).isEqualTo("exec-1");
-        assertThat(after.get("stdout").asText()).isEqualTo("hey\n");
+        assertThat(after.get("tenantId").asString()).isEqualTo(TENANT_ID);
+        assertThat(after.get("machineId").asString()).isEqualTo(MACHINE_ID);
+        assertThat(after.get("executionId").asString()).isEqualTo("exec-1");
+        assertThat(after.get("stdout").asString()).isEqualTo("hey\n");
         assertThat(after.get("exitCode").asInt()).isZero();
         assertThat(after.get("executionTimeMs").asLong()).isEqualTo(12L);
         assertThat(after.get("timedOut").asBoolean()).isFalse();
@@ -114,8 +115,8 @@ class RmmResultServiceTest {
         ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
         verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), any());
         JsonNode after = envelope.getValue().getPayload().getAfter();
-        assertThat(after.get("scriptId").asText()).isEqualTo("script-b");
-        assertThat(after.get("scheduleId").asText()).isEqualTo("sched-1");
+        assertThat(after.get("scriptId").asString()).isEqualTo("script-b");
+        assertThat(after.get("scheduleId").asString()).isEqualTo("sched-1");
     }
 
     @Test
@@ -149,8 +150,8 @@ class RmmResultServiceTest {
         verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), org.mockito.ArgumentMatchers.anyMap());
 
         JsonNode after = envelope.getValue().getPayload().getAfter();
-        assertThat(after.get("tenantId").asText()).isEqualTo(TENANT_ID);
-        assertThat(after.get("executionId").asText()).isEqualTo("exec-2");
+        assertThat(after.get("tenantId").asString()).isEqualTo(TENANT_ID);
+        assertThat(after.get("executionId").asString()).isEqualTo("exec-2");
         assertThat(after.has("stdout")).isFalse();
         assertThat(after.has("exitCode")).isFalse();
         assertThat(after.has("timedOut")).isFalse();

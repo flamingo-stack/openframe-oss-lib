@@ -1,6 +1,6 @@
 package com.openframe.gateway.filter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.apikey.ApiKey;
 import com.openframe.gateway.config.prop.RateLimitProperties;

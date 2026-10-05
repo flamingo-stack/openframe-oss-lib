@@ -1,6 +1,7 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
@@ -32,11 +33,11 @@ class DebeziumCassandraMessageHandlerTenantGuardTest {
     void setUp() {
         repository = mock(UnifiedLogEventRepository.class);
         handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
     }
 
     private static DeserializedDebeziumMessage message(String tenantId) {
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setOperation("c");
         DeserializedDebeziumMessage message = DeserializedDebeziumMessage.builder()
                 .payload(payload)

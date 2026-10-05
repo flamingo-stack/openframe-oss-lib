@@ -2,7 +2,7 @@ package com.openframe.notification.support;
 
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.MongoDBContainer;
+import org.testcontainers.mongodb.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
 // Copy of data-mongo-sync's base — test support isn't shared across modules as an artifact.
@@ -15,7 +15,7 @@ public abstract class BaseMongoIntegrationTest {
 
     @DynamicPropertySource
     static void mongoProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.mongodb.uri", BaseMongoIntegrationTest::resolveUri);
+        registry.add("spring.mongodb.uri", BaseMongoIntegrationTest::resolveUri);
         registry.add("spring.data.mongodb.auto-index-creation", () -> "true");
     }
 

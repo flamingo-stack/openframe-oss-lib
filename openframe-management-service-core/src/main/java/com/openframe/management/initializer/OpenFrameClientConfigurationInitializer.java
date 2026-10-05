@@ -1,6 +1,6 @@
 package com.openframe.management.initializer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import lombok.RequiredArgsConstructor;

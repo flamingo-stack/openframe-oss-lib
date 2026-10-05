@@ -1,5 +1,6 @@
 package com.openframe.gateway.config;
 
+import com.openframe.core.jackson.Jackson2Compatibility;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
@@ -30,6 +31,7 @@ public class WebClientConfig {
             );
 
         return WebClient.builder()
-            .clientConnector(new ReactorClientHttpConnector(httpClient));
+            .clientConnector(new ReactorClientHttpConnector(httpClient))
+            .codecs(Jackson2Compatibility::webClientCodecs);
     }
 } 

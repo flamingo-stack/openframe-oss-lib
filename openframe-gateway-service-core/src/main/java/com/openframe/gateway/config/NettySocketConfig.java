@@ -2,7 +2,7 @@ package com.openframe.gateway.config;
 
 import io.netty.channel.ChannelOption;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.web.embedded.netty.NettyReactiveWebServerFactory;
+import org.springframework.boot.reactor.netty.NettyReactiveWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.cloud.gateway.config.HttpClientCustomizer;
 import org.springframework.context.annotation.Bean;
