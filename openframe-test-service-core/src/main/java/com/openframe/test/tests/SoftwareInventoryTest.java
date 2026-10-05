@@ -357,11 +357,9 @@ public class SoftwareInventoryTest extends BaseTest {
         assertThat(present.cveIds()).as("One row per CVE").doesNotHaveDuplicates().allSatisfy(id -> assertThat(id).matches(CVE_ID));
         assertThat(rows).allSatisfy(row -> {
             assertThat(row.getAffectedSoftware()).as("affectedSoftware is populated on every row: %s", row.getCveId()).isNotEmpty();
-            assertThat(row.getDevicesCount()).as("devicesCount of %s counts at least this device", row.getCveId()).isPositive();
+            // #2518: the fleet-wide count would cost one Fleet call per row, so it is left null here.
+            assertThat(row.getDevicesCount()).as("devicesCount is not populated in a device scope: %s", row.getCveId()).isNull();
         });
-        Vulnerability fleetWide = SoftwareInventoryApi.getVulnerability(cveId);
-        assertThat(rows).filteredOn(row -> cveId.equals(row.getCveId())).extracting(Vulnerability::getDevicesCount)
-                .as("devicesCount of %s stays fleet-wide", cveId).containsExactly(fleetWide.getDevicesCount());
         assertThat(affectedSoftwareIds(rows)).as("affectedSoftware is scoped to %s: exactly its titles with CVEs", affectedDevice.getHostname())
                 .isEqualTo(vulnerableTitleIds(SoftwareInventoryApi.getDeviceSoftware(machineId, null, null, null).nodes()));
         assertThat(rows).extracting(Vulnerability::getCvssScore).as("The default order is severity DESC, unscored last")
