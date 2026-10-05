@@ -176,7 +176,12 @@ export {
 
 // Post-fetch enrichment for the minimal ChatRef descriptor a
 // `[card://type:id]` marker produces (the wire ships no card metadata).
-export { resolveFetchedCardHref, readFetchedCardTitle, type FetchedCardHrefInput } from './resolve-fetched-card-href';
+export {
+  resolveFetchedCardHref,
+  readFetchedCardPath,
+  readFetchedCardTitle,
+  type FetchedCardHrefInput,
+} from './resolve-fetched-card-href';
 
 // The ONE "Ask Mingo" prompt builder — shared by the SSE adapter, the NATS
 // adapter, and hosts that inject their own Mingo state (openframe-frontend).

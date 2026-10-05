@@ -112,7 +112,12 @@ import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
 import { resolveIcon } from '../utils/icon-library';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
-import { resolveFetchedCardHref, pickFetchedCardHref, readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
+import {
+  resolveFetchedCardHref,
+  pickFetchedCardHref,
+  readFetchedCardPath,
+  readFetchedCardTitle,
+} from '../utils/resolve-fetched-card-href';
 import { getSourceLabel } from '../utils/source-icons';
 import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
@@ -2072,14 +2077,40 @@ export function ChatCardLoader({
           allowComposed: !fetchEntry.noComposedHref,
         })
       : null;
-  const hrefResolvedChatRef: ChatRef = hrefChoice
-    ? {
-        ...resolvedChatRef,
-        url: safeHref(hrefChoice.href),
-        // The `item` branch carries no platform of its own — keep the ref's.
-        targetPlatform: hrefChoice.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
-      }
-    : resolvedChatRef;
+  // A doc card (`markdown`, `data_room_doc`) has no url on its row either: its
+  // destination is its viewer plus the row's tree path. The marker carried no
+  // path, so `resolveSourceRowCTA` above had nothing to route; ask it again
+  // with the fetched path, which is the answer the source chip got.
+  const fetchedPath = fetchEntry && !resolvedChatRef.url && item ? readFetchedCardPath(item) : null;
+  const pathCta = fetchedPath
+    ? resolveSourceRowCTA(
+        {
+          sourceRepo: resolvedChatRef.sourceRepo,
+          documentType: resolvedChatRef.type,
+          id: resolvedChatRef.id,
+          title: resolvedChatRef.title,
+          path: fetchedPath,
+        },
+        sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
+      )
+    : null;
+  const hrefResolvedChatRef: ChatRef =
+    pathCta?.href && fetchedPath
+      ? {
+          ...resolvedChatRef,
+          url: resolveHrefForRuntime(pathCta.href, runtime),
+          targetPlatform: pathCta.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
+          // The nav wrapper reads the path off the ref for in-app doc navigation.
+          metadata: { ...(resolvedChatRef.metadata ?? {}), path: fetchedPath },
+        }
+      : hrefChoice
+        ? {
+            ...resolvedChatRef,
+            url: safeHref(hrefChoice.href),
+            // The `item` branch carries no platform of its own — keep the ref's.
+            targetPlatform: hrefChoice.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
+          }
+        : resolvedChatRef;
 
   // Title enrichment, same synthetic-ref gap as the href above: a Mingo
   // `[card://type:id]` marker produces `title: <id>` because the transport
