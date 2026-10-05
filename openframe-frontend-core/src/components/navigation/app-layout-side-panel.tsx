@@ -217,7 +217,7 @@ export interface AppLayoutSidePanelState extends SidePanelLayout {
   isOpen: boolean;
   morph: SidePanelMorph | null;
   /**
-   * Dragged back out of the whole area and not yet let go: the panel follows
+   * Dragged wider than any column can be and not yet let go: the panel follows
    * the pointer over the content, laid out at its narrowest beneath it.
    */
   peekWidth: number | null;
@@ -232,12 +232,15 @@ export interface AppLayoutSidePanelState extends SidePanelLayout {
   close: () => void;
   resize: (next: number) => void;
   /**
-   * A pointer drag to `next`. One that started in the whole area (`fromFull`)
-   * follows the pointer while it is wider than any column could be.
+   * A pointer drag to `next`. Wider than any column can be, the panel follows
+   * the pointer over the content instead of jumping to the whole area.
    */
-  drag: (next: number, fromFull: boolean) => void;
-  /** The drag ended at `next`: a panel left between the two snaps to the nearer. */
-  release: (next: number, fromFull: boolean) => void;
+  drag: (next: number) => void;
+  /**
+   * The drag ended at `next`: a panel left between the widest column and the
+   * whole area settles on the nearer of the two, animated.
+   */
+  release: (next: number) => void;
 }
 
 /**
@@ -315,9 +318,9 @@ export function useAppLayoutSidePanel(
     if (!reduceMotion) setMorph(next);
   };
   const fullWidth = Math.max(0, rowWidth - 2 * SIDE_PANEL_INSET);
-  // Only while the drag holds the panel in the whole area: anything that moved
-  // it elsewhere (the room went, a phone) drops the peek.
-  const peekWidth = layout.mode === 'full' && layout.canDock ? liveWidth : null;
+  // Only while there is a column to peek out of: losing the room (or a phone)
+  // drops it.
+  const peekWidth = layout.canDock ? liveWidth : null;
   const dock = (next: number) => setSize({ width: Math.max(minWidth, Math.round(next)), expanded: false });
 
   const resize = (next: number) => {
@@ -362,33 +365,29 @@ export function useAppLayoutSidePanel(
     toggle: () => setIsOpen(!isOpen),
     close: () => setIsOpen(false),
     resize,
-    drag: (next, fromFull) => {
-      if (!fromFull || !layout.canDock) {
-        resize(next);
-        return;
-      }
+    drag: next => {
       if (next > layout.maxDockedWidth) {
         // Wider than a column can be: follow the pointer over the content, which
         // is laid out at its narrowest (the widest column) underneath.
-        if (!size.expanded || size.width !== layout.maxDockedWidth) {
-          setSize({ width: layout.maxDockedWidth, expanded: true });
-        }
+        if (size.expanded || size.width !== layout.maxDockedWidth) dock(layout.maxDockedWidth);
         setLiveWidth(Math.min(Math.round(next), fullWidth));
         return;
       }
-      // Into the column: an ordinary resize that picks up where the peek was.
+      // Within the column: an ordinary resize, picking up where a peek was.
       setLiveWidth(null);
       dock(next);
     },
-    release: (next, fromFull) => {
-      if (!fromFull || !layout.canDock || next <= layout.maxDockedWidth) return;
+    release: next => {
       setLiveWidth(null);
-      // Settle on the nearer of the two: back into the whole area, or the widest
-      // column. Either way from where the pointer left it, animated.
+      // Let go within the column: the drag already put it there.
+      if (next <= layout.maxDockedWidth) return;
+      // Settle on the nearer of the two, from where the pointer left it.
       if (next > (layout.maxDockedWidth + fullWidth) / 2) {
-        animate('expand');
+        // Dragged all the way: nothing left to animate.
+        if (next < fullWidth) animate('expand');
+        setSize({ width: layout.maxDockedWidth, expanded: true });
       } else {
-        animate('collapse');
+        animate('narrow');
         dock(layout.maxDockedWidth);
       }
     },
@@ -403,14 +402,14 @@ interface SidePanelResizeHandleProps {
 
 function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandleProps) {
   const { width, minWidth, maxDockedWidth, mode, peekWidth, resize, drag, release } = state;
-  const startRef = useRef<{ x: number; width: number; fromFull: boolean } | null>(null);
+  const startRef = useRef<{ x: number; width: number } | null>(null);
   // Pointer moves outpace frames; resize once per frame with the latest one.
   const frameRef = useRef<number | null>(null);
   const pendingRef = useRef<number | null>(null);
   // Unmeasured row (first paint): no upper bound to announce or jump to yet.
   const measured = Number.isFinite(maxDockedWidth);
-  // The width a drag starts from: in `full`, one past the docked maximum.
-  const current = mode === 'full' && measured ? maxDockedWidth + 1 : width;
+  // The width the keyboard steps from: in `full`, one past the docked maximum.
+  const current = peekWidth ?? (mode === 'full' && measured ? maxDockedWidth + 1 : width);
 
   useEffect(
     () => () => {
@@ -419,12 +418,12 @@ function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandle
     [],
   );
 
-  const scheduleDrag = (next: number, fromFull: boolean) => {
+  const scheduleDrag = (next: number) => {
     pendingRef.current = next;
     if (frameRef.current !== null) return;
     frameRef.current = requestAnimationFrame(() => {
       frameRef.current = null;
-      if (pendingRef.current !== null) drag(pendingRef.current, fromFull);
+      if (pendingRef.current !== null) drag(pendingRef.current);
     });
   };
 
@@ -433,8 +432,7 @@ function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandle
     event.preventDefault();
     // From the whole area the drag starts at the panel's real width, so its
     // edge stays under the pointer instead of jumping to the widest column.
-    const fromFull = mode === 'full' && measured;
-    startRef.current = { x: event.clientX, width: fromFull ? (peekWidth ?? width) : current, fromFull };
+    startRef.current = { x: event.clientX, width: mode === 'full' && measured ? width : current };
     pendingRef.current = null;
     event.currentTarget.setPointerCapture(event.pointerId);
     document.body.style.cursor = 'col-resize';
@@ -445,7 +443,7 @@ function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandle
     const start = startRef.current;
     if (!start) return;
     // The handle sits on the panel's left edge: dragging left widens it.
-    scheduleDrag(start.width - (event.clientX - start.x), start.fromFull);
+    scheduleDrag(start.width - (event.clientX - start.x));
   };
 
   const endDrag = (event: PointerEvent<HTMLDivElement>) => {
@@ -456,9 +454,9 @@ function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandle
     if (frameRef.current !== null) {
       cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
-      if (pendingRef.current !== null) drag(pendingRef.current, start.fromFull);
+      if (pendingRef.current !== null) drag(pendingRef.current);
     }
-    if (pendingRef.current !== null) release(pendingRef.current, start.fromFull);
+    if (pendingRef.current !== null) release(pendingRef.current);
     pendingRef.current = null;
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -579,7 +577,7 @@ export function AppLayoutSidePanel({ config, state }: AppLayoutSidePanelProps) {
           )}
         >
           {config.children({
-            width,
+            width: peekWidth ?? width,
             mode,
             canClose: mode === 'overlay' || (mode === 'full' && !canDock),
             close,

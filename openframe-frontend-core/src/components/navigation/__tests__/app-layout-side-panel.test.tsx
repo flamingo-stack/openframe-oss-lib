@@ -129,9 +129,35 @@ describe('AppLayout side panel', () => {
     // Moves land once per frame.
     await act(() => new Promise(resolve => requestAnimationFrame(() => resolve(undefined))));
     expect(screen.getByRole('main')).not.toHaveClass('hidden');
-    expect(screen.getByText(`panel full ${fullWidth}`)).toBeInTheDocument();
+    expect(screen.getByText(`panel docked ${fullWidth - 300}`)).toBeInTheDocument();
     fireEvent.pointerUp(handle, { pointerId: 1, clientX: 400 });
     expect(screen.getByText(`panel docked ${widestColumn}`)).toBeInTheDocument();
+  });
+
+  it('follows the pointer past the widest column and settles on the nearer of the two', async () => {
+    preferReducedMotion();
+    // jsdom has no pointer capture.
+    Object.assign(HTMLElement.prototype, { setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() });
+    setLayoutWidth(1224);
+    renderLayout();
+    const handle = screen.getByRole('separator', { name: 'Resize Mingo' });
+    const widestColumn = 1224 - 400 - 16;
+
+    // Past the widest column, short of halfway to the whole area: the panel is
+    // drawn over the content under the pointer, and settles back on the column.
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 1000 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 300 });
+    await act(() => new Promise(resolve => requestAnimationFrame(() => resolve(undefined))));
+    expect(screen.getByText('panel docked 996')).toBeInTheDocument();
+    expect(screen.getByRole('main')).not.toHaveClass('hidden');
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: 300 });
+    expect(screen.getByText(`panel docked ${widestColumn}`)).toBeInTheDocument();
+
+    // Past halfway: it takes the whole area.
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 1000 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 700 });
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: 700 });
+    expect(screen.getByText(/panel full/)).toBeInTheDocument();
   });
 
   it('collapses one step at a time: the whole area back to its column, then the minimum', () => {
