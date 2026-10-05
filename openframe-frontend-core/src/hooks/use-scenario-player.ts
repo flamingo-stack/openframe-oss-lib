@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { usePrefersReducedMotionState } from './ui/use-prefers-reduced-motion';
+import { useAutoplay } from './ui/use-autoplay';
 
 export interface UseScenarioPlayerOptions {
   /** How many scenarios (tabs) the stage cycles through. */
@@ -51,23 +51,9 @@ export interface UseScenarioPlayerResult {
  * `(scenario, step)`, which is what makes a tab strip, a step list, a progress
  * line and the stage itself agree by construction.
  *
- * WHEN IT MOVES is four plain facts, and nothing else:
- *   1. it is on screen (`enabled`, the caller's `useInView`);
- *   2. the browser tab is visible (`visibilitychange`, and `pageshow` for a
- *      page restored from the back/forward cache);
- *   3. the visitor has not pressed pause (`setPaused`, the stop/start control
- *      WCAG 2.2.2 asks of anything that moves for more than five seconds);
- *   4. motion is allowed: under reduced motion it parks on the last step of
- *      the current scenario, and every scenario can still be read by choosing it.
- *
- * Every one of those has a way back that does not depend on the visitor doing
- * something particular: scroll back and it runs, return to the tab and it
- * runs, press play and it runs. It deliberately does NOT hold on hover or on
- * keyboard focus. Both were tried: a browser re-reports focus on the last
- * clicked control when its window is re-activated, and whether that counts as
- * "keyboard focus" varies by browser and setting, so the demo froze with no
- * visible reason and no visible way out. The pause control is the one, always
- * visible, always reversible way to stop it.
+ * WHEN IT MOVES is `useAutoplay`'s rule: on screen (`enabled`), tab visible,
+ * not paused, motion allowed. Under reduced motion it parks on the last step
+ * of the current scenario, and every scenario can still be read by choosing it.
  *
  * A visitor's own choice (`go`, `setStep`) moves the clock there and un-pauses
  * it; the rotation carries on from that point.
@@ -81,30 +67,17 @@ export function useScenarioPlayer({
   initialScenario = 0,
   startAtEnd = false,
 }: UseScenarioPlayerOptions): UseScenarioPlayerResult {
-  const reducedState = usePrefersReducedMotionState();
-  const reducedMotion = reducedState === true;
+  const auto = useAutoplay(enabled);
+  const { reducedMotion, paused, setPaused } = auto;
 
   const [scenario, setScenario] = useState(initialScenario);
   const [rawStep, setRawStep] = useState(startAtEnd ? Number.MAX_SAFE_INTEGER : 0);
-  const [paused, setPaused] = useState(false);
-  const [tabHidden, setTabHidden] = useState(false);
   const lastStep = typeof lastStepOption === 'function' ? lastStepOption(scenario) : lastStepOption;
 
   // Under reduced motion the stage shows the finished scenario.
   const step = reducedMotion ? lastStep : Math.min(rawStep, lastStep);
 
-  useEffect(() => {
-    const sync = () => setTabHidden(document.visibilityState === 'hidden');
-    sync();
-    document.addEventListener('visibilitychange', sync);
-    window.addEventListener('pageshow', sync);
-    return () => {
-      document.removeEventListener('visibilitychange', sync);
-      window.removeEventListener('pageshow', sync);
-    };
-  }, []);
-
-  const playing = enabled && !paused && !tabHidden && reducedState === false && scenarioCount > 0;
+  const playing = auto.playing && scenarioCount > 0;
 
   useEffect(() => {
     if (!playing) return undefined;
@@ -128,14 +101,17 @@ export function useScenarioPlayer({
       setRawStep(Math.max(0, Math.min(lastStep, next)));
       setPaused(false);
     },
-    [lastStep],
+    [lastStep, setPaused],
   );
 
-  const go = useCallback((next: number) => {
-    setScenario(next);
-    setRawStep(0);
-    setPaused(false);
-  }, []);
+  const go = useCallback(
+    (next: number) => {
+      setScenario(next);
+      setRawStep(0);
+      setPaused(false);
+    },
+    [setPaused],
+  );
 
   return { scenario, step, paused, setPaused, setStep, go, reducedMotion };
 }

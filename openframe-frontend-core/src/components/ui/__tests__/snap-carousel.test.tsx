@@ -97,20 +97,58 @@ describe('SnapCarousel', () => {
     expect(scrolledTo).toEqual([STEP, STEP * 2, 0]);
   });
 
-  it('stops when the visitor touches it and picks up again once left alone', () => {
+  it('waits only while it is pressed, then carries on', () => {
     renderCarousel();
     setInView(true);
-    fireEvent.pointerDown(screen.getByRole('group', { name: 'Example requests' }));
-    // Stopped: nothing moves inside the idle wait (8s).
+    const carousel = screen.getByRole('group', { name: 'Example requests' });
+    fireEvent.pointerDown(carousel);
     act(() => {
-      vi.advanceTimersByTime(7_900);
+      vi.advanceTimersByTime(20_000);
     });
     expect(scrolledTo).toEqual([]);
 
-    // Left alone past the wait: it advances again after one interval.
+    // Released: one full interval later it advances, with nothing else asked of the visitor.
+    // ...even when the press ends somewhere else on the page.
+    fireEvent.pointerUp(window);
     act(() => {
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(5_000);
     });
+    expect(scrolledTo).toEqual([STEP]);
+  });
+
+  it('is not stopped by a wheel, a key or focus, and comes back every time it returns on screen', () => {
+    renderCarousel();
+    setInView(true);
+    const carousel = screen.getByRole('group', { name: 'Example requests' });
+    fireEvent.wheel(carousel);
+    fireEvent.keyDown(carousel, { key: 'Tab' });
+    fireEvent.focus(screen.getByLabelText('Next'));
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+    expect(scrolledTo).toEqual([STEP]);
+
+    setInView(false);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(scrolledTo).toEqual([STEP]);
+    setInView(true);
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+    expect(scrolledTo.length).toBe(2);
+  });
+
+  it('stops and starts with its pause control', () => {
+    renderCarousel();
+    setInView(true);
+    fireEvent.click(screen.getByLabelText('Pause'));
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(scrolledTo).toEqual([]);
+    fireEvent.click(screen.getByLabelText('Play'));
     act(() => {
       vi.advanceTimersByTime(5_000);
     });

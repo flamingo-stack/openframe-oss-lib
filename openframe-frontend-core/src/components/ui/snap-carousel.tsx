@@ -1,11 +1,12 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { useAutoplay } from '../../hooks/ui/use-autoplay';
 import { useInView } from '../../hooks/ui/use-in-view';
-import { usePrefersReducedMotionState } from '../../hooks/ui/use-prefers-reduced-motion';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
+import { PlaybackToggle } from './playback-toggle';
 
 export interface SnapCarouselProps<T> {
   items: readonly T[];
@@ -15,8 +16,9 @@ export interface SnapCarouselProps<T> {
   label: string;
   /** Move to the next slide after this long. `0` turns auto-advance off. Default 5000. */
   autoAdvanceMs?: number;
-  /** After the visitor touches it, auto-advance picks up again once it has been left alone this long. Default 8000. */
-  resumeAfterMs?: number;
+  /** Names of the stop/start control. */
+  playLabel?: string;
+  pauseLabel?: string;
   /** Width of one slide. Default `basis-[300px]`. */
   slideClassName?: string;
   prevLabel?: string;
@@ -49,13 +51,12 @@ function DotFill({ durationMs }: { durationMs: number }) {
  * A native scroll-snap carousel: swipe or use the arrows; dots show the
  * position, a counter says it in words.
  *
- * It advances on its own only while at least 60% of it is on screen. The moment
- * the visitor touches it (pointer, wheel, key) it stops: the visitor is driving.
- * Left alone for `resumeAfterMs` it picks up again, because a thumb that only
- * brushed it while scrolling the page should not switch it off for good. It
- * stays stopped for as long as keyboard focus is inside it. Under reduced
- * motion it never advances by itself. While it is auto-playing the active dot fills over the
- * interval, so the wait is visible.
+ * WHEN IT ADVANCES is `useAutoplay`'s rule, the same one the looping demos
+ * use: mostly on screen, tab visible, not paused, motion allowed. A swipe or
+ * an arrow moves it and it carries on from there after a full interval; it
+ * waits only while a finger or the mouse button is actually down on it. The
+ * small pause control stops it for good, and starts it again. While it is
+ * auto-playing the active dot fills over the interval, so the wait is visible.
  */
 export function SnapCarousel<T>({
   items,
@@ -63,7 +64,8 @@ export function SnapCarousel<T>({
   getKey,
   label,
   autoAdvanceMs = 5000,
-  resumeAfterMs = 8000,
+  playLabel,
+  pauseLabel,
   slideClassName = 'basis-[300px]',
   prevLabel = 'Previous',
   nextLabel = 'Next',
@@ -71,9 +73,10 @@ export function SnapCarousel<T>({
 }: SnapCarouselProps<T>) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [index, setIndex] = useState(0);
-  const [auto, setAuto] = useState(true);
-  const { ref: viewRef, inView } = useInView<HTMLDivElement>({ threshold: 0.6 });
-  const reducedState = usePrefersReducedMotionState();
+  // Held only while a finger or the mouse button is down on it: the visitor is mid-swipe.
+  const [pressed, setPressed] = useState(false);
+  const { ref: viewRef, inView } = useInView<HTMLDivElement>({ threshold: 0.5 });
+  const auto = useAutoplay(inView);
   const count = items.length;
 
   const slideStep = useCallback(() => {
@@ -99,26 +102,26 @@ export function SnapCarousel<T>({
     setIndex(Math.min(count - 1, Math.round(track.scrollLeft / step)));
   }, [count, slideStep]);
 
-  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hold = useCallback(() => {
-    if (resumeTimer.current) clearTimeout(resumeTimer.current);
-    resumeTimer.current = null;
-    setAuto(false);
-  }, []);
-  /** The visitor touched it: stop now, pick up again once it has been left alone. */
-  const stop = useCallback(() => {
-    hold();
-    resumeTimer.current = setTimeout(() => setAuto(true), resumeAfterMs);
-  }, [hold, resumeAfterMs]);
-  useEffect(
-    () => () => {
-      if (resumeTimer.current) clearTimeout(resumeTimer.current);
-    },
-    [],
-  );
+  // The release is listened for on the WINDOW: a press that ends outside the
+  // carousel (a drag that leaves it, a scroll the browser takes over) must
+  // still end, or the carousel would wait forever.
+  useEffect(() => {
+    if (!pressed) return undefined;
+    const release = () => setPressed(false);
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+    window.addEventListener('blur', release);
+    return () => {
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+      window.removeEventListener('blur', release);
+    };
+  }, [pressed]);
 
-  const playing = auto && inView && reducedState === false && autoAdvanceMs > 0 && count > 1;
+  const canAutoAdvance = autoAdvanceMs > 0 && count > 1;
+  const playing = auto.playing && canAutoAdvance && !pressed;
 
+  // Restarts on every slide change, so a swipe or an arrow is followed by a full interval.
   useEffect(() => {
     if (!playing) return undefined;
     const timer = setTimeout(() => goTo(index >= count - 1 ? 0 : index + 1), autoAdvanceMs);
@@ -136,20 +139,7 @@ export function SnapCarousel<T>({
   if (count === 0) return null;
 
   return (
-    <div
-      className={className}
-      onPointerDown={stop}
-      onTouchStart={stop}
-      onWheel={stop}
-      onKeyDown={stop}
-      // Keyboard focus inside holds it for as long as it stays; leaving starts the idle wait.
-      onFocus={event => {
-        if (event.target.matches(':focus-visible')) hold();
-      }}
-      onBlur={event => {
-        if (!event.currentTarget.contains(event.relatedTarget)) stop();
-      }}
-    >
+    <div className={className} onPointerDown={() => setPressed(true)}>
       <div
         ref={setRefs}
         onScroll={onScroll}
@@ -192,10 +182,18 @@ export function SnapCarousel<T>({
         </span>
         <span
           className="ml-auto mr-1 whitespace-nowrap text-ods-text-secondary text-h5"
-          aria-live={auto ? 'off' : 'polite'}
+          aria-live={playing ? 'off' : 'polite'}
         >
           {index + 1} / {count}
         </span>
+        {canAutoAdvance && !auto.reducedMotion && (
+          <PlaybackToggle
+            paused={auto.paused}
+            onChange={auto.setPaused}
+            playLabel={playLabel}
+            pauseLabel={pauseLabel}
+          />
+        )}
         <button
           type="button"
           aria-label={prevLabel}

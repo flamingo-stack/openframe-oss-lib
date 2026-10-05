@@ -45,6 +45,7 @@ export * from './modal';
 export * from './modal-v2';
 export * from './modal-guarded-close';
 export * from './admin-form-drawer';
+export * from './playback-toggle';
 export * from './admin-form-modal';
 export * from './separator';
 export * from './sheet';

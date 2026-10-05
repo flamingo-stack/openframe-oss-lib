@@ -29,3 +29,4 @@ export * from './use-window-size';
 export { usePreventScroll } from '@react-aria/overlays';
 export * from './use-prefers-reduced-motion';
 export * from './use-in-view';
+export * from './use-autoplay';
