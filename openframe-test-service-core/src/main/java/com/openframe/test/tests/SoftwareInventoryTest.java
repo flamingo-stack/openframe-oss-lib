@@ -90,7 +90,6 @@ public class SoftwareInventoryTest extends BaseTest {
         assertThat(titles).allSatisfy(title -> {
             assertThat(title.getName()).as("Title %s has a name", title.getId()).isNotBlank();
             assertThat(title.getSource()).as("Title %s source", title.getName()).isIn(SOURCES);
-            assertThat(title.getDevicesCount()).as("The list keeps only titles on at least one device: %s", title.getName()).isPositive();
         });
         assertThat(titles).filteredOn(title -> title.getVulnerabilitySummary() != null)
                 .allSatisfy(title -> assertThat(title.cveCount()).as("A vulnerability summary is only present with CVEs: %s", title.getName()).isPositive());
@@ -140,9 +139,8 @@ public class SoftwareInventoryTest extends BaseTest {
 
         List<String> byName = names(SoftwareInventoryApi.getSoftwares(null, null, sort("name", "ASC"), null, null).nodes());
         assertThat(byName).as("name ASC is alphabetical, ignoring case").isSortedAccordingTo(String.CASE_INSENSITIVE_ORDER);
-        List<Integer> byDevices = SoftwareInventoryApi.getSoftwares(null, null, sort("devicesCount", "DESC"), null, null).nodes().stream()
-                .map(Software::getDevicesCount).toList();
-        assertThat(byDevices).as("devicesCount DESC is most-installed first").isSortedAccordingTo(Comparator.reverseOrder());
+        // devicesCount stays an advertised sort key (see the refusal message asserted below) but #2518
+        // removed it from `Software`, so the order it produces cannot be read back and verified here.
         List<Integer> byCves = SoftwareInventoryApi.getSoftwares(null, null, sort("cveCount", "DESC"), null, null).nodes().stream()
                 .map(Software::cveCount).toList();
         assertThat(byCves).as("cveCount DESC is most-vulnerable first").isSortedAccordingTo(Comparator.reverseOrder());
@@ -171,7 +169,6 @@ public class SoftwareInventoryTest extends BaseTest {
         assertThat(fetched.getId()).as("software(id) returns the requested title").isEqualTo(listed.getId());
         assertThat(fetched.getName()).as("The title's name matches the list").isEqualTo(listed.getName());
         assertThat(fetched.getSource()).as("The title's source matches the list").isEqualTo(listed.getSource());
-        assertThat(fetched.getDevicesCount()).as("The title is on at least one device").isPositive();
         assertThat(fetched.cveCount()).as("The title's CVE count matches the list").isEqualTo(listed.cveCount());
 
         assertThat(SoftwareInventoryApi.getSoftware("999999999")).as("An id Fleet does not hold is null").isNull();
@@ -209,8 +206,6 @@ public class SoftwareInventoryTest extends BaseTest {
 
         assertThat(rows).extracting(row -> row.getDevice().getMachineId() + "@" + row.getSoftwareVersion())
                 .as("One row per device and installed version").doesNotHaveDuplicates();
-        long machines = rows.stream().map(row -> row.getDevice().getMachineId()).distinct().count();
-        assertThat(machines).as("software.devicesCount counts the devices this tab lists").isEqualTo(title.getDevicesCount().longValue());
     }
 
     @Tag("feature")
@@ -320,7 +315,6 @@ public class SoftwareInventoryTest extends BaseTest {
         assertThat(rows).allSatisfy(row -> {
             assertThat(row.getName()).as("Title %s has a name", row.getId()).isNotBlank();
             assertThat(row.getSource()).as("%s source", row.getName()).isIn(SOURCES);
-            assertThat(row.getDevicesCount()).as("devicesCount of %s counts at least this device", row.getName()).isPositive();
         });
         assertThat(names(rows)).as("The default order is name, ignoring case").isSortedAccordingTo(String.CASE_INSENSITIVE_ORDER);
 
@@ -329,13 +323,7 @@ public class SoftwareInventoryTest extends BaseTest {
         assertThat(holders).filteredOn(row -> device.getMachineId().equals(row.getDevice().getMachineId()))
                 .extracting(SoftwareOnDevice::getSoftwareVersion)
                 .as("currentVersion of %s is the version installed on %s", here.getName(), HOSTNAME).contains(here.getCurrentVersion());
-        assertThat(SoftwareInventoryApi.getSoftwares(null, here.getName(), null, null, null).nodes())
-                .filteredOn(title -> title.getId().equals(here.getId())).extracting(Software::getDevicesCount)
-                .as("devicesCount of %s stays fleet-wide, as softwares reports it", here.getName()).containsExactly(here.getDevicesCount());
 
-        List<Integer> byDevices = SoftwareInventoryApi.getDeviceSoftware(device.getMachineId(), null, null, sort("devicesCount", "DESC")).nodes().stream()
-                .map(Software::getDevicesCount).toList();
-        assertThat(byDevices).as("devicesCount DESC is most-installed first").isSortedAccordingTo(Comparator.reverseOrder());
         assertThat(codes(SoftwareInventoryApi.attemptDeviceSoftwareErrors(device.getMachineId(), sort("e2e-unknown-" + RUN_ID, "ASC"))))
                 .as("An unknown sort field is BAD_REQUEST").contains("BAD_REQUEST");
 
