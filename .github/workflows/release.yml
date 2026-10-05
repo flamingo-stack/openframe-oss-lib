@@ -271,18 +271,17 @@ jobs:
           RELEASE_REF: ${{ inputs.release_tag }}
         run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
 
-      # npmjs keeps getting every version too (a release as `latest`, a snapshot as
-      # `snapshot`), for consumers that still install from it. The script uploads
-      # the same tarball, moves a release past a number npm already holds and does
-      # not wait for npm's scan.
+      # npmjs gets releases only, as `latest`. A snapshot stays on pkg.pr.new: every
+      # npm upload waits in npm's scan, and nothing installs snapshots from npm.
+      # The script uploads the same tarball, moves a release past a number npm
+      # already holds and does not wait for npm's scan.
       - name: Publish ${{ env.NEW_VERSION }} to npmjs
-        if: steps.should_run.outputs.run == 'true' && inputs.release_tag == ''
+        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && !inputs.snapshot && inputs.release_tag == ''
         working-directory: ${{ matrix.path }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "$PUBLISH_TAG" --access public
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" latest --access public
         shell: bash
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PUBLISH_TAG: ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }}
 
       # Only after a number skip: pkg.pr.new gets the tarball npm was given, so the
       # two registries hold the same version of this commit.

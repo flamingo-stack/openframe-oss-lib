@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # THE npmjs publish of this repository's packages, called from the package's
-# directory by every workflow that publishes (a release, a main-push snapshot, a
-# pull request's prerelease).
+# directory by the release workflow for a release only.
 #
 #   npm-publish.sh <dist-tag> [extra `npm publish` arguments]
 #
-# Every version goes to BOTH registries. pkg.pr.new (preview-publish.sh) is the
-# one our own apps install from; npmjs is kept for everyone else. Since 2026-07 npm scans every upload before it
+# A release goes to BOTH registries; a snapshot and a pull request's build go to
+# pkg.pr.new (preview-publish.sh) only. npmjs is kept for everyone else. Since 2026-07 npm scans every upload before it
 # serves it: the upload is answered 202 ("being processed") and the version
 # appears minutes to two hours later. So this step does NOT wait for npm.
 #
@@ -35,8 +34,7 @@ for attempt in 1 2 3 4 5; do
     echo "Uploaded $PKG@$VERSION to npmjs ($TAG). npm serves it after its scan: minutes, sometimes hours." | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
     exit 0
   fi
-  # Only a release has a number that can be taken; a snapshot's and a pull
-  # request's carry a timestamp or a run number.
+  # Only `latest` (a release) has a number that can be taken.
   if [ "$TAG" != "latest" ] || ! grep -qE "previously (staged|published) version" publish.log; then
     exit 1
   fi
