@@ -3,6 +3,7 @@
  */
 
 import type { ProgramInstant } from './program-instant';
+import { OPENFRAME_CLASSIFICATIONS, isOpenFrameClassification } from './vendor-classification';
 
 /**
  * Format a date to a human-readable string
@@ -940,10 +941,8 @@ export function stripHtml(html: string): string {
  * curated mapping.
  */
 export function formatClassification(classification: string): string {
-  const customMappings: Record<string, string> = {
-    openframe_selected: 'OpenFrame Selected',
-  };
-  return customMappings[classification] || formatUnderscoreText(classification);
+  if (isOpenFrameClassification(classification)) return OPENFRAME_CLASSIFICATIONS[classification].label;
+  return formatUnderscoreText(classification);
 }
 
 /**

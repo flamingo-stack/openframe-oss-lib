@@ -42,6 +42,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAutoplay } from '../../hooks/ui/use-autoplay';
+import { useInView } from '../../hooks/ui/use-in-view';
 import { useMarqueeEngine } from '../../hooks/ui/use-marquee-engine';
 import { useResetOnPageHidden } from '../../hooks/ui/use-reset-on-page-hidden';
 import { useSuppressCloneFocus } from '../../hooks/ui/use-suppress-clone-focus';
@@ -427,16 +429,16 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
   // stops while the strip is far off-screen (a paused engine would keep
   // scheduling frames forever), and because the velocity envelope persists
   // across engine restarts, scrolling back resumes at cruise speed instantly.
-  const [nearViewport, setNearViewport] = useState(true);
+  //
+  // WHEN it may move at all is the shared rule (`useAutoplay`): near the
+  // viewport, tab visible, motion allowed. A hovered card and the suppress
+  // windows below are pause REASONS on top of it.
+  const { ref: observe, inView: nearViewport } = useInView<HTMLDivElement>({ rootMargin: '200px', initial: true });
   useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
-    const io = new IntersectionObserver(entries => setNearViewport(entries[0]?.isIntersecting ?? true), {
-      rootMargin: '200px',
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    observe(wrapperRef.current);
+    return () => observe(null);
+  }, [observe]);
+  const autoplay = useAutoplay(nearViewport);
 
   // ---- hover / overlay state -----------------------------------------------------
   // activeKey identifies the hovered/tap-activated CARD (copy-aware so hovering
@@ -590,11 +592,10 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     // Viewport gates `active` (the rAF fully stops off-screen — a paused
     // engine would keep scheduling frames forever), same treatment as
     // <MarqueeWall>; the envelope persists, so re-entry resumes at cruise.
-    active: marqueeActive && nearViewport,
+    active: marqueeActive && autoplay.playing,
     speed: autoScrollSpeed,
     isPaused: now =>
       (pauseOnHover && (hoverPointerRef.current.inside || activeKeyRef.current !== null)) ||
-      document.visibilityState === 'hidden' ||
       now < Math.max(chevronSuppressUntilRef.current, userScrollSuppressUntilRef.current),
     getWrapSize: () => singleCopyWidthRef.current,
     getWrapMin: seamBuffer,

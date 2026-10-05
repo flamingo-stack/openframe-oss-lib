@@ -18,7 +18,7 @@ export type PageActionButton = {
   onClick?: () => void;
   icon?: React.ReactNode;
   /** `overlay` and `glyph` are media chrome and `link` an inline text action; none is a page action, and SplitButton has no divider colour for them. */
-  variant?: Exclude<ButtonProps['variant'], 'overlay' | 'glyph' | 'link'>;
+  variant?: Exclude<ButtonProps['variant'], 'overlay' | 'glyph' | 'link' | 'inverted'>;
   disabled?: boolean;
   /**
    * For SplitButton actions (when `iconAction` is set): disables only the main

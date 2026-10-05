@@ -17,6 +17,15 @@ export {
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
 export { formatDate, formatNumber, formatPrice, formatBytes } from './format';
+export {
+  VENDOR_CLASSIFICATIONS,
+  OPENFRAME_CLASSIFICATIONS,
+  isVendorClassification,
+  isOpenFrameClassification,
+  type VendorClassificationValue,
+  type OpenFrameClassification,
+  type OpenFrameClassificationCopy,
+} from './vendor-classification';
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon';
 export {
@@ -451,3 +460,4 @@ export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './
 
 // Footer copyright line (one owner; never a double period after "Inc.").
 export { copyrightLine } from './copyright-line';
+export * from './path-pattern';
