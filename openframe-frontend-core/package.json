@@ -10,7 +10,15 @@
     "dist",
     "src",
     "eslint-config",
-    "tailwind.config.ts"
+    "tailwind.config.ts",
+    "!dist/__tests__",
+    "!src/**/__tests__",
+    "!src/**/__fixtures__",
+    "!src/**/*.test.*",
+    "!src/stories",
+    "!src/**/*.stories.*",
+    "!src/**/.*.md",
+    "!src/components/icons-v2/**/*.svg"
   ],
   "exports": {
     ".": {

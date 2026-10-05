@@ -223,23 +223,15 @@ jobs:
           npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
           bash "$GITHUB_WORKSPACE/.github/scripts/pack-package.sh"
 
-      # A pull request's build goes to pkg.pr.new first: installable when this step
+      # A pull request's build goes to pkg.pr.new only: installable when this step
       # ends, addressed by the PR's head commit (.github/scripts/preview-publish.sh).
+      # Not to npmjs: every upload there waits in npm's scan, and only releases
+      # are installed from it.
       - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
         shell: bash
         run: bash "$GITHUB_WORKSPACE/.github/scripts/preview-publish.sh"
-
-      # ...and to npmjs under the PR's dist-tag, as before, for consumers that
-      # still install from it. Same tarball; no waiting on npm's scan.
-      - name: Publish ${{ env.NEW_VERSION }} (pr-${{ github.event.pull_request.number }} tag) to npmjs
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
-        shell: bash
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: bash "$GITHUB_WORKSPACE/.github/scripts/npm-publish.sh" "pr-${{ github.event.pull_request.number }}"
 
 
   # `lint:cycles` gets its OWN job, purely for wall-clock. It is graph-wide —
