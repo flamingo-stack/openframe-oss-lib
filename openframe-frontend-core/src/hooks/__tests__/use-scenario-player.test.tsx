@@ -64,7 +64,7 @@ describe('useScenarioPlayer', () => {
     expect(result.current).toMatchObject({ scenario: 0, step: 0 });
   });
 
-  it('restarts a scenario from step 0 when it is chosen, plays it out, then stops', () => {
+  it('restarts a scenario from step 0 when it is chosen, then keeps rotating', () => {
     stubReducedMotion(false);
     const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
     beats(3);
@@ -77,20 +77,7 @@ describe('useScenarioPlayer', () => {
     beats(8);
     expect(result.current).toMatchObject({ scenario: 1, step: 8 });
 
-    // The visitor chose it: it does not rotate on to the next scenario.
-    act(() => {
-      vi.advanceTimersByTime(4200);
-    });
-    expect(result.current).toMatchObject({ scenario: 1, step: 8, paused: true });
-    act(() => {
-      vi.advanceTimersByTime(60_000);
-    });
-    expect(result.current).toMatchObject({ scenario: 1, step: 8 });
-
-    // Play hands the rotation back.
-    act(() => {
-      result.current.setPaused(false);
-    });
+    // The rotation carries on after the visitor's choice has played out.
     act(() => {
       vi.advanceTimersByTime(4200);
     });

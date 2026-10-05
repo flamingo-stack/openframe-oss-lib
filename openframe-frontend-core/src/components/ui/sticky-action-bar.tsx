@@ -10,6 +10,8 @@ export interface UseBetweenAnchorsOptions {
   before: RefObject<Element | null>;
   /** Height of anything fixed at the top (a sticky header) that covers `after`. */
   topOffset?: number;
+  /** Hide this many px BEFORE `before` reaches the viewport's bottom edge. */
+  bottomMargin?: number;
 }
 
 /**
@@ -18,7 +20,12 @@ export interface UseBetweenAnchorsOptions {
  * instance of it is on screen (the hero's has gone, the closing one has not
  * arrived), so the same button is never visible twice.
  */
-export function useBetweenAnchors({ after, before, topOffset = 0 }: UseBetweenAnchorsOptions): boolean {
+export function useBetweenAnchors({
+  after,
+  before,
+  topOffset = 0,
+  bottomMargin = 0,
+}: UseBetweenAnchorsOptions): boolean {
   const [between, setBetween] = useState(false);
 
   useEffect(() => {
@@ -32,7 +39,7 @@ export function useBetweenAnchors({ after, before, topOffset = 0 }: UseBetweenAn
         return;
       }
       const pastFirst = afterEl.getBoundingClientRect().bottom < topOffset;
-      const beforeSecond = beforeEl ? beforeEl.getBoundingClientRect().top > window.innerHeight : true;
+      const beforeSecond = beforeEl ? beforeEl.getBoundingClientRect().top > window.innerHeight - bottomMargin : true;
       setBetween(pastFirst && beforeSecond);
     };
     const schedule = () => {
@@ -46,7 +53,7 @@ export function useBetweenAnchors({ after, before, topOffset = 0 }: UseBetweenAn
       window.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
     };
-  }, [after, before, topOffset]);
+  }, [after, before, topOffset, bottomMargin]);
 
   return between;
 }
@@ -69,7 +76,7 @@ export function StickyActionBar({ visible, children, className }: StickyActionBa
       aria-hidden={!visible}
       inert={!visible}
       className={cn(
-        'fixed inset-x-0 bottom-0 z-[44] border-t border-ods-border bg-ods-bg px-4 pt-3 transition-transform duration-200 ease-out motion-reduce:transition-none',
+        'duration-[180ms] ease-[cubic-bezier(.2,0,0,1)] fixed inset-x-0 bottom-0 z-[44] border-t border-ods-border bg-ods-bg px-4 pt-3 transition-transform motion-reduce:transition-none',
         'pb-[calc(1rem+env(safe-area-inset-bottom))]',
         visible ? 'translate-y-0' : 'pointer-events-none translate-y-full',
         className,

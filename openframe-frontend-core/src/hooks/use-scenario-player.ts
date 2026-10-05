@@ -46,7 +46,7 @@ export interface UseScenarioPlayerResult {
   scenario: number;
   /** Current step, 0..lastStep. */
   step: number;
-  /** The visitor stopped it (the pause control, or a choice that played out). */
+  /** The visitor stopped it with the pause control. */
   paused: boolean;
   setPaused: (paused: boolean) => void;
   /** Jump to a step in the current scenario (a visitor's tap, a stepper button). */
@@ -76,9 +76,8 @@ export interface UseScenarioPlayerResult {
  *     `holdOnHover`) while a mouse is over it (`holdProps`), and picks up where
  *     it was when they leave;
  *   - `setPaused` is the visitor's stop/start control;
- *   - a visitor's own choice (`go`, `setStep`) is theirs: the chosen scenario
- *     plays to its end and STOPS there instead of rotating on to the next one.
- *     Pressing play (`setPaused(false)`) hands the rotation back.
+ *   - a visitor's own choice (`go`, `setStep`) restarts the clock from there
+ *     (and un-pauses it); the rotation simply carries on afterwards.
  */
 export function useScenarioPlayer({
   scenarioCount,
@@ -96,8 +95,6 @@ export function useScenarioPlayer({
   const [scenario, setScenario] = useState(initialScenario);
   const [rawStep, setRawStep] = useState(startAtEnd ? Number.MAX_SAFE_INTEGER : 0);
   const [paused, setPausedState] = useState(false);
-  // The visitor chose what is on screen: play it out, then stop.
-  const [chosen, setChosen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [tabHidden, setTabHidden] = useState(false);
@@ -123,10 +120,6 @@ export function useScenarioPlayer({
       () => {
         if (!atEnd) {
           setRawStep(current => Math.min(current, lastStep) + 1);
-        } else if (chosen) {
-          // Their choice has played out: stop here, do not rotate away from it.
-          setChosen(false);
-          setPausedState(true);
         } else {
           setScenario(current => (current + 1) % scenarioCount);
           setRawStep(0);
@@ -135,18 +128,13 @@ export function useScenarioPlayer({
       atEnd ? holdMs : stepMs,
     );
     return () => clearTimeout(timer);
-  }, [playing, rawStep, lastStep, stepMs, holdMs, scenario, scenarioCount, chosen]);
+  }, [playing, rawStep, lastStep, stepMs, holdMs, scenario, scenarioCount]);
 
-  const setPaused = useCallback((next: boolean) => {
-    // Play hands the rotation back, whatever stopped it.
-    if (!next) setChosen(false);
-    setPausedState(next);
-  }, []);
+  const setPaused = useCallback((next: boolean) => setPausedState(next), []);
 
   const setStep = useCallback(
     (next: number) => {
       setRawStep(Math.max(0, Math.min(lastStep, next)));
-      setChosen(true);
       setPausedState(false);
     },
     [lastStep],
@@ -155,7 +143,6 @@ export function useScenarioPlayer({
   const go = useCallback((next: number) => {
     setScenario(next);
     setRawStep(0);
-    setChosen(true);
     setPausedState(false);
   }, []);
 
