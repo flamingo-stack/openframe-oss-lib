@@ -27,6 +27,31 @@ function preferReducedMotion() {
   );
 }
 
+// A phone: under the 800px step, the panel opens over the content.
+function onPhone() {
+  const original = window.matchMedia;
+  vi.spyOn(window, 'matchMedia').mockImplementation(query =>
+    query.includes('max-width: 799.98px')
+      ? ({
+          matches: true,
+          media: query,
+          onchange: null,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+          addListener: () => undefined,
+          removeListener: () => undefined,
+          dispatchEvent: () => false,
+        } as MediaQueryList)
+      : original(query),
+  );
+}
+
+/** The `z-[N]` an element is stacked at (both share the layout row's stacking context). */
+function zIndexOf(element: HTMLElement) {
+  const match = /(?:^|\s)z-\[(\d+)\]/.exec(element.className);
+  return match ? Number(match[1]) : Number.NaN;
+}
+
 function renderLayout(collapsed = false) {
   return render(
     <AppLayout
@@ -200,6 +225,25 @@ describe('AppLayout side panel', () => {
     fireEvent.click(screen.getByRole('button', { name: /^full \d+ to column$/ }));
     fireEvent.click(screen.getByRole('button', { name: 'docked 520 to minimum' }));
     expect(screen.getByRole('button', { name: 'docked 296 to none' })).toBeInTheDocument();
+  });
+
+  it('opens over the content on a phone, under the mobile menu', () => {
+    onPhone();
+    setLayoutWidth(375);
+    render(
+      <AppLayout
+        sidebarConfig={{ items: [], onNavigate: () => undefined }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        sidePanel={{ label: 'Mingo', open: true, children: ({ mode }) => <p>panel {mode}</p> }}
+      >
+        <h1>Page</h1>
+      </AppLayout>,
+    );
+    expect(screen.getByText('panel overlay')).toBeInTheDocument();
+    const panel = screen.getByRole('complementary', { name: 'Mingo' });
+    const menu = screen.getByRole('dialog', { name: 'Mobile navigation menu', hidden: true });
+    expect(zIndexOf(panel)).toBeLessThan(zIndexOf(menu));
   });
 
   it('moves behind the header button without room to dock', () => {

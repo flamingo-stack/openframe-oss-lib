@@ -549,7 +549,10 @@ export function AppLayoutSidePanel({ config, state }: AppLayoutSidePanelProps) {
         // paint): keep it off phones until JS says otherwise.
         mode !== 'overlay' && inColumn && 'hidden shrink-0 md:block',
         mode !== 'overlay' && !inColumn && 'flex-1',
-        mode === 'overlay' && 'absolute inset-0 z-[103] bg-ods-bg',
+        // z-[99]: above the page's own layers (sticky headers, the z-50 bottom
+        // action bar), BELOW the mobile burger menu (backdrop z-[100], panel
+        // z-[101]), so the menu opens over a panel covering the content.
+        mode === 'overlay' && 'absolute inset-0 z-[99] bg-ods-bg',
       )}
       style={mode !== 'overlay' && inColumn ? { width: dockedWidth + SIDE_PANEL_INSET } : undefined}
     >
