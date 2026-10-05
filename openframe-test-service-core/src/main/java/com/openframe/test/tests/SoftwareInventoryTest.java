@@ -85,7 +85,11 @@ public class SoftwareInventoryTest extends BaseTest {
         SoftwareConnection all = SoftwareInventoryApi.getSoftwares(null, null, null, null, null);
         List<Software> titles = all.nodes();
         assertThat(titles).as("Fleet reports installed software; an empty list means Fleet MDM is not connected").isNotEmpty();
-        assertThat(all.getFilteredCount()).as("Without first, one page holds every title").isEqualTo(titles.size());
+        // filteredCount is every match; without `first` the server returns at most its default page, so
+        // the two are equal only on a tenant small enough to fit one — true on the pipeline's fresh
+        // tenant, false on the long-lived qa and stage ones (2116 titles, 5381 CVEs).
+        assertThat(all.getFilteredCount()).as("filteredCount counts every matching title, not just this page")
+                .isGreaterThanOrEqualTo(titles.size());
         assertThat(all.ids()).as("Every title has an id, once").doesNotContainNull().doesNotHaveDuplicates();
         assertThat(titles).allSatisfy(title -> {
             assertThat(title.getName()).as("Title %s has a name", title.getId()).isNotBlank();
@@ -99,7 +103,8 @@ public class SoftwareInventoryTest extends BaseTest {
 
         SoftwareConnection first = SoftwareInventoryApi.getSoftwares(null, null, null, 1, null);
         assertThat(first.ids()).as("first: 1 returns the first title").containsExactly(titles.getFirst().getId());
-        assertThat(first.getFilteredCount()).as("filteredCount counts every title, not the page").isEqualTo(titles.size());
+        assertThat(first.getFilteredCount()).as("filteredCount counts every title, not the page")
+                .isEqualTo(all.getFilteredCount());
         assertThat(first.getPageInfo().getHasNextPage()).as("hasNextPage while titles remain").isEqualTo(titles.size() > 1);
         assumeTrue(titles.size() > 1, "Only one title, so there is no second page to read");
         SoftwareConnection second = SoftwareInventoryApi.getSoftwares(null, null, null, 1, first.getPageInfo().getEndCursor());
@@ -242,7 +247,8 @@ public class SoftwareInventoryTest extends BaseTest {
         VulnerabilityConnection all = SoftwareInventoryApi.getVulnerabilities(null, null, null);
         List<Vulnerability> rows = all.nodes();
         assertThat(rows).as("Fleet reports CVEs on the tenant's devices").isNotEmpty();
-        assertThat(all.getFilteredCount()).as("Without first, one page holds every CVE").isEqualTo(rows.size());
+        assertThat(all.getFilteredCount()).as("filteredCount counts every matching CVE, not just this page")
+                .isGreaterThanOrEqualTo(rows.size());
         assertThat(all.cveIds()).as("One row per CVE").doesNotHaveDuplicates().allSatisfy(id -> assertThat(id).matches(CVE_ID));
         assertThat(rows).allSatisfy(row -> {
             assertThat(row.getDevicesCount()).as("%s affects at least one OpenFrame device", row.getCveId()).isPositive();
@@ -268,7 +274,8 @@ public class SoftwareInventoryTest extends BaseTest {
 
         VulnerabilityConnection page = SoftwareInventoryApi.getVulnerabilities(null, null, 1);
         assertThat(page.cveIds()).as("first: 1 returns the first CVE").containsExactly(cveId);
-        assertThat(page.getFilteredCount()).as("filteredCount counts every CVE, not the page").isEqualTo(rows.size());
+        assertThat(page.getFilteredCount()).as("filteredCount counts every CVE, not the page")
+                .isEqualTo(all.getFilteredCount());
     }
 
     @Tag("feature")
@@ -353,7 +360,8 @@ public class SoftwareInventoryTest extends BaseTest {
         VulnerabilityConnection present = SoftwareInventoryApi.getDeviceVulnerabilities(machineId, null, null, null);
         List<Vulnerability> rows = present.nodes();
         assertThat(present.cveIds()).as("%s, affected by %s, lists it", affectedDevice.getHostname(), cveId).contains(cveId);
-        assertThat(present.getFilteredCount()).as("Without first, one page holds every CVE").isEqualTo(rows.size());
+        assertThat(present.getFilteredCount()).as("filteredCount counts every matching CVE, not just this page")
+                .isGreaterThanOrEqualTo(rows.size());
         assertThat(present.cveIds()).as("One row per CVE").doesNotHaveDuplicates().allSatisfy(id -> assertThat(id).matches(CVE_ID));
         assertThat(rows).allSatisfy(row -> {
             assertThat(row.getAffectedSoftware()).as("affectedSoftware is populated on every row: %s", row.getCveId()).isNotEmpty();
@@ -397,7 +405,8 @@ public class SoftwareInventoryTest extends BaseTest {
         Set<String> vulnerableHere = vulnerableTitleIds(SoftwareInventoryApi.getDeviceSoftware(device.getMachineId(), null, null, null).nodes());
         assertThat(affectedSoftwareIds(rows)).as("The CVEs on %s hit exactly its %d titles with CVEs", HOSTNAME, vulnerableHere.size())
                 .isEqualTo(vulnerableHere);
-        assertThat(present.getFilteredCount()).as("filteredCount counts the CVEs listed").isEqualTo(rows.size());
+        assertThat(present.getFilteredCount()).as("filteredCount counts every CVE on the device, not the page")
+                .isGreaterThanOrEqualTo(rows.size());
         assertThat(rows).allSatisfy(row -> assertThat(row.getAffectedSoftware()).as("affectedSoftware of %s", row.getCveId()).isNotEmpty());
         VulnerabilityFilters facets = SoftwareInventoryApi.getDeviceVulnerabilityFilters(device.getMachineId(), null);
         assertThat(total(facets.getSeverities())).as("The severity facet counts the scored CVEs on %s, none when it has none", HOSTNAME)
