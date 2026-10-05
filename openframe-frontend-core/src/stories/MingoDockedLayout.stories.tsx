@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useContext, useState } from 'react';
 import { fn } from 'storybook/test';
 
-import { EmbeddableChat } from '../components/chat/embeddable-chat';
+import { EmbeddableChat, MINGO_V2_RAIL_WIDTH } from '../components/chat/embeddable-chat';
 import type { UnifiedChatMessage, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import {
   BracketCurlyIcon,
@@ -43,7 +43,6 @@ const CHATS = [
 
 // Chat list and conversation side by side from this panel width.
 const SPLIT_WIDTH = 696;
-const LIST_WIDTH = 296;
 
 function ContentProbe() {
   const width = useContext(ContentAreaWidthContext);
@@ -227,7 +226,7 @@ function MockMingo({ width, mode }: AppLayoutSidePanelRenderState) {
   if (split) {
     return (
       <div className="flex min-w-0 flex-1">
-        <div className="shrink-0 border-r border-ods-border" style={{ width: LIST_WIDTH }}>
+        <div className="shrink-0 border-r border-ods-border" style={{ width: MINGO_V2_RAIL_WIDTH }}>
           <ChatList active={active} onOpen={setActive} />
         </div>
         <Conversation title={title} />
@@ -421,6 +420,7 @@ function Screen({
       mobileBurgerMenuProps={{ user: { userName: 'Roman Smith', userEmail: 'roman@openframe.dev' } }}
       sidePanel={{
         label: 'Mingo',
+        minWidth: MINGO_V2_RAIL_WIDTH,
         storageKey: 'storybook:mingo-docked-width',
         collapsed,
         children: state => (panel === 'mock' ? <MockMingo {...state} /> : <RealMingo {...state} thread={thread} />),

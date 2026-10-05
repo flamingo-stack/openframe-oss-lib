@@ -128,8 +128,8 @@ import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row
  * self-contained — the host wires nothing.
  */
 const HISTORY_RAIL_WIDTH = 320;
-/** The v2 chat list (`MingoChatRail`, Figma `chat-sidebar`). */
-const MINGO_V2_RAIL_WIDTH = 296;
+/** The v2 chat list (`MingoChatRail`, Figma `chat-sidebar`): the narrowest the v2 chat draws. */
+export const MINGO_V2_RAIL_WIDTH = 296;
 const CHAT_BLOCK_MIN_WIDTH = 400;
 const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 

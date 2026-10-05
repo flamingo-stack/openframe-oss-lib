@@ -2,6 +2,7 @@ import containerQueries from '@tailwindcss/container-queries';
 import type { Config } from 'tailwindcss';
 import tailwindcssAnimate from 'tailwindcss-animate';
 import plugin from 'tailwindcss/plugin';
+import { LAYOUT_STEPS } from './src/styles/layout-steps';
 
 const odsTypographyPlugin = plugin(({ addUtilities }) => {
   addUtilities({
@@ -86,32 +87,30 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
  *
  * Outside a content area (apps without a side panel, overlays portalled to
  * <body>) each falls back to its viewport step, so a component can switch to
- * them without changing anywhere else it renders.
+ * them without changing anywhere else it renders. So does everything under an
+ * `.ods-viewport-layer`: a modal or drawer that renders inside the content
+ * area but follows the window.
  *
  * Registered `max-*` first and then ascending, like Tailwind's own screens, so
  * a wider step wins over a narrower one on the same property.
  */
-const CONTENT_STEPS = [
-  { name: 'sm', content: 640, viewport: 640 },
-  { name: 'md', content: 720, viewport: 800 },
-  { name: 'lg', content: 1024, viewport: 1280 },
-  { name: 'xl', content: 1216, viewport: 1440 },
-  { name: '2xl', content: 1312, viewport: 1536 },
-] as const;
+const CONTENT_STEPS = Object.entries(LAYOUT_STEPS).map(([name, step]) => ({ name, ...step }));
 
 const odsContentAreaPlugin = plugin(({ addVariant }) => {
-  const outsideContentArea = '&:where(:not(.ods-content-area *))';
+  const viewportLayer = '.ods-viewport-layer, .ods-viewport-layer *';
+  const byContent = `&:where(:not(${viewportLayer}))`;
+  const byViewport = `&:where(:not(.ods-content-area *), ${viewportLayer})`;
   for (const { name, content, viewport } of CONTENT_STEPS) {
     if (name !== 'md' && name !== 'lg') continue;
     addVariant(`content-max-${name}`, [
-      `@container ods-content (max-width: ${content - 0.02}px)`,
-      `@media (max-width: ${viewport - 0.02}px) { ${outsideContentArea} }`,
+      `@container ods-content not (min-width: ${content}px) { ${byContent} }`,
+      `@media not all and (min-width: ${viewport}px) { ${byViewport} }`,
     ]);
   }
   for (const { name, content, viewport } of CONTENT_STEPS) {
     addVariant(`content-${name}`, [
-      `@container ods-content (min-width: ${content}px)`,
-      `@media (min-width: ${viewport}px) { ${outsideContentArea} }`,
+      `@container ods-content (min-width: ${content}px) { ${byContent} }`,
+      `@media (min-width: ${viewport}px) { ${byViewport} }`,
     ]);
   }
 });
@@ -345,12 +344,8 @@ const config: Config = {
           current: 'var(--ods-current)',
         }),
       },
-      // Custom breakpoints (aligned with ODS responsive tokens from Figma)
-      screens: {
-        md: '800px', // Tablet: 50rem
-        lg: '1280px', // Desktop: 80rem
-        xl: '1440px', // Large desktop: 90rem
-      },
+      // Aligned with the ODS responsive tokens from Figma: md tablet, lg desktop.
+      screens: Object.fromEntries(CONTENT_STEPS.map(({ name, viewport }) => [name, `${viewport}px`])),
 
       borderRadius: {
         lg: 'var(--radius)', // 8px

@@ -3,8 +3,9 @@
 /*
  * `.ods-viewport-layer` restates the same values on an element: chrome that
  * follows the WINDOW (a modal, a drawer) but renders inside a narrow content
- * area, whose scope re-declares the mobile values (ods-content-area.css), gets
- * the viewport's tokens back for its own subtree.
+ * area, whose scope re-declares the mobile values
+ * (ods-content-area-tokens.css), gets the viewport's tokens back for its own
+ * subtree.
  */
 
 :root,

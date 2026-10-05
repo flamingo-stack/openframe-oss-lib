@@ -11,7 +11,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
-import { useMediaQuery } from '../../hooks/ui/use-media-query';
+import { breakpoints, useMediaQuery } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
 import { Menu01Icon } from '../icons-v2-generated';
 
@@ -49,8 +49,8 @@ export interface AppLayoutSidePanelRenderState {
 export interface AppLayoutSidePanelConfig {
   /** Panel body. Told its width so it can choose what fits. */
   children: (state: AppLayoutSidePanelRenderState) => ReactNode;
-  /** Narrowest docked width, and the width it starts at. Default 296. */
-  minWidth?: number;
+  /** Narrowest docked width, and the width it starts at: the narrowest its content draws. */
+  minWidth: number;
   /** Narrowest the content may get before the panel takes over. Default 400. */
   minContentWidth?: number;
   /** localStorage key for the chosen width. Without it the width lasts the session. */
@@ -75,7 +75,7 @@ export interface AppLayoutSidePanelConfig {
 
 /** Inset of the docked card from the window edge and the header. */
 export const SIDE_PANEL_INSET = 16;
-const MOBILE_QUERY = '(max-width: 799.98px)';
+const MOBILE_QUERY = `not all and ${breakpoints.md}`;
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 /** Length of the docked <-> full morph; keep in step with `duration-300` below. */
 const MORPH_MS = 300;
@@ -252,7 +252,7 @@ export function useAppLayoutSidePanel(
   row: HTMLElement | null,
 ): AppLayoutSidePanelState | null {
   const enabled = config !== undefined;
-  const minWidth = config?.minWidth ?? 296;
+  const minWidth = config?.minWidth ?? 0;
   const minContentWidth = config?.minContentWidth ?? 400;
   const collapsed = config?.collapsed ?? false;
   const minimum: SidePanelSize = { width: minWidth, expanded: false };

@@ -355,6 +355,7 @@
     "yalc:push": "yalc push ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "yalc:publish": "yalc publish ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "generate:icons": "node scripts/generate-icons.mjs",
+    "generate:content-area": "vitest run src/__tests__/content-area-variants.test.ts -u",
     "format": "prettier --check .",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",

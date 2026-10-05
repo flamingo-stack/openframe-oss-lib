@@ -7,10 +7,11 @@
  *
  *   - `.ods-content-area` is a named inline-size container (`ods-content`).
  *   - `.ods-content-scope` sits inside it and re-declares the mobile tokens
- *     while the area is narrower than the content tablet step (720px). The
- *     variables cascade, so every `text-h*` and `var(--spacing-system-*)`
- *     below the scope picks them up with no change to the components.
- *   - From 720px up the scope declares nothing and inherits the viewport
+ *     while the area is narrower than the content `md` step
+ *     (ods-content-area-tokens.css, generated). The variables cascade, so
+ *     every `text-h*` and `var(--spacing-system-*)` below the scope picks
+ *     them up with no change to the components.
+ *   - From that step up the scope declares nothing and inherits the viewport
  *     tokens from :root, so a wide content area renders exactly as before.
  *
  * A container query cannot style the container itself, hence two elements.
@@ -18,7 +19,7 @@
  * box, so pages keep `<main>` as their layout parent.
  *
  * Layout switches inside the area use the `content-md:` / `content-lg:`
- * Tailwind variants (720px / 1024px of content width).
+ * Tailwind variants. The steps themselves live in layout-steps.ts.
  */
 
 .ods-content-area {
@@ -27,34 +28,4 @@
 
 .ods-content-scope {
   display: contents;
-}
-
-@container ods-content (max-width: 719.98px) {
-  .ods-content-scope {
-    --device-type: mobile;
-    --device-screen-width: 26.875rem;
-
-    --spacing-system-xs: 0.25rem; /* 4px */
-    --spacing-system-s: 0.5rem; /* 8px */
-    --spacing-system-m: 0.75rem; /* 12px */
-    --spacing-system-l: 1rem; /* 16px */
-    --spacing-system-xl: 1.5rem; /* 24px */
-    --spacing-system-xxl: 2.5rem; /* 40px */
-
-    --font-size-h1-title: 2.5rem; /* 40px */
-    --font-size-h2-sub-title: 1.5rem; /* 24px */
-    --font-size-h3-body: 0.875rem; /* 14px */
-    --font-size-h4-body: 0.875rem; /* 14px */
-    --font-size-h5-caption: 0.75rem; /* 12px */
-    --font-size-h6-caption: 0.75rem; /* 12px */
-
-    --font-line-space-h1-main-title: 2.5rem; /* 40px */
-    --font-line-space-h2-sub-title: 2rem; /* 32px */
-    --font-line-space-h3-body: 1.25rem; /* 20px */
-    --font-line-space-h4-body: 1.25rem; /* 20px */
-    --font-line-space-h5-caption: 1rem; /* 16px */
-    --font-line-space-h6-caption: 1rem; /* 16px */
-
-    --icon-size-icon-size: 1rem; /* 16px */
-  }
 }

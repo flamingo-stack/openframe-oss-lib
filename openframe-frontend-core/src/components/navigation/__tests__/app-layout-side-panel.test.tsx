@@ -31,7 +31,7 @@ function preferReducedMotion() {
 function onPhone() {
   const original = window.matchMedia;
   vi.spyOn(window, 'matchMedia').mockImplementation(query =>
-    query.includes('max-width: 799.98px')
+    query.startsWith('not all and (min-width: 800px)')
       ? ({
           matches: true,
           media: query,
@@ -60,6 +60,7 @@ function renderLayout(collapsed = false) {
       mobileBurgerMenuProps={{}}
       sidePanel={{
         label: 'Mingo',
+        minWidth: 296,
         storageKey: 'test:side-panel',
         collapsed,
         children: ({ width, mode }) => (
@@ -211,6 +212,7 @@ describe('AppLayout side panel', () => {
         mobileBurgerMenuProps={{}}
         sidePanel={{
           label: 'Mingo',
+          minWidth: 296,
           storageKey: 'test:side-panel',
           children: ({ mode, width, collapsesTo, collapse }) => (
             <button type="button" onClick={collapse}>
@@ -235,7 +237,7 @@ describe('AppLayout side panel', () => {
         sidebarConfig={{ items: [], onNavigate: () => undefined }}
         headerProps={{}}
         mobileBurgerMenuProps={{}}
-        sidePanel={{ label: 'Mingo', open: true, children: ({ mode }) => <p>panel {mode}</p> }}
+        sidePanel={{ label: 'Mingo', minWidth: 296, open: true, children: ({ mode }) => <p>panel {mode}</p> }}
       >
         <h1>Page</h1>
       </AppLayout>,
@@ -271,6 +273,7 @@ describe('AppLayout side panel', () => {
         mobileBurgerMenuProps={{}}
         sidePanel={{
           label: 'Mingo',
+          minWidth: 296,
           storageKey: 'test:side-panel',
           children: ({ width, mode }) => (
             <p>
@@ -295,6 +298,7 @@ describe('AppLayout side panel', () => {
         mobileBurgerMenuProps={{}}
         sidePanel={{
           label: 'Mingo',
+          minWidth: 296,
           open: true,
           onOpenChange,
           children: ({ mode, canClose, close }) => (
@@ -318,7 +322,7 @@ describe('AppLayout side panel', () => {
         sidebarConfig={{ items: [], onNavigate: () => undefined }}
         headerProps={{}}
         mobileBurgerMenuProps={{}}
-        sidePanel={{ label: 'Mingo', children: ({ mode, canClose }) => <p>{`${mode} ${canClose}`}</p> }}
+        sidePanel={{ label: 'Mingo', minWidth: 296, children: ({ mode, canClose }) => <p>{`${mode} ${canClose}`}</p> }}
       >
         <h1>Page</h1>
       </AppLayout>,

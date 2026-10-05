@@ -2,6 +2,7 @@
 
 import { type ReactNode, createContext, forwardRef, useContext, useRef, useEffect, useState } from 'react';
 import { RemoveScroll } from 'react-remove-scroll';
+import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
 import { XmarkIcon } from '../icons-v2-generated';
 
@@ -305,7 +306,9 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
             role="dialog"
             aria-modal="true"
           >
-            <ModalContext.Provider value={{ onClose }}>{children}</ModalContext.Provider>
+            <ModalContext.Provider value={{ onClose }}>
+              <ViewportBreakpoints>{children}</ViewportBreakpoints>
+            </ModalContext.Provider>
           </div>
         </div>
       </RemoveScroll>

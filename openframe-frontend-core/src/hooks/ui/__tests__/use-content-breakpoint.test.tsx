@@ -7,6 +7,7 @@ import {
   useContentBreakpoint,
   useContentLgUp,
   useContentMdUp,
+  ViewportBreakpoints,
 } from '../use-content-breakpoint';
 
 function inContentArea(width: number) {
@@ -41,6 +42,18 @@ describe('useContentBreakpoint', () => {
   it('falls back to the viewport outside a content area', () => {
     // The test setup's matchMedia matches nothing: a narrow viewport.
     const { result } = renderHook(() => useContentBreakpoint());
+    expect(result.current).toBe('mobile');
+  });
+
+  it('falls back to the viewport under ViewportBreakpoints, inside a wide content area too', () => {
+    const ContentArea = inContentArea(1200);
+    const { result } = renderHook(() => useContentBreakpoint(), {
+      wrapper: ({ children }) => (
+        <ContentArea>
+          <ViewportBreakpoints>{children}</ViewportBreakpoints>
+        </ContentArea>
+      ),
+    });
     expect(result.current).toBe('mobile');
   });
 });

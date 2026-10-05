@@ -18,6 +18,7 @@ import {
   useState,
 } from 'react';
 
+import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { useHeaderHeight } from '../../hooks/ui/use-header-height';
 import { cn } from '../../utils/cn';
 import { clamp } from '../../utils/common';
@@ -456,7 +457,7 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
             className={cn(drawerPanelVariants({ side, flush, size }), className, panelClassName)}
             style={{ ...sizeStyle, ...panelStyle }}
           >
-            {children}
+            <ViewportBreakpoints>{children}</ViewportBreakpoints>
           </div>
         </DialogPrimitive.Content>
       </DrawerPortal>
