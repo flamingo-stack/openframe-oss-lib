@@ -13,6 +13,7 @@ import {
 } from '../utils/announcement-storage';
 import { getAppType } from '../utils/app-config';
 import { pickReadableTextColor } from '../utils/color-analysis';
+import { pathMatchesAny } from '../utils/path-pattern';
 import { EntityIcon } from './icon-display';
 import { AnnouncementBarView } from './ui/announcement-bar-view';
 import { Button } from './ui/button';
@@ -141,8 +142,8 @@ export function AnnouncementBar({
 
   // Preview always mirrors the draft directly (storage is not consulted there).
   // A page that shows the news itself (a hero's news pill) is listed in the
-  // announcement's `excluded_paths`; the bar stays collapsed there.
-  const excludedHere = pathname != null && (announcement?.excluded_paths ?? []).includes(pathname);
+  // announcement's `excluded_paths` (path patterns); the bar stays collapsed there.
+  const excludedHere = pathname != null && pathMatchesAny(pathname, announcement?.excluded_paths);
   const expanded = previewMode
     ? announcement != null
     : announcement != null && expandedState && !dismissed && !excludedHere;

@@ -188,6 +188,54 @@ describe('useScenarioPlayer', () => {
     expect(result.current.step).toBe(7);
   });
 
+  it('takes its first step within a third of a second of becoming playable, then keeps the beat', () => {
+    stubReducedMotion(false);
+    const { result, rerender } = renderHook(({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled }), {
+      initialProps: { enabled: false },
+    });
+    rerender({ enabled: true });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current.step).toBe(1);
+    // The next one takes a whole beat.
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
+    expect(result.current.step).toBe(1);
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(result.current.step).toBe(2);
+
+    // Coming back on screen is the same: it moves at once.
+    rerender({ enabled: false });
+    rerender({ enabled: true });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current.step).toBe(3);
+  });
+
+  it('still holds a finished scenario its full time when it becomes playable', () => {
+    stubReducedMotion(false);
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled, startAtEnd: true }),
+      {
+        initialProps: { enabled: false },
+      },
+    );
+    rerender({ enabled: true });
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+    expect(result.current).toMatchObject({ scenario: 0, step: 8 });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(result.current).toMatchObject({ scenario: 1, step: 0 });
+  });
+
   it('parks on the last step under reduced motion and never advances', () => {
     stubReducedMotion(true);
     const { result } = renderHook(() => useScenarioPlayer(OPTIONS));

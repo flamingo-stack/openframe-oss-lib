@@ -1,7 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAutoplay } from './ui/use-autoplay';
+
+/**
+ * How soon the first step follows the moment the demo becomes playable (it
+ * scrolled into view, the tab came back, play was pressed). A demo that sits
+ * still for a whole step after it appears reads as broken; one that moves
+ * within a third of a second reads as responding to you.
+ */
+const START_MS = 300;
 
 export interface UseScenarioPlayerOptions {
   /** How many scenarios (tabs) the stage cycles through. */
@@ -55,6 +63,9 @@ export interface UseScenarioPlayerResult {
  * not paused, motion allowed. Under reduced motion it parks on the last step
  * of the current scenario, and every scenario can still be read by choosing it.
  *
+ * The moment it becomes playable its first step follows within `START_MS`,
+ * not a whole step later; from there every step takes `stepMs`.
+ *
  * A visitor's own choice (`go`, `setStep`) moves the clock there and un-pauses
  * it; the rotation carries on from that point.
  */
@@ -79,9 +90,18 @@ export function useScenarioPlayer({
 
   const playing = auto.playing && scenarioCount > 0;
 
+  // True from the moment it becomes playable until its first tick has been scheduled.
+  const starting = useRef(false);
+  const wasPlaying = useRef(false);
   useEffect(() => {
+    if (playing && !wasPlaying.current) starting.current = true;
+    wasPlaying.current = playing;
     if (!playing) return undefined;
     const atEnd = rawStep >= lastStep;
+    // The first step after it becomes playable comes quickly. A finished
+    // scenario still holds its full time: it is there to be read.
+    const quickStart = starting.current && !atEnd;
+    starting.current = false;
     const timer = setTimeout(
       () => {
         if (atEnd) {
@@ -91,7 +111,7 @@ export function useScenarioPlayer({
           setRawStep(current => Math.min(current, lastStep) + 1);
         }
       },
-      atEnd ? holdMs : stepMs,
+      atEnd ? holdMs : quickStart ? Math.min(START_MS, stepMs) : stepMs,
     );
     return () => clearTimeout(timer);
   }, [playing, rawStep, lastStep, stepMs, holdMs, scenario, scenarioCount]);
