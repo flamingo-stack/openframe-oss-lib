@@ -17,6 +17,30 @@ export { RemoteSessionDialog } from './remote-session-dialog';
 export type { RemoteSessionDialogProps } from './remote-session-dialog';
 export { RemoteSessionBorder, RemoteSessionPill } from './remote-session-overlay';
 export {
+  REMOTE_SESSION_KEEP_REASON_LABELS,
+  KeepRecordingModal,
+  ReleaseKeepingModal,
+} from './remote-session-keep-modals';
+export type {
+  KeepRecordingModalProps,
+  KeepRecordingSelection,
+  ReleaseKeepingModalProps,
+} from './remote-session-keep-modals';
+export {
+  RemoteSessionEventList,
+  RemoteSessionTimelineMarkers,
+  formatRemoteSessionOffset,
+} from './remote-session-events';
+export type { RemoteSessionEventListProps, RemoteSessionTimelineMarkersProps } from './remote-session-events';
+export { RemoteSessionExpiry, RemoteSessionStatusTag, RemoteSessionStorageAlert } from './remote-session-status';
+export type {
+  RemoteSessionExpiryProps,
+  RemoteSessionStatusTagProps,
+  RemoteSessionStorageAlertProps,
+} from './remote-session-status';
+export { RemoteSessionViewers } from './remote-session-viewers';
+export type { RemoteSessionViewersProps } from './remote-session-viewers';
+export {
   REMOTE_SESSION_DRAG_HANDLE_CLASS,
   RemoteSessionDragger,
   RemoteSessionOrgLogo,
@@ -32,5 +56,9 @@ export type {
   RemoteSessionChatMessage,
   RemoteSessionDialogVariant,
   RemoteSessionDragHandlers,
+  RemoteSessionEvent,
+  RemoteSessionKeepReason,
   RemoteSessionParty,
+  RemoteSessionStatus,
+  RemoteSessionViewer,
 } from './types';

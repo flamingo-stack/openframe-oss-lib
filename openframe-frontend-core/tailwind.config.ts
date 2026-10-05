@@ -448,6 +448,11 @@ const config: Config = {
           '0%, 80%, 100%': { transform: 'scale(1)', opacity: '0.7' },
           '40%': { transform: 'scale(1.5)', opacity: '1' },
         },
+        // The dot on a LIVE tag: opacity only, so it reads as "on air" without moving.
+        'live-pulse': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.25' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -455,6 +460,7 @@ const config: Config = {
         'fade-in': 'fade-in 0.3s ease-out',
         'cursor-blink': 'cursor-blink 1s steps(1) infinite',
         'dot-pulse': 'dot-pulse 1.4s ease-in-out infinite',
+        'live-pulse': 'live-pulse 1.6s ease-in-out infinite',
       },
     },
   },
