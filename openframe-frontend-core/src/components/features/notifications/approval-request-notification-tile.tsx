@@ -11,6 +11,13 @@ import { NotificationTile } from './notification-tile';
 import { approvalMetaToBatchData, getApprovalMeta, resolutionToStatus } from './types';
 import type { Notification } from './types';
 
+/**
+ * The two buttons on a lock-screen notification: compact and their own width.
+ * Stretched to fill the tile they dwarfed the notification wherever the tile
+ * is wide (a phone-width page shows it at the full content width).
+ */
+const LOCKSCREEN_BUTTON = 'h-9 min-w-24';
+
 export interface ApprovalRequestNotificationTileProps {
   notification: Notification;
   onApprove: (approvalRequestId: string) => void | Promise<void>;
@@ -24,7 +31,7 @@ export interface ApprovalRequestNotificationTileProps {
   titleLines?: 1 | 2;
   /**
    * `lockscreen`: the approval as a phone shows it (see `NotificationTile`):
-   * two full-width, thumb-sized buttons and no command drawer.
+   * two compact buttons and no command drawer.
    */
   presentation?: 'card' | 'lockscreen';
   /**
@@ -119,7 +126,7 @@ export function ApprovalRequestNotificationTile({
                 data-pressed={approvePressed || undefined}
                 className={cn(
                   'ease-[cubic-bezier(.2,0,0,1)] transition-[filter,transform] duration-200 motion-reduce:transition-none',
-                  lockscreen && 'h-11 flex-1',
+                  lockscreen && LOCKSCREEN_BUTTON,
                   approvePressed && 'scale-[0.98] brightness-75',
                 )}
               >
@@ -130,7 +137,7 @@ export function ApprovalRequestNotificationTile({
                 size="small"
                 onClick={() => resolve('rejected', onReject)}
                 disabled={processing}
-                className={lockscreen ? 'h-11 flex-1' : undefined}
+                className={lockscreen ? LOCKSCREEN_BUTTON : undefined}
               >
                 Reject
               </Button>
