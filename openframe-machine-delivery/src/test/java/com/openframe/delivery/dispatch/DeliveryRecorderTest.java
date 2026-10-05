@@ -21,6 +21,7 @@ import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,13 +57,14 @@ class DeliveryRecorderTest {
     @Test
     void record_rowOfThisDispatchAlreadyThere_false() {
         // setup
-        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(false);
+        when(repository.existsByIdAndDispatchId(any(), any())).thenReturn(true);
 
         // execution
         boolean recorded = recorder.record(request);
 
         // verifications
         assertThat(recorded).isFalse();
+        verify(repository, never()).upsertPending(any(MachineDelivery.class));
     }
 
     @Test

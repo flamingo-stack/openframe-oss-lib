@@ -1,6 +1,5 @@
 package com.openframe.client.listener.delivery;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.client.service.delivery.LocalDeliverySink;
@@ -19,6 +18,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import static org.springframework.util.StringUtils.hasText;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -28,6 +29,7 @@ public class DeliveryDispatchListener {
 
     static final String REJECTED_INCOMPLETE = "incomplete";
     static final String REJECTED_MALFORMED = "malformed";
+    private static final String DELIVERY_FIELD = "delivery";
 
     private final DeliverySpecRegistry registry;
     private final LocalDeliverySink sink;
@@ -40,46 +42,49 @@ public class DeliveryDispatchListener {
             groupId = "client-service-delivery-dispatch",
             containerFactory = "ossTenantKafkaListenerContainerFactory")
     public void onDispatch(DeliveryDispatchMessage message) {
-        DeliveryRequest<DeliveryPayload> request;
+        if (!isComplete(message)) {
+            reject(REJECTED_INCOMPLETE, message, null);
+            return;
+        }
         try {
-            request = toRequest(message);
-        } catch (JsonProcessingException | IllegalArgumentException permanentlyBad) {
-            metrics.recordDispatchRejected(REJECTED_MALFORMED);
-            log.error("Delivery hand-off rejected, malformed: {}", message, permanentlyBad);
+            dispatchLocally(message);
+        } catch (IllegalArgumentException malformed) {
+            reject(REJECTED_MALFORMED, message, malformed);
+        }
+    }
+
+    private void dispatchLocally(DeliveryDispatchMessage message) {
+        JsonNode command = message.getPayload();
+        JsonNode deliveryNode = command.get(DELIVERY_FIELD);
+        DeliveryRef delivery = objectMapper.convertValue(deliveryNode, DeliveryRef.class);
+        if (!isComplete(delivery)) {
+            reject(REJECTED_INCOMPLETE, message, null);
             return;
         }
-        if (request == null) {
-            metrics.recordDispatchRejected(REJECTED_INCOMPLETE);
-            log.error("Delivery hand-off rejected, delivery block incomplete: {}", message);
-            return;
-        }
+        DeliveryType type = delivery.getType();
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
+        DeliveryPayload payload = objectMapper.convertValue(command, payloadClass);
+        DeliveryRequest<DeliveryPayload> request = DeliveryRequest.<DeliveryPayload>builder()
+                .type(type)
+                .targetId(delivery.getTargetId())
+                .machineId(message.getMachineId())
+                .payload(payload)
+                .build();
         sink.accept(request);
     }
 
-    private DeliveryRequest<DeliveryPayload> toRequest(DeliveryDispatchMessage message) throws JsonProcessingException {
-        JsonNode payloadNode = message.getPayload();
-        String machineId = message.getMachineId();
-        if (payloadNode == null || machineId == null || machineId.isBlank()) {
-            return null;
-        }
-        JsonNode deliveryNode = payloadNode.get("delivery");
-        if (deliveryNode == null) {
-            return null;
-        }
-        DeliveryRef delivery = objectMapper.treeToValue(deliveryNode, DeliveryRef.class);
-        DeliveryType type = delivery.getType();
-        String targetId = delivery.getTargetId();
-        if (type == null || targetId == null || delivery.getDispatchId() == null) {
-            return null;
-        }
-        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
-        Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
-        DeliveryPayload payload = objectMapper.treeToValue(payloadNode, payloadClass);
-        return DeliveryRequest.<DeliveryPayload>builder()
-                .type(type)
-                .targetId(targetId)
-                .machineId(machineId)
-                .payload(payload)
-                .build();
+    private static boolean isComplete(DeliveryDispatchMessage message) {
+        JsonNode command = message.getPayload();
+        return hasText(message.getMachineId()) && command != null && command.has(DELIVERY_FIELD);
+    }
+
+    private static boolean isComplete(DeliveryRef delivery) {
+        return delivery.getType() != null && hasText(delivery.getTargetId()) && hasText(delivery.getDispatchId());
+    }
+
+    private void reject(String reason, DeliveryDispatchMessage message, Exception cause) {
+        metrics.recordDispatchRejected(reason);
+        log.error("Delivery hand-off rejected, {}: {}", reason, message, cause);
     }
 }

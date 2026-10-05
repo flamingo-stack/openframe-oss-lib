@@ -11,7 +11,6 @@ import com.openframe.data.repository.delivery.CustomMachineDeliveryRepository;
 import org.bson.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Sort;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -59,8 +58,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     // $set per field, not a replacement document: a replacement is inserted without the tenant of the scoped filter;
     // null fields are not written, so what a previous dispatch closed the row with has to be unset explicitly
     @Override
-    // a row that already carries this dispatchId makes the upsert miss and the insert collide on _id: a replayed hand-off
-    public boolean upsertPending(MachineDelivery delivery) {
+    public void upsertPending(MachineDelivery delivery) {
         Document document = new Document();
         mongoTemplate.getConverter().write(delivery, document);
         Update update = new Update().set(FIELD_TENANT_ID, tenantId())
@@ -70,14 +68,8 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
                 .unset(FIELD_ERROR);
         document.forEach((field, value) -> setField(update, field, value));
         String id = delivery.getId();
-        String dispatchId = delivery.getDispatchId();
-        Query otherDispatch = new Query(Criteria.where(FIELD_ID).is(id).and(FIELD_DISPATCH_ID).ne(dispatchId));
-        try {
-            mongoTemplate.upsert(otherDispatch, update, MachineDelivery.class);
-            return true;
-        } catch (DuplicateKeyException replayed) {
-            return false;
-        }
+        Query byId = new Query(Criteria.where(FIELD_ID).is(id));
+        mongoTemplate.upsert(byId, update, MachineDelivery.class);
     }
 
     @Override

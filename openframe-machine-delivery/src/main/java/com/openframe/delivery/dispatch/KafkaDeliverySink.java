@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
 import lombok.RequiredArgsConstructor;
@@ -24,15 +25,14 @@ public class KafkaDeliverySink implements DeliverySink {
     public void accept(DeliveryRequest<?> request) {
         DeliveryType type = request.getType();
         String machineId = request.getMachineId();
-        JsonNode payload = objectMapper.valueToTree(request.getPayload());
-        DeliveryDispatchMessage message = new DeliveryDispatchMessage(machineId, payload);
+        DeliveryPayload payload = request.getPayload();
+        JsonNode command = objectMapper.valueToTree(payload);
+        DeliveryDispatchMessage message = new DeliveryDispatchMessage(machineId, command);
         try {
             producer.sendAndAwait(topic, machineId, message);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException kafkaDown) {
             metrics.recordDispatchFailed(type);
-            log.error("Delivery hand-off to Kafka failed: type={} targetId={} machineId={} topic={}",
-                    type, request.getTargetId(), machineId, topic, e);
-            throw e;
+            throw kafkaDown;
         }
         metrics.recordDispatched(type, SINK);
         log.info("Delivery handed to Kafka: type={} targetId={} machineId={}", type, request.getTargetId(), machineId);

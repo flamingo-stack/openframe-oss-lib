@@ -30,12 +30,15 @@ public class DeliveryRecorder {
     // false = a row for this very dispatch already exists: the hand-off was replayed, nothing to do
     public boolean record(DeliveryRequest<?> request) {
         MachineDelivery delivery = pendingRow(request);
-        boolean written = repository.upsertPending(delivery);
-        if (written) {
-            log.info("Delivery recorded: type={} targetId={} machineId={}",
-                    request.getType(), request.getTargetId(), request.getMachineId());
+        String id = delivery.getId();
+        String dispatchId = delivery.getDispatchId();
+        if (repository.existsByIdAndDispatchId(id, dispatchId)) {
+            return false;
         }
-        return written;
+        repository.upsertPending(delivery);
+        log.info("Delivery recorded: type={} targetId={} machineId={}",
+                request.getType(), request.getTargetId(), request.getMachineId());
+        return true;
     }
 
     private MachineDelivery pendingRow(DeliveryRequest<?> request) {

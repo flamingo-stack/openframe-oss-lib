@@ -8,4 +8,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 @TenantAwareRepository
 public interface MachineDeliveryRepository extends MongoRepository<MachineDelivery, String>, CustomMachineDeliveryRepository {
+
+    boolean existsByIdAndDispatchId(String id, String dispatchId);
 }
