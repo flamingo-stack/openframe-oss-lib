@@ -87,7 +87,9 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
  *
  * Outside a content area (apps without a side panel, overlays portalled to
  * <body>) each falls back to its viewport step, so a component can switch to
- * them without changing anywhere else it renders.
+ * them without changing anywhere else it renders. So does everything under an
+ * `.ods-viewport-layer`: a modal or drawer that renders inside the content
+ * area but follows the window.
  *
  * Registered `max-*` first and then ascending, like Tailwind's own screens, so
  * a wider step wins over a narrower one on the same property.
@@ -95,18 +97,20 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
 const CONTENT_STEPS = Object.entries(LAYOUT_STEPS).map(([name, step]) => ({ name, ...step }));
 
 const odsContentAreaPlugin = plugin(({ addVariant }) => {
-  const outsideContentArea = '&:where(:not(.ods-content-area *))';
+  const viewportLayer = '.ods-viewport-layer, .ods-viewport-layer *';
+  const byContent = `&:where(:not(${viewportLayer}))`;
+  const byViewport = `&:where(:not(.ods-content-area *), ${viewportLayer})`;
   for (const { name, content, viewport } of CONTENT_STEPS) {
     if (name !== 'md' && name !== 'lg') continue;
     addVariant(`content-max-${name}`, [
-      `@container ods-content not (min-width: ${content}px)`,
-      `@media not all and (min-width: ${viewport}px) { ${outsideContentArea} }`,
+      `@container ods-content not (min-width: ${content}px) { ${byContent} }`,
+      `@media not all and (min-width: ${viewport}px) { ${byViewport} }`,
     ]);
   }
   for (const { name, content, viewport } of CONTENT_STEPS) {
     addVariant(`content-${name}`, [
-      `@container ods-content (min-width: ${content}px)`,
-      `@media (min-width: ${viewport}px) { ${outsideContentArea} }`,
+      `@container ods-content (min-width: ${content}px) { ${byContent} }`,
+      `@media (min-width: ${viewport}px) { ${byViewport} }`,
     ]);
   }
 });

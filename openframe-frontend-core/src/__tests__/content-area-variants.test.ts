@@ -34,7 +34,10 @@ function rulesOf(root: Root, className: string) {
   return found;
 }
 
-const OUTSIDE = ':where(:not(.ods-content-area *))';
+// Window chrome inside a content area (`.ods-viewport-layer`) is back on the viewport.
+const LAYER = '.ods-viewport-layer, .ods-viewport-layer *';
+const BY_CONTENT = `:where(:not(${LAYER}))`;
+const OUTSIDE = `:where(:not(.ods-content-area *), ${LAYER})`;
 
 /** Every rule of the class as its at-rule ancestry, outermost first. */
 function chainsOf(root: Root, className: string) {
@@ -59,7 +62,7 @@ describe('content-* variants', () => {
       const root = await compile(`content-${step}:grid`);
       const cls = `.content-${step}\\:grid`;
       expect(rulesOf(root, `content-${step}:grid`)).toEqual([
-        `@container ods-content (min-width: ${content}px) | ${cls}`,
+        `@container ods-content (min-width: ${content}px) | ${cls}${BY_CONTENT}`,
         `@media (min-width: ${viewport}px) | ${cls}${OUTSIDE}`,
       ]);
     },
@@ -71,7 +74,7 @@ describe('content-* variants', () => {
     const root = await compile(`content-max-${step}:grid`);
     const cls = `.content-max-${step}\\:grid`;
     expect(rulesOf(root, `content-max-${step}:grid`)).toEqual([
-      `@container ods-content not (min-width: ${content}px) | ${cls}`,
+      `@container ods-content not (min-width: ${content}px) | ${cls}${BY_CONTENT}`,
       `@media not all and (min-width: ${viewport}px) | ${cls}${OUTSIDE}`,
     ]);
   });
