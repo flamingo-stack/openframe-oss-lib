@@ -2,7 +2,7 @@ import containerQueries from '@tailwindcss/container-queries';
 import type { Config } from 'tailwindcss';
 import tailwindcssAnimate from 'tailwindcss-animate';
 import plugin from 'tailwindcss/plugin';
-import { below, LAYOUT_STEPS } from './src/styles/layout-steps';
+import { LAYOUT_STEPS } from './src/styles/layout-steps';
 
 const odsTypographyPlugin = plugin(({ addUtilities }) => {
   addUtilities({
@@ -99,8 +99,8 @@ const odsContentAreaPlugin = plugin(({ addVariant }) => {
   for (const { name, content, viewport } of CONTENT_STEPS) {
     if (name !== 'md' && name !== 'lg') continue;
     addVariant(`content-max-${name}`, [
-      `@container ods-content (max-width: ${below(content)}px)`,
-      `@media (max-width: ${below(viewport)}px) { ${outsideContentArea} }`,
+      `@container ods-content not (min-width: ${content}px)`,
+      `@media not all and (min-width: ${viewport}px) { ${outsideContentArea} }`,
     ]);
   }
   for (const { name, content, viewport } of CONTENT_STEPS) {

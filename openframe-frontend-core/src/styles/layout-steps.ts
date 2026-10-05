@@ -12,6 +12,3 @@ export const LAYOUT_STEPS = {
   xl: { viewport: 1440, content: 1216 },
   '2xl': { viewport: 1536, content: 1312 },
 } as const;
-
-/** Just under a step, for a `max-width` query that must not overlap its `min-width` twin. */
-export const below = (px: number) => px - 0.02;

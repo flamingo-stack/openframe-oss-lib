@@ -12,7 +12,7 @@ import postcss, { type AtRule, type Root, type Rule } from 'postcss';
 import tailwindcss from 'tailwindcss';
 import { describe, expect, it } from 'vitest';
 import config from '../../tailwind.config';
-import { below, LAYOUT_STEPS } from '../styles/layout-steps';
+import { LAYOUT_STEPS } from '../styles/layout-steps';
 
 /** Utilities generated for `classes` (plus the config's safelist). */
 async function compile(classes: string) {
@@ -71,8 +71,8 @@ describe('content-* variants', () => {
     const root = await compile(`content-max-${step}:grid`);
     const cls = `.content-max-${step}\\:grid`;
     expect(rulesOf(root, `content-max-${step}:grid`)).toEqual([
-      `@container ods-content (max-width: ${below(content)}px) | ${cls}`,
-      `@media (max-width: ${below(viewport)}px) | ${cls}${OUTSIDE}`,
+      `@container ods-content not (min-width: ${content}px) | ${cls}`,
+      `@media not all and (min-width: ${viewport}px) | ${cls}${OUTSIDE}`,
     ]);
   });
 
@@ -85,8 +85,8 @@ describe('content-* variants', () => {
     // Inside a content area: a narrow content area in a wide window. Outside one it
     // can never match: at least 800px and under 800px at once.
     expect(chainsOf(root, 'md:content-max-md:flex')).toEqual([
-      '@media (min-width: 800px) > @container ods-content (max-width: 719.98px)',
-      '@media (min-width: 800px) > @media (max-width: 799.98px) [outside]',
+      '@media (min-width: 800px) > @container ods-content not (min-width: 720px)',
+      '@media (min-width: 800px) > @media not all and (min-width: 800px) [outside]',
     ]);
   });
 
@@ -152,7 +152,7 @@ describe('content-area tokens', () => {
     const css = [
       '/* GENERATED from ods-responsive-tokens.css. Do not edit: `npm run generate:content-area`. */',
       '',
-      `@container ods-content (max-width: ${below(LAYOUT_STEPS.md.content)}px) {`,
+      `@container ods-content not (min-width: ${LAYOUT_STEPS.md.content}px) {`,
       '  .ods-content-scope {',
       ...tokens.map(([name, value]) => `    ${name}: ${value};`),
       '  }',

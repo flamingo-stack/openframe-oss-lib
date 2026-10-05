@@ -11,8 +11,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
-import { useMediaQuery } from '../../hooks/ui/use-media-query';
-import { below, LAYOUT_STEPS } from '../../styles/layout-steps';
+import { breakpoints, useMediaQuery } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
 import { Menu01Icon } from '../icons-v2-generated';
 
@@ -76,7 +75,7 @@ export interface AppLayoutSidePanelConfig {
 
 /** Inset of the docked card from the window edge and the header. */
 export const SIDE_PANEL_INSET = 16;
-const MOBILE_QUERY = `(max-width: ${below(LAYOUT_STEPS.md.viewport)}px)`;
+const MOBILE_QUERY = `not all and ${breakpoints.md}`;
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 /** Length of the docked <-> full morph; keep in step with `duration-300` below. */
 const MORPH_MS = 300;

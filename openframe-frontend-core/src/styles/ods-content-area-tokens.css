@@ -1,6 +1,6 @@
 /* GENERATED from ods-responsive-tokens.css. Do not edit: `npm run generate:content-area`. */
 
-@container ods-content (max-width: 719.98px) {
+@container ods-content not (min-width: 720px) {
   .ods-content-scope {
     --device-type: mobile;
     --device-screen-width: 26.875rem;

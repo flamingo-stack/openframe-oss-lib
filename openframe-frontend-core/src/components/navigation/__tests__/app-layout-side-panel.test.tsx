@@ -31,7 +31,7 @@ function preferReducedMotion() {
 function onPhone() {
   const original = window.matchMedia;
   vi.spyOn(window, 'matchMedia').mockImplementation(query =>
-    query.includes('max-width: 799.98px')
+    query.startsWith('not all and (min-width: 800px)')
       ? ({
           matches: true,
           media: query,
