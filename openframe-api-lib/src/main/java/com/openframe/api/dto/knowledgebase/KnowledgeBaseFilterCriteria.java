@@ -18,4 +18,6 @@ public class KnowledgeBaseFilterCriteria {
     private KnowledgeBaseItemType type;
     private List<String> tagIds;
     private List<KnowledgeBaseArticleStatus> statuses;
+    /** Null keeps the rules that predate the argument — see {@link KnowledgeBaseScope}. */
+    private KnowledgeBaseScope scope;
 }

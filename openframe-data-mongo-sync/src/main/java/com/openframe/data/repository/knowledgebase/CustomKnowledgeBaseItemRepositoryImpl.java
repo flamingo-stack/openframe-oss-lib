@@ -11,9 +11,10 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 @Slf4j
 public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBaseItemRepository {
@@ -33,60 +34,59 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     }
 
     @Override
-    public List<KnowledgeBaseItem> findFoldersForParent(String parentId, String search, List<String> itemIds) {
-        Query query = new Query();
-
-        if (StringUtils.hasText(parentId)) {
-            query.addCriteria(Criteria.where(FIELD_PARENT_ID).is(parentId));
-        } else {
-            query.addCriteria(Criteria.where(FIELD_PARENT_ID).isNull());
-        }
-
-        query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.FOLDER));
-
-        if (StringUtils.hasText(search)) {
-            query.addCriteria(Criteria.where(FIELD_NAME).regex(Pattern.quote(search), "i"));
-        }
-
-        if (itemIds != null) {
-            query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
-        }
-
+    public List<KnowledgeBaseItem> findFolders(KnowledgeBaseParentFilter parent, String search, List<String> itemIds,
+                                               KnowledgeBaseItemCursor cursor, int limit) {
+        Query query = buildFolderQuery(parent, search, itemIds);
+        addComposites(query, folderPosition(cursor));
         query.with(Sort.by(
                 Sort.Order.asc(FIELD_NAME),
                 Sort.Order.desc(ID_FIELD)
         ));
-
+        query.limit(limit);
         return mongoTemplate.find(query, KnowledgeBaseItem.class);
     }
 
     @Override
-    public List<KnowledgeBaseItem> findArticles(String parentId, String search,
-                                                 KnowledgeBaseItemType type, List<String> itemIds,
-                                                 List<KnowledgeBaseArticleStatus> statuses,
-                                                 String cursor, int limit) {
-        Query query = buildItemQuery(parentId, search, type, itemIds, statuses, cursor);
-        return executeWithSort(query, limit);
+    public long countFolders(KnowledgeBaseParentFilter parent, String search, List<String> itemIds) {
+        return mongoTemplate.count(buildFolderQuery(parent, search, itemIds), KnowledgeBaseItem.class);
     }
 
     @Override
-    public long countArticles(String parentId, String search,
-                              KnowledgeBaseItemType type, List<String> itemIds,
+    public List<KnowledgeBaseItem> findArticles(KnowledgeBaseParentFilter parent, String search, List<String> itemIds,
+                                                 List<KnowledgeBaseArticleStatus> statuses,
+                                                 KnowledgeBaseItemCursor cursor, int limit) {
+        Query query = buildArticleQuery(parent, itemIds, statuses);
+        addComposites(query, articleSearch(search), articlePosition(cursor));
+        return executeWithArticleSort(query, limit);
+    }
+
+    @Override
+    public long countArticles(KnowledgeBaseParentFilter parent, String search, List<String> itemIds,
                               List<KnowledgeBaseArticleStatus> statuses) {
-        Query query = buildItemQuery(parentId, search, type, itemIds, statuses, null);
+        Query query = buildArticleQuery(parent, itemIds, statuses);
+        addComposites(query, articleSearch(search));
         return mongoTemplate.count(query, KnowledgeBaseItem.class);
     }
 
     @Override
+    public List<KnowledgeBaseItem> findFolderLinks() {
+        Query query = new Query(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.FOLDER));
+        query.fields().include(FIELD_PARENT_ID);
+        return mongoTemplate.find(query, KnowledgeBaseItem.class);
+    }
+
+    @Override
     public List<KnowledgeBaseItem> findArchivedArticles(String search, List<String> itemIds,
-                                                         String cursor, int limit) {
-        Query query = buildArchivedArticlesQuery(search, itemIds, cursor);
-        return executeWithSort(query, limit);
+                                                         KnowledgeBaseItemCursor cursor, int limit) {
+        Query query = buildArchivedArticlesQuery(itemIds);
+        addComposites(query, articleSearch(search), articlePosition(cursor));
+        return executeWithArticleSort(query, limit);
     }
 
     @Override
     public long countArchivedArticles(String search, List<String> itemIds) {
-        Query query = buildArchivedArticlesQuery(search, itemIds, null);
+        Query query = buildArchivedArticlesQuery(itemIds);
+        addComposites(query, articleSearch(search));
         return mongoTemplate.count(query, KnowledgeBaseItem.class);
     }
 
@@ -99,21 +99,30 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         return mongoTemplate.find(query, KnowledgeBaseItem.class);
     }
 
-    private Query buildItemQuery(String parentId, String search,
-                                  KnowledgeBaseItemType type, List<String> itemIds,
-                                  List<KnowledgeBaseArticleStatus> statuses, String cursor) {
+    private Query buildFolderQuery(KnowledgeBaseParentFilter parent, String search, List<String> itemIds) {
         Query query = new Query();
+        addParentCriteria(query, parent);
+        query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.FOLDER));
+
+        if (StringUtils.hasText(search)) {
+            query.addCriteria(Criteria.where(FIELD_NAME).regex(Pattern.quote(search), "i"));
+        }
 
         if (itemIds != null) {
             query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
-        } else if (StringUtils.hasText(parentId)) {
-            query.addCriteria(Criteria.where(FIELD_PARENT_ID).is(parentId));
-        } else {
-            query.addCriteria(Criteria.where(FIELD_PARENT_ID).isNull());
         }
+        return query;
+    }
 
-        if (type != null) {
-            query.addCriteria(Criteria.where(FIELD_TYPE).is(type));
+    /** Drafts are visible to all admins (team collaboration model); only archived articles are held back. */
+    private Query buildArticleQuery(KnowledgeBaseParentFilter parent, List<String> itemIds,
+                                    List<KnowledgeBaseArticleStatus> statuses) {
+        Query query = new Query();
+        addParentCriteria(query, parent);
+        query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.ARTICLE));
+
+        if (itemIds != null) {
+            query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
         }
 
         if (statuses != null && !statuses.isEmpty()) {
@@ -121,12 +130,10 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         } else {
             query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
         }
-
-        addComposites(query, search, cursor);
         return query;
     }
 
-    private Query buildArchivedArticlesQuery(String search, List<String> itemIds, String cursor) {
+    private Query buildArchivedArticlesQuery(List<String> itemIds) {
         Query query = new Query();
         query.addCriteria(Criteria.where(FIELD_TYPE).is(KnowledgeBaseItemType.ARTICLE));
         query.addCriteria(Criteria.where(FIELD_STATUS).is(KnowledgeBaseArticleStatus.ARCHIVED));
@@ -134,70 +141,104 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         if (itemIds != null) {
             query.addCriteria(Criteria.where(ID_FIELD).in(itemIds));
         }
-
-        addComposites(query, search, cursor);
         return query;
     }
 
-    /**
-     * Combines search ($or on name/summary) and cursor ($or on updatedAt/id) into a single
-     * $and at root. Spring Data Mongo rejects multiple $or criteria on the same Query
-     * (null-key collision). Drafts are visible to all admins (team collaboration model).
-     */
-    private void addComposites(Query query, String search, String cursor) {
-        List<Criteria> composites = new ArrayList<>();
-
-        if (StringUtils.hasText(search)) {
-            String quoted = Pattern.quote(search);
-            composites.add(new Criteria().orOperator(
-                    Criteria.where(FIELD_NAME).regex(quoted, "i"),
-                    Criteria.where(FIELD_SUMMARY).regex(quoted, "i")));
+    private static void addParentCriteria(Query query, KnowledgeBaseParentFilter parent) {
+        if (parent.unrestricted()) {
+            return;
         }
-
-        Criteria cursorCriteria = buildCursorCriteria(cursor);
-        if (cursorCriteria != null) {
-            composites.add(cursorCriteria);
-        }
-
-        if (composites.size() == 1) {
-            query.addCriteria(composites.getFirst());
-        } else if (!composites.isEmpty()) {
-            query.addCriteria(new Criteria().andOperator(composites.toArray(new Criteria[0])));
+        List<String> parentIds = parent.parentIds();
+        if (parentIds.isEmpty()) {
+            query.addCriteria(Criteria.where(FIELD_PARENT_ID).isNull());
+        } else if (parentIds.size() == 1) {
+            query.addCriteria(Criteria.where(FIELD_PARENT_ID).is(parentIds.getFirst()));
+        } else {
+            query.addCriteria(Criteria.where(FIELD_PARENT_ID).in(parentIds));
         }
     }
 
-    private Criteria buildCursorCriteria(String cursor) {
-        if (!StringUtils.hasText(cursor)) {
+    private static Criteria articleSearch(String search) {
+        if (!StringUtils.hasText(search)) {
             return null;
         }
-        ObjectId cursorId;
-        try {
-            cursorId = new ObjectId(cursor);
-        } catch (IllegalArgumentException ex) {
-            log.warn("Invalid ObjectId cursor format: {}", cursor);
+        String quoted = Pattern.quote(search);
+        return new Criteria().orOperator(
+                Criteria.where(FIELD_NAME).regex(quoted, "i"),
+                Criteria.where(FIELD_SUMMARY).regex(quoted, "i"));
+    }
+
+    /**
+     * Folders after the cursor in (name asc, _id desc) order.
+     *
+     * Every branch returns an operator criteria (a null key), never a bare field one: the folder
+     * query already holds criteria on name (the search) and may hold one on _id (the tag filter),
+     * and Spring Data Mongo rejects a second criteria on the same key.
+     */
+    private static Criteria folderPosition(KnowledgeBaseItemCursor cursor) {
+        if (cursor == null || cursor.name() == null) {
             return null;
         }
+        Criteria pastName = Criteria.where(FIELD_NAME).gt(cursor.name());
+        ObjectId cursorId = toObjectId(cursor.id());
+        if (cursorId == null) {
+            return new Criteria().orOperator(pastName);
+        }
+        Criteria sameNamePastId = new Criteria().andOperator(
+                Criteria.where(FIELD_NAME).is(cursor.name()),
+                Criteria.where(ID_FIELD).lt(cursorId)
+        );
+        return new Criteria().orOperator(pastName, sameNamePastId);
+    }
 
-        KnowledgeBaseItem cursorDoc = mongoTemplate.findById(cursorId, KnowledgeBaseItem.class);
-        if (cursorDoc == null) {
-            log.warn("Cursor document not found for id: {}", cursorId);
-            return Criteria.where(ID_FIELD).lt(cursorId);
+    /**
+     * Articles after the cursor in (updatedAt desc, _id desc) order. A cursor without a sort value
+     * (a document that has none, or a legacy cursor whose document is gone) falls back to the id
+     * alone. Operator criteria throughout, for the reason given on {@link #folderPosition}.
+     */
+    private static Criteria articlePosition(KnowledgeBaseItemCursor cursor) {
+        if (cursor == null) {
+            return null;
+        }
+        ObjectId cursorId = toObjectId(cursor.id());
+        if (cursor.updatedAt() == null) {
+            if (cursorId == null) {
+                log.warn("Knowledge base cursor carries neither a sort value nor a valid id: {}", cursor.id());
+                return null;
+            }
+            return new Criteria().andOperator(Criteria.where(ID_FIELD).lt(cursorId));
         }
 
-        Object cursorSortValue = cursorDoc.getUpdatedAt();
-        if (cursorSortValue == null) {
-            return Criteria.where(ID_FIELD).lt(cursorId);
+        Criteria pastSortValue = Criteria.where(FIELD_UPDATED_AT).lt(cursor.updatedAt());
+        if (cursorId == null) {
+            return new Criteria().orOperator(pastSortValue);
         }
-
-        Criteria pastSortValue = Criteria.where(FIELD_UPDATED_AT).lt(cursorSortValue);
         Criteria sameSortValuePastId = new Criteria().andOperator(
-                Criteria.where(FIELD_UPDATED_AT).is(cursorSortValue),
+                Criteria.where(FIELD_UPDATED_AT).is(cursor.updatedAt()),
                 Criteria.where(ID_FIELD).lt(cursorId)
         );
         return new Criteria().orOperator(pastSortValue, sameSortValuePastId);
     }
 
-    private List<KnowledgeBaseItem> executeWithSort(Query query, int limit) {
+    private static ObjectId toObjectId(String id) {
+        return id != null && ObjectId.isValid(id) ? new ObjectId(id) : null;
+    }
+
+    /**
+     * Combines the operator criteria of one query (search $or, cursor $or) into a single $and at
+     * root. Spring Data Mongo rejects multiple $or criteria on the same Query (null-key collision).
+     */
+    private static void addComposites(Query query, Criteria... composites) {
+        List<Criteria> present = Stream.of(composites).filter(Objects::nonNull).toList();
+
+        if (present.size() == 1) {
+            query.addCriteria(present.getFirst());
+        } else if (!present.isEmpty()) {
+            query.addCriteria(new Criteria().andOperator(present.toArray(new Criteria[0])));
+        }
+    }
+
+    private List<KnowledgeBaseItem> executeWithArticleSort(Query query, int limit) {
         query.with(Sort.by(
                 Sort.Order.desc(FIELD_UPDATED_AT),
                 Sort.Order.desc(ID_FIELD)

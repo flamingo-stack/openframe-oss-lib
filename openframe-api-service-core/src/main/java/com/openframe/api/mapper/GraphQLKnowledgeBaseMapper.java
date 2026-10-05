@@ -5,12 +5,12 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.knowledgebase.CreateArticleCommand;
 import com.openframe.api.dto.knowledgebase.CreateArticleInput;
+import com.openframe.api.dto.knowledgebase.KnowledgeBaseCursors;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterInput;
 import com.openframe.api.dto.knowledgebase.UpdateArticleCommand;
 import com.openframe.api.dto.knowledgebase.UpdateArticleInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
-import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import graphql.relay.Relay;
@@ -32,6 +32,7 @@ public class GraphQLKnowledgeBaseMapper {
                 .parentId(decodeId(input.getParentId()))
                 .type(input.getType())
                 .tagIds(decodeIds(input.getTagIds()))
+                .scope(input.getScope())
                 .build();
     }
 
@@ -44,7 +45,7 @@ public class GraphQLKnowledgeBaseMapper {
         List<GenericEdge<KnowledgeBaseItem>> edges = result.getItems().stream()
                 .map(item -> GenericEdge.<KnowledgeBaseItem>builder()
                         .node(item)
-                        .cursor(CursorCodec.encode(item.getId()))
+                        .cursor(KnowledgeBaseCursors.encode(item))
                         .build())
                 .collect(Collectors.toList());
         return CountedGenericConnection.<GenericEdge<KnowledgeBaseItem>>builder()

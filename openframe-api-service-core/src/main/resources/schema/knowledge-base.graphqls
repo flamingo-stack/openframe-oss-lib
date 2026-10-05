@@ -22,6 +22,24 @@ input KnowledgeBaseFilterInput {
     parentId: ID
     type: KnowledgeBaseItemType
     tagIds: [ID]
+    """
+    How far below parentId to look. Omitted, the listing keeps the rules that predate this
+    argument: one level, except that a search or a tag filter returns the matching articles of the
+    whole subtree and no folders.
+    """
+    scope: KnowledgeBaseScope
+}
+
+"""
+The reach of a knowledgeBaseItems listing. An absent parentId cannot say it on its own: it already
+means the root level, so it cannot also mean every level. In both scopes folders come first, by
+name, then articles, most recently updated first.
+"""
+enum KnowledgeBaseScope {
+    "The items directly under parentId; the root level when there is none."
+    CHILDREN
+    "Everything under parentId at any depth; the whole knowledge base when there is none."
+    DESCENDANTS
 }
 
 extend type Mutation {
@@ -93,6 +111,8 @@ type KnowledgeBaseItem implements AssignableTarget & Node {
     type: KnowledgeBaseItemType!
     name: String!
     parentId: ID
+    "The folder this item is in; null at the root level."
+    parent: KnowledgeBaseItem
     slug: String
     sortOrder: Int
     content: String

@@ -16,4 +16,5 @@ public class KnowledgeBaseFilterInput {
     private String parentId;
     private KnowledgeBaseItemType type;
     private List<String> tagIds;
+    private KnowledgeBaseScope scope;
 }
