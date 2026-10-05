@@ -129,6 +129,10 @@ out by **its own width** instead. `<main>` becomes an `.ods-content-area` contai
   switch to them without changing anywhere else it renders.
 - **Keep `md:` / `lg:` for chrome and overlays** that follow the window: header, navigation,
   modals, dropdowns, toasts. Never mix `md:` and `content-md:` on one property of one element.
+- **Chrome inside the content area that ALSO depends on the window** stacks the two:
+  `md:content-max-md:` is "narrow content in a wide window" and never matches outside a content
+  area. `PageActions` `primary-buttons` uses it: the bottom bar spans the window (`md:hidden`),
+  so a docked panel narrowing the content compacts the actions into the title row instead.
 - **JS layout decisions** use `useContentBreakpoint()` / `useContentMdUp()` / `useContentLgUp()`
   from `hooks` instead of `useMdUp()` / `useLgUp()` — the same steps, the same viewport fallback.
 - **Things that measure the window** (`vw`, `w-screen`, `fixed left-0 right-0`, a `resize` listener

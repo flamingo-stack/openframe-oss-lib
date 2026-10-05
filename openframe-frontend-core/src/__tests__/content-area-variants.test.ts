@@ -35,6 +35,22 @@ function rulesOf(root: Root, className: string) {
 
 const OUTSIDE = ':where(:not(.ods-content-area *))';
 
+/** Every rule of the class as its at-rule ancestry, outermost first. */
+function chainsOf(root: Root, className: string) {
+  const escaped = `.${className.replace(/:/g, '\\:')}`;
+  const found: string[] = [];
+  root.walkRules((rule: Rule) => {
+    if (!rule.selector.startsWith(escaped)) return;
+    const chain: string[] = [];
+    for (let node = rule.parent; node && node.type === 'atrule'; node = node.parent) {
+      const atRule = node as AtRule;
+      chain.unshift(`@${atRule.name} ${atRule.params}`);
+    }
+    found.push(chain.join(' > ') + (rule.selector.endsWith(OUTSIDE) ? ' [outside]' : ''));
+  });
+  return found;
+}
+
 describe('content-* variants', () => {
   it.each([
     ['sm', 640, 640],
@@ -60,6 +76,20 @@ describe('content-* variants', () => {
     expect(rulesOf(root, `content-max-${step}:grid`)).toEqual([
       `@container ods-content (max-width: ${content - 0.02}px) | ${cls}`,
       `@media (max-width: ${viewport - 0.02}px) | ${cls}${OUTSIDE}`,
+    ]);
+  });
+
+  it('stacks under md: for chrome that also needs the window wide (PageActions)', async () => {
+    const root = await compile('md:content-md:flex md:content-max-md:flex');
+    expect(chainsOf(root, 'md:content-md:flex')).toEqual([
+      '@media (min-width: 800px) > @container ods-content (min-width: 720px)',
+      '@media (min-width: 800px) > @media (min-width: 800px) [outside]',
+    ]);
+    // Inside a content area: a narrow content area in a wide window. Outside one it
+    // can never match: at least 800px and under 800px at once.
+    expect(chainsOf(root, 'md:content-max-md:flex')).toEqual([
+      '@media (min-width: 800px) > @container ods-content (max-width: 719.98px)',
+      '@media (min-width: 800px) > @media (max-width: 799.98px) [outside]',
     ]);
   });
 
