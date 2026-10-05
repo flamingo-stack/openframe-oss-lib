@@ -206,8 +206,11 @@ public class UserTest extends BaseTest {
         UserApi.transferOwnership(throwaway.getId());
         ownershipAway = true;
 
-        assertThat(UserApi.getUser(throwaway.getId()).getRoles()).as("The new owner holds only OWNER")
-                .containsExactly(UserRole.OWNER);
+        // OWNER is additive on top of ADMIN by design: promoting grants OWNER and leaves the ADMIN the
+        // user already held, so the new owner carries both. Demotion is not symmetric — the outgoing
+        // owner is set to ADMIN alone, which the next assertion pins.
+        assertThat(UserApi.getUser(throwaway.getId()).getRoles()).as("The new owner holds OWNER on top of ADMIN")
+                .containsExactlyInAnyOrder(UserRole.OWNER, UserRole.ADMIN);
         assertThat(UserApi.getUser(ownerId).getRoles()).as("The previous owner is demoted to ADMIN")
                 .containsExactly(UserRole.ADMIN);
         assertThat(UserApi.attemptTransferOwnership(ownerId).getStatusCode())
@@ -227,8 +230,8 @@ public class UserTest extends BaseTest {
         UserApi.transferOwnership(ownerId, AuthFlow.login(throwawayLogin()));
         ownershipAway = false;
 
-        assertThat(UserApi.getUser(ownerId).getRoles()).as("The original owner holds only OWNER again")
-                .containsExactly(UserRole.OWNER);
+        assertThat(UserApi.getUser(ownerId).getRoles()).as("The original owner holds OWNER on top of ADMIN again")
+                .containsExactlyInAnyOrder(UserRole.OWNER, UserRole.ADMIN);
         assertThat(UserApi.getUser(throwaway.getId()).getRoles()).as("The interim owner is demoted to ADMIN")
                 .containsExactly(UserRole.ADMIN);
     }
