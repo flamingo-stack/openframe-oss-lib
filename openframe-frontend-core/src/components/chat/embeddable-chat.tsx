@@ -128,11 +128,11 @@ const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 
 // Desktop drawer is this fraction of the viewport width (clamped to the
 // Drawer's own min/max) until the user resizes it. Only the size they choose is
-// stored (under DRAWER_WIDTH_KEY); the default is followed live, so changing
+// stored (see DRAWER_WIDTH_KEY); the default tracks the window, so changing
 // this policy needs no new key.
 const DRAWER_DEFAULT_WIDTH_RATIO = 0.5;
 const DRAWER_WIDTH_KEY = 'mingo-chat-width-v4';
-const DRAWER_DEFAULT_WIDTH_PX = 750; // SSR fallback before the viewport is known
+const DRAWER_DEFAULT_WIDTH_PX = 750; // before the viewport is known (server render)
 /**
  * A panel that owns a dialog list opens WIDE ENOUGH TO SPLIT, so the "Current
  * Chats" rail sits beside the conversation instead of replacing it.
@@ -144,12 +144,14 @@ const DRAWER_DEFAULT_WIDTH_PX = 750; // SSR fallback before the viewport is know
  * viewport, so a genuinely small screen keeps the stacked view.
  */
 const SPLIT_DEFAULT_WIDTH_ALLOWANCE = 16;
-function drawerDefaultWidth(withHistoryRail: boolean): number {
-  if (typeof window === 'undefined') return DRAWER_DEFAULT_WIDTH_PX;
-  const ratioWidth = Math.round(window.innerWidth * DRAWER_DEFAULT_WIDTH_RATIO);
+function drawerDefaultWidth(viewportWidth: number, withHistoryRail: boolean): number {
+  if (viewportWidth <= 0) return DRAWER_DEFAULT_WIDTH_PX;
+  const ratioWidth = Math.round(viewportWidth * DRAWER_DEFAULT_WIDTH_RATIO);
   if (!withHistoryRail) return ratioWidth;
   return Math.max(ratioWidth, SPLIT_MIN_WIDTH + SPLIT_DEFAULT_WIDTH_ALLOWANCE);
 }
+const drawerDefaultWidthWithRail = (viewportWidth: number) => drawerDefaultWidth(viewportWidth, true);
+const drawerDefaultWidthWithoutRail = (viewportWidth: number) => drawerDefaultWidth(viewportWidth, false);
 
 // =============================================================================
 // Types
@@ -2810,7 +2812,7 @@ function EmbeddableChatInner({
           resizable
           minSize={480}
           maxSize={1600}
-          defaultSize={drawerDefaultWidth(historyListMode)}
+          defaultSize={historyListMode ? drawerDefaultWidthWithRail : drawerDefaultWidthWithoutRail}
           storageKey={DRAWER_WIDTH_KEY}
           resizeAriaLabel="Resize chat panel"
           overlayClassName="mingo-chat-overlay"
