@@ -26,16 +26,16 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraConfig.class);
 
-    @Value("${spring.cassandra.local-datacenter}")
+    @Value("${spring.data.cassandra.local-datacenter}")
     private String localDatacenter;
 
-    @Value("${spring.cassandra.keyspace-name}")
+    @Value("${spring.data.cassandra.keyspace-name}")
     private String keyspaceName;
 
-    @Value("${spring.cassandra.contact-points}")
+    @Value("${spring.data.cassandra.contact-points}")
     private String contactPoints;
 
-    @Value("${spring.cassandra.port:9042}")
+    @Value("${spring.data.cassandra.port:9042}")
     private int port;
 
     @Value("${spring.data.cassandra.replication-factor:1}")

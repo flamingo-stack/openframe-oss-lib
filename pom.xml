@@ -31,7 +31,6 @@
         <jjwt.version>0.11.5</jjwt.version>
         <jsonwebtoken.version>0.11.5</jsonwebtoken.version>
         <netflix.dgs.version>12.1.0</netflix.dgs.version>
-        <grpc.version>1.58.0</grpc.version>
         <spring-retry.version>2.0.13</spring-retry.version>
         <!-- DGS 12 needs Jackson3JsonProvider (json-path 3); the Spring Boot 4.1 BOM still manages 2.10 -->
         <json-path.version>3.0.0</json-path.version>
@@ -305,11 +304,6 @@
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-jackson</artifactId>
                 <version>${jsonwebtoken.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.grpc</groupId>
-                <artifactId>grpc-netty</artifactId>
-                <version>${grpc.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
