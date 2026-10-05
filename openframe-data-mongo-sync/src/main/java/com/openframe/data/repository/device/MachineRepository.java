@@ -35,6 +35,8 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
 
     List<Machine> findByMachineIdInAndStatus(Collection<String> machineIds, DeviceStatus status);
 
+    List<Machine> findByMachineIdInAndStatusAndLastSeenAfter(Collection<String> machineIds, DeviceStatus status, Instant lastSeenAfter);
+
     List<Machine> findByMachineIdInAndStatusIn(Collection<String> machineIds, Collection<DeviceStatus> statuses);
 
     List<Machine> findByStatusIn(Collection<DeviceStatus> statuses);

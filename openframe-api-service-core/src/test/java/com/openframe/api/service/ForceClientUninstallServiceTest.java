@@ -24,8 +24,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -74,7 +72,7 @@ class ForceClientUninstallServiceTest {
     }
 
     @Test
-    void process_flagOn_dispatchedThroughEngineStatusUntouched() {
+    void process_flagOn_dispatchedThroughEngineAndMarkedPendingDeletion() {
         // setup
         when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UNINSTALL)).thenReturn(true);
 
@@ -84,23 +82,9 @@ class ForceClientUninstallServiceTest {
         // verifications
         verify(deliveryDispatcher).dispatch(seedCaptor.capture());
         assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.ONLINE);
-        verify(machineRepository, never()).save(any());
+        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
+        verify(machineRepository).save(machine);
         verifyNoInteractions(clientUninstallNatsPublisher);
-        assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.PROCESSED);
-    }
-
-    @Test
-    void process_flagOnUninstallAlreadyAcknowledged_notDispatchedAgain() {
-        // setup
-        machine.setStatus(DeviceStatus.PENDING_DELETION);
-        when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UNINSTALL)).thenReturn(true);
-
-        // execution
-        ForceClientUninstallResponse response = service.process(request);
-
-        // verifications
-        verifyNoInteractions(deliveryDispatcher, clientUninstallNatsPublisher);
         assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.PROCESSED);
     }
 }

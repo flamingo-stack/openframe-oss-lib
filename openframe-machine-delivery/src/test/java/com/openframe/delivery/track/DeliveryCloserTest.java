@@ -7,16 +7,12 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryTestPolicies;
-import com.openframe.delivery.event.DeliveryFailedEvent;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 
@@ -38,9 +34,6 @@ class DeliveryCloserTest {
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliveryMetrics metrics;
-    @Mock private ApplicationEventPublisher events;
-
-    @Captor private ArgumentCaptor<DeliveryFailedEvent> failedCaptor;
 
     private DeliveryCloser closer;
 
@@ -63,11 +56,11 @@ class DeliveryCloserTest {
                 .dispatchedAt(dispatchedAt)
                 .build();
         DeliveryProperties properties = DeliveryTestPolicies.properties();
-        closer = new DeliveryCloser(repository, events, properties, metrics);
+        closer = new DeliveryCloser(repository, properties, metrics);
     }
 
     @Test
-    void fail_rowStillUnacked_rowFailedMetricCountedEventPublished() {
+    void fail_rowStillUnacked_rowFailedMetricCounted() {
         // setup
         Instant expiresAt = now.plusSeconds(TTL);
         when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, DeliveryFailure.EXHAUSTED, now, expiresAt)).thenReturn(true);
@@ -81,12 +74,6 @@ class DeliveryCloserTest {
         assertThat(delivery.getFinishedAt()).isEqualTo(now);
         assertThat(delivery.getExpiresAt()).isEqualTo(expiresAt);
         verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.EXHAUSTED);
-        verify(events).publishEvent(failedCaptor.capture());
-        DeliveryFailedEvent event = failedCaptor.getValue();
-        assertThat(event.getType()).isEqualTo(DeliveryType.CLIENT_UNINSTALL);
-        assertThat(event.getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(event.getDispatchId()).isEqualTo(DISPATCH_ID);
-        assertThat(event.getFailure()).isEqualTo(DeliveryFailure.EXHAUSTED);
     }
 
     @Test
@@ -100,11 +87,11 @@ class DeliveryCloserTest {
 
         // verifications
         assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.PENDING);
-        verifyNoInteractions(metrics, events);
+        verifyNoInteractions(metrics);
     }
 
     @Test
-    void failReported_openRowOfThisDispatch_rowFailedMetricCountedEventCarriesTheError() {
+    void failReported_openRowOfThisDispatch_rowFailedMetricCounted() {
         // setup
         when(repository.markFailed(DELIVERY_ID, DISPATCH_ID, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, ERROR, now, now.plusSeconds(TTL))).thenReturn(true);
 
@@ -113,11 +100,6 @@ class DeliveryCloserTest {
 
         // verifications
         verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.AGENT_ERROR);
-        verify(events).publishEvent(failedCaptor.capture());
-        DeliveryFailedEvent event = failedCaptor.getValue();
-        assertThat(event.getFailure()).isEqualTo(DeliveryFailure.AGENT_ERROR);
-        assertThat(event.getError()).isEqualTo(ERROR);
-        assertThat(event.getMachineId()).isEqualTo(MACHINE_ID);
     }
 
     @Test
@@ -129,7 +111,7 @@ class DeliveryCloserTest {
         closer.failReported(DeliveryType.CLIENT_UNINSTALL, TARGET_ID, MACHINE_ID, DISPATCH_ID, ERROR, now);
 
         // verifications
-        verifyNoInteractions(metrics, events);
+        verifyNoInteractions(metrics);
     }
 
     @Test
@@ -143,6 +125,6 @@ class DeliveryCloserTest {
 
         // verifications
         verify(repository).markCancelled(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, now, expiresAt);
-        verifyNoInteractions(metrics, events);
+        verifyNoInteractions(metrics);
     }
 }

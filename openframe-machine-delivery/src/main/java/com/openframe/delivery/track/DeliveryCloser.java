@@ -7,11 +7,9 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
-import com.openframe.delivery.event.DeliveryFailedEvent;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -23,7 +21,6 @@ import java.util.Set;
 public class DeliveryCloser {
 
     private final MachineDeliveryRepository repository;
-    private final ApplicationEventPublisher events;
     private final DeliveryProperties properties;
     private final DeliveryMetrics metrics;
 
@@ -44,8 +41,6 @@ public class DeliveryCloser {
         delivery.setExpiresAt(expiresAt);
 
         metrics.recordFailed(type, failure);
-        events.publishEvent(new DeliveryFailedEvent(this, type, delivery.getTargetId(), delivery.getMachineId(),
-                delivery.getDispatchId(), failure, delivery.getError()));
         log.warn("Delivery FAILED: type={} targetId={} machineId={} attempts={} reason={}",
                 type, delivery.getTargetId(), delivery.getMachineId(), delivery.getAttempts(), failure);
     }
@@ -59,7 +54,6 @@ public class DeliveryCloser {
             return;
         }
         metrics.recordFailed(type, DeliveryFailure.AGENT_ERROR);
-        events.publishEvent(new DeliveryFailedEvent(this, type, targetId, machineId, dispatchId, DeliveryFailure.AGENT_ERROR, error));
         log.warn("Delivery FAILED by agent: type={} targetId={} machineId={} dispatchId={} error={}",
                 type, targetId, machineId, dispatchId, error);
     }

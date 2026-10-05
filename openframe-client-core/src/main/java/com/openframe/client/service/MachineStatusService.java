@@ -38,31 +38,6 @@ public class MachineStatusService {
         update(machineId, ONLINE, eventTimestamp);
     }
 
-    // the agent holds its uninstall command: from here on status events are ignored until the machine is gone
-    public void markDeletionAcknowledged(String machineId) {
-        machineRepository.findByMachineId(machineId).ifPresent(machine -> {
-            if (isDeletionInProgress(machine)) {
-                return;
-            }
-            machine.setStatus(PENDING_DELETION);
-            machineRepository.save(machine);
-            log.info("Machine {} marked PENDING_DELETION: uninstall acknowledged by the agent", machineId);
-        });
-    }
-
-    // the uninstall did not happen: hand the machine back as OFFLINE, the next heartbeat sets ONLINE again
-    public boolean cancelPendingDeletion(String machineId) {
-        return machineRepository.findByMachineId(machineId)
-                .filter(machine -> machine.getStatus() == PENDING_DELETION)
-                .map(machine -> {
-                    machine.setStatus(OFFLINE);
-                    machineRepository.save(machine);
-                    log.warn("Machine {} returned to OFFLINE: pending deletion cancelled", machineId);
-                    return true;
-                })
-                .orElse(false);
-    }
-
     private void update(String machineId, DeviceStatus newStatus, Instant eventTimestamp) {
         log.debug("Received status update event to {} for machineId={} eventTimestamp={}", newStatus, machineId, eventTimestamp);
 
@@ -70,6 +45,11 @@ public class MachineStatusService {
                 .orElseThrow(() -> new MachineNotFoundException(machineId));
 
         if (isDeletionInProgress(machine)) {
+            // the status is frozen until the agent is gone, but a fresh lastSeen still tells the delivery sweep the machine is reachable
+            if (machine.getStatus() == PENDING_DELETION && isEventNewer(eventTimestamp, machine.getLastSeen())) {
+                touchLastSeen(machine, eventTimestamp);
+                return;
+            }
             log.debug("Ignoring {} event for machineId={} in status {}", newStatus, machineId, machine.getStatus());
             return;
         }

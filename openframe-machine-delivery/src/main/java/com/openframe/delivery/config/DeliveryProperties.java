@@ -60,6 +60,8 @@ public class DeliveryProperties {
         @NotNull
         @Positive
         private Integer batchSize;
+        // a PENDING_DELETION machine keeps its status until the agent is gone; it counts as online while its heartbeat is this fresh
+        private long onlineThresholdSeconds = 130;
     }
 
     @Getter
