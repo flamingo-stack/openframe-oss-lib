@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
+import { usePathname } from '../embed-shims/next-navigation';
 import { useSelfFetch } from '../hooks/use-self-fetch';
 import type { Announcement, AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
 import { ANNOUNCEMENT_CTA_DEFAULTS } from '../types/announcement';
@@ -70,7 +71,6 @@ export function AnnouncementBar({
   initialAnnouncement,
   previewMode = false,
   dismissible = true,
-  pathname,
   className,
 }: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
@@ -79,6 +79,11 @@ export function AnnouncementBar({
   // the fallback — fine, cookies are domain-scoped and an embed domain
   // serves one platform's announcements.
   const platform = getAppType();
+
+  // The path the bar is on, from the host's router (the navigation shim: Next's
+  // `usePathname` on a Next host, the embedder's registered router elsewhere).
+  // Read HERE so every host gets `excluded_paths` with no wiring of its own.
+  const pathname = usePathname();
 
   // Optional endpoint runtime: no provider → no URL → fetching disabled.
   const endpoints = useEndpointsRuntime();
@@ -143,7 +148,7 @@ export function AnnouncementBar({
   // Preview always mirrors the draft directly (storage is not consulted there).
   // A page that shows the news itself (a hero's news pill) is listed in the
   // announcement's `excluded_paths` (path patterns); the bar stays collapsed there.
-  const excludedHere = pathname != null && pathMatchesAny(pathname, announcement?.excluded_paths);
+  const excludedHere = pathMatchesAny(pathname, announcement?.excluded_paths);
   const expanded = previewMode
     ? announcement != null
     : announcement != null && expandedState && !dismissed && !excludedHere;
