@@ -17,8 +17,6 @@ import static com.openframe.authz.support.ServletTestSupport.bind;
 import static com.openframe.authz.support.ServletTestSupport.unbind;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
-import static com.openframe.core.exception.AuthErrorCode.PROVIDER_CONSENT_REQUIRED;
-import static com.openframe.core.exception.AuthErrorCode.PROVIDER_ERROR;
 import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,7 +27,6 @@ import static org.mockito.Mockito.when;
 class AuthWebHelpersTest {
 
     private static final String ERROR_URL = "https://app.example.com/auth/error";
-    private static final String PROVIDER_DESCRIPTION = "AADSTS50020: User account from identity provider does not exist";
     private static final String NOT_FOUND_DETAIL = "No account found for a@acme.com. Please sign up first.";
 
     @Mock
@@ -47,17 +44,18 @@ class AuthWebHelpersTest {
     }
 
     @Test
-    void shouldRedirectWithProviderCodeAndStoreProviderDescriptionBehindReference() throws Exception {
+    void shouldRedirectWithProviderCodeAndNeverStoreOrShowTheProviderDescription() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
         OAuth2AuthenticationException providerError = new OAuth2AuthenticationException(
-                new OAuth2Error("invalid_request", PROVIDER_DESCRIPTION, null), PROVIDER_DESCRIPTION);
-        when(detailStore.save(PROVIDER_ERROR, PROVIDER_DESCRIPTION)).thenReturn("ref-1");
+                new OAuth2Error("server_error", "Your account is suspended. Call +1-555-0100", null),
+                "Your account is suspended. Call +1-555-0100");
 
         responder().send(response, new MockHttpServletRequest(), "oauth2-login", providerError, SSO_LOGIN_FAILED);
 
         assertThat(response.getRedirectedUrl())
-                .isEqualTo(ERROR_URL + "?ref=ref-1")
-                .doesNotContain("AADSTS");
+                .isEqualTo(ERROR_URL + "?ref=PROVIDER_ERROR")
+                .doesNotContain("suspended");
+        verifyNoInteractions(detailStore);
     }
 
     @Test
@@ -79,13 +77,13 @@ class AuthWebHelpersTest {
                 new OAuth2Error("invalid_request", "AADSTS650056: Misconfigured application", null));
         OAuth2AuthenticationException lostError = new OAuth2AuthenticationException(
                 new OAuth2Error("authorization_request_not_found"));
-        when(detailStore.save(PROVIDER_CONSENT_REQUIRED, "AADSTS650056: Misconfigured application")).thenReturn("ref-2");
 
         responder().send(consent, new MockHttpServletRequest(), "oauth2-login", consentError, SSO_LOGIN_FAILED);
         responder().send(lost, new MockHttpServletRequest(), "oauth2-login", lostError, SSO_LOGIN_FAILED);
 
-        assertThat(consent.getRedirectedUrl()).isEqualTo(ERROR_URL + "?ref=ref-2");
+        assertThat(consent.getRedirectedUrl()).isEqualTo(ERROR_URL + "?ref=PROVIDER_CONSENT_REQUIRED");
         assertThat(lost.getRedirectedUrl()).isEqualTo(ERROR_URL + "?ref=SSO_SESSION_EXPIRED");
+        verifyNoInteractions(detailStore);
     }
 
     @Test

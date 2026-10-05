@@ -25,10 +25,11 @@ import static org.springframework.util.StringUtils.hasText;
  * Single exit point for auth failures that end in a redirect to the error page.
  * <p>
  * The redirect carries one reference: the {@link AuthErrorCode} name, or, when the failure has a dynamic
- * part worth showing (the provider's own {@code error_description}, a message built around an email), the
- * short-lived key that text was stored under. The page resolves either through one query. Free text never
- * goes into the URL, so the error page cannot be made to show words chosen by whoever crafted a link. The
- * classification exists only for the log line, so provider-side failures can be counted and grouped.
+ * part worth showing (a message built around an email), the short-lived key that text was stored under. The
+ * page resolves either through one query. Only text this code composed is ever stored: the provider's
+ * {@code error_description} arrives as query parameters on our own callback, so anyone with a login in
+ * progress can put any sentence there, and it is logged, never shown. The classification exists only for
+ * the log line, so provider-side failures can be counted and grouped.
  */
 @Slf4j
 @Component
@@ -83,9 +84,6 @@ public class AuthErrorResponder {
     private String resolveDetail(Exception e) {
         if (e instanceof AuthFlowException flowException) {
             return flowException.getDetail();
-        }
-        if (e instanceof OAuth2AuthenticationException oauthException) {
-            return descriptionOf(oauthException.getError());
         }
         return "";
     }
