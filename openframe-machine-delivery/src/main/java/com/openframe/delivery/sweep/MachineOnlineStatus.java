@@ -2,6 +2,7 @@ package com.openframe.delivery.sweep;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,7 +25,7 @@ public class MachineOnlineStatus {
     private final MachineRepository machineRepository;
 
     public Set<String> online(Set<String> machineIds) {
-        List<Machine> online = machineRepository.findByMachineIdInAndStatus(machineIds, DeviceStatus.ONLINE);
+        List<Machine> online = machineRepository.findByMachineIdInAndTelemetryStatus(machineIds, TelemetryStatus.ONLINE);
         return ids(online);
     }
 

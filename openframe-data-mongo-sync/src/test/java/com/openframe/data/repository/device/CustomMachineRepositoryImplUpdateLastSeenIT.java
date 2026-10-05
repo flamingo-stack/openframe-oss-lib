@@ -3,6 +3,7 @@ package com.openframe.data.repository.device;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.MachineIntegrationTestApplication;
@@ -21,7 +22,7 @@ import java.time.Instant;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration tests for {@link CustomMachineRepositoryImpl#updateLastSeen} against a real MongoDB.
+ * Integration tests for {@link CustomMachineRepositoryImpl#updatePresence} against a real MongoDB.
  *
  * <p>The method deliberately bypasses {@code save}/{@code saveAll} so the Pinot publishing aspect
  * does not fire on heartbeats. That is only safe as long as it touches nothing but {@code lastSeen} —
@@ -70,7 +71,7 @@ class CustomMachineRepositoryImplUpdateLastSeenIT extends BaseMongoIntegrationTe
     void updatesOnlyLastSeenField() {
         save(MACHINE, DeviceStatus.ONLINE, SEEN);
 
-        repository.updateLastSeen(MACHINE, LATER);
+        repository.updatePresence(MACHINE, TelemetryStatus.ONLINE, LATER);
 
         Machine stored = reload(MACHINE);
         assertThat(stored.getLastSeen()).isEqualTo(LATER);
@@ -87,7 +88,7 @@ class CustomMachineRepositoryImplUpdateLastSeenIT extends BaseMongoIntegrationTe
     void unknownMachineId_changesNothing() {
         save(MACHINE, DeviceStatus.ONLINE, SEEN);
 
-        repository.updateLastSeen("does-not-exist", LATER);
+        repository.updatePresence("does-not-exist", TelemetryStatus.ONLINE, LATER);
 
         assertThat(mongoTemplate.count(new Query(), Machine.class)).isEqualTo(1);
         assertThat(reload(MACHINE).getLastSeen()).isEqualTo(SEEN);
@@ -99,7 +100,7 @@ class CustomMachineRepositoryImplUpdateLastSeenIT extends BaseMongoIntegrationTe
         save(MACHINE, DeviceStatus.ONLINE, SEEN);
         save(OTHER_MACHINE, DeviceStatus.OFFLINE, SEEN);
 
-        repository.updateLastSeen(MACHINE, LATER);
+        repository.updatePresence(MACHINE, TelemetryStatus.ONLINE, LATER);
 
         assertThat(reload(MACHINE).getLastSeen()).isEqualTo(LATER);
         assertThat(reload(OTHER_MACHINE).getLastSeen()).isEqualTo(SEEN);

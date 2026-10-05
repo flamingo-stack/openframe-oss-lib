@@ -2,6 +2,7 @@ package com.openframe.delivery.sweep;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +35,7 @@ class MachineOnlineStatusTest {
         // setup
         Set<String> asked = Set.of(ONLINE_ID, OFFLINE_ID);
         List<Machine> found = List.of(machine(ONLINE_ID));
-        when(machineRepository.findByMachineIdInAndStatus(asked, DeviceStatus.ONLINE)).thenReturn(found);
+        when(machineRepository.findByMachineIdInAndTelemetryStatus(asked, TelemetryStatus.ONLINE)).thenReturn(found);
 
         // execution
         Set<String> online = status.online(asked);
