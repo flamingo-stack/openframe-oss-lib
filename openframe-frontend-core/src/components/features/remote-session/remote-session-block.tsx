@@ -10,9 +10,9 @@ import {
   REMOTE_SESSION_DRAG_HANDLE_CLASS,
   RemoteSessionDragger,
   RemoteSessionOrgLogo,
-  RemoteSessionRecordingTag,
+  RemoteSessionStatusRow,
 } from './remote-session-parts';
-import type { RemoteSessionDragHandlers, RemoteSessionParty } from './types';
+import type { RemoteSessionDragHandlers, RemoteSessionParty, RemoteSessionViewer } from './types';
 
 export interface RemoteSessionBlockFrameProps {
   /** The summary or the chat panel. */
@@ -74,6 +74,8 @@ export interface RemoteSessionSummaryProps {
   /** Elapsed session time, e.g. from `useRemoteSessionTimer`. */
   elapsed: string;
   showRecordingTag?: boolean;
+  /** Everyone in the session while colleagues watch it, the host included; hidden when empty. */
+  viewers?: RemoteSessionViewer[];
   onOpenChat: () => void;
   onEndSession: () => void;
   /** Makes the header row and the dragger move the window. */
@@ -85,6 +87,7 @@ export function RemoteSessionSummary({
   party,
   elapsed,
   showRecordingTag = false,
+  viewers,
   onOpenChat,
   onEndSession,
   dragHandlers,
@@ -118,7 +121,7 @@ export function RemoteSessionSummary({
           <p className="w-full truncate text-ods-text-secondary text-h4">{party.organizationName}</p>
         </div>
       </div>
-      {showRecordingTag && <RemoteSessionRecordingTag />}
+      <RemoteSessionStatusRow showRecordingTag={showRecordingTag} viewers={viewers} />
       <div className="flex w-full items-stretch gap-[var(--spacing-system-m)]">
         <Button
           variant="outline"
