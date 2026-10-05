@@ -3,6 +3,7 @@ package com.openframe.api.service.ticket;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.core.exception.ForbiddenException;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -85,7 +86,7 @@ class TicketServiceArchiveResolvedTest {
         AuthPrincipal agent = principal(ActorType.AGENT);
 
         assertThatThrownBy(() -> service.archiveResolvedTickets(agent, filter))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ForbiddenException.class);
 
         verify(ticketLifecycleService, never()).archiveResolvedTickets(any(), any());
         verify(listener, never()).onTicketsArchived(any(), any());
