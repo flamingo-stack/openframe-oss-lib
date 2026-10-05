@@ -57,9 +57,22 @@ describe('AppLayout side panel', () => {
     setLayoutWidth(1224);
     renderLayout();
     expect(screen.getByText('panel docked 296')).toBeInTheDocument();
+    // The content area the `content-*` variants and the content tokens read:
+    // the measured container, and the scope carrying the tokens inside it.
     expect(screen.getByRole('main')).toHaveClass('ods-content-area');
+    expect(screen.getByRole('main')).toContainHTML('class="ods-content-scope"');
     expect(within(screen.getByRole('main')).getByRole('heading', { name: 'Page' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mingo AI' })).not.toBeInTheDocument();
+  });
+
+  it('leaves <main> a plain viewport-laid page without a side panel', () => {
+    render(
+      <AppLayout sidebarConfig={{ items: [], onNavigate: () => undefined }} headerProps={{}} mobileBurgerMenuProps={{}}>
+        <h1>Page</h1>
+      </AppLayout>,
+    );
+    expect(screen.getByRole('main')).not.toHaveClass('ods-content-area');
+    expect(screen.getByRole('main')).not.toContainHTML('ods-content-scope');
   });
 
   it('restores the stored width', () => {
