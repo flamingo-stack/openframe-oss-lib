@@ -1,7 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FocusEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent, type PointerEvent } from 'react';
 import { usePrefersReducedMotionState } from './ui/use-prefers-reduced-motion';
+
+/** Focus this soon after a pointer went down came from that click, not from the keyboard. */
+const POINTER_FOCUS_WINDOW_MS = 800;
 
 export interface UseScenarioPlayerOptions {
   /** How many scenarios (tabs) the stage cycles through. */
@@ -35,6 +38,7 @@ export interface UseScenarioPlayerOptions {
 
 /** Spread on the stage's container: keyboard focus inside it (and, when asked, a mouse over it) holds the clock. */
 export interface ScenarioHoldProps {
+  onPointerDownCapture: (event: PointerEvent<HTMLElement>) => void;
   onPointerEnter: (event: PointerEvent<HTMLElement>) => void;
   onPointerLeave: (event: PointerEvent<HTMLElement>) => void;
   onFocusCapture: (event: FocusEvent<HTMLElement>) => void;
@@ -77,7 +81,11 @@ export interface UseScenarioPlayerResult {
  *     it was when they leave;
  *   - `setPaused` is the visitor's stop/start control;
  *   - a visitor's own choice (`go`, `setStep`) restarts the clock from there
- *     (and un-pauses it); the rotation simply carries on afterwards.
+ *     and ALWAYS plays out: it un-pauses, drops a focus hold, and runs even if
+ *     `enabled` is false (they are looking at it: they just clicked it). The
+ *     rotation carries on afterwards under the usual rules;
+ *   - focus that a click or tap put there is not a keyboard reader: it never
+ *     holds, whatever the browser reports as `:focus-visible`.
  */
 export function useScenarioPlayer({
   scenarioCount,
@@ -97,6 +105,10 @@ export function useScenarioPlayer({
   const [paused, setPausedState] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  // The visitor chose what is playing: it plays to the end of the scenario even while `enabled` is false.
+  const [forced, setForced] = useState(false);
+  /** When a pointer last went down inside the stage: focus that follows it came from that click. */
+  const pointerDownAt = useRef(0);
   const [tabHidden, setTabHidden] = useState(false);
   const lastStep = typeof lastStepOption === 'function' ? lastStepOption(scenario) : lastStepOption;
 
@@ -111,7 +123,7 @@ export function useScenarioPlayer({
   }, []);
 
   const playing =
-    enabled && !paused && !hovered && !focused && !tabHidden && reducedState === false && scenarioCount > 0;
+    (enabled || forced) && !paused && !hovered && !focused && !tabHidden && reducedState === false && scenarioCount > 0;
 
   useEffect(() => {
     if (!playing) return undefined;
@@ -121,6 +133,7 @@ export function useScenarioPlayer({
         if (!atEnd) {
           setRawStep(current => Math.min(current, lastStep) + 1);
         } else {
+          setForced(false);
           setScenario(current => (current + 1) % scenarioCount);
           setRawStep(0);
         }
@@ -136,6 +149,8 @@ export function useScenarioPlayer({
     (next: number) => {
       setRawStep(Math.max(0, Math.min(lastStep, next)));
       setPausedState(false);
+      setFocused(false);
+      setForced(true);
     },
     [lastStep],
   );
@@ -144,10 +159,16 @@ export function useScenarioPlayer({
     setScenario(next);
     setRawStep(0);
     setPausedState(false);
+    setFocused(false);
+    setForced(true);
   }, []);
 
   const holdProps = useMemo<ScenarioHoldProps>(
     () => ({
+      onPointerDownCapture: () => {
+        pointerDownAt.current = Date.now();
+        setFocused(false);
+      },
       // A mouse only: a touch has no "leave", so it would hold forever.
       onPointerEnter: event => {
         if (holdOnHover && event.pointerType === 'mouse') setHovered(true);
@@ -155,9 +176,10 @@ export function useScenarioPlayer({
       onPointerLeave: event => {
         if (event.pointerType === 'mouse') setHovered(false);
       },
-      // Keyboard focus only: a click's focus is not someone reading with the keyboard.
+      // Keyboard focus only: focus that a click or tap just put there is not someone reading with the keyboard.
       onFocusCapture: event => {
-        if (event.target.matches(':focus-visible')) setFocused(true);
+        const fromPointer = Date.now() - pointerDownAt.current < POINTER_FOCUS_WINDOW_MS;
+        if (!fromPointer && event.target.matches(':focus-visible')) setFocused(true);
       },
       onBlurCapture: event => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);

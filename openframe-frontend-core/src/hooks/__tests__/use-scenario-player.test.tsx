@@ -213,6 +213,40 @@ describe('useScenarioPlayer', () => {
     expect(result.current.step).toBe(1);
   });
 
+  it("plays a visitor's click out even when focus holds it or it is not enabled", () => {
+    stubReducedMotion(false);
+    const { result } = renderHook(({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled }), {
+      initialProps: { enabled: false },
+    });
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(result.current.step).toBe(0);
+
+    // A click on a step: the pointer goes down, the button takes focus, the step is set.
+    const inside = document.createElement('button');
+    const container = document.createElement('div');
+    container.append(inside);
+    inside.matches = () => true;
+    act(() => {
+      result.current.holdProps.onPointerDownCapture({} as never);
+      result.current.holdProps.onFocusCapture({ target: inside, currentTarget: container } as never);
+      result.current.setStep(5);
+    });
+    beats(3);
+    expect(result.current).toMatchObject({ scenario: 0, step: 8 });
+
+    // Once it has played out, the usual rule is back: not enabled, no rotation.
+    act(() => {
+      vi.advanceTimersByTime(4200);
+    });
+    expect(result.current).toMatchObject({ scenario: 1, step: 0 });
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(result.current).toMatchObject({ scenario: 1, step: 0 });
+  });
+
   it('parks on the last step under reduced motion and never advances', () => {
     stubReducedMotion(true);
     const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
