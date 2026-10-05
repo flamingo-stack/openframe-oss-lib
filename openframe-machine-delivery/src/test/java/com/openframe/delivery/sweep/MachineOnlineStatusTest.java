@@ -2,6 +2,7 @@ package com.openframe.delivery.sweep;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,9 +30,10 @@ class MachineOnlineStatusTest {
     @InjectMocks private MachineOnlineStatus status;
 
     @Test
-    void online_onlineMachines_returned() {
+    void online_machinesTalkingToUs_returned() {
         // setup
-        when(machineRepository.findByMachineIdInAndStatus(ALL, DeviceStatus.ONLINE)).thenReturn(List.of(machine(ONLINE_ID, DeviceStatus.ONLINE)));
+        when(machineRepository.findByMachineIdInAndTelemetryStatus(ALL, TelemetryStatus.ONLINE))
+                .thenReturn(List.of(machine(ONLINE_ID, DeviceStatus.PENDING_DELETION)));
 
         // execution
         Set<String> online = status.online(ALL);
