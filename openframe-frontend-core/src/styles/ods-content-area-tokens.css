@@ -1,0 +1,27 @@
+/* GENERATED from ods-responsive-tokens.css. Do not edit: `npm run generate:content-area`. */
+
+@container ods-content (max-width: 719.98px) {
+  .ods-content-scope {
+    --device-type: mobile;
+    --device-screen-width: 26.875rem;
+    --spacing-system-xs: 0.25rem;
+    --spacing-system-s: 0.5rem;
+    --spacing-system-m: 0.75rem;
+    --spacing-system-l: 1rem;
+    --spacing-system-xl: 1.5rem;
+    --spacing-system-xxl: 2.5rem;
+    --font-size-h1-title: 2.5rem;
+    --font-size-h2-sub-title: 1.5rem;
+    --font-size-h3-body: 0.875rem;
+    --font-size-h4-body: 0.875rem;
+    --font-size-h5-caption: 0.75rem;
+    --font-size-h6-caption: 0.75rem;
+    --font-line-space-h1-main-title: 2.5rem;
+    --font-line-space-h2-sub-title: 2rem;
+    --font-line-space-h3-body: 1.25rem;
+    --font-line-space-h4-body: 1.25rem;
+    --font-line-space-h5-caption: 1rem;
+    --font-line-space-h6-caption: 1rem;
+    --icon-size-icon-size: 1rem;
+  }
+}

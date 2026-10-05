@@ -1,15 +1,13 @@
 'use client';
 
 import { createContext, useContext } from 'react';
+import { LAYOUT_STEPS } from '../../styles/layout-steps';
 import { useLgUp, useMdUp } from './use-media-query';
 
 export type ContentBreakpoint = 'mobile' | 'tablet' | 'desktop';
 
-/**
- * Content-area steps, in px of the area's own width. They match the
- * `content-md:` / `content-lg:` Tailwind variants and `ods-content-area.css`.
- */
-export const CONTENT_BREAKPOINTS = { md: 720, lg: 1024 } as const;
+/** Content-area steps, in px of the area's own width. */
+export const CONTENT_BREAKPOINTS = { md: LAYOUT_STEPS.md.content, lg: LAYOUT_STEPS.lg.content } as const;
 
 /**
  * Width of the enclosing content area (`AppLayout` with a side panel provides

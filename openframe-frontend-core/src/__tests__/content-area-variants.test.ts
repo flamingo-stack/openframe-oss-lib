@@ -12,6 +12,7 @@ import postcss, { type AtRule, type Root, type Rule } from 'postcss';
 import tailwindcss from 'tailwindcss';
 import { describe, expect, it } from 'vitest';
 import config from '../../tailwind.config';
+import { below, LAYOUT_STEPS } from '../styles/layout-steps';
 
 /** Utilities generated for `classes` (plus the config's safelist). */
 async function compile(classes: string) {
@@ -52,30 +53,26 @@ function chainsOf(root: Root, className: string) {
 }
 
 describe('content-* variants', () => {
-  it.each([
-    ['sm', 640, 640],
-    ['md', 720, 800],
-    ['lg', 1024, 1280],
-    ['xl', 1216, 1440],
-    ['2xl', 1312, 1536],
-  ])('content-%s: %ipx of content inside a content area, %ipx of viewport outside', async (step, content, viewport) => {
-    const root = await compile(`content-${step}:grid`);
-    const cls = `.content-${step}\\:grid`;
-    expect(rulesOf(root, `content-${step}:grid`)).toEqual([
-      `@container ods-content (min-width: ${content}px) | ${cls}`,
-      `@media (min-width: ${viewport}px) | ${cls}${OUTSIDE}`,
-    ]);
-  });
+  it.each(Object.entries(LAYOUT_STEPS).map(([step, { content, viewport }]) => [step, content, viewport] as const))(
+    'content-%s: %ipx of content inside a content area, %ipx of viewport outside',
+    async (step, content, viewport) => {
+      const root = await compile(`content-${step}:grid`);
+      const cls = `.content-${step}\\:grid`;
+      expect(rulesOf(root, `content-${step}:grid`)).toEqual([
+        `@container ods-content (min-width: ${content}px) | ${cls}`,
+        `@media (min-width: ${viewport}px) | ${cls}${OUTSIDE}`,
+      ]);
+    },
+  );
 
-  it.each([
-    ['md', 720, 800],
-    ['lg', 1024, 1280],
-  ])('content-max-%s: under %ipx of content, under %ipx of viewport outside', async (step, content, viewport) => {
+  it.each(
+    (['md', 'lg'] as const).map(step => [step, LAYOUT_STEPS[step].content, LAYOUT_STEPS[step].viewport] as const),
+  )('content-max-%s: under %ipx of content, under %ipx of viewport outside', async (step, content, viewport) => {
     const root = await compile(`content-max-${step}:grid`);
     const cls = `.content-max-${step}\\:grid`;
     expect(rulesOf(root, `content-max-${step}:grid`)).toEqual([
-      `@container ods-content (max-width: ${content - 0.02}px) | ${cls}`,
-      `@media (max-width: ${viewport - 0.02}px) | ${cls}${OUTSIDE}`,
+      `@container ods-content (max-width: ${below(content)}px) | ${cls}`,
+      `@media (max-width: ${below(viewport)}px) | ${cls}${OUTSIDE}`,
     ]);
   });
 
@@ -121,6 +118,8 @@ describe('content-area tokens', () => {
   const styles = resolve(__dirname, '../styles');
   const responsive = postcss.parse(readFileSync(resolve(styles, 'ods-responsive-tokens.css'), 'utf8'));
   const contentArea = postcss.parse(readFileSync(resolve(styles, 'ods-content-area.css'), 'utf8'));
+  const mobile = declarations(responsive, ':root');
+  const stepQueries = [LAYOUT_STEPS.md, LAYOUT_STEPS.lg].map(step => `@media (min-width: ${step.viewport}px)`);
 
   it('makes <main> the ods-content container the variants query', () => {
     const decls: string[] = [];
@@ -131,29 +130,35 @@ describe('content-area tokens', () => {
   });
 
   it('restates every viewport token on .ods-viewport-layer, for window chrome inside a content area', () => {
-    for (const atRule of [undefined, '@media (min-width: 800px)', '@media (min-width: 1280px)']) {
+    for (const atRule of [undefined, ...stepQueries]) {
       const onRoot = declarations(responsive, ':root', atRule);
       expect(onRoot.size).toBeGreaterThan(0);
       expect(declarations(responsive, '.ods-viewport-layer', atRule)).toEqual(onRoot);
     }
   });
 
-  it('re-declares, under 720px of content, the mobile value of every token the viewport steps change', () => {
-    const mobile = declarations(responsive, ':root');
+  // The file is this test's snapshot: `npm run generate:content-area` rewrites it.
+  it('ods-content-area-tokens.css re-declares the mobile value of every token the viewport steps change', async () => {
     // Fixed tokens (`*-f`, `xxs`, ...) are re-stated by the steps unchanged.
     const changedAbove = new Set(
-      [
-        ...declarations(responsive, ':root', '@media (min-width: 800px)'),
-        ...declarations(responsive, ':root', '@media (min-width: 1280px)'),
-      ]
+      stepQueries
+        .flatMap(atRule => [...declarations(responsive, ':root', atRule)])
         .filter(([name, value]) => mobile.get(name) !== value)
         .map(([name]) => name),
     );
-    expect(changedAbove.size).toBeGreaterThan(0);
-    const scope = declarations(contentArea, '.ods-content-scope', '@container ods-content (max-width: 719.98px)');
+    const tokens = [...mobile].filter(([name]) => changedAbove.has(name));
+    expect(tokens.length).toBeGreaterThan(0);
 
-    const expected = Object.fromEntries([...changedAbove].map(name => [name, mobile.get(name)]));
-    const actual = Object.fromEntries([...changedAbove].map(name => [name, scope.get(name)]));
-    expect(actual).toEqual(expected);
+    const css = [
+      '/* GENERATED from ods-responsive-tokens.css. Do not edit: `npm run generate:content-area`. */',
+      '',
+      `@container ods-content (max-width: ${below(LAYOUT_STEPS.md.content)}px) {`,
+      '  .ods-content-scope {',
+      ...tokens.map(([name, value]) => `    ${name}: ${value};`),
+      '  }',
+      '}',
+      '',
+    ].join('\n');
+    await expect(css).toMatchFileSnapshot(resolve(styles, 'ods-content-area-tokens.css'));
   });
 });

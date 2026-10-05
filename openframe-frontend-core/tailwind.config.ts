@@ -2,6 +2,7 @@ import containerQueries from '@tailwindcss/container-queries';
 import type { Config } from 'tailwindcss';
 import tailwindcssAnimate from 'tailwindcss-animate';
 import plugin from 'tailwindcss/plugin';
+import { below, LAYOUT_STEPS } from './src/styles/layout-steps';
 
 const odsTypographyPlugin = plugin(({ addUtilities }) => {
   addUtilities({
@@ -91,21 +92,15 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
  * Registered `max-*` first and then ascending, like Tailwind's own screens, so
  * a wider step wins over a narrower one on the same property.
  */
-const CONTENT_STEPS = [
-  { name: 'sm', content: 640, viewport: 640 },
-  { name: 'md', content: 720, viewport: 800 },
-  { name: 'lg', content: 1024, viewport: 1280 },
-  { name: 'xl', content: 1216, viewport: 1440 },
-  { name: '2xl', content: 1312, viewport: 1536 },
-] as const;
+const CONTENT_STEPS = Object.entries(LAYOUT_STEPS).map(([name, step]) => ({ name, ...step }));
 
 const odsContentAreaPlugin = plugin(({ addVariant }) => {
   const outsideContentArea = '&:where(:not(.ods-content-area *))';
   for (const { name, content, viewport } of CONTENT_STEPS) {
     if (name !== 'md' && name !== 'lg') continue;
     addVariant(`content-max-${name}`, [
-      `@container ods-content (max-width: ${content - 0.02}px)`,
-      `@media (max-width: ${viewport - 0.02}px) { ${outsideContentArea} }`,
+      `@container ods-content (max-width: ${below(content)}px)`,
+      `@media (max-width: ${below(viewport)}px) { ${outsideContentArea} }`,
     ]);
   }
   for (const { name, content, viewport } of CONTENT_STEPS) {
@@ -345,12 +340,8 @@ const config: Config = {
           current: 'var(--ods-current)',
         }),
       },
-      // Custom breakpoints (aligned with ODS responsive tokens from Figma)
-      screens: {
-        md: '800px', // Tablet: 50rem
-        lg: '1280px', // Desktop: 80rem
-        xl: '1440px', // Large desktop: 90rem
-      },
+      // Aligned with the ODS responsive tokens from Figma: md tablet, lg desktop.
+      screens: Object.fromEntries(CONTENT_STEPS.map(({ name, viewport }) => [name, `${viewport}px`])),
 
       borderRadius: {
         lg: 'var(--radius)', // 8px
