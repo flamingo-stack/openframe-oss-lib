@@ -135,7 +135,9 @@ out by **its own width** instead. `<main>` becomes an `.ods-content-area` contai
 - **Window chrome that renders inside the content area** (not portalled to `<body>`: `ModalV2`,
   `Modal`, `SlidingSidebar`) carries `ods-viewport-layer`, which restates the viewport's tokens on its
   subtree; otherwise a modal opened from a narrow content area inherits the area's mobile fonts.
-  `content-*` classes under the layer follow the window as well.
+  `content-*` classes under the layer follow the window as well. The JS hooks need their own reset,
+  because React context crosses a portal: `ModalV2`, `Modal`, `Dialog`, `Sheet` and `Drawer` wrap
+  their content in `<ViewportBreakpoints>`.
 - **Chrome inside the content area that ALSO depends on the window** stacks the two:
   `md:content-max-md:` is "narrow content in a wide window" and never matches outside a content
   area. `PageActions` `primary-buttons` uses it: the bottom bar spans the window (`md:hidden`),

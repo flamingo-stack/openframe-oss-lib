@@ -2,6 +2,7 @@
 
 import { usePreventScroll } from '@react-aria/overlays';
 import { type ReactNode, forwardRef, useEffect } from 'react';
+import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
 
 /**
@@ -72,7 +73,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(({ isOpen, onClose, childre
         role="dialog"
         aria-modal="true"
       >
-        {children}
+        <ViewportBreakpoints>{children}</ViewportBreakpoints>
       </div>
     </div>
   );

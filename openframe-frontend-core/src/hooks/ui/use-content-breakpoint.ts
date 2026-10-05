@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext } from 'react';
+import { createContext, createElement, type ReactNode, useContext } from 'react';
 import { LAYOUT_STEPS } from '../../styles/layout-steps';
 import { useLgUp, useMdUp } from './use-media-query';
 
@@ -14,6 +14,15 @@ export const CONTENT_BREAKPOINTS = { md: LAYOUT_STEPS.md.content, lg: LAYOUT_STE
  * it), or `null` outside one.
  */
 export const ContentAreaWidthContext = createContext<number | null>(null);
+
+/**
+ * For window chrome opened from a content area (a modal, a drawer): its subtree
+ * is back on the viewport's steps. Context crosses a portal, so without this
+ * the hooks below would still answer with the content area's width.
+ */
+export function ViewportBreakpoints({ children }: { children: ReactNode }) {
+  return createElement(ContentAreaWidthContext.Provider, { value: null }, children);
+}
 
 export function contentBreakpointFor(width: number): ContentBreakpoint {
   if (width >= CONTENT_BREAKPOINTS.lg) return 'desktop';
