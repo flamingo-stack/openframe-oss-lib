@@ -11,6 +11,13 @@ export interface UseInViewOptions {
   threshold?: number;
   /** Margin around the viewport, CSS-style. */
   rootMargin?: string;
+  /**
+   * The answer before the observer has reported (and where there is no
+   * observer at all). Default false: nothing runs until it is known to be on
+   * screen. A decorative strip that should rather move than sit still when the
+   * observer never reports passes true.
+   */
+  initial?: boolean;
 }
 
 export interface UseInViewResult<T extends Element> {
@@ -40,8 +47,9 @@ const STEPS = Array.from({ length: 21 }, (_, i) => i / 20);
 export function useInView<T extends Element = HTMLElement>({
   threshold = 0,
   rootMargin = '0px',
+  initial = false,
 }: UseInViewOptions = {}): UseInViewResult<T> {
-  const [inView, setInView] = useState(false);
+  const [inView, setInView] = useState(initial);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   const disconnect = useCallback(() => {
@@ -52,8 +60,12 @@ export function useInView<T extends Element = HTMLElement>({
   const ref = useCallback(
     (node: T | null) => {
       disconnect();
-      if (!node || typeof IntersectionObserver === 'undefined') {
+      if (!node) {
         setInView(false);
+        return;
+      }
+      if (typeof IntersectionObserver === 'undefined') {
+        setInView(initial);
         return;
       }
       const observer = new IntersectionObserver(
@@ -70,7 +82,7 @@ export function useInView<T extends Element = HTMLElement>({
       observer.observe(node);
       observerRef.current = observer;
     },
-    [disconnect, threshold, rootMargin],
+    [disconnect, threshold, rootMargin, initial],
   );
 
   useEffect(() => disconnect, [disconnect]);
