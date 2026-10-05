@@ -128,7 +128,8 @@ out by **its own width** instead. `<main>` becomes an `.ods-content-area` contai
   portalled to `<body>`) they fall back to the viewport `md` / `lg` steps, so a shared component can
   switch to them without changing anywhere else it renders.
 - **Keep `md:` / `lg:` for chrome and overlays** that follow the window: header, navigation,
-  modals, dropdowns, toasts. Never mix `md:` and `content-md:` on one property of one element.
+  modals, dropdowns, toasts. Never mix `md:` and `content-md:` on one element: lint rejects the two
+  in one class string (`flamingo/no-mixed-layout-variants`).
 - **Window chrome that renders inside the content area** (not portalled to `<body>`: `ModalV2`,
   `Modal`, `SlidingSidebar`) carries `ods-viewport-layer`, which restates the viewport's tokens on its
   subtree; otherwise a modal opened from a narrow content area inherits the area's mobile fonts.
