@@ -14,6 +14,11 @@ export const buttonSurfaceClasses = {
     'bg-ods-error text-ods-text-on-accent hover:bg-ods-error-hover active:bg-ods-error-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled',
   warning:
     'bg-ods-warning text-ods-text-on-accent hover:bg-ods-warning-hover active:bg-ods-warning-active disabled:bg-ods-disabled aria-disabled:bg-ods-disabled',
+  // The page's colours swapped: light on a dark theme, dark on a light one. A
+  // strong action that must NOT be the accent, for a surface that already
+  // holds the one accent call to action (an "Approve" inside a product demo).
+  inverted:
+    'bg-ods-text-primary text-ods-bg hover:bg-ods-text-secondary active:bg-ods-text-secondary disabled:bg-ods-disabled aria-disabled:bg-ods-disabled',
   // A self-contained glyph (play badge, unmute glyph) that already carries its
   // own scrim: no button surface at all, in any state. Distinct from
   // `transparent`, whose hover/active fills would paint a rectangle behind the

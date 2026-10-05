@@ -37,6 +37,7 @@ import { usePreventScroll } from '@react-aria/overlays';
 import { isIOS } from '@react-aria/utils';
 import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { chatProgressLabel } from '../../chat-protocol/progress';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
@@ -1219,6 +1220,7 @@ function EmbeddableChatInner({
   const {
     messages: rawMessages,
     isLoading: chatLoading,
+    streamingProgress,
     sendMessage: sendMessageRaw,
     discussRef,
     stopMessage,
@@ -1930,16 +1932,20 @@ function EmbeddableChatInner({
   // Measured off the panel NODE (state), not a ref read once on mount. In the
   // `drawer` shell the panel body does not exist until the drawer opens, so a
   // mount-time ref read saw `null`, bailed, and — with `[]` deps — never ran
-  // again: `panelWidth` stayed 0, `canSplit` stayed false, and EVERY drawer
+  // again: the width stayed 0, `canSplit` stayed false, and EVERY drawer
   // host was silently pinned to the stacked single-column list no matter how
   // wide it was. Only `shell="none"` hosts (the panel is inline and present at
   // mount) ever reached the split layout.
-  const [panelWidth, setPanelWidth] = useState(0);
+  //
+  // Only the split threshold is state, not the width: the observer fires on
+  // every pixel of a drawer drag, and a width in state re-rendered this whole
+  // component each frame for a value that changes at one width.
+  const [canSplit, setCanSplit] = useState(false);
   useEffect(() => {
     if (!panelBoundary || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect?.width;
-      if (typeof w === 'number') setPanelWidth(w);
+      if (typeof w === 'number') setCanSplit(w >= SPLIT_MIN_WIDTH);
     });
     ro.observe(panelBoundary);
     return () => ro.disconnect();
@@ -1957,7 +1963,7 @@ function EmbeddableChatInner({
   // a reactive (non-mount-only) effect.
   const setPanelNode = useCallback((node: HTMLDivElement | null) => {
     setPanelBoundary(node);
-    if (node) setPanelWidth(node.clientWidth);
+    if (node) setCanSplit(node.clientWidth >= SPLIT_MIN_WIDTH);
   }, []);
 
   // Rail collapse toggle (Figma ⟶| control), persisted so it survives the
@@ -2003,7 +2009,6 @@ function EmbeddableChatInner({
   // right chat block stays put), and only falls back to the full-panel archive
   // when stacked/collapsed.
   const splitEligible = historyListMode;
-  const canSplit = panelWidth >= SPLIT_MIN_WIDTH;
   // Embedded previews (hero demo tabs) always use the compact single-column
   // header, never the two-column split — so `previewMode` opts out of `wideMingo`.
   const wideMingo = splitEligible && canSplit && !previewMode;
@@ -2284,7 +2289,7 @@ function EmbeddableChatInner({
                 // expand toggle + the chat-block header (the fill column shows
                 // the chat / new-chat welcome). No back chevron — chat-list
                 // navigation is the rail toggle. Shown whenever the panel is wide
-                // enough to split (`panelWidth ≥ SPLIT_MIN_WIDTH`), NOT gated on
+                // enough to split (width ≥ `SPLIT_MIN_WIDTH`), NOT gated on
                 // the viewport `md` breakpoint — otherwise a 720–799px panel on a
                 // sub-`md` viewport would split the body yet drop to the mobile
                 // single-bar header (no rail search / collapse controls).
@@ -2522,6 +2527,9 @@ function EmbeddableChatInner({
                                 <ChatMessageList
                                   messages={messages}
                                   isTyping={chatLoading}
+                                  // The stage the turn reports while the user waits
+                                  // ("Searching 28 sources"); the generic phrase otherwise.
+                                  typingMessage={streamingProgress ? chatProgressLabel(streamingProgress) : undefined}
                                   // Sticky footer for approvals the host lifted out of the
                                   // thread — see the prop's docblock.
                                   pendingApprovals={pendingApprovals}

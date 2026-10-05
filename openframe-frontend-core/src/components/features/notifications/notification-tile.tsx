@@ -6,7 +6,7 @@ import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime } from '../../../utils/date-utils';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { dotColorByVariant, progressColorByVariant } from '../../ui/toaster';
+import { dotColorByVariant, progressColorByVariant as toastProgressColorByVariant } from '../../ui/toaster';
 import type { Notification, NotificationSeverity, NotificationVariant } from './types';
 
 /** Backend severity → tile color variant; overrides `notification.variant` when present. */
@@ -24,6 +24,18 @@ const typeColorByVariant: Record<NotificationVariant, string> = {
   success: 'text-ods-success',
   warning: 'text-ods-warning',
   error: 'text-ods-error',
+};
+
+/**
+ * The live countdown bar. The attention variants keep their colour; the neutral card's bar
+ * is the brand accent (Figma `notification-card`: `open-colors/yellow`), not the grey the
+ * toast draws. A toast's bar only times out; a card's says "new, still live" in a drawer of
+ * settled grey rows, so it needs the accent to read at all. The dot keeps the toast colours.
+ */
+const progressColorByVariant: Record<NotificationVariant, string> = {
+  ...toastProgressColorByVariant,
+  default: 'bg-ods-accent',
+  info: 'bg-ods-accent',
 };
 
 const headerControlClass =
@@ -51,6 +63,19 @@ export interface NotificationTileProps {
    * watch-face mock, a side rail) passes `2` so the title is read, not cut.
    */
   titleLines?: 1 | 2;
+  /**
+   * `card` (default): the app's own tile, with its uppercase type label and the
+   * dismiss / complete control.
+   * `lockscreen`: the same notification as a phone shows it: the app's mark and
+   * a plain, sentence-case label that is never cut short, the time, no in-app
+   * control, phone-sized corners. For a phone or watch mock.
+   */
+  presentation?: 'card' | 'lockscreen';
+  /**
+   * Words shown in place of the relative time ("now"). For a mock that stays
+   * on screen: its notifications have just arrived for as long as it plays.
+   */
+  timeLabel?: string;
 }
 
 export function NotificationTile({
@@ -63,7 +88,10 @@ export function NotificationTile({
   children,
   paused = false,
   titleLines = 1,
+  presentation = 'card',
+  timeLabel,
 }: NotificationTileProps) {
+  const lockscreen = presentation === 'lockscreen';
   const {
     id,
     variant = 'default',
@@ -111,7 +139,8 @@ export function NotificationTile({
   return (
     <output
       className={cn(
-        'relative block w-full shrink-0 overflow-hidden rounded-md border border-ods-border bg-ods-card',
+        'relative block w-full shrink-0 overflow-hidden border border-ods-border bg-ods-card',
+        lockscreen ? 'rounded-2xl' : 'rounded-md',
         className,
       )}
     >
@@ -140,50 +169,62 @@ export function NotificationTile({
           </span>
 
           {type ? (
-            <p className={cn('min-w-0 flex-1 truncate text-h5', typeColorByVariant[accentVariant])} title={type}>
-              {type}
-            </p>
+            lockscreen ? (
+              // A phone names the sender in plain words and never cuts them.
+              <p className="min-w-0 flex-1 break-words text-ods-text-secondary text-h6">{type}</p>
+            ) : (
+              <p className={cn('min-w-0 flex-1 truncate text-h5', typeColorByVariant[accentVariant])} title={type}>
+                {type}
+              </p>
+            )
           ) : (
             <span className="min-w-0 flex-1" />
           )}
 
           {!isLive && createdAtIso ? (
-            <time dateTime={createdAtIso} className="shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
-              {formatTicketRelativeTime(createdAtIso)}
+            <time
+              dateTime={createdAtIso}
+              className={cn('shrink-0 whitespace-nowrap text-ods-text-secondary text-h6', lockscreen && 'self-start')}
+            >
+              {timeLabel ?? formatTicketRelativeTime(createdAtIso)}
             </time>
           ) : null}
 
-          {/* Live X and settled check swap in the same 16px slot; the inactive
+          {!lockscreen && (
+            <>
+              {/* Live X and settled check swap in the same 16px slot; the inactive
               one is removed from the a11y tree and disabled, not just faded. */}
-          <span className="relative size-4 shrink-0">
-            {[
-              {
-                active: isLive,
-                label: 'Dismiss notification',
-                icon: <XmarkIcon size={16} />,
-                onClick: () => onSettle?.(id),
-              },
-              {
-                active: !isLive,
-                label: 'Mark notification complete',
-                icon: <CheckCircleIcon size={16} />,
-                onClick: () => onComplete(id),
-              },
-            ].map(({ active, label, icon: actionIcon, onClick }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={onClick}
-                aria-label={label}
-                aria-hidden={!active}
-                disabled={!active}
-                tabIndex={active ? 0 : -1}
-                className={cn(headerControlClass, !active && 'pointer-events-none opacity-0')}
-              >
-                {actionIcon}
-              </button>
-            ))}
-          </span>
+              <span className="relative size-4 shrink-0">
+                {[
+                  {
+                    active: isLive,
+                    label: 'Dismiss notification',
+                    icon: <XmarkIcon size={16} />,
+                    onClick: () => onSettle?.(id),
+                  },
+                  {
+                    active: !isLive,
+                    label: 'Mark notification complete',
+                    icon: <CheckCircleIcon size={16} />,
+                    onClick: () => onComplete(id),
+                  },
+                ].map(({ active, label, icon: actionIcon, onClick }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={onClick}
+                    aria-label={label}
+                    aria-hidden={!active}
+                    disabled={!active}
+                    tabIndex={active ? 0 : -1}
+                    className={cn(headerControlClass, !active && 'pointer-events-none opacity-0')}
+                  >
+                    {actionIcon}
+                  </button>
+                ))}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="flex min-w-0 flex-col">

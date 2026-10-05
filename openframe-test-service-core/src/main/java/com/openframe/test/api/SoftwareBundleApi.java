@@ -1,8 +1,11 @@
 package com.openframe.test.api;
 
 import com.openframe.test.data.dto.device.DeviceFilterInput;
+import com.openframe.test.data.dto.shared.GraphqlError;
 import com.openframe.test.data.dto.softwarebundle.SoftwareBundle;
+import com.openframe.test.data.dto.softwarebundle.SubmitSoftwareBundleInput;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 
 import java.util.HashMap;
 import java.util.List;
@@ -16,12 +19,13 @@ import static com.openframe.test.api.graphql.SoftwareBundleQueries.GET_SOFTWARE_
 import static com.openframe.test.api.graphql.SoftwareBundleQueries.GET_SOFTWARE_BUNDLE_DEVICES;
 import static com.openframe.test.api.graphql.SoftwareBundleQueries.REMOVE_ALL_DEVICES_FROM_SOFTWARE_BUNDLE;
 import static com.openframe.test.api.graphql.SoftwareBundleQueries.REMOVE_DEVICES_FROM_SOFTWARE_BUNDLE;
+import static com.openframe.test.api.graphql.SoftwareBundleQueries.SUBMIT_SOFTWARE_BUNDLE;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import static io.restassured.RestAssured.given;
 
-// Software bundle client: the PENDING draft lifecycle (create, read, assign/unassign devices, delete); submit is not here.
+// Software bundle client: the draft lifecycle (create, read, assign/unassign devices, delete) and its submit.
 public class SoftwareBundleApi {
 
     public static SoftwareBundle createBundle() {
@@ -64,6 +68,21 @@ public class SoftwareBundleApi {
                 deviceSelection("bundleId", bundleId, filter, search));
     }
 
+    // An assignment expected to be refused (a COMPLETED bundle); returns the GraphQL errors.
+    public static List<GraphqlError> attemptAddDevicesErrors(String bundleId, List<String> machineIds) {
+        return errorsOf(ADD_DEVICES_TO_SOFTWARE_BUNDLE, Map.of("bundleId", bundleId, "machineIds", machineIds));
+    }
+
+    // Validates, runs it now (no schedule) and marks the bundle COMPLETED; an already COMPLETED bundle comes back unchanged.
+    public static SoftwareBundle submitBundle(SubmitSoftwareBundleInput input) {
+        return object(SUBMIT_SOFTWARE_BUNDLE, "submitSoftwareBundle", Map.of("input", input));
+    }
+
+    // A submit expected to be refused (no devices, no packages, an invalid package, an unknown bundle); returns the GraphQL errors.
+    public static List<GraphqlError> attemptSubmitBundleErrors(SubmitSoftwareBundleInput input) {
+        return errorsOf(SUBMIT_SOFTWARE_BUNDLE, Map.of("input", input));
+    }
+
     // True for a PENDING, unknown or reaped id; false for a COMPLETED bundle, which is left untouched.
     public static boolean deleteBundle(String id) {
         JsonPath response = query(DELETE_SOFTWARE_BUNDLE, Map.of("id", id));
@@ -101,5 +120,19 @@ public class SoftwareBundleApi {
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
                 .extract().jsonPath();
+    }
+
+    // Sends a document without the success spec and returns its GraphQL errors; a non-200 answer fails with the status and body.
+    private static List<GraphqlError> errorsOf(String document, Map<String, Object> variables) {
+        Map<String, Object> body = Map.of("query", document, "variables", variables);
+        Response response = given(getAuthorizedSpec()).body(body).post(GRAPHQL);
+        if (response.statusCode() != 200) {
+            String operation = document.lines().findFirst().orElse("").trim();
+            throw new AssertionError("api/graphql answered HTTP " + response.statusCode() + " to \"" + operation
+                    + "\" instead of 200 with a GraphQL error; body: "
+                    + response.asString().replaceAll("\\s+", " ").strip());
+        }
+        List<GraphqlError> errors = response.jsonPath().getList("errors", GraphqlError.class);
+        return errors == null ? List.of() : errors;
     }
 }

@@ -1,6 +1,6 @@
 package com.openframe.test.api.graphql;
 
-// Software bundle documents on api/graphql (software-bundle.graphqls): the PENDING draft behind Install / Update Software and its device pickers.
+// Software bundle documents on api/graphql (software-bundle.graphqls): the draft behind Install / Update Software, its device pickers and its submit.
 public class SoftwareBundleQueries {
 
     private static final String BUNDLE_FIELDS = """
@@ -83,6 +83,15 @@ public class SoftwareBundleQueries {
     public static final String REMOVE_ALL_DEVICES_FROM_SOFTWARE_BUNDLE = """
             mutation RemoveAllDevicesFromSoftwareBundle($bundleId: ID!, $filter: DeviceFilterInput, $search: String) {
                 removeAllDevicesFromSoftwareBundle(bundleId: $bundleId, filter: $filter, search: $search) {
+                    ...bundleFields
+                }
+            }
+            """ + BUNDLE_FIELDS;
+
+    // Run now when the input has no schedule; the bundle comes back COMPLETED.
+    public static final String SUBMIT_SOFTWARE_BUNDLE = """
+            mutation SubmitSoftwareBundle($input: SubmitSoftwareBundleInput!) {
+                submitSoftwareBundle(input: $input) {
                     ...bundleFields
                 }
             }

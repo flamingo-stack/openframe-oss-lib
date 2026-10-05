@@ -3,11 +3,12 @@
 import { forwardRef, useState } from 'react';
 import type { HTMLAttributes } from 'react';
 import { cn } from '../../utils/cn';
-import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon, XmarkIcon } from '../icons-v2-generated';
+import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon } from '../icons-v2-generated';
 import type { ToolType } from '../platform';
 import { ToolIcon } from '../tool-icon';
 import { Button } from '../ui/button';
-import { Tag } from '../ui/tag';
+import { StatusLine } from '../ui/status-line';
+import { CHAT_BLOCK_CLASS, CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
@@ -80,16 +81,15 @@ export interface ApprovalStatusTagProps {
  */
 export function ApprovalStatusTag({ status, resolvedByName, inlineResolver = false }: ApprovalStatusTagProps) {
   const suffix = inlineResolver && resolvedByName ? ` by ${resolvedByName}` : '';
-  if (status === 'approved') {
-    return <Tag label={`Approved${suffix}`} variant="success" icon={<CheckCircleIcon className="h-4 w-4" />} />;
-  }
-  if (status === 'cancelled') {
-    return <Tag label={`Canceled${suffix}`} variant="grey" icon={<XmarkIcon className="h-4 w-4" />} />;
-  }
-  if (status === 'rejected') {
-    return <Tag label={`Rejected${suffix}`} variant="error" icon={<XmarkCircleIcon className="h-4 w-4" />} />;
-  }
+  if (status === 'approved') return <StatusLine tone="success" label={`Approved${suffix}`} />;
+  if (status === 'cancelled') return <StatusLine tone="muted" label={`Canceled${suffix}`} />;
+  if (status === 'rejected') return <StatusLine tone="error" label={`Rejected${suffix}`} />;
   return null;
+}
+
+/** What a pending approval says while it waits: the one place the wording lives. */
+export function ApprovalWaitingLine() {
+  return <StatusLine tone="waiting" label="Waiting for you" />;
 }
 
 function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
@@ -277,14 +277,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
         .map(c => c.toolExplanation?.trim() || c.toolTitle?.trim())
         .filter((s): s is string => !!s);
       return (
-        <div
-          ref={ref}
-          className={cn(
-            'mb-[var(--spacing-system-xsf)] flex flex-col gap-[var(--spacing-system-mf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
-            className,
-          )}
-          {...props}
-        >
+        <div ref={ref} className={cn('mb-[var(--spacing-system-xsf)]', CHAT_BLOCK_CLASS, className)} {...props}>
           {titles.length > 0 ? (
             titles.map((title, i) => (
               <p key={i} className="w-full whitespace-pre-line break-words text-ods-text-primary text-h4">
@@ -294,9 +287,10 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
           ) : (
             <p className="w-full text-ods-text-primary text-h4">Approval required</p>
           )}
+          {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
           {showFooterActions &&
             (status === 'pending' ? (
-              <div className="flex w-full items-center gap-[var(--spacing-system-mf)]">{actionButtons}</div>
+              <div className="flex w-full items-center gap-[var(--spacing-system-xsf)]">{actionButtons}</div>
             ) : (
               <div className="flex w-full">
                 <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver />
@@ -312,8 +306,8 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       <div
         ref={ref}
         className={cn(
-          'mb-[var(--spacing-system-xsf)] flex flex-col',
-          'overflow-hidden rounded-md border border-ods-border bg-ods-card',
+          'mb-[var(--spacing-system-xsf)] flex flex-col overflow-hidden',
+          CHAT_BLOCK_FRAME_CLASS,
           className,
         )}
         {...props}
@@ -338,7 +332,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
         </div>
 
         {showFooterBlock && (
-          <div className="flex flex-col items-start justify-center gap-[var(--spacing-system-xsf)] border-t border-ods-border bg-ods-card p-[var(--spacing-system-sf)]">
+          <div className="flex flex-col items-start justify-center gap-[var(--spacing-system-xsf)] border-t border-ods-border p-[var(--spacing-system-sf)]">
             {explanations.length > 0 && (
               <ul className="w-full list-disc pl-5 text-ods-text-primary text-h6">
                 {explanations.map((expl, i) => (
@@ -347,6 +341,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               </ul>
             )}
 
+            {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
             {showFooterActions &&
               (status === 'pending' ? (
                 <div className="flex items-center gap-[var(--spacing-system-xsf)]">{actionButtons}</div>
