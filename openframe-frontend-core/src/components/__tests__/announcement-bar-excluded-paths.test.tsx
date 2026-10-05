@@ -10,6 +10,8 @@ const announcement = (excluded_paths: string[]): Announcement => ({
   description: 'Read about it',
   background_color: '#000000',
   is_active: true,
+  created_at: '2026-10-01T00:00:00Z',
+  updated_at: '2026-10-01T00:00:00Z',
   excluded_paths,
 });
 
