@@ -107,7 +107,9 @@ describe('AppLayout side panel', () => {
       // Still laid out under the growing panel, with its layers kept below it.
       expect(screen.getByRole('main')).not.toHaveClass('hidden');
       expect(screen.getByRole('main')).toHaveClass('isolate');
-      act(() => vi.advanceTimersByTime(1000));
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
       expect(screen.getByRole('main', { hidden: true })).toHaveClass('hidden');
 
       fireEvent.keyDown(handle, { key: 'Home' });
