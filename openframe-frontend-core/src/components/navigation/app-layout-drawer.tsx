@@ -18,8 +18,8 @@ import {
   useState,
 } from 'react';
 
+import { useResizablePanelSize } from '../../hooks/ui/use-resizable-panel-size';
 import { cn } from '../../utils/cn';
-import { clamp } from '../../utils/common';
 import {
   DrawerBody,
   DrawerDescription,
@@ -216,25 +216,8 @@ const HORIZONTAL_SIDES: ReadonlySet<DrawerSide> = new Set(['left', 'right']);
  */
 const PERSIST_CLOSED_HOLD = 'data-[state=closed]:fill-mode-forwards';
 
-interface UseContainedResizableSizeArgs {
-  enabled: boolean;
-  isHorizontal: boolean;
-  minSize: number;
-  maxSize: number;
-  defaultSize: number;
-  storageKey?: string;
-  container: HTMLElement | null;
-}
-
-function useContainedResizableSize({
-  enabled,
-  isHorizontal,
-  minSize,
-  maxSize,
-  defaultSize,
-  storageKey,
-  container,
-}: UseContainedResizableSizeArgs) {
+/** Room the portal container gives the panel along its resize axis, in px. */
+function useContainerExtent(enabled: boolean, isHorizontal: boolean, container: HTMLElement | null): number {
   const [available, setAvailable] = useState(0);
 
   useEffect(() => {
@@ -248,59 +231,7 @@ function useContainedResizableSize({
     return () => ro.disconnect();
   }, [enabled, container, isHorizontal]);
 
-  const clampToContainer = useCallback(
-    (value: number) => {
-      // Reserve 40px (the `system-m` outside-edge padding from the wrapper
-      // plus a matching gap on the inside edge) so the panel sits symmetrically
-      // inside the container. This also keeps the resize grip on-screen at
-      // maximum extent.
-      const effectiveMax = available > 0 ? Math.min(maxSize, available - 40) : maxSize;
-      return clamp(value, minSize, Math.max(minSize, effectiveMax));
-    },
-    [available, minSize, maxSize],
-  );
-
-  const readInitial = useCallback(() => {
-    if (!enabled) return defaultSize;
-    if (typeof window === 'undefined') return defaultSize;
-    if (!storageKey) return defaultSize;
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) return defaultSize;
-      const parsed = parseFloat(raw);
-      if (!Number.isFinite(parsed)) return defaultSize;
-      return parsed;
-    } catch {
-      return defaultSize;
-    }
-  }, [enabled, storageKey, defaultSize]);
-
-  const [rawSize, setSizeRaw] = useState<number>(readInitial);
-
-  // Re-clamp the stored size whenever the container resizes so a previously
-  // saved size never overflows after the user shrinks the viewport.
-  //
-  // Clamped where it is READ rather than written back into state from an
-  // effect: `available` is already state (the ResizeObserver above owns it), so
-  // the container shrinking re-renders regardless — and deriving here means the
-  // panel is never painted overflowing its container for the frame between the
-  // resize and the corrective commit. Keeping the raw value also means widening
-  // the viewport again restores the size the user actually chose, instead of
-  // leaving it permanently trimmed to the narrowest width ever seen.
-  const size = enabled ? clampToContainer(rawSize) : rawSize;
-
-  const setSize = useCallback((next: number) => setSizeRaw(clampToContainer(next)), [clampToContainer]);
-
-  useEffect(() => {
-    if (!enabled || !storageKey || typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(storageKey, String(Math.round(size)));
-    } catch {
-      // ignore quota / disabled-storage
-    }
-  }, [enabled, size, storageKey]);
-
-  return { size, setSize, clampSize: clampToContainer };
+  return available;
 }
 
 /** Ends a drawer resize drag: commits the size it reached and restores the
@@ -628,14 +559,18 @@ const AppLayoutDrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Co
     }, [mobileBreakpoint]);
 
     const panelRef = useRef<HTMLDivElement>(null);
-    const { size, setSize, clampSize } = useContainedResizableSize({
+    // Reserve 40px (the `system-m` outside-edge padding from the wrapper plus a
+    // matching gap on the inside edge) so the panel sits symmetrically inside
+    // the container and the resize grip stays on screen at maximum extent.
+    const available = useContainerExtent(resizable, isHorizontal, portalContainer);
+    const { size, setSize, clampSize } = useResizablePanelSize({
       enabled: resizable,
-      isHorizontal,
       minSize,
       maxSize,
       defaultSize: initialSize,
+      available,
+      reserve: 40,
       storageKey,
-      container: portalContainer,
     });
 
     const applyInlineSize = resizable && !isMobile;

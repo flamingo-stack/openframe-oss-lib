@@ -12,15 +12,15 @@ import {
   type PointerEvent,
   type ReactNode,
   forwardRef,
-  useCallback,
   useEffect,
   useRef,
   useState,
 } from 'react';
 
 import { useHeaderHeight } from '../../hooks/ui/use-header-height';
+import { useResizablePanelSize } from '../../hooks/ui/use-resizable-panel-size';
+import { useWindowSize } from '../../hooks/ui/use-window-size';
 import { cn } from '../../utils/cn';
-import { clamp } from '../../utils/common';
 
 /** Unified overlay backdrop — dimmed, no blur. Single source of truth for
  *  every full-screen backdrop (Drawer, AppLayoutDrawer, MobileBurgerMenu,
@@ -137,68 +137,6 @@ const drawerPanelVariants = cva(
 type DrawerSide = 'right' | 'left' | 'top' | 'bottom';
 
 const HORIZONTAL_SIDES: ReadonlySet<DrawerSide> = new Set(['left', 'right']);
-
-function viewportSize(isHorizontal: boolean): number {
-  if (typeof window === 'undefined') return 0;
-  return isHorizontal ? window.innerWidth : window.innerHeight;
-}
-
-interface UseResizableSizeArgs {
-  enabled: boolean;
-  isHorizontal: boolean;
-  minSize: number;
-  maxSize: number;
-  defaultSize: number;
-  storageKey?: string;
-}
-
-function useResizableSize({ enabled, isHorizontal, minSize, maxSize, defaultSize, storageKey }: UseResizableSizeArgs) {
-  const clampToViewport = useCallback(
-    (value: number) => {
-      const vp = viewportSize(isHorizontal);
-      const effectiveMax = vp > 0 ? Math.min(maxSize, vp - 80) : maxSize;
-      return clamp(value, minSize, Math.max(minSize, effectiveMax));
-    },
-    [isHorizontal, minSize, maxSize],
-  );
-
-  const readInitial = useCallback(() => {
-    if (!enabled) return defaultSize;
-    if (typeof window === 'undefined') return defaultSize;
-    if (!storageKey) return clampToViewport(defaultSize);
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) return clampToViewport(defaultSize);
-      const parsed = parseFloat(raw);
-      if (!Number.isFinite(parsed)) return clampToViewport(defaultSize);
-      return clampToViewport(parsed);
-    } catch {
-      return clampToViewport(defaultSize);
-    }
-  }, [enabled, storageKey, defaultSize, clampToViewport]);
-
-  const [size, setSizeRaw] = useState<number>(readInitial);
-
-  const setSize = useCallback((next: number) => setSizeRaw(clampToViewport(next)), [clampToViewport]);
-
-  useEffect(() => {
-    if (!enabled || !storageKey || typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(storageKey, String(Math.round(size)));
-    } catch {
-      // ignore quota / disabled-storage
-    }
-  }, [enabled, size, storageKey]);
-
-  useEffect(() => {
-    if (!enabled || typeof window === 'undefined') return undefined;
-    const onResize = () => setSizeRaw(prev => clampToViewport(prev));
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [enabled, clampToViewport]);
-
-  return { size, setSize };
-}
 
 interface DrawerResizeHandleProps {
   side: DrawerSide;
@@ -326,9 +264,11 @@ interface DrawerContentBaseProps
   minSize?: number;
   /** Maximum allowed size (px) when resizable. Also clamped by viewport. */
   maxSize?: number;
-  /** Initial size (px) when no localStorage entry exists. */
+  /** Size (px) while the user has not resized the panel. Followed live, never
+   *  stored, so it may depend on the viewport. */
   defaultSize?: number;
-  /** localStorage key for persisting the size across sessions. */
+  /** localStorage key for the size the user chose with the handle. Only that
+   *  choice is stored; see `useResizablePanelSize`. */
   storageKey?: string;
   /** Pixel breakpoint below which `resizable` is disabled and inline
    *  size is not applied (so consumer CSS can render full-viewport).
@@ -414,12 +354,16 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
       return () => mq.removeEventListener('change', update);
     }, [mobileBreakpoint]);
 
-    const { size: resizedSize, setSize } = useResizableSize({
+    // The panel keeps 80px of the viewport free so the page behind it, and the
+    // resize handle, stay reachable.
+    const viewport = useWindowSize();
+    const { size: resizedSize, setSize } = useResizablePanelSize({
       enabled: resizable,
-      isHorizontal,
       minSize,
       maxSize,
       defaultSize: initialSize,
+      available: isHorizontal ? viewport.width : viewport.height,
+      reserve: 80,
       storageKey,
     });
 

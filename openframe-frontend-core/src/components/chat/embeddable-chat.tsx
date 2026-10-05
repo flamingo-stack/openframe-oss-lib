@@ -126,11 +126,11 @@ const HISTORY_RAIL_WIDTH = 320;
 const CHAT_BLOCK_MIN_WIDTH = 400;
 const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 
-// Desktop drawer opens at this fraction of the viewport width (clamped to the
-// Drawer's own min/max). The user can still resize (persisted per DRAWER_WIDTH_KEY).
+// Desktop drawer is this fraction of the viewport width (clamped to the
+// Drawer's own min/max) until the user resizes it. Only the size they choose is
+// stored (under DRAWER_WIDTH_KEY); the default is followed live, so changing
+// this policy needs no new key.
 const DRAWER_DEFAULT_WIDTH_RATIO = 0.5;
-// Bump the suffix whenever the default policy changes so previously-persisted
-// widths (e.g. the old fixed 750px / earlier 30% default) reset on next open.
 const DRAWER_WIDTH_KEY = 'mingo-chat-width-v4';
 const DRAWER_DEFAULT_WIDTH_PX = 750; // SSR fallback before the viewport is known
 /**
