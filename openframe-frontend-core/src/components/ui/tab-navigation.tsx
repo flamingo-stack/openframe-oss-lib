@@ -51,6 +51,17 @@ export interface TabItem {
    * "Label (Badge)". Cased as read — the chip upper-cases it.
    */
   badge?: string;
+  /** A second, quieter line of text: beside the label from `md`, under it below. */
+  sublabel?: string;
+  /** A leading visual used instead of `icon` (an avatar, a logo). Rendered as given. */
+  avatar?: React.ReactNode;
+  /**
+   * 0..1. Set on the ACTIVE tab, the underline stops being a selection marker
+   * and becomes a progress line: its width is this fraction of the tab, and it
+   * moves there linearly over `progressTransitionMs`. A timed, auto-advancing
+   * strip (a looping demo) uses it; `0` snaps back with no animation.
+   */
+  progress?: number;
 }
 
 export interface TabNavigationUrlSyncOptions {
@@ -73,6 +84,8 @@ interface TabNavigationProps {
   /** Tabs grow to share the bar's full width equally (Figma segmented-underline
    *  look, e.g. the 480px homepage strip switcher). Default: natural width. */
   stretchTabs?: boolean;
+  /** How long the underline takes to reach a new `TabItem.progress` value. Default 200. */
+  progressTransitionMs?: number;
 
   // URL sync mode
   urlSync?: boolean | TabNavigationUrlSyncOptions;
@@ -117,6 +130,7 @@ interface TabBarProps {
   showLeftGradient: boolean;
   showRightGradient: boolean;
   stretchTabs: boolean;
+  progressTransitionMs: number;
 }
 
 /**
@@ -140,6 +154,7 @@ const TabBar = memo(function TabBarImpl({
   showLeftGradient,
   showRightGradient,
   stretchTabs,
+  progressTransitionMs,
 }: TabBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLButtonElement>(null);
@@ -308,10 +323,23 @@ const TabBar = memo(function TabBarImpl({
   // that for a 4px-tall bar is not measurable. Correctness at every zoom level
   // is worth more than keeping one property on the compositor.
   const isPlaced = indicator.width > 0;
+  // A tab that reports `progress` turns the underline into a progress line.
+  const activeProgress = tabs.find(tab => tab.id === activeTab)?.progress;
+  const hasProgress = typeof activeProgress === 'number';
+  const progress = hasProgress ? Math.max(0, Math.min(1, activeProgress)) : 1;
   const indicatorStyle: React.CSSProperties = {
-    width: `${indicator.width}px`,
+    width: `${indicator.width * progress}px`,
     transform: `translateX(${indicator.left}px)`,
     opacity: isPlaced ? 1 : 0,
+    // Width only, linear: a progress line is a clock, not a slide between
+    // tabs. At 0 it snaps, so a restarted or newly chosen tab starts empty.
+    ...(hasProgress
+      ? {
+          transitionProperty: 'width',
+          transitionTimingFunction: 'linear',
+          transitionDuration: progress === 0 ? '0ms' : `${progressTransitionMs}ms`,
+        }
+      : null),
   };
   // True from the render AFTER the one that first committed a real position.
   const shouldAnimateIndicator =
@@ -353,6 +381,7 @@ const TabBar = memo(function TabBarImpl({
                 // sitting 4px away.
                 'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
                 stretchTabs && 'flex-1',
+                tab.avatar && 'gap-[var(--spacing-system-xsf)]',
                 // Known limitation: ODS color vars hold hex values, so Tailwind
                 // alpha modifiers (to-ods-accent/10) silently produce no CSS.
                 // color-mix() accepts hex, so we derive the 10%-alpha stop from the token.
@@ -361,7 +390,12 @@ const TabBar = memo(function TabBarImpl({
                   : 'hover:bg-gradient-to-b hover:from-transparent hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]',
               )}
             >
-              {tab.icon ? (
+              {tab.avatar ? (
+                <div className="relative flex shrink-0 items-center justify-center">
+                  {tab.avatar}
+                  {tab.indicator && <StatusDot indicator={tab.indicator} className="absolute right-0 top-[-3px]" />}
+                </div>
+              ) : tab.icon ? (
                 <div className="relative flex items-center justify-center">
                   <tab.icon
                     className={cn(
@@ -377,14 +411,28 @@ const TabBar = memo(function TabBarImpl({
                 <StatusDot indicator={tab.indicator} className="shrink-0" />
               ) : null}
 
-              <span
-                className={cn(
-                  'whitespace-nowrap transition-colors text-h4',
-                  isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary',
-                )}
-              >
-                {tab.label}
-              </span>
+              {tab.sublabel ? (
+                <span className="flex min-w-0 flex-col items-start text-left md:flex-row md:items-baseline md:gap-[var(--spacing-system-xsf)]">
+                  <span
+                    className={cn(
+                      'whitespace-nowrap transition-colors text-h4',
+                      isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                    )}
+                  >
+                    {tab.label}
+                  </span>
+                  <span className="whitespace-nowrap text-ods-text-secondary text-h6">{tab.sublabel}</span>
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    'whitespace-nowrap transition-colors text-h4',
+                    isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                  )}
+                >
+                  {tab.label}
+                </span>
+              )}
 
               {tab.badge && (
                 // The chip is 32px against a 20/24px label line. The negative
@@ -414,9 +462,9 @@ const TabBar = memo(function TabBarImpl({
           // tests) rather than incidental styling.
           data-testid="tab-navigation-underline"
           className={cn(
-            'pointer-events-none absolute bottom-0 left-0 h-1 bg-ods-accent',
-            shouldAnimateIndicator &&
-              'transition-[transform,width,opacity] duration-200 ease-out motion-reduce:transition-none',
+            'pointer-events-none absolute bottom-0 left-0 bg-ods-accent motion-reduce:transition-none',
+            hasProgress ? 'h-0.5' : 'h-1',
+            !hasProgress && shouldAnimateIndicator && 'transition-[transform,width,opacity] duration-200 ease-out',
           )}
           style={indicatorStyle}
         />
@@ -455,6 +503,7 @@ export function TabNavigation({
   showRightGradient = false,
   showLeftGradient = false,
   stretchTabs = false,
+  progressTransitionMs = 200,
   urlSync = false,
   defaultTab,
   children,
@@ -628,6 +677,7 @@ export function TabNavigation({
         showLeftGradient={showLeftGradient}
         showRightGradient={showRightGradient}
         stretchTabs={stretchTabs}
+        progressTransitionMs={progressTransitionMs}
       />
 
       {/* Render children with active tab if provided */}

@@ -119,12 +119,6 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     }
 
     @Override
-    public boolean markCancelled(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
-        Update update = closed(DeliveryStatus.CANCELLED, finishedAt, expiresAt);
-        return updateOne(stillIn(id, from), update);
-    }
-
-    @Override
     public boolean markCancelled(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.CANCELLED, finishedAt, expiresAt);
         return updateOne(sameDispatch(id, from, dispatchedAt), update);

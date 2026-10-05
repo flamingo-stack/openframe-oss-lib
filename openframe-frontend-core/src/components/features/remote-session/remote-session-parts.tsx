@@ -5,7 +5,8 @@ import { cn } from '../../../utils/cn';
 import { DraggerIcon, RecordingIcon } from '../../icons-v2-generated';
 import { OpenFrameLogo } from '../../icons/openframe-logo';
 import { SquareAvatar } from '../../ui/square-avatar';
-import type { RemoteSessionDragHandlers } from './types';
+import { RemoteSessionViewers } from './remote-session-viewers';
+import type { RemoteSessionDragHandlers, RemoteSessionViewer } from './types';
 
 /**
  * The remote session surfaces are fixed-size desktop windows (440 / 600 px
@@ -90,11 +91,39 @@ export function RemoteSessionOrgLogo({ name, logoUrl, sizePx, className }: Remot
 }
 
 /** The green SESSION RECORDING tag. */
-export function RemoteSessionRecordingTag() {
+export function RemoteSessionRecordingTag({ className }: { className?: string }) {
   return (
-    <div className="flex h-8 items-center gap-[var(--spacing-system-xs)] self-start rounded-md bg-ods-success-secondary p-[var(--spacing-system-xsf)]">
+    <div
+      className={cn(
+        'flex h-8 items-center gap-[var(--spacing-system-xs)] self-start rounded-md bg-ods-success-secondary p-[var(--spacing-system-xsf)]',
+        className,
+      )}
+    >
       <RecordingIcon size={16} color="currentColor" className="text-ods-success" />
       <span className="text-ods-success text-h5">Session Recording</span>
+    </div>
+  );
+}
+
+/**
+ * The row under the block's header: the SESSION RECORDING tag and, while
+ * colleagues watch, who is in the session. With viewers the tag stretches to
+ * the left and the viewers sit on the right.
+ */
+export function RemoteSessionStatusRow({
+  showRecordingTag,
+  viewers,
+}: {
+  showRecordingTag: boolean;
+  viewers?: RemoteSessionViewer[];
+}) {
+  const hasViewers = !!viewers && viewers.length > 0;
+  if (!showRecordingTag && !hasViewers) return null;
+  if (!hasViewers) return <RemoteSessionRecordingTag />;
+  return (
+    <div className="flex w-full items-center gap-[var(--spacing-system-m)]">
+      {showRecordingTag && <RemoteSessionRecordingTag className="flex-1 justify-center self-auto" />}
+      <RemoteSessionViewers viewers={viewers} className="ml-auto" />
     </div>
   );
 }

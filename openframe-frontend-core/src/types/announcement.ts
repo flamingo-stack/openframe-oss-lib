@@ -16,6 +16,10 @@ export interface Announcement {
    *  DAL's attachPlatformsToRow(s) emits. No singular platform/platform_id. */
   announcement_platforms?: EntityPlatformAssoc[];
   is_active: boolean;
+  /** A one-line form of the title for tight spots (a hero's news pill). */
+  short_title?: string | null;
+  /** Path patterns the bar is NOT shown on (regular expressions matched against the whole path): the page shows the news itself. */
+  excluded_paths?: string[] | null;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
   cta_text?: string;
@@ -61,6 +65,10 @@ export interface CreateAnnouncementData {
   icon_props?: Record<string, unknown>;
   platforms?: string[]; // entity_platforms set (multi-select)
   is_active?: boolean;
+  /** A one-line form of the title for tight spots (a hero's news pill). */
+  short_title?: string | null;
+  /** Paths the bar is not shown on (exact match). */
+  excluded_paths?: string[];
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
   cta_text?: string;
@@ -84,6 +92,10 @@ export interface UpdateAnnouncementData {
   icon_props?: Record<string, unknown>;
   platforms?: string[]; // entity_platforms set (multi-select)
   is_active?: boolean;
+  /** A one-line form of the title for tight spots (a hero's news pill). */
+  short_title?: string | null;
+  /** Paths the bar is not shown on (exact match). */
+  excluded_paths?: string[];
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
   cta_text?: string;
@@ -151,6 +163,10 @@ export interface AnnouncementFormData {
   cta_icon_props?: string; // JSON string in form
   /** Extra props for the main bar/icon */
   icon_props?: string;
+  /** A one-line form of the title for tight spots (a hero's news pill). */
+  short_title?: string;
+  /** Paths the bar is not shown on, as the form holds them. */
+  excluded_paths?: string[];
 }
 
 // API Query Parameters

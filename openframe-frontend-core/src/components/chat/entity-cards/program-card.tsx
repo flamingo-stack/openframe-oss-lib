@@ -2,9 +2,16 @@
 
 /**
  * ProgramCard (pure presentation). Generic card for podcasts / webinars /
- * events. Three densities — `default` (wide horizontal detail, archive
- * pages), `sm` (compact horizontal for chat-inline), and `portrait`
- * (vertical rail/strip card).
+ * events. Five densities — `default` (wide horizontal detail, archive
+ * pages), `sm` (compact horizontal for chat-inline), `portrait` (vertical
+ * rail/strip card), and the editorial pair a page section uses to lead with
+ * one item: `feature` (cover on top, label, title, date, description, person)
+ * beside `row`s (square cover, title, date · length · person, two lines).
+ *
+ * The cover is never tinted, and a podcast's play glyph (`CardHoverPlay`)
+ * shows only while the card is hovered or focused: a program's artwork carries
+ * its own marks. In the editorial pair the whole card is the link, and the
+ * cover sits whole on its own edge colour (the fill every entity card uses).
  *
  * `portrait` exists because mixed-content rails MUST share ONE card anatomy
  * (2026 card-UI practice: a rail mixes content types, never card layouts —
@@ -19,18 +26,21 @@
  * and pass the resolved detail URL via `href`.
  */
 
-import { ExternalLink, Clock, Play, Video } from 'lucide-react';
+import { ArrowRight, ExternalLink, Clock, Play, Video } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
-import { formatProgramDate } from '../../../utils/format';
+import { formatProgramDate, formatProgramDateRange } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
+import { CardHoverPlay } from '../../features/video-center-badge';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
+import { Tag } from '../../ui/tag';
 import {
   programItemToStripProfile,
   type BaseProgramItem,
@@ -50,13 +60,95 @@ import {
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CONTENT_CARD_SKELETON_FRAME_CLASS, ContentCardFrame } from './content-card-frame';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-type CardSize = 'default' | 'sm' | 'portrait';
+type CardSize = 'default' | 'sm' | 'portrait' | 'feature' | 'row';
 
-export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
+// The editorial pair's boxes, read by the card AND its skeleton (`ProgramCardSkeleton`
+// size `feature` / `row`), so the two cannot drift. Every text row keeps its space
+// (`min-h-[Nlh]` in its own typography), so a card is one height whatever its copy.
+const EDITORIAL_FRAME = CONTENT_CARD_SKELETON_FRAME_CLASS;
+const EDITORIAL_ROW_GRID =
+  'grid grid-cols-[88px_minmax(0,1fr)] items-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)] sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-[var(--spacing-system-l)]';
+const EDITORIAL_ROW_THUMB = 'relative block aspect-square w-full overflow-hidden rounded-md';
+const EDITORIAL_ROW_TEXT = 'flex min-w-0 flex-col gap-[var(--spacing-system-xs)]';
+const EDITORIAL_FEATURE_COVER = 'relative block aspect-video w-full overflow-hidden';
+const EDITORIAL_FEATURE_BODY = 'flex flex-col gap-[var(--spacing-system-s)] p-[var(--spacing-system-l)]';
+const EDITORIAL_META_ROW =
+  'flex h-[1lh] min-w-0 items-center gap-x-[var(--spacing-system-s)] overflow-hidden whitespace-nowrap text-h6';
+const EDITORIAL_PERSON_ROW = 'flex h-8 min-w-0 items-center gap-[var(--spacing-system-s)]';
+
+// The default card's boxes, shared by the card and its skeleton: a large SQUARE cover
+// (the picture fills it), a display title, the date and meta row (stacked on a phone,
+// one line from md), a three-line description, a tag row, the gallery and the action,
+// so a card is one height whatever its copy and cover.
+const DEFAULT_BODY =
+  'flex flex-col gap-[var(--spacing-system-lf)] p-[var(--spacing-system-lf)] md:p-[var(--spacing-system-xlf)]';
+const DEFAULT_HEADER = 'flex flex-col gap-[var(--spacing-system-lf)] md:flex-row md:gap-[var(--spacing-system-xlf)]';
+const DEFAULT_COVER_FRAME =
+  'relative aspect-square w-full flex-shrink-0 overflow-hidden rounded-lg md:w-[240px] lg:w-[320px] xl:w-[400px]';
+const DEFAULT_TEXT = 'flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-mf)]';
+const DEFAULT_TITLE = 'line-clamp-2 text-ods-text-primary text-h1';
+const DEFAULT_META_ROW =
+  'flex min-h-[calc(2lh+0.5rem)] flex-col gap-2 text-h4 md:min-h-[1lh] md:flex-row md:items-center md:gap-4';
+const DEFAULT_DESCRIPTION = 'line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h4';
+const DEFAULT_TAG_ROW = 'flex flex-wrap gap-[var(--spacing-system-xsf)]';
+const DEFAULT_GALLERY_ROW = 'flex gap-[var(--spacing-system-mf)]';
+const DEFAULT_GALLERY_THUMB =
+  'relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg md:h-40 md:w-40 xl:h-[200px] xl:w-[200px]';
+const DEFAULT_FOOTER = 'flex justify-end border-t border-ods-border pt-[var(--spacing-system-lf)]';
+
+export function ProgramCardSkeleton({
+  size = 'default',
+  eyebrow = true,
+  media = 0,
+  tags = false,
+}: {
+  size?: CardSize;
+  eyebrow?: boolean;
+  /** `default` size: how many gallery thumbnails the card shows (`MediaGallery`'s row). 0 = no gallery. */
+  media?: number;
+  /** `default` size: the card shows a tag row. */
+  tags?: boolean;
+}) {
+  // The editorial pair: the card's own boxes (EDITORIAL_*), each text row a bar of
+  // that row's line height.
+  if (size === 'row') {
+    return (
+      <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID, 'animate-pulse')}>
+        <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-border/20')} />
+        <span className={EDITORIAL_ROW_TEXT}>
+          <span className="block h-[2lh] w-full rounded bg-ods-border text-h3" />
+          <span className={EDITORIAL_META_ROW}>
+            <span className="block h-[1lh] w-40 rounded bg-ods-border" />
+          </span>
+          <span className="block h-[2lh] w-full rounded bg-ods-border text-h6" />
+        </span>
+      </span>
+    );
+  }
+  if (size === 'feature') {
+    return (
+      <span className={cn(EDITORIAL_FRAME, 'flex animate-pulse flex-col')}>
+        <span className={cn(EDITORIAL_FEATURE_COVER, 'bg-ods-border/20')} />
+        <span className={EDITORIAL_FEATURE_BODY}>
+          {eyebrow && <span className="block h-[1lh] w-28 rounded bg-ods-border text-h5" />}
+          <span className="block h-[2lh] w-full rounded bg-ods-border text-h3" />
+          <span className={EDITORIAL_META_ROW}>
+            <span className="block h-[1lh] w-40 rounded bg-ods-border" />
+          </span>
+          <span className="block h-[3lh] w-full rounded bg-ods-border text-h4" />
+          <span className={EDITORIAL_PERSON_ROW}>
+            <span className="block h-8 w-8 shrink-0 rounded-full bg-ods-border" />
+            <span className="block h-[1lh] w-40 rounded bg-ods-border text-h6" />
+          </span>
+        </span>
+      </span>
+    );
+  }
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
@@ -79,29 +171,37 @@ export function ProgramCardSkeleton({ size = 'default' }: { size?: CardSize }) {
     );
   }
   return (
-    <div
-      className="flex animate-pulse flex-col overflow-hidden rounded-lg border border-ods-border"
-      style={{ backgroundColor: 'var(--ods-system-greys-black)' }}
-    >
-      <div className="flex-1 p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className="h-[180px] w-full flex-shrink-0 rounded-lg bg-ods-bg md:w-[180px]" />
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
-            <div className="h-7 w-3/4 rounded bg-ods-bg" />
-            <div className="h-7 w-1/2 rounded bg-ods-bg" />
-            <div className="h-4 w-1/3 rounded bg-ods-bg/60" />
-            <div className="space-y-2">
-              <div className="h-3 w-full rounded bg-ods-bg/60" />
-              <div className="h-3 w-5/6 rounded bg-ods-bg/60" />
-              <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
-            </div>
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DEFAULT_BODY, 'animate-pulse')}>
+      <div className={DEFAULT_HEADER}>
+        <div className={`${DEFAULT_COVER_FRAME} bg-ods-border`} />
+        <div className={DEFAULT_TEXT}>
+          <div className={DEFAULT_TITLE}>
+            <span className="block h-[1lh] w-3/4 rounded bg-ods-border" />
           </div>
+          <div className={DEFAULT_META_ROW}>
+            <span className="block h-[1lh] w-32 rounded bg-ods-border" />
+            <span className="block h-[1lh] w-40 rounded bg-ods-border" />
+          </div>
+          <div className={DEFAULT_DESCRIPTION}>
+            <span className="block h-[3lh] w-full rounded bg-ods-border" />
+          </div>
+          {tags && (
+            <div className={DEFAULT_TAG_ROW}>
+              <span className="block h-8 w-24 rounded bg-ods-border" />
+              <span className="block h-8 w-24 rounded bg-ods-border" />
+            </div>
+          )}
         </div>
       </div>
-      <div className="mt-auto p-6 pt-0">
-        <div className="border-t border-ods-border pt-4">
-          <div className="h-9 w-40 rounded bg-ods-bg" />
+      {media > 0 && (
+        <div className={DEFAULT_GALLERY_ROW}>
+          {Array.from({ length: media }, (_, i) => (
+            <div key={i} className={`${DEFAULT_GALLERY_THUMB} bg-ods-border`} />
+          ))}
         </div>
+      )}
+      <div className={DEFAULT_FOOTER}>
+        <div className="h-10 w-40 rounded bg-ods-border" />
       </div>
     </div>
   );
@@ -127,6 +227,10 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   /** OG placeholder URL used by the compact branch when no cover. */
   placeholderUrl?: string | null;
   wholeCardClickable?: boolean;
+  /** `feature` density: the label above the title ("Latest episode"). */
+  eyebrow?: string;
+  /** `default` density: the item's tags, drawn under the description. */
+  tags?: string[];
   className?: string;
 }
 
@@ -173,32 +277,25 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
   };
   return (
     <>
-      <div className="p-6 pt-4">
-        <div className="mb-4 overflow-x-auto">
-          <div className="flex gap-3 pb-2" style={{ width: 'max-content' }}>
-            {images.map((mediaItem, index) => (
-              <div
-                key={mediaItem.id}
-                className="group/thumb relative h-24 w-24 flex-shrink-0 cursor-pointer overflow-hidden rounded-md"
-                onClick={e => openImageModal(index, e)}
-              >
-                <Image
-                  src={mediaItem.media_url}
-                  alt={`${title} photo ${index + 1}`}
-                  fill
-                  className="object-cover transition-transform duration-200 group-hover/thumb:scale-105"
-                  sizes="96px"
-                  loading="lazy"
-                  unoptimized
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity duration-200 group-hover/thumb:opacity-100">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/90">
-                    <span className="text-sm text-black">+</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="overflow-x-auto">
+        <div className={DEFAULT_GALLERY_ROW} style={{ width: 'max-content' }}>
+          {images.map((mediaItem, index) => (
+            <div
+              key={mediaItem.id}
+              className={cn(DEFAULT_GALLERY_THUMB, 'group/thumb cursor-pointer')}
+              onClick={e => openImageModal(index, e)}
+            >
+              <Image
+                src={mediaItem.media_url}
+                alt={`${title} photo ${index + 1}`}
+                fill
+                className="object-cover transition-transform duration-200 group-hover/thumb:scale-105"
+                sizes="200px"
+                loading="lazy"
+                unoptimized
+              />
+            </div>
+          ))}
         </div>
       </div>
       <ImageGalleryModal
@@ -208,6 +305,134 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
         initialIndex={selectedImageIndex || 0}
       />
     </>
+  );
+}
+
+/**
+ * The editorial pair. `feature`: the cover across the top (a wide cover fills
+ * it, square artwork is contained on its own edge colour), then label, title,
+ * date · length, description and the person. `row`: a square cover beside the
+ * title, date · length · person and two lines of description.
+ */
+function ProgramEditorialCard({
+  feature,
+  href,
+  target,
+  rel,
+  title,
+  description,
+  cover,
+  eyebrow,
+  date,
+  typeMeta,
+  profile,
+  playable,
+  className,
+}: {
+  feature: boolean;
+  href: string;
+  target?: '_blank';
+  rel?: string;
+  title: string;
+  description?: string | null;
+  cover: string | null;
+  eyebrow?: string;
+  date: string | null;
+  typeMeta: string | null | undefined;
+  profile: ReturnType<typeof programItemToStripProfile>;
+  playable: boolean;
+  className?: string;
+}) {
+  // The cover is shown WHOLE on its own edge colour: the fill AdminContentCard
+  // and the portrait card use, so square artwork is never cropped or boxed.
+  const edgeColor = useImageEdgeColor(feature ? cover : null, 'transparent');
+  const meta = (
+    <div className={EDITORIAL_META_ROW}>
+      {date && <span className="text-ods-flamingo-pink">{date}</span>}
+      {[typeMeta, feature ? null : profile?.name]
+        .filter((part): part is string => !!part)
+        .map(part => (
+          <span key={part} className="flex items-center gap-[var(--spacing-system-s)] text-ods-text-secondary">
+            <span aria-hidden="true">•</span>
+            {part}
+          </span>
+        ))}
+    </div>
+  );
+
+  if (!feature) {
+    return (
+      <ContentCardFrame
+        as="a"
+        href={href}
+        target={target}
+        rel={rel}
+        aria-label={`Open ${title}`}
+        className={cn(EDITORIAL_ROW_GRID, className)}
+      >
+        <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
+          {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
+          {playable && cover && <CardHoverPlay size="md" />}
+        </span>
+        <span className={EDITORIAL_ROW_TEXT}>
+          <span className="line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3">{title}</span>
+          {meta}
+          <span className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">{description}</span>
+        </span>
+      </ContentCardFrame>
+    );
+  }
+
+  return (
+    <ContentCardFrame
+      as="a"
+      href={href}
+      target={target}
+      rel={rel}
+      aria-label={`Open ${title}`}
+      className={cn('flex flex-col', className)}
+    >
+      <span
+        className={cn(EDITORIAL_FEATURE_COVER, 'transition-colors duration-300')}
+        style={{ backgroundColor: edgeColor }}
+      >
+        {cover && (
+          <Image
+            src={cover}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 640px, 100vw"
+            className="object-contain"
+            unoptimized
+          />
+        )}
+        {playable && cover && <CardHoverPlay size="lg" />}
+      </span>
+      <span className={EDITORIAL_FEATURE_BODY}>
+        {eyebrow && <span className="block h-[1lh] text-ods-text-secondary text-h5">{eyebrow}</span>}
+        <span className="line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3">{title}</span>
+        {meta}
+        <span className="line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h4">{description}</span>
+        {/* The person row keeps its space with or without a person (the skeleton draws it). */}
+        <span className={EDITORIAL_PERSON_ROW}>
+          {profile && (
+            <>
+              <SquareAvatar
+                variant="round"
+                src={profile.avatarUrl || undefined}
+                alt={profile.name}
+                fallback={profile.name.charAt(0).toUpperCase()}
+                size="sm"
+              />
+              <span className="truncate text-h6">
+                <span className="text-ods-text-primary">{profile.name}</span>
+                {profile.subtitle && <span className="text-ods-text-secondary"> · {profile.subtitle}</span>}
+              </span>
+            </>
+          )}
+        </span>
+      </span>
+    </ContentCardFrame>
   );
 }
 
@@ -224,6 +449,8 @@ export function ProgramCard<T extends BaseProgramItem>({
   targetPlatform,
   placeholderUrl: placeholderUrlProp,
   wholeCardClickable = false,
+  eyebrow,
+  tags = [],
   className,
 }: ProgramCardProps<T>) {
   const { target, rel } = useEntityCardLink({
@@ -235,17 +462,15 @@ export function ProgramCard<T extends BaseProgramItem>({
   const placeholderUrl = useEntityCardPlaceholder({
     title: item.title,
     placeholderUrl: placeholderUrlProp,
-    aspect: size === 'sm' ? 'square' : 'wide',
+    aspect: size === 'sm' || size === 'row' ? 'square' : 'wide',
   });
   const coverImage = item.cover_url;
   const images = media.filter(m => isImageMedia(m));
   const hosts = getHosts(item.hosts);
   const accentColor = 'var(--color-accent-primary)';
-  // `status` / `duration_seconds` / `location_name` / `start_at` … live on the
-  // concrete program shapes (PodcastItem / EventItem / WebinarItem), not on
-  // `BaseProgramItem`. The `in` guards narrow them to `unknown`, so each read
-  // below is followed by a real type check instead of a cast.
-  const isScheduled = 'status' in item && item.status === 'scheduled';
+  // A published podcast episode plays; a scheduled one has nothing to play yet.
+  // (`status` lives on the concrete program shapes, not on `BaseProgramItem`.)
+  const isPlayable = config.type === 'podcast' && !('status' in item && item.status === 'scheduled');
 
   // The compact meta line, built by the ONE shared function — the chat card
   // renders the same string from the same code rather than mirroring it.
@@ -287,6 +512,26 @@ export function ProgramCard<T extends BaseProgramItem>({
     );
   }
 
+  if (size === 'feature' || size === 'row') {
+    return (
+      <ProgramEditorialCard
+        feature={size === 'feature'}
+        href={href}
+        target={target}
+        rel={rel}
+        title={item.title}
+        description={item.description}
+        cover={coverImage || placeholderUrl || null}
+        eyebrow={eyebrow}
+        date={formatProgramDate(zonedDate, 'weekday')}
+        typeMeta={compactTypeMetaValue}
+        profile={programItemToStripProfile(item)}
+        playable={isPlayable}
+        className={className}
+      />
+    );
+  }
+
   if (size === 'sm') {
     const itemDate = compactDate;
     const compactCover = coverImage || placeholderUrl || null;
@@ -295,7 +540,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       (s): s is string => typeof s === 'string' && s.length > 0,
     );
     return (
-      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
+      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, 'group', className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
             <Image src={compactCover} alt={item.title} fill sizes="56px" className="object-contain" unoptimized />
@@ -310,11 +555,7 @@ export function ProgramCard<T extends BaseProgramItem>({
               )}
             </span>
           )}
-          {config.type === 'podcast' && !isScheduled && compactCover && (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
-            </span>
-          )}
+          {isPlayable && compactCover && <CardHoverPlay size="sm" />}
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
@@ -342,7 +583,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   // why this asks for an unlabelled webinar value. Restating the dispatch is
   // how the two ended up with three conditions that disagreed: the podcast one
   // dropped the `> 0` check, and the event one dropped the non-empty check.
-  const { typeMeta: defaultTypeMeta } = programMetaLine(
+  const { typeMeta: defaultTypeMeta, audience: defaultAudience } = programMetaLine(
     item,
     config.type,
     programMetaFormatters(PROGRAM_META_RENDERERS, { withZoneLabel: false }),
@@ -362,7 +603,8 @@ export function ProgramCard<T extends BaseProgramItem>({
     // differently — one silent, one confidently "TBD" — is the drift this
     // shared dispatch exists to end.
     if (config.type === 'event') {
-      return defaultTypeMeta ? <span className="font-body text-ods-text-secondary">{defaultTypeMeta}</span> : null;
+      const eventMeta = [defaultTypeMeta, defaultAudience].filter(Boolean).join(' · ');
+      return eventMeta ? <span className="font-body text-ods-text-secondary">{eventMeta}</span> : null;
     }
     if (config.type === 'webinar' && (defaultTypeMeta || zonedDate.timezone)) {
       return (
@@ -376,130 +618,118 @@ export function ProgramCard<T extends BaseProgramItem>({
     return null;
   };
 
+  // An event that spans days reads as its range ("Aug 14 – 20, 2026").
+  const endAt = 'end_at' in item && typeof item.end_at === 'string' ? item.end_at : null;
+  const dateLabel = formatProgramDateRange(zonedDate, endAt) ?? dateFormat;
+
   const cardHeader = (
-    <div className="flex-1 border-ods-border p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-        {coverImage && (
-          <div className="flex w-full flex-shrink-0 items-center md:w-[180px]">
-            <div className="relative overflow-hidden rounded-lg">
-              <Image
-                src={coverImage}
-                alt={item.title}
-                width={180}
-                height={180}
-                className="h-auto w-full rounded-lg object-contain"
-                unoptimized
-              />
-              {config.type === 'podcast' && !isScheduled && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Play className="h-10 w-10 text-ods-text-on-dark" fill="white" />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+    <div className={DEFAULT_HEADER}>
+      {coverImage && (
+        <div className={DEFAULT_COVER_FRAME}>
+          <Image
+            src={coverImage}
+            alt={item.title}
+            fill
+            sizes="(min-width: 1280px) 400px, (min-width: 768px) 320px, 100vw"
+            className="object-cover"
+            unoptimized
+          />
+          {isPlayable && <CardHoverPlay size="md" />}
+        </div>
+      )}
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <h3 className="mb-3 line-clamp-2 flex min-h-[3rem] items-center text-ods-text-primary text-h2 md:min-h-[3.5rem]">
-            {item.title}
-          </h3>
+      <div className={DEFAULT_TEXT}>
+        <h3 className={DEFAULT_TITLE}>{item.title}</h3>
 
-          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-            <span className="text-h6" style={{ color: accentColor }}>
-              {dateFormat}
-            </span>
-            {renderMeta ? (
+        <div className={DEFAULT_META_ROW}>
+          <span style={{ color: accentColor }}>{dateLabel}</span>
+          {renderMeta ? (
+            <>
+              <span className="hidden text-ods-text-secondary md:inline">•</span>
+              {renderMeta(item)}
+            </>
+          ) : (
+            defaultRenderMeta() && (
               <>
                 <span className="hidden text-ods-text-secondary md:inline">•</span>
-                {renderMeta(item)}
+                <div className="flex items-center gap-2">{defaultRenderMeta()}</div>
               </>
-            ) : (
-              defaultRenderMeta() && (
-                <>
-                  <span className="hidden text-ods-text-secondary md:inline">•</span>
-                  <div className="flex items-center gap-2">{defaultRenderMeta()}</div>
-                </>
-              )
-            )}
-          </div>
-
-          <div className="flex-1">
-            <p className="line-clamp-3 min-h-[4.5rem] text-ods-text-secondary text-h6">{item.description}</p>
-          </div>
+            )
+          )}
         </div>
 
-        {hosts.length > 0 && (
-          <div className="md:text-right">
-            <div className="flex flex-wrap gap-2 md:justify-end">
-              {hosts.map((host, index) => (
-                <SquareAvatar
-                  variant="round"
-                  key={`${item.id}-host-${index}`}
-                  src={host.avatar || undefined}
-                  alt={host.name}
-                  fallback={host.name.charAt(0).toUpperCase()}
-                  size="sm"
-                />
-              ))}
-            </div>
+        <p className={DEFAULT_DESCRIPTION}>{item.description}</p>
+
+        {tags.length > 0 && (
+          <div className={DEFAULT_TAG_ROW}>
+            {tags.map(tag => (
+              <Tag key={tag} as="span" label={tag} variant="outline" />
+            ))}
           </div>
         )}
       </div>
+
+      {hosts.length > 0 && (
+        <div className="flex flex-wrap gap-2 md:justify-end">
+          {hosts.map((host, index) => (
+            <SquareAvatar
+              variant="round"
+              key={`${item.id}-host-${index}`}
+              src={host.avatar || undefined}
+              alt={host.name}
+              fallback={host.name.charAt(0).toUpperCase()}
+              size="sm"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 
-  const cardFrameClass = cn(
-    'group flex flex-col overflow-hidden rounded-lg border border-ods-border transition-all duration-200',
-    className,
-  );
-  const cardFrameStyle = { backgroundColor: 'var(--ods-system-greys-black)' } as const;
+  const cardFrameClass = cn(DEFAULT_BODY, className);
+  const actionLabel = `View ${config.labels.singular.toLowerCase()}`;
 
   if (wholeCardClickable) {
     return (
-      <a
+      <ContentCardFrame
+        as="a"
         href={href}
         target={target}
         rel={rel}
-        className={cn(cardFrameClass, 'no-underline hover:border-ods-accent/50')}
-        style={cardFrameStyle}
+        className={cardFrameClass}
         aria-label={`Open ${item.title}`}
       >
         {cardHeader}
         {images.length > 0 && <MediaGallery images={images} title={item.title} />}
-        <div className="mt-auto p-6 pt-0">
-          <div className="border-t border-ods-border pt-4">
-            <span
-              className="inline-flex items-center gap-2 rounded-md border border-ods-accent px-4 py-2 text-ods-accent text-h6"
-              aria-hidden="true"
-            >
-              View {config.labels.singular} Details
-              <ExternalLink className="h-5 w-5" />
-            </span>
-          </div>
+        <div className={DEFAULT_FOOTER}>
+          <span
+            className="inline-flex items-center gap-2 rounded-md border border-ods-border px-4 py-2 text-ods-text-primary text-h4"
+            aria-hidden="true"
+          >
+            {actionLabel}
+            <ArrowRight className="h-5 w-5" />
+          </span>
         </div>
-      </a>
+      </ContentCardFrame>
     );
   }
 
   return (
-    <div className={cardFrameClass} style={cardFrameStyle}>
+    <ContentCardFrame as="div" className={cardFrameClass}>
       <a href={href} target={target} rel={rel} className="block" aria-label={`Open ${item.title}`}>
         {cardHeader}
       </a>
       {images.length > 0 && <MediaGallery images={images} title={item.title} />}
-      <div className="mt-auto p-6 pt-0">
-        <div className="border-t border-ods-border pt-4">
-          <Button
-            variant="outline"
-            size="small-legacy"
-            href={href}
-            openInNewTab={target === '_blank'}
-            rightIcon={<ExternalLink className="h-5 w-5" />}
-          >
-            View {config.labels.singular} Details
-          </Button>
-        </div>
+      <div className={DEFAULT_FOOTER}>
+        <Button
+          variant="outline"
+          href={href}
+          openInNewTab={target === '_blank'}
+          rightIcon={<ArrowRight className="h-5 w-5" />}
+        >
+          {actionLabel}
+        </Button>
       </div>
-    </div>
+    </ContentCardFrame>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
+import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../../chat/entity-cards/content-card-frame';
 
 export interface ProductReleaseCardSkeletonProps {
   /** Additional CSS classes */
@@ -22,21 +23,8 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
   // skeleton's shape matches exactly with zero load-to-resolve reflow.
   if (size === 'lg') {
     return (
-      <div
-        className={cn(
-          'overflow-hidden rounded-lg border border-ods-border bg-ods-card',
-          'flex flex-col gap-4 p-6',
-          'animate-pulse',
-          className,
-        )}
-      >
-        {/* HERO — placeholders use `bg-ods-border` (#3a3a3a) so they
-            contrast against the card's `bg-ods-card`
-            (#212121) container. The metadata grid cells below use
-            `bg-ods-card` containers so `bg-ods-bg` placeholders work
-            there, but in the hero the card IS `bg-ods-card`-equivalent —
-            `bg-ods-bg` (#161616) is only 6 hex points darker than the
-            card and renders nearly invisible.
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex flex-col gap-4 p-6', 'animate-pulse', className)}>
+        {/* HERO: placeholders are `bg-ods-border` bars on the page background.
 
             CRITICAL: title + summary use the SAME min-h containers as
             the loaded card so total card height is byte-identical
@@ -80,30 +68,26 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
           <div className="h-5 w-2/3 rounded bg-ods-border/70" />
         </div>
 
-        {/* METADATA GRID — 4-cell placeholder. The grid cells use
-            `bg-ods-card` containers and `bg-ods-bg` placeholders, which
-            DO contrast correctly because the cells are brighter than
-            the placeholders. Inner content heights mirror the loaded
-            cells (`text-h4` ≈ 28 px + `DM_Sans 14px leading-20`) so
-            total grid height matches the loaded ~86 px. */}
+        {/* METADATA GRID: 4-cell placeholder, the loaded cells' own boxes (no surface of
+            their own; bars on the page background). Inner heights mirror the loaded cells. */}
         <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border md:grid-cols-4">
           {[0, 1, 2].map(i => (
             <div
               key={`cell-${i}`}
-              className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r"
+              className="flex flex-col gap-3 border-b border-ods-border p-4 md:border-b-0 md:border-r"
             >
               <div className="flex flex-col gap-2">
-                <div className="h-7 w-24 rounded bg-ods-bg" />
-                <div className="h-4 w-16 rounded bg-ods-bg/60" />
+                <div className="h-7 w-24 rounded bg-ods-border" />
+                <div className="h-4 w-16 rounded bg-ods-border" />
               </div>
             </div>
           ))}
           {/* Author cell */}
-          <div className="flex items-center gap-3 bg-ods-card p-4">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-bg" />
+          <div className="flex items-center gap-3 p-4">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-border" />
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <div className="h-5 w-3/4 rounded bg-ods-bg" />
-              <div className="h-4 w-1/2 rounded bg-ods-bg/60" />
+              <div className="h-5 w-3/4 rounded bg-ods-border" />
+              <div className="h-4 w-1/2 rounded bg-ods-border" />
             </div>
           </div>
         </div>

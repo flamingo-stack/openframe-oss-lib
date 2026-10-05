@@ -6,12 +6,13 @@ import { MessageOffIcon, Send03Icon } from '../../icons-v2-generated';
 import { Button } from '../../ui/button/button';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { RemoteSessionEndButton } from './remote-session-block';
-import {
-  REMOTE_SESSION_DRAG_HANDLE_CLASS,
-  RemoteSessionDragger,
-  RemoteSessionRecordingTag,
-} from './remote-session-parts';
-import type { RemoteSessionChatMessage, RemoteSessionDragHandlers, RemoteSessionParty } from './types';
+import { REMOTE_SESSION_DRAG_HANDLE_CLASS, RemoteSessionDragger, RemoteSessionStatusRow } from './remote-session-parts';
+import type {
+  RemoteSessionChatMessage,
+  RemoteSessionDragHandlers,
+  RemoteSessionParty,
+  RemoteSessionViewer,
+} from './types';
 
 export interface RemoteSessionChatPanelProps {
   party: RemoteSessionParty;
@@ -19,6 +20,8 @@ export interface RemoteSessionChatPanelProps {
   elapsed: string;
   messages: RemoteSessionChatMessage[];
   showRecordingTag?: boolean;
+  /** Everyone in the session while colleagues watch it, the host included; hidden when empty. */
+  viewers?: RemoteSessionViewer[];
   /** The composer's text; owned by the host so it survives hiding the block. */
   draft: string;
   onDraftChange: (draft: string) => void;
@@ -43,6 +46,7 @@ export function RemoteSessionChatPanel({
   elapsed,
   messages,
   showRecordingTag = false,
+  viewers,
   draft,
   onDraftChange,
   onSend,
@@ -83,7 +87,7 @@ export function RemoteSessionChatPanel({
           </p>
           <p className="w-full truncate text-ods-text-secondary text-h4">You can end this session at any time</p>
         </div>
-        {showRecordingTag && <RemoteSessionRecordingTag />}
+        <RemoteSessionStatusRow showRecordingTag={showRecordingTag} viewers={viewers} />
         <div className="flex w-full items-stretch gap-[var(--spacing-system-m)]">
           <Button
             variant="outline"
