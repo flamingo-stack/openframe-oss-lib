@@ -8,19 +8,18 @@ import {
   type ComponentPropsWithoutRef,
   type ComponentRef,
   type HTMLAttributes,
-  type KeyboardEvent,
-  type PointerEvent,
   type ReactNode,
   forwardRef,
-  useCallback,
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 
 import { useHeaderHeight } from '../../hooks/ui/use-header-height';
+import { type PanelDefaultSize, useResizablePanelSize } from '../../hooks/ui/use-resizable-panel-size';
 import { cn } from '../../utils/cn';
-import { clamp } from '../../utils/common';
+import { PanelResizeHandle } from './panel-resize-handle';
 
 /** Unified overlay backdrop — dimmed, no blur. Single source of truth for
  *  every full-screen backdrop (Drawer, AppLayoutDrawer, MobileBurgerMenu,
@@ -138,181 +137,21 @@ type DrawerSide = 'right' | 'left' | 'top' | 'bottom';
 
 const HORIZONTAL_SIDES: ReadonlySet<DrawerSide> = new Set(['left', 'right']);
 
-function viewportSize(isHorizontal: boolean): number {
-  if (typeof window === 'undefined') return 0;
-  return isHorizontal ? window.innerWidth : window.innerHeight;
-}
+const subscribeToResize = (onChange: () => void) => {
+  window.addEventListener('resize', onChange);
+  return () => window.removeEventListener('resize', onChange);
+};
+const subscribeToNothing = () => () => {};
+const noExtent = () => 0;
 
-interface UseResizableSizeArgs {
-  enabled: boolean;
-  isHorizontal: boolean;
-  minSize: number;
-  maxSize: number;
-  defaultSize: number;
-  storageKey?: string;
-}
-
-function useResizableSize({ enabled, isHorizontal, minSize, maxSize, defaultSize, storageKey }: UseResizableSizeArgs) {
-  const clampToViewport = useCallback(
-    (value: number) => {
-      const vp = viewportSize(isHorizontal);
-      const effectiveMax = vp > 0 ? Math.min(maxSize, vp - 80) : maxSize;
-      return clamp(value, minSize, Math.max(minSize, effectiveMax));
-    },
-    [isHorizontal, minSize, maxSize],
-  );
-
-  const readInitial = useCallback(() => {
-    if (!enabled) return defaultSize;
-    if (typeof window === 'undefined') return defaultSize;
-    if (!storageKey) return clampToViewport(defaultSize);
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) return clampToViewport(defaultSize);
-      const parsed = parseFloat(raw);
-      if (!Number.isFinite(parsed)) return clampToViewport(defaultSize);
-      return clampToViewport(parsed);
-    } catch {
-      return clampToViewport(defaultSize);
-    }
-  }, [enabled, storageKey, defaultSize, clampToViewport]);
-
-  const [size, setSizeRaw] = useState<number>(readInitial);
-
-  const setSize = useCallback((next: number) => setSizeRaw(clampToViewport(next)), [clampToViewport]);
-
-  useEffect(() => {
-    if (!enabled || !storageKey || typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(storageKey, String(Math.round(size)));
-    } catch {
-      // ignore quota / disabled-storage
-    }
-  }, [enabled, size, storageKey]);
-
-  useEffect(() => {
-    if (!enabled || typeof window === 'undefined') return undefined;
-    const onResize = () => setSizeRaw(prev => clampToViewport(prev));
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [enabled, clampToViewport]);
-
-  return { size, setSize };
-}
-
-interface DrawerResizeHandleProps {
-  side: DrawerSide;
-  size: number;
-  minSize: number;
-  maxSize: number;
-  onSize: (next: number) => void;
-  ariaLabel?: string;
-}
-
-function DrawerResizeHandle({ side, size, minSize, maxSize, onSize, ariaLabel }: DrawerResizeHandleProps) {
-  const isHorizontal = HORIZONTAL_SIDES.has(side);
-  const startRef = useRef<{ x: number; y: number; size: number } | null>(null);
-
-  const direction = side === 'right' || side === 'bottom' ? -1 : 1;
-
-  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 && e.pointerType === 'mouse') return;
-    e.preventDefault();
-    startRef.current = { x: e.clientX, y: e.clientY, size };
-    e.currentTarget.setPointerCapture(e.pointerId);
-    document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize';
-    document.body.style.userSelect = 'none';
-  };
-
-  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    const start = startRef.current;
-    if (!start) return;
-    const delta = isHorizontal ? e.clientX - start.x : e.clientY - start.y;
-    onSize(start.size + delta * direction);
-  };
-
-  const endDrag = (e: PointerEvent<HTMLDivElement>) => {
-    if (!startRef.current) return;
-    startRef.current = null;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore — pointer may already be released
-    }
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const step = e.shiftKey ? 40 : 16;
-    if (isHorizontal) {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        onSize(size + step * (side === 'right' ? 1 : -1));
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        onSize(size + step * (side === 'right' ? -1 : 1));
-      }
-    } else {
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        onSize(size + step * (side === 'bottom' ? 1 : -1));
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        onSize(size + step * (side === 'bottom' ? -1 : 1));
-      }
-    }
-    if (e.key === 'Home') {
-      e.preventDefault();
-      onSize(minSize);
-    } else if (e.key === 'End') {
-      e.preventDefault();
-      onSize(maxSize);
-    }
-  };
-
-  // Handle is rendered as a SIBLING of the panel (child of DialogPrimitive.Content)
-  // so the panel can use `overflow-hidden` without clipping the handle.
-  // Wrapper has `py-4 px-4` (or `md:py-4 md:px-4` for flush on desktop)
-  // when the handle is visible — handle is desktop-only, where both flush
-  // and non-flush wrappers carry that padding — so `top-4 bottom-4` (or
-  // `left-4 right-4`) aligns the handle with the panel's bounds.
-  const trackPosition =
-    side === 'right'
-      ? 'right-full top-4 bottom-4 w-3 items-center justify-end pr-1'
-      : side === 'left'
-        ? 'left-full top-4 bottom-4 w-3 items-center justify-start pl-1'
-        : side === 'bottom'
-          ? 'bottom-full left-4 right-4 h-3 justify-center items-end pb-1'
-          : 'top-full left-4 right-4 h-3 justify-center items-start pt-1';
-
-  const cursorClass = isHorizontal ? 'cursor-col-resize' : 'cursor-row-resize';
-
-  const gripClass = isHorizontal ? 'h-10 w-1' : 'w-10 h-1';
-
-  return (
-    <div
-      role="separator"
-      tabIndex={0}
-      aria-orientation={isHorizontal ? 'vertical' : 'horizontal'}
-      aria-valuenow={Math.round(size)}
-      aria-valuemin={minSize}
-      aria-valuemax={maxSize}
-      aria-label={ariaLabel ?? (isHorizontal ? 'Resize panel width' : 'Resize panel height')}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      onKeyDown={handleKeyDown}
-      className={cn(
-        'group absolute z-20 flex touch-none select-none',
-        'outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0',
-        trackPosition,
-        cursorClass,
-      )}
-    >
-      <div aria-hidden className={cn('rounded-full bg-ods-bg-surface', gripClass)} />
-    </div>
+/** The viewport's extent along the resize axis, in px. 0 on the server and
+ *  while `enabled` is false, when nothing listens for resizes at all. A change
+ *  on the other axis (a phone's URL bar collapsing) re-renders nothing. */
+function useViewportExtent(enabled: boolean, isHorizontal: boolean): number {
+  return useSyncExternalStore(
+    enabled ? subscribeToResize : subscribeToNothing,
+    enabled ? (isHorizontal ? () => window.innerWidth : () => window.innerHeight) : noExtent,
+    noExtent,
   );
 }
 
@@ -326,9 +165,12 @@ interface DrawerContentBaseProps
   minSize?: number;
   /** Maximum allowed size (px) when resizable. Also clamped by viewport. */
   maxSize?: number;
-  /** Initial size (px) when no localStorage entry exists. */
-  defaultSize?: number;
-  /** localStorage key for persisting the size across sessions. */
+  /** Size (px) while the user has not resized the panel. Never stored. Pass a
+   *  function of the viewport's extent (0 on the server) for a default that
+   *  tracks the window. */
+  defaultSize?: PanelDefaultSize;
+  /** localStorage key for the size the user chose with the handle. Only that
+   *  choice is stored; see `useResizablePanelSize`. */
   storageKey?: string;
   /** Pixel breakpoint below which `resizable` is disabled and inline
    *  size is not applied (so consumer CSS can render full-viewport).
@@ -400,8 +242,6 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
   ) => {
     const resolvedSide: DrawerSide = side ?? 'right';
     const isHorizontal = HORIZONTAL_SIDES.has(resolvedSide);
-    const initialSize = defaultSize ?? (isHorizontal ? 560 : 480);
-
     const headerHeight = useHeaderHeight();
 
     const [isMobile, setIsMobile] = useState(false);
@@ -414,12 +254,21 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
       return () => mq.removeEventListener('change', update);
     }, [mobileBreakpoint]);
 
-    const { size: resizedSize, setSize } = useResizableSize({
+    // The panel keeps 80px of the viewport free so the page behind it, and the
+    // resize handle, stay reachable.
+    const available = useViewportExtent(resizable, isHorizontal);
+    const panelRef = useRef<HTMLDivElement>(null);
+    const {
+      size: resizedSize,
+      setSize,
+      clampSize,
+    } = useResizablePanelSize({
       enabled: resizable,
-      isHorizontal,
       minSize,
       maxSize,
-      defaultSize: initialSize,
+      defaultSize: defaultSize ?? (isHorizontal ? 560 : 480),
+      available,
+      reserve: 80,
       storageKey,
     });
 
@@ -443,16 +292,20 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
               `overflow-hidden` so the drag track stays visible while the
               panel cleanly clips children to its rounded corners. */}
           {applyInlineSize ? (
-            <DrawerResizeHandle
+            <PanelResizeHandle
+              variant="overlay"
               side={resolvedSide}
               size={resizedSize}
               minSize={minSize}
               maxSize={maxSize}
               onSize={setSize}
+              clampSize={clampSize}
+              panelRef={panelRef}
               ariaLabel={resizeAriaLabel}
             />
           ) : null}
           <div
+            ref={panelRef}
             className={cn(drawerPanelVariants({ side, flush, size }), className, panelClassName)}
             style={{ ...sizeStyle, ...panelStyle }}
           >
