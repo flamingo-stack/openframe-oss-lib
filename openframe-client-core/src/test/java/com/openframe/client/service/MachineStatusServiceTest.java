@@ -215,37 +215,13 @@ class MachineStatusServiceTest {
     }
 
     @Test
-    void processHeartbeat_machinePendingDeletion_lastSeenRefreshedStatusKept() {
-        // setup
-        Machine machine = new Machine();
-        machine.setMachineId(MACHINE);
-        machine.setStatus(DeviceStatus.PENDING_DELETION);
-        machine.setLastSeen(SEEN);
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
+    @DisplayName("T11: a device being deleted is left alone — neither save() nor updateLastSeen")
+    void pendingDeletion_touchesNothing() {
+        machineIs(DeviceStatus.PENDING_DELETION);
 
-        // execution
         service.processHeartbeat(MACHINE, LATER);
 
-        // verifications
-        verify(machineRepository).updateLastSeen(MACHINE, LATER);
-        verify(machineRepository, never()).save(any());
-        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
-    }
-
-    @Test
-    void processHeartbeat_machineDeleted_ignored() {
-        // setup
-        Machine machine = new Machine();
-        machine.setMachineId(MACHINE);
-        machine.setStatus(DeviceStatus.DELETED);
-        machine.setLastSeen(SEEN);
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
-
-        // execution
-        service.processHeartbeat(MACHINE, LATER);
-
-        // verifications
-        verify(machineRepository, never()).updateLastSeen(anyString(), any());
-        verify(machineRepository, never()).save(any());
+        verify(machineRepository, never()).save(any(Machine.class));
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 }

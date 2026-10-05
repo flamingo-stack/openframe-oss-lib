@@ -16,7 +16,6 @@ import java.time.Instant;
 import static com.openframe.data.document.device.DeviceStatus.OFFLINE;
 import static com.openframe.data.document.device.DeviceStatus.ONLINE;
 import static com.openframe.data.document.device.DeviceStatus.PENDING;
-import static com.openframe.data.document.device.DeviceStatus.PENDING_DELETION;
 
 @Service
 @RequiredArgsConstructor
@@ -45,11 +44,6 @@ public class MachineStatusService {
                 .orElseThrow(() -> new MachineNotFoundException(machineId));
 
         if (isDeletionInProgress(machine)) {
-            // the status is frozen until the agent is gone, but a fresh lastSeen still tells the delivery sweep the machine is reachable
-            if (machine.getStatus() == PENDING_DELETION && isEventNewer(eventTimestamp, machine.getLastSeen())) {
-                touchLastSeen(machine, eventTimestamp);
-                return;
-            }
             log.debug("Ignoring {} event for machineId={} in status {}", newStatus, machineId, machine.getStatus());
             return;
         }

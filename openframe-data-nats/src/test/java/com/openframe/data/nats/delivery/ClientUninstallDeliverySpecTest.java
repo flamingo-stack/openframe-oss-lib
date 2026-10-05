@@ -1,9 +1,13 @@
 package com.openframe.data.nats.delivery;
 
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.nats.model.ClientUninstallMessage;
 import com.openframe.delivery.spec.DeliveryRequest;
+import com.openframe.delivery.spec.DeliverySpec;
 import org.junit.jupiter.api.Test;
+
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,6 +31,17 @@ class ClientUninstallDeliverySpecTest {
         assertThat(request.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(request.getPayload().getIssuedAt()).isNotBlank();
         assertThat(request.getPayload().getDelivery()).isNull();
+    }
+
+    @Test
+    void getDeliverableStatuses_machineMarkedForDeletion_stillReceivesTheUninstall() {
+        // execution
+        Set<DeviceStatus> statuses = spec.getDeliverableStatuses();
+
+        // verifications
+        assertThat(statuses).contains(DeviceStatus.PENDING_DELETION, DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
+        assertThat(statuses).doesNotContain(DeviceStatus.DELETED, DeviceStatus.ARCHIVED, DeviceStatus.DECOMMISSIONED);
+        assertThat(DeliverySpec.IN_SERVICE).doesNotContain(DeviceStatus.PENDING_DELETION);
     }
 
     @Test
