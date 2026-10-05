@@ -29,7 +29,8 @@
  *     fetch-mode entries.
  */
 
-import React, { type ReactNode } from 'react';
+import type React from 'react';
+import type { ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
@@ -106,20 +107,15 @@ import type { PrReviewState, GitHubActivityKind } from '../types/entities/github
 import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
 import type { BaseProgramItem, ProgramConfig } from '../types/entities/program-types';
 import { getStatusColorScheme } from '../utils/agent-status-message';
+import { resolveCardDestination } from '../utils/card-destination';
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution';
-import { safeHref } from '../utils/compact-card-classes';
 import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
 import { resolveIcon } from '../utils/icon-library';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
-import {
-  resolveFetchedCardHref,
-  pickFetchedCardHref,
-  readFetchedCardPath,
-  readFetchedCardTitle,
-} from '../utils/resolve-fetched-card-href';
+import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { getSourceLabel } from '../utils/source-icons';
-import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
+import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
 import { BlogCardSkeleton } from './blog-card';
 import { CampaignCardAdminSkeleton } from './campaign-card-admin';
@@ -1634,7 +1630,8 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   }));
 }
 
-const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
+/** Exported for the destination test, which walks every registered type. */
+export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   // ───────── ref-shaped types: hydrated via /api/chat/entity-refs ─────────
   ...githubRegistryEntries(),
   // Generic TOMBSTONE for entities a chat action deleted (ClickUp task
@@ -2007,28 +2004,7 @@ export function ChatCardLoader({
   extras,
 }: ChatCardLoaderProps) {
   const runtime = useRequiredChatRuntime();
-  const resolvedChatRef = React.useMemo<ChatRef>(() => {
-    const cta = resolveSourceRowCTA(
-      {
-        sourceRepo: chatRef.sourceRepo,
-        documentType: chatRef.type,
-        id: chatRef.id,
-        title: chatRef.title,
-        externalUrl: chatRef.url,
-        targetPlatform: chatRef.targetPlatform,
-        path: typeof chatRef.metadata?.path === 'string' ? chatRef.metadata.path : null,
-      },
-      sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
-    );
-    const finalHref = cta.href ? resolveHrefForRuntime(cta.href, runtime) : null;
-    return {
-      ...chatRef,
-      url: finalHref ?? chatRef.url,
-      targetPlatform: cta.targetPlatform ?? chatRef.targetPlatform ?? null,
-    };
-  }, [chatRef, runtime, baseRoute, chipBasePlatform]);
-
-  const entry = CHAT_CARD_REGISTRY[resolvedChatRef.type];
+  const entry = CHAT_CARD_REGISTRY[chatRef.type];
   // Hook order MUST be stable across renders — call the data hook
   // unconditionally regardless of entry mode. For non-fetch types the
   // `contentRefType` is empty so the hook returns `isLoading=false` and
@@ -2036,81 +2012,30 @@ export function ChatCardLoader({
   const fetchEntry = entry && entry.contentRefType ? entry : null;
   const { item, isLoading, isError, isFetched } = useChatCardItem<ChatCardItem>(
     fetchEntry?.contentRefType ?? '',
-    fetchEntry ? resolvedChatRef.id : '',
+    fetchEntry ? chatRef.id : '',
   );
   if (!entry) return null;
 
-  // Apply the post-fetch URL fallback (the ref carried no `externalUrl`).
-  // We mutate `resolvedChatRef.url` BEFORE computing isNewTab so the
-  // wrapper's interceptor sees the destination the user will actually
-  // visit. `safeHref` blocks `javascript:` / `data:` payloads even
-  // though the registry callers compose hub-internal strings today.
-  //
-  // Two producers, ranked by `pickFetchedCardHref` (which owns the
-  // precedence and its rationale):
-  //   1. the registry's per-type `fallbackHref` — an explicit non-content
-  //      destination (marketing campaign → `/admin/...`, or a ref-hydrated
-  //      row's own `item.url`);
-  //   2. the host's `composeContentUrl` seam via `resolveFetchedCardHref` —
-  //      the SAME resolver page cards go through. This is what makes cards
-  //      clickable on every transport: the wire ships bare
-  //      `[card://type:id]` markers with no metadata, so the ref reaches
-  //      us with `url: null` and `resolveSourceRowCTA` has nothing to route.
-  // …except an EXPLICIT host override outranks both: the seam is asked
-  // even for `fallbackHref` / `noComposedHref` types now, and its answer is
-  // taken only when the host actually re-homed the type (never when the
-  // composer merely synthesized one) — the case those two flags guard against.
-  const composedHref =
-    fetchEntry?.contentRefType && !resolvedChatRef.url && item
-      ? resolveFetchedCardHref({
-          contentRefType: fetchEntry.contentRefType,
-          id: resolvedChatRef.id,
-          item,
-          composeContentUrl: runtime.composeContentUrl,
-        })
-      : null;
-  const hrefChoice =
-    fetchEntry && !resolvedChatRef.url && item
-      ? pickFetchedCardHref({
-          composed: composedHref,
-          itemHref: fetchEntry.fallbackHref?.(item) ?? null,
-          allowComposed: !fetchEntry.noComposedHref,
-        })
-      : null;
-  // A doc card (`markdown`, `data_room_doc`) has no url on its row either: its
-  // destination is its viewer plus the row's tree path. The marker carried no
-  // path, so `resolveSourceRowCTA` above had nothing to route; ask it again
-  // with the fetched path, which is the answer the source chip got.
-  const fetchedPath = fetchEntry && !resolvedChatRef.url && item ? readFetchedCardPath(item) : null;
-  const pathCta = fetchedPath
-    ? resolveSourceRowCTA(
-        {
-          sourceRepo: resolvedChatRef.sourceRepo,
-          documentType: resolvedChatRef.type,
-          id: resolvedChatRef.id,
-          title: resolvedChatRef.title,
-          path: fetchedPath,
-        },
-        sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
-      )
-    : null;
-  const hrefResolvedChatRef: ChatRef =
-    pathCta?.href && fetchedPath
-      ? {
-          ...resolvedChatRef,
-          url: resolveHrefForRuntime(pathCta.href, runtime),
-          targetPlatform: pathCta.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
-          // The nav wrapper reads the path off the ref for in-app doc navigation.
-          metadata: { ...(resolvedChatRef.metadata ?? {}), path: fetchedPath },
-        }
-      : hrefChoice
-        ? {
-            ...resolvedChatRef,
-            url: safeHref(hrefChoice.href),
-            // The `item` branch carries no platform of its own — keep the ref's.
-            targetPlatform: hrefChoice.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
-          }
-        : resolvedChatRef;
+  // THE card's destination, decided in one place (`resolveCardDestination`):
+  // the source chip's resolver with the row as far as it is known (the ref's
+  // fields, plus the fetched row's doc path when a bare `[card://type:id]`
+  // marker carried none), else the fetched row's own destination. Computed
+  // BEFORE `isNewTab` so the click wrapper sees the page the user will visit.
+  const destination = resolveCardDestination({
+    chatRef,
+    item: fetchEntry ? item : undefined,
+    entry: fetchEntry,
+    ctx: sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
+    composeContentUrl: runtime.composeContentUrl,
+    resolveHref: href => resolveHrefForRuntime(href, runtime),
+  });
+  const hrefResolvedChatRef: ChatRef = {
+    ...chatRef,
+    url: destination.url,
+    targetPlatform: destination.targetPlatform,
+    // The nav wrapper reads the path off the ref for in-app doc navigation.
+    ...(destination.path ? { metadata: { ...(chatRef.metadata ?? {}), path: destination.path } } : {}),
+  };
 
   // Title enrichment, same synthetic-ref gap as the href above: a Mingo
   // `[card://type:id]` marker produces `title: <id>` because the transport

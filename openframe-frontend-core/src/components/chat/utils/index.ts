@@ -177,6 +177,13 @@ export {
 // Post-fetch enrichment for the minimal ChatRef descriptor a
 // `[card://type:id]` marker produces (the wire ships no card metadata).
 export {
+  resolveCardDestination,
+  type CardDestination,
+  type CardDestinationEntry,
+  type CardDestinationInput,
+  type CardDestinationSource,
+} from './card-destination';
+export {
   resolveFetchedCardHref,
   readFetchedCardPath,
   readFetchedCardTitle,
