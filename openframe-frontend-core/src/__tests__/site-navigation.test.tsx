@@ -5,6 +5,7 @@ import { MOBILE_NAV_SHEET_ID, MobileNavSheet } from '../components/navigation/mo
 import { SiteFooter } from '../components/navigation/site-footer';
 import { SiteHeader } from '../components/navigation/site-header';
 import { adminNav, simpleNav, siteNav } from '../stories/site-nav-fixtures';
+import type { CaseStudy, CaseStudyCardData } from '../types/case-study';
 
 /**
  * What only a render can show: the header's panels are in the DOM while closed
@@ -217,5 +218,15 @@ describe('SiteFooter', () => {
     expect(screen.getByRole('link', { name: 'FAQs', hidden: true })).toHaveAttribute('href', '/faqs');
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+describe('CaseStudyCard input', () => {
+  it('still accepts a full case study row: the prop widened to the fields the card reads', () => {
+    // Compile-time proof for consumers that pass whole rows: if `CaseStudyCardData`
+    // ever asks for something a `CaseStudy` lacks, this file stops type-checking.
+    const cardInput = (study: CaseStudyCardData) => study.id;
+    const row = { id: 7 } as CaseStudy;
+    expect(cardInput(row)).toBe(7);
   });
 });
