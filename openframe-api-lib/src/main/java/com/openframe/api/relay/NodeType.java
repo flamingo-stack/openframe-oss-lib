@@ -16,7 +16,14 @@ public enum NodeType {
     SCRIPT_EXECUTION("ScriptExecution"),
     SCRIPT_SCHEDULE("ScriptSchedule"),
     SCHEDULE_RUN("ScheduleRun"),
-    SOFTWARE_BUNDLE("SoftwareBundle");
+    SOFTWARE_BUNDLE("SoftwareBundle"),
+    TICKET("Ticket"),
+    TICKET_NOTE("TicketNote"),
+    TICKET_ATTACHMENT("TicketAttachment"),
+    TICKET_STATUS_DEFINITION("TicketStatusDefinition"),
+    USER("User"),
+    KNOWLEDGE_BASE_ITEM("KnowledgeBaseItem"),
+    INSIGHT("Insight");
 
     private final String graphqlTypeName;
 
