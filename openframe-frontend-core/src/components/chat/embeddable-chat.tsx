@@ -1601,18 +1601,25 @@ function EmbeddableChatInner({
     [handleNavigationClose],
   );
 
+  // "Ask Mingo" about a row (a card or source chip in the thread, or a page's
+  // `ask-ai:open-with-ref`): asks in the open conversation. Forwarded through a
+  // ref because what it does depends on dialog state declared further down
+  // (`askAboutRef.current` is set next to it: an archived chat is read-only).
+  const askAboutRef = useRef<(reference: ChatRef) => void>(discussRef);
+  const askAbout = useCallback((reference: ChatRef) => askAboutRef.current(reference), []);
+
   // Host-provided renderer for inline entity cards — routes through the
   // shared dispatcher in lib's `entity-cards/dispatch.tsx`.
   const renderEntityCard = useCallback(
     (reference: ChatRef): React.ReactNode =>
       renderChatInlineEntityCard(reference, {
-        onDiscuss: discussRef,
+        onDiscuss: askAbout,
         onDisplay: displayRef,
         baseRoute: resolvedBaseRoute,
         chipBasePlatform,
         extras,
       }),
-    [discussRef, displayRef, resolvedBaseRoute, chipBasePlatform, extras],
+    [askAbout, displayRef, resolvedBaseRoute, chipBasePlatform, extras],
   );
 
   // Stable assistant-icon element. `<ChatMessageList>` forwards this prop to
@@ -1832,11 +1839,11 @@ function EmbeddableChatInner({
       ).detail;
       if (!detail || detail.source !== source) return;
       setIsOpen(true);
-      setTimeout(() => discussRef(detail.ref as ChatRef), 0);
+      setTimeout(() => askAbout(detail.ref as ChatRef), 0);
     };
     window.addEventListener('ask-ai:open-with-ref', handler);
     return () => window.removeEventListener('ask-ai:open-with-ref', handler);
-  }, [source, discussRef, setIsOpen]);
+  }, [source, askAbout, setIsOpen]);
 
   // Listen for plain "open chat" events (no row context). Fired by the
   // header MingoAiButton. Same strict source filter as `ask-ai:open-with-ref`
@@ -1960,12 +1967,12 @@ function EmbeddableChatInner({
             baseRoute={resolvedBaseRoute}
             chipBasePlatform={chipBasePlatform}
             onClose={handleNavigationClose}
-            onDiscuss={discussRef}
+            onDiscuss={askAbout}
           />
         </div>
       );
     },
-    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, discussRef],
+    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, askAbout],
   );
 
   // Host node for in-panel Radix portals (see the body wrapper below).
@@ -2175,6 +2182,30 @@ function EmbeddableChatInner({
   const handleNewChat = useCallback(() => {
     resetToNewChat();
   }, [resetToNewChat]);
+
+  // "Ask Mingo" from an archived chat: the conversation is read-only (the
+  // backend refuses writes), so the question starts a new chat instead. It is
+  // queued until the host has let go of the archived dialog: until then its
+  // `discussRef` still writes into the dialog it has open.
+  const queuedAskRef = useRef<ChatRef | null>(null);
+  useEffect(() => {
+    askAboutRef.current = reference => {
+      if (!isViewingArchived) {
+        discussRef(reference);
+        return;
+      }
+      queuedAskRef.current = reference;
+      if (archiveOpen) closeArchive();
+      resetToNewChat();
+      setComposeOpen(true);
+    };
+  });
+  useEffect(() => {
+    const reference = queuedAskRef.current;
+    if (!reference || activeDialogId != null) return;
+    queuedAskRef.current = null;
+    discussRef(reference);
+  }, [activeDialogId, discussRef]);
 
   // Host prefill (`prefillDraft`) — staged, not written at once. The composer
   // it goes into may only mount on the commit `resetToNewChat` +
