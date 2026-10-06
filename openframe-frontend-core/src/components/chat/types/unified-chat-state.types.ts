@@ -239,7 +239,7 @@ export interface UnifiedChatMessage {
   /**
    * Documents this answer cited, rendered as chips beneath it. Produced by
    * BOTH transports now — SSE reads them off the per-turn metadata frame, NATS
-   * decodes them out of a `GUIDE`/`SOURCES` chunk.
+   * decodes them out of an `ATTACHMENTS` chunk.
    */
   sources?: ChatSource[];
   /**
