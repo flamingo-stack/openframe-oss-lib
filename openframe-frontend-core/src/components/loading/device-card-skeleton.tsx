@@ -81,7 +81,7 @@ export function DeviceCardSkeleton({ className }: DeviceCardSkeletonProps) {
 export function DeviceCardSkeletonGrid({ count = 12, className }: { count?: number; className?: string }) {
   return (
     <div
-      className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4', className)}
+      className={cn('grid grid-cols-1 gap-4 content-md:grid-cols-2 content-lg:grid-cols-4', className)}
       role="status"
       aria-label={`Loading ${count} device cards`}
     >

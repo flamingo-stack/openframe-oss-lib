@@ -66,6 +66,29 @@ export function VideoPlayBadge({ size = 'md', className }: VideoPlayBadgeProps):
   );
 }
 
+/**
+ * The play affordance of a CARD cover: the bare play glyph, shown ONLY while
+ * the card is hovered or holds focus, with no tint over the artwork. One
+ * definition for every entity card whose record has a video (programs, guides,
+ * releases), so none of them paints a permanent glyph or dims its cover. The
+ * host card carries `group` (and `group/card` for the accent); the cover slot
+ * is `relative`.
+ */
+export function CardHoverPlay({ size = 'md', className }: VideoPlayBadgeProps): React.ReactElement {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200',
+        'group-focus-within:opacity-100 group-hover:opacity-100',
+        className,
+      )}
+    >
+      <VideoPlayBadge size={size} />
+    </span>
+  );
+}
+
 export interface VideoUnmuteGlyphProps {
   size?: VideoCenterBadgeSize;
   className?: string;

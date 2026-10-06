@@ -18,6 +18,7 @@
  */
 
 import type { DeliveryItem } from '../../types/delivery';
+import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../chat/entity-cards/content-card-frame';
 import { DeliveryRow } from '../shared/delivery/delivery-row';
 import type { TicketClickupSummary } from './types';
 
@@ -43,7 +44,7 @@ export function TicketLinkedDeliveryCard({ clickup, className }: TicketLinkedDel
   };
 
   return (
-    <div className={`overflow-hidden rounded-md border border-ods-border bg-ods-bg ${className ?? ''}`}>
+    <div className={`${CONTENT_CARD_SKELETON_FRAME_CLASS} ${className ?? ''}`}>
       <DeliveryRow item={item} href={clickup.delivery_href} caption="Linked delivery" />
     </div>
   );

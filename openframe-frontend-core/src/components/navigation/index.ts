@@ -30,6 +30,11 @@ export type { AppHeaderProps, HeaderLoadingCell } from './app-header';
 
 export { AppLayout, useAppLayoutDrawerContainer } from './app-layout';
 export type { AppLayoutProps } from './app-layout';
+export type {
+  AppLayoutSidePanelConfig,
+  AppLayoutSidePanelMode,
+  AppLayoutSidePanelRenderState,
+} from './app-layout-side-panel';
 
 export {
   AppLayoutDrawer,

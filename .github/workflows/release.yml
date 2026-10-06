@@ -27,6 +27,11 @@ on:
         required: false
         type: boolean
         default: false
+      release_tag:
+        description: 'Internal. Set by a release run when it starts itself again on the version tag, so pkg.pr.new serves the build under the version. Leave empty.'
+        required: false
+        type: string
+        default: ''
 
 env:
   REGISTRY: "com.openframe.oss"
@@ -89,23 +94,12 @@ jobs:
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
         run: |
-          OLD_BASE="${{ env.OLD_VERSION }}"
-          [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
-          IFS='.' read -r old_major old_minor old_patch <<< "$OLD_BASE"
-
-          if [ -z "$NEW_VERSION" ]; then
-            NEW_VERSION="${old_major}.${old_minor}.$((old_patch + 1))"
-            echo "No version provided, auto patch bump: $OLD_BASE → $NEW_VERSION"
-          else
-            IFS='.' read -r new_major new_minor new_patch <<< "$NEW_VERSION"
-            if ! ([ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ]) &&
-               ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ]) &&
-               ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq "$old_minor" ] && [ "$new_patch" -eq $((old_patch + 1)) ]); then
-              echo "Invalid version bump: $OLD_BASE → $NEW_VERSION"
-              exit 1
-            fi
-            echo "New version validated: $OLD_BASE → $NEW_VERSION"
-          fi
+          IFS='.' read -r major minor patch <<< "$OLD_VERSION"
+          NEW_VERSION=${NEW_VERSION:-$major.$minor.$((patch + 1))}
+          case "$NEW_VERSION" in
+            "$major.$minor.$((patch + 1))"|"$major.$((minor + 1)).0"|"$((major + 1)).0.0") echo "$OLD_VERSION → $NEW_VERSION" ;;
+            *) echo "Invalid version bump: $OLD_VERSION → $NEW_VERSION"; exit 1 ;;
+          esac
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Build and Deploy ${{ env.NEW_VERSION }}
@@ -139,6 +133,11 @@ jobs:
     name: Release Node (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [changes]
+    permissions:
+      # A release pushes its version tag and starts this workflow on it.
+      contents: write
+      actions: write
+      packages: write
     # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s 
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
@@ -188,7 +187,9 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           PKG_NAME=$(jq -r '.name' package.json)
-          OLD_VERSION=$(npm view "$PKG_NAME" dist-tags.latest 2>/dev/null || echo "0.0.0")
+          # npm's `latest` trails a release by its scan (minutes to 2h); the release's git tag does not.
+          OLD_VERSION=$( { npm view "$PKG_NAME" dist-tags.latest 2>/dev/null; git ls-remote --tags --refs origin | cut -d/ -f3; } | \
+                        grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           OLD_VERSION=${OLD_VERSION:-0.0.0}
           echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
           echo "Found old version: $OLD_VERSION"
@@ -196,8 +197,6 @@ jobs:
       - name: Set Snapshot Version
         if: steps.should_run.outputs.run == 'true' && (github.event_name == 'push' || inputs.snapshot)
         working-directory: ${{ matrix.path }}
-        env:
-          OLD_VERSION: ${{ env.OLD_VERSION }}
         run: |
           NEW_VERSION="${OLD_VERSION}-snapshot.$(date +%Y%m%d%H%M%S)"
           npm version "$NEW_VERSION" --no-git-tag-version
@@ -209,24 +208,20 @@ jobs:
         working-directory: ${{ matrix.path }}
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          OLD_BASE="${{ env.OLD_VERSION }}"
-          [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
-          IFS='.' read -r old_major old_minor old_patch <<< "$OLD_BASE"
-
-          if [ -z "$NEW_VERSION" ]; then
-            NEW_VERSION="${old_major}.${old_minor}.$((old_patch + 1))"
-            echo "No version provided, auto patch bump: $OLD_BASE → $NEW_VERSION"
-          else
-            IFS='.' read -r new_major new_minor new_patch <<< "$NEW_VERSION"
-            if ! ([ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ]) &&
-               ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ]) &&
-               ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq "$old_minor" ] && [ "$new_patch" -eq $((old_patch + 1)) ]); then
-              echo "Invalid version bump: $OLD_BASE → $NEW_VERSION"
-              exit 1
-            fi
-            echo "New version validated: $OLD_BASE → $NEW_VERSION"
+          # The run on the version tag rebuilds the version the release run chose.
+          if [ -n "$RELEASE_TAG" ]; then
+            npm version "$RELEASE_TAG" --no-git-tag-version --allow-same-version
+            echo "NEW_VERSION=$RELEASE_TAG" >> $GITHUB_ENV
+            exit 0
           fi
+          IFS='.' read -r major minor patch <<< "$OLD_VERSION"
+          NEW_VERSION=${NEW_VERSION:-$major.$minor.$((patch + 1))}
+          case "$NEW_VERSION" in
+            "$major.$minor.$((patch + 1))"|"$major.$((minor + 1)).0"|"$((major + 1)).0.0") echo "$OLD_VERSION → $NEW_VERSION" ;;
+            *) echo "Invalid version bump: $OLD_VERSION → $NEW_VERSION"; exit 1 ;;
+          esac
           npm version "$NEW_VERSION" --no-git-tag-version
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
@@ -235,13 +230,49 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
-      - name: Publish ${{ env.NEW_VERSION }}
+      # One tarball for both registries; --ignore-scripts skips a prepack rebuild.
+      - name: Pack ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        run: npm publish --tag ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }} --access public
+        shell: bash
+        run: echo "PACKAGE_TARBALL=$PWD/$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_ENV"
+
+      # Where our apps install from; needs the pkg.pr.new GitHub App.
+      - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        run: |
+          npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --json pkg-pr-new.json "$PACKAGE_TARBALL"
+          jq -r '.packages[0].url' pkg-pr-new.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish ${{ env.NEW_VERSION }} to npmjs
+        if: steps.should_run.outputs.run == 'true' && inputs.release_tag == ''
+        working-directory: ${{ matrix.path }}
+        run: |
+          npm publish "$PACKAGE_TARBALL" --tag "$PUBLISH_TAG" --access public
+          echo "Uploaded $NEW_VERSION to npmjs ($PUBLISH_TAG); served after npm's scan." >> "$GITHUB_STEP_SUMMARY"
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PUBLISH_TAG: ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }}
 
+      # A RELEASE gets an address named after its version:
+      #   https://pkg.pr.new/<owner>/<repo>/<package>@<x.y.z>
+      # pkg.pr.new names a build after the git ref of the run that published it, so
+      # the release is tagged `<x.y.z>` and this workflow is started once more on
+      # that tag (`release_tag`), where it builds the same commit under the same
+      # version and publishes to pkg.pr.new only. A consumer pins that URL.
+      - name: Publish the version address for ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && !inputs.snapshot && inputs.release_tag == ''
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag "$NEW_VERSION" "$GITHUB_SHA"
+          git push origin "refs/tags/$NEW_VERSION"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$NEW_VERSION" -f target=node -f release_tag="$NEW_VERSION"
+          echo "Tagged \`$NEW_VERSION\`; https://pkg.pr.new/$GITHUB_REPOSITORY/$(jq -r '.name' package.json)@$NEW_VERSION is live when the run on that tag finishes." | tee -a "$GITHUB_STEP_SUMMARY"
 
   release-rust:
     name: Release Rust
@@ -267,23 +298,12 @@ jobs:
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
         run: |
-          OLD_BASE="${{ env.OLD_VERSION }}"
-          [[ "$OLD_BASE" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]] && OLD_BASE="${BASH_REMATCH[1]}"
-          IFS='.' read -r old_major old_minor old_patch <<< "$OLD_BASE"
-
-          if [ -z "$NEW_VERSION" ]; then
-            NEW_VERSION="${old_major}.${old_minor}.$((old_patch + 1))"
-            echo "No version provided, auto patch bump: $OLD_BASE → $NEW_VERSION"
-          else
-            IFS='.' read -r new_major new_minor new_patch <<< "$NEW_VERSION"
-            if ! ([ "$new_major" -eq $((old_major + 1)) ] && [ "$new_minor" -eq 0 ] && [ "$new_patch" -eq 0 ]) &&
-               ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq $((old_minor + 1)) ] && [ "$new_patch" -eq 0 ]) &&
-               ! ([ "$new_major" -eq "$old_major" ] && [ "$new_minor" -eq "$old_minor" ] && [ "$new_patch" -eq $((old_patch + 1)) ]); then
-              echo "Invalid version bump: $OLD_BASE → $NEW_VERSION"
-              exit 1
-            fi
-            echo "New version validated: $OLD_BASE → $NEW_VERSION"
-          fi
+          IFS='.' read -r major minor patch <<< "$OLD_VERSION"
+          NEW_VERSION=${NEW_VERSION:-$major.$minor.$((patch + 1))}
+          case "$NEW_VERSION" in
+            "$major.$minor.$((patch + 1))"|"$major.$((minor + 1)).0"|"$((major + 1)).0.0") echo "$OLD_VERSION → $NEW_VERSION" ;;
+            *) echo "Invalid version bump: $OLD_VERSION → $NEW_VERSION"; exit 1 ;;
+          esac
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Push Tag ${{ env.NEW_VERSION }}

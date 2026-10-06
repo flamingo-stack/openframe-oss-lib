@@ -631,9 +631,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
             <div className="relative min-w-0 flex-1">
               {/* No chip-line override on the placeholder: it only renders while
                   the draft is EMPTY, so the editor is always on its plain line
-                  box here. */}
+                  box here. `data-editor-ghost` (here and on the preview) pins
+                  both overlays to 16px on phones alongside `data-editor` — the
+                  iOS focus-zoom rule in app-globals.css. */}
               {isEmpty && !showPreview && (
                 <span
+                  data-editor-ghost
                   className={cn(
                     // One line, clipped with an ellipsis (Figma 954:28455): the
                     // disabled copy is a sentence, and the panel's narrowest
@@ -659,6 +662,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   editor. */}
               {showPreview && (
                 <p
+                  data-editor-ghost
                   className={cn(
                     'pointer-events-none absolute inset-x-0 top-0 m-0 select-none truncate text-ods-text-secondary text-h4',
                     hasChips && '!leading-9',

@@ -11,6 +11,7 @@ import {
   RemoteSessionSummary,
   type RemoteSessionChatMessage,
   type RemoteSessionParty,
+  type RemoteSessionViewer,
 } from '../components/features/remote-session';
 
 /**
@@ -21,6 +22,14 @@ import {
 
 const organization: RemoteSessionParty = { organizationName: 'TechFlow Solutions' };
 const technician: RemoteSessionParty = { ...organization, technicianName: 'Mike Rodriguez' };
+
+const viewers: RemoteSessionViewer[] = [
+  { id: 'h', name: 'Mike Rodriguez', isHost: true },
+  { id: 'v1', name: 'Michael Ellington' },
+  { id: 'v2', name: 'Ilona Hawthorne' },
+  { id: 'v3', name: 'Dana Whitfield' },
+  { id: 'v4', name: 'Anthony Reed' },
+];
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
 
@@ -74,6 +83,11 @@ export const NotRecorded: Story = {
   args: { showRecordingTag: false },
 };
 
+/** Colleagues watch the session: who is in it sits beside the SESSION RECORDING tag. */
+export const Watched: Story = {
+  args: { viewers },
+};
+
 /** A long name truncates before the dragger in the corner. */
 export const LongName: Story = {
   args: { party: { ...technician, technicianName: 'Maximilian Alexander Rodriguez-Fernandez' } },
@@ -89,6 +103,30 @@ export const Chat: Story = {
           party={args.party}
           elapsed={args.elapsed}
           showRecordingTag={args.showRecordingTag}
+          messages={messages}
+          draft={draft}
+          onDraftChange={setDraft}
+          onSend={fn()}
+          onCloseChat={fn()}
+          onEndSession={args.onEndSession}
+          dragHandlers={{ onPointerDown: fn() }}
+        />
+      </RemoteSessionBlockFrame>
+    );
+  },
+};
+
+/** The chat while colleagues watch the session. */
+export const ChatWatched: Story = {
+  render: args => {
+    const [draft, setDraft] = useState('');
+    return (
+      <RemoteSessionBlockFrame expanded onHide={fn()}>
+        <RemoteSessionChatPanel
+          party={args.party}
+          elapsed={args.elapsed}
+          showRecordingTag={args.showRecordingTag}
+          viewers={viewers}
           messages={messages}
           draft={draft}
           onDraftChange={setDraft}
