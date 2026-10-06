@@ -75,7 +75,7 @@ export function ProviderButton({ provider, onClick, disabled = false, loading = 
       variant="outline"
       size="default"
       leftIcon={isLoading ? null : <IconComponent className="h-5 w-5" />}
-      className={`h-[56px] w-full !font-bold !text-h6 hover:bg-ods-bg-hover md:!w-full ${isLoading ? 'cursor-wait' : 'cursor-pointer'} `}
+      className={`h-[56px] w-full !font-bold !text-h6 hover:bg-ods-bg-hover content-md:!w-full ${isLoading ? 'cursor-wait' : 'cursor-pointer'} `}
       aria-label={config.displayName}
     >
       {isLoading ? 'Signing in...' : config.displayName}

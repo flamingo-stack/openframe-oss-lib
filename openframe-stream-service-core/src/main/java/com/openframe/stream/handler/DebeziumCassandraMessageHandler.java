@@ -62,6 +62,8 @@ public class DebeziumCassandraMessageHandler
             logEvent.setDeviceId(enrichedData.getMachineId());
             logEvent.setHostname(enrichedData.getHostname());
             logEvent.setNickname(enrichedData.getNickname());
+            logEvent.setExecutionSource(enrichedData.getExecutionSource());
+            logEvent.setScriptCreationSource(enrichedData.getScriptCreationSource());
             logEvent.setOrganizationId(enrichedData.getOrganizationId());
             logEvent.setOrganizationName(enrichedData.getOrganizationName());
             logEvent.setSeverity(debeziumMessage.getUnifiedEventType().getSeverity().name());

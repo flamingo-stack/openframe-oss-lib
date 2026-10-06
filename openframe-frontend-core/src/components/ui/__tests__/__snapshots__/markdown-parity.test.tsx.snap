@@ -23,7 +23,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: auto-url-generic-
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: auto-url-inside-code-not-embedded 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">code <code class="rounded border border-ods-border bg-ods-card px-1.5 py-0.5 font-mono text-[0.9em] text-ods-text-primary">https://blog.example.com/post-3</code> inline</p>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">arduino</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-arduino hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">https:<span class="hljs-comment">//blog.example.com/post-4</span>
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">https://blog.example.com/post-4
 </code></pre></div></div></pre></article></div></div>"
 `;
 
@@ -181,7 +181,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: images 1`] = `
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: indented-code-angle-bracket-not-escaped 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Para</p>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">css</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-css hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">if <span class="hljs-selector-tag">a</span> &lt;<span class="hljs-selector-tag">b</span> then
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">if a &lt;b then
 done
 </code></pre></div></div></pre></article></div></div>"
 `;
@@ -225,9 +225,9 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: list-continuation
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: list-marker-inside-fence-does-not-shift-indent-columns 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">A &lt;textarea&gt;</p>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">css</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-css hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">- <span class="hljs-attribute">x</span>
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">- x
 </code></pre></div></div></pre>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
 </code></pre></div></div></pre></article></div></div>"
 `;
 
@@ -235,9 +235,9 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: list-marker-insid
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><div>
 &lt;textarea&gt;
 </div>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">css</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-css hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">- <span class="hljs-attribute">x</span>
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">- x
 </code></pre></div></div></pre>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
 </code></pre></div></div></pre>
 <h1 id="heading-after" class="mb-4 mt-8 font-sans font-bold text-ods-text-primary first:mt-0 text-[32px] md:text-[40px] lg:text-[48px] leading-[1.25]">Heading after</h1>
 <p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Body after.</p></article></div></div>"
@@ -287,13 +287,13 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: mermaid 1`] = `
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: mismatched-fence-carve-does-not-shelter-opener 1`] = `
-"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">go</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-go hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"><span class="hljs-string">\`\`</span><span class="hljs-string">\`js
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">\`\`\`js
 ~~~
-</span></code></pre></div></div></pre>
+</code></pre></div></div></pre>
 <p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">&lt;textarea&gt;<br>
 hello</p>
-<pre><code class="rounded border border-ods-border bg-ods-card px-1.5 py-0.5 font-mono text-[0.9em] text-ods-text-primary">after
-</code></pre></article></div></div>"
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">after
+</code></pre></div></div></pre></article></div></div>"
 `;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: nested-lists 1`] = `
@@ -430,7 +430,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-indented-code-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Explaining &lt;textarea&gt; in prose.</p>
 <h2 id="after-heading" class="mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary text-[28px] md:text-[32px]">After heading</h2>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
 </code></pre></div></div></pre>
 <p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">tail</p></article></div></div>"
 `;
@@ -501,9 +501,9 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 <ul class="my-4 ml-8 list-outside list-disc space-y-2 text-ods-text-primary">
 <li class="pl-2 text-[16px] md:text-[18px]">
 <p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">item</p>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">go</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-go hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"><span class="hljs-string">\`\`</span><span class="hljs-string">\`html
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">\`\`\`html
 &lt;/textarea&gt;
-\`</span><span class="hljs-string">\`\`</span>
+\`\`\`
 </code></pre></div></div></pre>
 </li>
 </ul>
@@ -725,7 +725,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in
 exports[`RichMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-tab-indented-code-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Explaining &lt;textarea&gt; in prose.</p>
 <h2 id="after-heading" class="mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary text-[28px] md:text-[32px]">After heading</h2>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
 </code></pre></div></div></pre>
 <p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">tail</p></article></div></div>"
 `;
@@ -1170,7 +1170,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: wide-list-marker-
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Explaining &lt;textarea&gt; in HTML.</p>
 <ul class="my-4 ml-8 list-outside list-disc space-y-2 text-ods-text-primary">
 <li class="pl-2 text-[16px] md:text-[18px]">
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"> foo
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"> foo
  &lt;/textarea&gt;
 </code></pre></div></div></pre>
 </li>
@@ -1322,7 +1322,7 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: images 1`] = `
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: indented-code-angle-bracket-not-escaped 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">Para</p>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">css</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-css hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">if <span class="hljs-selector-tag">a</span> &lt;<span class="hljs-selector-tag">b</span> then
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">if a &lt;b then
 done
 </code></pre></div></div></pre></article></div></div>"
 `;
@@ -1366,9 +1366,9 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: list-continuati
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: list-marker-inside-fence-does-not-shift-indent-columns 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">A &lt;textarea&gt;</p>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">css</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-css hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">- <span class="hljs-attribute">x</span>
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">- x
 </code></pre></div></div></pre>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
 </code></pre></div></div></pre></article></div></div>"
 `;
 
@@ -1376,9 +1376,9 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: list-marker-ins
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><div>
 &lt;textarea&gt;
 </div>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">css</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-css hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">- <span class="hljs-attribute">x</span>
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">- x
 </code></pre></div></div></pre>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
 </code></pre></div></div></pre>
 <h1 id="heading-after" class="mb-4 mt-8 font-sans font-bold first:mt-0 text-heading-1">Heading after</h1>
 <p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">Body after.</p></article></div></div>"
@@ -1428,13 +1428,13 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: mermaid 1`] = `
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: mismatched-fence-carve-does-not-shelter-opener 1`] = `
-"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">go</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-go hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"><span class="hljs-string">\`\`</span><span class="hljs-string">\`js
+"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">\`\`\`js
 ~~~
-</span></code></pre></div></div></pre>
+</code></pre></div></div></pre>
 <p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">&lt;textarea&gt;<br>
 hello</p>
-<pre><code class="rounded border border-ods-border bg-ods-card px-1.5 py-0.5 font-mono text-[0.9em] text-ods-text-primary">after
-</code></pre></article></div></div>"
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">after
+</code></pre></div></div></pre></article></div></div>"
 `;
 
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: nested-lists 1`] = `
@@ -1569,7 +1569,7 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-indented-code-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">Explaining &lt;textarea&gt; in prose.</p>
 <h2 id="after-heading" class="mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-heading-2">After heading</h2>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
 </code></pre></div></div></pre>
 <p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">tail</p></article></div></div>"
 `;
@@ -1640,9 +1640,9 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 <ul class="my-4 ml-8 list-outside list-disc space-y-2 text-ods-text-primary">
 <li class="pl-2 text-base md:text-lg">
 <p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">item</p>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">go</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-go hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"><span class="hljs-string">\`\`</span><span class="hljs-string">\`html
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">\`\`\`html
 &lt;/textarea&gt;
-\`</span><span class="hljs-string">\`\`</span>
+\`\`\`
 </code></pre></div></div></pre>
 </li>
 </ul>
@@ -1864,7 +1864,7 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-
 exports[`SimpleMarkdownRenderer golden parity > renders fixture: rawtext-closer-in-tab-indented-code-does-not-unescape 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">Explaining &lt;textarea&gt; in prose.</p>
 <h2 id="after-heading" class="mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-heading-2">After heading</h2>
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);">&lt;/textarea&gt;
 </code></pre></div></div></pre>
 <p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">tail</p></article></div></div>"
 `;
@@ -2285,7 +2285,7 @@ exports[`SimpleMarkdownRenderer golden parity > renders fixture: wide-list-marke
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0 md:text-h4 lg:text-h4">Explaining &lt;textarea&gt; in HTML.</p>
 <ul class="my-4 ml-8 list-outside list-disc space-y-2 text-ods-text-primary">
 <li class="pl-2 text-base md:text-lg">
-<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">bash</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-bash hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"> foo
+<pre><div class="code-block-container my-6 overflow-hidden rounded-lg border border-ods-border bg-ods-card"><div class="code-header border-b border-ods-border bg-ods-card px-4 py-2"><span class="font-sans text-xs uppercase tracking-wide text-ods-text-tertiary">code</span></div><div class="p-4"><pre class="overflow-x-auto"><code class="language-code hljs font-mono text-[14px]" style="background: transparent; color: var(--color-text-primary);"> foo
  &lt;/textarea&gt;
 </code></pre></div></div></pre>
 </li>

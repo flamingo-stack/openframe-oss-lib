@@ -39,7 +39,7 @@ import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected
 import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
 import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown';
-import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../layout/page-heading';
 import {
   Button,
   type ButtonProps,
@@ -262,11 +262,11 @@ export function ContactForm({
 
   return (
     <div
-      className={`flex h-full flex-col ${!noBorder ? 'rounded-2xl border border-ods-border md:rounded-3xl' : ''} ${!noPadding ? 'p-6 md:p-8 lg:p-10' : ''}`}
+      className={`flex h-full flex-col ${!noBorder ? 'rounded-2xl border border-ods-border content-md:rounded-3xl' : ''} ${!noPadding ? 'p-6 content-md:p-8 content-lg:p-10' : ''}`}
     >
       {(title || subtitle) && (
-        <div className="mb-6 md:mb-8">
-          {title && <h2 className={`${SECTION_HEADING_CLASS} mb-3 md:mb-4`}>{title}</h2>}
+        <div className="mb-6 content-md:mb-8">
+          {title && <h2 className={`${SECTION_HEADING_CLASS} mb-3 content-md:mb-4`}>{accentSentenceMarks(title)}</h2>}
           {subtitle && <p className="text-ods-text-primary text-h4">{subtitle}</p>}
         </div>
       )}
@@ -283,7 +283,7 @@ export function ContactForm({
             Object.fromEntries(Object.entries(validationErrors).map(([k, v]) => [k, v?.message ?? v])),
           );
         })}
-        className="flex flex-grow flex-col space-y-4 md:space-y-6"
+        className="flex flex-grow flex-col space-y-4 content-md:space-y-6"
         {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}
       >
         {/* Hidden inputs for fields that are required by `ContactSchema`
@@ -308,7 +308,7 @@ export function ContactForm({
         {extraTopField}
 
         {showNameEmailRow && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 content-md:grid-cols-2 content-md:gap-6">
             {showName && (
               <div className="flex flex-col">
                 <Label htmlFor="name">
@@ -359,7 +359,7 @@ export function ContactForm({
         )}
 
         {(showCompanySize || showReferralSource) && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 content-md:grid-cols-2 content-md:gap-6">
             {showCompanySize && (
               <div className="flex flex-col">
                 <Label htmlFor="companySize">Company Size</Label>
@@ -511,14 +511,16 @@ export function ContactForm({
           </div>
         )}
 
-        <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 md:flex-row md:gap-6">
-          {footerText && <p className="text-center text-ods-text-secondary text-h6 md:text-left">{footerText}</p>}
+        <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 content-md:flex-row content-md:gap-6">
+          {footerText && (
+            <p className="text-center text-ods-text-secondary text-h6 content-md:text-left">{footerText}</p>
+          )}
           <Button
             type="submit"
             loading={isSubmitting}
             disabled={isSubmitting || isSuccess || (attachmentsEnabled && attachments.hasInflightUploads)}
             variant={buttonVariant}
-            className={`w-full md:w-auto ${buttonClassName}`}
+            className={`w-full content-md:w-auto ${buttonClassName}`}
           >
             {isSuccess ? submitSuccessLabel : submitLabel}
           </Button>

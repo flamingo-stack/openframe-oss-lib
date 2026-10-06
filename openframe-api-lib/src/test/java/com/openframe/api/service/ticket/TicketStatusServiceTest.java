@@ -11,6 +11,7 @@ import com.openframe.api.exception.ticket.InvalidTicketStatusReplacementExceptio
 import com.openframe.api.exception.ticket.SystemTicketStatusModificationException;
 import com.openframe.api.exception.ticket.TicketStatusInUseException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
+import com.openframe.core.exception.ForbiddenException;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -146,7 +147,7 @@ class TicketStatusServiceTest {
         @Test
         void create_byNonAdmin_isRejectedBeforeAnyLookup() {
             assertThatThrownBy(() -> service.create(principal(ActorType.AGENT), create("Nope", "#ff0000")))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(ForbiddenException.class)
                     .hasMessageContaining("ADMIN");
 
             verify(statusRepository, never()).save(any());
@@ -217,7 +218,7 @@ class TicketStatusServiceTest {
         @Test
         void update_byNonAdmin_isRejectedBeforeAnyLookup() {
             assertThatThrownBy(() -> service.update(principal(ActorType.AGENT), update("st-hold", "Paused", null)))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(ForbiddenException.class)
                     .hasMessageContaining("ADMIN");
 
             verifyNoInteractions(statusRepository, ticketRepository);
@@ -298,7 +299,7 @@ class TicketStatusServiceTest {
         @Test
         void delete_byNonAdmin_isRejectedBeforeAnyLookup() {
             assertThatThrownBy(() -> service.delete(principal(ActorType.AGENT), delete("st-hold", null)))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(ForbiddenException.class)
                     .hasMessageContaining("ADMIN");
 
             verifyNoInteractions(statusRepository, ticketRepository);
@@ -527,7 +528,7 @@ class TicketStatusServiceTest {
         @Test
         void reorder_byNonAdmin_isRejectedBeforeAnyLookup() {
             assertThatThrownBy(() -> service.reorder(principal(ActorType.AGENT), reorder("st-move", "st-hold", null)))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(ForbiddenException.class)
                     .hasMessageContaining("ADMIN");
 
             verifyNoInteractions(statusRepository, ticketRepository);

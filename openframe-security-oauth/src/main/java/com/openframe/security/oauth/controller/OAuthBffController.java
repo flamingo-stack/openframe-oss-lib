@@ -1,5 +1,7 @@
 package com.openframe.security.oauth.controller;
 
+import com.openframe.core.exception.AuthErrorCode;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredException;
@@ -21,6 +23,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static com.openframe.security.oauth.SecurityConstants.*;
 import static org.springframework.http.HttpHeaders.LOCATION;
 import static org.springframework.http.HttpStatus.FOUND;
@@ -103,11 +106,14 @@ public class OAuthBffController {
                 )))
                 .onErrorResume(e -> {
                     log.error("OAuth callback failed: {}", e.getMessage(), e);
-                    String msg = URLEncoder.encode(
-                            e.getMessage() != null ? e.getMessage() : "Authentication failed. Please try again.",
-                            StandardCharsets.UTF_8);
-                    return Mono.just(buildFound(authErrorUrl + "?error=" + msg, state));
+                    AuthErrorCode errorCode = errorCodeOf(e);
+                    String target = authErrorUrl + "?ref=" + errorCode.name();
+                    return Mono.just(buildFound(target, state));
                 });
+    }
+
+    private AuthErrorCode errorCodeOf(Throwable failure) {
+        return failure instanceof AuthFlowException flowException ? flowException.getCode() : SSO_LOGIN_FAILED;
     }
 
     @PostMapping("/refresh")

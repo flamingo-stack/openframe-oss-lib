@@ -2,6 +2,7 @@ use super::*;
 
 fn windows(edition: Option<&str>, product_type: ProductType, build: Option<u32>) -> OsSpec {
     OsSpec {
+        os: Os::Windows,
         arch: Arch::X86_64,
         product_type,
         edition_id: edition.map(str::to_string),
@@ -11,6 +12,7 @@ fn windows(edition: Option<&str>, product_type: ProductType, build: Option<u32>)
 
 fn mac(arch: Arch) -> OsSpec {
     OsSpec {
+        os: Os::Mac,
         arch,
         product_type: ProductType::Unknown,
         edition_id: None,
@@ -97,25 +99,46 @@ fn an_unreadable_edition_still_gates_an_old_server() {
 }
 
 #[test]
-fn unknown_facts_fail_open() {
-    let spec = OsSpec {
-        arch: Arch::Unknown,
-        product_type: ProductType::Unknown,
-        edition_id: None,
-        build: None,
-    };
-    assert_eq!(support_of(ManagerId::Brew, &spec), Support::Supported);
-    assert_eq!(support_of(ManagerId::Winget, &spec), Support::Supported);
+fn unknown_facts_fail_open_on_the_right_platform() {
+    assert_eq!(
+        support_of(ManagerId::Brew, &mac(Arch::Unknown)),
+        Support::Supported
+    );
+    assert_eq!(
+        support_of(
+            ManagerId::Winget,
+            &windows(None, ProductType::Unknown, None)
+        ),
+        Support::Supported
+    );
 }
 
 #[test]
-fn gating_one_manager_leaves_the_others_alone() {
-    let intel = mac(Arch::X86_64);
-    assert!(is_gated(ManagerId::Brew, &intel));
-    assert_eq!(support_of(ManagerId::Winget, &intel), Support::Supported);
-    assert_eq!(support_of(ManagerId::Choco, &intel), Support::Supported);
+fn every_manager_is_gated_off_its_platform() {
+    let desktop = windows(Some("Professional"), ProductType::Workstation, Some(19045));
+    assert!(is_gated(ManagerId::Brew, &desktop));
+    assert!(is_gated(ManagerId::Winget, &mac(Arch::Arm64)));
+}
 
-    let server = windows(Some("ServerStandard"), ProductType::Server, Some(20348));
-    assert!(is_gated(ManagerId::Winget, &server));
-    assert_eq!(support_of(ManagerId::Choco, &server), Support::Supported);
+#[test]
+fn choco_is_gated_everywhere_while_disabled() {
+    assert!(is_gated(ManagerId::Choco, &mac(Arch::Arm64)));
+    assert!(is_gated(
+        ManagerId::Choco,
+        &windows(Some("Professional"), ProductType::Workstation, Some(19045))
+    ));
+}
+
+#[test]
+fn each_manager_is_judged_independently() {
+    let apple_silicon = mac(Arch::Arm64);
+    assert_eq!(
+        support_of(ManagerId::Brew, &apple_silicon),
+        Support::Supported
+    );
+    assert!(is_gated(ManagerId::Winget, &apple_silicon));
+
+    let desktop = windows(Some("Professional"), ProductType::Workstation, Some(19045));
+    assert_eq!(support_of(ManagerId::Winget, &desktop), Support::Supported);
+    assert!(is_gated(ManagerId::Brew, &desktop));
 }

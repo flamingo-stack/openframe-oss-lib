@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
+import { usePathname } from '../embed-shims/next-navigation';
 import { useSelfFetch } from '../hooks/use-self-fetch';
 import type { Announcement, AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
 import { ANNOUNCEMENT_CTA_DEFAULTS } from '../types/announcement';
@@ -13,6 +14,7 @@ import {
 } from '../utils/announcement-storage';
 import { getAppType } from '../utils/app-config';
 import { pickReadableTextColor } from '../utils/color-analysis';
+import { pathMatchesAny } from '../utils/path-pattern';
 import { EntityIcon } from './icon-display';
 import { AnnouncementBarView } from './ui/announcement-bar-view';
 import { Button } from './ui/button';
@@ -78,6 +80,11 @@ export function AnnouncementBar({
   // serves one platform's announcements.
   const platform = getAppType();
 
+  // The path the bar is on, from the host's router (the navigation shim: Next's
+  // `usePathname` on a Next host, the embedder's registered router elsewhere).
+  // Read HERE so every host gets `excluded_paths` with no wiring of its own.
+  const pathname = usePathname();
+
   // Optional endpoint runtime: no provider → no URL → fetching disabled.
   const endpoints = useEndpointsRuntime();
   const url = previewMode ? null : (endpoints?.announcementsUrl ?? null);
@@ -139,7 +146,12 @@ export function AnnouncementBar({
   );
 
   // Preview always mirrors the draft directly (storage is not consulted there).
-  const expanded = previewMode ? announcement != null : announcement != null && expandedState && !dismissed;
+  // A page that shows the news itself (a hero's news pill) is listed in the
+  // announcement's `excluded_paths` (path patterns); the bar stays collapsed there.
+  const excludedHere = pathMatchesAny(pathname, announcement?.excluded_paths);
+  const expanded = previewMode
+    ? announcement != null
+    : announcement != null && expandedState && !dismissed && !excludedHere;
 
   // Cleanup of the pre-refactor localStorage announcement cache. Keyed on
   // `platform` rather than `[]`: the cache is per-platform, so a platform

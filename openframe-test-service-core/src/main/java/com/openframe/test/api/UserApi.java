@@ -2,11 +2,13 @@ package com.openframe.test.api;
 
 import com.openframe.test.data.dto.error.ErrorResponse;
 import com.openframe.test.data.dto.user.*;
+import io.restassured.response.Response;
 
 import java.util.List;
 import java.util.Map;
 
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
+import static com.openframe.test.helpers.RequestSpecHelper.getUnAuthorizedSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.getUnAuthorizedAuthSpec;
 import static io.restassured.RestAssured.given;
 
@@ -44,10 +46,57 @@ public class UserApi {
                 .extract().as(AuthUser.class);
     }
 
+    public static AuthUser updateUser(String userId, UpdateUserRequest request) {
+        return given(getAuthorizedSpec())
+                .body(request)
+                .put(USERS.concat("/").concat(userId))
+                .then().statusCode(200)
+                .extract().as(AuthUser.class);
+    }
+
+    public static ErrorResponse attemptUpdateUser(String userId, UpdateUserRequest request) {
+        return given(getAuthorizedSpec())
+                .body(request)
+                .put(USERS.concat("/").concat(userId))
+                .then().statusCode(400)
+                .extract().as(ErrorResponse.class);
+    }
+
     public static int deleteUser(String userId) {
         final String DELETE_USER = USERS.concat("/").concat(userId);
         return given(getAuthorizedSpec())
                 .delete(DELETE_USER).statusCode();
+    }
+
+    public static void transferOwnership(String userId) {
+        final String TRANSFER_OWNERSHIP = USERS.concat("/").concat(userId).concat("/transfer-ownership");
+        given(getAuthorizedSpec())
+                .post(TRANSFER_OWNERSHIP)
+                .then().statusCode(204);
+    }
+
+    // The same transfer made from another user's session (cookies from AuthFlow.login).
+    public static void transferOwnership(String userId, Map<String, String> cookies) {
+        final String TRANSFER_OWNERSHIP = USERS.concat("/").concat(userId).concat("/transfer-ownership");
+        given(getUnAuthorizedSpec())
+                .cookies(cookies)
+                .post(TRANSFER_OWNERSHIP)
+                .then().statusCode(204);
+    }
+
+    // A transfer expected to be refused, or made by cleanup that must not throw: returns the raw response.
+    public static Response attemptTransferOwnership(String userId) {
+        final String TRANSFER_OWNERSHIP = USERS.concat("/").concat(userId).concat("/transfer-ownership");
+        return given(getAuthorizedSpec())
+                .post(TRANSFER_OWNERSHIP);
+    }
+
+    // The same, from another user's session (cookies from AuthFlow.login).
+    public static Response attemptTransferOwnership(String userId, Map<String, String> cookies) {
+        final String TRANSFER_OWNERSHIP = USERS.concat("/").concat(userId).concat("/transfer-ownership");
+        return given(getUnAuthorizedSpec())
+                .cookies(cookies)
+                .post(TRANSFER_OWNERSHIP);
     }
 
     public static void resetPassword(User user) {

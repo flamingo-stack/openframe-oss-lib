@@ -12,8 +12,10 @@ import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareResponse;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
+import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -42,6 +44,9 @@ public class DeviceHostInventoryLoader {
     private final TenantIdProvider tenantIdProvider;
     private final CorrelatedHostSoftwareCache hostSoftwareCache;
     private final ToolConnectionRepository toolConnectionRepository;
+
+    @Value("${openframe.rmm.software.fleet-paging.enabled:false}")
+    private boolean fleetPaging;
 
     public HostInventory load(FleetMdmClient fleet, String machineId) {
         Machine machine = requireMachine(machineId);
@@ -90,8 +95,13 @@ public class DeviceHostInventoryLoader {
 
     private HostInventory loadInventory(FleetMdmClient fleet, long hostId) {
         List<HostSoftwareTitle> titles = fetchAllTitles(fleet, hostId);
-        List<FleetSoftware> hostSoftware = correlatedSoftwareOf(fleet, hostId);
+        List<FleetSoftware> hostSoftware = fleetPaging ? hostSoftwareOf(fleet, hostId) : correlatedSoftwareOf(fleet, hostId);
         return HostInventory.of(titles, hostSoftware);
+    }
+
+    private static List<FleetSoftware> hostSoftwareOf(FleetMdmClient fleet, long hostId) {
+        HostVulnerabilityInventory host = fleet.getHostVulnerabilityInventoryById(hostId);
+        return host == null || host.software() == null ? List.of() : host.software();
     }
 
     private List<FleetSoftware> correlatedSoftwareOf(FleetMdmClient fleet, long hostId) {

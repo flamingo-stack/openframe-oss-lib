@@ -9,6 +9,8 @@ import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.exception.PackageNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
@@ -16,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class BrewPackageClientTest {
@@ -74,6 +78,28 @@ class BrewPackageClientTest {
         when(packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.BREW, "nope")).thenReturn(List.of());
 
         assertThrows(PackageNotFoundException.class, () -> client.findPackage("nope", null));
+    }
+
+    @Test
+    void emptyQueryPagesTheCatalogMostPopularFirstWithoutScoring() {
+        // setup
+        Sort mostPopularFirst = Sort.by(Sort.Order.desc("popularity"), Sort.Order.asc("packageId"));
+        PackageCatalogEntry gh = formulaEntry("gh", "gh", 90000);
+        PackageCatalogEntry slack = caskEntry("slack", "Slack", 7594);
+        PackageCatalogEntry xz = formulaEntry("xz", "xz", 400);
+        when(packageCatalogRepository.findByManager(PackageManagerType.BREW, PageRequest.of(0, 3, mostPopularFirst)))
+                .thenReturn(List.of(gh, slack, xz));
+        when(packageCatalogRepository.countByManager(PackageManagerType.BREW)).thenReturn(15323L);
+
+        // execution
+        PackageSearchResult result = client.search("", 2, 1);
+
+        // verifications
+        List<String> ids = result.getItems().stream().map(item -> item.getId()).toList();
+        assertEquals(List.of("slack", "xz"), ids);
+        assertEquals(15323, result.getTotal());
+        assertTrue(result.isHasMore());
+        verify(packageCatalogRepository, never()).findByManagerAndSearchBlobContaining(PackageManagerType.BREW, "");
     }
 
     @Test

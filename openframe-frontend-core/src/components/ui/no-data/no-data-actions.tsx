@@ -25,13 +25,15 @@ const NoDataAction = React.forwardRef<HTMLDivElement, NoDataActionProps>(functio
       ref={ref}
       className={cn(
         'flex flex-1 items-center gap-[var(--spacing-system-s)] p-[var(--spacing-system-m)] text-ods-text-secondary',
-        'md:w-[224px] md:flex-none md:flex-col md:items-start md:gap-[var(--spacing-system-xs)]',
+        'content-md:w-[224px] content-md:flex-none content-md:flex-col content-md:items-start content-md:gap-[var(--spacing-system-xs)]',
         className,
       )}
       {...props}
     >
       {icon && <span className={cn(noDataIconClasses, 'text-ods-text-primary')}>{icon}</span>}
-      <span className="min-w-0 flex-1 break-words text-h6 md:w-full md:flex-none">{label ?? children}</span>
+      <span className="min-w-0 flex-1 break-words text-h6 content-md:w-full content-md:flex-none">
+        {label ?? children}
+      </span>
     </div>
   );
 });
@@ -61,7 +63,11 @@ const NoDataActions = React.forwardRef<HTMLDivElement, NoDataActionsProps>(funct
   return (
     <div
       ref={ref}
-      className={cn(noDataActionsVariants({ variant }), 'flex w-full flex-col md:w-auto md:flex-row', className)}
+      className={cn(
+        noDataActionsVariants({ variant }),
+        'flex w-full flex-col content-md:w-auto content-md:flex-row',
+        className,
+      )}
       {...props}
     >
       {blocks.map((block, index) => (
@@ -69,7 +75,7 @@ const NoDataActions = React.forwardRef<HTMLDivElement, NoDataActionsProps>(funct
           {index > 0 && (
             <div
               aria-hidden="true"
-              className="shrink-0 self-stretch border-t border-ods-border md:border-l md:border-t-0"
+              className="shrink-0 self-stretch border-t border-ods-border content-md:border-l content-md:border-t-0"
             />
           )}
           {block}

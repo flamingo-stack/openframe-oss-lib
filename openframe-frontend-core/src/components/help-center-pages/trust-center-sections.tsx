@@ -72,9 +72,9 @@ const BODY_TEXT = 'text-h6 text-ods-text-secondary';
  * beside the section rail.
  */
 export const TRUST_STATUS_ROW_CLASS =
-  'flex flex-col gap-[var(--spacing-system-xs)] md:flex-row md:items-center md:justify-between';
+  'flex flex-col gap-[var(--spacing-system-xs)] content-md:flex-row content-md:items-center content-md:justify-between';
 export const TRUST_BODY_GRID_CLASS =
-  'grid grid-cols-1 gap-[var(--spacing-system-xl)] lg:grid-cols-[minmax(0,1fr)_12rem]';
+  'grid grid-cols-1 gap-[var(--spacing-system-xl)] content-lg:grid-cols-[minmax(0,1fr)_12rem]';
 export const TRUST_SECTIONS_COLUMN_CLASS = 'flex min-w-0 flex-col gap-[var(--spacing-system-xxl)]';
 
 /** Each section's one-line lead under its heading (the page and its skeleton read the same copy). */
@@ -89,7 +89,7 @@ export const TRUST_SECTION_LEADS: Partial<Record<TrustCenterSectionId, string>> 
  * The right-hand action / status column: ONE width from tablet up, so every
  * panel's rows line up; on phones it hugs its content so the title keeps the room.
  */
-const ACTION_COLUMN = 'shrink-0 md:w-36';
+const ACTION_COLUMN = 'shrink-0 content-md:w-36';
 
 // ---------------------------------------------------------------------------
 // Section frame
@@ -202,7 +202,7 @@ export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFrame
  * so the list box shows exactly 5 of them and scrolls for
  * the rest.
  */
-const CONTROL_ROW_CLASS = 'h-14 md:h-20 overflow-hidden';
+const CONTROL_ROW_CLASS = 'h-14 content-md:h-20 overflow-hidden';
 
 /** ONE row renderer for the controls list: fixed-height rows, one line each for name and description. */
 function controlRows(controls: TrustCenterControl[]): PanelRow[] {
@@ -229,7 +229,7 @@ function countLabel(n: number, noun: string): string {
  * md) plus their 1px separators and the panel's border. Controls, loading,
  * empty and error all fill this same box, so nothing below it moves.
  */
-const CONTROLS_LIST_HEIGHT = 'h-[calc(5*3.5rem+7px)] md:h-[calc(5*5rem+7px)]';
+const CONTROLS_LIST_HEIGHT = 'h-[calc(5*3.5rem+7px)] content-md:h-[calc(5*5rem+7px)]';
 
 /** Skeleton rows shown in the list box while the server's answer is on its way: exactly the box's visible rows. */
 const CONTROLS_SKELETON_ROWS = 5;
@@ -332,11 +332,11 @@ export function ControlsSection({ endpoint, seed }: { endpoint: string; seed: Tr
           setDomain(categories.find(category => controlsTabId(category.domain) === tabId)?.domain ?? null)
         }
       />
-      <div className="flex flex-col gap-[var(--spacing-system-s)] md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-[var(--spacing-system-s)] content-md:flex-row content-md:items-center content-md:justify-between">
         <p className={BODY_TEXT} aria-live="polite">
           {summary}
         </p>
-        <div className="w-full md:w-80">
+        <div className="w-full content-md:w-80">
           <SearchInput
             placeholder="Search controls"
             value={typed}
@@ -598,7 +598,7 @@ function skeletonRows(count: number, shape: { mark: 'logo' | 'glyph'; action: 'b
               className={shape.mark === 'logo' ? 'size-10 shrink-0 rounded-full' : 'size-6 shrink-0 rounded'}
             />
             <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
-              <UnifiedSkeleton variant="text" className="h-5 w-1/3 md:h-6" />
+              <UnifiedSkeleton variant="text" className="h-5 w-1/3 content-md:h-6" />
               <TextSkeleton.Body className="w-1/2" />
             </div>
           </div>
@@ -612,7 +612,7 @@ function skeletonRows(count: number, shape: { mark: 'logo' | 'glyph'; action: 'b
           shape.action === 'badge' ? (
             <UnifiedSkeleton className="h-4 w-28 rounded" />
           ) : (
-            <UnifiedSkeleton className="h-6 w-16 rounded md:h-8" />
+            <UnifiedSkeleton className="h-6 w-16 rounded content-md:h-8" />
           ),
       },
     ],
@@ -626,13 +626,13 @@ function ControlsSectionSkeleton() {
       <div className="flex items-center gap-[var(--spacing-system-xxs)] overflow-hidden">
         {[0, 1, 2, 3].map(index => (
           <div key={index} className="shrink-0 p-[var(--spacing-system-m)]">
-            <UnifiedSkeleton variant="text" className="h-5 w-36 md:h-6" />
+            <UnifiedSkeleton variant="text" className="h-5 w-36 content-md:h-6" />
           </div>
         ))}
       </div>
-      <div className="flex flex-col gap-[var(--spacing-system-s)] md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-[var(--spacing-system-s)] content-md:flex-row content-md:items-center content-md:justify-between">
         <TextSkeleton.Body className="w-48" />
-        <UnifiedSkeleton className="h-11 w-full rounded-[6px] md:h-12 md:w-80" />
+        <UnifiedSkeleton className="h-11 w-full rounded-[6px] content-md:h-12 content-md:w-80" />
       </div>
       <div className={CONTROLS_LIST_HEIGHT}>
         <ControlsListSkeleton />
@@ -675,7 +675,7 @@ export function TrustCenterSkeleton() {
           <TextSkeleton.Body className="w-44" />
         </div>
         {/* `DataAttribution`'s own layout: two lines below `sm`, one row above it. */}
-        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] sm:flex-row sm:items-center sm:gap-[var(--spacing-system-sf)]">
+        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] content-sm:flex-row content-sm:items-center content-sm:gap-[var(--spacing-system-sf)]">
           <div className="flex items-center gap-[var(--spacing-system-xsf)]">
             <UnifiedSkeleton className="size-4 rounded" />
             <TextSkeleton.Body className="w-36" />
@@ -695,7 +695,7 @@ export function TrustCenterSkeleton() {
             <StackedRowsPanel rows={skeletonRows(2, { mark: 'glyph', action: 'button' })} />
           </SkeletonSection>
         </div>
-        <aside className="hidden lg:block" aria-hidden="true">
+        <aside className="hidden content-lg:block" aria-hidden="true">
           <SectionRailSkeleton />
         </aside>
       </div>

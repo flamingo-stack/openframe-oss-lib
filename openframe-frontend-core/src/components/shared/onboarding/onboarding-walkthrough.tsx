@@ -3,12 +3,20 @@
 import React, { useRef, useCallback } from 'react';
 import { useOnboardingState, type OnboardingStepConfig } from '../../../hooks/ui/use-onboarding-state';
 import { cn } from '../../../utils/cn';
-import { SECTION_HEADING_CLASS } from '../../layout/page-heading';
+import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../../layout/page-heading';
 import { Button } from '../../ui/button';
 import { OnboardingStepCard } from './onboarding-step-card';
 
 export interface OnboardingWalkthroughProps {
   steps: OnboardingStepConfig[];
+  /** Heading above the steps. Defaults to "Get Started". */
+  title?: string;
+  /**
+   * What to render once the walkthrough is dismissed. Receives `restart`,
+   * which clears every completed/skipped step and shows the walkthrough
+   * again. Omitted: a dismissed walkthrough renders nothing.
+   */
+  renderDismissed?: (restart: () => void) => React.ReactNode;
   onDismiss?: () => void;
   storageKey?: string;
   className?: string;
@@ -26,6 +34,8 @@ export interface OnboardingWalkthroughProps {
 
 export function OnboardingWalkthrough({
   steps,
+  title = 'Get Started',
+  renderDismissed,
   onDismiss,
   storageKey = 'openframe-onboarding-state',
   className,
@@ -38,6 +48,7 @@ export function OnboardingWalkthrough({
     markComplete,
     markSkipped,
     dismissOnboarding,
+    resetOnboarding,
     isStepComplete,
     isStepSkipped,
     allStepsComplete,
@@ -63,8 +74,11 @@ export function OnboardingWalkthrough({
     // Skip if no completion status
     if (!completionStatus) return;
 
-    // Create a stable key from completion status to detect actual changes
-    const statusKey = JSON.stringify(completionStatus);
+    // Create a stable key from completion status to detect actual changes.
+    // An empty state (first load, or after a restart) is keyed by when it was
+    // written, so a restart applies the same status again.
+    const isFreshState = state.completedSteps.length === 0 && state.skippedSteps.length === 0;
+    const statusKey = `${JSON.stringify(completionStatus)}|${isFreshState ? state.lastUpdated : ''}`;
 
     // Skip if we've already processed this exact status
     if (lastCompletionStatusRef.current === statusKey) return;
@@ -86,7 +100,6 @@ export function OnboardingWalkthrough({
       // Mark as in progress to prevent concurrent calls
       autoMarkingInProgressRef.current = true;
 
-      console.log('📊 Auto-marking steps as complete from hook data:', completedStepIds);
       markMultipleComplete(completedStepIds);
 
       // Update the last processed status key
@@ -101,14 +114,20 @@ export function OnboardingWalkthrough({
       // Even if no steps to mark, update the status key to prevent re-processing
       lastCompletionStatusRef.current = statusKey;
     }
-  }, [completionStatus, isLoadingCompletion, state.completedSteps, markMultipleComplete]);
+  }, [
+    completionStatus,
+    isLoadingCompletion,
+    state.completedSteps,
+    state.skippedSteps,
+    state.lastUpdated,
+    markMultipleComplete,
+  ]);
 
   // useCallback must be called unconditionally (before any early returns)
   const handleStepAction = useCallback(
     async (step: OnboardingStepConfig) => {
       // Prevent duplicate action handling for the same step
       if (actionInProgressRef.current.has(step.id)) {
-        console.log(`⏳ Action already in progress for "${step.id}", skipping`);
         return;
       }
 
@@ -120,13 +139,11 @@ export function OnboardingWalkthrough({
 
         // Skip if already completed (could have been auto-marked while action was running)
         if (state.completedSteps.includes(step.id)) {
-          console.log(`✓ Step "${step.id}" already completed, skipping mark`);
           return;
         }
 
         // Auto-mark Knowledge Base as complete (no verification needed)
         if (step.id === 'knowledge-base') {
-          console.log(`🎯 Auto-completing Knowledge Base`);
           markComplete(step.id);
           return;
         }
@@ -135,7 +152,6 @@ export function OnboardingWalkthrough({
         if (step.checkComplete) {
           try {
             const isComplete = await step.checkComplete();
-            console.log(`🔍 Post-action check for "${step.id}": isComplete=${isComplete}`);
 
             // Double-check it wasn't completed while we were checking
             if (isComplete && !state.completedSteps.includes(step.id)) {
@@ -166,7 +182,7 @@ export function OnboardingWalkthrough({
   // ALL hooks have been called above - now safe to do conditional returns
   // Don't render if dismissed
   if (state.dismissed) {
-    return null;
+    return renderDismissed ? <>{renderDismissed(resetOnboarding)}</> : null;
   }
 
   const isAllComplete = allStepsComplete(steps);
@@ -175,7 +191,7 @@ export function OnboardingWalkthrough({
     <div className={cn('w-full space-y-4', className)}>
       {/* Header - responsive: stacks on mobile */}
       <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center md:gap-0">
-        <h2 className={SECTION_HEADING_CLASS}>Get Started</h2>
+        <h2 className={SECTION_HEADING_CLASS}>{accentSentenceMarks(title)}</h2>
 
         {isLoadingCompletion ? (
           <div className="h-[48px] w-full animate-pulse rounded-[6px] bg-ods-border md:w-[160px]" />

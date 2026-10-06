@@ -68,9 +68,9 @@ const SkeletonGrid = forwardRef<HTMLDivElement, SkeletonGridProps>(
         ref={ref}
         className={cn(
           `grid grid-cols-1 gap-6`,
-          columns === 2 && 'md:grid-cols-2',
-          columns === 3 && 'md:grid-cols-3',
-          columns === 4 && 'md:grid-cols-4',
+          columns === 2 && 'content-md:grid-cols-2',
+          columns === 3 && 'content-md:grid-cols-3',
+          columns === 4 && 'content-md:grid-cols-4',
           className,
         )}
         {...props}

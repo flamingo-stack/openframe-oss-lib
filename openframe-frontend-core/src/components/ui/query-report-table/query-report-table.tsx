@@ -65,7 +65,7 @@ export function QueryReportTable({
             {headerActions}
             {showExport && data.length > 0 && (
               <Button
-                className="bg-ods-card max-md:hidden"
+                className="bg-ods-card content-max-md:hidden"
                 variant="outline"
                 leftIcon={<Download02Icon size={18} className="text-ods-text-secondary" />}
                 onClick={handleExport}

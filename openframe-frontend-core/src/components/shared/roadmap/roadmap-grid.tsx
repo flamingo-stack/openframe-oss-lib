@@ -141,11 +141,11 @@ function RoadmapGridSingle({
   votingTasks: Set<string>;
 }) {
   return (
-    // LITERAL class strings: an interpolated `md:grid-cols-${n}` is invisible
+    // LITERAL class strings: an interpolated `content-md:grid-cols-${n}` is invisible
     // to Tailwind's scanner and is never generated.
     <div
-      className={`grid grid-cols-1 gap-6 ${columns === 2 ? 'md:grid-cols-2' : ''} ${
-        showLeftMargin ? 'md:ml-[120px]' : ''
+      className={`grid grid-cols-1 gap-6 ${columns === 2 ? 'content-md:grid-cols-2' : ''} ${
+        showLeftMargin ? 'content-md:ml-[120px]' : ''
       }`}
     >
       {items.map(item => (

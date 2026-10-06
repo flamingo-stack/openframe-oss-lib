@@ -2,6 +2,11 @@
 
 import { Boxes, Database, Hand, Plug, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from '../utils/cn';
+import {
+  OPENFRAME_CLASSIFICATIONS,
+  isOpenFrameClassification,
+  type OpenFrameClassification,
+} from '../utils/vendor-classification';
 import { OpenSourceIcon, CoinsIcon } from './icons-stub';
 import { OpenFrameLogo } from './openframe-logo';
 
@@ -18,6 +23,8 @@ export interface VendorTagProps {
     | 'ai'
     | 'manual'
     | 'openframe_selected'
+    | 'openframe_connect'
+    | 'openframe_shipped'
     | 'placeholder'
     | 'api'
     | 'data'
@@ -28,6 +35,17 @@ export interface VendorTagProps {
   size?: 'sm' | 'md';
   hidden?: boolean;
   accentColor?: string;
+}
+
+/** An OpenFrame classification: the OpenFrame mark and its one word ("Selected", "Connect"). */
+function openFrameTag(classification: OpenFrameClassification, text?: string) {
+  return {
+    text: text || OPENFRAME_CLASSIFICATIONS[classification].word,
+    textColor: undefined,
+    icon: (
+      <OpenFrameLogo lowerPathColor="currentColor" upperPathColor="currentColor" className="h-4 w-4 text-ods-accent" />
+    ),
+  };
 }
 
 export function VendorTag({ type, text, className = '', hidden = false, size = 'md', accentColor }: VendorTagProps) {
@@ -195,17 +213,8 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
               </div>
             ),
           };
-        } else if (classificationType === 'openframe_selected') {
-          return {
-            text: 'OpenFrame Selected',
-            icon: (
-              <OpenFrameLogo
-                lowerPathColor="currentColor"
-                upperPathColor="currentColor"
-                className="h-4 w-4 text-ods-accent"
-              />
-            ),
-          };
+        } else if (isOpenFrameClassification(classificationType)) {
+          return openFrameTag(classificationType);
         } else {
           // Fallback for unknown classification types
           return {
@@ -219,16 +228,9 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
         }
       }
       case 'openframe_selected':
-        return {
-          text: text || 'OpenFrame Selected',
-          icon: (
-            <OpenFrameLogo
-              lowerPathColor="currentColor"
-              upperPathColor="currentColor"
-              className="h-4 w-4 text-ods-accent"
-            />
-          ),
-        };
+      case 'openframe_connect':
+      case 'openframe_shipped':
+        return openFrameTag(type, text);
       default:
         return {
           text: text || type,
