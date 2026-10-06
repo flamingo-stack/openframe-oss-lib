@@ -51,6 +51,9 @@ public class GlobalIdCodec {
     }
 
     public Optional<ParsedGlobalId> parse(String id) {
+        if (!hasText(id)) {
+            return Optional.empty();
+        }
         String canonical = toUrlSafeUnpadded(id);
         return decodeUtf8(canonical)
                 .map(GLOBAL_ID::matcher)
@@ -60,13 +63,15 @@ public class GlobalIdCodec {
 
     private String rawIdOf(ParsedGlobalId globalId, NodeType expected) {
         String expectedName = expected.getGraphqlTypeName();
+        String actualTypeName = globalId.getTypeName();
+        String rawId = globalId.getRawId();
         if (!globalId.isOfType(expected)) {
-            throw new InvalidGlobalIdException("Expected a " + expectedName + " id, got " + globalId.getTypeName());
+            throw new InvalidGlobalIdException("Expected a " + expectedName + " id, got " + actualTypeName);
         }
-        if (!hasText(globalId.getRawId())) {
+        if (!hasText(rawId)) {
             throw new InvalidGlobalIdException("Empty " + expectedName + " id");
         }
-        return globalId.getRawId();
+        return rawId;
     }
 
     private static String toUrlSafeUnpadded(String id) {
@@ -82,7 +87,8 @@ public class GlobalIdCodec {
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT);
             CharBuffer chars = strictUtf8.decode(buffer);
-            return Optional.of(chars.toString());
+            String decoded = chars.toString();
+            return Optional.of(decoded);
         } catch (IllegalArgumentException | CharacterCodingException e) {
             return Optional.empty();
         }

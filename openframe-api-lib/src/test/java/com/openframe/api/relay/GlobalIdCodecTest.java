@@ -70,7 +70,7 @@ class GlobalIdCodecTest {
 
     @ParameterizedTest
     @ValueSource(strings = {OBJECT_ID, "3f1e9c2a-7b4d-4e8f-9a1b-2c3d4e5f6a7b", MACHINE_RAW_ID, "client-1",
-            "abc", "!!!", "12345", NON_UTF8_BASE64})
+            "abc", "!!!", "12345", NON_UTF8_BASE64, "aGVsbG8", "bWFjaGluZToxMg"})
     void decode_rawId_returnedUnchanged(String rawId) {
         // execution
         String decoded = codec.decode(rawId, TICKET);
@@ -98,6 +98,14 @@ class GlobalIdCodecTest {
 
         // verifications
         assertThat(exception.getMessage()).isEqualTo("Expected a Ticket id, got Machine");
+    }
+
+    @Test
+    void invalidGlobalIdException_code_invalidId() {
+        // execution
+        InvalidGlobalIdException exception = new InvalidGlobalIdException("x");
+
+        // verifications
         assertThat(exception.getCode()).isEqualTo("INVALID_ID");
     }
 
@@ -121,6 +129,19 @@ class GlobalIdCodecTest {
 
         // verifications
         assertThat(decoded).containsExactly(OBJECT_ID, OBJECT_ID);
+    }
+
+    @Test
+    void decodeAll_globalIdOfOtherType_throwsInvalidGlobalId() {
+        // setup
+        List<String> ids = List.of(TICKET_GLOBAL_ID, MACHINE_GLOBAL_ID);
+
+        // execution
+        InvalidGlobalIdException exception = assertThrows(InvalidGlobalIdException.class,
+                () -> codec.decodeAll(ids, TICKET));
+
+        // verifications
+        assertThat(exception.getMessage()).isEqualTo("Expected a Ticket id, got Machine");
     }
 
     @Test
@@ -148,6 +169,17 @@ class GlobalIdCodecTest {
     void parse_rawObjectId_empty() {
         // execution
         Optional<ParsedGlobalId> parsed = codec.parse(OBJECT_ID);
+
+        // verifications
+        assertThat(parsed).isEmpty();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void parse_nullOrBlank_empty(String id) {
+        // execution
+        Optional<ParsedGlobalId> parsed = codec.parse(id);
 
         // verifications
         assertThat(parsed).isEmpty();
