@@ -296,9 +296,9 @@ Variants: `primary`, `secondary`, `outline`, `footer-link` (minimal, zero-paddin
 
 Radix-based. `z-[2147483647]` so it beats everything. Always wrap trigger in `TooltipProvider`.
 
-### Header
+### SiteHeader
 
-`autoHide` flag in `HeaderConfig` — true hides on scroll-down/shows on scroll-up, false stays fixed. Z-index `z-[50]`. `border-ods-border` is always applied.
+`autoHide` prop of `SiteHeader`: true hides on scroll-down/shows on scroll-up, false stays fixed. Z-index `z-[50]`. `border-ods-border` is always applied.
 
 ### StickySectionNav
 

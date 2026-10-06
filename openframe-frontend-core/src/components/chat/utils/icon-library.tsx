@@ -52,6 +52,8 @@ import { GraduationCapIcon } from '../../icons-v2-generated/school/graduation-ca
 import { TicketIcon } from '../../icons-v2-generated/shopping/ticket-icon';
 import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
 import { FlamingoLogo } from '../../icons/flamingo-logo';
+import { MiamiCyberGangLogoFaceOnly } from '../../icons/miami-cyber-gang-logo-face-only';
+import { MlgLogo } from '../../icons/mlg-logo';
 import { OpenFrameLogo } from '../../icons/openframe-logo';
 import { OpenmspLogo } from '../../icons/openmsp-logo';
 import { getIconComponent } from './icon-registry';
@@ -71,8 +73,26 @@ function sizedLogo(Logo: ComponentType<{ className?: string; style?: CSSProperti
     return <Logo className={className} style={{ width: size, height: size }} />;
   };
 }
-const OpenmspLogoIcon = sizedLogo(OpenmspLogo);
+// The OpenMSP mark's own defaults are black and white (made for a light page):
+// on the dark surfaces every glyph sits on, they are pinned to the theme's
+// tokens, the way the OpenMSP header draws its logo.
+const OpenmspLogoIcon: IconComponent = ({ size = 16, className }) => (
+  <OpenmspLogo
+    className={className}
+    style={{ width: size, height: size }}
+    frontBubbleColor="var(--color-text-primary)"
+    innerFrontBubbleColor="var(--color-bg)"
+    backBubbleColor="var(--color-accent-primary)"
+  />
+);
 const FlamingoLogoIcon = sizedLogo(FlamingoLogo);
+// The two community marks size themselves through a `size` prop, the resolver's own contract.
+const MlgLogoIcon: IconComponent = ({ size = 16, className, color }) => (
+  <MlgLogo size={size} className={className} color={color} />
+);
+const TmcgLogoIcon: IconComponent = ({ size = 16, className }) => (
+  <MiamiCyberGangLogoFaceOnly size={size} className={className} />
+);
 
 /**
  * `OpenFrameLogo` from `components/icons/` predates the v2 set and:
@@ -138,6 +158,8 @@ export const ICON_ALIASES: Record<string, IconComponent> = {
   // (was the separate `renderSvgIcon` map; now ONE resolver everywhere).
   'openframe-logo': LogoOpenframeIcon,
   'openmsp-logo': OpenmspLogoIcon,
+  'mlg-logo': MlgLogoIcon,
+  'tmcg-logo': TmcgLogoIcon,
   flamingo: FlamingoLogoIcon,
   'flamingo-logo': FlamingoLogoIcon,
   megaphone: Megaphone,

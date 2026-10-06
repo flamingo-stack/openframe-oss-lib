@@ -1,45 +1,74 @@
 'use client';
 
 import type React from 'react';
+import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
+import { shortcutLabel } from '../../utils/visitor-os';
 import { MingoIcon } from '../icons';
 
 export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   source?: string;
-  /** The platform's Mingo identity glyph — pass the SAME server-configured
+  /** The platform's Mingo identity glyph: pass the SAME server-configured
    *  icon the chat panel renders (host-side: `EntityIcon` fed by the admin
    *  `assistantIcon`), so the launcher and the panel can never diverge.
    *  Falls back to the packaged Mingo mark when the server has none. */
   icon?: React.ReactNode;
-  /** The launcher's wordmark + aria-label — pass the server-configured
+  /** The launcher's wordmark + aria-label: pass the server-configured
    *  assistant name (same `assistantName` the chat panel shows) so the
    *  launcher never hardcodes an identity the admin has renamed. */
   label?: string;
+  /** Show the keyboard hint (Cmd K on Apple platforms, Ctrl K elsewhere) beside
+   *  the label. The HOST binds the shortcut; this only shows it. Default false. */
+  shortcutHint?: boolean;
+  /** `inline` (default): the header launcher, the height and type of the menu
+   *  items beside it. `field`: the full-width row that opens the mobile menu
+   *  (the name reads as the field's prompt). ONE component, so every Mingo
+   *  launcher carries the same identity, ring and event. */
+  variant?: 'inline' | 'field';
 }
 
+const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
+
 /**
- * Marketing-header Mingo AI launcher: the flush, full-height button rendered
- * at the far right edge of the public `Header` (`config.mingo`). Stateless:
- * clicking dispatches an `ask-ai:open` CustomEvent (source-filtered) that the
- * mounted `EmbeddableChat` panel listens for.
+ * THE Mingo AI launcher, in the site header's right cluster and at the top of
+ * the mobile menu (`variant="field"`): the round identity glyph, the
+ * assistant's name and an optional shortcut hint, sized like the menu items
+ * beside it. Stateless: clicking dispatches an `ask-ai:open`
+ * CustomEvent (source-filtered) that the mounted `EmbeddableChat` panel
+ * listens for.
+ *
+ * It carries the AI edge light (`.mingo-edge-frame` / `.mingo-edge` in
+ * `styles/chat-animations.css`): an accent arc travelling around its outline,
+ * with a one-shot shimmer on hover. Static under reduced motion.
  *
  * Distinct from `header-mingo-button.tsx` (`HeaderMingoButton`), the
  * dashboard/AppHeader controlled toggle; different surface and contract, do
  * not merge them.
  *
- * Deliberately a raw `<button>` rather than the ui-kit `Button`: it needs
- * full-height flush cell layout, an absolutely-positioned animated ring, and
- * icon-only collapse that `Button` cannot express (same precedent as
- * `header-mingo-button.tsx`).
+ * Deliberately a raw `<button>` rather than the ui-kit `Button`: it needs an
+ * absolutely-positioned animated ring and an icon-only collapse that `Button`
+ * cannot express (same precedent as `header-mingo-button.tsx`).
  */
-const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
+export function MingoAiButton({
+  source,
+  icon,
+  label = 'Mingo AI',
+  shortcutHint = false,
+  variant = 'inline',
+  className,
+  onClick,
+  ...props
+}: MingoAiButtonProps) {
+  // Known after hydration only: until then the hint keeps its space, empty.
+  const visitor = useVisitorOs();
+  const field = variant === 'field';
 
-export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onClick, ...props }: MingoAiButtonProps) {
   return (
     <button
       {...props}
       type="button"
       aria-label={label}
+      aria-keyshortcuts={shortcutHint ? 'Meta+K Control+K' : undefined}
       onClick={e => {
         // Coalesce to '' so a source-less mount still matches EmbeddableChat's
         // own `runtime.source ?? ''` comparison (undefined !== '' would make
@@ -48,56 +77,68 @@ export function MingoAiButton({ source, icon, label = 'Mingo AI', className, onC
         onClick?.(e);
       }}
       className={cn(
-        // Unified ODS top-navigation cell (Figma 2797-6808 desktop /
-        // 2797-7275 mobile): full-height cell with a leading divider,
-        // transparent at rest so it inherits the bar's background.
-        // No hover background on the cell: the animated ring + shimmer are
-        // the ONLY hover treatment (a bg flip on top read as a double
-        // animation).
-        'group/mingo relative flex h-full shrink-0 items-center border-l border-ods-border bg-transparent px-[var(--spacing-system-m)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        // Transparent at rest so it inherits the bar's background; the hover
+        // wash is the menu items' own.
+        'group/mingo relative flex shrink-0 items-center gap-[var(--spacing-system-xsf)] rounded-md text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        field
+          ? 'h-[52px] w-full bg-ods-card px-[var(--spacing-system-sf)] text-left'
+          : 'h-10 pl-[var(--spacing-system-xsf)] pr-2.5',
         className,
       )}
     >
-      {/* Inner box = 1:1 twin of the DEFAULT-size Button geometry (rounded-md,
-          h-11 md:h-12, px-m) — the same footprint as the header's "Try for
-          Free" CTA — so the animated ring traces exactly where a full button
-          border would sit inside the 72px bar. */}
-      <span className="relative flex h-11 items-center gap-[var(--spacing-system-xsf)] rounded-md px-[var(--spacing-system-m)] md:h-12">
-        {/* AI edge light (Apple-Intelligence-style): a rotating accent-
-            gradient arc clipped to a 3px ring on the box outline via CSS
-            mask (.mingo-edge-frame) — NO opaque cover, so the launcher
-            inherits whatever background sits behind it. Platform-tinted via
-            the accent token. */}
-        <span aria-hidden="true" className="mingo-edge-frame pointer-events-none absolute inset-0 rounded-md">
-          <span className="mingo-edge" />
-        </span>
-        {/* One-shot light-streak shimmer on hover, clipped to the box. */}
-        <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
-          <span
-            className="mingo-shimmer absolute inset-y-0 left-0 w-1/2"
-            style={{
-              background:
-                'linear-gradient(105deg, transparent, color-mix(in srgb, var(--ods-system-greys-white) 12%, transparent), transparent)',
-            }}
-          />
-        </span>
-        {icon ? (
-          <span className="relative inline-flex size-6 shrink-0 items-center justify-center">{icon}</span>
-        ) : (
-          <MingoIcon
-            color="currentColor"
-            eyesColor={MINGO_ACCENT}
-            cornerColor={MINGO_ACCENT}
-            className="relative h-6 w-6 shrink-0 text-ods-text-primary"
-          />
-        )}
-        {/* Wordmark collapses below md — the mobile cell is icon-only per
-            spec. h3 bold, matching the default-size CTA label next to it
-            (Figma 2936-6825). */}
-        {/* Bare `text-h3` — the exact composite the default-size Button label
-            uses (bold 700 and -0.02em tracking are built into the utility). */}
-        <span className="relative hidden whitespace-nowrap text-ods-text-primary text-h3 md:inline">{label}</span>
+      {/* AI edge light (Apple-Intelligence-style): a rotating accent-gradient
+          arc clipped to a hairline ring on the outline via CSS mask
+          (.mingo-edge-frame). NO opaque cover, so the launcher inherits
+          whatever background sits behind it. Platform-tinted via the accent
+          token. */}
+      <span aria-hidden="true" className="mingo-edge-frame pointer-events-none absolute inset-0 rounded-md">
+        <span className="mingo-edge" />
       </span>
+      {/* One-shot light-streak shimmer on hover, clipped to the outline. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
+        <span
+          className="mingo-shimmer absolute inset-y-0 left-0 w-1/2"
+          style={{
+            background:
+              'linear-gradient(105deg, transparent, color-mix(in srgb, var(--ods-system-greys-white) 12%, transparent), transparent)',
+          }}
+        />
+      </span>
+      {icon ? (
+        <span
+          className={cn(
+            'relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full',
+            field ? 'size-6' : 'size-5',
+          )}
+        >
+          {icon}
+        </span>
+      ) : (
+        <MingoIcon
+          color="currentColor"
+          eyesColor={MINGO_ACCENT}
+          cornerColor={MINGO_ACCENT}
+          className={cn('relative shrink-0 text-ods-text-primary', field ? 'size-6' : 'size-5')}
+        />
+      )}
+      {/* In the header the name collapses below lg, with the menus: on a phone
+          the launcher is its glyph alone (the name stays the accessible name). */}
+      <span
+        className={cn(
+          'relative whitespace-nowrap',
+          field ? 'min-w-0 flex-1 truncate text-ods-text-muted text-h4' : 'hidden text-h6 lg:inline',
+        )}
+      >
+        {label}
+      </span>
+      {shortcutHint && !field && (
+        // A key cap in the label's own type (never smaller: a hint nobody can
+        // read is decoration) and the label's colour, which clears 4.5:1 on
+        // the bar. It keeps its width before the platform is known.
+        <kbd className="relative hidden h-6 min-w-9 items-center justify-center rounded border border-ods-border px-[var(--spacing-system-xxs)] text-h6 lg:inline-flex">
+          {visitor.known ? shortcutLabel(visitor.os, 'K') : ''}
+        </kbd>
+      )}
     </button>
   );
 }

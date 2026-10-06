@@ -1,20 +1,22 @@
 'use client';
 
 // Navigation component exports
-export { Header } from './header';
-export type { HeaderConfig, HeaderProps } from './header';
-
+// Site navigation: one data model (`SiteNav`), rendered by the header, its
+// menu panels, the mobile sheet and the footer.
+export { SiteHeader } from './site-header';
+export type { SiteHeaderProps } from './site-header';
+export { NavPanel, isMegaMenu } from './nav-panel';
+export type { NavPanelProps } from './nav-panel';
+export { NavItemRow } from './nav-item-row';
+export type { NavItemRowProps, NavItemRowVariant } from './nav-item-row';
 export { MingoAiButton } from './mingo-ai-button';
 export type { MingoAiButtonProps } from './mingo-ai-button';
-
-export { ClientOnlyHeader } from './client-only-header';
-export type { ClientOnlyHeaderProps } from './client-only-header';
-
-export { HeaderSkeleton } from './header-skeleton';
-export type { HeaderSkeletonProps } from './header-skeleton';
-
-export { MobileNavPanel, MOBILE_NAV_PANEL_ID } from './mobile-nav-panel';
-export type { MobileNavPanelProps } from './mobile-nav-panel';
+export { MobileNavSheet, MOBILE_NAV_SHEET_ID } from './mobile-nav-sheet';
+export type { MobileNavSheetProps } from './mobile-nav-sheet';
+export { SiteFooter } from './site-footer';
+export type { SiteFooterProps } from './site-footer';
+export { defaultRenderSiteNavLink, navLinkLabel } from './site-nav-link';
+export type { SiteNavLinkRenderer } from './site-nav-link';
 
 export { SlidingSidebar } from './sliding-sidebar';
 export type { SlidingSidebarProps } from './sliding-sidebar';
@@ -75,10 +77,15 @@ export type { NavigationNode } from './multi-level-navigation';
 
 // Re-export types from navigation types
 export type {
-  MobileNavConfig,
+  NavFeature,
+  NavGroup,
+  NavLink,
+  NavMenu,
   NavigationItem,
   NavigationSidebarConfig,
   NavigationSidebarItem,
+  SiteNav,
+  SiteNavPrimaryCta,
   SlidingSidebarConfig,
   UnifiedSidebarUser,
 } from '../../types/navigation';

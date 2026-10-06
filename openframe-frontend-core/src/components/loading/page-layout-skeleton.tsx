@@ -33,7 +33,7 @@ export function AnnouncementBarSkeleton() {
 }
 
 /**
- * Header skeleton that matches the ClientOnlyHeader placeholder but with proper animations
+ * Header skeleton for a page that is still loading: logo, navigation and action placeholders
  */
 export function HeaderSkeleton() {
   return (

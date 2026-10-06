@@ -30,3 +30,6 @@ export { usePreventScroll } from '@react-aria/overlays';
 export * from './use-prefers-reduced-motion';
 export * from './use-in-view';
 export * from './use-autoplay';
+export * from './use-active-section';
+export * from './use-nav-menus';
+export * from './use-visitor-os';

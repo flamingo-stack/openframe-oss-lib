@@ -82,6 +82,22 @@ export interface CaseStudy {
   case_study_tags?: TagAssoc[];
 }
 
+/**
+ * What a case study card reads: the story, its cover and video, whose story it
+ * is and who tells it. A full `CaseStudy` row satisfies it; a surface that ships
+ * the card's data to the browser (the site menu) sends only this.
+ */
+export type CaseStudyCardData = Pick<CaseStudy, 'id' | 'title' | 'summary' | 'featured_image'> &
+  Partial<
+    Pick<
+      CaseStudy,
+      'main_video_url' | 'main_video_thumbnail' | 'highlight_video_url' | 'highlight_video_thumbnail' | 'video_bites'
+    >
+  > & {
+    user?: Pick<UserProfile, 'full_name' | 'avatar_url' | 'job_title'>;
+    msp?: Pick<MSP, 'name' | 'icon_url'>;
+  };
+
 export interface CreateCaseStudyData {
   title: string;
   slug: string;
