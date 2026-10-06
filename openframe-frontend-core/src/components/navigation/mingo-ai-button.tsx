@@ -5,6 +5,7 @@ import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel } from '../../utils/visitor-os';
 import { MingoIcon } from '../icons';
+import { Button } from '../ui/button';
 
 export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   source?: string;
@@ -45,9 +46,8 @@ const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
  * dashboard/AppHeader controlled toggle; different surface and contract, do
  * not merge them.
  *
- * Deliberately a raw `<button>` rather than the ui-kit `Button`: it needs an
- * absolutely-positioned animated ring and an icon-only collapse that `Button`
- * cannot express (same precedent as `header-mingo-button.tsx`).
+ * It is the lib `Button` (`transparent`, or `glyph` for the menu row, at the
+ * `wrap` size): the launcher's own box, ring and collapse are classes on it.
  */
 export function MingoAiButton({
   source,
@@ -64,9 +64,12 @@ export function MingoAiButton({
   const field = variant === 'field';
 
   return (
-    <button
+    <Button
       {...props}
       type="button"
+      variant={field ? 'glyph' : 'transparent'}
+      size="wrap"
+      font="regular"
       aria-label={label}
       aria-keyshortcuts={shortcutHint ? 'Meta+K Control+K' : undefined}
       onClick={e => {
@@ -77,14 +80,14 @@ export function MingoAiButton({
         onClick?.(e);
       }}
       className={cn(
-        'group/mingo relative flex shrink-0 items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        'group/mingo flex shrink-0 justify-start focus-visible:ring-ods-accent',
         field
           ? // A row of the mobile menu like the groups under it: same height,
             // type and divider, no surface and no ring of its own.
-            'min-h-14 w-full gap-[var(--spacing-system-sf)] border-b border-ods-border text-left text-ods-text-primary text-h4'
+            'min-h-14 w-full gap-[var(--spacing-system-sf)] rounded-none border-b border-ods-border text-left text-h4 [&_svg]:h-6 [&_svg]:w-6'
           : // Transparent at rest so it inherits the bar's background; the hover
             // wash is the menu items' own.
-            'h-10 gap-[var(--spacing-system-xsf)] rounded-md pl-[var(--spacing-system-xsf)] pr-2.5 text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary',
+            'h-10 gap-[var(--spacing-system-xsf)] rounded-md pl-[var(--spacing-system-xsf)] pr-2.5 text-ods-text-secondary hover:text-ods-text-primary',
         className,
       )}
     >
@@ -142,7 +145,7 @@ export function MingoAiButton({
           {visitor.known ? shortcutLabel(visitor.os, 'K') : ''}
         </kbd>
       )}
-    </button>
+    </Button>
   );
 }
 
