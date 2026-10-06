@@ -48,15 +48,37 @@ export interface NavLinkAnchorViaRuntimeProps extends Omit<
   onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
-export function NavLinkAnchorViaRuntime({
+export interface NavLinkViaRuntimeInput {
+  href: string;
+  path?: string | null;
+  /** The platform that owns `href`, by name. */
+  targetPlatform?: string | null;
+  /** Runs before the navigation; `preventDefault()` cancels it. */
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
+}
+
+export interface NavLinkViaRuntimeProps {
+  href: string;
+  target?: '_blank';
+  rel?: 'noopener' | 'noopener noreferrer';
+  onClick: (event: MouseEvent<HTMLAnchorElement>) => void;
+}
+
+/**
+ * The anchor props of {@link NavLinkAnchorViaRuntime}, for an element that is
+ * not a bare `<a>` (a `Button`'s `linkProps`). ONE decision and ONE click
+ * handler for both forms.
+ *
+ * A new-tab link to a NAMED platform is one of our own sites and keeps the
+ * Referer (`noopener` alone: the cross-domain analytics attribute the visit by
+ * it); any other new-tab link also gets `noreferrer`.
+ */
+export function useNavLinkViaRuntime({
   href,
   path,
   targetPlatform,
-  className,
-  children,
   onClick: onClickProp,
-  ...anchorAttrs
-}: NavLinkAnchorViaRuntimeProps) {
+}: NavLinkViaRuntimeInput): NavLinkViaRuntimeProps {
   const runtime = useRequiredChatRuntime();
   const router = useRouter();
   const panel = useChatPanel();
@@ -76,8 +98,27 @@ export function NavLinkAnchorViaRuntime({
     });
     if (handled && !isNewTab && panel?.closeChat) panel.closeChat();
   };
+  const attrs = newTabAnchorAttrs(isNewTab);
+  return {
+    href: resolvedHref,
+    ...attrs,
+    ...(isNewTab && targetPlatform && { rel: 'noopener' as const }),
+    onClick,
+  };
+}
+
+export function NavLinkAnchorViaRuntime({
+  href,
+  path,
+  targetPlatform,
+  className,
+  children,
+  onClick,
+  ...anchorAttrs
+}: NavLinkAnchorViaRuntimeProps) {
+  const linkProps = useNavLinkViaRuntime({ href, path, targetPlatform, onClick });
   return (
-    <a href={resolvedHref} {...newTabAnchorAttrs(isNewTab)} {...anchorAttrs} onClick={onClick} className={className}>
+    <a {...linkProps} {...anchorAttrs} className={className}>
       {children}
     </a>
   );
