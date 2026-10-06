@@ -1,5 +1,6 @@
 'use client';
 
+import { cn } from '../../../utils/cn';
 import { DatePickerInputSimple, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui';
 
 export interface SoftwareScheduleOption<V extends string = string> {
@@ -28,6 +29,12 @@ export interface SoftwareScheduleFieldsProps<TRef extends string = string> {
   onDateChange: (date: Date | null) => void;
   onTimeChange: (time: string) => void;
   onTimeReferenceChange: (reference: TRef) => void;
+  /**
+   * `page` (default): the script schedule's four-column grid, the three fields
+   * in its first three columns. `fill`: the three fields share the whole width
+   * (the fields beside something else on the row).
+   */
+  columns?: 'page' | 'fill';
 }
 
 /** Date / Time / Timezone: the same grid and readings as a script schedule's start. */
@@ -39,12 +46,18 @@ export function SoftwareScheduleFields<TRef extends string = string>({
   onDateChange,
   onTimeChange,
   onTimeReferenceChange,
+  columns = 'page',
 }: SoftwareScheduleFieldsProps<TRef>) {
   const timeOptions = timing.getTimeOptions(date, timeReference);
   const startError = timing.getStartError(date, time, timeReference);
 
   return (
-    <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-4 content-md:items-start">
+    <div
+      className={cn(
+        'grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:items-start',
+        columns === 'fill' ? 'content-md:grid-cols-3' : 'content-md:grid-cols-4',
+      )}
+    >
       <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
         <Label className="text-h4">Date</Label>
         <DatePickerInputSimple

@@ -117,6 +117,11 @@ export interface DeviceSelectorProps<T extends DeviceRow = DeviceRow> {
   singleSelect?: boolean;
   /** Return a tooltip string if the device should be disabled, or undefined if enabled. */
   isDeviceDisabled?: (device: T) => string | undefined;
+  /**
+   * The search and tag filter row over the table. Default true; a host that
+   * shows a fixed list (nothing to search) passes false.
+   */
+  showToolbar?: boolean;
   /** Column ids to drop from the table (e.g. `['organization', 'status']` to leave only device + os). */
   hideColumns?: string[];
   /**

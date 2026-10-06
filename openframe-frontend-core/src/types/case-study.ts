@@ -167,6 +167,8 @@ export interface CaseStudyFilters {
   company_size?: string; // Filtered from MSP profile data
   search?: string;
   featured?: boolean;
+  /** Only stories that carry at least one headline metric. */
+  withMetrics?: boolean;
   status?: string;
   limit?: number;
   offset?: number;

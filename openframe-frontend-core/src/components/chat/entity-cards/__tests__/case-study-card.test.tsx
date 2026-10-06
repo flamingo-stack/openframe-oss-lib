@@ -68,3 +68,51 @@ describe('CaseStudyCard headline metric', () => {
     expect(screen.getByTestId('case-study-metric-skeleton').className).toContain('h-[72px]');
   });
 });
+
+describe('CaseStudyCard result size', () => {
+  it('shows who, the first metric large, the title and the way in', () => {
+    render(
+      <CaseStudyCard
+        study={{
+          ...withMetrics,
+          user: { id: 'u1', full_name: 'Tyson Wilcox', job_title: 'CEO' } as CaseStudyCardData['user'],
+        }}
+        href="/case-studies/acme"
+        size="result"
+        placeholderUrl={null}
+      />,
+    );
+    expect(screen.getByText('50%')).toBeTruthy();
+    expect(screen.getByText('of routine tasks automated')).toBeTruthy();
+    expect(screen.queryByText('3x')).toBeNull();
+    expect(screen.getByText('Tyson Wilcox')).toBeTruthy();
+    expect(screen.getByText(withMetrics.title)).toBeTruthy();
+    expect(screen.getByRole('link').getAttribute('href')).toBe('/case-studies/acme');
+  });
+
+  it('renders nothing for a story with no metric', () => {
+    render(<CaseStudyCard study={base} href="/case-studies/acme" size="result" placeholderUrl={null} />);
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(zone()).toBeNull();
+  });
+
+  it('takes the page accent for the metric', () => {
+    render(
+      <CaseStudyCard
+        study={withMetrics}
+        href="/case-studies/acme"
+        size="result"
+        accentClassName="text-ods-flamingo-cyan-base"
+        placeholderUrl={null}
+      />,
+    );
+    expect(screen.getByText('50%').className).toContain('text-ods-flamingo-cyan-base');
+  });
+
+  it('has a skeleton in the same boxes', () => {
+    render(<CaseStudyCardSkeleton size="result" />);
+    render(<CaseStudyCard study={withMetrics} href="/case-studies/acme" size="result" placeholderUrl={null} />);
+    expect(screen.getByTestId('case-study-result-skeleton-metric').className).toContain('h-[112px]');
+    expect(zone()?.className).toContain('h-[112px]');
+  });
+});

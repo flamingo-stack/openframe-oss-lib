@@ -53,6 +53,16 @@ export interface SoftwareActionFormProps<TRef extends string = string> {
   renderPackageSearch: (field: PackageSearchSlotProps) => ReactNode;
   /** "Device Selection": the host's picker for the given scope. */
   renderDevicePicker: (scope: SoftwareDeviceScope) => ReactNode;
+  /** Offer "Add Software" (several packages in one run). Default true; false is a one-package form. */
+  addRows?: boolean;
+  /**
+   * `stacked` (default): the run choice, then the schedule's fields under it.
+   * `inline`: on a wide form the two choices sit side by side with the
+   * schedule's fields on the same row, so the devices start higher.
+   */
+  runModeLayout?: 'stacked' | 'inline';
+  /** The "Device Selection" heading over the picker. Default true; a host that titles the picker itself passes false. */
+  showDeviceHeading?: boolean;
   className?: string;
 }
 
@@ -78,6 +88,9 @@ export function SoftwareActionForm<TRef extends string = string>({
   initialValues,
   renderPackageSearch,
   renderDevicePicker,
+  addRows = true,
+  runModeLayout = 'stacked',
+  showDeviceHeading = true,
   className = 'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
 }: SoftwareActionFormProps<TRef>) {
   const copy = SOFTWARE_ACTION_COPY[action];
@@ -106,6 +119,31 @@ export function SoftwareActionForm<TRef extends string = string>({
   const removeRow = (key: string) => setRows(current => current.filter(row => row.key !== key));
   const addRow = () => setRows(current => [...current, newSoftwareRow(crypto.randomUUID())]);
 
+  const inline = runModeLayout === 'inline';
+  const runModeField = (
+    <RadioGroupBlock
+      name="runMode"
+      variant="grouped"
+      orientation={inline ? 'horizontal' : 'vertical'}
+      value={mode}
+      onValueChange={value => setMode(value as SoftwareRunMode)}
+      options={copy.modes}
+      itemClassName="py-[var(--spacing-system-sf)]"
+    />
+  );
+  const scheduleFields = mode === 'schedule' && (
+    <SoftwareScheduleFields
+      date={date}
+      time={time}
+      timeReference={timeReference}
+      timing={timing}
+      onDateChange={setDate}
+      onTimeChange={setTime}
+      onTimeReferenceChange={setTimeReference}
+      columns={inline ? 'fill' : 'page'}
+    />
+  );
+
   return (
     <PageLayout
       title={copy.formTitle}
@@ -126,39 +164,34 @@ export function SoftwareActionForm<TRef extends string = string>({
         />
       ))}
 
-      <Button
-        type="button"
-        variant="outline"
-        size="small"
-        className="self-start"
-        onClick={addRow}
-        leftIcon={<PlusCircleIcon size={24} className="text-ods-text-secondary" />}
-      >
-        Add Software
-      </Button>
-
-      <RadioGroupBlock
-        name="runMode"
-        variant="grouped"
-        value={mode}
-        onValueChange={value => setMode(value as SoftwareRunMode)}
-        options={copy.modes}
-        itemClassName="py-[var(--spacing-system-sf)]"
-      />
-
-      {mode === 'schedule' && (
-        <SoftwareScheduleFields
-          date={date}
-          time={time}
-          timeReference={timeReference}
-          timing={timing}
-          onDateChange={setDate}
-          onTimeChange={setTime}
-          onTimeReferenceChange={setTimeReference}
-        />
+      {addRows && (
+        <Button
+          type="button"
+          variant="outline"
+          size="small"
+          className="self-start"
+          onClick={addRow}
+          leftIcon={<PlusCircleIcon size={24} className="text-ods-text-secondary" />}
+        >
+          Add Software
+        </Button>
       )}
 
-      <h2 className="pt-[var(--spacing-system-l)] text-ods-text-primary text-h2">Device Selection</h2>
+      {inline ? (
+        <div className="flex flex-col gap-[var(--spacing-system-l)] content-lg:flex-row content-lg:items-end">
+          <div className="min-w-0 content-lg:flex-1">{runModeField}</div>
+          {scheduleFields && <div className="min-w-0 content-lg:flex-1">{scheduleFields}</div>}
+        </div>
+      ) : (
+        <>
+          {runModeField}
+          {scheduleFields}
+        </>
+      )}
+
+      {showDeviceHeading && (
+        <h2 className="pt-[var(--spacing-system-l)] text-ods-text-primary text-h2">Device Selection</h2>
+      )}
 
       {renderDevicePicker({ osTypes: osTypesKey.split(','), osTypesKey })}
     </PageLayout>

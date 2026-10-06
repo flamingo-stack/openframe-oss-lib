@@ -20,9 +20,15 @@ export const PRODUCT_SCREEN_COMPACT_HEIGHT = 300;
  * The narrowest layout a screen reads well at, where that is wider than a
  * host's readable width: the device list's customer column breaks a name
  * mid-word below it, and the logs table beside its open drawer has no room
- * for the message. A frame never lays such a screen out narrower.
+ * for the message; the software form is laid out wide so the package, the
+ * schedule and the picked devices all fit the frame's height. A frame never
+ * lays such a screen out narrower.
  */
-const MIN_LAYOUT_WIDTH: Partial<Record<ProductScreenKey, number>> = { devices: 1120, logs: 1120 };
+const MIN_LAYOUT_WIDTH: Partial<Record<ProductScreenKey, number>> = {
+  devices: 1120,
+  logs: 1120,
+  'software-update': 1400,
+};
 
 export interface ProductScreenProps extends Omit<ProductScreenFrameProps, 'children' | 'label' | 'height'> {
   screen: ProductScreenKey;

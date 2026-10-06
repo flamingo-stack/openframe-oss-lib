@@ -39,8 +39,10 @@ const NO_NARROWING = { columnFilters: [], tags: [] };
  * The product's Update Software page: Chrome through WinGet, scheduled for
  * tonight, with the devices picked for it on the "Selected Devices" tab. The
  * page's title row is left out (the job is named above the picture), so the
- * frame starts at the package. The narrow rendering drops the picker's
- * customer column.
+ * frame starts at the package. The form is in its densest arrangement (one
+ * package, the run choice beside its start, no search row over a fixed list),
+ * so the frame reaches the devices: what gets updated is in the picture. The
+ * narrow rendering drops the picker's customer column.
  */
 export default function SoftwareUpdateScreen({ compact = false }: ProductScreenViewProps) {
   const cast = useProductDemoCast();
@@ -55,6 +57,10 @@ export default function SoftwareUpdateScreen({ compact = false }: ProductScreenV
         <SoftwareActionForm
           action={fixture.action}
           showHeader={false}
+          // The picture's arrangement: one package, the run choice and its start on one row, the devices right under.
+          addRows={false}
+          runModeLayout="inline"
+          showDeviceHeading={false}
           onSubmit={noop}
           timing={fixture.timing}
           initialValues={fixture.initialValues}
@@ -65,6 +71,7 @@ export default function SoftwareUpdateScreen({ compact = false }: ProductScreenV
               loading={false}
               selectedIds={fixture.selectedIds}
               showSelectionModeRadio={false}
+              showToolbar={false}
               hideColumns={compact ? HIDDEN_WHEN_COMPACT : undefined}
               // The picker's server mode is how a host says which tab is open: the picture shows what was picked.
               server={{

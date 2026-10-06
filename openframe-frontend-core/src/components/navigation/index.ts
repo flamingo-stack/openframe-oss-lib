@@ -24,6 +24,10 @@ export type { SlidingSidebarProps } from './sliding-sidebar';
 
 export { StickySectionNav, useSectionNavigation } from './sticky-section-nav';
 export type { StickyNavSection } from './sticky-section-nav';
+// The scroll spy behind a section nav that keeps the URL on the section being
+// read (`syncHash`, two levels of anchors): the docs and trust-center spy.
+export { useScrollSpy } from '../docs/use-scroll-spy';
+export type { UseScrollSpyOptions } from '../docs/use-scroll-spy';
 
 export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar';
 export type { NavigationSidebarProps } from './navigation-sidebar';

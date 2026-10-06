@@ -105,6 +105,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   singleSelect = false,
   isDeviceDisabled,
   hideColumns,
+  showToolbar = true,
   totalCount,
   server,
   selectionMode,
@@ -760,24 +761,26 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
           )}
 
           <div className="flex flex-col gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)]">
-            <DevicesFilterToolbar
-              sticky={false}
-              searchValue={searchTerm}
-              onSearchChange={setSearchTerm}
-              tags={tagOptions}
-              onTagRemove={handleTagRemove}
-              onClearAll={handleClearAll}
-              onSubmit={handleTagSubmit}
-              onOpenFilterModal={openTagsModal}
-              isFilterModalOpen={tagsModalOpen}
-              onCloseFilterModal={closeTagsModal}
-              filterGroups={filterGroups}
-              onFilterChange={handleModalFilterChange}
-              currentFilters={isMdUp === false ? tableFilters : undefined}
-              tagFilterKeys={tagFilterKeys}
-              selectedTags={selectedTags}
-              onTagsChange={handleModalTagsChange}
-            />
+            {showToolbar && (
+              <DevicesFilterToolbar
+                sticky={false}
+                searchValue={searchTerm}
+                onSearchChange={setSearchTerm}
+                tags={tagOptions}
+                onTagRemove={handleTagRemove}
+                onClearAll={handleClearAll}
+                onSubmit={handleTagSubmit}
+                onOpenFilterModal={openTagsModal}
+                isFilterModalOpen={tagsModalOpen}
+                onCloseFilterModal={closeTagsModal}
+                filterGroups={filterGroups}
+                onFilterChange={handleModalFilterChange}
+                currentFilters={isMdUp === false ? tableFilters : undefined}
+                tagFilterKeys={tagFilterKeys}
+                selectedTags={selectedTags}
+                onTagsChange={handleModalTagsChange}
+              />
+            )}
 
             {deviceTable}
           </div>

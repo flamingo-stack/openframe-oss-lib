@@ -1,5 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useLocationHash } from '../../../hooks/use-location-hash';
+import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
+import { ACTIVE_ANCHOR_ATTRIBUTE, replaceLocationHash } from '../../../utils/same-page-hash-nav';
 import { scrollElementIntoView } from '../../../utils/scroll-into-view';
 import { useScrollSpy } from '../use-scroll-spy';
 
@@ -50,6 +53,7 @@ function scrollTo(scrollY: number, scrollHeight = 5000) {
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
+  vi.mocked(scrollElementIntoView).mockClear();
   vi.useRealTimers();
   vi.restoreAllMocks();
   for (const el of created.values()) el.remove();
@@ -137,7 +141,7 @@ describe('useScrollSpy — a rail click', () => {
     placeSections(0);
     const { result } = renderHook(() => useScrollSpy(sections, { syncHash: true }));
     act(() => result.current.handleSectionClick('b'));
-    expect(replaceState).toHaveBeenCalledWith(null, '', '/#b');
+    expect(replaceState).toHaveBeenCalledWith({ __hashSync: '#b' }, '', '/#b');
     expect(pushState).not.toHaveBeenCalled();
     expect(hashchange).not.toHaveBeenCalled();
     window.removeEventListener('hashchange', hashchange);
@@ -265,5 +269,162 @@ describe('useScrollSpy — inside a scroll container', () => {
     scrollContainerTo(850);
     scrollContainerTo(50); // 150 < 300: above section a → cleared
     expect(replaceState.mock.calls.map(call => call[2])).toEqual(['/#b', '/']);
+  });
+});
+
+describe('useScrollSpy: two levels of anchors and reloads (syncHash)', () => {
+  const sections = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+
+  // The suite's `window.location` is a fixed stub: give it a hash that follows `replaceState`.
+  const stubLocation = window.location;
+  beforeEach(() => {
+    const location = { ...stubLocation, hash: '' };
+    Object.defineProperty(window, 'location', { value: location, writable: true });
+    const setState = window.history.replaceState.bind(window.history);
+    setState(null, '');
+    vi.spyOn(window.history, 'replaceState').mockImplementation((state, _unused, url) => {
+      const text = String(url ?? '/');
+      location.hash = text.includes('#') ? text.slice(text.indexOf('#')) : '';
+      setState(state, ''); // the entry's state is real; only the URL is the stub's
+    });
+  });
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { value: stubLocation, writable: true });
+  });
+
+  /** An anchor inside section `parent`: a tab's, a card's. */
+  function child(parent: string, id: string, active = false): HTMLElement {
+    const el = document.createElement('span');
+    el.id = id;
+    if (active) el.setAttribute(ACTIVE_ANCHOR_ATTRIBUTE, '');
+    created.get(parent)?.append(el);
+    return el;
+  }
+
+  it('a section is named by its active child, remembers it while the reader is elsewhere, and history never grows', () => {
+    placeSections(0);
+    const job = child('b', 'job-1', true);
+    renderHook(() => useScrollSpy(sections, { syncHash: true }));
+    const entries = window.history.length;
+    scrollTo(850);
+    expect(window.location.hash).toBe('#job-1');
+    scrollTo(1450);
+    expect(window.location.hash).toBe('#c');
+    // The tab group moved to another job while the reader was away.
+    job.removeAttribute(ACTIVE_ANCHOR_ATTRIBUTE);
+    child('b', 'job-2', true);
+    scrollTo(850);
+    expect(window.location.hash).toBe('#job-2');
+    expect(window.history.length).toBe(entries);
+  });
+
+  it('a hash that names something inside the section is kept until the reader leaves it', () => {
+    placeSections(0);
+    child('b', 'card');
+    renderHook(() => useScrollSpy(sections, { syncHash: true }));
+    window.history.replaceState(null, '', '/#card');
+    scrollTo(850);
+    scrollTo(900);
+    expect(window.location.hash).toBe('#card');
+    scrollTo(1450);
+    expect(window.location.hash).toBe('#c');
+    scrollTo(850);
+    expect(window.location.hash).toBe('#b');
+  });
+
+  it('a click on the section entry writes its active child, not a finer hash from an earlier link', () => {
+    placeSections(0);
+    child('b', 'card');
+    child('b', 'job-1', true);
+    window.history.replaceState(null, '', '/#card');
+    const { result } = renderHook(() => useScrollSpy(sections, { syncHash: true }));
+    act(() => result.current.handleSectionClick('b'));
+    expect(window.location.hash).toBe('#job-1');
+    act(() => result.current.handleSectionClick('c'));
+    expect(window.location.hash).toBe('#c');
+  });
+
+  it("the line is the section's own scroll-margin-top when it is larger than the offset", () => {
+    placeSections(0);
+    const real = window.getComputedStyle.bind(window);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation(el =>
+      el === created.get('b')
+        ? ({ ...real(el), scrollMarginTop: '144px', overflowY: 'visible' } as CSSStyleDeclaration)
+        : real(el),
+    );
+    const { result } = renderHook(() => useScrollSpy(sections, { headerOffset: 72 }));
+    scrollTo(756); // b lands at 900 - 144: on its line although 756 + 72 < 900
+    expect(result.current.activeSection).toBe('b');
+    scrollTo(750);
+    expect(result.current.activeSection).toBe('a');
+  });
+
+  it("aboveFirst: 'none' leaves nothing active above the first section", () => {
+    placeSections(0);
+    const { result } = renderHook(() => useScrollSpy(sections, { syncHash: true, aboveFirst: 'none' }));
+    scrollTo(50);
+    expect(result.current.activeSection).toBe('');
+    expect(window.location.hash).toBe('');
+    scrollTo(250);
+    expect(result.current.activeSection).toBe('a');
+  });
+
+  it('a spy write reaches hash FOLLOWERS (useLocationHash) and never hash SCROLLERS (useScrollToHash)', () => {
+    placeSections(0);
+    const follower = renderHook(() => useLocationHash());
+    renderHook(() => useScrollToHash(true));
+    renderHook(() => useScrollSpy(sections, { syncHash: true }));
+    scrollTo(850);
+    expect(follower.result.current).toBe('b');
+    expect(scrollElementIntoView).not.toHaveBeenCalled();
+  });
+
+  it('reload: a synced hash that agrees with the restored position scrolls nothing', () => {
+    placeSections(0);
+    child('b', 'job-1', true);
+    replaceLocationHash('job-1'); // what the last visit's scrolling left
+    scrollTo(1200); // the browser restored the reader deep inside b
+    renderHook(() => useScrollToHash(true));
+    renderHook(() => useScrollSpy(sections, { syncHash: true }));
+    expect(scrollElementIntoView).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe('#job-1');
+  });
+
+  it('reload: when the position was not restored the hash wins, once and without a tween', () => {
+    placeSections(0);
+    replaceLocationHash('c');
+    scrollTo(0);
+    const { rerender } = renderHook(({ offset }) => useScrollSpy(sections, { syncHash: true, headerOffset: offset }), {
+      initialProps: { offset: 100 },
+    });
+    expect(scrollElementIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollElementIntoView).toHaveBeenCalledWith(created.get('c'), { headerOffset: 100, behavior: 'instant' });
+    rerender({ offset: 60 }); // the header hid: a re-subscription, not a second check
+    expect(scrollElementIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('back or forward to an entry the reader left by scrolling does not scroll: the browser restores it', () => {
+    placeSections(0);
+    renderHook(() => useScrollToHash(true));
+    replaceLocationHash('b');
+    act(() => {
+      window.dispatchEvent(new Event('hashchange'));
+    });
+    expect(scrollElementIntoView).not.toHaveBeenCalled();
+    // A navigation (its own state) to the same hash scrolls.
+    window.history.replaceState(null, '', '/#c');
+    act(() => {
+      window.dispatchEvent(new Event('hashchange'));
+    });
+    expect(scrollElementIntoView).toHaveBeenCalledWith(created.get('c'), { headerOffset: 0 });
+  });
+
+  it('a hash a NAVIGATION wrote is still scrolled to on mount', () => {
+    placeSections(0);
+    window.history.replaceState(null, '', '/#c');
+    renderHook(() => useScrollToHash(true));
+    renderHook(() => useScrollSpy(sections, { syncHash: true }));
+    expect(scrollElementIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollElementIntoView).toHaveBeenCalledWith(created.get('c'), { headerOffset: 0 });
   });
 });

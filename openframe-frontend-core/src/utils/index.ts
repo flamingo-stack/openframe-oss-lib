@@ -338,8 +338,12 @@ export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scro
 // hub's `useUnifiedNav` + chat-runtime `navigate`, AND by every
 // embeddable surface that drives state off the URL hash.
 export {
+  ACTIVE_ANCHOR_ATTRIBUTE,
+  isScrollSyncedHash,
+  LOCATION_HASH_SYNC_EVENT,
   navigateSamePageHash,
   normalizeHashFragment,
+  replaceLocationHash,
   STICKY_HEADER_OFFSET_PX,
   HUB_HEADER_OFFSET_PX,
   type NavigateSamePageHashOptions,
