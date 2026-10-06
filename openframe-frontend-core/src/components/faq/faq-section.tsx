@@ -315,10 +315,10 @@ function GroupedFaqList({
 function FaqSkeleton() {
   return (
     <div className="animate-pulse space-y-8">
-      <div className="h-12 w-2/3 rounded bg-ods-border md:h-14" />
+      <div className="h-12 w-2/3 rounded bg-ods-border content-md:h-14" />
       <div className="w-full divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent">
         {Array.from({ length: 8 }).map((_, idx) => (
-          <div key={idx} className="flex items-center justify-between gap-6 px-6 py-4 md:gap-10">
+          <div key={idx} className="flex items-center justify-between gap-6 px-6 py-4 content-md:gap-10">
             <div className="h-6 w-5/6 rounded bg-ods-border" />
             <div className="size-6 rounded bg-ods-border" />
           </div>
