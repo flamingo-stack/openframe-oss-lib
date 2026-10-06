@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { SECTION_HEADING_CLASS } from './layout/page-heading';
+import { accentSentenceMarks, SECTION_HEADING_CLASS } from './layout/page-heading';
 
 interface WhyItMattersItemProps {
   number: string;
@@ -17,7 +17,7 @@ const WhyItMattersItem: React.FC<WhyItMattersItemProps> = ({ number, title, desc
     >
       <span className="tracking-[-0.02em] text-ods-accent text-h2">{number}</span>
       <div className="flex-1">
-        <h3 className="tracking-[-0.02em] text-ods-text-primary text-h2">{title}</h3>
+        <h3 className="tracking-[-0.02em] text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h3>
         <p className="mt-4 text-ods-text-primary text-h4">{description}</p>
       </div>
     </li>

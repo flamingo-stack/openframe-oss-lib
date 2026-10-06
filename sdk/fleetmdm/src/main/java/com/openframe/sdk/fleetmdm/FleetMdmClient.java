@@ -3,6 +3,7 @@ package com.openframe.sdk.fleetmdm;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmArgumentException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.sdk.fleetmdm.model.AffectedSoftware;
@@ -209,7 +210,7 @@ public class FleetMdmClient {
      */
     public List<Host> searchHosts(HostSearchRequest searchRequest) {
         if (searchRequest == null) {
-            throw new IllegalArgumentException("Search request cannot be null");
+            throw new FleetMdmArgumentException("Search request cannot be null");
         }
 
         return call("process host search request", () -> {
@@ -369,7 +370,7 @@ public class FleetMdmClient {
 
     private static void validateQuery(String query) {
         if (query == null || query.trim().isEmpty()) {
-            throw new IllegalArgumentException("Query cannot be null or empty");
+            throw new FleetMdmArgumentException("Query cannot be null or empty");
         }
     }
 
@@ -841,12 +842,12 @@ public class FleetMdmClient {
     public CompletableFuture<LiveQueryCampaign> runLiveQueryAsync(RunLiveQueryRequest request) {
         if (request == null) {
             CompletableFuture<LiveQueryCampaign> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalArgumentException("Live query request cannot be null"));
+            failed.completeExceptionally(new FleetMdmArgumentException("Live query request cannot be null"));
             return failed;
         }
         if ((request.getQuery() == null || request.getQuery().trim().isEmpty()) && request.getQueryId() == null) {
             CompletableFuture<LiveQueryCampaign> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalArgumentException("Live query request must specify either query or queryId"));
+            failed.completeExceptionally(new FleetMdmArgumentException("Live query request must specify either query or queryId"));
             return failed;
         }
         try {
@@ -900,7 +901,7 @@ public class FleetMdmClient {
 
     private long modifyQueryHosts(long queryId, List<Long> hostIds, String method, String responseField) {
         if (hostIds == null || hostIds.isEmpty()) {
-            throw new IllegalArgumentException("hostIds must not be empty");
+            throw new FleetMdmArgumentException("hostIds must not be empty");
         }
         String path = QUERIES_URL + "/" + queryId + "/hosts";
         String action = ("POST".equals(method) ? "assign hosts to " : "remove hosts from ")
@@ -997,7 +998,7 @@ public class FleetMdmClient {
     private CompletableFuture<Long> modifyAssociationAsync(String path, List<Long> hostIds, String method, String responseField, String contextLabel) {
         if (hostIds == null || hostIds.isEmpty()) {
             CompletableFuture<Long> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalArgumentException("hostIds must not be empty"));
+            failed.completeExceptionally(new FleetMdmArgumentException("hostIds must not be empty"));
             return failed;
         }
         try {

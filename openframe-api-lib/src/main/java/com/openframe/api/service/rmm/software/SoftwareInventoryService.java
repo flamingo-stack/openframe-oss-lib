@@ -352,29 +352,11 @@ public class SoftwareInventoryService {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, filter, search);
-        if (fleetPaging) {
-            PageResult<SoftwareResponse> result = paginateList(rows.stream().sorted(order).toList(), page, perPage);
-            // counts are read for this page only, so a devicesCount sort here orders by name
-            fillDevicesCount(result.items());
-            return result;
+        if (!fleetPaging) {
+            enrichDevicesCountFromHosts(rows);
         }
-        enrichDevicesCountFromHosts(rows);
         List<SoftwareResponse> ordered = rows.stream().sorted(order).toList();
         return paginateList(ordered, page, perPage);
-    }
-
-    private void fillDevicesCount(List<SoftwareResponse> rows) {
-        List<Integer> counts = FleetCalls.inParallel(rows, this::fleetDevicesCount);
-        for (int i = 0; i < rows.size(); i++) {
-            rows.get(i).setDevicesCount(counts.get(i));
-        }
-    }
-
-    private Integer fleetDevicesCount(SoftwareResponse row) {
-        return parseNumericId(row.getId())
-                .map(fleet()::getSoftwareTitle)
-                .map(SoftwareTitle::getHostsCount)
-                .orElse(null);
     }
 
     public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
@@ -524,11 +506,25 @@ public class SoftwareInventoryService {
         Map<Long, Machine> machinesByHostId = hostMachineResolver.resolve(
                 tenantIdProvider.getTenantId(), hostVersions.stream().map(HostVersion::host).toList());
 
-        return hostVersions.stream()
+        // one machine can carry several versions (e.g. a pip per Python install) and several Fleet hosts
+        Map<String, List<SoftwareOnDeviceResponse>> rowsByMachine = hostVersions.stream()
                 .map(hv -> toDeviceResponse(hv, machinesByHostId, latestVersion))
                 .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(row -> row.getDevice().getMachineId(),
+                        java.util.LinkedHashMap::new, Collectors.toList()));
+        return rowsByMachine.values().stream()
+                .map(SoftwareInventoryService::mergeDeviceRows)
                 .filter(row -> matchesDeviceSearch(row, search))
                 .toList();
+    }
+
+    private static SoftwareOnDeviceResponse mergeDeviceRows(List<SoftwareOnDeviceResponse> rows) {
+        boolean upToDate = rows.stream().allMatch(row -> row.getStatus() == SoftwareOnDeviceStatus.UP_TO_DATE);
+        return SoftwareOnDeviceResponse.builder()
+                .device(rows.get(0).getDevice())
+                .softwareVersion(joinVersions(rows.stream().map(SoftwareOnDeviceResponse::getSoftwareVersion).toList()))
+                .status(upToDate ? SoftwareOnDeviceStatus.UP_TO_DATE : SoftwareOnDeviceStatus.OUTDATED)
+                .build();
     }
 
     private List<HostVersion> hostVersionsOf(SoftwareTitleVersion version) {

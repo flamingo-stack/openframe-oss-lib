@@ -3,6 +3,7 @@ package com.openframe.data.repository.device;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -35,6 +36,8 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
 
     List<Machine> findByMachineIdInAndStatus(Collection<String> machineIds, DeviceStatus status);
 
+    List<Machine> findByMachineIdInAndTelemetryStatus(Collection<String> machineIds, TelemetryStatus telemetryStatus);
+
     List<Machine> findByMachineIdInAndStatusIn(Collection<String> machineIds, Collection<DeviceStatus> statuses);
 
     List<Machine> findByStatusIn(Collection<DeviceStatus> statuses);
@@ -42,6 +45,8 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     long countByStatusIn(Collection<DeviceStatus> statuses);
 
     List<Machine> findByStatusInAndRegisteredAtBefore(Collection<DeviceStatus> statuses, Instant before);
+
+    List<Machine> findByTelemetryStatusAndLastSeenBefore(TelemetryStatus telemetryStatus, Instant lastSeenBefore);
 
     List<Machine> findByStatusAndLastSeenBefore(DeviceStatus status, Instant threshold);
 

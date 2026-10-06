@@ -1,3 +1,5 @@
+import type { VendorClassificationValue } from '../utils/vendor-classification';
+
 /**
  * Vendor media item
  */
@@ -40,7 +42,7 @@ export interface VendorGithub {
 export interface VendorClassification {
   id: number;
   vendor_id: number;
-  classification: 'open_source' | 'commercial' | 'openframe_selected';
+  classification: VendorClassificationValue;
   created_at: string;
   updated_at: string;
 }

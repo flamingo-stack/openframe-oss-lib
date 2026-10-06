@@ -2,6 +2,7 @@
 
 import { useEffect, useReducer } from 'react';
 import { embedAuthedFetch, needsBearerAssetFetch } from '../utils/embed-authed-fetch';
+import { useIsomorphicLayoutEffect } from './ui/use-isomorphic-layout-effect';
 
 /**
  * Resolve ANY asset URL the browser would load natively — `<img src>`,
@@ -21,17 +22,55 @@ import { embedAuthedFetch, needsBearerAssetFetch } from '../utils/embed-authed-f
  * callers show their existing placeholder / "no captions" branch instead of a
  * broken asset; a failed fetch retries on the next mount.
  *
- * Cache: module-level, session-lifetime, keyed by full URL — so the two
- * `<track>` URLs of one player, or the same avatar in twenty rows, cost one
- * request. Gateway URLs carry a `?v=<content-hash>` cache-buster, so changed
- * content is a new key; entries are never revoked (a VTT / avatar is a few KB
- * — refcount churn isn't worth it) and are dropped wholesale at session end
- * via `clearAuthedAssetCache`.
+ * Cache: module-level, keyed by full URL — so the two `<track>` URLs of one
+ * player, or the same avatar in twenty rows, cost one request. Gateway URLs
+ * carry a `?v=<content-hash>` cache-buster, so changed content is a new key.
+ * Entries are reference-counted by the mounted hooks using them and revoked
+ * RELEASE_DELAY_MS after the last one unmounts (a remount inside that window
+ * keeps the blob). They used to live for the whole session, and chat images,
+ * org logos and avatars are not "a few KB": in a desktop shell open for days
+ * every distinct image ever shown stayed in memory. `clearAuthedAssetCache`
+ * still drops everything at session end.
  */
 
 const resolvedCache = new Map<string, string>();
 const inFlight = new Map<string, Promise<void>>();
 let cacheGeneration = 0;
+
+/** How long an unused blob is kept before it is revoked, in ms. */
+const RELEASE_DELAY_MS = 60_000;
+const refCounts = new Map<string, number>();
+const releaseTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleRelease(src: string): void {
+  clearTimeout(releaseTimers.get(src));
+  releaseTimers.set(
+    src,
+    setTimeout(() => {
+      releaseTimers.delete(src);
+      if (refCounts.has(src)) return;
+      const blobUrl = resolvedCache.get(src);
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      resolvedCache.delete(src);
+    }, RELEASE_DELAY_MS),
+  );
+}
+
+function acquire(src: string): void {
+  clearTimeout(releaseTimers.get(src));
+  releaseTimers.delete(src);
+  refCounts.set(src, (refCounts.get(src) ?? 0) + 1);
+}
+
+function release(src: string): void {
+  const remaining = (refCounts.get(src) ?? 1) - 1;
+  if (remaining > 0) {
+    refCounts.set(src, remaining);
+    return;
+  }
+  refCounts.delete(src);
+  scheduleRelease(src);
+}
 
 /**
  * Drop every cached blob and revoke its object URL. Hosts call this at
@@ -45,6 +84,8 @@ export function clearAuthedAssetCache(): void {
   for (const url of resolvedCache.values()) URL.revokeObjectURL(url);
   resolvedCache.clear();
   inFlight.clear();
+  for (const timer of releaseTimers.values()) clearTimeout(timer);
+  releaseTimers.clear();
 }
 
 function fetchAsBlobUrl(src: string, accept: string): Promise<void> {
@@ -57,6 +98,8 @@ function fetchAsBlobUrl(src: string, accept: string): Promise<void> {
         const blobUrl = URL.createObjectURL(await response.blob());
         if (startedGeneration === cacheGeneration) {
           resolvedCache.set(src, blobUrl);
+          // Everyone who asked for it unmounted while it was loading.
+          if (!refCounts.has(src)) scheduleRelease(src);
         } else {
           URL.revokeObjectURL(blobUrl);
         }
@@ -78,6 +121,15 @@ function fetchAsBlobUrl(src: string, accept: string): Promise<void> {
 export function useAuthedAssetSrc(src?: string | null, accept = '*/*'): string | undefined {
   const bearerSrc = src && needsBearerAssetFetch(src) ? src : null;
   const [, rerender] = useReducer((c: number) => c + 1, 0);
+
+  // Layout, not passive: this render hands out the cached blob URL, and a
+  // release timer firing before a passive effect ran would revoke it under
+  // the committed <img>.
+  useIsomorphicLayoutEffect(() => {
+    if (!bearerSrc) return undefined;
+    acquire(bearerSrc);
+    return () => release(bearerSrc);
+  }, [bearerSrc]);
 
   useEffect(() => {
     if (!bearerSrc || resolvedCache.has(bearerSrc)) return undefined;

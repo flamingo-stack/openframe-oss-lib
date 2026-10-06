@@ -107,18 +107,21 @@ export function EmbedSkeleton({ documentType }: EmbedSkeletonProps = {}) {
   return (
     <div className="space-y-4">
       {/* Header — matches the actual viewer's
-       *  `flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`
+       *  `flex flex-col gap-3 content-sm:flex-row content-sm:items-center content-sm:justify-between`
        *  (mobile-stacked, desktop-row). */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 content-sm:flex-row content-sm:items-center content-sm:justify-between">
         {/* Left: icon + title */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <div className="h-5 w-5 shrink-0 animate-pulse rounded bg-ods-border" />
           <div className="h-6 w-2/3 animate-pulse rounded bg-ods-border" />
         </div>
         {/* Right: 1 or 2 buttons. Mobile = full-width; desktop = auto. */}
-        <div className="flex w-full items-center gap-2 sm:w-auto">
+        <div className="flex w-full items-center gap-2 content-sm:w-auto">
           {Array.from({ length: buttonCount }).map((_, i) => (
-            <div key={i} className="h-10 w-full flex-1 animate-pulse rounded bg-ods-border sm:w-32 sm:flex-initial" />
+            <div
+              key={i}
+              className="h-10 w-full flex-1 animate-pulse rounded bg-ods-border content-sm:w-32 content-sm:flex-initial"
+            />
           ))}
         </div>
       </div>

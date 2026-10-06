@@ -104,26 +104,27 @@ const FORM_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
 /** The row grid: two columns on a phone, four from `md`. The row gap is one step
  *  wider than the column gap because field messages hang ~16px below their
  *  control and would print over the next row's label at the column gap. */
-const ROW_GRID = 'grid grid-cols-2 gap-x-[var(--spacing-system-m)] gap-y-[var(--spacing-system-lf)] md:grid-cols-4';
+const ROW_GRID =
+  'grid grid-cols-2 gap-x-[var(--spacing-system-m)] gap-y-[var(--spacing-system-lf)] content-md:grid-cols-4';
 
 /** The wire key of the host consent tick (stripped server-side, never sent to HubSpot). */
 const HOST_CONSENT_KEY = 'hostConsent';
 
-/** The row grid's column count at `md` and up. `ROW_GRID`'s `md:grid-cols-4`
+/** The row grid's column count at `md` and up. `ROW_GRID`'s `content-md:grid-cols-4`
  *  and `SPAN_CLASS` are its Tailwind twins (literal so the scanner sees them). */
 const GRID_COLUMNS = 4;
 
 /** Static so Tailwind's scanner sees every class — a template built from a
  *  runtime span would compile to nothing. */
 const SPAN_CLASS = {
-  1: 'md:col-span-1',
-  2: 'md:col-span-2',
-  3: 'md:col-span-3',
-  4: 'md:col-span-4',
+  1: 'content-md:col-span-1',
+  2: 'content-md:col-span-2',
+  3: 'content-md:col-span-3',
+  4: 'content-md:col-span-4',
 } as const;
 
 /** One field's skeleton: label + control footprint — the CSS twin of `FieldWrapper`'s
- *  label row over `Input`'s `h-11 md:h-12` (the other skeleton heights below are
+ *  label row over `Input`'s `h-11 content-md:h-12` (the other skeleton heights below are
  *  the same kind of twin: the textarea, the consent row, the `Button`). */
 const FIELD_SKELETON_CLASS = 'h-[4.75rem] w-full';
 
@@ -135,7 +136,7 @@ const FOOTER_ROW_CLASS = 'flex flex-wrap items-center justify-between gap-[var(-
 /** The bare footer: the button stays LEFT, where the form's reading order ends. */
 const FOOTER_BARE_CLASS = 'flex';
 /** The submit's width when a note sits beside it. */
-const SUBMIT_WIDE_CLASS = 'md:w-60';
+const SUBMIT_WIDE_CLASS = 'content-md:w-60';
 
 /** The built-in layout when a host passes no rows — what the skeleton draws for it. */
 const DEFAULT_FIELD_ROWS: BookingFieldRow[] = [[{ name: 'email' }], [{ name: 'firstName' }, { name: 'lastName' }]];

@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
+import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../../chat/entity-cards/content-card-frame';
 
 export interface ProductReleaseCardSkeletonProps {
   /** Additional CSS classes */
@@ -22,29 +23,16 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
   // skeleton's shape matches exactly with zero load-to-resolve reflow.
   if (size === 'lg') {
     return (
-      <div
-        className={cn(
-          'overflow-hidden rounded-lg border border-ods-border bg-ods-card',
-          'flex flex-col gap-4 p-6',
-          'animate-pulse',
-          className,
-        )}
-      >
-        {/* HERO — placeholders use `bg-ods-border` (#3a3a3a) so they
-            contrast against the card's `bg-ods-card`
-            (#212121) container. The metadata grid cells below use
-            `bg-ods-card` containers so `bg-ods-bg` placeholders work
-            there, but in the hero the card IS `bg-ods-card`-equivalent —
-            `bg-ods-bg` (#161616) is only 6 hex points darker than the
-            card and renders nearly invisible.
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex flex-col gap-4 p-6', 'animate-pulse', className)}>
+        {/* HERO: placeholders are `bg-ods-border` bars on the page background.
 
             CRITICAL: title + summary use the SAME min-h containers as
             the loaded card so total card height is byte-identical
             between skeleton state and loaded state. Without this,
             individual placeholder heights underrun the loaded card's
             min-h reservations and the page jumps on resolve. */}
-        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className="aspect-[1200/630] w-full flex-shrink-0 rounded-lg bg-ods-border md:w-[256px]" />
+        <div className="flex flex-col gap-4 content-md:flex-row content-md:gap-6">
+          <div className="aspect-[1200/630] w-full flex-shrink-0 rounded-lg bg-ods-border content-md:w-[256px]" />
           <div className="flex min-w-0 flex-1 flex-col">
             {/* Version pill — mirrors `flex items-center gap-3 mb-3` in
                 the loaded card. The loaded `<span text-lg>` renders at
@@ -55,16 +43,16 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
             </div>
             {/* Title container — SAME min-h as the loaded card so the
                 card height contributed by this region matches exactly. */}
-            <div className="mb-3 flex min-h-[60px] flex-col justify-start gap-1.5 md:min-h-[72px]">
-              <div className="h-[25px] w-3/4 rounded bg-ods-border md:h-[30px]" />
-              <div className="h-[25px] w-1/2 rounded bg-ods-border md:h-[30px]" />
+            <div className="mb-3 flex min-h-[60px] flex-col justify-start gap-1.5 content-md:min-h-[72px]">
+              <div className="h-[25px] w-3/4 rounded bg-ods-border content-md:h-[30px]" />
+              <div className="h-[25px] w-1/2 rounded bg-ods-border content-md:h-[30px]" />
             </div>
             {/* Summary container — SAME min-h as the loaded card. The
                 3 placeholder lines mirror the rendered 3-line clamp;
                 `bg-ods-border/70` keeps summary placeholders slightly
                 dimmer than title placeholders (primary vs secondary
                 text hierarchy). */}
-            <div className="flex min-h-[68px] flex-col justify-start gap-2 md:min-h-[78px]">
+            <div className="flex min-h-[68px] flex-col justify-start gap-2 content-md:min-h-[78px]">
               <div className="h-3 w-full rounded bg-ods-border/70" />
               <div className="h-3 w-11/12 rounded bg-ods-border/70" />
               <div className="h-3 w-5/6 rounded bg-ods-border/70" />
@@ -80,30 +68,26 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
           <div className="h-5 w-2/3 rounded bg-ods-border/70" />
         </div>
 
-        {/* METADATA GRID — 4-cell placeholder. The grid cells use
-            `bg-ods-card` containers and `bg-ods-bg` placeholders, which
-            DO contrast correctly because the cells are brighter than
-            the placeholders. Inner content heights mirror the loaded
-            cells (`text-h4` ≈ 28 px + `DM_Sans 14px leading-20`) so
-            total grid height matches the loaded ~86 px. */}
-        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border md:grid-cols-4">
+        {/* METADATA GRID: 4-cell placeholder, the loaded cells' own boxes (no surface of
+            their own; bars on the page background). Inner heights mirror the loaded cells. */}
+        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border content-md:grid-cols-4">
           {[0, 1, 2].map(i => (
             <div
               key={`cell-${i}`}
-              className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r"
+              className="flex flex-col gap-3 border-b border-ods-border p-4 content-md:border-b-0 content-md:border-r"
             >
               <div className="flex flex-col gap-2">
-                <div className="h-7 w-24 rounded bg-ods-bg" />
-                <div className="h-4 w-16 rounded bg-ods-bg/60" />
+                <div className="h-7 w-24 rounded bg-ods-border" />
+                <div className="h-4 w-16 rounded bg-ods-border" />
               </div>
             </div>
           ))}
           {/* Author cell */}
-          <div className="flex items-center gap-3 bg-ods-card p-4">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-bg" />
+          <div className="flex items-center gap-3 p-4">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-border" />
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <div className="h-5 w-3/4 rounded bg-ods-bg" />
-              <div className="h-4 w-1/2 rounded bg-ods-bg/60" />
+              <div className="h-5 w-3/4 rounded bg-ods-border" />
+              <div className="h-4 w-1/2 rounded bg-ods-border" />
             </div>
           </div>
         </div>

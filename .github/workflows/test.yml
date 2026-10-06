@@ -214,14 +214,23 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
-      - name: Publish ${{ env.NEW_VERSION }} (pr-${{ github.event.pull_request.number }} tag)
+      # --ignore-scripts skips a prepack rebuild.
+      - name: Pack ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
         run: |
           npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
-          npm publish --tag "pr-${{ github.event.pull_request.number }}" --ignore-scripts
+          echo "PACKAGE_TARBALL=$PWD/$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_ENV"
+
+      # PR builds go to pkg.pr.new only.
+      - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        run: |
+          npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --json pkg-pr-new.json "$PACKAGE_TARBALL"
+          jq -r '.packages[0].url' pkg-pr-new.json >> "$GITHUB_STEP_SUMMARY"
 
 
   # `lint:cycles` gets its OWN job, purely for wall-clock. It is graph-wide —

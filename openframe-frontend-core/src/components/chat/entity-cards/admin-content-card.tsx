@@ -6,6 +6,7 @@ import Image from '../../../embed-shims/next-image';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
 import { PlatformBadge } from '../../features/platform-badge';
+import { CONTENT_CARD_FRAME_CLASS } from './content-card-frame';
 
 interface PlatformInfo {
   platform_id?: string;
@@ -42,6 +43,12 @@ interface AdminContentCardProps {
    * `AdminContentCardGrid` and `AdminContentCardSkeleton` reserve. Default false.
    */
   reserveRows?: boolean;
+  /**
+   * Whether this KIND of card has a subtitle line at all. A card type that never
+   * carries one (an employee entry) passes false, and `reserveRows` then keeps no
+   * empty line for it; its skeleton passes the same. Default true.
+   */
+  subtitleRow?: boolean;
   /** Additional class names */
   className?: string;
 }
@@ -57,6 +64,7 @@ export function AdminContentCard({
   meta,
   actions,
   reserveRows = false,
+  subtitleRow = true,
   className,
 }: AdminContentCardProps) {
   const [imageError, setImageError] = useState(false);
@@ -71,17 +79,7 @@ export function AdminContentCard({
   const imageBgColor = useImageEdgeColor(displayUrl || null, 'transparent');
 
   return (
-    <article
-      className={cn(
-        'group h-full overflow-hidden rounded-2xl',
-        'border border-ods-border bg-ods-card',
-        'flex flex-col',
-        'transition-all duration-300 ease-out',
-        'hover:-translate-y-1 hover:shadow-lg hover:shadow-ods-accent/[0.08]',
-        'hover:border-ods-accent',
-        className,
-      )}
-    >
+    <article className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col', className)}>
       {/* Cover Image — 3:2 aspect ratio, centered with edge-color fill */}
       <div className="relative aspect-[3/2] w-full shrink-0 overflow-hidden" style={{ backgroundColor: imageBgColor }}>
         {displayUrl ? (
@@ -116,7 +114,7 @@ export function AdminContentCard({
         </h3>
 
         {/* Subtitle (optional) */}
-        {(subtitle || reserveRows) && (
+        {(subtitle || (reserveRows && subtitleRow)) && (
           <p className={cn('truncate text-ods-text-secondary text-h6', reserveRows && 'min-h-[1lh]')}>{subtitle}</p>
         )}
 

@@ -39,11 +39,12 @@ import static com.openframe.authz.support.SsoTestFixtures.cookieCodec;
 import static com.openframe.authz.support.SsoTestFixtures.inTenMinutes;
 import static com.openframe.authz.support.SsoTestFixtures.oidcUser;
 import static com.openframe.authz.support.SsoTestFixtures.tenant;
+import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -115,7 +116,7 @@ class SsoLoginControllerTest {
 
         controller.startSsoLogin(new com.openframe.authz.dto.SsoLoginInitRequest(), request, response);
 
-        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-login-init"), any(), anyString());
+        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-login-init"), any(), eq(SSO_LOGIN_FAILED));
     }
 
     @Test
@@ -159,7 +160,7 @@ class SsoLoginControllerTest {
         controller.completeSsoRegistration("NewCo", "newco", null, session, request, response);
 
         verify(registrationService, never()).registerTenant(any());
-        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-login-complete"), any(SsoAlreadyLinkedException.class), anyString());
+        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-login-complete"), any(SsoAlreadyLinkedException.class), eq(REGISTRATION_FAILED));
     }
 
     @Test

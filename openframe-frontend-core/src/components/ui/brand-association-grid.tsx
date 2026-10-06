@@ -15,7 +15,7 @@ export function BrandAssociationGrid({
   className = '',
   cardClassName = 'bg-ods-card border border-ods-border rounded-lg p-0 overflow-hidden',
 }: BrandAssociationGridProps) {
-  const gridCols = columns === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3';
+  const gridCols = columns === 2 ? 'grid-cols-1 content-md:grid-cols-2' : 'grid-cols-1 content-md:grid-cols-3';
   const itemsPerRow = columns;
   const rows = Math.ceil(items.length / itemsPerRow);
 
@@ -26,7 +26,7 @@ export function BrandAssociationGrid({
     if (!isLastInRow) {
       // On mobile (1 column), never show right border
       // On desktop (2/3 columns), show right border except for last in row
-      classes += ' md:border-r border-ods-border';
+      classes += ' content-md:border-r border-ods-border';
     }
 
     // Bottom border logic
@@ -39,10 +39,10 @@ export function BrandAssociationGrid({
 
     // Desktop: override mobile border, show bottom border for all rows except last
     if (!isLastRow) {
-      classes += ' md:border-b border-ods-border';
+      classes += ' content-md:border-b border-ods-border';
     } else {
       // Last row on desktop - remove bottom border
-      classes += ' md:border-b-0';
+      classes += ' content-md:border-b-0';
     }
 
     return classes;
