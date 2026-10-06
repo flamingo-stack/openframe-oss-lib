@@ -524,7 +524,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // width. The NAME is written only where it is the information itself: a
     // system line and a human technician. Every face carries its name for
     // assistive tech and on hover.
-    const showName = isSystem || authorType === 'admin';
+    // Mingo v2 draws every turn under an author row instead: the face, the
+    // name and the time, with the user's words as plain text like the agent's.
+    const authorRow = isV2 && assistantType === 'mingo';
+    const showName = isSystem || authorType === 'admin' || authorRow;
     const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
     const faceBox = 'h-5 w-5 flex-shrink-0';
     const face: ReactNode =
@@ -592,9 +595,27 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             no margin collapsing — visually identical. */}
           <div className="grid min-w-0 grid-cols-1 gap-[var(--spacing-system-xxs)]">
             {(face || showName) && (
-              <div className={cn('flex items-center gap-[var(--spacing-system-xs)]', isUser && 'justify-end')}>
+              <div
+                className={cn(
+                  'flex items-center',
+                  authorRow ? 'gap-[var(--spacing-system-xxs)]' : 'gap-[var(--spacing-system-xs)]',
+                  isUser && !authorRow && 'justify-end',
+                )}
+              >
                 {face}
-                {showName && <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>}
+                {showName &&
+                  (authorRow ? (
+                    <span
+                      className={cn(
+                        'min-w-0 flex-1 truncate text-h6',
+                        authorType === 'mingo' ? 'text-ods-flamingo-cyan' : 'text-ods-open-yellow',
+                      )}
+                    >
+                      {displayName}
+                    </span>
+                  ) : (
+                    <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>
+                  ))}
                 {showName && timestamp && (
                   <span className="ml-auto shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
                     {formatMessageTimestamp(timestamp)}
@@ -619,7 +640,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     // across the thread's full width, with no bubble. Nothing
                     // takes a column, so every line gets the whole width (the
                     // speaker's face is the short line above).
-                    if (isUser) {
+                    if (isUser && !authorRow) {
                       return (
                         <div key={index} className="flex min-w-0 justify-end">
                           <div className="min-w-0 max-w-[85%] break-words rounded-xl bg-ods-bg-active px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-ods-text-primary text-h4">
