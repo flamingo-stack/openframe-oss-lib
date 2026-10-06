@@ -116,6 +116,7 @@ export * from './shell-utils';
 export * from './video-bite-id';
 // OS type utilities
 export * from './os-utils';
+export * from './visitor-os';
 // Phone utilities
 export * from './country-phone-utils';
 export * from './compliance-standards';

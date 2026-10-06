@@ -39,6 +39,7 @@ export * from './use-claude-mirror-src';
 // Deep-link "scroll to URL hash" after data loads. Pairs with URL
 // composers that emit `?<filter>=<id>#<prefix>-<id>` — the filter
 // narrows the list, the hash scrolls the matching DOM id.
+export * from './use-location-hash';
 export * from './use-scroll-to-hash';
 
 // Invisible bot-protection client primitive (honeypot ref + submit-timing).
