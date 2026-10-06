@@ -36,11 +36,11 @@ public class DeliveryDispatchListener {
     private final ObjectMapper objectMapper;
     private final DeliveryMetrics metrics;
 
-    // a bad message is logged and skipped; anything else (Mongo, NATS) propagates so the container retries the record
+    // a bad message is logged and skipped; a Mongo failure propagates and the record is retried until the row is written
     @KafkaListener(
             topics = "${openframe.delivery.dispatch-topic}",
             groupId = "client-service-delivery-dispatch",
-            containerFactory = "ossTenantKafkaListenerContainerFactory")
+            containerFactory = DeliveryDispatchListenerConfiguration.CONTAINER_FACTORY)
     public void onDispatch(DeliveryDispatchMessage message) {
         if (!isComplete(message)) {
             reject(REJECTED_INCOMPLETE, message, null);
