@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useContext, useState } from 'react';
 import { fn } from 'storybook/test';
 
-import { EmbeddableChat, MINGO_V2_RAIL_WIDTH } from '../components/chat/embeddable-chat';
+import { EmbeddableChat, MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from '../components/chat/embeddable-chat';
 import type { UnifiedChatMessage, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import {
   BracketCurlyIcon,
@@ -14,7 +14,10 @@ import {
 } from '../components/icons-v2-generated';
 import { PageLayout } from '../components/layout/page-layout';
 import { AppLayout } from '../components/navigation/app-layout';
-import type { AppLayoutSidePanelRenderState } from '../components/navigation/app-layout-side-panel';
+import {
+  type AppLayoutSidePanelRenderState,
+  SIDE_PANEL_FRAME_WIDTH,
+} from '../components/navigation/app-layout-side-panel';
 import { Button } from '../components/ui/button';
 import { DashboardInfoCard } from '../components/ui/dashboard-info-card';
 import { type ColumnDef, DataTable, useDataTable } from '../components/ui/data-table';
@@ -379,6 +382,8 @@ function RealMingo({
   close,
   collapse,
   collapsesTo,
+  canExpand,
+  expand,
   thread,
 }: AppLayoutSidePanelRenderState & { thread: 'conversation' | 'new' }) {
   return (
@@ -393,6 +398,7 @@ function RealMingo({
         appearance="v2"
         onCollapse={collapsesTo ? collapse : undefined}
         collapseTo={collapsesTo === 'column' ? 'column' : 'list'}
+        onExpand={canExpand ? expand : undefined}
         defaultActiveMode="mingo"
         showInternalTrigger={false}
         mingoState={thread === 'new' ? NEW_CHAT_STATE : MINGO_STATE}
@@ -421,6 +427,7 @@ function Screen({
       sidePanel={{
         label: 'Mingo',
         minWidth: MINGO_V2_RAIL_WIDTH,
+        defaultWidth: MINGO_V2_SPLIT_WIDTH + SIDE_PANEL_FRAME_WIDTH,
         storageKey: 'storybook:mingo-docked-width',
         collapsed,
         children: state => (panel === 'mock' ? <MockMingo {...state} /> : <RealMingo {...state} thread={thread} />),
