@@ -74,10 +74,20 @@ export interface DashboardInfoCardProps {
   href?: string;
   /** Tooltip content shown on a question-mark icon next to the value */
   tooltip?: ReactNode;
-  /** Override the value text className (default: `text-h3 md:text-h2` per Figma) */
+  /** Override the value text className (default: `text-h3 content-md:text-h2` per Figma) */
   valueClassName?: string;
   /** Secondary text rendered beside the value (e.g. an entry/item count). */
   subValue?: ReactNode;
+  /**
+   * One line UNDER the value (what the number counts). A card with a caption
+   * grows to fit it instead of holding the fixed stat-tile height.
+   */
+  caption?: ReactNode;
+  /**
+   * The figure is still being fetched: the SAME card, its title, value and caption
+   * drawn as bars of their own line heights, so the loaded card replaces it in place.
+   */
+  loading?: boolean;
 }
 
 export function DashboardInfoCard({
@@ -97,6 +107,8 @@ export function DashboardInfoCard({
   tooltip,
   valueClassName,
   subValue,
+  caption,
+  loading = false,
 }: DashboardInfoCardProps) {
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : value;
 
@@ -145,17 +157,21 @@ export function DashboardInfoCard({
     const { base, md, lg } = size;
 
     const rings: Array<{ key: string; size: number; className: string }> = [
-      { key: 'base', size: base, className: md !== undefined ? 'md:hidden' : lg !== undefined ? 'lg:hidden' : '' },
+      {
+        key: 'base',
+        size: base,
+        className: md !== undefined ? 'content-md:hidden' : lg !== undefined ? 'content-lg:hidden' : '',
+      },
     ];
     if (md !== undefined) {
       rings.push({
         key: 'md',
         size: md,
-        className: lg !== undefined ? 'hidden md:block lg:hidden' : 'hidden md:block',
+        className: lg !== undefined ? 'hidden content-md:block content-lg:hidden' : 'hidden content-md:block',
       });
     }
     if (lg !== undefined) {
-      rings.push({ key: 'lg', size: lg, className: 'hidden lg:block' });
+      rings.push({ key: 'lg', size: lg, className: 'hidden content-lg:block' });
     }
 
     return (
@@ -178,8 +194,8 @@ export function DashboardInfoCard({
       {/* Icon slot (Figma "icon" variant): 32px box / 16px content on mobile,
           56px box / 24px content from `md` up. */}
       {icon && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary md:size-14">
-          <span className="flex size-4 items-center justify-center md:size-6 [&>*]:size-full">{icon}</span>
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary content-md:size-14">
+          <span className="flex size-4 items-center justify-center content-md:size-6 [&>*]:size-full">{icon}</span>
         </div>
       )}
 
@@ -187,13 +203,21 @@ export function DashboardInfoCard({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Title row: caption and/or tag (Figma "status" variant) */}
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
-          {titleSlot ?? (title !== undefined && <p className="truncate text-ods-text-secondary text-h5">{title}</p>)}
+          {loading ? (
+            <p className="text-h5">
+              <span className="block h-[1lh] w-20 animate-pulse rounded bg-ods-border" />
+            </p>
+          ) : (
+            (titleSlot ?? (title !== undefined && <p className="truncate text-ods-text-secondary text-h5">{title}</p>))
+          )}
           {titleTag}
         </div>
 
         {/* Value and percentage */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
-          <p className={cn('truncate text-ods-text-primary text-h3 md:text-h2', valueClassName)}>{formattedValue}</p>
+          <p className={cn('truncate text-ods-text-primary text-h3 content-md:text-h2', valueClassName)}>
+            {loading ? <span className="block h-[1lh] w-24 animate-pulse rounded bg-ods-border" /> : formattedValue}
+          </p>
           {subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
           {renderPercentage()}
           {tooltip && (
@@ -204,6 +228,13 @@ export function DashboardInfoCard({
             </FloatingTooltip>
           )}
         </div>
+
+        {/* Two lines kept for the caption, loading or loaded, so a narrow tile is one height. */}
+        {caption && (
+          <p className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">
+            {loading ? <span className="block h-[1lh] w-32 animate-pulse rounded bg-ods-border" /> : caption}
+          </p>
+        )}
       </div>
 
       {/* Progress indicator */}
@@ -216,7 +247,10 @@ export function DashboardInfoCard({
   // min-h) — with a 32px titleTag the natural content height slightly exceeds
   // the spec, and Figma's frame is fixed; items-center absorbs the difference.
   const baseClassName =
-    'bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-xsf)] md:p-[var(--spacing-system-m)] h-16 md:h-[104px] flex gap-[var(--spacing-system-s)] md:gap-[var(--spacing-system-m)] items-center transition-all';
+    'bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-xsf)] content-md:p-[var(--spacing-system-m)] h-16 content-md:h-[104px] flex gap-[var(--spacing-system-s)] content-md:gap-[var(--spacing-system-m)] items-center transition-all';
+
+  // A caption is a third line: the fixed stat-tile height would clip it.
+  const captionClassName = caption ? 'h-auto content-md:h-auto' : undefined;
 
   if (href) {
     return (
@@ -224,6 +258,7 @@ export function DashboardInfoCard({
         href={href}
         className={cn(
           baseClassName,
+          captionClassName,
           'group cursor-pointer',
           'hover:border-ods-border-hover hover:bg-ods-card-hover',
           className,
@@ -234,5 +269,5 @@ export function DashboardInfoCard({
     );
   }
 
-  return <div className={cn(baseClassName, className)}>{cardContent}</div>;
+  return <div className={cn(baseClassName, captionClassName, className)}>{cardContent}</div>;
 }

@@ -33,6 +33,10 @@ export interface AvatarStackProps {
    * so the text beside every stack starts at the same x.
    */
   slots?: number;
+  /** How many people the group has when `people` is only a sample of it (a
+   *  server that returns the first few faces plus a count). The "+N" circle
+   *  then counts everyone not shown. Defaults to `people.length`. */
+  total?: number;
   /** Size bucket (also sizes the "+N" circle). `xs` (24px) is for
    *  dense card meta rows (chat compact cards, delivery rows). */
   size?: AvatarStackSize;
@@ -63,22 +67,28 @@ export function AvatarStack({
   people,
   max = 3,
   slots,
+  total,
   size = 'md',
   ringClassName = 'ring-ods-card',
   label = 'Assignees',
   className,
 }: AvatarStackProps) {
   if (people.length === 0) return null;
-  const faces = slots ? (people.length > slots ? slots - 1 : slots) : max;
+  const groupSize = Math.max(total ?? people.length, people.length);
+  const faces = slots ? (groupSize > slots ? slots - 1 : slots) : max;
   const visible = people.slice(0, faces);
   const overflow = people.slice(faces);
+  const overflowCount = groupSize - visible.length;
+  const names = people.map(p => p.name).join(', ');
+  // Names beyond the sample are unknown here; say how many there are instead.
+  const unnamed = groupSize - people.length;
   const compact = size === 'xs';
   return (
     <div
       className={cn('flex items-center', slots && 'shrink-0', className)}
       style={slots ? { width: SIZE_PX[size] + (slots - 1) * (SIZE_PX[size] - OVERLAP_PX[size]) } : undefined}
       role="group"
-      aria-label={`${label}: ${people.map(p => p.name).join(', ')}`}
+      aria-label={`${label}: ${names}${unnamed > 0 ? ` and ${unnamed} more` : ''}`}
     >
       {visible.map((person, i) => (
         <SquareAvatar
@@ -95,9 +105,9 @@ export function AvatarStack({
           style={{ zIndex: visible.length - i }}
         />
       ))}
-      {overflow.length > 0 && (
+      {overflowCount > 0 && (
         <span
-          title={overflow.map(p => p.name).join(', ')}
+          title={overflow.length > 0 ? overflow.map(p => p.name).join(', ') : `${overflowCount} more`}
           className={cn(
             'relative z-0 flex shrink-0 items-center justify-center rounded-full bg-ods-bg text-ods-text-secondary ring-2',
             ringClassName,
@@ -109,7 +119,7 @@ export function AvatarStack({
             OVERFLOW_CIRCLE_SIZE[size],
           )}
         >
-          +{overflow.length}
+          +{overflowCount}
         </span>
       )}
     </div>

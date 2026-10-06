@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TicketCardView } from '../components/features/board/ticket-card';
+import { TicketCard, TicketCardView } from '../components/features/board/ticket-card';
 
 const base = { id: 't1', title: 'VPN drops', status: 'ACTIVE' };
 
@@ -33,5 +33,43 @@ describe('TicketCardView ticket number line', () => {
   it('renders no line when both are missing', () => {
     const { container } = render(<TicketCardView ticket={{ ...base, ticketNumber: '' }} />);
     expect(container.textContent).toBe('VPN drops');
+  });
+});
+
+describe('TicketCard number line', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-10T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('opens the ticket from the number/time line, which takes pointer events back for its tooltip', () => {
+    render(
+      <TicketCard
+        ticket={{ ...base, ticketNumber: '3891', createdAt: '2026-09-10T11:55:00Z' }}
+        columnId="c1"
+        href="/tickets/dialog?id=t1"
+        dragDisabled
+      />,
+    );
+    const meta = screen.getByRole('link', { name: '3891 • 5 min ago' });
+    expect(meta).toHaveAttribute('href', '/tickets/dialog?id=t1');
+    expect(meta).toHaveAttribute('tabindex', '-1');
+    expect(meta).toHaveClass('pointer-events-auto');
+  });
+
+  it('keeps the line plain text on a card without a link', () => {
+    render(
+      <TicketCard
+        ticket={{ ...base, ticketNumber: '3891', createdAt: '2026-09-10T11:55:00Z' }}
+        columnId="c1"
+        dragDisabled
+      />,
+    );
+    expect(screen.getByText('3891 • 5 min ago')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

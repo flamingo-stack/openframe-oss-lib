@@ -11,8 +11,8 @@ import java.util.List;
 /**
  * Flattened view of the AI agent's {@code messageData} union. The GraphQL query selects the fields the
  * harness needs across several concrete types (TextData, ExecutedToolData, ApprovalRequestData,
- * ErrorData, AskData) via inline fragments; {@code type} discriminates, and fields not present on a given
- * variant stay null.
+ * ErrorData, AskData, ContextCompactionEndData) via inline fragments; {@code type} discriminates, and
+ * fields not present on a given variant stay null.
  */
 @Data
 @Builder
@@ -45,4 +45,7 @@ public class MessageData {
     // from the agent's upstream request log.
     private String question;
     private List<AskOption> options;
+
+    // ContextCompactionEndData -- the summary that replaced the compacted history in the model's memory
+    private String summary;
 }

@@ -7,7 +7,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 // Leading-icon glyph scale: 16px on mobile, 24px on md+. Color is intentionally
 // omitted so the glyph inherits the current text color.
 export const noDataIconClasses =
-  'inline-flex shrink-0 items-center justify-center [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6';
+  'inline-flex shrink-0 items-center justify-center [&_svg]:h-4 [&_svg]:w-4 content-md:[&_svg]:h-6 content-md:[&_svg]:w-6';
 
 // Surface for the info-block group container: a transparent, bordered panel with
 // rounded corners. `overflow-hidden` keeps only the outer blocks round — inner

@@ -12,7 +12,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
@@ -29,6 +31,8 @@ class DeliveryDispatcherTest {
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliveryRecorder recorder;
     @Mock private DeliverySpec<TestSeed, TestPayload> spec;
+    @Mock private ObjectProvider<DeliveryPublisher> publisherProvider;
+    @Mock private DeliveryPublisher publisher;
 
     @InjectMocks private DeliveryDispatcher dispatcher;
 
@@ -50,17 +54,22 @@ class DeliveryDispatcherTest {
     }
 
     @Test
-    void dispatch_seed_requestRecordedThenPublishedThroughSpec() {
+    void dispatch_seed_dispatchIdSetThenRecordedThenPublishedToSpecSubject() {
         // setup
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         when(spec.request(seed)).thenReturn(request);
+        when(spec.subject(MACHINE_ID)).thenReturn("machine.mach-42.test");
+        when(publisherProvider.getObject()).thenReturn(publisher);
 
         // execution
         dispatcher.dispatch(seed);
 
         // verifications
+        assertThat(payload.getDelivery().getType()).isEqualTo(DeliveryType.TOOL_INSTALLATION);
+        assertThat(payload.getDelivery().getTargetId()).isEqualTo(TARGET_ID);
+        assertThat(payload.getDelivery().getDispatchId()).isNotBlank();
         verify(recorder).record(request);
-        verify(spec).publish(MACHINE_ID, payload);
+        verify(publisher).publish("machine.mach-42.test", payload);
     }
 
     @Test

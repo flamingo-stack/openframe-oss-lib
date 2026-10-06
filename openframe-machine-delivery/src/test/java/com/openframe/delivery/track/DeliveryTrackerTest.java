@@ -4,6 +4,7 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryTestPolicies;
+import com.openframe.delivery.spec.DeliveryRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,9 +29,12 @@ class DeliveryTrackerTest {
     private static final String MACHINE_ID = "mach-42";
     private static final String TARGET_ID = "fleetmdm-agent";
     private static final String DELIVERY_ID = DeliveryId.of(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
-    private static final long TWO_ROWS = 2L;
+    private static final String DISPATCH_ID = "d-1";
+    private static final String ERROR = "download failed";
+    private static final DeliveryRef REF = new DeliveryRef(DeliveryType.TOOL_INSTALLATION, TARGET_ID, DISPATCH_ID);
 
     @Mock private MachineDeliveryRepository repository;
+    @Mock private DeliveryCloser closer;
 
     @Captor private ArgumentCaptor<Instant> atCaptor;
     @Captor private ArgumentCaptor<Instant> untilCaptor;
@@ -39,16 +43,16 @@ class DeliveryTrackerTest {
 
     @BeforeEach
     void setUp() {
-        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties());
+        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer);
     }
 
     @Test
-    void acknowledge_typedKey_unackedRowMarkedAckedWithResultDeadline() {
+    void acknowledge_ref_unackedRowMarkedAckedWithResultDeadline() {
         // setup
-        when(repository.markAcked(eq(DELIVERY_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
+        when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
 
         // execution
-        tracker.acknowledge(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+        tracker.acknowledge(REF, MACHINE_ID);
 
         // verifications
         Instant ackedAt = atCaptor.getValue();
@@ -56,12 +60,12 @@ class DeliveryTrackerTest {
     }
 
     @Test
-    void complete_typedKey_openOrFailedRowMarkedDoneWithTtlExpiry() {
+    void done_ref_openOrFailedRowMarkedDoneWithTtlExpiry() {
         // setup
-        when(repository.markDone(eq(DELIVERY_ID), eq(DeliveryStatus.COMPLETABLE), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
+        when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
 
         // execution
-        tracker.complete(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+        tracker.done(REF, MACHINE_ID);
 
         // verifications
         Instant finishedAt = atCaptor.getValue();
@@ -69,27 +73,11 @@ class DeliveryTrackerTest {
     }
 
     @Test
-    void cancel_typedKey_openRowMarkedCancelledWithTtlExpiry() {
-        // setup
-        when(repository.markCancelled(eq(DELIVERY_ID), eq(DeliveryStatus.OPEN), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
-
+    void fail_agentReportedError_closerAsked() {
         // execution
-        tracker.cancel(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+        tracker.fail(REF, MACHINE_ID, ERROR);
 
         // verifications
-        Instant finishedAt = atCaptor.getValue();
-        assertThat(untilCaptor.getValue()).isEqualTo(finishedAt.plusSeconds(TTL));
-    }
-
-    @Test
-    void wake_machineId_unackedRowsOfThatMachineWoken() {
-        // setup
-        when(repository.wake(eq(MACHINE_ID), eq(DeliveryStatus.UNACKED), any(Instant.class))).thenReturn(TWO_ROWS);
-
-        // execution
-        tracker.wake(MACHINE_ID);
-
-        // verifications
-        verify(repository).wake(eq(MACHINE_ID), eq(DeliveryStatus.UNACKED), any(Instant.class));
+        verify(closer).failReported(eq(DeliveryType.TOOL_INSTALLATION), eq(TARGET_ID), eq(MACHINE_ID), eq(DISPATCH_ID), eq(ERROR), any(Instant.class));
     }
 }

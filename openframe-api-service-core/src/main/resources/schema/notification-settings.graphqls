@@ -17,6 +17,7 @@ enum NotificationSettingGroup {
     MINGO_MESSAGES
     APPROVAL_TICKET
     APPROVAL_MINGO
+    INSIGHTS
 }
 
 type NotificationTypeSetting {

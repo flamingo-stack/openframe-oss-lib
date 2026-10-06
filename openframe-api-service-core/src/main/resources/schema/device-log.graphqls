@@ -1,8 +1,10 @@
 extend type Query {
-    # Agent logs of one device, newest first, always scoped to the current tenant.
+    # Agent logs, newest first, always scoped to the current tenant.
+    # Name devices with `machineIds`, or omit it to follow every device in the tenant.
     # Paginate with first/after (older entries); re-query without `after` to pick up newer ones.
     deviceLogs(
-        machineId: String!
+        machineId: String @deprecated(reason: "Use machineIds; a value given here is added to that list")
+        machineIds: [String!]  # 1-50 devices. Omit for every device in the tenant; an empty list is rejected
         filter: DeviceLogFilterInput
         first: Int       # Lines per page: 1-500, default 100
         after: String
@@ -20,7 +22,7 @@ input DeviceLogFilterInput {
     levels: [DeviceLogLevel!]  # Any of these levels; all levels when omitted
     contains: [String!]        # All of these must appear in the message; case-insensitive, matched literally. Max 5 terms of 256 characters
     excludes: [String!]        # None of these may appear in the message; same matching and limits
-    from: Instant              # Inclusive; defaults to 7 days before `to`
+    from: Instant              # Inclusive; defaults to 7 days before `to`, or 24 hours when no device is named
     to: Instant                # Inclusive; defaults to now. The range may not exceed 30 days
 }
 
@@ -39,6 +41,7 @@ type DeviceLogEntry {
     agentTimestamp: Instant    # When the agent wrote the line
     level: String!
     message: String!
+    machineId: String          # Device the line came from
     hostname: String
     count: Long                # Identical lines the agent collapsed into this entry
 }

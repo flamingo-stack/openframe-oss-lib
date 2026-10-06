@@ -1,5 +1,9 @@
 package com.openframe.api.service.ticket;
 
+import com.openframe.api.exception.ticket.TicketNotFoundException;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.ForbiddenException;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.ticket.TicketNote;
 import com.openframe.data.repository.ticket.TicketNoteRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -45,9 +49,9 @@ public class TicketNoteService {
         validateAdminAccess(principal);
         log.info("Updating note {} by: {}", noteId, principal.getDisplayName());
         TicketNote note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("Note not found: " + noteId));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.TICKET_NOTE_NOT_FOUND, "Note not found: " + noteId));
         if (!note.getAuthorId().equals(principal.getId())) {
-            throw new IllegalStateException("Only the author can update this note");
+            throw new ForbiddenException(ErrorCode.OPERATION_NOT_ALLOWED, "Only the author can update this note");
         }
         note.setContent(content);
         return noteRepository.save(note);
@@ -58,9 +62,9 @@ public class TicketNoteService {
         validateAdminAccess(principal);
         log.info("Deleting note {} by: {}", noteId, principal.getDisplayName());
         TicketNote note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("Note not found: " + noteId));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.TICKET_NOTE_NOT_FOUND, "Note not found: " + noteId));
         if (!note.getAuthorId().equals(principal.getId())) {
-            throw new IllegalStateException("Only the author can delete this note");
+            throw new ForbiddenException(ErrorCode.OPERATION_NOT_ALLOWED, "Only the author can delete this note");
         }
         noteRepository.delete(note);
         log.info("Note deleted: {}", noteId);
@@ -78,7 +82,7 @@ public class TicketNoteService {
 
     private void validateTicketExists(String ticketId) {
         if (!ticketRepository.existsById(ticketId)) {
-            throw new IllegalArgumentException("Ticket not found: " + ticketId);
+            throw new TicketNotFoundException(ticketId);
         }
     }
 }

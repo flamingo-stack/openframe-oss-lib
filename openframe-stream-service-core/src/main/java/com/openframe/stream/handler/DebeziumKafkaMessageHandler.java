@@ -36,6 +36,8 @@ public abstract class DebeziumKafkaMessageHandler
             message.setDeviceId(enrichedData.getMachineId());
             message.setHostname(enrichedData.getHostname());
             message.setNickname(enrichedData.getNickname());
+            message.setExecutionSource(enrichedData.getExecutionSource());
+            message.setScriptCreationSource(enrichedData.getScriptCreationSource());
             message.setOrganizationId(enrichedData.getOrganizationId());
             message.setOrganizationName(enrichedData.getOrganizationName());
             message.setIngestDay(debeziumMessage.getIngestDay());

@@ -27,14 +27,17 @@ import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterOption;
 import com.openframe.api.dto.rmm.script.ScriptFilters;
+import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
+import com.openframe.api.mapper.ScriptEnvVarMapper;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.script.ScriptDispatchService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.api.service.rmm.script.ScriptFilterService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import jakarta.validation.Valid;
@@ -101,7 +104,8 @@ public class ScriptDataFetcher {
     @DgsMutation
     public ScriptResponse createScript(@InputArgument @Valid CreateScriptInput input) {
         input.setTagIds(decodeIds(input.getTagIds()));
-        return scriptService.create(input, getCurrentUserId());
+        String userId = getCurrentUserId();
+        return scriptService.create(input, userId, ScriptCreationSource.MANUAL);
     }
 
     @DgsMutation
@@ -159,6 +163,13 @@ public class ScriptDataFetcher {
         options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
     }
 
+    @DgsData(parentType = "Script", field = "envVars")
+    public List<ScriptEnvVarInput> envVars(DgsDataFetchingEnvironment dfe) {
+        ScriptResponse script = dfe.getSource();
+        return ScriptEnvVarMapper.mask(script.getEnvVars());
+    }
+
+    /** Resolves the {@code Script.tags} field, batched per request via the data loader. */
     @DgsData(parentType = "Script", field = "tags")
     public CompletableFuture<List<Tag>> tags(DgsDataFetchingEnvironment dfe) {
         ScriptResponse script = dfe.getSource();

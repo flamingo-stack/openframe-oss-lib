@@ -10,6 +10,7 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLAssignmentMapper;
+import com.openframe.api.dataloader.TicketStatusDefinitionDataLoader;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
@@ -18,6 +19,9 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.ticket.TicketStatusDefinition;
+import com.openframe.data.document.ticket.TicketStatusKind;
+import com.openframe.data.document.ticket.TicketStatus;
 import graphql.relay.Relay;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +30,8 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 import java.util.Map;
+import org.dataloader.DataLoader;
+
 import java.util.concurrent.CompletableFuture;
 
 @DgsComponent
@@ -114,6 +120,41 @@ public class AssignmentDataFetcher {
         Ticket ticket = dfe.getSource();
         String ticketId = ticket.getId();
         return RELAY.toGlobalId("Ticket", ticketId);
+    }
+
+    /**
+     * The legacy status, kept for clients built before the lifecycle rollout — the mobile and
+     * desktop shells ship a frozen web bundle. Nothing stores it any more, so it is derived from
+     * the lifecycle kind; this schema exposes no kind of its own.
+     * TODO(lifecycle-rollout): drop once no released shell reads it.
+     */
+    @DgsData(parentType = "Ticket", field = "status")
+    public String ticketLegacyStatus(DgsDataFetchingEnvironment dfe) {
+        Ticket ticket = dfe.getSource();
+        return TicketStatus.fromKind(ticket.getStatusKind()).name();
+    }
+
+    /**
+     * The lifecycle status drives the chip the assigned-ticket lists render: the kind selects the
+     * canonical styling, and a custom column takes its name and colour from the definition. The
+     * legacy string next to it cannot stand in — it reports every custom column as TECH_REQUIRED.
+     */
+    @DgsData(parentType = "Ticket", field = "statusKind")
+    public TicketStatusKind ticketStatusKind(DgsDataFetchingEnvironment dfe) {
+        Ticket ticket = dfe.getSource();
+        return ticket.getStatusKind();
+    }
+
+    @DgsData(parentType = "Ticket", field = "statusDefinition")
+    public CompletableFuture<TicketStatusDefinition> ticketStatusDefinition(DgsDataFetchingEnvironment dfe) {
+        Ticket ticket = dfe.getSource();
+        String statusId = ticket.getStatusId();
+        if (statusId == null || statusId.isBlank()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DataLoader<String, TicketStatusDefinition> loader =
+                dfe.getDataLoader(TicketStatusDefinitionDataLoader.NAME);
+        return loader.load(statusId);
     }
 
     @DgsData(parentType = "ItemAssignment", field = "target")

@@ -22,10 +22,11 @@
  */
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useContactSubmission } from '../../hooks/use-contact-submission';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
+import { useRescuedForm } from '../../hooks/use-rescued-form';
 import {
   ContactSchema,
   type ContactFormData,
@@ -33,11 +34,12 @@ import {
   referralSourceOptions,
   defaultHelpCategoryOptions,
 } from '../../schemas/contact-schema';
+import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
 import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown';
-import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../layout/page-heading';
 import {
   Button,
   type ButtonProps,
@@ -130,6 +132,11 @@ export interface ContactFormProps {
   submitSuccessLabel?: string;
   successRedirectUrl?: string;
   successToastMessage?: string;
+  /** Form rescue (a half-filled form is saved so the team can follow up): the
+   *  form's definition (`RESCUE_FORMS.contact`, or the host's own
+   *  `defineRescueForm`). OPT-IN: omitted or `null` saves nothing, so a host that
+   *  has not chosen rescue never starts storing what visitors type. */
+  rescue?: FormRescueDefinition | null;
 }
 
 export function ContactForm({
@@ -155,6 +162,7 @@ export function ContactForm({
   submitSuccessLabel = 'Message Sent!',
   successRedirectUrl = '/blog#community',
   successToastMessage = 'Redirecting you to join our community...',
+  rescue: rescueForm = null,
 }: ContactFormProps = {}) {
   // Attachments staging — same hook the chat composer + ticket
   // detail-drawer composer use. Files upload to Supabase as soon as
@@ -185,13 +193,7 @@ export function ContactForm({
   // own their own UX (no "Message Sent!" button-label flicker).
   const isSuccess = onCustomSubmit ? false : builtInSubmission.isSuccess;
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors },
-    reset,
-  } = useForm<ContactFormData>({
+  const form = useForm<ContactFormData>({
     resolver: zodResolver(ContactSchema),
     defaultValues: {
       ...(prefilledReason && { helpCategory: prefilledReason }),
@@ -201,12 +203,30 @@ export function ContactForm({
       ...defaultValuesProp,
     },
   });
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    reset,
+  } = form;
+
+  // Form rescue: only the fields the visitor can see are tracked, so a hidden
+  // prefilled value (a signed-in email, a fixed category) is never sent.
+  const rescueFieldNames = useMemo(
+    () =>
+      (['name', 'email', 'companySize', 'referralSource', 'helpCategory', 'message'] as const).filter(
+        field => !hideFields.includes(field),
+      ),
+    [hideFields],
+  );
+  const rescue = useRescuedForm(form, { rescue: rescueForm, fields: rescueFieldNames, getSignals });
 
   const handleFormSubmit = async (data: ContactFormData) => {
     if (isSubmitting) return;
     if (attachmentsEnabled && attachments.hasInflightUploads) return;
     try {
-      const payload = { ...data, ...(rdtCid && { rdt_cid: rdtCid }), ...getSignals() };
+      const payload = { ...data, ...(rdtCid && { rdt_cid: rdtCid }), ...getSignals(), ...rescue.submitFields() };
       const readyAttachments = attachmentsEnabled ? attachments.readyAttachments : [];
       if (onCustomSubmit) {
         setCustomSubmitting(true);
@@ -218,6 +238,7 @@ export function ContactForm({
       } else {
         await builtInSubmission.submit(payload);
       }
+      rescue.complete();
       onSubmitSuccess?.();
       reset();
       resetSignals();
@@ -241,11 +262,11 @@ export function ContactForm({
 
   return (
     <div
-      className={`flex h-full flex-col ${!noBorder ? 'rounded-2xl border border-ods-border md:rounded-3xl' : ''} ${!noPadding ? 'p-6 md:p-8 lg:p-10' : ''}`}
+      className={`flex h-full flex-col ${!noBorder ? 'rounded-2xl border border-ods-border content-md:rounded-3xl' : ''} ${!noPadding ? 'p-6 content-md:p-8 content-lg:p-10' : ''}`}
     >
       {(title || subtitle) && (
-        <div className="mb-6 md:mb-8">
-          {title && <h2 className={`${SECTION_HEADING_CLASS} mb-3 md:mb-4`}>{title}</h2>}
+        <div className="mb-6 content-md:mb-8">
+          {title && <h2 className={`${SECTION_HEADING_CLASS} mb-3 content-md:mb-4`}>{accentSentenceMarks(title)}</h2>}
           {subtitle && <p className="text-ods-text-primary text-h4">{subtitle}</p>}
         </div>
       )}
@@ -262,7 +283,7 @@ export function ContactForm({
             Object.fromEntries(Object.entries(validationErrors).map(([k, v]) => [k, v?.message ?? v])),
           );
         })}
-        className="flex flex-grow flex-col space-y-4 md:space-y-6"
+        className="flex flex-grow flex-col space-y-4 content-md:space-y-6"
         {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}
       >
         {/* Hidden inputs for fields that are required by `ContactSchema`
@@ -287,7 +308,7 @@ export function ContactForm({
         {extraTopField}
 
         {showNameEmailRow && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 content-md:grid-cols-2 content-md:gap-6">
             {showName && (
               <div className="flex flex-col">
                 <Label htmlFor="name">
@@ -338,7 +359,7 @@ export function ContactForm({
         )}
 
         {(showCompanySize || showReferralSource) && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 content-md:grid-cols-2 content-md:gap-6">
             {showCompanySize && (
               <div className="flex flex-col">
                 <Label htmlFor="companySize">Company Size</Label>
@@ -346,7 +367,7 @@ export function ContactForm({
                   control={control}
                   name="companySize"
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <SelectTrigger
                         id="companySize"
                         aria-label="Company Size"
@@ -378,7 +399,7 @@ export function ContactForm({
                   control={control}
                   name="referralSource"
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <SelectTrigger
                         id="referralSource"
                         aria-label="Referral Source"
@@ -416,7 +437,7 @@ export function ContactForm({
               control={control}
               name="helpCategory"
               render={({ field }) => (
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value ?? ''}>
                   <SelectTrigger
                     id="helpCategory"
                     aria-label="Help Category"
@@ -490,14 +511,16 @@ export function ContactForm({
           </div>
         )}
 
-        <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 md:flex-row md:gap-6">
-          {footerText && <p className="text-center text-ods-text-secondary text-h6 md:text-left">{footerText}</p>}
+        <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 content-md:flex-row content-md:gap-6">
+          {footerText && (
+            <p className="text-center text-ods-text-secondary text-h6 content-md:text-left">{footerText}</p>
+          )}
           <Button
             type="submit"
             loading={isSubmitting}
             disabled={isSubmitting || isSuccess || (attachmentsEnabled && attachments.hasInflightUploads)}
             variant={buttonVariant}
-            className={`w-full md:w-auto ${buttonClassName}`}
+            className={`w-full content-md:w-auto ${buttonClassName}`}
           >
             {isSuccess ? submitSuccessLabel : submitLabel}
           </Button>

@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
 import type { MeetingHost } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
-import { SquareAvatar, AvatarStack, Button, Skeleton, Autocomplete } from '../ui';
+import { SquareAvatar, AvatarStack, Button, Skeleton } from '../ui';
+import { TimezoneSelect } from '../ui/timezone-select';
 
 /**
  * ContextPanel — the "who / what / how long" side of the scheduler card
@@ -70,7 +70,7 @@ const PANEL_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
  * two children, different axis; nothing is hidden at any width.
  */
 const IDENTITY_ROW =
-  'flex items-center justify-between gap-[var(--spacing-system-m)] lg:flex-col lg:items-stretch lg:gap-[var(--spacing-system-l)]';
+  'flex items-center justify-between gap-[var(--spacing-system-m)] content-lg:flex-col content-lg:items-stretch content-lg:gap-[var(--spacing-system-l)]';
 
 /**
  * Everything under the back edge, in TWO groups: identity/title/duration, and
@@ -85,11 +85,13 @@ const IDENTITY_ROW =
  * Below `md` (phone) and from `lg` up (280px sidebar) there is no horizontal
  * room to spend, so both fall back to the plain stack.
  */
-const STRIP_BODY = 'flex flex-col gap-[var(--spacing-system-l)] md:flex-row md:items-start lg:flex-col';
-const STRIP_MAIN = 'flex min-w-0 flex-col gap-[var(--spacing-system-l)] md:flex-1';
+const STRIP_BODY =
+  'flex flex-col gap-[var(--spacing-system-l)] content-md:flex-row content-md:items-start content-lg:flex-col';
+const STRIP_MAIN = 'flex min-w-0 flex-col gap-[var(--spacing-system-l)] content-md:flex-1';
 /** 280px — the same width this panel has as a sidebar, so the field is the
  *  size the visitor meets at every other breakpoint. */
-const STRIP_ASIDE = 'flex flex-col gap-[var(--spacing-system-xxs)] md:w-[280px] md:shrink-0 lg:w-full';
+const STRIP_ASIDE =
+  'flex flex-col gap-[var(--spacing-system-xxs)] content-md:w-[280px] content-md:shrink-0 content-lg:w-full';
 
 /** The back affordance sits flush with the panel's top padding: `BackButton`'s
  *  own 12px block padding would otherwise double the 24px stack gap under it. */
@@ -99,19 +101,6 @@ const BACK_BUTTON_CLASS = 'py-0';
  *  their control, so the panel reads as a form rather than as a stack of
  *  section headers. */
 const FIELD_LABEL_CLASS = 'text-h4 text-ods-text-primary';
-
-function zoneLabel(tz: string): string {
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      timeZoneName: 'shortOffset',
-    }).formatToParts(new Date());
-    const offset = parts.find(p => p.type === 'timeZoneName')?.value ?? '';
-    return offset ? `${tz.replace(/_/g, ' ')} (${offset})` : tz.replace(/_/g, ' ');
-  } catch {
-    return tz.replace(/_/g, ' ');
-  }
-}
 
 /**
  * Same-footprint skeleton — swaps with the loaded panel with zero shift.
@@ -137,7 +126,7 @@ export function ContextPanelSkeleton({
       <div className={STRIP_BODY}>
         <div className={STRIP_MAIN}>
           <div className={IDENTITY_ROW}>
-            <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)] lg:flex-none">
+            <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)] content-lg:flex-none">
               <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
               <div className="flex flex-1 flex-col gap-[var(--spacing-system-xxs)]">
                 <Skeleton className="h-5 w-32" />
@@ -172,22 +161,6 @@ export function SchedulerContextPanel({
   showTimezone = true,
   className,
 }: SchedulerContextPanelProps) {
-  // All IANA zones with live GMT offsets — computed once, client-only (the
-  // panel renders the picker only after the parent resolves a zone).
-  const zoneOptions = useMemo(() => {
-    if (!timezone) return [];
-    let zones: string[];
-    try {
-      // Older lib targets don't type supportedValuesOf (ES2022) — runtime-guarded.
-      const intl = Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] };
-      zones = intl.supportedValuesOf ? intl.supportedValuesOf('timeZone') : [timezone];
-    } catch {
-      zones = [timezone];
-    }
-    if (!zones.includes(timezone)) zones = [timezone, ...zones];
-    return zones.map(tz => ({ value: tz, label: zoneLabel(tz) }));
-  }, [timezone]);
-
   return (
     <div className={cn(PANEL_STACK, className)}>
       {/* The card's ONE back edge, at every step — the caller decides where it
@@ -270,19 +243,15 @@ export function SchedulerContextPanel({
           // summary line states the zone one row below — so the fact survives,
           // only the control steps aside. The 280px sidebar has the room, so
           // there it stays.
-          <div className={cn(STRIP_ASIDE, locked && 'max-lg:hidden')}>
+          <div className={cn(STRIP_ASIDE, locked && 'content-max-lg:hidden')}>
             <p className={FIELD_LABEL_CLASS}>Timezone</p>
             {timezone ? (
-              <Autocomplete
+              <TimezoneSelect
                 value={timezone}
                 disabled={disabled}
                 onChange={tz => {
                   if (tz) onTimezoneChange?.(tz);
                 }}
-                options={zoneOptions}
-                placeholder="Search timezone…"
-                noOptionsText="No matching timezone"
-                showClearAll={false}
               />
             ) : (
               <Skeleton className="h-12 w-full" />

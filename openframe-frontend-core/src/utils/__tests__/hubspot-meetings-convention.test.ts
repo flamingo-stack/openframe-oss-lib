@@ -100,14 +100,23 @@ describe('makeBookingSchema × SUPPORTED_FORM_FIELD_TYPES', () => {
         label: `Question (${type})`,
         type,
         required: true,
-        options: type === 'select' || type === 'radio' ? ['a', 'b'] : undefined,
+        options: type === 'select' || type === 'radio' || type === 'multiselect' ? ['a', 'b'] : undefined,
       };
       expect(isSupportedFormField(field)).toBe(true);
       const schema = makeBookingSchema([field], null);
-      // One well-formed answer per type: a boolean for the box, an option for the
-      // pickers, a decimal literal for a Number property, free text otherwise.
-      const answer =
-        type === 'checkbox' ? true : type === 'select' || type === 'radio' ? 'a' : type === 'number' ? '42' : 'hello';
+      // One well-formed answer per control: a boolean for the box, an option for the
+      // pickers, `;`-joined options for the multi-picker, a decimal literal for a
+      // Number property, a phone and an ISO date for theirs, free text otherwise.
+      const ANSWERS: Record<string, unknown> = {
+        checkbox: true,
+        select: 'a',
+        radio: 'a',
+        multiselect: 'a;b',
+        number: '42',
+        phone: '+1 415 555 2671',
+        date: '2026-09-24',
+      };
+      const answer = ANSWERS[type] ?? 'hello';
       const ok = schema.safeParse({ ...base, formFields: { [field.name]: answer } });
       expect(ok.success).toBe(true);
       const missing = schema.safeParse({ ...base, formFields: {} });
@@ -115,7 +124,7 @@ describe('makeBookingSchema × SUPPORTED_FORM_FIELD_TYPES', () => {
     }
   });
 
-  it('unsupported types are excluded from validation (fail-closed happens at render)', () => {
+  it('an unanswerable question (file upload) is excluded from validation (fail-closed happens at render)', () => {
     const field: MeetingFormField = { name: 'q_file', label: 'Upload', type: 'file', required: true };
     expect(isSupportedFormField(field)).toBe(false);
     const schema = makeBookingSchema([field], null);

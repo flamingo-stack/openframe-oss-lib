@@ -73,4 +73,39 @@ class DeliveryPropertiesTest {
         // verifications
         assertThat(resolved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
     }
+    @Test
+    void isEnabled_typeNotListed_false() {
+        // setup
+        properties.setEnabled(Map.of());
+
+        // execution
+        boolean enabled = properties.isEnabled(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(enabled).isFalse();
+    }
+
+    @Test
+    void isEnabled_typeListedOff_false() {
+        // setup
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, false));
+
+        // execution
+        boolean enabled = properties.isEnabled(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(enabled).isFalse();
+    }
+
+    @Test
+    void isEnabled_typeListedOn_true() {
+        // setup
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+
+        // execution
+        boolean enabled = properties.isEnabled(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(enabled).isTrue();
+    }
 }

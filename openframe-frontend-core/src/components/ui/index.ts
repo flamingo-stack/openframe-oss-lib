@@ -4,6 +4,7 @@
 export * from './allowed-domains-input';
 export * from './announcement-bar-view';
 export * from './autocomplete';
+export * from './timezone-select';
 export * from './button';
 export * from './card';
 export * from './checkbox';
@@ -43,6 +44,8 @@ export * from './image-gallery-modal';
 export * from './modal';
 export * from './modal-v2';
 export * from './modal-guarded-close';
+export * from './admin-form-drawer';
+export * from './playback-toggle';
 export * from './admin-form-modal';
 export * from './separator';
 export * from './sheet';
@@ -69,6 +72,7 @@ export * from './slack-channel-chip';
 export * from './status-badge';
 export * from './palette-badge';
 export * from './department-badge';
+export * from './store-badges';
 export * from './status-indicator';
 export * from './toaster';
 // TODO: Add other UI components as they are moved to ui-kit
@@ -102,6 +106,8 @@ export * from './info-card-row';
 export * from './device-card';
 export * from './device-card-compact';
 export * from './entity-image';
+export * from './data-attribution';
+export * from './compliance-badge';
 export * from './feature-card';
 export * from './feature-list';
 export { FloatingTooltip } from './floating-tooltip';
@@ -218,11 +224,21 @@ export * from './ticket-attachments-list';
 export * from './ticket-note-card';
 export * from './ticket-notes-section';
 export * from './marquee-wall';
+export * from './photo-wall';
 export * from './markdown';
 export * from './filter-pill-row';
 
 // Viewport-gated mounting for heavy previews (players, large images)
 export { LazyMount, type LazyMountProps } from './lazy-mount';
+
+// Product-demo stage primitives (marketing pages): window + phone chrome, the
+// incident feed, the swipe carousel and the sticky call-to-action bar.
+export * from './app-window-frame';
+export * from './phone-frame';
+export * from './incident-feed';
+export * from './status-line';
+export * from './snap-carousel';
+export * from './sticky-action-bar';
 export { RequiredMark } from './required-mark';
 export { IconTile } from './icon-tile';
 export { PolicyLink } from './policy-link';

@@ -20,6 +20,12 @@ export { EntityPortraitCard, type EntityPortraitCardProps, type EntityPortraitPe
 export { useCoverImageFallback, hideOnError, type CoverImageFallback } from './use-cover-image-fallback';
 export { AdminContentCard } from './admin-content-card';
 export {
+  CONTENT_CARD_FRAME_CLASS,
+  CONTENT_CARD_SKELETON_FRAME_CLASS,
+  ContentCardFrame,
+  type ContentCardFrameProps,
+} from './content-card-frame';
+export {
   AdminContentCardGrid,
   AdminContentCardSkeleton,
   ADMIN_CONTENT_CARD_GRID_CLASS,
@@ -69,6 +75,13 @@ export {
   type OnboardingGuideCardProps,
 } from './onboarding-guide-card';
 export { RoadmapCard, RoadmapCardSkeleton, type RoadmapCardProps, type VoteType } from './roadmap-card';
+export {
+  DesignDocCard,
+  DesignDocCardSkeleton,
+  designDocMetaLine,
+  designDocPeople,
+  type DesignDocCardProps,
+} from './design-doc-card';
 export { RoadmapVoteButton, type RoadmapVoteButtonProps } from './roadmap-vote-button';
 export { TaskTypeIcon, type TaskTypeIconProps } from './task-type-icon';
 export {

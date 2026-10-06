@@ -1,29 +1,206 @@
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 
 $FamilyName = 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe'
+$LatestUrl = 'https://github.com/microsoft/winget-cli/releases/latest'
+$CacheRoot = Join-Path $env:TEMP 'openframe-winget-bootstrap'
+$CacheTtlDays = 7
+$DiskMarginMb = 100
+$ExtractedDepsMb = 50
+
+$OsArch = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment' -ErrorAction SilentlyContinue).PROCESSOR_ARCHITECTURE
+if (-not $OsArch) { $OsArch = $env:PROCESSOR_ARCHITEW6432 }
+if (-not $OsArch) { $OsArch = $env:PROCESSOR_ARCHITECTURE }
+$Arch = switch ($OsArch) {
+    'AMD64' { 'x64' }
+    'ARM64' { 'arm64' }
+    default { 'x86' }
+}
 
 function Get-WingetExe {
-    $p = (Get-AppxPackage -Name Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue).InstallLocation
-    if ($p -and (Test-Path "$p\winget.exe")) { return "$p\winget.exe" }
+    $package = Get-AppxPackage -Name Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue |
+               Select-Object -First 1
+    if (-not $package) { return $null }
+    $exe = Join-Path $package.InstallLocation 'winget.exe'
+    if (Test-Path $exe) { return $exe }
     return $null
 }
 
-$exe = Get-WingetExe
+function Resolve-LatestTag {
+    $request = [System.Net.HttpWebRequest]::Create($LatestUrl)
+    $request.AllowAutoRedirect = $false
+    $request.Method = 'HEAD'
+    $request.Timeout = 30000
+    $response = $request.GetResponse()
+    try { $location = $response.Headers['Location'] } finally { $response.Close() }
+    if (-not $location) { throw 'no Location header on releases/latest' }
+    return $location.Split('/')[-1]
+}
+
+function Get-RemoteSize {
+    param([string]$Url)
+
+    $request = [System.Net.HttpWebRequest]::Create($Url)
+    $request.Method = 'HEAD'
+    $request.Timeout = 30000
+    $response = $request.GetResponse()
+    try { return [long]$response.ContentLength } finally { $response.Close() }
+}
+
+function Assert-FreeSpace {
+    param([long]$RequiredBytes)
+
+    $drive = (Get-Item $CacheRoot).PSDrive.Name
+    $free = (Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$drive`:'").FreeSpace
+    $needMb = [math]::Round($RequiredBytes / 1MB) + $DiskMarginMb
+    $freeMb = [math]::Round($free / 1MB)
+    if ($freeMb -lt $needMb) {
+        Write-Output "not enough disk space: need ${needMb}MB, free ${freeMb}MB on ${drive}:"
+        exit 12
+    }
+}
+
+function Get-CachedAsset {
+    param([string]$Url, [string]$Name, [string]$Directory)
+
+    $final = Join-Path $Directory $Name
+    if (Test-Path $final) { return $final }
+
+    New-Item -ItemType Directory -Force -Path $Directory | Out-Null
+    $partial = "$final.$PID.partial"
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $partial -UseBasicParsing
+        if (Test-Path $final) { Remove-Item $partial -Force -ErrorAction SilentlyContinue }
+        else { Move-Item -Path $partial -Destination $final -Force }
+    } catch {
+        Remove-Item $partial -Force -ErrorAction SilentlyContinue
+        if (-not (Test-Path $final)) { throw }
+    }
+    return $final
+}
+
+function Test-DependencySatisfied {
+    param([string]$Name, [string]$MinVersion)
+
+    $installed = Get-AppxPackage -Name $Name -ErrorAction SilentlyContinue |
+                 Where-Object { $_.Architecture -eq $Arch -or $_.Architecture -eq 'Neutral' }
+    if (-not $installed) { return $false }
+    $best = $installed | ForEach-Object { [version]$_.Version } | Sort-Object -Descending | Select-Object -First 1
+    return $best -ge [version]$MinVersion
+}
+
+function Expand-Dependencies {
+    param([string]$ZipPath, [object[]]$Missing, [string]$Directory)
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    New-Item -ItemType Directory -Force -Path $Directory | Out-Null
+
+    $paths = @()
+    $archive = [IO.Compression.ZipFile]::OpenRead($ZipPath)
+    try {
+        foreach ($dependency in $Missing) {
+            $entry = $archive.Entries |
+                Where-Object { $_.FullName -like "$Arch/$($dependency.Name)_*" } |
+                Select-Object -First 1
+            if (-not $entry) { return $null }
+
+            $target = Join-Path $Directory $entry.Name
+            if (-not (Test-Path $target)) {
+                [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $target, $true)
+            }
+            $paths += $target
+        }
+    } finally {
+        $archive.Dispose()
+    }
+    return $paths
+}
+
+function Remove-StaleCache {
+    if (-not (Test-Path $CacheRoot)) { return }
+    $cutoff = (Get-Date).AddDays(-$CacheTtlDays)
+    Get-ChildItem $CacheRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -lt $cutoff } |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+try {
+    $exe = Get-WingetExe
+} catch {
+    Write-Output "AppX subsystem is not usable: $($_.Exception.Message)"
+    exit 10
+}
+
+if ($exe) {
+    try {
+        $version = (& $exe --version).Trim()
+    } catch {
+        Write-Output "winget is present but will not run: $(($_.Exception.Message -split "`r?`n")[0])"
+        exit 40
+    }
+    Remove-Item $CacheRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Output "winget ready: $version"
+    exit 0
+}
+
+try {
+    Add-AppxPackage -RegisterByFamilyName -MainPackage $FamilyName
+    $exe = Get-WingetExe
+    if ($exe) { Write-Output 'recovered by registering the package already on disk' }
+} catch {
+    Write-Output "register-in-place not applicable: $(($_.Exception.Message -split "`r?`n")[0])"
+}
 
 if (-not $exe) {
-    $staged = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Appx\AppxAllUserStore\Applications' -ErrorAction SilentlyContinue |
-              Where-Object { $_.PSChildName -like 'Microsoft.DesktopAppInstaller*' }
-    if ($staged) {
-        try { Add-AppxPackage -RegisterByFamilyName -MainPackage $FamilyName }
-        catch { Write-Output "registration failed: $_"; exit 1 }
+    New-Item -ItemType Directory -Force -Path $CacheRoot | Out-Null
+    Remove-StaleCache
+
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
+
+        $tag = Resolve-LatestTag
+        $assetBase = "https://github.com/microsoft/winget-cli/releases/download/$tag"
+        $versionDir = Join-Path $CacheRoot $tag
+        $bundleUrl = "$assetBase/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+        $zipUrl = "$assetBase/DesktopAppInstaller_Dependencies.zip"
+        Write-Output "latest release: $tag, architecture: $Arch"
+
+        $manifest = Get-CachedAsset -Url "$assetBase/DesktopAppInstaller_Dependencies.json" -Name 'Dependencies.json' -Directory $versionDir
+        $required = (Get-Content $manifest -Raw | ConvertFrom-Json).Dependencies
+        $missing = @($required | Where-Object { -not (Test-DependencySatisfied -Name $_.Name -MinVersion $_.Version) })
+        Write-Output "dependencies: $($required.Count) required, $($missing.Count) missing"
+
+        $needed = Get-RemoteSize -Url $bundleUrl
+        if ($missing.Count -gt 0) { $needed += (Get-RemoteSize -Url $zipUrl) + ($ExtractedDepsMb * 1MB) }
+        Assert-FreeSpace -RequiredBytes $needed
+
+        $dependencyPaths = @()
+        if ($missing.Count -gt 0) {
+            $zip = Get-CachedAsset -Url $zipUrl -Name 'Dependencies.zip' -Directory $versionDir
+            $dependencyPaths = Expand-Dependencies -ZipPath $zip -Missing $missing -Directory (Join-Path $versionDir $Arch)
+            if ($null -eq $dependencyPaths) {
+                Write-Output "release has no dependency payload for architecture $Arch"
+                exit 21
+            }
+        }
+
+        $bundle = Get-CachedAsset -Url $bundleUrl -Name 'AppInstaller.msixbundle' -Directory $versionDir
+
+        if ($dependencyPaths.Count -gt 0) {
+            Add-AppxPackage -Path $bundle -DependencyPath $dependencyPaths -ForceUpdateFromAnyVersion
+        } else {
+            Add-AppxPackage -Path $bundle -ForceUpdateFromAnyVersion
+        }
+
         $exe = Get-WingetExe
-        if (-not $exe) { Write-Output "registered but winget still unavailable"; exit 2 }
+        if ($exe) { Write-Output 'recovered by direct install' }
+    } catch {
+        Write-Output "direct install failed: $($_.Exception.Message)"
     }
 }
 
 if (-not $exe) {
     try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
         Install-PackageProvider -Name NuGet -Force -Scope CurrentUser | Out-Null
 
         $moduleRoot = Join-Path $env:TEMP 'openframe-winget-module'
@@ -32,17 +209,31 @@ if (-not $exe) {
 
         $psd1 = Get-ChildItem $moduleRoot -Recurse -Filter 'Microsoft.WinGet.Client.psd1' |
                 Select-Object -First 1 -ExpandProperty FullName
-        if (-not $psd1) { Write-Output 'module download produced no manifest'; exit 1 }
+        if (-not $psd1) { Write-Output 'module download produced no manifest'; exit 30 }
         Import-Module $psd1 -Force
+    } catch { Write-Output "module bootstrap failed: $($_.Exception.Message)"; exit 30 }
 
-        Repair-WinGetPackageManager -Force -Latest
-    } catch { Write-Output "bootstrap failed: $_"; exit 1 }
+    try { Repair-WinGetPackageManager -Force -Latest }
+    catch { Write-Output "repair failed: $($_.Exception.Message)"; exit 31 }
 
     $exe = Get-WingetExe
-    if (-not $exe) { Write-Output "bootstrapped but winget still unavailable"; exit 3 }
+    if ($exe) { Write-Output 'recovered by Repair-WinGetPackageManager' }
 }
 
-& $exe list --accept-source-agreements --disable-interactivity | Out-Null
+if (-not $exe) {
+    Write-Output 'every path completed but winget is still unavailable'
+    exit 32
+}
 
-Write-Output "winget ready: $(& $exe --version)"
+try {
+    & $exe list --accept-source-agreements --disable-interactivity | Out-Null
+    $version = (& $exe --version).Trim()
+} catch {
+    Write-Output "winget is installed but will not run: $($_.Exception.Message)"
+    exit 40
+}
+
+Remove-Item $CacheRoot -Recurse -Force -ErrorAction SilentlyContinue
+
+Write-Output "winget ready: $version"
 exit 0

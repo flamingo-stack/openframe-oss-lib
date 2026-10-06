@@ -84,6 +84,19 @@ class DeliveryMetricsTest {
     }
 
     @Test
+    void recordResultRejected_reason_counterTaggedWithReason() {
+        // setup
+
+        // execution
+        metrics.recordResultRejected("incomplete");
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.result.rejected").tags("reason", "incomplete").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
     void recordFailed_typeAndReason_counterTaggedLowercase() {
         // setup
 

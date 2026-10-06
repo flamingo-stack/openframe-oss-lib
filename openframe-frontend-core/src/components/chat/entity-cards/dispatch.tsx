@@ -29,11 +29,29 @@
  *     fetch-mode entries.
  */
 
-import React, { type ReactNode } from 'react';
+import type React from 'react';
+import type { ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
+import type { DesignDoc } from '../../../types/design-doc';
+import {
+  TRUST_CENTER_DOCUMENT_TYPE,
+  TRUST_CENTER_PAGE_PATH,
+  TRUST_CENTER_TAGLINE,
+  TRUST_CENTER_TITLE,
+  trustFrameworkBadge,
+  trustFrameworkMonitoringEntry,
+  trustFrameworksSummary,
+  type TrustCenterPublic,
+  type TrustFrameworkMonitoringEntry,
+} from '../../../types/trust-center';
 import { formatDateShort } from '../../../utils/date-formatters';
+import {
+  DESIGN_DOC_READINESS_DISPLAY,
+  designDocReadiness,
+  formatCompletionLabel,
+} from '../../../utils/design-doc-readiness';
 import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
@@ -51,6 +69,7 @@ import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
 import { CodeSquareIcon } from '../../icons-v2-generated/coding/code-square-icon';
 import { CodingBranchIcon } from '../../icons-v2-generated/coding/coding-branch-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
+import { CodingMergeIcon } from '../../icons-v2-generated/coding/coding-merge-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
 import { PackageIcon } from '../../icons-v2-generated/coding/package-icon';
 import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
@@ -69,6 +88,7 @@ import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-tria
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon';
 import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon';
 import { MapIcon } from '../../icons-v2-generated/map-and-travel/map-icon';
+import { ShieldCheckIcon } from '../../icons-v2-generated/security/shield-check-icon';
 import { Megaphone01Icon } from '../../icons-v2-generated/shopping/megaphone-01-icon';
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon';
 import { CheckSquareIcon } from '../../icons-v2-generated/signs-and-symbols/check-square-icon';
@@ -87,15 +107,15 @@ import type { PrReviewState, GitHubActivityKind } from '../types/entities/github
 import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
 import type { BaseProgramItem, ProgramConfig } from '../types/entities/program-types';
 import { getStatusColorScheme } from '../utils/agent-status-message';
+import { resolveCardDestination } from '../utils/card-destination';
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution';
-import { safeHref } from '../utils/compact-card-classes';
 import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
 import { resolveIcon } from '../utils/icon-library';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
-import { resolveFetchedCardHref, pickFetchedCardHref, readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
+import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { getSourceLabel } from '../utils/source-icons';
-import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
+import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
 import { BlogCardSkeleton } from './blog-card';
 import { CampaignCardAdminSkeleton } from './campaign-card-admin';
@@ -103,6 +123,7 @@ import { CaseStudyCardSkeleton } from './case-study-card';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
 import { CustomerInterviewCardSkeleton } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
+import { designDocMetaLine } from './design-doc-card';
 import {
   parseGithubTitle,
   formatActivityId,
@@ -651,6 +672,54 @@ function GlyphChatCard({
   );
 }
 
+/** Framework status colour (a `StatusBadge` scheme) → the card pill's `Tag` variant. */
+const TRUST_STATUS_TAG_VARIANT: Record<TrustFrameworkMonitoringEntry['color'], MingoInfoCardStatus['variant']> = {
+  cyan: 'selectedCyan',
+  pinkSoft: 'selected',
+};
+
+/** Trust center (single record: the whole public projection). Title + the
+ *  frameworks with their monitoring badges; the lead framework's badge is the pill;
+ *  "View trust center" opens the page. Defensive reads — the row is unvalidated. */
+function TrustCenterChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  discuss,
+}: {
+  item: unknown;
+  chatRef: ChatRef;
+  isNewTab: boolean;
+  discuss?: CardDiscussAction;
+}) {
+  const raw = (item as { frameworks?: unknown } | undefined)?.frameworks;
+  const frameworks: TrustCenterPublic['frameworks'] = Array.isArray(raw)
+    ? (raw as TrustCenterPublic['frameworks'])
+    : [];
+  const summary = trustFrameworksSummary(frameworks);
+  const leadFramework = frameworks[0];
+  const lead = leadFramework
+    ? {
+        label: trustFrameworkBadge(leadFramework),
+        color: trustFrameworkMonitoringEntry(leadFramework.monitoring).color,
+      }
+    : undefined;
+  return (
+    <MingoInfoCard
+      title={TRUST_CENTER_TITLE}
+      description={summary || TRUST_CENTER_TAGLINE}
+      icon={<ShieldCheckIcon size={24} />}
+      status={lead ? { label: lead.label, variant: TRUST_STATUS_TAG_VARIANT[lead.color] } : undefined}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(chatRef.url, discuss, {
+        label: 'View trust center',
+        icon: <ShieldCheckIcon size={20} />,
+      })}
+      menuAriaLabel="Trust center actions"
+    />
+  );
+}
+
 function DataRoomDocChatCard({
   chatRef,
   isNewTab,
@@ -1008,6 +1077,46 @@ function CustomerInterviewChatCard({
   );
 }
 
+/**
+ * Design doc → the doc glyph, its readiness as the pill (the hub's own wording: "Ready to build" / "Not ready",
+ * `design-doc-readiness`) and "DRI · updated · n/m reviews signed off" under the title. The hub's card route attaches the doc's list row as
+ * `item.doc`; a row without it (an older hub) renders the ref's own title and preview.
+ */
+function DesignDocChatCard({
+  item,
+  chatRef,
+  isNewTab,
+  discuss,
+}: {
+  item: (ChatCardItem & { doc?: DesignDoc }) | undefined;
+  chatRef: ChatRef;
+  isNewTab: boolean;
+  discuss?: CardDiscussAction;
+}) {
+  const displayRef = fetchedItemDisplayRef(item, chatRef);
+  const doc = item?.doc;
+  const readiness = doc ? DESIGN_DOC_READINESS_DISPLAY[designDocReadiness(doc.completion)] : null;
+  return (
+    <MingoInfoCard
+      title={doc?.title ?? displayRef.title}
+      description={
+        doc
+          ? [designDocMetaLine(doc), formatCompletionLabel(doc.completion)].join(' · ')
+          : (displayRef.preview ?? undefined)
+      }
+      icon={<FileContentIcon size={24} />}
+      status={
+        readiness
+          ? { label: readiness.label, variant: readiness.scheme === 'success' ? 'success' : 'grey' }
+          : { label: 'Design doc', variant: 'grey' }
+      }
+      anchorProps={buildAnchorProps(displayRef.url, isNewTab)}
+      menuGroups={cardMenuGroups(displayRef.url, discuss)}
+      menuAriaLabel="Design doc actions"
+    />
+  );
+}
+
 /** Investor update → presentation icon + "Investor update" pill. Title falls
  *  back to "Update #N" when the row has no explicit title. */
 function InvestorUpdateChatCard({
@@ -1351,7 +1460,6 @@ interface GlyphCardConfig {
 /** The OpenFrame logo every OpenFrame surface uses (the `openframe` icon name). */
 const OpenFrameGlyph = resolveIcon('openframe');
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
-  design_doc: { label: 'Design doc', icon: () => <FileContentIcon size={24} /> },
   openframe_tenant: { label: 'OpenFrame tenant', icon: () => <OpenFrameGlyph size={24} /> },
   prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
   // Code intelligence (product-hub internal): the review rules a repository is
@@ -1369,6 +1477,9 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   code_symbol: { label: 'Code symbol', icon: () => <CodeSquareIcon size={24} /> },
   code_duplicate: { label: 'Duplicate code', icon: () => <Copy01Icon size={24} /> },
   code_impact: { label: 'Change impact', icon: () => <CodingPullRequestIcon size={24} /> },
+  // A change set: pull requests across repositories declared as one change, with the ClickUp tasks and design
+  // docs its pull requests are attached to. ONE card for it wherever a set is shown (chat, a design doc's page).
+  change_set: { label: 'Change set', icon: () => <CodingMergeIcon size={24} /> },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
@@ -1519,7 +1630,8 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   }));
 }
 
-const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
+/** Exported for the destination test, which walks every registered type. */
+export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   // ───────── ref-shaped types: hydrated via /api/chat/entity-refs ─────────
   ...githubRegistryEntries(),
   // Generic TOMBSTONE for entities a chat action deleted (ClickUp task
@@ -1561,6 +1673,21 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     skeleton: () => <MingoInfoCardSkeleton />,
     render: (item, chatRef, opts) => (
       <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    ),
+  },
+  // Trust center — ONE record (`[card://trust_center:main]`) from the public
+  // projection route; `extractCardItems` turns its object payload into the
+  // single matched row. Destination is the public page unless the host
+  // re-homes the type (`composeContentUrl` override).
+  [TRUST_CENTER_DOCUMENT_TYPE]: {
+    label: 'Trust center',
+    bareInline: true,
+    contentRefType: TRUST_CENTER_DOCUMENT_TYPE,
+    noComposedHref: true,
+    fallbackHref: () => TRUST_CENTER_PAGE_PATH,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => (
+      <TrustCenterChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
   },
   hubspot_ticket: refHydratedEntry('hubspot_ticket', 'HubSpot ticket', (displayRef, opts) => (
@@ -1621,6 +1748,17 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         discuss={opts.discuss}
         ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
+    ),
+  },
+  design_doc: {
+    label: 'Design doc',
+    contentRefType: 'design_doc',
+    bareInline: true,
+    noComposedHref: true,
+    fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
+    skeleton: () => <MingoInfoCardSkeleton />,
+    render: (item, chatRef, opts) => (
+      <DesignDocChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
   },
   customer_interview: {
@@ -1866,28 +2004,7 @@ export function ChatCardLoader({
   extras,
 }: ChatCardLoaderProps) {
   const runtime = useRequiredChatRuntime();
-  const resolvedChatRef = React.useMemo<ChatRef>(() => {
-    const cta = resolveSourceRowCTA(
-      {
-        sourceRepo: chatRef.sourceRepo,
-        documentType: chatRef.type,
-        id: chatRef.id,
-        title: chatRef.title,
-        externalUrl: chatRef.url,
-        targetPlatform: chatRef.targetPlatform,
-        path: typeof chatRef.metadata?.path === 'string' ? chatRef.metadata.path : null,
-      },
-      sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
-    );
-    const finalHref = cta.href ? resolveHrefForRuntime(cta.href, runtime) : null;
-    return {
-      ...chatRef,
-      url: finalHref ?? chatRef.url,
-      targetPlatform: cta.targetPlatform ?? chatRef.targetPlatform ?? null,
-    };
-  }, [chatRef, runtime, baseRoute, chipBasePlatform]);
-
-  const entry = CHAT_CARD_REGISTRY[resolvedChatRef.type];
+  const entry = CHAT_CARD_REGISTRY[chatRef.type];
   // Hook order MUST be stable across renders — call the data hook
   // unconditionally regardless of entry mode. For non-fetch types the
   // `contentRefType` is empty so the hook returns `isLoading=false` and
@@ -1895,55 +2012,30 @@ export function ChatCardLoader({
   const fetchEntry = entry && entry.contentRefType ? entry : null;
   const { item, isLoading, isError, isFetched } = useChatCardItem<ChatCardItem>(
     fetchEntry?.contentRefType ?? '',
-    fetchEntry ? resolvedChatRef.id : '',
+    fetchEntry ? chatRef.id : '',
   );
   if (!entry) return null;
 
-  // Apply the post-fetch URL fallback (the ref carried no `externalUrl`).
-  // We mutate `resolvedChatRef.url` BEFORE computing isNewTab so the
-  // wrapper's interceptor sees the destination the user will actually
-  // visit. `safeHref` blocks `javascript:` / `data:` payloads even
-  // though the registry callers compose hub-internal strings today.
-  //
-  // Two producers, ranked by `pickFetchedCardHref` (which owns the
-  // precedence and its rationale):
-  //   1. the registry's per-type `fallbackHref` — an explicit non-content
-  //      destination (marketing campaign → `/admin/...`, or a ref-hydrated
-  //      row's own `item.url`);
-  //   2. the host's `composeContentUrl` seam via `resolveFetchedCardHref` —
-  //      the SAME resolver page cards go through. This is what makes cards
-  //      clickable on every transport: the wire ships bare
-  //      `[card://type:id]` markers with no metadata, so the ref reaches
-  //      us with `url: null` and `resolveSourceRowCTA` has nothing to route.
-  // …except an EXPLICIT host override outranks both: the seam is asked
-  // even for `fallbackHref` / `noComposedHref` types now, and its answer is
-  // taken only when the host actually re-homed the type (never when the
-  // composer merely synthesized one) — the case those two flags guard against.
-  const composedHref =
-    fetchEntry?.contentRefType && !resolvedChatRef.url && item
-      ? resolveFetchedCardHref({
-          contentRefType: fetchEntry.contentRefType,
-          id: resolvedChatRef.id,
-          item,
-          composeContentUrl: runtime.composeContentUrl,
-        })
-      : null;
-  const hrefChoice =
-    fetchEntry && !resolvedChatRef.url && item
-      ? pickFetchedCardHref({
-          composed: composedHref,
-          itemHref: fetchEntry.fallbackHref?.(item) ?? null,
-          allowComposed: !fetchEntry.noComposedHref,
-        })
-      : null;
-  const hrefResolvedChatRef: ChatRef = hrefChoice
-    ? {
-        ...resolvedChatRef,
-        url: safeHref(hrefChoice.href),
-        // The `item` branch carries no platform of its own — keep the ref's.
-        targetPlatform: hrefChoice.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
-      }
-    : resolvedChatRef;
+  // THE card's destination, decided in one place (`resolveCardDestination`):
+  // the source chip's resolver with the row as far as it is known (the ref's
+  // fields, plus the fetched row's doc path when a bare `[card://type:id]`
+  // marker carried none), else the fetched row's own destination. Computed
+  // BEFORE `isNewTab` so the click wrapper sees the page the user will visit.
+  const destination = resolveCardDestination({
+    chatRef,
+    item: fetchEntry ? item : undefined,
+    entry: fetchEntry,
+    ctx: sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
+    composeContentUrl: runtime.composeContentUrl,
+    resolveHref: href => resolveHrefForRuntime(href, runtime),
+  });
+  const hrefResolvedChatRef: ChatRef = {
+    ...chatRef,
+    url: destination.url,
+    targetPlatform: destination.targetPlatform,
+    // The nav wrapper reads the path off the ref for in-app doc navigation.
+    ...(destination.path ? { metadata: { ...(chatRef.metadata ?? {}), path: destination.path } } : {}),
+  };
 
   // Title enrichment, same synthetic-ref gap as the href above: a Mingo
   // `[card://type:id]` marker produces `title: <id>` because the transport
@@ -2067,7 +2159,7 @@ export function ChatCardLoader({
       // Same 12px rhythm as the message renderer's block-sibling wrapper
       // (`my-3` in chat-message-enhanced) so card→player spacing matches
       // the spacing between any two hoisted blocks.
-      <div className="flex min-w-0 flex-col gap-3">
+      <div className="grid min-w-0 grid-cols-1 gap-3">
         {finish(entry.render(item, finalChatRef, renderOpts))}
         <ChatVideoEntityCard chatRef={videoRef} />
       </div>

@@ -30,13 +30,20 @@ jobs:
 
 
   scan:
-    name: "Scan Code"
+    name: "Scan Code: ${{ matrix.target.name }}"
     runs-on: ubuntu-latest
     needs: [changes]
     permissions:
       contents: read
       packages: read
+      pull-requests: read
     if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.changes.outputs.node_matrix) }}
+        include:
+          - target: { name: backend, path: ".", paths: "**/{pom.xml,Cargo.toml,Cargo.lock,Dockerfile*}", skip_files: "**/package.json,**/package-lock.json,**/yarn.lock,**/pnpm-lock.yaml" }
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +55,10 @@ jobs:
         uses: ./.github/steps/trivy
         with:
           scan: code
+          path: ${{ matrix.target.path }}
+          paths: ${{ matrix.target.paths || '' }}
+          skip-files: ${{ matrix.target.skip_files || '' }}
+          image-name: ${{ matrix.target.name }}
 
   test-java:
     name: Test Java
@@ -203,14 +214,23 @@ jobs:
         # No local (file:/link:/.yalc) specs may reach the registry - see the script.
         run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
 
-      - name: Publish ${{ env.NEW_VERSION }} (pr-${{ github.event.pull_request.number }} tag)
+      # --ignore-scripts skips a prepack rebuild.
+      - name: Pack ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
         run: |
           npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
-          npm publish --tag "pr-${{ github.event.pull_request.number }}" --ignore-scripts
+          echo "PACKAGE_TARBALL=$PWD/$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_ENV"
+
+      # PR builds go to pkg.pr.new only.
+      - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
+        if: steps.should_run.outputs.run == 'true'
+        working-directory: ${{ matrix.path }}
+        shell: bash
+        run: |
+          npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --json pkg-pr-new.json "$PACKAGE_TARBALL"
+          jq -r '.packages[0].url' pkg-pr-new.json >> "$GITHUB_STEP_SUMMARY"
 
 
   # `lint:cycles` gets its OWN job, purely for wall-clock. It is graph-wide —

@@ -23,7 +23,7 @@ class DeliverySpecRegistryTest {
         DeliverySpecRegistry registry = new DeliverySpecRegistry(specs);
 
         // execution
-        DeliverySpec<DeliverySeed, Object> resolved = registry.require(DeliveryType.TOOL_INSTALLATION);
+        DeliverySpec<DeliverySeed, DeliveryPayload> resolved = registry.require(DeliveryType.TOOL_INSTALLATION);
 
         // verifications
         assertThat(resolved).isSameAs(spec);
@@ -77,7 +77,7 @@ class DeliverySpecRegistryTest {
         DeliverySpecRegistry registry = new DeliverySpecRegistry(specs);
 
         // execution
-        Optional<DeliverySpec<DeliverySeed, Object>> found = registry.find(DeliveryType.TOOL_INSTALLATION);
+        Optional<DeliverySpec<DeliverySeed, DeliveryPayload>> found = registry.find(DeliveryType.TOOL_INSTALLATION);
 
         // verifications
         assertThat(found).get().isSameAs(spec);
@@ -90,7 +90,7 @@ class DeliverySpecRegistryTest {
         DeliverySpecRegistry registry = new DeliverySpecRegistry(specs);
 
         // execution
-        Optional<DeliverySpec<DeliverySeed, Object>> found = registry.find(DeliveryType.CLIENT_UNINSTALL);
+        Optional<DeliverySpec<DeliverySeed, DeliveryPayload>> found = registry.find(DeliveryType.CLIENT_UNINSTALL);
 
         // verifications
         assertThat(found).isEmpty();

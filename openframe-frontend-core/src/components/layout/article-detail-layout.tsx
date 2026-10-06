@@ -52,7 +52,7 @@ export function PageShell({ children, schemas, contentClassName }: LayoutProps) 
 /**
  * Constrained layout for article/detail pages (max-w-[1280px]) — readable
  * content width for blog posts, release notes, case studies, investor updates.
- * Fixed hub padding (`px-6 md:px-20 py-6 md:py-10`); pass `contentClassName` to
+ * Fixed hub padding (`px-6 content-md:px-20 py-6 content-md:py-10`); pass `contentClassName` to
  * override per instance. (PageShell's `--page-shell-*` var system does NOT apply
  * here — this layout keeps its own fixed spacing.)
  */
@@ -60,7 +60,9 @@ export function ArticleDetailLayout({ children, schemas, contentClassName }: Lay
   return (
     <main className="bg-ods-bg">
       {schemas}
-      <div className={cn('mx-auto max-w-[1280px] px-6 py-6 md:px-20 md:py-10', contentClassName)}>{children}</div>
+      <div className={cn('mx-auto max-w-[1280px] px-6 py-6 content-md:px-20 content-md:py-10', contentClassName)}>
+        {children}
+      </div>
     </main>
   );
 }

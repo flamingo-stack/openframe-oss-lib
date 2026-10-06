@@ -17,6 +17,7 @@ import type { AskOptionData, ChatSource } from '../components/chat/types/message
 // The wire-frame shapes these events carry through are defined ONCE in
 // `./frames.ts` — reuse them here rather than restating their fields.
 import type { ApprovalRequestField, DecisionResolvedFrame, UsageTelemetry } from './frames';
+import type { ChatProgress } from './progress';
 
 /** Optional envelope on every event. `seq` carries the transport's
  *  stream sequence (JetStream `streamSeq` on NATS; unused on SSE). */
@@ -72,6 +73,8 @@ export interface AskEvent extends ChatStreamEventBase {
 export interface StatusEvent extends ChatStreamEventBase {
   type: 'status';
   phase: 'thinking';
+  /** What the turn is doing right now, when the server says (`./progress`). */
+  progress?: ChatProgress;
 }
 
 /** NATS tool execution progress (EXECUTING_TOOL / EXECUTED_TOOL). */

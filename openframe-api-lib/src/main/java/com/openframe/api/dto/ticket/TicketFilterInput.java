@@ -23,7 +23,7 @@ public class TicketFilterInput {
     private List<String> assigneeIds;
     @Size(max = 20)
     private List<String> tagIds;
-    /** true keeps only tickets the caller has unread notifications about; false and null do not filter. */
+    /** true keeps only tickets with client-chat messages the caller has not read; false and null do not filter. */
     private Boolean hasUnreadNotifications;
     @Size(max = 3)
     private List<TicketActivityFilter> activity;

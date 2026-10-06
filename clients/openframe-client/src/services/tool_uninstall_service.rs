@@ -134,9 +134,11 @@ impl ToolUninstallService {
 
                 let tool_dir = self.directory_manager.app_support_dir().join(tool_agent_id);
                 if tool_dir.exists() {
-                    std::fs::remove_dir_all(&tool_dir).with_context(|| {
-                        format!("Failed to remove tool directory: {}", tool_dir.display())
-                    })?;
+                    crate::platform::remove_directory_with_retry(&tool_dir, 5)
+                        .await
+                        .with_context(|| {
+                            format!("Failed to remove tool directory: {}", tool_dir.display())
+                        })?;
                     info!("Removed tool directory: {}", tool_dir.display());
                 }
 

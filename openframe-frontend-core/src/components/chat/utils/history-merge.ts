@@ -24,6 +24,12 @@ export interface MergeableChatMessage {
   role: string;
   content: MessageContent;
   timestamp?: Date;
+  /** Who authored a `user`-role row: the host's own user (`'user'` / unset),
+   *  a technician (`'admin'`) or the system (`'system'`). Every host renders
+   *  technician and system lines under role `user`, so a user row's twin must
+   *  match on this as well as on text - otherwise the end user's "?" is taken
+   *  for the twin of the technician's "?" and dropped from the thread. */
+  authorType?: string;
   /** Highest CONTENT chunk streamSeq that composed this message (text / tool /
    *  approval / error / compaction — never the non-persisted MESSAGE_END /
    *  TOKEN_USAGE control chunks). Hosts stamp it on realtime synthetics so the
@@ -154,10 +160,17 @@ function sharesRequestKey(keys: ReadonlySet<string>, others: ReadonlySet<string>
   return false;
 }
 
-/** A user row's identity is its text; empty text is no identity (system rows
- *  persist with `content: ''`). `''` for any other row. */
-function userText(m: MergeableChatMessage): string {
-  return m.role === 'user' && typeof m.content === 'string' ? m.content : '';
+/** A user row's identity is its text under its author kind; empty text is no
+ *  identity (system rows persist with `content: ''`). `''` for any other row.
+ *  The kind is part of the key because technician (`authorType: 'admin'`) and
+ *  system rows share role `user` with the host's own sends: without it a
+ *  technician who typed the same text is the own bubble's "twin", and the own
+ *  bubble is dropped while its row is not in the snapshot yet. An unset
+ *  authorType is the own user (hosts stamp `'admin'` on their own sends where
+ *  the operator IS the admin, so the rule stays symmetric per host). */
+function userTwinKey(m: MergeableChatMessage): string {
+  if (m.role !== 'user' || typeof m.content !== 'string' || m.content === '') return '';
+  return `${m.authorType ?? 'user'}\u0000${m.content}`;
 }
 
 /** What a set of rows says about the turns they render, so another copy of one
@@ -182,8 +195,8 @@ function collectTwinSignals(rows: readonly MergeableChatMessage[]): TwinSignals 
       if (text !== '') signals.assistantTexts.set(text, (signals.assistantTexts.get(text) ?? 0) + 1);
       continue;
     }
-    const text = userText(row);
-    if (text !== '') signals.userContents.set(text, (signals.userContents.get(text) ?? 0) + 1);
+    const key = userTwinKey(row);
+    if (key !== '') signals.userContents.set(key, (signals.userContents.get(key) ?? 0) + 1);
   }
   return signals;
 }
@@ -198,9 +211,9 @@ type TwinVerdict = 'twin' | 'distinct' | 'unknown';
  *  request id, no answer text), so "no match" says nothing about it. */
 function twinVerdict(signals: TwinSignals, m: MergeableChatMessage): TwinVerdict {
   if (m.role !== 'assistant') {
-    const text = userText(m);
-    if (text === '') return 'unknown';
-    return signals.userContents.has(text) ? 'twin' : 'distinct';
+    const key = userTwinKey(m);
+    if (key === '') return 'unknown';
+    return signals.userContents.has(key) ? 'twin' : 'distinct';
   }
   const keys = turnRequestKeys(m.content);
   if (keys.size > 0) return sharesRequestKey(keys, signals.requestKeys) ? 'twin' : 'distinct';
@@ -529,7 +542,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       // optimistic messages are minted on send, never by chunk replay, so
       // their timestamps are trustworthy.
       const canBeInSnapshot = (m.timestamp?.getTime() ?? 0) <= historyFetchedAt;
-      return !(canBeInSnapshot && windowSignals.userContents.has(m.content));
+      return !(canBeInSnapshot && windowSignals.userContents.has(userTwinKey(m)));
     }
     // Freshness rule: a synthetic whose turn is represented in the snapshot
     // (under its persisted Mongo id) must be dropped or the turn renders
@@ -560,10 +573,11 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       // already does for DIRECT/SYSTEM), which also stops the replay at the
       // source via a correct `optStartSeq`.
       if (m.role === 'user' && isUserRequestSyntheticId(m.id) && typeof m.content === 'string') {
-        const seen = (seenUserSyntheticByContent.get(m.content) ?? 0) + 1;
-        seenUserSyntheticByContent.set(m.content, seen);
+        const twinKey = userTwinKey(m);
+        const seen = (seenUserSyntheticByContent.get(twinKey) ?? 0) + 1;
+        seenUserSyntheticByContent.set(twinKey, seen);
         // No persisted row for THIS occurrence slot → keep (nothing renders it).
-        if ((windowSignals.userContents.get(m.content) ?? 0) < seen) return true;
+        if ((windowSignals.userContents.get(twinKey) ?? 0) < seen) return true;
         // A same-text persisted twin exists for this slot. User rows carry no
         // persisted seq, so that twin may be THIS message's OWN row (drop — it
         // renders the message) OR an OLDER identical-text turn while this is a
@@ -582,7 +596,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
         if (typeof m.streamSeq !== 'number' || historyMaxStreamSeq <= 0) return false;
         if (historyMaxStreamSeq >= m.streamSeq) return false;
         const lastPersisted = processedToUse[processedToUse.length - 1];
-        if (lastPersisted && lastPersisted.role === 'user' && lastPersisted.content === m.content) return false;
+        if (lastPersisted && userTwinKey(lastPersisted) === twinKey) return false;
         return true;
       }
       // Per-message seq coverage for the remaining synthetics (assistant /
@@ -701,10 +715,10 @@ export function computeHistoryPrepend<M extends MergeableChatMessage>(
     for (let i = newEnd - 1; i >= 0; i--) {
       const pm = processedHistory[i];
       if (pm.role === 'user') {
-        const text = userText(pm);
-        const left = text === '' ? 0 : (userTwinsLeft.get(text) ?? 0);
+        const key = userTwinKey(pm);
+        const left = key === '' ? 0 : (userTwinsLeft.get(key) ?? 0);
         if (left === 0) continue;
-        userTwinsLeft.set(text, left - 1);
+        userTwinsLeft.set(key, left - 1);
         twinIndices.add(i);
       } else if (pm.role === 'assistant') {
         const keys = turnRequestKeys(pm.content);

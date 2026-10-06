@@ -594,6 +594,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
         priority={props.priority}
         className={props.className}
         minimalControls={props.minimalControls}
+        muted={props.muted}
         {...pickYouTube(props)}
       />
     ) : 'firstFrameOnly' in props && props.firstFrameOnly ? (
@@ -1400,6 +1401,7 @@ interface YouTubeFacadeProps extends VideoYouTubeFacadeProps {
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
+  muted?: boolean;
 }
 
 function YouTubeFacade({
@@ -1408,6 +1410,7 @@ function YouTubeFacade({
   priority,
   className,
   minimalControls,
+  muted,
   // `...facade` rather than naming each one: this hop is invisible to the
   // build-time forwarding proof, so a prop added to VideoYouTubeFacadeProps
   // would reach here and silently stop before Inner.
@@ -1425,6 +1428,7 @@ function YouTubeFacade({
       priority={priority}
       className={className}
       minimalControls={minimalControls}
+      muted={muted}
       {...facade}
     />
   );
@@ -1436,6 +1440,10 @@ interface YouTubeFacadeInnerProps extends VideoYouTubeFacadeProps {
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
+  /** `mute=1` on the embed — what lets `autoActivate` start playback with no
+   *  user gesture (browsers only allow muted autoplay; YouTube's own control
+   *  unmutes). */
+  muted?: boolean;
 }
 
 const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
@@ -1497,10 +1505,20 @@ function YouTubeFacadeInner({
   priority,
   className,
   minimalControls,
+  muted,
   autoActivate,
   suspended,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(Boolean(autoActivate));
+  // A host that flips `autoActivate` on later (an accordion step expanding)
+  // activates too. Adjusted during render, like the other prop-driven state
+  // here; the guard makes the immediate re-run a no-op. Flipping it off does
+  // nothing: `suspended` is the pause signal.
+  const [prevAutoActivate, setPrevAutoActivate] = useState(Boolean(autoActivate));
+  if (Boolean(autoActivate) !== prevAutoActivate) {
+    setPrevAutoActivate(Boolean(autoActivate));
+    if (autoActivate) setActivated(true);
+  }
   // The embed reported a hard player error (see the `onError` branch below).
   // Retry remounts the iframe via `reloadNonce` — a fresh element, since there
   // is no way to re-init a cross-origin player from outside.
@@ -1542,6 +1560,7 @@ function YouTubeFacadeInner({
       playsinline: '1',
       enablejsapi: '1',
     });
+    if (muted) params.set('mute', '1');
     if (typeof window !== 'undefined') {
       params.set('origin', window.location.origin);
     }
@@ -1553,7 +1572,7 @@ function YouTubeFacadeInner({
       params.set('disablekb', '1');
     }
     return `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`;
-  }, [videoId, minimalControls]);
+  }, [videoId, minimalControls, muted]);
 
   // Poster starts at the highest tier and steps down on load error (see
   // `YT_POSTER_TIERS`). Reset to the top tier whenever the video changes so a
@@ -1665,19 +1684,18 @@ function YouTubeFacadeInner({
   // Close-side pause: a closing dialog flips `suspended` false→true. Post the
   // pauseVideo command over the same enablejsapi channel so the iframe stops
   // BEFORE the Radix exit animation unmounts it (an unmount-cleanup post would
-  // fire too late). Edge-triggered: only acts on the false→true transition
-  // while activated (prev seeded false, so the initial render never pauses).
+  // fire too late). Edge-triggered: only acts on a transition while activated
+  // (prev seeded false, so the initial render never pauses). The way back,
+  // true→false, resumes — a collapsed accordion step re-expanding.
   const prevSuspendedRef = useRef(false);
   useEffect(() => {
     const wasSuspended = prevSuspendedRef.current;
     prevSuspendedRef.current = Boolean(suspended);
-    if (!activated) return;
-    if (suspended && !wasSuspended) {
-      iframeRef.current?.contentWindow?.postMessage(
-        '{"event":"command","func":"pauseVideo","args":[]}',
-        YT_NOCOOKIE_ORIGIN,
-      );
-    }
+    if (!activated || Boolean(suspended) === wasSuspended) return;
+    iframeRef.current?.contentWindow?.postMessage(
+      `{"event":"command","func":"${suspended ? 'pauseVideo' : 'playVideo'}","args":[]}`,
+      YT_NOCOOKIE_ORIGIN,
+    );
   }, [suspended, activated]);
 
   const wrapperClass = `relative w-full ${className ?? ''}`;

@@ -75,6 +75,9 @@ public class GenericJsonMessageProcessor {
 
     private IntegratedToolEnrichedData getExtraParams(DeserializedDebeziumMessage message, MessageType messageType) {
         DataEnrichmentService dataEnrichmentService = dataEnrichmentServices.get(messageType.getDataEnrichmentServiceType());
+        if (dataEnrichmentService == null) {
+            throw new IllegalStateException("No DataEnrichmentService registered for type: " + messageType.getDataEnrichmentServiceType());
+        }
         return dataEnrichmentService.getExtraParams(message);
     }
 

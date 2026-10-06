@@ -35,6 +35,14 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
     private static final String DEFAULT_SORT_COLUMN = "eventTimestamp";
     private static final String PRIMARY_KEY_FIELD = "toolEventId";
 
+    /**
+     * Explicit upper bound for the filter-option queries. Pinot applies its own default of 10 to any query that
+     * does not set a LIMIT, so without this a facet silently returns only the first 10 values in ORDER BY order -
+     * an organization whose name sorts eleventh simply never appears in the Source filter. 10000 is the builder's
+     * maximum and is comfortably above the number of distinct values any of these facets can hold.
+     */
+    private static final int MAX_FILTER_OPTIONS = 10000;
+
     @Value("${pinot.tables.logs.name:logs}")
     private String logsTable;
 
@@ -48,7 +56,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                         List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
                                         String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "executionSource", "scriptCreationSource", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -69,7 +77,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                           List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
                                           String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "executionSource", "scriptCreationSource", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -94,7 +102,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("toolType", toolTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("eventType");
+                .orderBy("eventType")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -108,7 +117,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("severity");
+                .orderBy("severity")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -122,7 +132,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("toolType");
+                .orderBy("toolType")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -136,7 +147,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("ingestDay");
+                .orderBy("ingestDay")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -151,7 +163,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
-                .orderBy("organizationName");
+                .orderBy("organizationName")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeQuery(queryBuilder.build(), resultSet -> rowIndex -> {
             String organizationId = resultSet.getString(rowIndex, 0);
@@ -181,14 +194,15 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
         return DEFAULT_SORT_COLUMN;
     }
 
-    // Most devices have no nickname: Pinot stores the schema default (empty string) for those rows,
-    // and the API contract is an absent nickname, not an empty one.
-    private String readNickname(ResultSet resultSet, int rowIndex, Map<String, Integer> columnIndexMap) {
-        String nickname = readString(resultSet, rowIndex, columnIndexMap, "nickname");
-        if (!hasText(nickname)) {
+    // Optional columns store the schema default (empty string) when absent, and the API contract is an
+    // absent field, not an empty one.
+    private String readOptionalString(ResultSet resultSet, int rowIndex, Map<String, Integer> columnIndexMap,
+                                      String column) {
+        String value = readString(resultSet, rowIndex, columnIndexMap, column);
+        if (!hasText(value)) {
             return null;
         }
-        return nickname;
+        return value;
     }
 
     private List<LogProjection> executeLogQuery(String query) {
@@ -204,7 +218,9 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 projection.userId = readString(resultSet, rowIndex, columnIndexMap, "userId");
                 projection.deviceId = readString(resultSet, rowIndex, columnIndexMap, "deviceId");
                 projection.hostname = readString(resultSet, rowIndex, columnIndexMap, "hostname");
-                projection.nickname = readNickname(resultSet, rowIndex, columnIndexMap);
+                projection.nickname = readOptionalString(resultSet, rowIndex, columnIndexMap, "nickname");
+                projection.executionSource = readOptionalString(resultSet, rowIndex, columnIndexMap, "executionSource");
+                projection.scriptCreationSource = readOptionalString(resultSet, rowIndex, columnIndexMap, "scriptCreationSource");
                 projection.organizationId = readString(resultSet, rowIndex, columnIndexMap, "organizationId");
                 projection.organizationName = readString(resultSet, rowIndex, columnIndexMap, "organizationName");
                 projection.summary = readString(resultSet, rowIndex, columnIndexMap, "summary");

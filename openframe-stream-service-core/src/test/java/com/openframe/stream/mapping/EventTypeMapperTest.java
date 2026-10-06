@@ -54,4 +54,14 @@ class EventTypeMapperTest {
         assertEquals(UnifiedEventType.UNKNOWN,
                 EventTypeMapper.mapToUnifiedType(IntegratedToolType.MICROSOFT_365, "USER_SETTINGS"));
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "script_run.finished, SCRIPT_EXECUTED",
+            "script_run.failed, SCRIPT_FAILED",
+            "cmd_run.finished, COMMAND_RUN_FINISHED"
+    })
+    void mapsRmmResultOutcomesToUnifiedTypes(String sourceEventType, UnifiedEventType expected) {
+        assertEquals(expected, EventTypeMapper.mapToUnifiedType(IntegratedToolType.RMM, sourceEventType));
+    }
 }

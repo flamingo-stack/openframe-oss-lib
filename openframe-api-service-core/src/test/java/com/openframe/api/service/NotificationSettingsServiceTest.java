@@ -85,7 +85,8 @@ class NotificationSettingsServiceTest {
                         tuple(NotificationSettingGroup.ADMIN_REPLIED, "Admin replied"),
                         tuple(NotificationSettingGroup.MINGO_MESSAGES, "New messages from Mingo"),
                         tuple(NotificationSettingGroup.APPROVAL_TICKET, "Approval required ticket"),
-                        tuple(NotificationSettingGroup.APPROVAL_MINGO, "Approval required Mingo"));
+                        tuple(NotificationSettingGroup.APPROVAL_MINGO, "Approval required Mingo"),
+                        tuple(NotificationSettingGroup.INSIGHTS, "Insights"));
     }
 
     @Test

@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
 import { PageActions, type PageActionButton } from '../ui/page-actions';
 import { BackButton } from './back-button';
+import { accentSentenceMarks } from './page-heading';
 
 // Legacy interface for backward compatibility (layout version)
 interface LegacyPageContainerProps {
@@ -231,15 +232,19 @@ function renderAdvancedPageContainer({
 
     if (variant === 'detail') {
       return (
-        <div className="flex items-end justify-between gap-4 md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex items-end justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-end content-lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             {/* Back Button */}
             {backButton && (
-              <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden md:inline-flex" />
+              <BackButton
+                onClick={backButton.onClick}
+                label={backButton.label}
+                className="hidden content-md:inline-flex"
+              />
             )}
 
             {/* Title */}
-            {title && <h1 className="text-ods-text-primary text-h2">{title}</h1>}
+            {title && <h1 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>}
 
             {/* Subtitle */}
             {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
@@ -258,14 +263,18 @@ function renderAdvancedPageContainer({
 
     if (variant === 'list') {
       return (
-        <div className="flex items-center justify-between gap-4 md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-center content-lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* Back Button */}
             {backButton && (
-              <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden md:inline-flex" />
+              <BackButton
+                onClick={backButton.onClick}
+                label={backButton.label}
+                className="hidden content-md:inline-flex"
+              />
             )}
 
-            {title && <h1 className="text-ods-text-primary text-h2">{title}</h1>}
+            {title && <h1 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>}
             {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
           </div>
 
@@ -282,14 +291,18 @@ function renderAdvancedPageContainer({
 
     if (variant === 'form') {
       return (
-        <div className="flex items-end justify-between gap-4 md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex items-end justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-end content-lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             {/* Back Button */}
             {backButton && (
-              <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden md:inline-flex" />
+              <BackButton
+                onClick={backButton.onClick}
+                label={backButton.label}
+                className="hidden content-md:inline-flex"
+              />
             )}
 
-            {title && <h1 className="text-ods-text-primary text-h2">{title}</h1>}
+            {title && <h1 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>}
           </div>
 
           {/* Header Actions */}
@@ -305,10 +318,10 @@ function renderAdvancedPageContainer({
 
     // Default content header
     return (
-      <div className="flex items-center justify-between gap-4 md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex items-center justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-center content-lg:justify-between">
         {(title || subtitle) && (
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            {title && <h1 className="text-ods-text-primary text-h2">{title}</h1>}
+            {title && <h1 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>}
             {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
           </div>
         )}
@@ -328,28 +341,28 @@ function renderAdvancedPageContainer({
 
     switch (variant) {
       case 'list':
-        return cn(baseClasses, 'gap-4 md:gap-6', className);
+        return cn(baseClasses, 'gap-4 content-md:gap-6', className);
       case 'detail':
-        return cn(baseClasses, 'gap-4 md:gap-6', className);
+        return cn(baseClasses, 'gap-4 content-md:gap-6', className);
       case 'form':
-        return cn(baseClasses, 'gap-6 md:gap-10', className);
+        return cn(baseClasses, 'gap-6 content-md:gap-10', className);
       case 'content':
       default:
-        return cn(baseClasses, 'gap-4 md:gap-6', className);
+        return cn(baseClasses, 'gap-4 content-md:gap-6', className);
     }
   };
 
   const getContentClasses = () => {
     // Add bottom padding on mobile when using primary-buttons variant (fixed bottom bar)
-    const mobilePadding = needsBottomPadding ? 'pb-28 md:pb-0' : '';
+    const mobilePadding = needsBottomPadding ? 'pb-28 content-md:pb-0' : '';
 
     switch (variant) {
       case 'detail':
         return cn('flex-1 overflow-auto', mobilePadding, contentClassName);
       case 'list':
-        return cn('flex flex-col gap-4 md:gap-6', mobilePadding, contentClassName);
+        return cn('flex flex-col gap-4 content-md:gap-6', mobilePadding, contentClassName);
       case 'form':
-        return cn('flex flex-col gap-4 md:gap-10', mobilePadding, contentClassName);
+        return cn('flex flex-col gap-4 content-md:gap-10', mobilePadding, contentClassName);
       case 'content':
       default:
         return cn('flex-1', mobilePadding, contentClassName);

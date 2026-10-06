@@ -117,7 +117,11 @@ public class KnowledgeBaseController {
     @Operation(summary = "Move an item to another folder",
             description = "Re-parent a folder or article. A folder cannot be moved into itself or its own descendant.")
     @ApiResponses({
-            @ApiResponse(responseCode = "404", description = "Item not found",
+            @ApiResponse(responseCode = "400", description = "An item moved onto itself",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Target is an article, not a folder, or a folder moved into its own descendant",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Item or target folder not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/items/{id}/move")
@@ -185,7 +189,13 @@ public class KnowledgeBaseController {
     @Operation(summary = "Create a folder")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Folder created",
-                    content = @Content(schema = @Schema(implementation = KnowledgeBaseItemResponse.class)))
+                    content = @Content(schema = @Schema(implementation = KnowledgeBaseItemResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Name is blank",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Parent folder not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Parent is an article, not a folder",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/folders")
     @ResponseStatus(CREATED)
@@ -220,9 +230,11 @@ public class KnowledgeBaseController {
                     "and deletes the sub-folders.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Folder deleted"),
-            @ApiResponse(responseCode = "400", description = "Folder has children and childrenAction is missing, or the move target is invalid",
+            @ApiResponse(responseCode = "400", description = "Folder has children and childrenAction is missing, or the move target is the folder being deleted",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Folder not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "The item is an article, not a folder, or the move target is inside the subtree being deleted",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/folders/{id}")
@@ -272,7 +284,13 @@ public class KnowledgeBaseController {
                     "customer/device/ticket/article assignments are applied.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Article created",
-                    content = @Content(schema = @Schema(implementation = KnowledgeBaseItemResponse.class)))
+                    content = @Content(schema = @Schema(implementation = KnowledgeBaseItemResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Name is blank",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Parent folder not found, or a tag in tagIds does not exist (see /tags)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Parent is an article, not a folder",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/articles")
     @ResponseStatus(CREATED)
@@ -282,6 +300,9 @@ public class KnowledgeBaseController {
 
         log.info("Creating KB article '{}' - userId: {}, apiKeyId: {}", request.name(), caller.userId(), caller.apiKeyId());
         AuthPrincipal principal = principalResolver.resolve(caller.userId());
+        if (request.tagIds() != null) {
+            request.tagIds().forEach(knowledgeBaseReadService::requireTag);
+        }
         KnowledgeBaseItem created = knowledgeBaseService.createArticle(
                 principal.getId(), knowledgeBaseMapper.toCreateCommand(request));
         return knowledgeBaseReadService.toResponse(created);
@@ -291,7 +312,7 @@ public class KnowledgeBaseController {
             description = "Partially update name, folder, content and summary. Use the publish/unpublish/archive " +
                     "endpoints to change the status and the tag endpoints to change tags.")
     @ApiResponses({
-            @ApiResponse(responseCode = "404", description = "Article not found",
+            @ApiResponse(responseCode = "404", description = "Article not found, or the target parent folder does not exist",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PatchMapping("/articles/{id}")
@@ -362,7 +383,7 @@ public class KnowledgeBaseController {
     @Operation(summary = "Restore an archived article",
             description = "Move an archived article back into a folder as PUBLISHED")
     @ApiResponses({
-            @ApiResponse(responseCode = "404", description = "Article not found",
+            @ApiResponse(responseCode = "404", description = "Article not found, or the target parent folder does not exist",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
             @ApiResponse(responseCode = "409", description = "Article is not archived",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))

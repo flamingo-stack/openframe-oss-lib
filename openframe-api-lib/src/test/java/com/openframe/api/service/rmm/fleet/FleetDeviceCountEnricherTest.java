@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm.fleet;
 
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,8 +15,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -28,12 +31,13 @@ class FleetDeviceCountEnricherTest {
 
     @Mock private FleetHostMachineResolver hostMachineResolver;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private CorrelatedHostSoftwareCache hostSoftwareCache;
 
     private FleetDeviceCountEnricher enricher;
 
     @BeforeEach
     void setUp() {
-        enricher = new FleetDeviceCountEnricher(hostMachineResolver, tenantIdProvider);
+        enricher = new FleetDeviceCountEnricher(hostMachineResolver, tenantIdProvider, hostSoftwareCache);
     }
 
     @Test
@@ -132,6 +136,45 @@ class FleetDeviceCountEnricherTest {
         enricher.enrich(List.of(row), r -> List.of(), Row::setCount);
 
         assertThat(row.count).isZero();
+    }
+
+    @Test
+    void enrichFromHostSoftware_countsHostsPerKey_onceEvenWithSeveralVersionsOnOneHost() {
+        Row chrome = new Row("chrome");
+        Row slack = new Row("slack");
+        Row unused = new Row("unused");
+        when(hostSoftwareCache.softwareByHostId(any())).thenReturn(Map.of(
+                1L, software("chrome", "chrome", "slack"),
+                2L, software("chrome")));
+
+        enricher.enrichFromHostSoftware(List.of(chrome, slack, unused),
+                request -> List.of(),
+                item -> Stream.of(item.getName()),
+                row -> row.name, Row::setCount);
+
+        assertThat(chrome.count).isEqualTo(2);
+        assertThat(slack.count).isEqualTo(1);
+        assertThat(unused.count).isZero();
+    }
+
+    @Test
+    void enrichFromHostSoftware_emptyRows_noHostLoad() {
+        enricher.enrichFromHostSoftware(List.<Row>of(),
+                request -> List.of(),
+                item -> Stream.of(item.getName()),
+                row -> row.name, Row::setCount);
+
+        verifyNoInteractions(hostSoftwareCache);
+    }
+
+    private static List<FleetSoftware> software(String... names) {
+        return java.util.Arrays.stream(names).map(FleetDeviceCountEnricherTest::installed).toList();
+    }
+
+    private static FleetSoftware installed(String name) {
+        FleetSoftware item = new FleetSoftware();
+        item.setName(name);
+        return item;
     }
 
     private static Host host(long id) {

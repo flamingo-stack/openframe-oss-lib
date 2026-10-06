@@ -535,6 +535,27 @@ export const MingoOnly: Story = {
   args: {},
 };
 
+/**
+ * The host cannot serve a message — the tenant's AI balance is spent and the
+ * agents are paused (Figma 954:28455). The panel reads as usual; the composer
+ * keeps its place, says why it takes nothing, and its `+` and Send are inert.
+ */
+export const ComposerLocked: Story = {
+  render: args => (
+    <EmbeddableChat
+      {...args}
+      modes={{
+        mingo: createMockMingoConfig(),
+      }}
+      defaultActiveMode="mingo"
+      defaultOpen
+      showInternalTrigger={false}
+      composerLock={{ placeholder: 'Mingo chat unavailable. Top up your balance.' }}
+    />
+  ),
+  args: {},
+};
+
 // =============================================================================
 // 3. Both modes (toggle visible — openframe-frontend target)
 // =============================================================================

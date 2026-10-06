@@ -161,6 +161,7 @@ impl UpdateHandlerService {
                 state.target_version, e
             ),
         }
+        self.cleanup_service.remove_pre_swap_copy();
 
         if let Err(e) = self
             .client_info_service

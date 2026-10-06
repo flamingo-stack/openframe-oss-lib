@@ -96,7 +96,7 @@ function VendorCardContent({ showMetadata }: { showMetadata: boolean }) {
       {showMetadata && (
         <div className="flex w-full min-w-0 items-center justify-between gap-2">
           {/* Stats Container - Flexible width, no overflow */}
-          <div className="flex min-w-0 flex-shrink items-center gap-3 md:gap-4">
+          <div className="flex min-w-0 flex-shrink items-center gap-3 content-md:gap-4">
             {/* OpenMSP Score skeleton */}
             <div className="flex flex-shrink-0 items-center gap-1">
               <MediaSkeleton.Icon size="sm" className="h-5 w-5" />
@@ -139,7 +139,7 @@ function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; 
       {/* Content - Fixed height structure to match BlogCard */}
       <div className="flex flex-grow flex-col p-4">
         {/* Title Section - Fixed 2 lines with vertical centering */}
-        <div className="mb-3 flex min-h-[50.4px] items-center md:min-h-[56px] lg:min-h-[61.6px]">
+        <div className="mb-3 flex min-h-[50.4px] items-center content-md:min-h-[56px] content-lg:min-h-[61.6px]">
           <div className="w-full space-y-1">
             <TextSkeleton.Subheading className="w-full" />
             <TextSkeleton.Subheading className="w-3/4" />
@@ -153,7 +153,7 @@ function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; 
         </div>
 
         {/* Description Section - Fixed 2 lines with vertical centering */}
-        <div className="mb-3 flex min-h-[42px] items-center md:min-h-[45px] lg:min-h-[48px]">
+        <div className="mb-3 flex min-h-[42px] items-center content-md:min-h-[45px] content-lg:min-h-[48px]">
           <div className="w-full space-y-1">
             <TextSkeleton.Body className="w-full" />
             <TextSkeleton.Body className="w-1/2" />
@@ -197,9 +197,9 @@ function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; 
  */
 function CategoryCardContent() {
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="space-y-4 p-4 content-md:p-6">
       {/* Icon grid */}
-      <div className="flex gap-2 md:gap-3">
+      <div className="flex gap-2 content-md:gap-3">
         {Array.from({ length: 6 }).map((_, index) => (
           <MediaSkeleton.Icon key={index} size="lg" className="flex-shrink-0" />
         ))}
@@ -212,13 +212,13 @@ function CategoryCardContent() {
           <TextSkeleton.Caption className="w-1/2" />
         </div>
 
-        <div className="flex items-start justify-between gap-4 md:items-end md:gap-6">
+        <div className="flex items-start justify-between gap-4 content-md:items-end content-md:gap-6">
           <div className="flex-1 space-y-2">
             <TextSkeleton.Body className="w-full" />
             <TextSkeleton.Body className="w-2/3" />
           </div>
 
-          <InteractiveSkeleton.Button className="h-10 w-10 flex-shrink-0 md:h-12 md:w-12" />
+          <InteractiveSkeleton.Button className="h-10 w-10 flex-shrink-0 content-md:h-12 content-md:w-12" />
         </div>
       </div>
     </div>
@@ -272,11 +272,11 @@ export function CardSkeletonGrid({
   return (
     <div
       className={cn(
-        'grid gap-4 md:gap-6',
+        'grid gap-4 content-md:gap-6',
         // Responsive grid based on card type
-        variant === 'vendor' && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
-        variant === 'blog' && 'grid-cols-1 md:grid-cols-2',
-        variant === 'category' && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
+        variant === 'vendor' && 'grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-3',
+        variant === 'blog' && 'grid-cols-1 content-md:grid-cols-2',
+        variant === 'category' && 'grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-4',
         variant === 'alternative' && 'grid-cols-1',
         className,
       )}

@@ -10,7 +10,15 @@
     "dist",
     "src",
     "eslint-config",
-    "tailwind.config.ts"
+    "tailwind.config.ts",
+    "!dist/__tests__",
+    "!src/**/__tests__",
+    "!src/**/__fixtures__",
+    "!src/**/*.test.*",
+    "!src/stories",
+    "!src/**/*.stories.*",
+    "!src/**/.*.md",
+    "!src/components/icons-v2/**/*.svg"
   ],
   "exports": {
     ".": {
@@ -229,6 +237,12 @@
       "require": "./dist/utils/humanity-signals.cjs",
       "default": "./dist/utils/humanity-signals.js"
     },
+    "./utils/form-rescue": {
+      "types": "./dist/utils/form-rescue.d.ts",
+      "import": "./dist/utils/form-rescue.js",
+      "require": "./dist/utils/form-rescue.cjs",
+      "default": "./dist/utils/form-rescue.js"
+    },
     "./utils/platform-identity": {
       "types": "./dist/utils/platform-identity.d.ts",
       "import": "./dist/utils/platform-identity.js",
@@ -302,12 +316,6 @@
       "require": "./dist/assets/index.cjs",
       "default": "./dist/assets/index.js"
     },
-    "./fonts": {
-      "types": "./dist/fonts.d.ts",
-      "import": "./dist/fonts.js",
-      "require": "./dist/fonts.cjs",
-      "default": "./dist/fonts.js"
-    },
     "./tailwind.config.ts": {
       "types": "./dist/tailwind.config.d.ts",
       "default": "./tailwind.config.ts"
@@ -347,6 +355,7 @@
     "yalc:push": "yalc push ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "yalc:publish": "yalc publish ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "generate:icons": "node scripts/generate-icons.mjs",
+    "generate:content-area": "vitest run src/__tests__/content-area-variants.test.ts -u",
     "format": "prettier --check .",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
@@ -494,6 +503,8 @@
     "lint-staged": "17.3.0",
     "next": "^16.1.3",
     "nodemon": "^3.1.11",
+    "pkg-pr-new": "0.0.88",
+    "postcss": "^8.5.15",
     "prettier": "^3.9.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

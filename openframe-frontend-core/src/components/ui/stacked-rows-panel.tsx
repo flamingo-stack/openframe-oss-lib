@@ -31,8 +31,10 @@ export interface PanelColumn {
   content?: ReactNode;
   /** Primary value rendered in the ODS h4 style when `content` is not set. */
   value?: ReactNode;
-  /** Secondary label rendered under the value (ODS h6, secondary colour). */
-  label?: string;
+  /** Secondary label rendered under the value (ODS h6, secondary colour); a node for inline emphasis. */
+  label?: ReactNode;
+  /** Let the value AND label WRAP instead of truncating to one line (full names, full sentences). */
+  wrap?: boolean;
   /** Icon shown before the value. */
   icon?: ReactNode;
   /** Icon shown before the whole value/label stack, vertically centered against
@@ -81,20 +83,20 @@ const CELL_ITEMS_ALIGN: Record<PanelColumnAlign, string> = {
 };
 
 const HIDE_CLASS: Record<PanelHideAt, string> = {
-  md: 'hidden md:flex',
-  lg: 'hidden lg:flex',
-  xl: 'hidden xl:flex',
+  md: 'hidden content-md:flex',
+  lg: 'hidden content-lg:flex',
+  xl: 'hidden content-xl:flex',
 };
 
 // Base column-row class. Row height is content-driven via the min-heights, matching
 // the joined-row pattern used across the detail layouts (56px mobile, 80px tablet+).
 const ROW_CLASS =
-  'flex items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] min-h-14 md:min-h-20 border-b border-ods-border last:border-b-0';
+  'flex items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] min-h-14 content-md:min-h-20 border-b border-ods-border last:border-b-0';
 
 function CellValue({ column }: { column: PanelColumn }) {
   const valueNode = (
     <div
-      className="truncate text-ods-text-primary text-h4"
+      className={cn(column.wrap ? 'whitespace-normal' : 'truncate', 'text-ods-text-primary text-h4')}
       title={typeof column.value === 'string' ? column.value : undefined}
     >
       {column.value}
@@ -118,7 +120,11 @@ function CellValue({ column }: { column: PanelColumn }) {
           valueNode
         )}
       </div>
-      {column.label ? <p className="truncate text-ods-text-secondary text-h6">{column.label}</p> : null}
+      {column.label ? (
+        <p className={cn(column.wrap ? 'whitespace-normal' : 'truncate', 'text-ods-text-secondary text-h6')}>
+          {column.label}
+        </p>
+      ) : null}
     </>
   );
 }

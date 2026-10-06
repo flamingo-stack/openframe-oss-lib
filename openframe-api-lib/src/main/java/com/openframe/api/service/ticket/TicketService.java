@@ -9,8 +9,14 @@ import com.openframe.api.dto.ticket.CreateTicketInput;
 import com.openframe.api.dto.ticket.ReorderTicketInput;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.dto.ticket.UpdateTicketInput;
+import com.openframe.api.exception.DeviceNotFoundException;
+import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
+import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.device.Machine;
@@ -20,7 +26,6 @@ import com.openframe.data.document.ticket.ClientTicketOwner;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketOwner;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.document.user.User;
@@ -133,7 +138,7 @@ public class TicketService {
             return getTicket(principal, ticketId);
         }
         if (ticketNumber == null) {
-            throw new IllegalArgumentException("ticketId or ticketNumber is required");
+            throw new ValidationException("ticketId or ticketNumber is required");
         }
         return getTicketByNumber(principal, ticketNumber);
     }
@@ -148,14 +153,13 @@ public class TicketService {
                 .ticketNumber(ticketNumberService.getNextTicketNumber())
                 .title(input.getTitle())
                 .description(input.getDescription())
-                .status(isAgentCreated ? TicketStatus.TECH_REQUIRED : TicketStatus.ACTIVE)
                 .creationSource(isAgentCreated ? TicketCreationSource.FAE_FORM : TicketCreationSource.ADMIN_DASHBOARD)
                 .owner(buildTicketOwner(principal))
                 .build();
 
         if (isAgentCreated) {
             populateDeviceFromPrincipal(ticket, principal);
-            applyInitialStatusIfLifecycle(ticket);
+            applyInitialStatus(ticket, TicketStatusKind.TECH_REQUIRED);
         } else {
             populateAdminFields(ticket, input);
             // Manually (admin) created tickets pick a custom status (default: first custom),
@@ -192,13 +196,12 @@ public class TicketService {
 
         Ticket ticket = Ticket.builder()
                 .ticketNumber(ticketNumberService.getNextTicketNumber())
-                .status(TicketStatus.ACTIVE)
                 .creationSource(TicketCreationSource.FAE_DIALOG)
                 .owner(buildTicketOwner(principal))
                 .build();
 
         populateDeviceFromPrincipal(ticket, principal);
-        applyInitialStatusIfLifecycle(ticket);
+        applyInitialStatus(ticket, TicketStatusKind.AI_ASSISTANCE);
 
         ticket.setOrder(computeTopOrder(ticket));
 
@@ -220,13 +223,12 @@ public class TicketService {
                 .ticketNumber(ticketNumberService.getNextTicketNumber())
                 .title(title)
                 .description(description)
-                .status(TicketStatus.TECH_REQUIRED)
                 .creationSource(TicketCreationSource.FAE_DIALOG)
                 .owner(buildTicketOwner(principal))
                 .build();
 
         populateDeviceFromPrincipal(ticket, principal);
-        applyInitialStatusIfLifecycle(ticket);
+        applyInitialStatus(ticket, TicketStatusKind.TECH_REQUIRED);
 
         ticket.setOrder(computeTopOrder(ticket));
 
@@ -384,8 +386,8 @@ public class TicketService {
         return ticketLifecycleService.computeRankAtTop(ticket.getStatusId());
     }
 
-    private void applyInitialStatusIfLifecycle(Ticket ticket) {
-        ticketLifecycleService.applyInitialStatus(ticket);
+    private void applyInitialStatus(Ticket ticket, TicketStatusKind kind) {
+        ticketLifecycleService.applyInitialStatus(ticket, kind);
     }
 
     private void applyManualStatusIfLifecycle(Ticket ticket, String requestedStatusId) {
@@ -394,7 +396,7 @@ public class TicketService {
 
     private Ticket getById(String ticketId) {
         return ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new IllegalArgumentException("Ticket not found: " + ticketId));
+                .orElseThrow(() -> new TicketNotFoundException(ticketId));
     }
 
     private TicketOwner buildTicketOwner(AuthPrincipal principal) {
@@ -485,7 +487,7 @@ public class TicketService {
             if (resolvedOrgId == null) {
                 resolvedOrgId = device.getOrganizationId();
             } else if (!resolvedOrgId.equals(device.getOrganizationId())) {
-                throw new IllegalArgumentException("Device doesn't belong to selected organization");
+                throw new ConflictException(ErrorCode.CONFLICT, "Device doesn't belong to selected organization");
             }
         }
 
@@ -498,19 +500,19 @@ public class TicketService {
 
     private void populateAssignee(Ticket ticket, String assigneeId) {
         User user = userRepository.findById(assigneeId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + assigneeId));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND, "User not found: " + assigneeId));
         ticket.setAssignedTo(user.getId());
         ticket.setAssignedName(TicketUserNames.displayName(user));
     }
 
     private Machine requireMachine(String machineId) {
         return machineRepository.findByMachineId(machineId)
-                .orElseThrow(() -> new IllegalArgumentException("Device not found by machineId: " + machineId));
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found by machineId: " + machineId));
     }
 
     private Organization requireOrganization(String organizationId) {
         return organizationRepository.findByOrganizationId(organizationId)
-                .orElseThrow(() -> new IllegalArgumentException("Organization not found by organizationId: " + organizationId));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.ORGANIZATION_NOT_FOUND, "Organization not found by organizationId: " + organizationId));
     }
 
     private boolean hasAssignee(Ticket ticket) {

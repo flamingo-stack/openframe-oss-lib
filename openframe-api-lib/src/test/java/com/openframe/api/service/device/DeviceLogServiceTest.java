@@ -1,5 +1,6 @@
 package com.openframe.api.service.device;
 
+import com.openframe.api.config.DeviceLogProperties;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
 import com.openframe.api.dto.device.DeviceLogFilterCriteria;
@@ -7,15 +8,13 @@ import com.openframe.api.dto.device.DeviceLogLevel;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.exception.DeviceNotFoundException;
-import com.openframe.core.exception.InternalException;
+import com.openframe.api.service.tenant.TenantDomainService;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
-import com.openframe.data.repository.tenant.TenantRepository;
-import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -26,17 +25,19 @@ import org.mockito.quality.Strictness;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Collection;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -47,7 +48,6 @@ import static org.mockito.Mockito.when;
 class DeviceLogServiceTest {
 
     private static final String MACHINE_ID = "machine-1";
-    private static final String TENANT_ID = "tenant-1";
     private static final String TENANT_DOMAIN = "acme.openframe.ai";
     private static final Instant TO = Instant.parse("2026-09-14T12:00:00Z");
     private static final Instant FROM = TO.minus(Duration.ofDays(1));
@@ -56,18 +56,17 @@ class DeviceLogServiceTest {
 
     @Mock private LokiClient lokiClient;
     @Mock private DeviceService deviceService;
-    @Mock private TenantIdProvider tenantIdProvider;
-    @Mock private TenantRepository tenantRepository;
+    @Mock private TenantDomainService tenantDomainService;
 
+    private final DeviceLogProperties properties = new DeviceLogProperties();
     private DeviceLogService service;
 
     @BeforeEach
     void setUp() {
-        service = new DeviceLogService(lokiClient, deviceService, tenantIdProvider, tenantRepository);
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(mock(Machine.class)));
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(tenantRepository.findById(TENANT_ID))
-                .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).domain(TENANT_DOMAIN).build()));
+        service = new DeviceLogService(lokiClient, deviceService, tenantDomainService, properties);
+        when(deviceService.findByMachineIds(anyCollection())).thenAnswer(invocation ->
+                invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceTest::machine).toList());
+        when(tenantDomainService.getTenantDomain()).thenReturn(TENANT_DOMAIN);
     }
 
     @Test
@@ -84,7 +83,7 @@ class DeviceLogServiceTest {
         verify(lokiClient).queryRange(
                 "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\", level=~\"ERROR|WARN\"}"
                         + " |~ \"(?i)a\\\"b\" | machine_id=\"machine-1\"",
-                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD);
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
     }
 
     @Test
@@ -93,7 +92,7 @@ class DeviceLogServiceTest {
 
         verify(lokiClient).queryRange(
                 "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"} | machine_id=\"machine-1\"",
-                TO_NANOS - Duration.ofDays(7).toNanos(), TO_NANOS + 1, 101, LokiDirection.BACKWARD);
+                TO_NANOS - Duration.ofDays(7).toNanos(), TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
     }
 
     @Test
@@ -101,13 +100,87 @@ class DeviceLogServiceTest {
         service.queryDeviceLogs(MACHINE_ID, window(), page(1000, null));
         service.queryDeviceLogs(MACHINE_ID, window(), page(0, null));
 
-        verify(lokiClient).queryRange(anyString(), anyLong(), anyLong(), eq(501), eq(LokiDirection.BACKWARD));
-        verify(lokiClient).queryRange(anyString(), anyLong(), anyLong(), eq(2), eq(LokiDirection.BACKWARD));
+        verify(lokiClient).queryRange(anyString(), anyLong(), anyLong(), eq(501), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN));
+        verify(lokiClient).queryRange(anyString(), anyLong(), anyLong(), eq(2), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN));
+    }
+
+    @Test
+    void declaresTheTenantAsTheLokiActorOnEveryQueryIncludingTheTiedTimestampRefetch() {
+        // Loki has no multi-tenancy here, so without an actor every tenant queues behind every other tenant's
+        // sub-queries. The refetch path must declare it too, or a tied-timestamp page loses the fair queue.
+        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN)))
+                .thenReturn(List.of(entry(200, "a"), entry(200, "b"), entry(200, "c")));
+        when(lokiClient.queryRange(anyString(), eq(200L), eq(201L), eq(5000), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN)))
+                .thenReturn(List.of(entry(200, "a"), entry(200, "b"), entry(200, "c"), entry(200, "d")));
+
+        service.queryDeviceLogs(MACHINE_ID, window(), page(2, null));
+
+        verify(lokiClient, times(2)).queryRange(anyString(), anyLong(), anyLong(), anyInt(),
+                eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN));
+        verify(lokiClient, never()).queryRange(anyString(), anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD));
+    }
+
+    @Test
+    @DisplayName("no cutover configured: the selector is unbucketed, so deploying this reader changes nothing")
+    void doesNotBucketUntilACutoverIsConfigured() {
+        service.queryLogs(List.of(MACHINE_ID), DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"} | machine_id=\"machine-1\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+    }
+
+    @Test
+    void bucketsOneDeviceToItsOwnStreamSubset() {
+        properties.setBucketCutover(FROM);
+
+        service.queryLogs(List.of(MACHINE_ID), DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        // CRC32("machine-1") % 16 == 5; the algorithm itself is pinned in AgentLogBucketTest
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\", bucket=~\"5\"} | machine_id=\"machine-1\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+    }
+
+    @Test
+    @DisplayName("a window starting before the cutover is queried unbucketed in full, never as two merged halves")
+    void doesNotBucketAWindowThatPredatesTheCutover() {
+        properties.setBucketCutover(TO);
+
+        service.queryLogs(List.of(MACHINE_ID), DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"} | machine_id=\"machine-1\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+    }
+
+    @Test
+    @DisplayName("a whole-tenant query wants every bucket, so it carries no bucket matcher")
+    void doesNotBucketAWholeTenantQuery() {
+        properties.setBucketCutover(FROM);
+
+        service.queryLogs(null, DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+    }
+
+    @Test
+    @DisplayName("devices spanning every bucket gain nothing, so the matcher is left off")
+    void dropsTheBucketMatcherWhenTheDevicesSpanEveryBucket() {
+        properties.setBucketCutover(FROM);
+        List<String> everyBucket = java.util.stream.IntStream.range(0, 40).mapToObj(i -> "machine-" + i).toList();
+
+        service.queryLogs(everyBucket, DeviceLogFilterCriteria.builder().from(FROM).to(TO).build(), page(null, null));
+
+        verify(lokiClient).queryRange(startsWith("{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"} |"),
+                anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN));
     }
 
     @Test
     void rejectsDevicesNotVisibleToTheTenant() {
-        when(deviceService.findByMachineId("other-tenant-machine")).thenReturn(Optional.empty());
+        when(deviceService.findByMachineIds(anyCollection())).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.queryDeviceLogs("other-tenant-machine", null, page(null, null)))
                 .isInstanceOf(DeviceNotFoundException.class);
@@ -115,40 +188,68 @@ class DeviceLogServiceTest {
     }
 
     @Test
-    void failsWhenTheTenantHasNoDomain() {
-        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).build()));
+    void rejectsTheWholeRequestWhenOneOfSeveralDevicesIsNotVisibleToTheTenant() {
+        when(deviceService.findByMachineIds(anyCollection())).thenReturn(List.of(machine(MACHINE_ID)));
 
-        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, window(), page(null, null)))
-                .isInstanceOf(InternalException.class);
+        assertThatThrownBy(() -> service.queryLogs(List.of(MACHINE_ID, "other-tenant-machine"), window(), page(null, null)))
+                .isInstanceOf(DeviceNotFoundException.class)
+                .hasMessageContaining("other-tenant-machine");
         verifyNoInteractions(lokiClient);
     }
 
     @Test
-    void cachesTheTenantDomainAcrossRequests() {
-        service.queryDeviceLogs(MACHINE_ID, window(), page(null, null));
-        service.queryDeviceLogs(MACHINE_ID, window(), page(null, null));
+    void chainsSeveralDevicesWithOrAndKeepsASingleDeviceUnchanged() {
+        service.queryLogs(List.of(MACHINE_ID, "machine-2", MACHINE_ID), window(), page(null, null));
 
-        verify(tenantRepository, times(1)).findById(TENANT_ID);
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}"
+                        + " | machine_id=\"machine-1\" or machine_id=\"machine-2\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
     }
 
     @Test
-    void doesNotCacheAMissingDomain() {
-        when(tenantRepository.findById(TENANT_ID))
-                .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).build()))
-                .thenReturn(Optional.of(Tenant.builder().id(TENANT_ID).domain(TENANT_DOMAIN).build()));
+    void queriesEveryDeviceOfTheTenantWithoutAMetadataFilterAndLooksBackOneDay() {
+        service.queryLogs(null, DeviceLogFilterCriteria.builder().to(TO).build(), page(null, null));
 
-        assertThatThrownBy(() -> service.queryDeviceLogs(MACHINE_ID, window(), page(null, null)))
-                .isInstanceOf(InternalException.class);
-        service.queryDeviceLogs(MACHINE_ID, window(), page(null, null));
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}",
+                TO_NANOS - Duration.ofDays(1).toNanos(), TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+        verifyNoInteractions(deviceService);
+    }
 
-        verify(tenantRepository, times(2)).findById(TENANT_ID);
-        verify(lokiClient).queryRange(startsWith("{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\""),
-                anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD));
+    @Test
+    void rejectsAnEmptyDeviceListSoAHalfLoadedClientCannotQueryTheWholeTenant() {
+        assertThatThrownBy(() -> service.queryLogs(List.of(), window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one device");
+        assertThatThrownBy(() -> service.queryLogs(List.of(" "), window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(lokiClient);
+    }
+
+    @Test
+    void rejectsANullDeviceIdRatherThanWideningToTheWholeTenant() {
+        // singletonList(null) is not the null list that means "every device": the id is filtered out, the list is
+        // then empty, and an empty-but-present list is rejected
+        assertThatThrownBy(() -> service.queryDeviceLogs(null, window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one device");
+        verifyNoInteractions(lokiClient);
+    }
+
+    @Test
+    void rejectsMoreThanFiftyDevices() {
+        List<String> tooMany = java.util.stream.IntStream.range(0, 51).mapToObj(i -> "machine-" + i).toList();
+
+        assertThatThrownBy(() -> service.queryLogs(tooMany, window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("50 devices");
+        verifyNoInteractions(lokiClient);
     }
 
     @Test
     void firstPageReportsNextPageAndCursors() {
-        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD)))
+        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN)))
                 .thenReturn(List.of(entry(300, "c"), entry(200, "b"), entry(100, "a")));
 
         GenericQueryResult<DeviceLogEntry> result = service.queryDeviceLogs(MACHINE_ID, window(), page(2, null));
@@ -163,7 +264,7 @@ class DeviceLogServiceTest {
     @Test
     void nextPageEndsJustBeforeTheCursorTimestamp() {
         long cursorNanos = TO_NANOS - 500;
-        when(lokiClient.queryRange(anyString(), eq(FROM_NANOS), eq(cursorNanos), eq(3), eq(LokiDirection.BACKWARD)))
+        when(lokiClient.queryRange(anyString(), eq(FROM_NANOS), eq(cursorNanos), eq(3), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN)))
                 .thenReturn(List.of(entry(cursorNanos - 1, "b"), entry(cursorNanos - 2, "a")));
 
         GenericQueryResult<DeviceLogEntry> result =
@@ -177,7 +278,7 @@ class DeviceLogServiceTest {
     @Test
     void endsAPageBeforeLinesThatShareTheCutTimestamp() {
         // Loki cut the lines at 200 ns at the limit, keeping whichever it chose
-        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD)))
+        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN)))
                 .thenReturn(List.of(entry(300, "c"), entry(200, "b1"), entry(200, "b2")));
 
         GenericQueryResult<DeviceLogEntry> result = service.queryDeviceLogs(MACHINE_ID, window(), page(2, null));
@@ -189,9 +290,9 @@ class DeviceLogServiceTest {
 
     @Test
     void returnsEveryLineOfATimestampThatFillsTheWholePage() {
-        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD)))
+        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN)))
                 .thenReturn(List.of(entry(200, "a"), entry(200, "b"), entry(200, "c")));
-        when(lokiClient.queryRange(anyString(), eq(200L), eq(201L), eq(5000), eq(LokiDirection.BACKWARD)))
+        when(lokiClient.queryRange(anyString(), eq(200L), eq(201L), eq(5000), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN)))
                 .thenReturn(List.of(entry(200, "a"), entry(200, "b"), entry(200, "c"), entry(200, "d")));
 
         GenericQueryResult<DeviceLogEntry> result = service.queryDeviceLogs(MACHINE_ID, window(), page(2, null));
@@ -213,9 +314,10 @@ class DeviceLogServiceTest {
 
     @Test
     void mapsStructuredMetadataOntoTheEntry() {
-        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD)))
+        when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), anyInt(), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN)))
                 .thenReturn(List.of(new LokiLogEntry(TO_NANOS + 35, "Control channel disconnected", Map.of(
                         "level", "ERROR",
+                        "machine_id", MACHINE_ID,
                         "hostname", "Mishas-MacBook-Pro.local",
                         "agent_ts", "2026-09-14T11:59:59.487Z",
                         "count", "2"))));
@@ -225,6 +327,7 @@ class DeviceLogServiceTest {
         assertThat(entry.getTimestamp()).isEqualTo(TO.plusNanos(35));
         assertThat(entry.getAgentTimestamp()).isEqualTo(Instant.parse("2026-09-14T11:59:59.487Z"));
         assertThat(entry.getLevel()).isEqualTo("ERROR");
+        assertThat(entry.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(entry.getHostname()).isEqualTo("Mishas-MacBook-Pro.local");
         assertThat(entry.getCount()).isEqualTo(2L);
     }
@@ -258,7 +361,7 @@ class DeviceLogServiceTest {
                 "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}"
                         + " |~ \"(?i)connection\" |~ \"(?i)failed\" !~ \"(?i)heartbeat\""
                         + " | machine_id=\"machine-1\"",
-                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD);
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
     }
 
     @Test
@@ -279,11 +382,17 @@ class DeviceLogServiceTest {
                 "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}"
                         + " |~ \"(?i)a\" |~ \"(?i)b\" |~ \"(?i)c\" |~ \"(?i)d\" |~ \"(?i)e\""
                         + " | machine_id=\"machine-1\"",
-                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD);
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
     }
 
     private static DeviceLogFilterCriteria window() {
         return DeviceLogFilterCriteria.builder().from(FROM).to(TO).build();
+    }
+
+    private static Machine machine(String machineId) {
+        Machine machine = new Machine();
+        machine.setMachineId(machineId);
+        return machine;
     }
 
     private static CursorPaginationCriteria page(Integer limit, String rawCursor) {

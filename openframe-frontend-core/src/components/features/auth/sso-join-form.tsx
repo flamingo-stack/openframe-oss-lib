@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
+import { accentSentenceMarks } from '../../layout/page-heading';
 import { Button } from '../../ui/button';
 import { CheckboxBlock } from '../../ui/checkbox-block';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -81,7 +82,7 @@ export function SsoJoinForm({
     >
       {/* Header */}
       <div className="flex flex-col">
-        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{title}</h1>
+        <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>
         <p className="text-ods-text-secondary text-h4">{subtitle}</p>
       </div>
 

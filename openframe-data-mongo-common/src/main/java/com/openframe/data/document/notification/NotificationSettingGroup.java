@@ -14,7 +14,8 @@ public enum NotificationSettingGroup {
     ADMIN_REPLIED("Admin replied"),
     MINGO_MESSAGES("New messages from Mingo"),
     APPROVAL_TICKET("Approval required ticket"),
-    APPROVAL_MINGO("Approval required Mingo");
+    APPROVAL_MINGO("Approval required Mingo"),
+    INSIGHTS("Insights");
 
     private final String label;
 }

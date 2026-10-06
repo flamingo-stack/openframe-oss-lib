@@ -20,6 +20,9 @@ export * from './nats/use-nats-client';
 // Viewport / lazy-mount primitive (shared IO singleton)
 export * from './use-near-viewport';
 
+// The clock of a looping scripted demo (scenarios x steps, hold, pause, jump)
+export * from './use-scenario-player';
+
 // Access code integration — pairs with the standalone helpers in
 // `utils/access-code-client`. Lives in `hooks/` so the createContext
 // pulled in via EndpointsRuntimeContext doesn't end up in the
@@ -41,3 +44,7 @@ export * from './use-scroll-to-hash';
 // Invisible bot-protection client primitive (honeypot ref + submit-timing).
 // Pairs with the server-safe decision fn in `utils/humanity-signals`.
 export * from './use-humanity-signals';
+// Saves a half-filled public form so a visitor who leaves can be followed up with.
+// Pairs with the server-safe rules in `utils/form-rescue`.
+export * from './use-form-rescue';
+export * from './use-rescued-form';

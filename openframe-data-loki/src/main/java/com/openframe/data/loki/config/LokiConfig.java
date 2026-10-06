@@ -32,6 +32,6 @@ public class LokiConfig {
                 .baseUrl(properties.getUrl())
                 .requestFactory(ClientHttpRequestFactories.get(settings))
                 .build();
-        return new LokiClient(restClient);
+        return new LokiClient(restClient, properties.getMaxQueryBytesRead());
     }
 }

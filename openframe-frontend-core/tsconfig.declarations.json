@@ -10,5 +10,12 @@
     "declarationDir": "./dist"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "src/stories/**", "**/*.test.ts", "**/*.test.tsx"]
+  "exclude": [
+    "node_modules",
+    "src/stories/**",
+    "**/__fixtures__/**",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
 }

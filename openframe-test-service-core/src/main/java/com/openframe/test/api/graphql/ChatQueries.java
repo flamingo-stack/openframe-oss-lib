@@ -15,7 +15,10 @@ public class ChatQueries {
                         node {
                             id
                             createdAt
-                            owner { type }
+                            owner {
+                                type
+                                ... on AssistantOwner { model modelName providerName }
+                            }
                             messageData {
                                 type
                                 ... on TextData { text }
@@ -28,6 +31,7 @@ public class ChatQueries {
                                 }
                                 ... on ErrorData { error details }
                                 ... on AskData { question options { label description } }
+                                ... on ContextCompactionEndData { summary }
                             }
                         }
                     }
@@ -89,6 +93,22 @@ public class ChatQueries {
             mutation UnarchiveDialog($input: DialogIdInput!) {
                 unarchiveDialog(input: $input) {
                     dialog { %s }
+                    userErrors { message }
+                }
+            }
+            """.formatted(DIALOG_NODE);
+
+    // One dialog with the caller's side of the unread message counter; an AGENT may read its own machine's dialog.
+    public static final String DIALOG_QUERY = """
+            query Dialog($id: ID!) {
+                dialog(id: $id) { %s unreadMessageCount }
+            }
+            """.formatted(DIALOG_NODE);
+
+    public static final String MARK_DIALOG_MESSAGES_READ = """
+            mutation MarkDialogMessagesRead($input: DialogIdInput!) {
+                markDialogMessagesRead(input: $input) {
+                    dialog { %s unreadMessageCount }
                     userErrors { message }
                 }
             }

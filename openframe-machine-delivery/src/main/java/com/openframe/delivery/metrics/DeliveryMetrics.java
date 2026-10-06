@@ -17,6 +17,7 @@ public class DeliveryMetrics {
     private static final String FAILED_COUNTER = "openframe.delivery.failed";
     private static final String PUBLISH_FAILED_COUNTER = "openframe.delivery.publish_failed";
     private static final String ROW_ERROR_COUNTER = "openframe.delivery.sweep.row_errors";
+    private static final String RESULT_REJECTED_COUNTER = "openframe.delivery.result.rejected";
     private static final String SWEEP_TIMER = "openframe.delivery.sweep.duration";
     private static final String TAG_TYPE = "type";
     private static final String TAG_REASON = "reason";
@@ -36,6 +37,10 @@ public class DeliveryMetrics {
         String typeTag = tagValue(type.name());
         String reasonTag = tagValue(failure.name());
         meterRegistry.counter(FAILED_COUNTER, TAG_TYPE, typeTag, TAG_REASON, reasonTag).increment();
+    }
+
+    public void recordResultRejected(String reason) {
+        meterRegistry.counter(RESULT_REJECTED_COUNTER, TAG_REASON, reason).increment();
     }
 
     public void recordPublishFailed(DeliveryType type) {

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import Image from '../../embed-shims/next-image';
 import { cn } from '../../utils';
+import { IMAGE_FILE_ACCEPT } from '../../utils/media-type';
 import { SEO_DESCRIPTION_MAX_LENGTH } from '../../utils/seo-description';
 // SSOT for the field cap (server-safe constant). The seo_title renders as the
 // page <title> verbatim (no brand suffix), so this is the full ~60-char budget.
@@ -120,7 +121,7 @@ export function SEOEditorPreview({
           both columns share one label-row geometry; badges + the char counter
           ride the label row (labelExtras / labelEnd) instead of adding stray
           rows that misalign siblings. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 content-lg:grid-cols-2">
         <div className="space-y-2">
           <Field
             label="SEO Title"
@@ -194,7 +195,7 @@ export function SEOEditorPreview({
       </div>
 
       {/* SEO Description & OG Image - Same Row */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 content-lg:grid-cols-2">
         <div className="space-y-2">
           <Field
             label="SEO Description"
@@ -310,7 +311,7 @@ export function SEOEditorPreview({
               <input
                 ref={setFileInputRef}
                 type="file"
-                accept="image/*"
+                accept={IMAGE_FILE_ACCEPT}
                 onChange={handleImageUpload}
                 className="hidden"
                 disabled={disabled || isUploading}

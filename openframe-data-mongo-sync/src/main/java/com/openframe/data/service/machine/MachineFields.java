@@ -3,9 +3,12 @@ package com.openframe.data.service.machine;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 
 import java.time.Instant;
+import java.util.Map;
 
 import static com.openframe.data.service.machine.MachineField.field;
 
@@ -22,6 +25,8 @@ public final class MachineFields {
     public static final MachineField<String> AGENT_VERSION = field("agentVersion", Machine::setAgentVersion);
     public static final MachineField<OsType> OS_TYPE = field("osType", Machine::setOsType);
     public static final MachineField<Instant> STUCK_NOTIFIED_AT = field("stuckNotifiedAt", Machine::setStuckNotifiedAt);
+    public static final MachineField<Map<PackageManagerType, PackageManagerState>> PACKAGE_MANAGERS =
+            field("packageManagers", Machine::setPackageManagers);
 
     public static final MachineField<Instant> UPDATED_AT = field("updatedAt", Machine::setUpdatedAt);
 

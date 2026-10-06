@@ -129,7 +129,12 @@ function DataTableRowImpl<T>({
           : compact
             ? 'py-[var(--spacing-system-xsf)]'
             : `py-0 ${ROW_HEIGHT_DESKTOP}`,
-        hasSubRow && 'border-b border-ods-border',
+        // The divider under the cells is an inset shadow, not a border. The row
+        // is a fixed border-box height, so a border takes its pixel out of the
+        // content box and every centered cell moves up half a pixel the moment a
+        // sub-row mounts, and back down when it unmounts — a visible twitch on
+        // each expand and collapse. A shadow paints without touching layout.
+        hasSubRow && 'shadow-[inset_0_-1px_0_0_var(--color-border-default)]',
       )}
     >
       {row.getVisibleCells().map(cell => {

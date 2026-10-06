@@ -21,13 +21,27 @@ export interface FieldWrapperProps {
    *
    * It is positioned OUT OF FLOW (absolute, hanging below the wrapper), so it
    * never changes the field's height when it appears — the same treatment
-   * `CheckboxBlock` uses. The trade is that it overlaps whatever sits directly
+   * `CheckboxBlock` uses. That holds only while the wrapper is already a box
+   * when the message arrives — see `errorSlot`. The trade is that it overlaps whatever sits directly
    * below: a form stacking fields needs at least ~20px of vertical gap (e.g.
    * `gap-[var(--spacing-system-lf)]`) for the message to land in clear space.
    */
   error?: string;
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey) */
   errorVariant?: 'error' | 'warning' | 'success' | 'muted';
+  /**
+   * The field is wired for a message: `error` may arrive later, so render the
+   * positioned box from the FIRST render instead of only once it does.
+   *
+   * Without a label the wrapper is `display: contents` while `error` is empty
+   * and a box once it is set — and the parent's spacing lands on a box but not
+   * on `contents`: a `space-y-*` margin, a flex row's sizing. So the control
+   * moved by that spacing the moment a message came, and back when it went.
+   * The controls pass this whenever the caller wrote an `error` attribute at
+   * all (`error={undefined}` included): those are exactly the call sites whose
+   * layout could flip, and a box there is the layout they already got on error.
+   */
+  errorSlot?: boolean;
   /**
    * Label scale. Default is the standard form-label scale (text-h6).
    * 'large' (text-h4) is for screens whose design specifies body-scale field
@@ -56,10 +70,20 @@ const errorVariantClasses = {
 
 const FieldWrapper = forwardRef<HTMLDivElement, FieldWrapperProps>(
   (
-    { label, htmlFor, error, errorVariant = 'error', labelVariant = 'default', required = false, className, children },
+    {
+      label,
+      htmlFor,
+      error,
+      errorVariant = 'error',
+      errorSlot = false,
+      labelVariant = 'default',
+      required = false,
+      className,
+      children,
+    },
     ref,
   ) => {
-    const hasChrome = label != null || error != null;
+    const hasChrome = label != null || error != null || errorSlot;
 
     return (
       <div ref={ref} className={cn(hasChrome ? 'relative flex w-full flex-col' : 'contents', className)}>

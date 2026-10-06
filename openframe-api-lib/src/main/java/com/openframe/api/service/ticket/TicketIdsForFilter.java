@@ -1,6 +1,7 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.dto.ticket.TicketFilterInput;
+import com.openframe.api.service.ticket.spi.TicketUnreadMessagesProvider;
 import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.EntityCount;
@@ -8,6 +9,7 @@ import com.openframe.data.repository.notification.NotificationReadStateRepositor
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
@@ -25,6 +27,7 @@ public class TicketIdsForFilter {
     private final TicketTagService ticketTagService;
     private final NotificationReadStateRepository readStateRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final ObjectProvider<TicketUnreadMessagesProvider> unreadMessagesProvider;
 
     // null means "no restriction at all"; an empty list means "nothing matches" — the two are opposite
     // outcomes downstream, so a filter that applied and found nothing must not collapse to null.
@@ -61,8 +64,16 @@ public class TicketIdsForFilter {
         return ticketTagService.getTicketIdsByTagIds(tagIds);
     }
 
-    // An AGENT's read-state rows are keyed by machine id, not user id.
     private List<String> unreadTicketIds(AuthPrincipal principal) {
+        TicketUnreadMessagesProvider provider = unreadMessagesProvider.getIfAvailable();
+        if (provider == null) {
+            return unreadNotificationTicketIds(principal);
+        }
+        return provider.ticketIdsWithUnreadMessages(principal);
+    }
+
+    // An AGENT's read-state rows are keyed by machine id, not user id.
+    private List<String> unreadNotificationTicketIds(AuthPrincipal principal) {
         boolean agent = isAgent(principal);
         String recipientId = agent ? principal.getMachineId() : principal.getId();
         RecipientType recipientType = agent ? RecipientType.MACHINE : RecipientType.USER;

@@ -11,6 +11,7 @@ public final class DeliveryTestPolicies {
     public static final int BACKOFF_MULTIPLIER = 2;
     public static final long MAX_RETRY_INTERVAL = 300L;
     public static final int BATCH_SIZE = 500;
+    public static final long SWEEP_INTERVAL_MILLIS = 30_000L;
     public static final long RECONNECT_WINDOW = 86_400L;
     public static final long RESULT_TIMEOUT = 600L;
     public static final long TTL = 604_800L;
@@ -29,9 +30,9 @@ public final class DeliveryTestPolicies {
         defaults.setResultTimeoutSeconds(RESULT_TIMEOUT);
         defaults.setTtlSeconds(TTL);
         Sweep sweep = new Sweep();
+        sweep.setInterval(SWEEP_INTERVAL_MILLIS);
         sweep.setBatchSize(BATCH_SIZE);
         DeliveryProperties properties = new DeliveryProperties();
-        properties.setEnabled(true);
         properties.setDefaults(defaults);
         properties.setSweep(sweep);
         return properties;
