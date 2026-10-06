@@ -62,7 +62,13 @@ export { remarkCardLinks } from './remark-card-links';
 export { remarkMentionChips } from './remark-mention-chips';
 
 // Card-supporting UI migrated from hub `components/shared/*` + `components/blog/*`
-export { NavLinkAnchorViaRuntime, type NavLinkAnchorViaRuntimeProps } from './nav-link-anchor-via-runtime';
+export {
+  NavLinkAnchorViaRuntime,
+  type NavLinkAnchorViaRuntimeProps,
+  type NavLinkViaRuntimeInput,
+  type NavLinkViaRuntimeProps,
+  useNavLinkViaRuntime,
+} from './nav-link-anchor-via-runtime';
 export { SourceActionButton, type SourceActionButtonProps, type SourceActionDensity } from './source-action-button';
 export {
   ChatAttachmentAddButton,

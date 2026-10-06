@@ -9,6 +9,7 @@ import type React from 'react';
 import type { ToolType } from '../../types/tool.types';
 import { cn } from '../../utils/cn';
 import { getToolLabel } from '../../utils/tool-utils';
+import { NavLinkAnchorViaRuntime } from '../chat/nav-link-anchor-via-runtime';
 import { ToolIcon } from '../tool-icon';
 
 export type { ToolType } from '../../types/tool.types';
@@ -32,16 +33,11 @@ export interface ToolBadgeProps {
    */
   href?: string | null;
   /**
-   * How the host renders the link around the badge: its own link component, so
-   * the badge opens the way every link of the host does (its navigation rule,
-   * its cross-site handoff). Default: a plain anchor in a new tab.
+   * The platform `href` is on, by name, when it is one of the host's own
+   * platforms. The badge then opens through the shared navigation rule (the
+   * one chat cards use); the host must mount the chat runtime.
    */
-  renderLink?: (link: {
-    href: string;
-    title?: string;
-    className: string;
-    children: React.ReactNode;
-  }) => React.ReactNode;
+  targetPlatform?: string | null;
   /** Additional CSS classes */
   className?: string;
   iconClassName?: string;
@@ -58,7 +54,7 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
   icon,
   variant = 'inline',
   href,
-  renderLink,
+  targetPlatform,
   className,
   iconClassName,
 }) => {
@@ -67,8 +63,15 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
 
   // One rule for both variants: with an `href` the badge is a link.
   const linked = (node: React.ReactElement, linkClassName: string) =>
-    href && renderLink ? (
-      <>{renderLink({ href, title: text || undefined, className: linkClassName, children: node })}</>
+    href && targetPlatform ? (
+      <NavLinkAnchorViaRuntime
+        href={href}
+        targetPlatform={targetPlatform}
+        title={text || undefined}
+        className={linkClassName}
+      >
+        {node}
+      </NavLinkAnchorViaRuntime>
     ) : href ? (
       <a href={href} target="_blank" rel="noopener noreferrer" title={text || undefined} className={linkClassName}>
         {node}
