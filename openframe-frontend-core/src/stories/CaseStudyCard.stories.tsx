@@ -46,3 +46,39 @@ export const Default: Story = {
     rel: 'noopener noreferrer',
   },
 };
+
+const caseStudyWithMetrics = {
+  ...caseStudy,
+  metrics: [
+    { value: '50%', label: 'of routine tasks automated' },
+    { value: '3x', label: 'faster onboarding' },
+  ],
+};
+
+/** The first headline metric sits between the title and the person. */
+export const WithHeadlineMetric: Story = {
+  args: {
+    study: caseStudyWithMetrics,
+    href: '/case-studies/' + caseStudy.slug,
+    size: 'default',
+  },
+};
+
+export const PortraitWithHeadlineMetric: Story = {
+  args: {
+    study: caseStudyWithMetrics,
+    href: '/case-studies/' + caseStudy.slug,
+    size: 'portrait',
+    showTypeBadge: false,
+  },
+};
+
+/** A story with no metric in a grid that reserves the zone: same box, empty zone. */
+export const MetricRowReserved: Story = {
+  args: {
+    study: caseStudy,
+    href: '/case-studies/' + caseStudy.slug,
+    size: 'default',
+    metricRow: true,
+  },
+};

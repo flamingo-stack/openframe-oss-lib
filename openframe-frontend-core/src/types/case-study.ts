@@ -9,6 +9,15 @@ import type { MSP } from './stack';
 import type { UserProfile } from './user';
 import type { EntityQuote } from './video-processing';
 
+/**
+ * One headline number of a story ("50%" / "of routine tasks automated"). A
+ * story carries at most three; a card shows the first, the story's page all.
+ */
+export interface CaseStudyMetric {
+  value: string;
+  label: string;
+}
+
 export interface CaseStudy {
   id: number;
   title: string;
@@ -24,6 +33,8 @@ export interface CaseStudy {
   challenge: string | null;
   solution: string | null;
   results: string | null;
+  /** Headline metrics (jsonb, at most three). Null or empty: the story has none. */
+  metrics?: CaseStudyMetric[] | null;
 
   // Testimonial video (text testimonials come from MSP profile)
   testimonial_video_url: string | null; // YouTube URL (preferred when both exist)
@@ -91,7 +102,12 @@ export type CaseStudyCardData = Pick<CaseStudy, 'id' | 'title' | 'summary' | 'fe
   Partial<
     Pick<
       CaseStudy,
-      'main_video_url' | 'main_video_thumbnail' | 'highlight_video_url' | 'highlight_video_thumbnail' | 'video_bites'
+      | 'main_video_url'
+      | 'main_video_thumbnail'
+      | 'highlight_video_url'
+      | 'highlight_video_thumbnail'
+      | 'video_bites'
+      | 'metrics'
     >
   > & {
     user?: Pick<UserProfile, 'full_name' | 'job_title'> & Partial<Pick<UserProfile, 'avatar_url'>>;
@@ -107,6 +123,8 @@ export interface CreateCaseStudyData {
   challenge?: string;
   solution?: string;
   results?: string;
+  /** Headline metrics, at most three. Null or an empty list clears them. */
+  metrics?: CaseStudyMetric[] | null;
   testimonial_video_url?: string; // YouTube URL
   main_video_url?: string; // Uploaded video file URL
   main_video_thumbnail?: string | null; // Manual poster image URL for testimonial video (standardized name across all video-bearing entities). Nullable so admin form can explicitly clear a stale poster from the DB when the testimonial video is removed or the source is switched to YouTube.

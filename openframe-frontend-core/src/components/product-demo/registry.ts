@@ -9,5 +9,12 @@ type ProductScreenLoader = () => Promise<{ default: ProductScreenComponent }>;
  * makes a key without a loader a compile error.
  */
 export const PRODUCT_SCREEN_LOADERS: Record<ProductScreenKey, ProductScreenLoader> = {
+  'remote-session': () => import('./screens/remote-session'),
+  'software-update': () => import('./screens/software-update'),
+  devices: () => import('./screens/devices'),
+  policies: () => import('./screens/policies'),
+  'cloud-tenants': () => import('./screens/cloud-tenants'),
   'tickets-board': () => import('./screens/tickets-board'),
+  logs: () => import('./screens/logs'),
+  knowledge: () => import('./screens/knowledge'),
 };

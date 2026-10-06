@@ -7,7 +7,14 @@
  * (to validate a stored key, to fill a picker). The loaders are in `registry`.
  */
 export const PRODUCT_SCREEN_LABELS = {
+  'remote-session': 'Remote desktop session',
+  'software-update': 'Update software',
+  devices: 'Devices',
+  policies: 'Policies',
+  'cloud-tenants': 'Cloud tenants',
   'tickets-board': 'Ticket board',
+  logs: 'Logs with a log open',
+  knowledge: 'Knowledge base',
 } as const;
 
 export type ProductScreenKey = keyof typeof PRODUCT_SCREEN_LABELS;
