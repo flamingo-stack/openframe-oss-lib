@@ -92,8 +92,10 @@ const OpenmspLogoIcon: IconComponent = ({ size = 16, className }) => (
 );
 const FlamingoLogoIcon = sizedLogo(FlamingoLogo);
 // The two community marks size themselves through a `size` prop, the resolver's own contract.
+// Major League GitHub draws its mark in the theme's text colour on its own site
+// (its header, hero and footer), never in an accent: so does every glyph of it.
 const MlgLogoIcon: IconComponent = ({ size = 16, className, color }) => (
-  <MlgLogo size={size} className={className} color={color ?? brandColor('mlg')} />
+  <MlgLogo size={size} className={className} color={color ?? 'var(--color-text-primary)'} />
 );
 const TmcgLogoIcon: IconComponent = ({ size = 16, className }) => (
   <MiamiCyberGangLogoFaceOnly
