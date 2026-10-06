@@ -19,9 +19,6 @@ export interface UseNavMenusOptions {
   hoverCloseMs?: number;
 }
 
-/** A click this soon after a hover switched menus is the same tap, not a second gesture. */
-const TAP_AFTER_HOVER_MS = 400;
-
 export interface NavMenuTriggerProps {
   ref: RefCallback<HTMLElement>;
   'aria-expanded': boolean;
@@ -81,8 +78,8 @@ export function useNavMenus({
   const panels = useRef(new Map<string, HTMLElement>());
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The last switch a hover made between open menus, for the tap rule in `onClick`.
-  const hoverSwitch = useRef<{ id: string; at: number } | null>(null);
+  // The menu a HOVER opened, until a click claims it (see `onClick`).
+  const openedByHover = useRef<string | null>(null);
 
   const clearTimers = useCallback(() => {
     if (openTimer.current) clearTimeout(openTimer.current);
@@ -150,11 +147,13 @@ export function useNavMenus({
         // A touch tap fires mouseenter first: drop its pending open, or it
         // would reopen the menu this click just closed.
         clearTimers();
-        // ...and when that mouseenter already switched to this menu, the click
-        // is the same tap finishing: it must not toggle the menu shut again.
-        const switched = hoverSwitch.current;
-        hoverSwitch.current = null;
-        if (switched && switched.id === id && Date.now() - switched.at < TAP_AFTER_HOVER_MS) {
+        // A click on a menu the pointer's hover already opened means "open
+        // it": it keeps the menu open instead of toggling it shut (a mouse
+        // user hovers, then clicks; a touch tap fires mouseenter, then click).
+        // The click claims the menu, so the next click on it closes it.
+        const hovered = openedByHover.current === id;
+        openedByHover.current = null;
+        if (hovered) {
           setOpened({ id, pathname });
           return;
         }
@@ -167,12 +166,13 @@ export function useNavMenus({
         // one opens at once. The hover-intent wait is only for the FIRST open
         // (it filters a pointer merely crossing the bar).
         if (openId !== null) {
-          hoverSwitch.current = { id, at: Date.now() };
+          openedByHover.current = id;
           setOpened({ id, pathname });
           return;
         }
         openTimer.current = setTimeout(() => {
           openTimer.current = null;
+          openedByHover.current = id;
           setOpened({ id, pathname });
         }, hoverOpenMs);
       },

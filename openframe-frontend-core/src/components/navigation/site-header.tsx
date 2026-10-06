@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
+import Link from '../../embed-shims/next-link';
 import { useActiveSection } from '../../hooks/ui/use-active-section';
 import { useNavMenus } from '../../hooks/ui/use-nav-menus';
 import type { NavMenu, SiteNav } from '../../types/navigation';
@@ -230,7 +231,7 @@ export function SiteHeader({
       style={{ transform: headerShown ? 'translateY(0)' : 'translateY(-100%)' }}
     >
       {/* First tab stop of the page; visible only while focused. */}
-      <a
+      <Link
         href={`#${skipToContentId}`}
         className={cn(
           'sr-only left-[var(--spacing-system-lf)] top-3 z-[70] rounded-md bg-ods-text-primary px-[var(--spacing-system-mf)] py-[var(--spacing-system-xsf)] text-ods-bg text-h6 focus:not-sr-only focus:absolute',
@@ -238,7 +239,7 @@ export function SiteHeader({
         )}
       >
         Skip to content
-      </a>
+      </Link>
       {/* Unified ODS top-navigation shell (Figma 2797-5978), cell model with
           per-cell dividers. NOTE: no `backdrop-blur` anywhere in this bar.
           Every platform ships an OPAQUE header background, so a

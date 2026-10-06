@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import type { HTMLAttributes } from 'react';
+import { forwardRef, type HTMLAttributes } from 'react';
 import type { NavGroup, NavMenu } from '../../types/navigation';
 import { cn } from '../../utils/cn';
 import { CaseStudyCard } from '../chat/entity-cards/case-study-card';
@@ -38,7 +38,6 @@ export interface NavPanelProps extends Omit<HTMLAttributes<HTMLDivElement>, 'chi
    * two panels never show through each other mid-switch.
    */
   handoff?: boolean;
-  ref?: React.Ref<HTMLDivElement>;
 }
 
 export type NavPanelMotion = 'open' | 'from-start' | 'from-end';
@@ -90,18 +89,21 @@ function Column({
  * links, not an ARIA menu, so there is no `role="menu"` and Tab moves through
  * the links in DOM order.
  */
-export function NavPanel({
-  menu,
-  open,
-  renderLink = defaultRenderSiteNavLink,
-  badges,
-  social,
-  onNavigate,
-  motion = 'open',
-  handoff = false,
-  className,
-  ...panelProps
-}: NavPanelProps) {
+export const NavPanel = forwardRef<HTMLDivElement, NavPanelProps>(function NavPanelImpl(
+  {
+    menu,
+    open,
+    renderLink = defaultRenderSiteNavLink,
+    badges,
+    social,
+    onNavigate,
+    motion = 'open',
+    handoff = false,
+    className,
+    ...panelProps
+  }: NavPanelProps,
+  ref,
+) {
   const columns = menu.columns ?? [];
   const mega = isMegaMenu(menu);
   const rowProps = { renderLink, badges, onNavigate };
@@ -112,6 +114,7 @@ export function NavPanel({
       inert={!open}
       data-state={open ? 'open' : 'closed'}
       {...panelProps}
+      ref={ref}
       className={cn(
         'absolute top-full z-[60]',
         // Between two mega menus the surface is handed over in one frame (same
@@ -189,4 +192,5 @@ export function NavPanel({
       )}
     </div>
   );
-}
+});
+NavPanel.displayName = 'NavPanel';

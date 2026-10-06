@@ -74,7 +74,7 @@ export function detectDesktopOs(userAgent: string | null | undefined, hints?: Vi
 }
 
 /** Apple systems use the Command key for shortcuts; every other system uses Control. */
-function usesCommandKey(os: VisitorOs | null): boolean {
+export function usesCommandKey(os: VisitorOs | null): boolean {
   return os === 'mac' || os === 'ios';
 }
 

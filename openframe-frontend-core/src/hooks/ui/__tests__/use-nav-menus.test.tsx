@@ -72,6 +72,17 @@ describe('useNavMenus', () => {
     expect(openId()).toBe('a');
   });
 
+  it('a click on a menu the hover opened keeps it open; the next click closes it', () => {
+    render(<Menus />);
+    fireEvent.mouseEnter(trigger('a'));
+    advance(1000);
+    expect(openId()).toBe('a');
+    fireEvent.click(trigger('a'));
+    expect(openId()).toBe('a');
+    fireEvent.click(trigger('a'));
+    expect(openId()).toBe('none');
+  });
+
   it('does not open when the pointer leaves before the intent delay', () => {
     render(<Menus />);
     fireEvent.mouseEnter(trigger('a'));

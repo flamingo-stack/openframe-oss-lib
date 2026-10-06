@@ -18,14 +18,14 @@ export type SiteNavLinkRenderer = (props: {
 
 /**
  * The default link: the library's `Link` shim (a plain `<a>`, or the host's
- * registered router link, so internal links soft-navigate), and a new-tab
- * `<a>` for a link that leaves the site.
+ * registered router link, so internal links soft-navigate), opened in a new
+ * tab for a link that leaves the site.
  */
 export const defaultRenderSiteNavLink: SiteNavLinkRenderer = ({ link, children, ...rest }) =>
   link.external ? (
-    <a href={link.href} target="_blank" rel="noopener noreferrer" {...rest}>
+    <Link href={link.href} target="_blank" rel="noopener noreferrer" {...rest}>
       {children}
-    </a>
+    </Link>
   ) : (
     <Link href={link.href} {...rest}>
       {children}

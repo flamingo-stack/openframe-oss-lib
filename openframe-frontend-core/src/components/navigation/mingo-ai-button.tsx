@@ -4,7 +4,7 @@ import type React from 'react';
 import { useEffect } from 'react';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
-import { shortcutLabel } from '../../utils/visitor-os';
+import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
 import { MingoIcon } from '../icons';
 import { Button } from '../ui/button';
 
@@ -76,19 +76,24 @@ export function MingoAiButton({
   const visitor = useVisitorOs();
   const field = variant === 'field';
 
+  const commandKey = visitor.known && usesCommandKey(visitor.os);
+
   // The shortcut the key cap shows opens the same chat the click opens.
   useEffect(() => {
     if (!shortcutHint) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       // Something on the page already took the shortcut (an editor's link shortcut): leave it alone.
       if (event.defaultPrevented || event.altKey || event.shiftKey) return;
-      if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) return;
+      // The modifier the key cap shows, and only that one: on a Mac Ctrl+K is
+      // the text fields' own "delete to the end of the line".
+      const modifier = commandKey ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+      if (event.key.toLowerCase() !== 'k' || !modifier) return;
       event.preventDefault();
       openAskAi(source);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [shortcutHint, source]);
+  }, [shortcutHint, source, commandKey]);
 
   return (
     <Button
@@ -98,7 +103,7 @@ export function MingoAiButton({
       size="wrap"
       font="regular"
       aria-label={label}
-      aria-keyshortcuts={shortcutHint ? 'Meta+K Control+K' : undefined}
+      aria-keyshortcuts={shortcutHint && visitor.known ? (commandKey ? 'Meta+K' : 'Control+K') : undefined}
       onClick={e => {
         openAskAi(source);
         onClick?.(e);
