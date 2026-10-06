@@ -56,7 +56,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
                 }
               }}
               aria-expanded={isOpen}
-              className="flex w-full cursor-pointer items-center gap-6 px-6 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus md:gap-10"
+              className="flex w-full cursor-pointer items-center gap-6 px-6 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus content-md:gap-10"
             >
               <h3 className="min-w-0 flex-1 break-words">{item.question}</h3>
               <Chevron02DownIcon

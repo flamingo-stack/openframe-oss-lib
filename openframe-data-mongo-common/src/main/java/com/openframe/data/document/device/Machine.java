@@ -30,6 +30,9 @@ public class Machine implements TenantScoped {
     private String agentVersion;
     @Indexed
     private DeviceStatus status;
+    // connectivity, kept moving while status is frozen in PENDING_DELETION; null until the first heartbeat after this field appeared
+    @Indexed
+    private TelemetryStatus telemetryStatus;
     private Instant lastSeen;
     @Indexed
     private String organizationId;

@@ -47,6 +47,10 @@ export interface AppHeaderProps {
   onMingoAI?: () => void;
   /** Whether the Mingo drawer is currently open (visually pressed state). */
   isMingoAIActive?: boolean;
+  /** Swap the Mingo logo for a close "X" while active, beside the wordmark
+   *  too (icon-only mode always does). For a panel the button both opens and
+   *  closes. */
+  mingoAICloseWhenActive?: boolean;
   // User block
   showUser?: boolean;
   userName?: string;
@@ -131,6 +135,7 @@ export const AppHeader = React.memo(function AppHeaderImpl({
   showMingoAI = false,
   onMingoAI,
   isMingoAIActive = false,
+  mingoAICloseWhenActive = false,
   showUser,
   userName,
   userEmail,
@@ -327,6 +332,7 @@ export const AppHeader = React.memo(function AppHeaderImpl({
             <HeaderMingoButton
               onClick={onMingoAI}
               isActive={isMingoAIActive}
+              closeWhenActive={mingoAICloseWhenActive}
               iconOnly={!isMdUp}
               disabled={disabled || !onMingoAI}
               className={cn(cellDivider, dimmedClass)}

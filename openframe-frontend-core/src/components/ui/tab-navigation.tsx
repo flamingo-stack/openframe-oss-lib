@@ -399,7 +399,7 @@ const TabBar = memo(function TabBarImpl({
                 <div className="relative flex items-center justify-center">
                   <tab.icon
                     className={cn(
-                      'h-4 w-4 transition-colors md:h-6 md:w-6',
+                      'h-4 w-4 transition-colors content-md:h-6 content-md:w-6',
                       isActive ? 'text-ods-accent' : 'text-ods-text-secondary',
                     )}
                   />
@@ -412,7 +412,7 @@ const TabBar = memo(function TabBarImpl({
               ) : null}
 
               {tab.sublabel ? (
-                <span className="flex min-w-0 flex-col items-start text-left md:flex-row md:items-baseline md:gap-[var(--spacing-system-xsf)]">
+                <span className="flex min-w-0 flex-col items-start text-left content-md:flex-row content-md:items-baseline content-md:gap-[var(--spacing-system-xsf)]">
                   <span
                     className={cn(
                       'whitespace-nowrap transition-colors text-h4',

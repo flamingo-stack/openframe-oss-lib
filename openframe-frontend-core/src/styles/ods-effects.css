@@ -57,10 +57,12 @@
    the corner, radii 100% × 103% as in the design). Written
    on the class, not as a :root variable, so the accent resolves on the element
    and follows a platform or runtime (tenant) accent set below the root. */
+/* The color is `--glow-color` when a surface sets one (Mingo's cyan), the
+   accent otherwise. */
 .ods-glow-accent-corner {
   background-image: radial-gradient(
     100% 103% at 100% 100%,
-    color-mix(in srgb, var(--color-accent-primary) 4%, transparent) 0%,
-    color-mix(in srgb, var(--color-accent-primary) 0%, transparent) 100%
+    color-mix(in srgb, var(--glow-color, var(--color-accent-primary)) 4%, transparent) 0%,
+    color-mix(in srgb, var(--glow-color, var(--color-accent-primary)) 0%, transparent) 100%
   );
 }

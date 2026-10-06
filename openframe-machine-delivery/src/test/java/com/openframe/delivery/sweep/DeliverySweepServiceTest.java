@@ -6,6 +6,7 @@ import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
@@ -26,6 +27,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 
@@ -41,6 +44,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -217,7 +221,7 @@ class DeliverySweepServiceTest {
 
         // verifications
         verify(closer).fail(eq(delivery), eq(DeliveryFailure.EXHAUSTED), eq(DeliveryStatus.UNACKED), any(Instant.class));
-        verifyNoInteractions(registry, metrics);
+        verifyNoInteractions(metrics);
     }
 
     @Test
@@ -236,7 +240,7 @@ class DeliverySweepServiceTest {
         assertThat(dueAtCaptor.getValue())
                 .isAfterOrEqualTo(nextSweep)
                 .isBefore(nextSweep.plusSeconds(CLOCK_SLACK_SECONDS));
-        verifyNoInteractions(registry, closer, metrics);
+        verifyNoInteractions(closer, metrics);
     }
 
     @Test
@@ -283,7 +287,7 @@ class DeliverySweepServiceTest {
         // verifications
         verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
         verify(closer, never()).fail(eq(delivery), any(DeliveryFailure.class), eq(DeliveryStatus.UNACKED), any(Instant.class));
-        verifyNoInteractions(registry, metrics);
+        verifyNoInteractions(metrics);
     }
 
     @Test
@@ -297,7 +301,36 @@ class DeliverySweepServiceTest {
 
         // verifications
         verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
-        verifyNoInteractions(registry, metrics);
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void retryPending_machineLeavingAndTypeDoesNotReachIt_cancelled() {
+        // setup
+        stubDue(delivery);
+        stubMachine(DeviceStatus.PENDING_DELETION, false);
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void retryPending_machineLeavingAndTypeReachesIt_waitsForOnlineInstead() {
+        // setup
+        stubDue(delivery);
+        stubMachine(DeviceStatus.PENDING_DELETION, false);
+        when(spec.getDeliverableStatuses()).thenReturn(EnumSet.complementOf(EnumSet.of(DeviceStatus.DELETED)));
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(closer, never()).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
+        verify(repository).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class));
     }
 
     @Test
@@ -306,8 +339,9 @@ class DeliverySweepServiceTest {
         MachineDelivery corrupt = row(OTHER_MACHINE_ID, CORRUPT_JSON);
         stubDue(corrupt, delivery);
         Set<String> both = Set.of(OTHER_MACHINE_ID, MACHINE_ID);
-        when(machineOnlineStatus.gone(both)).thenReturn(Set.of());
+        when(machineOnlineStatus.statuses(both)).thenReturn(Map.of(OTHER_MACHINE_ID, DeviceStatus.ONLINE, MACHINE_ID, DeviceStatus.ONLINE));
         when(machineOnlineStatus.online(both)).thenReturn(both);
+        when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING));
         stubSpec();
         when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
 
@@ -355,18 +389,22 @@ class DeliverySweepServiceTest {
     }
 
     private void stubMachineOnline() {
-        when(machineOnlineStatus.gone(Set.of(MACHINE_ID))).thenReturn(Set.of());
-        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(Set.of(MACHINE_ID));
+        stubMachine(DeviceStatus.ONLINE, true);
     }
 
     private void stubMachineNotOnline() {
-        when(machineOnlineStatus.gone(Set.of(MACHINE_ID))).thenReturn(Set.of());
-        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(Set.of());
+        stubMachine(DeviceStatus.OFFLINE, false);
     }
 
     private void stubMachineGone() {
-        when(machineOnlineStatus.gone(Set.of(MACHINE_ID))).thenReturn(Set.of(MACHINE_ID));
-        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(Set.of());
+        stubMachine(DeviceStatus.DELETED, false);
+    }
+
+    private void stubMachine(DeviceStatus status, boolean online) {
+        when(machineOnlineStatus.statuses(Set.of(MACHINE_ID))).thenReturn(Map.of(MACHINE_ID, status));
+        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(online ? Set.of(MACHINE_ID) : Set.of());
+        lenient().doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        lenient().when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING));
     }
 
     private void stubSpec() {

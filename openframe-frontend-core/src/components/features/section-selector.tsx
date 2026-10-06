@@ -102,7 +102,7 @@ const SectionButton: React.FC<{
         isActive && activeButtonClassName,
         layout === 'vertical'
           ? // Strip below lg: a compact, non-shrinking tab. Side list from lg: the full card.
-            '!h-auto !min-h-12 shrink-0 !px-[var(--spacing-system-mf)] !py-[var(--spacing-system-sf)] lg:!min-h-[var(--section-min-height)] lg:shrink lg:!py-[var(--spacing-system-mf)]'
+            '!h-auto !min-h-12 shrink-0 !px-[var(--spacing-system-mf)] !py-[var(--spacing-system-sf)] content-lg:!min-h-[var(--section-min-height)] content-lg:shrink content-lg:!py-[var(--spacing-system-mf)]'
           : '!h-auto !min-h-[76px] !whitespace-normal !text-left',
       )}
       style={{
@@ -125,7 +125,12 @@ const SectionButton: React.FC<{
           {section.number && <span className={cn(numberClasses, 'shrink-0 text-h3')}>{section.number}</span>}
           <div className="min-w-0 flex-1 text-left">
             <div className="flex flex-wrap items-center gap-2">
-              <p className={cn(titleClasses, 'whitespace-nowrap text-h4 lg:whitespace-normal lg:break-words')}>
+              <p
+                className={cn(
+                  titleClasses,
+                  'whitespace-nowrap text-h4 content-lg:whitespace-normal content-lg:break-words',
+                )}
+              >
                 {section.title}
               </p>
               {section.badge && (
@@ -137,7 +142,7 @@ const SectionButton: React.FC<{
               )}
             </div>
             {section.description && showDescription && (
-              <p className={cn(subtitleClasses, 'mt-1 hidden whitespace-normal break-words text-h6 lg:block')}>
+              <p className={cn(subtitleClasses, 'mt-1 hidden whitespace-normal break-words text-h6 content-lg:block')}>
                 {section.description}
               </p>
             )}
@@ -189,8 +194,8 @@ export const SectionSelector: React.FC<SectionSelectorProps> = ({
 }) => {
   const containerClasses = cn(
     layout === 'wrap'
-      ? 'flex flex-wrap gap-2 md:gap-4 lg:gap-6'
-      : 'flex flex-row gap-[var(--spacing-system-xsf)] overflow-x-auto [scrollbar-width:none] lg:flex-col lg:overflow-visible [&::-webkit-scrollbar]:hidden',
+      ? 'flex flex-wrap gap-2 content-md:gap-4 content-lg:gap-6'
+      : 'flex flex-row gap-[var(--spacing-system-xsf)] overflow-x-auto [scrollbar-width:none] content-lg:flex-col content-lg:overflow-visible [&::-webkit-scrollbar]:hidden',
     className,
   );
 
@@ -242,7 +247,7 @@ export const SectionSelector: React.FC<SectionSelectorProps> = ({
       case 'full':
         return 'w-full';
       case 'responsive':
-        return 'w-full md:w-[calc(50%-8px)] lg:w-auto';
+        return 'w-full content-md:w-[calc(50%-8px)] content-lg:w-auto';
       default:
         return '';
     }
