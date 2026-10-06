@@ -7,11 +7,8 @@
  * `result` (a customer result: who, the headline metric large, the story's
  * title and a link to read it; no cover).
  *
- * Headline metric: `default` and `portrait` show the story's FIRST metric (the
- * value large, its label under it) in a fixed zone between the title and the
- * person. A story without one renders with no such zone, unless the host passes
- * `metricRow` to keep every card of a grid, and the skeleton, one box. `sm` and
- * `menu` never show it: neither has room without changing its box.
+ * Only `result` shows a metric (the story's FIRST one). Every other density is
+ * the story's regular card and never changes its box for one.
  *
  * The card writes NO click logic — callers wrap with their own anchor
  * and pass the resolved detail URL via `href`.
@@ -74,16 +71,8 @@ export interface CaseStudyCardProps {
   onNavigate?: () => void;
   /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
   showTypeBadge?: boolean;
-  /** `default` / `portrait`: keep the headline-metric zone even when this story has
-   *  no metric, so a grid that mixes stories with and without one stays aligned
-   *  (pass the same flag to `CaseStudyCardSkeleton`). Default false: a story
-   *  without a metric renders exactly as it always has. */
-  metricRow?: boolean;
   className?: string;
 }
-
-/** The headline-metric zone's box: the card and its skeleton share it. */
-const CASE_STUDY_METRIC_ROW_BOX = 'flex h-[72px] shrink-0 flex-col justify-center overflow-hidden';
 
 /** The `result` card's boxes: the card and its skeleton share them, so they are one height. */
 const CASE_STUDY_RESULT_STACK = 'flex h-full flex-col gap-5 p-6';
@@ -95,19 +84,6 @@ const CASE_STUDY_RESULT_FOOTER_BOX =
 function headlineMetric(study: CaseStudyCardData): CaseStudyMetric | null {
   const metric = study.metrics?.[0];
   return metric?.value && metric.label ? metric : null;
-}
-
-function CaseStudyMetricRow({ metric }: { metric: CaseStudyMetric | null }) {
-  return (
-    <div className={CASE_STUDY_METRIC_ROW_BOX} data-testid="case-study-metric">
-      {metric && (
-        <>
-          <span className="truncate text-ods-accent text-h3">{metric.value}</span>
-          <span className="truncate text-ods-text-secondary text-h6">{metric.label}</span>
-        </>
-      )}
-    </div>
-  );
 }
 
 /** Who tells the story: the portrait with the MSP's mark on it, the name and MSP, the job title. A fixed 60px zone. */
@@ -159,14 +135,7 @@ function CaseStudyPersonRow({ study }: { study: CaseStudyCardData }) {
 
 /** `portrait` shares the default skeleton shape — the portrait anatomy uses the
  *  same zone boxes (media aspect → 72px title → 60px person footer). */
-export function CaseStudyCardSkeleton({
-  size = 'default',
-  metricRow = false,
-}: {
-  size?: 'default' | 'sm' | 'portrait' | 'result';
-  /** Reserve the headline-metric zone (the grid's cards pass `metricRow` too). */
-  metricRow?: boolean;
-}) {
+export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' | 'result' }) {
   if (size === 'result') {
     return (
       <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, CASE_STUDY_RESULT_STACK, 'animate-pulse')}>
@@ -213,12 +182,6 @@ export function CaseStudyCardSkeleton({
         <div className="h-5 w-3/4 rounded bg-ods-border" />
         <div className="h-5 w-1/2 rounded bg-ods-border" />
       </div>
-      {metricRow && (
-        <div className={cn(CASE_STUDY_METRIC_ROW_BOX, 'gap-2')} data-testid="case-study-metric-skeleton">
-          <div className="h-7 w-1/4 rounded bg-ods-border" />
-          <div className="h-4 w-2/3 rounded bg-ods-border" />
-        </div>
-      )}
       <div className="flex h-[60px] items-center gap-3">
         <div className="h-12 w-12 rounded-full bg-ods-border" />
         <div className="flex-1 space-y-2">
@@ -255,7 +218,6 @@ export function CaseStudyCard({
   placeholderUrl: placeholderUrlProp,
   size = 'default',
   showTypeBadge = true,
-  metricRow = false,
   accentClassName = 'text-ods-accent',
   mediaMounted,
   onNavigate,
@@ -274,8 +236,6 @@ export function CaseStudyCard({
     aspect: size === 'sm' ? 'square' : 'wide',
   });
   const coverImage = study.featured_image || placeholderUrl || null;
-  const metric = headlineMetric(study);
-  const showMetricRow = metric !== null || metricRow;
 
   if (size === 'sm') {
     return (
@@ -390,6 +350,7 @@ export function CaseStudyCard({
   if (size === 'result') {
     // A customer result: the person, the headline metric large, then the story's
     // title and the way in. A story with no metric has no result to show.
+    const metric = headlineMetric(study);
     if (!metric) return null;
     return (
       <Link
@@ -432,7 +393,6 @@ export function CaseStudyCard({
           subtitle: study.msp?.name ?? null,
           iconOverlayUrl: study.msp?.icon_url ?? null,
         }}
-        detail={showMetricRow ? <CaseStudyMetricRow metric={metric} /> : undefined}
         className={className}
       />
     );
@@ -464,8 +424,6 @@ export function CaseStudyCard({
         <div className="flex h-[72px] shrink-0 items-center">
           <p className="line-clamp-3 break-words text-ods-text-primary text-h4">{study.title}</p>
         </div>
-
-        {showMetricRow && <CaseStudyMetricRow metric={metric} />}
 
         <CaseStudyPersonRow study={study} />
       </Card>

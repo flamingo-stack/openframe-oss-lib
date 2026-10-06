@@ -1,7 +1,6 @@
 /**
- * `CaseStudyCard` headline metric: the first metric shows on the `default` and
- * `portrait` densities, a story without one renders no metric zone, and
- * `metricRow` reserves the zone on the card and on its skeleton alike.
+ * `CaseStudyCard`: only the `result` density shows a metric; the regular
+ * densities never change their box for one.
  */
 
 import { render, screen } from '@testing-library/react';
@@ -20,52 +19,11 @@ const withMetrics: CaseStudyCardData = {
 
 const zone = () => screen.queryByTestId('case-study-metric');
 
-describe('CaseStudyCard headline metric', () => {
-  it.each(['default', 'portrait'] as const)('shows only the first metric on the %s card', size => {
-    render(<CaseStudyCard study={withMetrics} href="/case-studies/acme" size={size} placeholderUrl={null} />);
-    expect(screen.getByText('50%')).toBeTruthy();
-    expect(screen.getByText('of routine tasks automated')).toBeTruthy();
-    expect(screen.queryByText('3x')).toBeNull();
-    expect(zone()).not.toBeNull();
-  });
-
-  it.each(['default', 'portrait', 'sm', 'menu'] as const)('renders no metric zone without a metric (%s)', size => {
-    render(<CaseStudyCard study={base} href="/case-studies/acme" size={size} placeholderUrl={null} />);
-    expect(zone()).toBeNull();
-  });
-
-  it.each(['sm', 'menu'] as const)('never shows the metric on the %s card', size => {
+describe('CaseStudyCard regular densities', () => {
+  it.each(['default', 'portrait', 'sm', 'menu'] as const)('never shows a metric on the %s card', size => {
     render(<CaseStudyCard study={withMetrics} href="/case-studies/acme" size={size} placeholderUrl={null} />);
     expect(screen.queryByText('50%')).toBeNull();
     expect(zone()).toBeNull();
-  });
-
-  it('ignores a metric missing its value or its label', () => {
-    render(
-      <CaseStudyCard
-        study={{ ...base, metrics: [{ value: '', label: 'of routine tasks automated' }] }}
-        href="/case-studies/acme"
-        placeholderUrl={null}
-      />,
-    );
-    expect(zone()).toBeNull();
-  });
-
-  it('metricRow keeps an empty zone on the card, in the box the skeleton reserves', () => {
-    const { unmount } = render(
-      <CaseStudyCard study={base} href="/case-studies/acme" metricRow placeholderUrl={null} />,
-    );
-    const cardZone = zone();
-    expect(cardZone?.textContent).toBe('');
-    expect(cardZone?.className).toContain('h-[72px]');
-    unmount();
-
-    const view = render(<CaseStudyCardSkeleton />);
-    expect(screen.queryByTestId('case-study-metric-skeleton')).toBeNull();
-    view.unmount();
-
-    render(<CaseStudyCardSkeleton metricRow />);
-    expect(screen.getByTestId('case-study-metric-skeleton').className).toContain('h-[72px]');
   });
 });
 

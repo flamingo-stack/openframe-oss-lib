@@ -70,9 +70,6 @@ export interface EntityPortraitCardProps {
   /** Typography override for the title (entity identity), zone box unchanged. */
   titleClassName?: string;
   person?: EntityPortraitPerson | null;
-  /** An extra fixed-height zone between the title and the footer (a case study's
-   *  headline metric). The entity card owns its box; omitted, the anatomy is unchanged. */
-  detail?: React.ReactNode;
   className?: string;
 }
 
@@ -87,7 +84,6 @@ export function EntityPortraitCard({
   title,
   titleClassName,
   person,
-  detail,
   className,
 }: EntityPortraitCardProps) {
   const { src, onError: onMediaError } = useCoverImageFallback(imageUrl, placeholderUrl);
@@ -156,8 +152,6 @@ export function EntityPortraitCard({
             {title}
           </h3>
         </div>
-
-        {detail}
 
         {/* Person/footer zone — fixed box (kept even when empty so every card
             in a rail shares baselines). */}
