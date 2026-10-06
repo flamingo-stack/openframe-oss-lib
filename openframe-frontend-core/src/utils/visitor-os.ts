@@ -7,8 +7,7 @@
  * Pure and server-safe: the server passes the request's User-Agent, the browser
  * goes through `useVisitorOs` (hooks), which also passes the touch-point count.
  */
-export const VISITOR_OSES = ['mac', 'windows', 'linux', 'ios', 'android'] as const;
-export type VisitorOs = (typeof VISITOR_OSES)[number];
+export type VisitorOs = 'mac' | 'windows' | 'linux' | 'ios' | 'android';
 
 /** The systems the desktop app installs on. */
 export const DESKTOP_OSES = ['mac', 'windows', 'linux'] as const;
@@ -47,13 +46,8 @@ export function detectDesktopOs(userAgent: string | null | undefined, hints?: Vi
   return desktopOsOf(detectVisitorOs(userAgent, hints));
 }
 
-/** A phone or a tablet. */
-export function isHandheldOs(os: VisitorOs | null): boolean {
-  return os === 'ios' || os === 'android';
-}
-
 /** Apple systems use the Command key for shortcuts; every other system uses Control. */
-export function usesCommandKey(os: VisitorOs | null): boolean {
+function usesCommandKey(os: VisitorOs | null): boolean {
   return os === 'mac' || os === 'ios';
 }
 

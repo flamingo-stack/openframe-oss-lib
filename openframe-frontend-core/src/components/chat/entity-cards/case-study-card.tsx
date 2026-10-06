@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * CaseStudyCard (pure presentation). Two densities — `default` (vertical
- * detail) and `sm` (compact horizontal for chat-inline).
+ * CaseStudyCard (pure presentation). Four densities — `default` (vertical
+ * detail), `sm` (compact horizontal for chat-inline), `portrait` (rails and
+ * strips) and `menu` (the site menu's card, hover-plays the highlight cut).
  *
  * The card writes NO click logic — callers wrap with their own anchor
  * and pass the resolved detail URL via `href`.
@@ -110,7 +111,7 @@ export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' |
  * is independent of the bite's own `published` flag, as on every featured surface). Never
  * the full video: that plays on the story's own page. Null when it has neither.
  */
-export function caseStudyHighlight(study: CaseStudyCardData): { url: string; posterUrl: string | null } | null {
+function caseStudyHighlight(study: CaseStudyCardData): { url: string; posterUrl: string | null } | null {
   if (study.highlight_video_url) {
     return { url: study.highlight_video_url, posterUrl: study.highlight_video_thumbnail ?? null };
   }

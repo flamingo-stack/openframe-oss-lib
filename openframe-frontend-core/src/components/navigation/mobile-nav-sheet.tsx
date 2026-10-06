@@ -30,8 +30,8 @@ export interface MobileNavSheetProps {
   cta?: React.ReactNode;
   /** Host nodes shown above the pinned CTA (a sign-up button). */
   actions?: React.ReactNode;
-  /** The field-looking button at the top. `label` is the placeholder shown in
-   *  it (the host's wording); `onOpen` opens the chat. Omitted: no field. */
+  /** The Mingo row at the top (`MingoAiButton variant="field"`): the assistant's
+   *  name and icon; `source` scopes the `ask-ai:open` event. Omitted: no row. */
   askAI?: { source?: string; icon?: React.ReactNode; label: string };
   /** Host-added groups after the site's own (Profile, Admin). */
   extraMenus?: NavMenu[];

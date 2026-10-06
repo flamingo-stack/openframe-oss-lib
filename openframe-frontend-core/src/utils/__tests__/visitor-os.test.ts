@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { desktopOsOf, detectDesktopOs, detectVisitorOs, isHandheldOs, shortcutLabel } from '../visitor-os';
+import { desktopOsOf, detectDesktopOs, detectVisitorOs, shortcutLabel } from '../visitor-os';
 
 const UA = {
   mac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
@@ -33,8 +33,6 @@ describe('visitor system detection', () => {
     expect(detectDesktopOs(UA.iphone)).toBeNull();
     expect(desktopOsOf('android')).toBeNull();
     expect(desktopOsOf(null)).toBeNull();
-    expect(isHandheldOs('ios')).toBe(true);
-    expect(isHandheldOs('linux')).toBe(false);
   });
 
   it('words a shortcut for the system', () => {

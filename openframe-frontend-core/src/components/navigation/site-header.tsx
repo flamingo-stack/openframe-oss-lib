@@ -36,12 +36,12 @@ export interface SiteHeaderProps {
   /** Trailing cells (ticket alerts). Each cell owns its divider. */
   sideActions?: React.ReactNode;
   /**
-   * The Mingo AI launcher, the last trailing cell at the far right edge.
+   * The Mingo AI launcher, first in the right cluster (before Sign in).
    * Omitted: no launcher. `icon` and `label` are the server-configured
    * assistant identity (the same ones the chat panel shows); `source` scopes
    * the `ask-ai:open` event the launcher dispatches.
    */
-  mingo?: { source?: string; icon?: React.ReactNode; label?: string; shortcutHint?: boolean; className?: string };
+  mingo?: { source?: string; icon?: React.ReactNode; label?: string; shortcutHint?: boolean };
   /** Omitted: no burger. */
   mobile?: { isOpen: boolean; onToggle: () => void; controlsId?: string };
   /** Values for `NavLink.badgeKey`. */
@@ -71,8 +71,8 @@ const menuIcon = (menu: NavMenu) =>
 
 /**
  * The site header of every platform, drawn from one `SiteNav`: logo, the
- * menus left-aligned after it, then Sign in, the host's actions, the primary
- * CTA (the only button) and the trailing cells, the Mingo AI launcher last. A
+ * menus left-aligned after it, then the Mingo AI launcher, Sign in, the host's
+ * actions, the primary CTA (the only button) and the trailing cells. A
  * platform differs only in the data and the slots it passes.
  *
  * Below `lg` the menus and Sign in leave the bar (they live in
@@ -297,7 +297,6 @@ export function SiteHeader({
                   icon={mingo.icon}
                   label={mingo.label}
                   shortcutHint={mingo.shortcutHint}
-                  className={mingo.className}
                 />
               )}
               {nav.signIn && (

@@ -94,7 +94,7 @@ export type CaseStudyCardData = Pick<CaseStudy, 'id' | 'title' | 'summary' | 'fe
       'main_video_url' | 'main_video_thumbnail' | 'highlight_video_url' | 'highlight_video_thumbnail' | 'video_bites'
     >
   > & {
-    user?: Pick<UserProfile, 'full_name' | 'avatar_url' | 'job_title'>;
+    user?: Pick<UserProfile, 'full_name' | 'job_title'> & Partial<Pick<UserProfile, 'avatar_url'>>;
     msp?: Pick<MSP, 'name' | 'icon_url'>;
   };
 
