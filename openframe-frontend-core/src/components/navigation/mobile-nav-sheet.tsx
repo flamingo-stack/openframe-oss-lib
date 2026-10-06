@@ -142,7 +142,6 @@ function MobileNavSheetBody({
             icon={askAI.icon}
             label={askAI.label}
             onClick={onClose}
-            className="mb-[var(--spacing-system-xsf)] mt-[var(--spacing-system-mf)]"
           />
         )}
 

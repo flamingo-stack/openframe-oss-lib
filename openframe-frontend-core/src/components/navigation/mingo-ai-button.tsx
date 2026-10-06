@@ -77,33 +77,39 @@ export function MingoAiButton({
         onClick?.(e);
       }}
       className={cn(
-        // Transparent at rest so it inherits the bar's background; the hover
-        // wash is the menu items' own.
-        'group/mingo relative flex shrink-0 items-center gap-[var(--spacing-system-xsf)] rounded-md text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        'group/mingo relative flex shrink-0 items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         field
-          ? 'h-[52px] w-full bg-ods-card px-[var(--spacing-system-sf)] text-left'
-          : 'h-10 pl-[var(--spacing-system-xsf)] pr-2.5',
+          ? // A row of the mobile menu like the groups under it: same height,
+            // type and divider, no surface and no ring of its own.
+            'min-h-14 w-full gap-[var(--spacing-system-sf)] border-b border-ods-border text-left text-ods-text-primary text-h4'
+          : // Transparent at rest so it inherits the bar's background; the hover
+            // wash is the menu items' own.
+            'h-10 gap-[var(--spacing-system-xsf)] rounded-md pl-[var(--spacing-system-xsf)] pr-2.5 text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary',
         className,
       )}
     >
-      {/* AI edge light (Apple-Intelligence-style): a rotating accent-gradient
+      {!field && (
+        <>
+          {/* AI edge light (Apple-Intelligence-style): a rotating accent-gradient
           arc clipped to a hairline ring on the outline via CSS mask
           (.mingo-edge-frame). NO opaque cover, so the launcher inherits
           whatever background sits behind it. Platform-tinted via the accent
           token. */}
-      <span aria-hidden="true" className="mingo-edge-frame pointer-events-none absolute inset-0 rounded-md">
-        <span className="mingo-edge" />
-      </span>
-      {/* One-shot light-streak shimmer on hover, clipped to the outline. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
-        <span
-          className="mingo-shimmer absolute inset-y-0 left-0 w-1/2"
-          style={{
-            background:
-              'linear-gradient(105deg, transparent, color-mix(in srgb, var(--ods-system-greys-white) 12%, transparent), transparent)',
-          }}
-        />
-      </span>
+          <span aria-hidden="true" className="mingo-edge-frame pointer-events-none absolute inset-0 rounded-md">
+            <span className="mingo-edge" />
+          </span>
+          {/* One-shot light-streak shimmer on hover, clipped to the outline. */}
+          <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
+            <span
+              className="mingo-shimmer absolute inset-y-0 left-0 w-1/2"
+              style={{
+                background:
+                  'linear-gradient(105deg, transparent, color-mix(in srgb, var(--ods-system-greys-white) 12%, transparent), transparent)',
+              }}
+            />
+          </span>
+        </>
+      )}
       {icon ? (
         <span
           className={cn(
@@ -124,10 +130,7 @@ export function MingoAiButton({
       {/* In the header the name collapses below lg, with the menus: on a phone
           the launcher is its glyph alone (the name stays the accessible name). */}
       <span
-        className={cn(
-          'relative whitespace-nowrap',
-          field ? 'min-w-0 flex-1 truncate text-ods-text-muted text-h4' : 'hidden text-h6 lg:inline',
-        )}
+        className={cn('relative whitespace-nowrap', field ? 'min-w-0 flex-1 truncate' : 'hidden text-h6 lg:inline')}
       >
         {label}
       </span>
