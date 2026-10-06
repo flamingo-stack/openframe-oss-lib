@@ -23,6 +23,8 @@ export interface SnapCarouselProps<T> {
   slideClassName?: string;
   prevLabel?: string;
   nextLabel?: string;
+  /** A slide to bring into view whenever this value changes (a link that names it). Only the track moves, never the page. */
+  focusIndex?: number;
   className?: string;
 }
 
@@ -69,6 +71,7 @@ export function SnapCarousel<T>({
   slideClassName = 'basis-[300px]',
   prevLabel = 'Previous',
   nextLabel = 'Next',
+  focusIndex,
   className,
 }: SnapCarouselProps<T>) {
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -94,6 +97,10 @@ export function SnapCarousel<T>({
     },
     [count, slideStep],
   );
+
+  useEffect(() => {
+    if (focusIndex !== undefined && focusIndex >= 0) goTo(focusIndex);
+  }, [focusIndex, goTo]);
 
   const onScroll = useCallback(() => {
     const track = trackRef.current;

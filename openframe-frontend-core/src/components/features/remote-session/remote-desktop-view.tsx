@@ -27,7 +27,8 @@ export interface RemoteDesktopViewProps {
   deviceName: string;
   /** The device's customer, on the second line of the header; "Unknown Customer" when absent. */
   organizationName?: string | null;
-  onBack: () => void;
+  /** The "Back" control over the header; left out, the page has none (a picture of the page has nowhere to go back to). */
+  onBack?: () => void;
   /**
    * The compact chrome over a window-filling screen. The host owns the browser's
    * fullscreen state and passes it here.
@@ -143,7 +144,11 @@ export function RemoteDesktopView({
   );
 
   return (
-    <PageLayout className={PAGE_CLASS} backButton={{ label: 'Back', onClick: onBack }} showHeader={!fullscreen}>
+    <PageLayout
+      className={PAGE_CLASS}
+      backButton={onBack ? { label: 'Back', onClick: onBack } : undefined}
+      showHeader={!fullscreen}
+    >
       <div className={fullscreen ? 'fixed inset-0 z-50 flex flex-col bg-black' : 'contents'}>
         {fullscreen ? (
           <RemoteDesktopFullscreenToolbar
@@ -179,7 +184,7 @@ export function RemoteDesktopView({
 /** The page while the device is still loading: the header bar as placeholders over an empty screen. */
 export function RemoteDesktopViewSkeleton({ onBack }: Pick<RemoteDesktopViewProps, 'onBack'>) {
   return (
-    <PageLayout className={PAGE_CLASS} backButton={{ label: 'Back', onClick: onBack }}>
+    <PageLayout className={PAGE_CLASS} backButton={onBack ? { label: 'Back', onClick: onBack } : undefined}>
       <div className={CONTROLS_BAR_CLASS}>
         <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
           <Skeleton className="h-9 w-9 flex-shrink-0 rounded-md" />

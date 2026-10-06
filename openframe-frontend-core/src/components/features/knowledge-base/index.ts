@@ -11,3 +11,9 @@ export type {
   KnowledgeBaseTableBodyProps,
   KnowledgeBaseTableMode,
 } from './knowledge-base-table';
+export { KnowledgeBaseArticleView } from './knowledge-base-article-view';
+export type {
+  KnowledgeBaseArticleAuthor,
+  KnowledgeBaseArticleStatus,
+  KnowledgeBaseArticleViewProps,
+} from './knowledge-base-article-view';

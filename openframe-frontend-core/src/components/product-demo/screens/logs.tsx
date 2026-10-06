@@ -18,6 +18,7 @@ import {
   LOGS_FIXTURE_DEVICE,
   LOGS_FIXTURE_ENTRIES,
   LOGS_FIXTURE_FACETS,
+  LOGS_FIXTURE_SEARCH,
   LOGS_FIXTURE_SELECTED,
   LOGS_FIXTURE_SELECTED_DETAILS,
 } from '../fixtures/logs';
@@ -25,8 +26,14 @@ import type { ProductScreenViewProps } from '../types';
 
 const noop = () => {};
 const NO_FILTERS: Record<string, string[]> = {};
-/** The narrow rendering keeps what a row is about and drops its action buttons. */
-const COMPACT_HIDDEN: LogsTableColumnId[] = ['copy', 'quickView', 'open'];
+/** A row's action buttons carry nothing in a picture and squeeze what the row is about: both renderings drop them. */
+const ACTION_COLUMNS: LogsTableColumnId[] = ['copy', 'quickView', 'open'];
+/**
+ * Beside the open drawer the table keeps when, how bad and what happened: the
+ * tool and the device are in the drawer, and their fixed widths would leave
+ * the message no room.
+ */
+const BESIDE_DRAWER_HIDDEN: LogsTableColumnId[] = [...ACTION_COLUMNS, 'tool', 'source'];
 const logHref = () => '#';
 const copyAction = () => <LogCopyIconButton />;
 
@@ -38,8 +45,16 @@ export default function LogsScreen({ compact = false }: ProductScreenViewProps) 
 
   return (
     <div className="flex h-full bg-ods-bg">
-      <div className="min-w-0 flex-1 overflow-hidden px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]">
-        <LogsPageView onRefresh={noop} search="" onSearchChange={noop} onOpenFilters={noop}>
+      {/* Clipped, not a scroll container: the page's sticky toolbar and table header measure from the frame, as they do from the product's page. */}
+      <div className="min-w-0 flex-1 overflow-clip">
+        {/* No title row: the job is named above the picture. The search shows the query the rows answer. */}
+        <LogsPageView
+          showHeader={false}
+          className="p-[var(--spacing-system-l)]"
+          search={LOGS_FIXTURE_SEARCH}
+          onSearchChange={noop}
+          onOpenFilters={noop}
+        >
           <LogsTableView
             logs={LOGS_FIXTURE_ENTRIES}
             facets={LOGS_FIXTURE_FACETS}
@@ -48,7 +63,7 @@ export default function LogsScreen({ compact = false }: ProductScreenViewProps) 
             getLogHref={logHref}
             renderCopyAction={copyAction}
             onQuickView={noop}
-            hiddenColumns={compact ? COMPACT_HIDDEN : undefined}
+            hiddenColumns={compact ? ACTION_COLUMNS : BESIDE_DRAWER_HIDDEN}
           />
         </LogsPageView>
       </div>

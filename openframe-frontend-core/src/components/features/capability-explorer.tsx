@@ -12,7 +12,11 @@ import { TruncateText } from '../ui/truncate-text';
 
 /** One job the product does, as the explorer shows it. Every field is the host's data. */
 export interface CapabilityExplorerItem {
-  /** The job's anchor: the tab's element id, so a link to `#id` lands on it. */
+  /**
+   * The job's key: what `activeId` names. The host owns the element a link to
+   * `#id` lands on (an anchor at the section's heading), so no element here
+   * carries it: a tab is `capabilityTabId(id)`.
+   */
   id: string;
   title: string;
   /** An icons-v2 name. */
@@ -24,10 +28,28 @@ export interface CapabilityExplorerItem {
   caption?: string;
   /** A mark beside the title in the list (a generation badge). */
   badge?: ReactNode;
-  /** A request in plain words and what happened. */
-  example?: { request: string; outcome: string } | null;
+  /**
+   * A request in plain words and what happened. `requester` and `responder`
+   * are who the two turns belong to in THIS example (a name, a note beside it,
+   * the host's own avatar); what is left out falls back to the explorer's
+   * labels and marks.
+   */
+  example?: {
+    request: string;
+    outcome: string;
+    requester?: CapabilityExampleParty;
+    responder?: CapabilityExampleParty;
+  } | null;
   /** The line pinned under the screen (what it is built on, what it replaces). */
   footer?: ReactNode;
+}
+
+/** One side of an example: who it is, as the host draws its people and agents everywhere else. */
+export interface CapabilityExampleParty {
+  name?: string;
+  note?: string;
+  /** The host's avatar component for this person or agent, sized for the turn (24px). */
+  mark?: ReactNode;
 }
 
 export interface CapabilityExplorerLabels {
@@ -53,7 +75,7 @@ export interface CapabilityExplorerProps {
   onActiveChange: (id: string) => void;
   /** The job's product screen; `compact` is the card rendering. Null: the job has none. */
   renderScreen: (item: CapabilityExplorerItem, options: { compact: boolean }) => ReactNode;
-  /** The marks beside the two turns of the example. */
+  /** The marks beside the two turns of an example that names nobody of its own. */
   requesterMark?: ReactNode;
   responderMark?: ReactNode;
   className?: string;
@@ -72,13 +94,16 @@ const CARD_HEIGHT_CLASS = 'h-[700px]';
 /** Both, for the box shown before the layout is known (literal, so the class is generated). */
 const SKELETON_HEIGHT_CLASS = 'h-[700px] content-lg:h-[824px]';
 
+/** The element id of a job's tab (never the job's own id: that is the host's anchor). */
+export const capabilityTabId = (id: string): string => `${id}-tab`;
+
 function Highlights({ items, className }: { items: readonly string[]; className?: string }) {
   if (items.length === 0) return null;
   return (
     <ul className={cn('flex flex-col gap-2', className)}>
       {items.slice(0, 3).map(text => (
         <li key={text} className="flex min-w-0 items-center gap-2.5">
-          <CheckIcon size={16} className="shrink-0 text-ods-success" />
+          <CheckIcon size={16} className="shrink-0 text-ods-flamingo-cyan" />
           <TruncateText variant="h6" triggerClassName="flex-1">
             {text}
           </TruncateText>
@@ -107,10 +132,11 @@ function Example({
       {note && <span className="truncate text-ods-text-secondary">{note}</span>}
     </p>
   );
+  // The mark is the host's own avatar: its shape says who it is (a person who uses a computer, one who runs it, an agent), so it is never clipped here.
   const mark = (node: ReactNode) =>
-    node ? (
-      <span className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full">{node}</span>
-    ) : null;
+    node ? <span className="flex size-6 shrink-0 items-center justify-center">{node}</span> : null;
+  const requester = example.requester;
+  const responder = example.responder;
   return (
     <div
       className={cn(
@@ -119,20 +145,20 @@ function Example({
       )}
     >
       <div className="flex min-w-0 gap-2.5">
-        {mark(requesterMark)}
+        {mark(requester?.mark ?? requesterMark)}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          {who(labels.requester, labels.requesterNote)}
+          {who(requester?.name ?? labels.requester, requester?.note ?? labels.requesterNote)}
           <TruncateText lines={2} variant="h4" className="min-h-[2lh]">
             {`\u201c${example.request}\u201d`}
           </TruncateText>
         </div>
       </div>
       <div className="flex min-w-0 gap-2.5 border-t border-ods-border pt-3">
-        {mark(responderMark)}
+        {mark(responder?.mark ?? responderMark)}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          {who(labels.responder, labels.responderNote)}
+          {who(responder?.name ?? labels.responder, responder?.note ?? labels.responderNote)}
           <div className="flex min-w-0 items-start gap-2">
-            <CheckIcon size={16} className="mt-0.5 shrink-0 text-ods-success" />
+            <CheckIcon size={16} className="mt-0.5 shrink-0 text-ods-flamingo-cyan" />
             <TruncateText lines={2} variant="h6" tone="secondary" className="min-h-[2lh]" triggerClassName="flex-1">
               {example.outcome}
             </TruncateText>
@@ -156,9 +182,11 @@ export function CapabilityExplorerSkeleton({ className }: { className?: string }
  * on top, its screen full width below, the footer pinned. Below it: a swipe
  * carousel of equal-height cards, each with the compact screen.
  *
- * Each tab (or card) carries the job's `id` as its element id, so a link to
- * the job's anchor lands on it; the host owns which job is active (it reads
- * the URL hash) through `activeId` and `onActiveChange`.
+ * The host owns which job is shown (it reads the URL hash) through `activeId`
+ * and `onActiveChange`, and the element a link to a job lands on: nothing here
+ * carries a job's id, so an anchor scroll never aims inside the list. In the
+ * carousel `activeId` brings that job's card into view (the track moves, the
+ * page does not).
  */
 export function CapabilityExplorer({
   items,
@@ -187,18 +215,18 @@ export function CapabilityExplorer({
         prevLabel={labels.previous}
         nextLabel={labels.next}
         getKey={item => item.id}
+        focusIndex={items.findIndex(item => item.id === activeId)}
         slideClassName="min-w-0 basis-[86%]"
         renderItem={item => (
           <article
-            id={item.id}
             className={cn(
-              'flex w-full min-w-0 scroll-mt-36 flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-xl border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
+              'flex w-full min-w-0 flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-xl border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
               CARD_HEIGHT_CLASS,
             )}
           >
             <div className="flex min-w-0 items-center gap-3">
               {item.iconName && (
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg text-ods-text-primary">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg text-ods-flamingo-cyan">
                   <EntityIcon icon={{ name: item.iconName }} size={18} />
                 </span>
               )}
@@ -284,7 +312,7 @@ export function CapabilityExplorer({
           return (
             <button
               key={item.id}
-              id={item.id}
+              id={capabilityTabId(item.id)}
               type="button"
               role="tab"
               aria-selected={selected}
@@ -300,7 +328,7 @@ export function CapabilityExplorer({
                 <span
                   className={cn(
                     'flex size-9 shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg',
-                    selected ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                    selected ? 'text-ods-flamingo-cyan' : 'text-ods-text-secondary',
                   )}
                 >
                   <EntityIcon icon={{ name: item.iconName }} size={18} />
@@ -324,7 +352,7 @@ export function CapabilityExplorer({
               </span>
               <Chevron02RightIcon
                 size={16}
-                className={cn('shrink-0', selected ? 'text-ods-text-primary' : 'invisible')}
+                className={cn('shrink-0', selected ? 'text-ods-flamingo-cyan' : 'invisible')}
                 aria-hidden
               />
             </button>
@@ -335,7 +363,7 @@ export function CapabilityExplorer({
       <div
         id={panelId}
         role="tabpanel"
-        aria-labelledby={active.id}
+        aria-labelledby={capabilityTabId(active.id)}
         className="flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7"
       >
         <div

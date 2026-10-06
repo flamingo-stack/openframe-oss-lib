@@ -4,9 +4,9 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import { MingoAiButton, openAskAi } from '../navigation/mingo-ai-button';
-import { QuickActionChipButton, type QuickActionIconSpec } from './quick-action-chip';
+import { QuickActionChipButton, QuickActionChipSkeleton, type QuickActionIconSpec } from './quick-action-chip';
 
-/** One question a page offers: the chip shows `label`, the chat is sent `prompt`. */
+/** One question a page offers: the chip shows `label` as written, the chat is sent `prompt`. */
 export interface AskPrompt {
   id: string;
   label: string;
@@ -17,9 +17,18 @@ export interface AskPrompt {
 
 export interface AskPromptsProps {
   prompts: readonly AskPrompt[];
+  /**
+   * How many chips the block shows and reserves room for: the same number in
+   * the same slots on every load. Default: the prompts given.
+   */
+  count?: number;
+  /** The questions are still being read: `count` chip skeletons in the chips' own slots. */
+  loading?: boolean;
+  /** `end`: the rows sit at the far end (a block beside a heading). Default `start`. */
+  align?: 'start' | 'end';
   /** The chat source the page's chat panel runs on (the `ask-ai:open` filter). */
   source?: string;
-  /** The assistant's configured name, shown before the chips ("Ask Mingo"). */
+  /** The assistant's configured name: the launcher before the chips ("Ask Mingo"). */
   label: string;
   /** The assistant's configured glyph. Absent: the packaged Mingo mark. */
   icon?: ReactNode;
@@ -36,58 +45,118 @@ function AssistantGlyph({ icon, className }: { icon?: ReactNode; className: stri
   );
 }
 
+/** A skeleton chip's label width (in `ch`), by slot: a believable spread that is the same on every load. */
+const SKELETON_LABEL_CH = [26, 22, 30, 24, 20, 28] as const;
+/** One chip's slot: the chip's own height, so an empty slot holds the same room. */
+const CHIP_SLOT_CLASS = 'flex h-9 min-w-0 max-w-full';
+
 /**
- * A row of questions that open the site chat and ask it: the assistant's mark
- * and name, then one quick-action chip per prompt. A click opens the chat and
- * sends that prompt once (`openAskAi` with a prompt). With no prompt it renders
- * nothing.
+ * The questions themselves, in `count` fixed slots: a sentence-case chip each
+ * (a click opens the chat and sends that question once), a chip skeleton each
+ * while loading, and an empty slot where fewer questions exist than slots.
  */
-export function AskPrompts({ prompts, source, label, icon, onAsk, className }: AskPromptsProps) {
-  if (prompts.length === 0) return null;
+function QuestionChips({
+  prompts,
+  count,
+  loading,
+  source,
+  onAsk,
+  slotClassName,
+}: Pick<AskPromptsProps, 'prompts' | 'loading' | 'source' | 'onAsk'> & { count: number; slotClassName?: string }) {
   return (
-    <div className={cn('flex flex-wrap items-center gap-2', className)}>
-      <span className="flex items-center gap-2 pr-1 text-ods-text-secondary text-h6">
-        <AssistantGlyph icon={icon} className="size-5" />
-        {label}
-      </span>
-      {prompts.map(prompt => (
-        <QuickActionChipButton
-          key={prompt.id}
-          label={prompt.label}
-          icon={prompt.icon}
-          onSelect={() => {
-            openAskAi(source, { prompt: prompt.prompt ?? prompt.label });
-            onAsk?.(prompt);
-          }}
-        />
-      ))}
+    <>
+      {Array.from({ length: count }, (_, slot) => {
+        const prompt = loading ? undefined : prompts[slot];
+        return (
+          <span key={prompt?.id ?? `slot-${slot}`} className={cn(CHIP_SLOT_CLASS, slotClassName)}>
+            {loading ? (
+              <QuickActionChipSkeleton
+                variant="question"
+                labelCh={SKELETON_LABEL_CH[slot % SKELETON_LABEL_CH.length]}
+              />
+            ) : prompt ? (
+              <QuickActionChipButton
+                variant="question"
+                label={prompt.label}
+                icon={prompt.icon}
+                onSelect={() => {
+                  openAskAi(source, { prompt: prompt.prompt ?? prompt.label });
+                  onAsk?.(prompt);
+                }}
+              />
+            ) : null}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * A row of questions that open the site chat and ask it: THE assistant
+ * launcher (`MingoAiButton`, its in-page variant: the mark and the name), then
+ * `count` question chips, ONE PER ROW in fixed slots, so the block's height is
+ * known before the questions are (a chip is one line: a longer question clips
+ * and its tooltip shows it whole). A click on a chip opens the
+ * chat and sends that question once (`openAskAi` with a prompt); the launcher
+ * only opens it. While `loading` the slots hold chip skeletons and the launcher
+ * keeps its place. Loaded with no prompt it renders nothing.
+ */
+export function AskPrompts({
+  prompts,
+  count = prompts.length,
+  loading = false,
+  align = 'start',
+  source,
+  label,
+  icon,
+  onAsk,
+  className,
+}: AskPromptsProps) {
+  if (!loading && prompts.length === 0) return null;
+  const end = align === 'end';
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-2', end ? 'items-end' : 'items-start', className)}>
+      <MingoAiButton variant="button" source={source} label={label} icon={icon} />
+      <QuestionChips
+        prompts={prompts}
+        count={count}
+        loading={loading}
+        source={source}
+        onAsk={onAsk}
+        slotClassName={end ? 'justify-end' : undefined}
+      />
     </div>
   );
 }
 
-export interface AskCardProps extends Omit<AskPromptsProps, 'label' | 'className'> {
+export interface AskCardProps extends Omit<AskPromptsProps, 'label' | 'className' | 'align'> {
   title: string;
   description?: string;
   /** The assistant's configured name: the launcher's label. */
   label: string;
-  /** Show the Cmd+K / Ctrl+K key cap on the launcher. Default false: a page binds it once, in its header. */
+  /** Show the Cmd+K / Ctrl+K key cap on the launcher (and bind it). Default true: the card's launcher reads like the header's. */
   shortcutHint?: boolean;
   className?: string;
 }
 
 /**
  * The "still deciding?" card beside a list of questions: the assistant's mark,
- * a title, a line of description, the page's prompts and the chat launcher.
+ * a title, a line of description, `count` questions (one per row, in fixed
+ * slots, chip skeletons while `loading`) and the chat launcher. The card is the
+ * same height before and after the questions arrive.
  */
 export function AskCard({
   title,
   description,
   prompts,
+  count = prompts.length,
+  loading = false,
   source,
   label,
   icon,
   onAsk,
-  shortcutHint = false,
+  shortcutHint = true,
   className,
 }: AskCardProps) {
   return (
@@ -104,22 +173,19 @@ export function AskCard({
           {description && <p className="text-ods-text-secondary text-h6">{description}</p>}
         </div>
       </div>
-      {prompts.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {prompts.map(prompt => (
-            <QuickActionChipButton
-              key={prompt.id}
-              label={prompt.label}
-              icon={prompt.icon}
-              onSelect={() => {
-                openAskAi(source, { prompt: prompt.prompt ?? prompt.label });
-                onAsk?.(prompt);
-              }}
-            />
-          ))}
+      {(loading || prompts.length > 0) && (
+        <div className="flex min-w-0 flex-col items-start gap-2">
+          <QuestionChips prompts={prompts} count={count} loading={loading} source={source} onAsk={onAsk} />
         </div>
       )}
-      <MingoAiButton source={source} label={label} icon={icon} shortcutHint={shortcutHint} className="self-start" />
+      <MingoAiButton
+        variant="button"
+        source={source}
+        label={label}
+        icon={icon}
+        shortcutHint={shortcutHint}
+        className="self-start"
+      />
     </div>
   );
 }

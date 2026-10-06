@@ -34,67 +34,38 @@ const sam = { name: DEMO_DEVICES.samT14.hostname, organization: DEMO_ORGANIZATIO
 /** A system event has no device: the API sends the literal the table maps to "System". */
 const system = (organization: string) => ({ name: 'null', organization });
 
-const SIGN_IN_AT = demoMinutesAgo(52);
+/** What the Logs page is searched for in the picture: the rows below are what answers it. */
+export const LOGS_FIXTURE_SEARCH = 'sign-in';
 
-/** A night of logs: one sign-in worth a look, among routine patching and policy work. */
+const device = (key: keyof typeof DEMO_DEVICES) => ({
+  name: DEMO_DEVICES[key].hostname,
+  organization: DEMO_ORGANIZATIONS[DEMO_DEVICES[key].organization].name,
+});
+
+/** A day of sign-ins across the three customers: one worth a look, a burst of failures, the rest routine. */
 export const LOGS_FIXTURE_ENTRIES: UiLogEntry[] = [
   entry('evt-8f3a61c2', 52, 'ERROR', 'FLEET_MDM', sam, 'Sign-in from new country'),
   entry(
     'evt-8f3a5d07',
     96,
     'WARNING',
-    'FLEET_MDM',
-    { name: DEMO_DEVICES.buildServer.hostname, organization: DEMO_ORGANIZATIONS.acme.name },
-    'Disk space below 10% on the system volume',
-  ),
-  entry(
-    'evt-8f3a4b90',
-    171,
-    'INFO',
     'OPENFRAME_RMM',
-    system(DEMO_ORGANIZATIONS.acme.name),
-    'Google Chrome updated on 38 computers',
+    system(DEMO_ORGANIZATIONS.northbridge.name),
+    '27 failed sign-ins for one account in 10 minutes',
   ),
+  entry('evt-8f3a4b90', 171, 'INFO', 'FLEET_MDM', device('mayaAir'), 'Sign-in from a new device, approved with MFA'),
   entry(
     'evt-8f3a3e15',
     233,
     'INFO',
-    'FLEET_MDM',
-    system(DEMO_ORGANIZATIONS.harbor.name),
-    'Firewall turned back on for 4 laptops',
-  ),
-  entry(
-    'evt-8f3a2c44',
-    318,
-    'INFO',
-    'MESHCENTRAL',
-    { name: DEMO_DEVICES.frontDesk.hostname, organization: DEMO_ORGANIZATIONS.harbor.name },
-    'Remote session ended',
-  ),
-  entry(
-    'evt-8f3a1a02',
-    402,
-    'INFO',
     'OPENFRAME_RMM',
-    { name: DEMO_DEVICES.mayaAir.hostname, organization: DEMO_ORGANIZATIONS.northbridge.name },
-    'Script "Clear temp files" finished',
+    system(DEMO_ORGANIZATIONS.acme.name),
+    'Sign-in blocked: the source address is on the block list',
   ),
-  entry(
-    'evt-8f3a0b7e',
-    487,
-    'INFO',
-    'FLEET_MDM',
-    { name: DEMO_DEVICES.leoThinkPad.hostname, organization: DEMO_ORGANIZATIONS.harbor.name },
-    'Policy "Disk encryption enabled" passed',
-  ),
-  entry(
-    'evt-8f39f951',
-    561,
-    'INFO',
-    'FLEET_MDM',
-    { name: DEMO_DEVICES.reception.hostname, organization: DEMO_ORGANIZATIONS.acme.name },
-    'Device checked in',
-  ),
+  entry('evt-8f3a2c44', 318, 'INFO', 'FLEET_MDM', device('frontDesk'), 'Sign-in after a password reset'),
+  entry('evt-8f3a1a02', 402, 'INFO', 'MESHCENTRAL', device('buildServer'), 'Technician sign-in to a remote session'),
+  entry('evt-8f3a0b7e', 487, 'INFO', 'FLEET_MDM', device('leoThinkPad'), 'Sign-in from the office network'),
+  entry('evt-8f39f951', 561, 'INFO', 'FLEET_MDM', device('reception'), 'Sign-in from the office network'),
 ];
 
 /** The filters the column headers offer. */
@@ -111,12 +82,8 @@ export const LOGS_FIXTURE_FACETS: NonNullable<LogsTableViewProps['facets']> = {
 /** The entry open in the Log Details drawer. */
 export const LOGS_FIXTURE_SELECTED: UiLogEntry = LOGS_FIXTURE_ENTRIES[0];
 
-/** The drawer's text for the selected entry: the full log, as the product prints it. */
+/** The drawer's text for the selected entry, as the product prints a log: what happened and to whom (its id, source and device are the fields under it). */
 export const LOGS_FIXTURE_SELECTED_DETAILS: Extract<LogDrawerProps['description'], string> = [
-  `Log ID: ${LOGS_FIXTURE_SELECTED.logId}`,
-  'Status: ERROR',
-  `Timestamp: ${SIGN_IN_AT}`,
-  'Tool Type: FLEET_MDM',
   'Event Type: sign-in',
   'Message: Sign-in from new country',
   `Details: ${DEMO_PEOPLE.sam.name} signed in on ${DEMO_DEVICES.samT14.hostname} from a country not seen for this account before.`,

@@ -156,8 +156,10 @@ export interface QuickActionChipButtonProps {
   /** {@link QuickActionChipLozenge} at the label's leading edge (e.g. an
    *  IT/SEC classification affix). `true` renders the `theme`'s lozenge. */
   lozenge?: QuickActionChipLozenge | boolean;
-  /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
-  variant?: 'primary' | 'outline';
+  /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default),
+   *  `'question'` = a bordered chip whose label is a SENTENCE in the case it was
+   *  written in (a question to ask the assistant), not an uppercase task label. */
+  variant?: 'primary' | 'outline' | 'question';
   /** Active single-select state (Figma "Feature Item" active): renders the
    *  Tag's `selected` variant (pink border + pink-secondary fill), overriding
    *  `variant`. Used by chip groups acting as tabs (OpenFrame categories). */
@@ -194,6 +196,8 @@ export interface QuickActionChipSkeletonProps {
   lozenge?: boolean;
   /** Chip scale — MUST match the loaded chips' `size` or the swap jumps. */
   size?: 'default' | 'large';
+  /** `'question'`: the placeholder of a `variant="question"` chip (its height and padding). */
+  variant?: 'outline' | 'question';
   className?: string;
 }
 
@@ -217,14 +221,18 @@ export function QuickActionChipSkeleton({
   icon = true,
   lozenge = false,
   size = 'default',
+  variant = 'outline',
   className,
 }: QuickActionChipSkeletonProps) {
+  const question = variant === 'question';
   return (
     <Tag
       variant="outline"
-      size={size}
-      className={className}
-      icon={icon ? <ChipSkelBar className={size === 'large' ? 'block size-5' : 'block size-4'} /> : undefined}
+      size={question ? 'sentence' : size}
+      className={cn(question && 'max-w-full', className)}
+      icon={
+        icon && !question ? <ChipSkelBar className={size === 'large' ? 'block size-5' : 'block size-4'} /> : undefined
+      }
       label={
         <>
           {lozenge && <ChipSkelBar className="mr-2 inline-block h-[16px] w-[26px] translate-y-[2px]" />}
@@ -268,9 +276,17 @@ export function QuickActionChipButton({
   const resolvedLozenge = lozenge === true ? theme?.lozenge : lozenge === false ? undefined : lozenge;
   const resolvedIcon = renderQuickActionIcon(themedIcon);
   const resolvedLabel = composeChipLabel(label, resolvedLozenge);
-  const tagVariant = selected ? (selectedAccent === 'cyan' ? 'selectedCyan' : 'selected') : variant;
+  const question = variant === 'question';
+  const tagVariant = selected
+    ? selectedAccent === 'cyan'
+      ? 'selectedCyan'
+      : 'selected'
+    : question
+      ? 'outline'
+      : variant;
+  const tagSize = question ? 'sentence' : size;
   if (!interactive) {
-    return <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} className={className} />;
+    return <Tag variant={tagVariant} size={tagSize} icon={resolvedIcon} label={resolvedLabel} className={className} />;
   }
   return (
     <button
@@ -282,11 +298,19 @@ export function QuickActionChipButton({
       onBlur={onHoverEnd}
       aria-pressed={selected || undefined}
       className={cn(
-        'shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        'rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        // A question may be longer than a narrow column: it shrinks and clips there.
+        question ? 'min-w-0 max-w-full' : 'shrink-0',
         className,
       )}
     >
-      <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} />
+      <Tag
+        variant={tagVariant}
+        size={tagSize}
+        icon={resolvedIcon}
+        label={resolvedLabel}
+        className={question ? 'max-w-full' : undefined}
+      />
     </button>
   );
 }

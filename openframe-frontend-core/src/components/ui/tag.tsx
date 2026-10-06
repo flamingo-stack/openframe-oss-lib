@@ -15,6 +15,11 @@ const tagVariants = cva(['inline-flex items-center justify-center rounded-md', '
     size: {
       default: 'h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
       large: 'h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] font-bold text-h3',
+      // A sentence, not a label: body type in the case it was written in (a
+      // question a visitor can ask), on the same chip surface. One line, always:
+      // a longer sentence clips and shows whole in the label's tooltip.
+      sentence:
+        'h-9 gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h6',
     },
     variant: {
       primary: ['bg-ods-accent text-ods-text-on-accent', 'hover:bg-ods-accent-hover active:bg-ods-accent-active'],

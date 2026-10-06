@@ -34,7 +34,13 @@ export interface SoftwareDeviceScope {
 
 export interface SoftwareActionFormProps<TRef extends string = string> {
   action: SoftwareActionKind;
-  onBack: () => void;
+  /** "Back" over the title and the phone's "Cancel"; left out, the form shows neither (a picture of the form). */
+  onBack?: () => void;
+  /**
+   * Render the page header (the title, "Back" and the primary button). Default
+   * true; a host that shows the form under a heading of its own passes false.
+   */
+  showHeader?: boolean;
   /** The header's primary button: run now or schedule, by the chosen mode. */
   onSubmit: (values: SoftwareActionFormValues<TRef>) => void;
   submitDisabled?: boolean;
@@ -64,6 +70,7 @@ const INITIAL_ROWS = (): SoftwareRow[] => [newSoftwareRow('row-0')];
 export function SoftwareActionForm<TRef extends string = string>({
   action,
   onBack,
+  showHeader = true,
   onSubmit,
   submitDisabled = false,
   submitting = false,
@@ -85,7 +92,7 @@ export function SoftwareActionForm<TRef extends string = string>({
   const osTypesKey = [...new Set(rows.map(row => PACKAGE_MANAGER_OS[row.packageManager]))].sort().join(',');
 
   const actions: PageActionButton[] = [
-    { label: 'Cancel', onClick: onBack, variant: 'outline', showOnlyMobile: true },
+    ...(onBack ? [{ label: 'Cancel', onClick: onBack, variant: 'outline' as const, showOnlyMobile: true }] : []),
     {
       label: mode === 'now' ? copy.runLabel : copy.scheduleLabel,
       variant: 'accent',
@@ -102,9 +109,10 @@ export function SoftwareActionForm<TRef extends string = string>({
   return (
     <PageLayout
       title={copy.formTitle}
-      backButton={{ label: 'Back', onClick: onBack }}
+      backButton={onBack ? { label: 'Back', onClick: onBack } : undefined}
       actions={actions}
       actionsVariant="primary-buttons"
+      showHeader={showHeader}
       className={className}
     >
       {rows.map(row => (

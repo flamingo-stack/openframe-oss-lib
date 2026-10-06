@@ -10,7 +10,7 @@ import { DEMO_NOW, demoMinutesAgo } from './shared';
 const noop = () => {};
 
 /** The fleet the policies run on: every device of the demo's largest customer. */
-const FLEET_SIZE = 212;
+const FLEET_SIZE = 213;
 const FLEET_HOSTS: readonly unknown[] = Array.from({ length: FLEET_SIZE });
 
 interface DemoPolicy extends PolicyHostCounts {
@@ -33,16 +33,17 @@ function policy(id: string, name: string, description: string, critical: boolean
   };
 }
 
-/** One device has fallen out of disk encryption; the two other policies pass everywhere. */
+/** Seven laptops have fallen out of disk encryption; the other policies pass everywhere. */
 const POLICIES: DemoPolicy[] = [
   policy(
     'policy-disk-encryption',
     'Disk encryption',
     'BitLocker on Windows and FileVault on macOS are turned on.',
     true,
-    1,
+    7,
   ),
   policy('policy-firewall', 'Firewall on', 'The system firewall is enabled on every device.', true, 0),
+  policy('policy-screen-lock', 'Screen lock', 'The screen locks after five minutes without use.', false, 0),
   policy('policy-local-admins', 'No local admins', 'No everyday account is a local administrator.', false, 0),
 ];
 

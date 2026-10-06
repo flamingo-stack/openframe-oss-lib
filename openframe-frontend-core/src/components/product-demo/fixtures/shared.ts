@@ -9,15 +9,26 @@ export const DEMO_ORGANIZATIONS = {
   harbor: { id: 'org-harbor', name: 'Harbor Dental', initials: 'HD', domain: 'harbordental.example' },
 } as const;
 
+/**
+ * `slug` is the persona's slug at the host (the key its portrait arrives by,
+ * see `ProductDemoCastProvider`; the host's own technician is `tech`); `role` decides how the product draws the
+ * person: a technician works in the product, an end user is the customer's
+ * employee on the other end.
+ */
 export const DEMO_PEOPLE = {
-  jen: { id: 'user-jen', name: 'Jen Park', initials: 'JP' },
-  leo: { id: 'user-leo', name: 'Leo Martin', initials: 'LM' },
-  maya: { id: 'user-maya', name: 'Maya Lopez', initials: 'ML' },
-  priya: { id: 'user-priya', name: 'Priya Shah', initials: 'PS' },
-  sam: { id: 'user-sam', name: 'Sam Okafor', initials: 'SO' },
-  dana: { id: 'user-dana', name: 'Dana Reyes', initials: 'DR' },
-  alex: { id: 'user-alex', name: 'Alex Reed', initials: 'AR' },
+  jen: { id: 'user-jen', slug: 'jen', name: 'Jen Park', initials: 'JP', role: 'end_user' },
+  leo: { id: 'user-leo', slug: 'leo', name: 'Leo Martin', initials: 'LM', role: 'end_user' },
+  maya: { id: 'user-maya', slug: 'maya', name: 'Maya Lopez', initials: 'ML', role: 'end_user' },
+  priya: { id: 'user-priya', slug: 'priya', name: 'Priya Shah', initials: 'PS', role: 'end_user' },
+  sam: { id: 'user-sam', slug: 'sam', name: 'Sam Okafor', initials: 'SO', role: 'end_user' },
+  dana: { id: 'user-dana', slug: 'tech', name: 'Dana Reyes', initials: 'DR', role: 'technician' },
+  alex: { id: 'user-alex', slug: 'alex-reed', name: 'Alex Reed', initials: 'AR', role: 'technician' },
+  roman: { id: 'user-roman', slug: 'roman-smith', name: 'Roman Smith', initials: 'RS', role: 'technician' },
+  sara: { id: 'user-sara', slug: 'sara-kim', name: 'Sara Kim', initials: 'SK', role: 'technician' },
 } as const;
+
+export type DemoPersonKey = keyof typeof DEMO_PEOPLE;
+export type DemoOrganizationKey = keyof typeof DEMO_ORGANIZATIONS;
 
 export const DEMO_DEVICES = {
   frontDesk: { id: 'device-frontdesk', hostname: 'FRONTDESK-LT02', os: 'WINDOWS', organization: 'harbor' },
@@ -26,6 +37,8 @@ export const DEMO_DEVICES = {
   reception: { id: 'device-reception', hostname: 'RECEPTION-01', os: 'WINDOWS', organization: 'acme' },
   leoThinkPad: { id: 'device-leo', hostname: 'LEO-THINKPAD', os: 'WINDOWS', organization: 'harbor' },
   buildServer: { id: 'device-build', hostname: 'BUILD-SRV-01', os: 'LINUX', organization: 'acme' },
+  jenSurface: { id: 'device-jen', hostname: 'JEN-SURFACE', os: 'WINDOWS', organization: 'acme' },
+  priyaXps: { id: 'device-priya', hostname: 'PRIYA-XPS', os: 'WINDOWS', organization: 'northbridge' },
 } as const;
 
 /**

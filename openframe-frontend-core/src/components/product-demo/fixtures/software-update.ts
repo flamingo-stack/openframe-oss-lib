@@ -1,6 +1,7 @@
 import type { DeviceRow } from '../../features/devices';
 import type { SelectedPackage, SoftwareActionFormProps, SoftwareScheduleTiming } from '../../features/software';
-import { DEVICES_FIXTURE } from './devices';
+import type { DemoCast } from '../cast';
+import { buildDevicesFixture } from './devices';
 import { DEMO_DEVICES, DEMO_NOW } from './shared';
 
 /** The catalog entry the row holds: WinGet's Google Chrome. */
@@ -44,15 +45,19 @@ const initialValues: SoftwareActionFormProps['initialValues'] = {
   timeReference: 'SERVER',
 };
 
-/** WinGet installs on Windows, so the picker offers the fleet's Windows devices. */
-const devices: DeviceRow[] = DEVICES_FIXTURE.devices.filter(device => device.osType === 'WINDOWS');
-
-/** Chrome updated tonight at 11 PM on two Windows devices, one of them offline until it reconnects. */
-export const SOFTWARE_UPDATE_FIXTURE = {
-  action: 'UPDATE',
-  package: chrome,
-  timing,
-  initialValues,
-  devices,
-  selectedIds: new Set<string>([DEMO_DEVICES.reception.id, DEMO_DEVICES.samT14.id]),
-} as const;
+/**
+ * Chrome updated tonight at 11 PM on the Windows devices picked for it (WinGet
+ * installs on Windows, so the picker offers the fleet's Windows devices), one
+ * of them offline until it reconnects.
+ */
+export function buildSoftwareUpdateFixture(cast: DemoCast) {
+  const devices: DeviceRow[] = buildDevicesFixture(cast).devices.filter(device => device.osType === 'WINDOWS');
+  return {
+    action: 'UPDATE',
+    package: chrome,
+    timing,
+    initialValues,
+    devices,
+    selectedIds: new Set<string>([DEMO_DEVICES.reception.id, DEMO_DEVICES.samT14.id, DEMO_DEVICES.frontDesk.id]),
+  } as const;
+}

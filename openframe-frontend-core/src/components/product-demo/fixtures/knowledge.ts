@@ -1,84 +1,48 @@
-import type { KnowledgeBaseRow, KnowledgeBaseTableBodyProps } from '../../features/knowledge-base';
-import { DEMO_DEVICES, DEMO_ORGANIZATIONS, DEMO_PEOPLE, demoMinutesAgo } from './shared';
+import type { KnowledgeBaseArticleViewProps } from '../../features/knowledge-base';
+import type { DemoCast } from '../cast';
+import { DEMO_DEVICES } from './shared';
 
-const acme = DEMO_ORGANIZATIONS.acme.name;
-
-const HOUR = 60;
-const DAY = 24 * HOUR;
-
-function folder(id: string, name: string): KnowledgeBaseRow {
-  return { id, type: 'FOLDER', name, parentId: null };
-}
-
-function article(
-  id: string,
-  name: string,
-  summary: string,
-  createdMinutesAgo: number,
-  rest: Pick<KnowledgeBaseRow, 'status' | 'tags'> = {},
-): KnowledgeBaseRow {
-  const createdAt = demoMinutesAgo(createdMinutesAgo);
-  return {
-    id,
-    type: 'ARTICLE',
-    name,
-    summary,
-    parentId: null,
-    status: 'PUBLISHED',
-    createdAt,
-    updatedAt: createdAt,
-    ...rest,
-  };
+export interface KnowledgeFixture {
+  article: Pick<KnowledgeBaseArticleViewProps, 'title' | 'tags' | 'author' | 'updatedLabel' | 'status'>;
+  /** The article's body, in the markdown the product stores. */
+  content: string;
 }
 
 /**
- * The knowledge base an MSP keeps for one client: folders first, then the
- * articles of the root, newest first. An article row carries a name, a summary,
- * a status and a created time; the table shows no author column, so the people
- * of the cast appear where a real summary would name them.
+ * One article of a client's knowledge base, open: the runbook a technician (or
+ * the assistant) follows to set up a new hire's laptop. It names the client,
+ * its author and the steps, so the page says what the knowledge base is for.
  */
-export const KNOWLEDGE_FIXTURE: Required<Pick<KnowledgeBaseTableBodyProps, 'items' | 'totalCount'>> = {
-  items: [
-    folder('kb-folder-runbooks', 'Runbooks'),
-    folder('kb-folder-vendors', 'Vendors and warranties'),
-    article(
-      'kb-new-laptop',
-      'New laptop runbook',
-      `How ${acme} sets up a laptop for a new hire: enrollment, disk encryption, the standard apps.`,
-      35,
-      { tags: [{ id: 'kb-tag-onboarding', key: 'onboarding' }] },
-    ),
-    article(
-      'kb-offboarding',
-      'Offboarding checklist',
-      `Draft by ${DEMO_PEOPLE.dana.name}: accounts to close, devices to collect and wipe on a last day.`,
-      3 * HOUR,
-      { status: 'DRAFT' },
-    ),
-    article(
-      'kb-wifi',
-      'Office Wi-Fi setup',
-      `Staff and guest networks at the ${acme} office, and how to join a new device to each.`,
-      DAY + 2 * HOUR,
-    ),
-    article(
-      'kb-network-diagram',
-      'Network diagram',
-      `Firewall, switches and access points, with ${DEMO_DEVICES.buildServer.hostname} and ${DEMO_DEVICES.reception.hostname} marked.`,
-      3 * DAY,
-    ),
-    article(
-      'kb-printer',
-      'Front desk printer',
-      `Driver, tray settings and the fix ${DEMO_PEOPLE.sam.name} uses when the queue stalls.`,
-      6 * DAY,
-    ),
-    article(
-      'kb-backup',
-      'Backup and restore',
-      'What is backed up every night, where it is kept and how to restore one file or a whole machine.',
-      9 * DAY,
-    ),
-  ],
-  totalCount: 8,
-};
+export function buildKnowledgeFixture(cast: DemoCast): KnowledgeFixture {
+  const client = cast.organization('acme');
+  const author = cast.person('dana');
+  return {
+    article: {
+      title: `New laptop runbook: ${client.name}`,
+      tags: [
+        { id: 'kb-tag-client', label: client.name },
+        { id: 'kb-tag-onboarding', label: 'onboarding' },
+        { id: 'kb-tag-runbook', label: 'runbook' },
+      ],
+      author: { name: author.name, imageUrl: author.avatarUrl },
+      updatedLabel: '10/06/2026',
+      status: 'PUBLISHED',
+    },
+    content: [
+      `How ${client.name} sets up a laptop for a new hire. Every step can be run by a technician or asked of the assistant.`,
+      '',
+      '## Before the first day',
+      '',
+      '1. **Enroll the laptop.** Sign in with the enrollment account. It appears in Devices within a minute.',
+      '2. **Turn on disk encryption.** The "Disk encryption" policy does it. Check that the recovery key is saved.',
+      '3. **Install the standard apps.** Chrome, Slack, Microsoft 365 and the VPN client from the software catalog.',
+      `4. **Create the accounts.** Mailbox, groups and MFA in the ${client.name} Microsoft 365 tenant.`,
+      '',
+      '## On the first day',
+      '',
+      `1. **Join the office Wi-Fi.** Staff network only. The guest network is for visitors.`,
+      `2. **Add the printers.** Front desk and second floor, the same drivers as ${DEMO_DEVICES.reception.hostname}.`,
+      '3. **Hand over.** Sign in together once and close the onboarding ticket.',
+    ].join('\n'),
+  };
+}

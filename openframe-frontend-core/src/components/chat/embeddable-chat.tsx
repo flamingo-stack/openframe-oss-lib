@@ -1858,17 +1858,35 @@ function EmbeddableChatInner({
   // header MingoAiButton. Same strict source filter as `ask-ai:open-with-ref`
   // above: events without a matching source are ignored.
   // With a `prompt` in the detail (a page's "Ask Mingo" question) the panel
-  // also asks it, once, in Guide mode: the same send the Guide launcher prompt
-  // above uses. In any other mode the chat only opens.
+  // also asks it, once, in Guide mode, in a new conversation. In any other mode
+  // the chat only opens.
+  // A question from the page starts its OWN conversation: it is never appended
+  // to whatever thread was open. An open thread is cleared to a draft first and
+  // the question is sent once that draft is what the panel holds.
+  const pendingAskRef = useRef<string | null>(null);
+  const isDraft = activeDialogId == null && messages.length === 0;
   const sendAskPrompt = useCallback(
     (prompt: string) => {
       if (activeMode !== 'guide') return;
-      void sendMessage(prompt).catch((err: unknown) => {
-        console.error('[EmbeddableChat] ask-ai:open prompt failed:', err);
-      });
+      if (isDraft) {
+        void sendMessage(prompt).catch((err: unknown) => {
+          console.error('[EmbeddableChat] ask-ai:open prompt failed:', err);
+        });
+        return;
+      }
+      pendingAskRef.current = prompt;
+      clearMessages();
     },
-    [activeMode, sendMessage],
+    [activeMode, isDraft, sendMessage, clearMessages],
   );
+  useEffect(() => {
+    const prompt = pendingAskRef.current;
+    if (!prompt || !isDraft) return;
+    pendingAskRef.current = null;
+    void sendMessage(prompt).catch((err: unknown) => {
+      console.error('[EmbeddableChat] ask-ai:open prompt failed:', err);
+    });
+  }, [isDraft, sendMessage]);
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ source?: string; prompt?: unknown }>).detail;
