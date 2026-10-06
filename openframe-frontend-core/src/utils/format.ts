@@ -3,6 +3,7 @@
  */
 
 import type { ProgramInstant } from './program-instant';
+import { OPENFRAME_CLASSIFICATIONS, isOpenFrameClassification } from './vendor-classification';
 
 /**
  * Format a date to a human-readable string
@@ -502,6 +503,31 @@ export function formatProgramDate(at: ProgramInstant, style: ZonedDateStyle = 'm
 }
 
 /**
+ * A program that spans DAYS, as one range: "Aug 14 – 20, 2026". `null` when
+ * there is no end, the end does not follow the start, or both fall on one day
+ * (the caller then prints its single date).
+ */
+export function formatProgramDateRange(at: ProgramInstant, end: Date | string | null | undefined): string | null {
+  const start = toValidDate(at.instant ?? at.utcDate);
+  const ends = end ? toValidDate(end) : null;
+  if (!start || !ends || ends.getTime() <= start.getTime()) return null;
+  // An end at midnight closes the day BEFORE it (Aug 14 to Aug 21 00:00 is "Aug 14 – 20").
+  const finish = new Date(ends.getTime() - 1);
+  const formatter = formatterFor(at.timezone, { year: 'numeric', month: 'short', day: 'numeric' }, 'en-US');
+  const partsOf = (date: Date) => {
+    const parts = formatter.formatToParts(date);
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value ?? '';
+    return { month: part('month'), day: part('day'), year: part('year') };
+  };
+  const from = partsOf(start);
+  const to = partsOf(finish);
+  if (from.year !== to.year) return `${from.month} ${from.day}, ${from.year} – ${to.month} ${to.day}, ${to.year}`;
+  if (from.month !== to.month) return `${from.month} ${from.day} – ${to.month} ${to.day}, ${to.year}`;
+  if (from.day === to.day) return null;
+  return `${from.month} ${from.day} – ${to.day}, ${to.year}`;
+}
+
+/**
  * Do these two endpoints describe a forward-running interval?
  *
  * THE ordering rule for every renderer in this file. A range that runs
@@ -915,10 +941,8 @@ export function stripHtml(html: string): string {
  * curated mapping.
  */
 export function formatClassification(classification: string): string {
-  const customMappings: Record<string, string> = {
-    openframe_selected: 'OpenFrame Selected',
-  };
-  return customMappings[classification] || formatUnderscoreText(classification);
+  if (isOpenFrameClassification(classification)) return OPENFRAME_CLASSIFICATIONS[classification].label;
+  return formatUnderscoreText(classification);
 }
 
 /**

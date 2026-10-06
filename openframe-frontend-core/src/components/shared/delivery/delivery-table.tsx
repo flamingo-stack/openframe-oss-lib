@@ -19,6 +19,7 @@
 
 import type { DeliveryItem } from '../../../types/delivery';
 import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
+import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../../chat/entity-cards/content-card-frame';
 import { DeliveryRow } from './delivery-row';
 
 interface DeliveryTableProps {
@@ -31,10 +32,10 @@ interface DeliveryTableProps {
  */
 function SkeletonRow() {
   return (
-    <div className="border-b border-ods-border p-[12px] last:border-b-0 md:p-[16px]">
-      <div className="flex w-full flex-col items-start justify-between gap-[12px] md:flex-row md:gap-[16px]">
+    <div className="border-b border-ods-border p-[12px] last:border-b-0 content-md:p-[16px]">
+      <div className="flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]">
         {/* Left: Title, subtitle, and description skeleton */}
-        <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] md:w-auto md:gap-[16px]">
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]">
           {/* Title skeleton - responsive */}
           <div className="flex min-h-[24px] items-center">
             <div className="h-[20px] w-full animate-pulse rounded bg-ods-border"></div>
@@ -71,7 +72,7 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
   // Show skeletons while loading
   if (isLoading) {
     return (
-      <div className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
+      <div className={`w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
         <div className="w-full">
           {[1, 2, 3, 4, 5].map(i => (
             <SkeletonRow key={i} />
@@ -84,14 +85,14 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
   // Empty state
   if (items.length === 0) {
     return (
-      <div className="w-full rounded-[6px] border border-ods-border bg-ods-card p-[40px] text-center">
+      <div className={`w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS} p-[var(--spacing-system-xlf)] text-center`}>
         <p className="text-ods-text-secondary text-h6">No tasks available</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
+    <div className={`w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
       <div className="w-full">
         {items.map(item => (
           // DOM id lives on DeliveryRow's own outer element (no wrapper

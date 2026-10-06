@@ -25,14 +25,14 @@ interface ChatArchivePageBaseProps {
   onLoadMore?: () => void;
 }
 
-/** Standalone (default): renders its own back/close header, so BOTH handlers
- *  are required. */
+/** Standalone (default): renders its own back/close header. `onBack` is
+ *  required; without `onClose` the close button is left out. */
 export interface ChatArchivePageStandaloneProps extends ChatArchivePageBaseProps {
   embedded?: false;
   /** Back chevron — returns to the previous (list) view. */
   onBack: () => void;
   /** Close the whole chat panel. */
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 /** Embedded (wide split layout): the archive lives in the left rail and the
@@ -69,7 +69,7 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
       {/* Mobile (<md): the shared mobile header — back to the list + a ⋯ menu
           (Close only here, since the archive list has no per-chat actions).
           `!props.embedded` narrows the union so `onBack` / `onClose` are the
-          required standalone handlers (no no-op fallbacks). */}
+          standalone handlers (no no-op fallbacks). */}
       {!props.embedded && (
         <ChatPanelHeaderMobile
           className="flex md:hidden"
@@ -93,9 +93,11 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
             <span className="truncate text-ods-text-primary text-h3">Chat Archive</span>
           </div>
 
-          <ChatHeaderIconButton onClick={props.onClose} aria-label="Close">
-            <XmarkIcon size={24} />
-          </ChatHeaderIconButton>
+          {props.onClose && (
+            <ChatHeaderIconButton onClick={props.onClose} aria-label="Close">
+              <XmarkIcon size={24} />
+            </ChatHeaderIconButton>
+          )}
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]">

@@ -18,7 +18,7 @@ export type PageActionButton = {
   onClick?: () => void;
   icon?: React.ReactNode;
   /** `overlay` and `glyph` are media chrome and `link` an inline text action; none is a page action, and SplitButton has no divider colour for them. */
-  variant?: Exclude<ButtonProps['variant'], 'overlay' | 'glyph' | 'link'>;
+  variant?: Exclude<ButtonProps['variant'], 'overlay' | 'glyph' | 'link' | 'inverted'>;
   disabled?: boolean;
   /**
    * For SplitButton actions (when `iconAction` is set): disables only the main
@@ -355,7 +355,7 @@ function IconButtonsVariant({
   return (
     <>
       {/* Desktop: every action as an icon button + optional overflow menu */}
-      <div className={cn('hidden items-center md:flex', ACTIONS_GAP, className)}>
+      <div className={cn('hidden items-center content-md:flex', ACTIONS_GAP, className)}>
         {selector}
         {loading ? (
           <ActionSkeletons actions={desktopActions} />
@@ -370,7 +370,7 @@ function IconButtonsVariant({
       </div>
 
       {/* Mobile: single icon button OR all actions merged into one "..." menu */}
-      <div className={cn('flex md:hidden', className)}>
+      <div className={cn('flex content-md:hidden', className)}>
         {loading ? (
           <MobileTriggerSkeleton />
         ) : useSingleActionMobile && singleAction ? (
@@ -386,6 +386,12 @@ function IconButtonsVariant({
 /**
  * Primary buttons variant — primary + outline buttons on desktop,
  * fixed bottom bar on mobile.
+ *
+ * The bottom bar spans the WINDOW, so it stays on the viewport `md` step. A
+ * content area narrowed by a docked side panel is a third case: the window is
+ * wide (no bar) but the title row has no room for every labelled button, so the
+ * actions compact into the row instead. `md:content-max-md:` is exactly that case
+ * and never matches outside a content area.
  */
 function PrimaryButtonsVariant({
   actions,
@@ -407,7 +413,7 @@ function PrimaryButtonsVariant({
 
   return (
     <>
-      <div className={cn('hidden items-center md:flex', ACTIONS_GAP, className)}>
+      <div className={cn('hidden items-center md:content-md:flex', ACTIONS_GAP, className)}>
         {loading ? (
           // No overflow trigger in this variant — an unknown action set settles
           // into a labelled button, not a square one.
@@ -417,6 +423,10 @@ function PrimaryButtonsVariant({
             <React.Fragment key={`desktop-${actionKey(action, idx)}`}>{renderActionButton(action)}</React.Fragment>
           ))
         )}
+      </div>
+
+      <div className={cn('hidden items-center md:content-max-md:flex', ACTIONS_GAP, className)}>
+        {loading ? <MobileTriggerSkeleton /> : <CompactPrimaryActions actions={desktopActions} />}
       </div>
 
       <MobileBottomActions actions={sortedActions} loading={loading} />
@@ -449,7 +459,7 @@ function MenuPrimaryVariant({
 
   return (
     <>
-      <div className={cn('hidden items-center md:flex', ACTIONS_GAP, className)}>
+      <div className={cn('hidden items-center content-md:flex', ACTIONS_GAP, className)}>
         {selector}
         {loading ? (
           <ActionSkeletons actions={desktopActions} />
@@ -465,7 +475,7 @@ function MenuPrimaryVariant({
         )}
       </div>
 
-      <div className={cn('flex md:hidden', className)}>
+      <div className={cn('flex content-md:hidden', className)}>
         {loading ? (
           <MobileTriggerSkeleton />
         ) : hasMobileMenuItems || selector ? (
@@ -475,6 +485,25 @@ function MenuPrimaryVariant({
           <ActionsMenuDropdown groups={mobileMenuGroups} header={selector} />
         ) : null}
       </div>
+    </>
+  );
+}
+
+/**
+ * `primary-buttons` in a narrow content area of a wide window: the accent (and
+ * icon-only) actions stay buttons, the other labelled ones fold into one "..."
+ * menu — unless that menu would hold a single action, which stays a button.
+ */
+function CompactPrimaryActions({ actions }: { actions: PageActionButton[] }) {
+  const foldable = actions.filter(action => action.variant !== 'accent' && !!action.label);
+  const fold = foldable.length > 1;
+  const inline = fold ? actions.filter(action => !foldable.includes(action)) : actions;
+  return (
+    <>
+      {fold && <ActionsMenuDropdown groups={[{ items: foldable.flatMap(actionToMenuItems) }]} />}
+      {inline.map((action, idx) => (
+        <React.Fragment key={`compact-${actionKey(action, idx)}`}>{renderActionButton(action)}</React.Fragment>
+      ))}
     </>
   );
 }

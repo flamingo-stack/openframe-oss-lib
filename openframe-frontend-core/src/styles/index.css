@@ -1,9 +1,12 @@
 /* Import the ODS design system files */
+@import './fonts.css';
 @import './ods-colors.css';
 @import './ods-design-tokens.css';
 @import './ods-interaction-states.css';
 @import './ods-effects.css';
 @import './ods-responsive-tokens.css';
+@import './ods-content-area.css';
+@import './ods-content-area-tokens.css';
 @import './app-globals.css';
 @import './chat-animations.css';
 @import './ods-page-shell.css';

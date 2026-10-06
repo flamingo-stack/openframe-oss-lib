@@ -275,10 +275,37 @@ GQL_SCALARS = {"String", "Int", "Float", "Boolean", "ID", "Instant", "Long", "JS
                "BigDecimal", "Upload", "Object", "Any", "UUID", "LocalDate", "LocalDateTime", "Map"}
 
 
+def gql_drop_directives(s):
+    """Removes `@name` and `@name(args)`. A directive inside an argument list
+    (`machineId: String @deprecated(reason: "…")`) nests a `(…)` that would otherwise end the field's
+    argument list early and turn the remaining argument names into phantom root fields."""
+    out, i, n = [], 0, len(s)
+    while i < n:
+        m = re.compile(r"@[A-Za-z_]\w*").match(s, i) if s[i] == "@" else None
+        if not m:
+            out.append(s[i])
+            i += 1
+            continue
+        j = m.end()
+        while j < n and s[j].isspace():
+            j += 1
+        if j < n and s[j] == "(":
+            depth = 0
+            while j < n:
+                depth += (s[j] == "(") - (s[j] == ")")
+                j += 1
+                if depth == 0:
+                    break
+            i = j
+        else:
+            i = m.end()
+    return "".join(out)
+
+
 def schema_root_field_defs(schema_text):
     """{kind: {name: {"args": "<args as written>", "returns": "<type>", "types": [named types]}}}
     for the root types of a .graphqls / schema.graphql text."""
-    s = gql_strip(schema_text)
+    s = gql_drop_directives(gql_strip(schema_text))
     out = {"query": {}, "mutation": {}, "subscription": {}}
     for m in re.finditer(r"(?:extend\s+)?type\s+(Query|Mutation|Subscription)\b[^{]*\{", s):
         start = m.end()
@@ -312,8 +339,9 @@ def java_strip_comments(src):
     return src
 
 
-def java_find_block_end(src, open_idx):
-    """Index just past the '}' matching the '{' at open_idx, skipping strings and text blocks."""
+def java_find_block_end(src, open_idx, open_ch="{", close_ch="}"):
+    """Index just past the '}' matching the '{' at open_idx (or another bracket pair), skipping strings
+    and text blocks."""
     depth, i, n = 0, open_idx, len(src)
     while i < n:
         c = src[i]
@@ -333,9 +361,9 @@ def java_find_block_end(src, open_idx):
                 i += 2 if src[i] == "\\" else 1
             i += 1
             continue
-        if c == "{":
+        if c == open_ch:
             depth += 1
-        elif c == "}":
+        elif c == close_ch:
             depth -= 1
             if depth == 0:
                 return i + 1
@@ -702,8 +730,6 @@ def resolve_path_expr(expr, consts):
     if m:
         expr = m.group(1)
     out = ""
-    for tok in re.findall(r'"(?:[^"\\]|\\.)*"|\.concat\(([^()]*(?:\([^()]*\))?[^()]*)\)|[A-Za-z_][\w.]*|\+', expr):
-        pass
     # token walk with concat support
     i, n = 0, len(expr)
     while i < n:
@@ -716,12 +742,15 @@ def resolve_path_expr(expr, consts):
             i = j + 1
         elif expr.startswith(".concat(", i):
             j = expr.find(")", i)
+            if j < 0:  # the caller's match can cut `.put(X.concat(id))` to `X.concat(id`
+                j = n
             inner = expr[i + 8:j]
             lit = java_string_literals(inner)
             out += lit[0] if lit else "{}"
             i = j + 1
         elif c.isalpha() or c == "_":
-            m = re.match(r"[A-Za-z_][\w.]*", expr[i:])
+            # a dotted name stops before `.concat(`, so `ORGANIZATIONS.concat("/")` reads the constant
+            m = re.match(r"[A-Za-z_]\w*(?:\.(?!concat\()[A-Za-z_]\w*)*", expr[i:])
             name = m.group(0).split(".")[-1]
             if name in consts:
                 out += consts[name]
@@ -826,12 +855,14 @@ def test_inventory(root, ref):
                 folded = resolve_path_expr(lm.group(2), local_consts)
                 if folded:
                     local_consts[lm.group(1)] = folded
-            for cm in re.finditer(r"\.(get|post|put|patch|delete|head|options)\(\s*([^;]*?)\)\s*(?:[;.)]|$)", body):
+            for cm in re.finditer(r"\.(get|post|put|patch|delete|head|options)\(", body):
+                # the whole argument, so `.get(USERS.concat("/").concat(id))` is not cut at `("/")`
+                arg = body[cm.end():java_find_block_end(body, cm.end() - 1, "(", ")") - 1]
                 stmt_start = body.rfind(";", 0, cm.start()) + 1
                 stmt = body[stmt_start:cm.start()]
                 if "given(" not in stmt and "spec" not in stmt.lower() and "Spec" not in stmt:
                     continue
-                p = resolve_path_expr(cm.group(2), local_consts)
+                p = resolve_path_expr(arg, local_consts)
                 if not p or "/" not in p:
                     continue
                 if p.startswith("http") or GRAPHQL_TRANSPORT.search(norm_path(p)):
@@ -981,7 +1012,7 @@ def kg_matches(row, kg, unique_names):
     operation name that is unique in the product (`installSoftware`), a controller class name
     (`ImageController`), or a path pattern — `METHOD /path`, `GET|POST /path`, or a bare `/path` for
     any method — with `{a,b}` alternatives, `{id}` variables and `**` suffixes."""
-    src = row["sources"][0]
+    classes = {s.get("class") for s in row["sources"]}
     for tok in kg["tokens"]:
         if tok == row["key"]:
             return True
@@ -989,7 +1020,7 @@ def kg_matches(row, kg, unique_names):
             if tok == row["name"] and row["name"] in unique_names:
                 return True
             continue
-        if tok == src.get("class"):
+        if tok in classes:
             return True
         m = re.match(r"(?:((?:GET|POST|PUT|PATCH|DELETE|ANY)(?:\|(?:GET|POST|PUT|PATCH|DELETE|ANY))*)\s+)?(/\S*)$", tok)
         if not m:
@@ -1233,7 +1264,13 @@ def build_matrix(product_gql, product_rest, fe, tl):
     fe_rest = fe["rest"] if fe else {}
     consumer_rest_keys = set(fe_rest) | set(op_methods)
     matched_consumer = set()
+    # One row per METHOD path. Two controllers serving the same path (an oss implementation and its
+    # SaaS override, gateway and external-api) cannot be told apart by a caller, so they share a row.
+    by_key = {}
     for ep in product_rest:
+        by_key.setdefault(f"{ep['method']} {ep['path']}", []).append(ep)
+    for key, eps in by_key.items():
+        ep = eps[0]
         uses, tests, methods = [], [], set()
         for ck in consumer_rest_keys:
             if " " not in ck:
@@ -1241,15 +1278,19 @@ def build_matrix(product_gql, product_rest, fe, tl):
             cmeth, cpath = ck.split(" ", 1)
             if ep["method"] not in ("ANY", cmeth):
                 continue
-            if any(paths_match(c, ep["path"]) for c in path_candidates(cpath)):
+            # A consumer path that starts with a wildcard is one the resolver could not read (`{}/{}`);
+            # it would match every path of that shape, so it matches none and surfaces as drift.
+            cands = [c for c in path_candidates(cpath) if c.split("/")[0] not in ("{}", "**", "")]
+            if any(paths_match(c, ep["path"]) for c in cands):
                 matched_consumer.add(ck)
                 uses += fe_rest.get(ck, [])
                 tests += op_tests.get(ck, [])
                 methods |= set(op_methods.get(ck, ()))
-        rows.append(row("rest", f"{ep['method']} {ep['path']}", ep["method"], ep["path"],
-                        [{"repo": ep["repo"], "module": ep["module"], "file": ep["file"], "class": ep["class"],
-                          "handler": ep["handler"], "view": ep["view"]}],
-                        ep.get("introduced"), uses, tests, sorted(methods)))
+        introduced = sorted(e["introduced"] for e in eps if e.get("introduced")) or [None]
+        rows.append(row("rest", key, ep["method"], ep["path"],
+                        [{"repo": e["repo"], "module": e["module"], "file": e["file"], "class": e["class"],
+                          "handler": e["handler"], "view": e["view"]} for e in eps],
+                        introduced[0], uses, tests, sorted(methods)))
     # consumer-side drift
     product_gql_keys = set(product_gql)
     federation = {"query:_service", "query:_entities"}
@@ -1420,7 +1461,7 @@ def md_report(rows, drift, meta, fe, tl, recent_days, plan=None, entry=None, pre
         s = r["sources"][0]
         if r["surface"] == "graphql":
             return f"{s['module']}/…/{os.path.basename(s['file'])}"
-        return f"{s['module']} `{s['class']}.{s['handler']}`"
+        return " · ".join(f"{s['module']} `{s['class']}.{s['handler']}`" for s in r["sources"])
 
     L.append(f"## Gap: used by the UI, not reached by any test ({len(open_ui)} open, {c['gap-ui'] - len(open_ui)} under known gaps)\n")
     L.append("| op | area | module | UI features | introduced | plan |")

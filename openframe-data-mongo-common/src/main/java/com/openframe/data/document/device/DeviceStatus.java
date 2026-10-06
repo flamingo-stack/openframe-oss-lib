@@ -16,4 +16,5 @@ public enum DeviceStatus {
     ARCHIVED;
 
     public static final Set<DeviceStatus> DISPATCH_ELIGIBLE = EnumSet.of(ONLINE, OFFLINE);
+    public static final Set<DeviceStatus> DELETING_OR_DELETED = EnumSet.of(PENDING_DELETION, DELETED);
 }

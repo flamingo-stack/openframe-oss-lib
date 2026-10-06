@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
+import org.springframework.session.web.http.SessionRepositoryFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -13,12 +14,19 @@ import java.io.IOException;
 import java.util.Set;
 
 import static com.openframe.authz.security.SsoRegistrationConstants.ONBOARDING_TENANT_ID;
-import static org.springframework.core.Ordered.HIGHEST_PRECEDENCE;
 
 @Slf4j
 @Component
-@Order(HIGHEST_PRECEDENCE + 10)
+@Order(TenantContextFilter.ORDER)
 public class TenantContextFilter extends OncePerRequestFilter {
+
+    /**
+     * Right after Spring Session's filter. This filter reads and writes TENANT_ID in the HTTP session,
+     * so it has to see the Redis-backed session: ahead of Spring Session it would get Tomcat's own
+     * in-memory session, which sets a second JSESSIONID cookie that the Redis one then overwrites,
+     * and TENANT_ID is gone on the next request.
+     */
+    public static final int ORDER = SessionRepositoryFilter.DEFAULT_ORDER + 10;
 
     public static final String TENANT_ID = "TENANT_ID";
 

@@ -11,9 +11,13 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -32,6 +36,24 @@ public class GraphQLDeviceMapper {
                 .organizationIds(input.getOrganizationIds())
                 .tagKeys(input.getTagKeys())
                 .tagValues(input.getTagValues())
+                .build();
+    }
+
+    public DeviceFilterCriteria toDeviceFilterCriteria(DeviceFilterInput input,
+                                                       Collection<PackageManagerType> manageableByPackageManagers) {
+        DeviceFilterCriteria criteria = toDeviceFilterCriteria(input);
+        criteria.setManageableByPackageManagers(manageableByPackageManagers);
+        return criteria;
+    }
+
+    public MachinePackageManagersResponse toPackageManagers(Map<PackageManagerType, PackageManagerState> states) {
+        if (states == null) {
+            return null;
+        }
+        return MachinePackageManagersResponse.builder()
+                .brew(states.get(PackageManagerType.BREW))
+                .winget(states.get(PackageManagerType.WINGET))
+                .choco(states.get(PackageManagerType.CHOCO))
                 .build();
     }
 

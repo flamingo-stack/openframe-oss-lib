@@ -293,7 +293,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
             <Button
               variant="transparent"
               onClick={prevSlide}
-              className="absolute left-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 md:h-auto"
+              className="absolute left-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 content-md:h-auto"
               aria-label="Previous media"
             >
               <ChevronLeftIcon />
@@ -302,7 +302,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
             <Button
               variant="transparent"
               onClick={nextSlide}
-              className="absolute right-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 md:h-auto"
+              className="absolute right-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 content-md:h-auto"
               aria-label="Next media"
             >
               <ChevronRightIcon />
@@ -326,7 +326,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
                   aria-current={isActive ? 'true' : undefined}
                   aria-label={`Go to slide ${index + 1}`}
                   onClick={() => selectSlide(index)}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full p-0 md:h-6"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full p-0 content-md:h-6"
                 >
                   <span
                     className={cn(

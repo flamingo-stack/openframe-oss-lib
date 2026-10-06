@@ -7,6 +7,7 @@ import com.openframe.test.data.dto.organization.OrganizationFilterInput;
 import com.openframe.test.data.dto.organization.OrganizationSortInput;
 import com.openframe.test.helpers.RequestSpecHelper;
 import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION;
 import static com.openframe.test.api.graphql.OrganizationQueries.ORGANIZATION_BY_ORGANIZATION_ID;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
@@ -83,14 +85,23 @@ public class OrganizationApi {
     }
 
     public static Organization retrieveOrganizationByOrganizationId(String organizationId) {
+        return queryOrganization(ORGANIZATION_BY_ORGANIZATION_ID, "organizationId", organizationId, "organizationByOrganizationId");
+    }
+
+    // organization(id:) by Relay global id; null when no organization has that id.
+    public static Organization retrieveOrganization(String globalId) {
+        return queryOrganization(ORGANIZATION, "id", globalId, "organization");
+    }
+
+    private static Organization queryOrganization(String document, String variable, String value, String field) {
         Map<String, Object> body = Map.of(
-                "query", ORGANIZATION_BY_ORGANIZATION_ID,
-                "variables", Map.of("organizationId", organizationId)
+                "query", document,
+                "variables", Map.of(variable, value)
         );
         return given(RequestSpecHelper.getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
-                .extract().jsonPath().getObject("data.organizationByOrganizationId", Organization.class);
+                .extract().jsonPath().getObject("data." + field, Organization.class);
     }
 
     public static Organization createOrganization(CreateOrganizationRequest request) {
@@ -109,11 +120,15 @@ public class OrganizationApi {
     }
 
     public static void archiveOrganization(Organization organization) {
-        final String ARCHIVE_ORGANIZATION = ORGANIZATIONS.concat("/").concat(organization.getOrganizationId()).concat("/status");
-        given(RequestSpecHelper.getAuthorizedSpec()).contentType(ContentType.JSON)
+        archiveOrganizationRaw(organization.getOrganizationId()).then().statusCode(204);
+    }
+
+    // Raw form, for teardown paths that must not throw.
+    public static Response archiveOrganizationRaw(String organizationId) {
+        final String ARCHIVE_ORGANIZATION = ORGANIZATIONS.concat("/").concat(organizationId).concat("/status");
+        return given(RequestSpecHelper.getAuthorizedSpec()).contentType(ContentType.JSON)
                 .body(Map.of("status", "ARCHIVED"))
-                .patch(ARCHIVE_ORGANIZATION)
-                .then().statusCode(204);
+                .patch(ARCHIVE_ORGANIZATION);
     }
 
     /** GET /organizations/{id}/can-archive: true when no active device is linked to the organization. */

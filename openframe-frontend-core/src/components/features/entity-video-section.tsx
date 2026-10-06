@@ -143,13 +143,13 @@ export function EntityVideoSection({
             <TabsList className="inline-flex h-auto justify-start gap-0 rounded-none bg-transparent p-0">
               <TabsTrigger
                 value="full-video"
-                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none md:px-6"
+                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none content-md:px-6"
               >
                 Full Video
               </TabsTrigger>
               <TabsTrigger
                 value="highlights"
-                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none md:px-6"
+                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none content-md:px-6"
               >
                 Highlights
               </TabsTrigger>

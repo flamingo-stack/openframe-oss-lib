@@ -1,7 +1,9 @@
 package com.openframe.stream.deserializer;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.software.SoftwareAction;
@@ -12,6 +14,7 @@ import com.openframe.stream.mapping.SourceEventTypes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,8 +32,15 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     private static final String FALLBACK_MESSAGE = "Script executed";
     private static final String FALLBACK_FAILED_MESSAGE = "Script failed";
 
+    private static final String DETAILS_INPUT = "input";
+    private static final List<String> SCRIPT_FIELDS_LEFT_OUT = List.of("id", "tenantId", "contentHash");
+    private static final String SCRIPT_ENV_VARS = "envVars";
+    private static final String ENV_VAR_VALUE = "value";
+    private static final String ENV_VAR_SECRET = "secret";
+
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptRepository scriptRepository;
+    private final ObjectMapper scriptMapper;
 
     public ScriptResultDeserializer(ObjectMapper mapper,
                                     ScriptExecutionRepository scriptExecutionRepository,
@@ -38,6 +48,7 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
         super(mapper);
         this.scriptExecutionRepository = scriptExecutionRepository;
         this.scriptRepository = scriptRepository;
+        this.scriptMapper = mapper.copy().setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
     @Override
@@ -91,6 +102,45 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
         } catch (Exception e) {
             log.warn("Failed to build script-result message", e);
             return Optional.of(fallback);
+        }
+    }
+
+    // The result block carries the script document as stored next to the output, without its id, tenant id,
+    // content hash, null fields and the values of secret env vars; logs never hold a secret.
+    @Override
+    protected String getResult(JsonNode after) {
+        String baseResult = super.getResult(after);
+        try {
+            ObjectNode result = toObjectNode(baseResult);
+            findScript(after).ifPresent(script -> result.set(DETAILS_INPUT, inputOf(script)));
+            return result.isEmpty() ? null : mapper.writeValueAsString(result);
+        } catch (Exception e) {
+            log.warn("Failed to attach the script input to the script-result block", e);
+            return baseResult;
+        }
+    }
+
+    private Optional<Script> findScript(JsonNode after) {
+        String tenantId = parseStringField(after, FIELD_TENANT_ID).orElse(null);
+        String scriptId = parseStringField(after, FIELD_SCRIPT_ID).orElse(null);
+        if (tenantId == null || scriptId == null) {
+            return Optional.empty();
+        }
+        return scriptRepository.findByTenantIdAndId(tenantId, scriptId);
+    }
+
+    private ObjectNode inputOf(Script script) {
+        ObjectNode input = scriptMapper.valueToTree(script);
+        input.remove(SCRIPT_FIELDS_LEFT_OUT);
+        JsonNode envVars = input.path(SCRIPT_ENV_VARS);
+        envVars.forEach(ScriptResultDeserializer::dropSecretValue);
+        return input;
+    }
+
+    private static void dropSecretValue(JsonNode envVar) {
+        boolean secret = envVar.path(ENV_VAR_SECRET).asBoolean();
+        if (secret && envVar.isObject()) {
+            ((ObjectNode) envVar).remove(ENV_VAR_VALUE);
         }
     }
 

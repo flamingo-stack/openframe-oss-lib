@@ -25,6 +25,7 @@ import static com.openframe.core.constants.SsoFlowCookieNames.OF_SSO_REG;
 import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
 import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
 import static com.openframe.authz.web.Redirects.seeOther;
+import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
 import static org.springframework.http.HttpStatus.OK;
 
 @Slf4j
@@ -67,8 +68,7 @@ public class TenantRegistrationController {
 
             seeOther(httpResponse, ssoAuthorizeData.redirectPath());
         } catch (Exception e) {
-            authErrorResponder.send(httpResponse, httpRequest, "sso-registration-init", e,
-                    "Registration failed. Please try again.");
+            authErrorResponder.send(httpResponse, httpRequest, "sso-registration-init", e, REGISTRATION_FAILED);
         }
     }
 

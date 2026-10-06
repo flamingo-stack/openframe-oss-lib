@@ -75,6 +75,16 @@ public class DeviceService {
         return result;
     }
 
+    /**
+     * One query for the whole set; machines that do not exist are simply absent from the result.
+     */
+    public List<Machine> findByMachineIds(Collection<String> machineIds) {
+        log.debug("Finding machines by IDs: {}", machineIds);
+        List<Machine> result = machineRepository.findByMachineIdIn(machineIds);
+        log.debug("Found {} of {} machines", result.size(), machineIds.size());
+        return result;
+    }
+
     public void verifyDispatchable(List<String> machineIds) {
         machineIds.forEach(this::verifyDispatchable);
     }
@@ -249,6 +259,7 @@ public class DeviceService {
             out.setStatuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null);
             out.setDeviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null);
             out.setOrganizationIds(filter.getOrganizationIds());
+            out.setManageableByPackageManagers(filter.getManageableByPackageManagers());
             filterOsTypes = filter.getOsTypes();
         }
         out.setOsTypes(resolveOsTypes(filterOsTypes, osTypeScope));

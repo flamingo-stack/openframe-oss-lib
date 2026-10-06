@@ -42,9 +42,9 @@ const TAB_TRIGGER_CLASS =
 
 /** Grid class for each aspect ratio (admin editors — narrower columns). */
 export const RATIO_GRID_CLASS: Record<RatioCategory, string> = {
-  portrait: 'grid grid-cols-2 md:grid-cols-3 gap-4',
-  square: 'grid grid-cols-2 md:grid-cols-3 gap-4',
-  landscape: 'grid grid-cols-1 md:grid-cols-2 gap-4',
+  portrait: 'grid grid-cols-2 content-md:grid-cols-3 gap-4',
+  square: 'grid grid-cols-2 content-md:grid-cols-3 gap-4',
+  landscape: 'grid grid-cols-1 content-md:grid-cols-2 gap-4',
 };
 
 /** CSS `aspect-ratio` value per category — sizing for strip cards + placeholders. */

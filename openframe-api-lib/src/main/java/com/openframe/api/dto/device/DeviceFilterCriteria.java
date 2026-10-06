@@ -2,12 +2,14 @@ package com.openframe.api.dto.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Collection;
 import java.util.List;
 
 @Data
@@ -23,4 +25,6 @@ public class DeviceFilterCriteria {
 
     private List<String> tagKeys;
     private List<String> tagValues;
-} 
+
+    private Collection<PackageManagerType> manageableByPackageManagers;
+}

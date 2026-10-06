@@ -29,7 +29,6 @@ export default defineConfig([
       'types/navigation': 'src/types/navigation.ts',
       'types/announcement': 'src/types/announcement.ts',
       'assets/index': 'src/assets/index.ts',
-      fonts: 'src/fonts.ts',
       'tailwind.config': './tailwind.config.ts',
       'utils/index': 'src/utils/index.ts',
       // Humanity signals — pure + server-safe (no React, no browser APIs).
@@ -106,7 +105,6 @@ export default defineConfig([
     format: ['esm', 'cjs'],
     dts: false,
     splitting: false,
-    sourcemap: true,
     external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
     treeshake: true,
   },
@@ -179,7 +177,6 @@ export default defineConfig([
     format: ['esm', 'cjs'],
     dts: false,
     splitting: true,
-    sourcemap: true,
     external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
     banner: {
       js: '"use client";',

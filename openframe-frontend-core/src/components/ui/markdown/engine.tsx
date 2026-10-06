@@ -17,10 +17,12 @@
  *   → escapeUnknownHtmlTags (text pre-pass, React 19 crash guard)
  *   → remark: remarkGfm, remarkBreaks, ...additionalRemarkPlugins
  *   → rehype: rehypeRaw → rehypeSanitize(schema) → rehypeStripUnsafe
- *       → rehypeHighlight
+ *       → rehypeLabelBareFences → rehypeHighlight (not on the streaming tail)
  *   → urlTransform: cardAwareUrlTransform
  *   → components: buildBaseComponents(...) spread-last componentOverrides
  */
+
+import type { Element, Root } from 'hast';
 import type React from 'react';
 import { memo, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
@@ -63,6 +65,36 @@ export type { ResolveLinkResult };
  * engine and its compositions, not public API.
  */
 export const NO_BROKEN_LINKS: readonly string[] = [];
+
+const BARE_FENCE_LANGUAGE = 'code';
+
+/**
+ * Gives a fenced code block written without a language the `language-code`
+ * class. The `code` renderer tells a fenced block from inline code only by a
+ * `language-*` class, which unlabelled fences used to get from
+ * rehype-highlight's language detection; without detection (and on the
+ * streaming tail, which is not highlighted at all) they would render as
+ * inline-code pills. `code` is in rehype-highlight's `plainText` list, so
+ * the block is left unhighlighted, and its header reads "code".
+ */
+function rehypeLabelBareFences() {
+  const visit = (node: Root | Element) => {
+    for (const child of node.children) {
+      if (child.type !== 'element') continue;
+      if (child.tagName === 'pre') {
+        for (const code of child.children) {
+          if (code.type !== 'element' || code.tagName !== 'code') continue;
+          const classes = Array.isArray(code.properties.className) ? code.properties.className : [];
+          if (!classes.some(c => String(c).startsWith('language-'))) {
+            code.properties.className = [...classes, `language-${BARE_FENCE_LANGUAGE}`];
+          }
+        }
+      }
+      visit(child);
+    }
+  };
+  return (tree: Root) => visit(tree);
+}
 
 export interface MarkdownEngineProps {
   content: string;
@@ -195,19 +227,31 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     [additionalRemarkPlugins],
   );
 
-  const rehypePlugins = useMemo<PluggableList>(() => {
+  const { rehypePlugins, liveRehypePlugins } = useMemo(() => {
     const schema = buildSanitizeSchema({
       extraAllowedHtmlTags: extraTagsKey ? extraTagsKey.split('|') : undefined,
     });
-    return [
-      // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
-      // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
-      // defense-in-depth (srcset scanning, iframe[srcdoc]); highlight last.
-      rehypeRaw,
-      [rehypeSanitize, schema],
-      rehypeStripUnsafe,
-      [rehypeHighlight, { detect: true, ignoreMissing: true }],
+    // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
+    // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
+    // defense-in-depth (srcset scanning, iframe[srcdoc]); the fence label
+    // goes on after sanitizing and before highlight, which runs last.
+    const safe: PluggableList = [rehypeRaw, [rehypeSanitize, schema], rehypeStripUnsafe, rehypeLabelBareFences];
+    const highlighted: PluggableList = [
+      ...safe,
+      // No language detection: it ran highlightAuto over every registered
+      // grammar for each unlabelled fence (~2.5x the cost of opening a
+      // thread) and often guessed wrong (PowerShell shown as "VBNET").
+      [rehypeHighlight, { plainText: [BARE_FENCE_LANGUAGE] }],
     ];
+    return {
+      rehypePlugins: highlighted,
+      // The streaming tail re-parses on every chunk, and a code fence being
+      // typed is one tail block — highlighting it every chunk was the
+      // costliest step of a streamed reply. It is highlighted once it
+      // completes: every block before the tail and the final parse use
+      // `rehypePlugins`.
+      liveRehypePlugins: safe,
+    };
   }, [extraTagsKey]);
 
   const components: Components = useMemo(
@@ -238,7 +282,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     // spam (polite + additions). Streaming caret/pulse affordances live in
     // chat components and honor prefers-reduced-motion there.
     <div aria-live="polite" aria-relevant="additions text">
-      {streamingBlocks.map(block => (
+      {streamingBlocks.map((block, i) => (
         // Each unit is parsed on its own, so hast positions restart at 1;
         // the offset maps them back onto the document-wide heading-id map.
         <HeadingLineOffsetContext.Provider key={block.index} value={block.startLine - 1}>
@@ -252,7 +296,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
           ) : (
             <ReactMarkdown
               remarkPlugins={remarkPlugins}
-              rehypePlugins={rehypePlugins}
+              rehypePlugins={i === streamingBlocks.length - 1 ? liveRehypePlugins : rehypePlugins}
               urlTransform={cardAwareUrlTransform}
               components={components}
             >

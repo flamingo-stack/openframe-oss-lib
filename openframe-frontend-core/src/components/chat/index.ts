@@ -6,7 +6,9 @@ export * from './approval-batch-message';
 export * from './escalation-offer-message';
 export * from './ticket-escalated-message';
 export * from './ticket-event-message';
+export * from './system-event-message';
 export * from './ai-assistant-info';
+export * from './chat-appearance-context';
 export * from './context-compaction-display';
 export * from './expand-chevron';
 export * from './thinking-display';
@@ -35,6 +37,9 @@ export * from './msp-organization-card';
 export * from './msp-organization-card-skeleton';
 export * from './guide-mode-banner';
 export * from './mingo-chat-history';
+export * from './mingo-archive-list';
+export * from './mingo-chat-header';
+export * from './mingo-chat-rail';
 export * from './mingo-history-rail';
 export * from './mingo-chat-modals';
 export * from './chat-header-icon-button';
@@ -47,6 +52,10 @@ export * from './context-items-list';
 export * from './chat-archive-page';
 export * from './model-display';
 export * from './chat-sidebar';
+export * from './chat-nav-sidebar';
+export * from './chat-list-empty-state';
+export * from './chat-top-navigation';
+export * from './onboarding-carousel';
 export type { ChatRef } from './chat-ref.types';
 export { remarkCardLinks } from './remark-card-links';
 export { remarkMentionChips } from './remark-mention-chips';
@@ -89,4 +98,6 @@ export {
   EmbeddableChat,
   type EmbeddableChatHandle,
   type EmbeddableChatProps,
+  MINGO_V2_RAIL_WIDTH,
 } from './embeddable-chat';
+export * from './proxy-credentials-panel';
