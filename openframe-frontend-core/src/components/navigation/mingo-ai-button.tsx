@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { useEffect } from 'react';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel } from '../../utils/visitor-os';
@@ -18,8 +19,8 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
    *  assistant name (same `assistantName` the chat panel shows) so the
    *  launcher never hardcodes an identity the admin has renamed. */
   label?: string;
-  /** Show the keyboard hint (Cmd K on Apple platforms, Ctrl K elsewhere) beside
-   *  the label. The HOST binds the shortcut; this only shows it. Default false. */
+  /** Bind Cmd+K (Ctrl+K off Apple platforms) to open the chat, and show the
+   *  key cap beside the label. Default false. */
   shortcutHint?: boolean;
   /** `inline` (default): the header launcher, the height and type of the menu
    *  items beside it. `field`: the full-width row that opens the mobile menu
@@ -29,6 +30,18 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
 }
 
 const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
+
+/** The event the mounted chat panel (`EmbeddableChat`) opens on. */
+export const ASK_AI_OPEN_EVENT = 'ask-ai:open';
+
+/**
+ * Open the chat of `source`. Coalesced to '' so a source-less call still
+ * matches the panel's own `runtime.source ?? ''` comparison (undefined !== ''
+ * would make the panel silently ignore the event).
+ */
+export function openAskAi(source?: string): void {
+  window.dispatchEvent(new CustomEvent(ASK_AI_OPEN_EVENT, { detail: { source: source ?? '' } }));
+}
 
 /**
  * THE Mingo AI launcher, in the site header's right cluster and at the top of
@@ -63,6 +76,20 @@ export function MingoAiButton({
   const visitor = useVisitorOs();
   const field = variant === 'field';
 
+  // The shortcut the key cap shows opens the same chat the click opens.
+  useEffect(() => {
+    if (!shortcutHint) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Something on the page already took the shortcut (an editor's link shortcut): leave it alone.
+      if (event.defaultPrevented || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      openAskAi(source);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [shortcutHint, source]);
+
   return (
     <Button
       {...props}
@@ -73,10 +100,7 @@ export function MingoAiButton({
       aria-label={label}
       aria-keyshortcuts={shortcutHint ? 'Meta+K Control+K' : undefined}
       onClick={e => {
-        // Coalesce to '' so a source-less mount still matches EmbeddableChat's
-        // own `runtime.source ?? ''` comparison (undefined !== '' would make
-        // the panel silently ignore the event).
-        window.dispatchEvent(new CustomEvent('ask-ai:open', { detail: { source: source ?? '' } }));
+        openAskAi(source);
         onClick?.(e);
       }}
       className={cn(

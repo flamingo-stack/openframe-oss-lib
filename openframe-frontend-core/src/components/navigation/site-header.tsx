@@ -224,6 +224,8 @@ export function SiteHeader({
 
   return (
     <div
+      // Hook point for page-scoped header CSS (a full-screen deck hides the bar).
+      data-site-header=""
       className="sticky top-0 z-[50] w-full transition-transform duration-300 ease-in-out"
       style={{ transform: headerShown ? 'translateY(0)' : 'translateY(-100%)' }}
     >

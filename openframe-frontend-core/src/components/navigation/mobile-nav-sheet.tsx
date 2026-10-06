@@ -32,7 +32,7 @@ export interface MobileNavSheetProps {
   actions?: React.ReactNode;
   /** The Mingo row at the top (`MingoAiButton variant="field"`): the assistant's
    *  name and icon; `source` scopes the `ask-ai:open` event. Omitted: no row. */
-  askAI?: { source?: string; icon?: React.ReactNode; label: string };
+  askAI?: { source?: string; icon?: React.ReactNode; label?: string };
   /** Host-added groups after the site's own (Profile, Admin). */
   extraMenus?: NavMenu[];
   /** Values for `NavLink.badgeKey`. */
@@ -41,6 +41,15 @@ export interface MobileNavSheetProps {
   social?: React.ReactNode;
   /** Opaque ODS background class. Default `bg-ods-bg`. */
   backgroundClassName?: string;
+}
+
+/**
+ * Would the sheet list anything from this navigation? The header's menu button
+ * and the sheet read this one answer (plus whatever the host adds: a profile
+ * entry, a sign-up button), so a button never opens an empty sheet.
+ */
+export function siteNavHasMobileMenus(nav: Pick<SiteNav, 'menus' | 'mobileMenus'>): boolean {
+  return (nav.mobileMenus ?? nav.menus).length > 0;
 }
 
 const GROUP_ROW_CLASS =

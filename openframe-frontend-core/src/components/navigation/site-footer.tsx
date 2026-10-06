@@ -13,6 +13,9 @@ import { defaultRenderSiteNavLink, NAV_FOCUS_CLASS, navLinkLabel, type SiteNavLi
 export interface SiteFooterProps {
   nav: SiteNav;
   logo: React.ReactNode;
+  /** The platform's name beside the logo: a string is set as the wordmark, a
+   *  node is drawn as given (a platform with its own styled name). */
+  name?: React.ReactNode;
   renderLink?: SiteNavLinkRenderer;
   /** The closing band's primary CTA when `nav.primaryCta` is `'trial'` or `'waitlist'`. */
   cta?: React.ReactNode;
@@ -123,6 +126,7 @@ function FooterColumn({
 export function SiteFooter({
   nav,
   logo,
+  name,
   renderLink = defaultRenderSiteNavLink,
   cta,
   social,
@@ -181,7 +185,14 @@ export function SiteFooter({
 
       <div className="flex flex-col gap-8 py-[var(--spacing-system-xlf)] lg:flex-row lg:gap-16 lg:py-14">
         <div className="flex w-full shrink-0 flex-col items-start gap-[var(--spacing-system-mf)] lg:w-60">
-          {logo}
+          <span className="flex items-center gap-[var(--spacing-system-xsf)]">
+            {logo}
+            {typeof name === 'string' ? (
+              <span className="whitespace-nowrap text-ods-text-primary text-wordmark">{name}</span>
+            ) : (
+              name
+            )}
+          </span>
           <p className="text-ods-text-secondary text-h6">{nav.brand.tagline}</p>
           {socialRow}
           {nav.brand.statusUrl &&
