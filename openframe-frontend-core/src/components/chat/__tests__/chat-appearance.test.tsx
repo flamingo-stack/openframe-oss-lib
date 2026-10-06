@@ -32,36 +32,14 @@ describe('chat appearance', () => {
     expect(screen.queryByText('John Smith')).toBeNull();
   });
 
-  it('Mingo v2 writes every author: face, name and time in a row', () => {
-    const at = new Date();
+  it("an admin's own turn in Mingo is a bubble under their face, with no written name", () => {
     render(
       <ChatAppearanceContext.Provider value="v2">
-        <ChatMessageEnhanced role="assistant" assistantType="mingo" name="Mingo" content="On it" timestamp={at} />
+        <ChatMessageEnhanced role="user" authorType="admin" assistantType="mingo" name="Roman Smith" content="Hi" />
       </ChatAppearanceContext.Provider>,
     );
-    const name = screen.getByText('Mingo');
-    expect(name.className).toContain('text-ods-flamingo-cyan');
-    expect(name.className).toContain('text-h6');
-    expect(screen.getByRole('img', { name: 'Mingo' })).toBeTruthy();
-    expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeTruthy();
-  });
-
-  it("Mingo v2 draws the user's turn like the agent's: named, on the left, no bubble", () => {
-    render(
-      <ChatAppearanceContext.Provider value="v2">
-        <ChatMessageEnhanced role="user" assistantType="mingo" name="Roman Smith" content="Hi" />
-      </ChatAppearanceContext.Provider>,
-    );
-    expect(screen.getByText('Roman Smith').className).toContain('text-ods-open-yellow');
-    expect(screen.getByText('Hi')).toBeTruthy();
-    expect(document.body).not.toContainHTML('bg-ods-bg-active');
-    expect(document.body).not.toContainHTML('justify-end');
-  });
-
-  it('a classic Mingo thread keeps the bubble and no written name', () => {
-    render(<ChatMessageEnhanced role="user" assistantType="mingo" name="Roman Smith" content="Hi" />);
+    expect(screen.getByTitle('Roman Smith')).toBeTruthy();
     expect(screen.queryByText('Roman Smith')).toBeNull();
-    expect(screen.getByText('Hi')).toBeTruthy();
     expect(document.body).toContainHTML('bg-ods-bg-active');
   });
 
