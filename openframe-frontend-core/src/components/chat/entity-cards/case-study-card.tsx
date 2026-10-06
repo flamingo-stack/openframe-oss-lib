@@ -15,6 +15,7 @@
 
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import type { CaseStudyCardData } from '../../../types/case-study';
 import { cn } from '../../../utils/cn';
 import { sortBitesByFeaturedAtDesc } from '../../features/video-bites-shared';
@@ -189,7 +190,7 @@ export function CaseStudyCard({
     // cut's own frame is usually upright and would not fill a 16:9 slot.
     const poster = study.main_video_thumbnail || study.featured_image || preview?.posterUrl || null;
     return (
-      <a
+      <Link
         href={href}
         target={target}
         rel={rel}
@@ -254,7 +255,7 @@ export function CaseStudyCard({
           </span>
         )}
         <span className="mt-auto text-ods-accent text-h6">{hasAnyVideo ? 'Watch the story' : 'Read the story'}</span>
-      </a>
+      </Link>
     );
   }
 

@@ -71,8 +71,11 @@ function FooterColumn({
           <>
             {/* Below md the heading is the accordion's button; from md it is a plain heading. */}
             <h3 className="md:hidden">
-              <button
+              <Button
                 type="button"
+                variant="glyph"
+                size="wrap"
+                font="regular"
                 aria-expanded={open}
                 aria-controls={listId}
                 onClick={() => setOpen(prev => !prev)}
@@ -87,7 +90,7 @@ function FooterColumn({
                   aria-hidden="true"
                   className={cn('h-5 w-5 shrink-0 transition-transform duration-150', open && 'rotate-180')}
                 />
-              </button>
+              </Button>
             </h3>
             <h3 className={cn('hidden md:block', HEADING_CLASS)}>{group.title}</h3>
           </>

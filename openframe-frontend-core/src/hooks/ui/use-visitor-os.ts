@@ -12,7 +12,9 @@ const KNOWN = new Map<VisitorOs | null, VisitorOsState>();
 const subscribe = () => () => {};
 const getServerSnapshot = () => UNKNOWN;
 function getSnapshot(): VisitorOsState {
-  const os = detectVisitorOs(navigator.userAgent, { maxTouchPoints: navigator.maxTouchPoints });
+  // `userAgentData` is the Client Hints API (Chromium only, so not in every DOM typing).
+  const stated = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
+  const os = detectVisitorOs(navigator.userAgent, { platform: stated, maxTouchPoints: navigator.maxTouchPoints });
   let state = KNOWN.get(os);
   if (!state) {
     state = { known: true, os };

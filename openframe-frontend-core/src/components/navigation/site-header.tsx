@@ -148,17 +148,24 @@ export function SiteHeader({
       if (!menu.href) return null;
       return (
         <div key={menu.id} className="flex">
-          {renderLink({
-            link: { href: menu.href },
-            className: cn(TOP_ITEM_CLASS, NAV_FOCUS_CLASS, current && TOP_ITEM_CURRENT_CLASS),
-            'aria-current': current ? 'page' : undefined,
-            children: (
-              <>
-                {menuIcon(menu)}
-                {menu.label}
-              </>
-            ),
-          })}
+          <Button
+            asChild
+            variant="transparent"
+            size="wrap"
+            font="regular"
+            className={cn(TOP_ITEM_CLASS, NAV_FOCUS_CLASS, current && TOP_ITEM_CURRENT_CLASS)}
+          >
+            {renderLink({
+              link: { href: menu.href },
+              'aria-current': current ? 'page' : undefined,
+              children: (
+                <>
+                  {menuIcon(menu)}
+                  {menu.label}
+                </>
+              ),
+            })}
+          </Button>
         </div>
       );
     }
@@ -168,8 +175,11 @@ export function SiteHeader({
       // A dropdown is anchored to its trigger (`relative`); a mega menu to the
       // bar itself, so its wrapper stays unpositioned.
       <div key={menu.id} className={cn('flex', !isMegaMenu(menu) && 'relative')}>
-        <button
+        <Button
           type="button"
+          variant="transparent"
+          size="wrap"
+          font="regular"
           {...getTriggerProps(menu.id)}
           aria-current={current ? 'page' : undefined}
           className={cn(
@@ -183,9 +193,10 @@ export function SiteHeader({
           {menu.label}
           <Chevron02DownIcon
             aria-hidden="true"
-            className={cn('h-4 w-4 transition-transform duration-150', open && 'rotate-180')}
+            // `!`: the Button sizes every glyph inside it at 20px; the chevron is 16.
+            className={cn('!h-4 !w-4 transition-transform duration-150', open && 'rotate-180')}
           />
-        </button>
+        </Button>
         <NavPanel
           {...getPanelProps(menu.id)}
           menu={menu}
@@ -301,11 +312,15 @@ export function SiteHeader({
               )}
               {nav.signIn && (
                 <div className="hidden lg:flex">
-                  {renderLink({
-                    link: nav.signIn,
-                    className: cn(TOP_ITEM_CLASS, NAV_FOCUS_CLASS),
-                    children: nav.signIn.label,
-                  })}
+                  <Button
+                    asChild
+                    variant="transparent"
+                    size="wrap"
+                    font="regular"
+                    className={cn(TOP_ITEM_CLASS, NAV_FOCUS_CLASS)}
+                  >
+                    {renderLink({ link: nav.signIn, children: nav.signIn.label })}
+                  </Button>
                 </div>
               )}
               {actions}

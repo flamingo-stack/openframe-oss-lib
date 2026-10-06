@@ -30,6 +30,7 @@
 
 import { Megaphone, Bell, Info, Star, Package as PackageGlyph } from 'lucide-react';
 import type { ComponentType, CSSProperties } from 'react';
+import { platformAccentVarName } from '../../../utils/platform-identity';
 import * as IconsV2 from '../../icons-v2-generated';
 import { HeadphoneIcon } from '../../icons-v2-generated/audio-and-visual/headphone-icon';
 import { VideoRecorderIcon } from '../../icons-v2-generated/audio-and-visual/video-recorder-icon';
@@ -73,25 +74,34 @@ function sizedLogo(Logo: ComponentType<{ className?: string; style?: CSSProperti
     return <Logo className={className} style={{ width: size, height: size }} />;
   };
 }
+// A sister platform's mark is drawn in THAT platform's brand colour (the
+// platform brand registry), never in the accent of the page showing it: on
+// flamingo.run the OpenMSP mark stays OpenMSP yellow, not flamingo pink.
+const brandColor = (platform: string) => `var(${platformAccentVarName(platform)})`;
 // The OpenMSP mark's own defaults are black and white (made for a light page):
-// on the dark surfaces every glyph sits on, they are pinned to the theme's
-// tokens, the way the OpenMSP header draws its logo.
+// on the dark surfaces every glyph sits on, the bubbles take the theme's text
+// and background tokens and the back bubble OpenMSP's brand colour.
 const OpenmspLogoIcon: IconComponent = ({ size = 16, className }) => (
   <OpenmspLogo
     className={className}
     style={{ width: size, height: size }}
     frontBubbleColor="var(--color-text-primary)"
     innerFrontBubbleColor="var(--color-bg)"
-    backBubbleColor="var(--color-accent-primary)"
+    backBubbleColor={brandColor('openmsp')}
   />
 );
 const FlamingoLogoIcon = sizedLogo(FlamingoLogo);
 // The two community marks size themselves through a `size` prop, the resolver's own contract.
 const MlgLogoIcon: IconComponent = ({ size = 16, className, color }) => (
-  <MlgLogo size={size} className={className} color={color} />
+  <MlgLogo size={size} className={className} color={color ?? brandColor('mlg')} />
 );
 const TmcgLogoIcon: IconComponent = ({ size = 16, className }) => (
-  <MiamiCyberGangLogoFaceOnly size={size} className={className} />
+  <MiamiCyberGangLogoFaceOnly
+    size={size}
+    className={className}
+    originalPink={brandColor('tmcg')}
+    originalWhite="var(--color-text-primary)"
+  />
 );
 
 /**

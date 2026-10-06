@@ -28,6 +28,17 @@ describe('visitor system detection', () => {
     expect(detectVisitorOs(UA.windows, { maxTouchPoints: 10 })).toBe('windows');
   });
 
+  it('reads the Client Hints platform first, quoted as the header sends it, and falls back to the User-Agent', () => {
+    expect(detectVisitorOs(UA.mac, { platform: '"Windows"' })).toBe('windows');
+    expect(detectVisitorOs(null, { platform: 'macOS' })).toBe('mac');
+    expect(detectVisitorOs(UA.linux, { platform: 'Android' })).toBe('android');
+    expect(detectVisitorOs(null, { platform: 'Chrome OS' })).toBe('linux');
+    // An empty or unknown hint is no hint.
+    expect(detectVisitorOs(UA.windows, { platform: '' })).toBe('windows');
+    expect(detectVisitorOs(UA.windows, { platform: '"Unknown"' })).toBe('windows');
+    expect(detectVisitorOs(null, { platform: 'macOS', maxTouchPoints: 5 })).toBe('ios');
+  });
+
   it('offers an installer to desktop systems only', () => {
     expect(detectDesktopOs(UA.windows)).toBe('windows');
     expect(detectDesktopOs(UA.iphone)).toBeNull();

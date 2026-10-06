@@ -121,17 +121,16 @@ function MobileNavSheetBody({
     >
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-ods-border pl-5 pr-[var(--spacing-system-xsf)]">
         <div className="flex min-w-0 items-center">{logo}</div>
-        <button
+        <Button
           type="button"
+          variant="transparent"
+          size="icon"
           aria-label="Close menu"
           onClick={onClose}
-          className={cn(
-            'flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ods-text-primary transition-colors hover:bg-ods-bg-hover',
-            NAV_FOCUS_CLASS,
-          )}
+          className={cn('h-11 w-11 shrink-0 md:h-11 md:w-11', NAV_FOCUS_CLASS)}
         >
-          <XmarkIcon aria-hidden="true" className="h-6 w-6" />
-        </button>
+          <XmarkIcon aria-hidden="true" className="!h-6 !w-6" />
+        </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5">
@@ -171,8 +170,11 @@ function MobileNavSheetBody({
             const listId = `${MOBILE_NAV_SHEET_ID}-${menu.id}`;
             return (
               <div key={menu.id} className="border-b border-ods-border">
-                <button
+                <Button
                   type="button"
+                  variant="glyph"
+                  size="wrap"
+                  font="regular"
                   aria-expanded={open}
                   aria-controls={open ? listId : undefined}
                   onClick={() => setOpenGroups(prev => ({ ...prev, [menu.id]: !prev[menu.id] }))}
@@ -186,7 +188,7 @@ function MobileNavSheetBody({
                       open && 'rotate-180',
                     )}
                   />
-                </button>
+                </Button>
                 {open && (
                   <div id={listId} className="flex flex-col pb-[var(--spacing-system-sf)]">
                     {links.map(link => (
