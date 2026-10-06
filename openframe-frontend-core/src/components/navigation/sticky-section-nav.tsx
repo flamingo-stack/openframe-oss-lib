@@ -17,6 +17,76 @@ interface StickySectionNavProps {
   className?: string;
   ribbonPosition?: 'left' | 'right';
   ribbonColor?: string;
+  /**
+   * `vertical` (default): the table of contents beside a document.
+   * `horizontal`: a bar across the page (stick it under the header with
+   * `className`): `brand` at the start, the sections as a pill row that scrolls
+   * sideways when it does not fit, `action` at the end.
+   */
+  orientation?: 'vertical' | 'horizontal';
+  /** Horizontal only: what the bar belongs to (a product mark and name). Hidden on a narrow area. */
+  brand?: React.ReactNode;
+  /** Horizontal only: one link or button at the end of the bar. Hidden on a narrow area. */
+  action?: React.ReactNode;
+  /** Names the navigation for assistive tech. */
+  label?: string;
+}
+
+function HorizontalSectionNav({
+  sections,
+  activeSection,
+  onSectionClick,
+  className,
+  brand,
+  action,
+  label,
+}: Omit<StickySectionNavProps, 'ribbonPosition' | 'ribbonColor' | 'orientation'>) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  // Keep the pill of the section being read in view when the row scrolls.
+  useEffect(() => {
+    const row = rowRef.current;
+    const pill = row?.querySelector<HTMLElement>(`[data-section="${CSS.escape(activeSection)}"]`);
+    if (!row || !pill) return;
+    const left = pill.offsetLeft - row.offsetLeft;
+    if (left < row.scrollLeft || left + pill.offsetWidth > row.scrollLeft + row.clientWidth) {
+      row.scrollTo({ left: Math.max(0, left - 12), behavior: 'smooth' });
+    }
+  }, [activeSection]);
+
+  return (
+    <nav
+      aria-label={label}
+      className={cn('flex h-14 items-center gap-6 border-b border-ods-border bg-ods-bg', className)}
+    >
+      {brand && (
+        <div className="hidden shrink-0 items-center gap-2 text-ods-text-primary text-h5 content-lg:flex">{brand}</div>
+      )}
+      <div ref={rowRef} className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none]">
+        {sections.map(section => {
+          const active = activeSection === section.id;
+          return (
+            <a
+              key={section.id}
+              href={`#${section.id}`}
+              data-section={section.id}
+              aria-current={active ? 'location' : undefined}
+              onClick={event => {
+                event.preventDefault();
+                onSectionClick(section.id);
+              }}
+              className={cn(
+                'shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 transition-colors text-h6',
+                active ? 'bg-ods-card text-ods-text-primary' : 'text-ods-text-secondary hover:text-ods-text-primary',
+              )}
+            >
+              {section.label}
+            </a>
+          );
+        })}
+      </div>
+      {action && <div className="hidden shrink-0 content-lg:block">{action}</div>}
+    </nav>
+  );
 }
 
 /**
@@ -30,11 +100,28 @@ export function StickySectionNav({
   className,
   ribbonPosition = 'left',
   ribbonColor = 'var(--color-accent-primary)',
+  orientation = 'vertical',
+  brand,
+  action,
+  label,
 }: StickySectionNavProps) {
+  if (orientation === 'horizontal') {
+    return (
+      <HorizontalSectionNav
+        sections={sections}
+        activeSection={activeSection}
+        onSectionClick={onSectionClick}
+        className={className}
+        brand={brand}
+        action={action}
+        label={label}
+      />
+    );
+  }
   const navHeight = sections.length * 40; // 40px per item (h-10)
 
   return (
-    <nav className={cn('relative bg-ods-bg', className)}>
+    <nav aria-label={label} className={cn('relative bg-ods-bg', className)}>
       {/* Background gray vertical line for all nav items */}
       <div
         className="absolute bg-ods-border"

@@ -34,13 +34,23 @@ const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
 /** The event the mounted chat panel (`EmbeddableChat`) opens on. */
 export const ASK_AI_OPEN_EVENT = 'ask-ai:open';
 
+/** What an `ask-ai:open` event carries. */
+export interface AskAiOpenDetail {
+  source: string;
+  /** A question to send as soon as the chat is open. Absent: the chat only opens. */
+  prompt?: string;
+}
+
 /**
- * Open the chat of `source`. Coalesced to '' so a source-less call still
- * matches the panel's own `runtime.source ?? ''` comparison (undefined !== ''
- * would make the panel silently ignore the event).
+ * Open the chat of `source`, and with `prompt` ask it that question once.
+ * `source` is coalesced to '' so a source-less call still matches the panel's
+ * own `runtime.source ?? ''` comparison (undefined !== '' would make the panel
+ * silently ignore the event).
  */
-export function openAskAi(source?: string): void {
-  window.dispatchEvent(new CustomEvent(ASK_AI_OPEN_EVENT, { detail: { source: source ?? '' } }));
+export function openAskAi(source?: string, options?: { prompt?: string }): void {
+  const prompt = options?.prompt?.trim();
+  const detail: AskAiOpenDetail = prompt ? { source: source ?? '', prompt } : { source: source ?? '' };
+  window.dispatchEvent(new CustomEvent<AskAiOpenDetail>(ASK_AI_OPEN_EVENT, { detail }));
 }
 
 /**

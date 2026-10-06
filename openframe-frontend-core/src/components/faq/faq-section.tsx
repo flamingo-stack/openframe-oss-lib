@@ -46,6 +46,13 @@ export interface FaqSectionProps {
   /** Fetch-URL prefix for third-party embeds / reverse proxies
    *  ('' = same-origin relative). */
   apiBaseUrl?: string;
+  /**
+   * A block beside the questions (an "ask the assistant" card). From the
+   * content `lg` step the heading, the category nav and this block form a left
+   * column and the questions the right one; below it the block follows the
+   * questions. Absent: the single-column layout, unchanged.
+   */
+  aside?: React.ReactNode;
 }
 
 const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
@@ -114,7 +121,12 @@ const groupKey = (g: FaqGroup): string => g.slug ?? UNCATEGORIZED_KEY;
 function GroupedFaqList({
   groups,
   categoryHeadingAs,
+  heading,
+  aside,
 }: {
+  /** With `aside`, the section heading: it sits in the left column above the category nav. */
+  heading?: React.ReactNode;
+  aside?: React.ReactNode;
   groups: FaqGroup[];
   /** Heading tag for each category, so the document outline nests correctly
    *  under whatever owns the heading above this block: `h2` on the standalone
@@ -265,49 +277,69 @@ function GroupedFaqList({
     });
   }, []);
 
-  return (
-    <div className="space-y-8">
-      {navGroups.length > 1 && (
-        <nav aria-label="FAQ categories" className="flex flex-wrap gap-2">
-          {navGroups.map(group => {
-            const isActive = group.slug === activeSlug;
-            return (
-              <a
-                key={group.slug}
-                href={`#${group.slug}`}
-                aria-current={isActive ? 'true' : undefined}
-                onClick={e => handleJump(e, group.slug as string)}
-                className={cn(
-                  'rounded-full border px-4 py-2 transition-colors text-h6',
-                  isActive
-                    ? 'border-ods-text-primary bg-ods-card text-ods-text-primary'
-                    : 'border-ods-border bg-ods-card text-ods-text-secondary hover:border-ods-text-secondary hover:text-ods-text-primary',
-                )}
-              >
-                {group.section}
-              </a>
-            );
-          })}
-        </nav>
-      )}
-      <div className="space-y-10">
-        {groups.map(group => {
-          const key = groupKey(group);
-          return (
-            <section key={key} id={group.slug ?? undefined} className="scroll-mt-24 space-y-4">
-              {group.section && <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>}
-              <FaqAccordion
-                // Re-key on item-hash changes so the remount picks up the new
-                // `defaultOpenIds` (the accordion is uncontrolled). Stable for
-                // section hashes — category navigation doesn't disturb state.
-                key={`${key}:${accordionKeySuffix}`}
-                items={group.items}
-                defaultOpenIds={defaultOpenByGroupKey?.get(key)}
-              />
-            </section>
-          );
-        })}
+  const categoryNav = navGroups.length > 1 && (
+    <nav aria-label="FAQ categories" className="flex flex-wrap gap-2">
+      {navGroups.map(group => {
+        const isActive = group.slug === activeSlug;
+        return (
+          <a
+            key={group.slug}
+            href={`#${group.slug}`}
+            aria-current={isActive ? 'true' : undefined}
+            onClick={e => handleJump(e, group.slug as string)}
+            className={cn(
+              'rounded-full border px-4 py-2 transition-colors text-h6',
+              isActive
+                ? 'border-ods-text-primary bg-ods-card text-ods-text-primary'
+                : 'border-ods-border bg-ods-card text-ods-text-secondary hover:border-ods-text-secondary hover:text-ods-text-primary',
+            )}
+          >
+            {group.section}
+          </a>
+        );
+      })}
+    </nav>
+  );
+  const questions = (
+    <div className="space-y-10">
+      {groups.map(group => {
+        const key = groupKey(group);
+        return (
+          <section key={key} id={group.slug ?? undefined} className="scroll-mt-24 space-y-4">
+            {group.section && <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>}
+            <FaqAccordion
+              // Re-key on item-hash changes so the remount picks up the new
+              // `defaultOpenIds` (the accordion is uncontrolled). Stable for
+              // section hashes — category navigation doesn't disturb state.
+              key={`${key}:${accordionKeySuffix}`}
+              items={group.items}
+              defaultOpenIds={defaultOpenByGroupKey?.get(key)}
+            />
+          </section>
+        );
+      })}
+    </div>
+  );
+
+  if (aside === undefined || aside === null) {
+    return (
+      <div className="space-y-8">
+        {categoryNav}
+        {questions}
       </div>
+    );
+  }
+
+  // One instance of each block, placed by the grid: questions second in the
+  // document (and on a narrow area), in the right column from `lg`.
+  return (
+    <div className="grid gap-10 content-lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] content-lg:grid-rows-[auto_1fr] content-lg:gap-x-16">
+      <div className="space-y-8">
+        {heading}
+        {categoryNav}
+      </div>
+      <div className="content-lg:col-start-2 content-lg:row-span-2 content-lg:row-start-1">{questions}</div>
+      <div className="content-lg:col-start-1 content-lg:row-start-2">{aside}</div>
     </div>
   );
 }
@@ -359,6 +391,7 @@ export function FaqSection({
   className,
   minResults,
   apiBaseUrl = '',
+  aside,
 }: FaqSectionProps) {
   const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl);
   // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
@@ -398,8 +431,13 @@ export function FaqSection({
   return (
     <>
       <section className={className ?? 'space-y-10'}>
-        {headingNode}
-        <GroupedFaqList groups={groups} categoryHeadingAs={heading === null ? 'h2' : 'h3'} />
+        {!aside && headingNode}
+        <GroupedFaqList
+          groups={groups}
+          categoryHeadingAs={heading === null ? 'h2' : 'h3'}
+          heading={aside ? headingNode : undefined}
+          aside={aside}
+        />
       </section>
       {schema && (
         <script

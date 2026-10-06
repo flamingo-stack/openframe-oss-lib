@@ -1857,15 +1857,29 @@ function EmbeddableChatInner({
   // Listen for plain "open chat" events (no row context). Fired by the
   // header MingoAiButton. Same strict source filter as `ask-ai:open-with-ref`
   // above: events without a matching source are ignored.
+  // With a `prompt` in the detail (a page's "Ask Mingo" question) the panel
+  // also asks it, once, in Guide mode: the same send the Guide launcher prompt
+  // above uses. In any other mode the chat only opens.
+  const sendAskPrompt = useCallback(
+    (prompt: string) => {
+      if (activeMode !== 'guide') return;
+      void sendMessage(prompt).catch((err: unknown) => {
+        console.error('[EmbeddableChat] ask-ai:open prompt failed:', err);
+      });
+    },
+    [activeMode, sendMessage],
+  );
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ source?: string }>).detail;
+      const detail = (e as CustomEvent<{ source?: string; prompt?: unknown }>).detail;
       if (!detail || detail.source !== source) return;
       setIsOpen(true);
+      const prompt = typeof detail.prompt === 'string' ? detail.prompt.trim() : '';
+      if (prompt) setTimeout(() => sendAskPrompt(prompt), 0);
     };
     window.addEventListener('ask-ai:open', handler);
     return () => window.removeEventListener('ask-ai:open', handler);
-  }, [source, setIsOpen]);
+  }, [source, setIsOpen, sendAskPrompt]);
 
   const hasMessages = messages.length > 0;
   // First dialog page in flight and nothing cached yet — we don't yet know if
