@@ -88,6 +88,15 @@ public class TicketGenerator {
                 .build();
     }
 
+    // One device's tickets in one column. The column is pinned so a freshly created ticket (ranked at
+    // the top of its column) is on the first page even when the device has pages of archived history.
+    public static TicketFilterInput ticketsOfDeviceInStatus(String deviceId, String statusId) {
+        return TicketFilterInput.builder()
+                .deviceIds(List.of(deviceId))
+                .statusIds(List.of(statusId))
+                .build();
+    }
+
     // Narrows archiveResolvedTickets to one organization and one assignee; that endpoint ignores statusIds.
     public static TicketFilterInput ticketsOfOrganizationAssignedTo(String organizationId, String assigneeId) {
         return TicketFilterInput.builder()
