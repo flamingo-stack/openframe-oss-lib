@@ -136,15 +136,15 @@ export const ScriptInfoSection: React.FC<ScriptInfoSectionProps> = ({
           - Desktop (lg+): 4 columns in single row
       */}
       {/* First row: Shell Type, Supported Platforms */}
-      <div className="grid grid-cols-2 gap-4 border-b border-ods-border px-4 py-4 lg:grid-cols-4 lg:border-b-0">
+      <div className="grid grid-cols-2 gap-4 border-b border-ods-border px-4 py-4 content-lg:grid-cols-4 content-lg:border-b-0">
         <InfoCell label="Shell Type" value={shellLabel} />
         <InfoCell label="Supported Platforms" value={platformsLabel} />
         {/* Desktop only: Category and Author in same row */}
-        <InfoCell label="Category" value={category} className="hidden lg:flex" />
-        {author && <InfoCell label="Added by" value={author.name} avatar={author} className="hidden lg:flex" />}
+        <InfoCell label="Category" value={category} className="hidden content-lg:flex" />
+        {author && <InfoCell label="Added by" value={author.name} avatar={author} className="hidden content-lg:flex" />}
       </div>
       {/* Second row (mobile/tablet only): Category, Author */}
-      <div className="grid grid-cols-2 gap-4 px-4 py-4 lg:hidden">
+      <div className="grid grid-cols-2 gap-4 px-4 py-4 content-lg:hidden">
         <InfoCell label="Category" value={category} />
         {author && <InfoCell label="Added by" value={author.name} avatar={author} />}
       </div>

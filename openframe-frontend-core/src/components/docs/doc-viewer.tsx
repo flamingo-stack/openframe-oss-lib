@@ -292,9 +292,9 @@ function DocViewerContent({
           )}
 
           {!error && (
-            <div className="flex flex-1 flex-col items-start gap-6 lg:flex-row lg:gap-10">
-              <div className="w-full lg:w-[320px] lg:shrink-0">
-                <div className="lg:sticky lg:top-20">
+            <div className="flex flex-1 flex-col items-start gap-6 content-lg:flex-row content-lg:gap-10">
+              <div className="w-full content-lg:w-[320px] content-lg:shrink-0">
+                <div className="content-lg:sticky content-lg:top-20">
                   {isLoadingStructure ? (
                     <CategorySidebarSkeleton />
                   ) : (
@@ -312,7 +312,7 @@ function DocViewerContent({
                       </PersistentMobileDropdown>
 
                       <PersistentSidebar isLoading={false}>
-                        <div className="hidden lg:block">
+                        <div className="hidden content-lg:block">
                           <div className="space-y-4">
                             <h3 className="font-semibold text-ods-text-secondary text-h5">{sidebarLabel}</h3>
                             <MultiLevelNavigation
@@ -343,7 +343,7 @@ function DocViewerContent({
                     // shouldn't be on file pages" bug.
                     isMarkdownContent &&
                     ((showStickyNav && stickyNavSections.length > 0) || isLoadingContent || isLoadingStructure)
-                      ? 'lg:grid-cols-[1fr_280px]'
+                      ? 'content-lg:grid-cols-[1fr_280px]'
                       : ''
                   } gap-8`}
                 >
@@ -366,7 +366,7 @@ function DocViewerContent({
                   </div>
 
                   {isMarkdownContent && (isLoadingContent || isLoadingStructure) && (
-                    <div className="hidden lg:block">
+                    <div className="hidden content-lg:block">
                       <div className="sticky top-24">
                         <div className="mb-5 h-[14px] w-28 animate-pulse rounded bg-ods-border" />
                         <div className="space-y-0">
@@ -386,7 +386,7 @@ function DocViewerContent({
                   )}
 
                   {showStickyNav && content && stickyNavSections.length > 0 && !isLoadingContent && (
-                    <div className="hidden lg:block">
+                    <div className="hidden content-lg:block">
                       <div className="sticky top-24">
                         <h3 className="mb-4 font-semibold text-ods-text-secondary text-h5">ON THIS PAGE</h3>
                         <StickySectionNav

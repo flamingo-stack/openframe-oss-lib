@@ -1,5 +1,6 @@
 // UI Hooks exports
 export * from './use-auto-limit-tags';
+export * from './use-content-breakpoint';
 export * from './use-debounce';
 export * from './use-deferred-error';
 export * from './use-drag-and-drop-enabled';
@@ -30,3 +31,6 @@ export { usePreventScroll } from '@react-aria/overlays';
 export * from './use-prefers-reduced-motion';
 export * from './use-in-view';
 export * from './use-autoplay';
+export * from './use-active-section';
+export * from './use-nav-menus';
+export * from './use-visitor-os';

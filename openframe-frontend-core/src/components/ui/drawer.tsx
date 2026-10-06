@@ -16,6 +16,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 
+import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { useHeaderHeight } from '../../hooks/ui/use-header-height';
 import { type PanelDefaultSize, useResizablePanelSize } from '../../hooks/ui/use-resizable-panel-size';
 import { cn } from '../../utils/cn';
@@ -309,7 +310,7 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
             className={cn(drawerPanelVariants({ side, flush, size }), className, panelClassName)}
             style={{ ...sizeStyle, ...panelStyle }}
           >
-            {children}
+            <ViewportBreakpoints>{children}</ViewportBreakpoints>
           </div>
         </DialogPrimitive.Content>
       </DrawerPortal>

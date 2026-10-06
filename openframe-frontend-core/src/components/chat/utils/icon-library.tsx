@@ -30,6 +30,7 @@
 
 import { Megaphone, Bell, Info, Star, Package as PackageGlyph } from 'lucide-react';
 import type { ComponentType, CSSProperties } from 'react';
+import { platformAccentVarName } from '../../../utils/platform-identity';
 import * as IconsV2 from '../../icons-v2-generated';
 import { HeadphoneIcon } from '../../icons-v2-generated/audio-and-visual/headphone-icon';
 import { VideoRecorderIcon } from '../../icons-v2-generated/audio-and-visual/video-recorder-icon';
@@ -52,6 +53,8 @@ import { GraduationCapIcon } from '../../icons-v2-generated/school/graduation-ca
 import { TicketIcon } from '../../icons-v2-generated/shopping/ticket-icon';
 import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
 import { FlamingoLogo } from '../../icons/flamingo-logo';
+import { MiamiCyberGangLogoFaceOnly } from '../../icons/miami-cyber-gang-logo-face-only';
+import { MlgLogo } from '../../icons/mlg-logo';
 import { OpenFrameLogo } from '../../icons/openframe-logo';
 import { OpenmspLogo } from '../../icons/openmsp-logo';
 import { getIconComponent } from './icon-registry';
@@ -71,8 +74,37 @@ function sizedLogo(Logo: ComponentType<{ className?: string; style?: CSSProperti
     return <Logo className={className} style={{ width: size, height: size }} />;
   };
 }
-const OpenmspLogoIcon = sizedLogo(OpenmspLogo);
+// A sister platform's mark is drawn in THAT platform's brand colour (the
+// platform brand registry), never in the accent of the page showing it: on
+// flamingo.run the OpenMSP mark stays OpenMSP yellow, not flamingo pink.
+const brandColor = (platform: string) => `var(${platformAccentVarName(platform)})`;
+// The OpenMSP mark's own defaults are black and white (made for a light page):
+// on the dark surfaces every glyph sits on, the bubbles take the theme's text
+// and background tokens and the back bubble OpenMSP's brand colour.
+const OpenmspLogoIcon: IconComponent = ({ size = 16, className }) => (
+  <OpenmspLogo
+    className={className}
+    style={{ width: size, height: size }}
+    frontBubbleColor="var(--color-text-primary)"
+    innerFrontBubbleColor="var(--color-bg)"
+    backBubbleColor={brandColor('openmsp')}
+  />
+);
 const FlamingoLogoIcon = sizedLogo(FlamingoLogo);
+// The two community marks size themselves through a `size` prop, the resolver's own contract.
+// Major League GitHub draws its mark in the theme's text colour on its own site
+// (its header, hero and footer), never in an accent: so does every glyph of it.
+const MlgLogoIcon: IconComponent = ({ size = 16, className, color }) => (
+  <MlgLogo size={size} className={className} color={color ?? 'var(--color-text-primary)'} />
+);
+const TmcgLogoIcon: IconComponent = ({ size = 16, className }) => (
+  <MiamiCyberGangLogoFaceOnly
+    size={size}
+    className={className}
+    originalPink={brandColor('tmcg')}
+    originalWhite="var(--color-text-primary)"
+  />
+);
 
 /**
  * `OpenFrameLogo` from `components/icons/` predates the v2 set and:
@@ -138,6 +170,8 @@ export const ICON_ALIASES: Record<string, IconComponent> = {
   // (was the separate `renderSvgIcon` map; now ONE resolver everywhere).
   'openframe-logo': LogoOpenframeIcon,
   'openmsp-logo': OpenmspLogoIcon,
+  'mlg-logo': MlgLogoIcon,
+  'tmcg-logo': TmcgLogoIcon,
   flamingo: FlamingoLogoIcon,
   'flamingo-logo': FlamingoLogoIcon,
   megaphone: Megaphone,

@@ -37,6 +37,9 @@ export * from './msp-organization-card';
 export * from './msp-organization-card-skeleton';
 export * from './guide-mode-banner';
 export * from './mingo-chat-history';
+export * from './mingo-archive-list';
+export * from './mingo-chat-header';
+export * from './mingo-chat-rail';
 export * from './mingo-history-rail';
 export * from './mingo-chat-modals';
 export * from './chat-header-icon-button';
@@ -58,7 +61,13 @@ export { remarkCardLinks } from './remark-card-links';
 export { remarkMentionChips } from './remark-mention-chips';
 
 // Card-supporting UI migrated from hub `components/shared/*` + `components/blog/*`
-export { NavLinkAnchorViaRuntime, type NavLinkAnchorViaRuntimeProps } from './nav-link-anchor-via-runtime';
+export {
+  NavLinkAnchorViaRuntime,
+  type NavLinkAnchorViaRuntimeProps,
+  type NavLinkViaRuntimeInput,
+  type NavLinkViaRuntimeProps,
+  useNavLinkViaRuntime,
+} from './nav-link-anchor-via-runtime';
 export { SourceActionButton, type SourceActionButtonProps, type SourceActionDensity } from './source-action-button';
 export {
   ChatAttachmentAddButton,
@@ -95,5 +104,7 @@ export {
   EmbeddableChat,
   type EmbeddableChatHandle,
   type EmbeddableChatProps,
+  MINGO_V2_RAIL_WIDTH,
+  MINGO_V2_SPLIT_WIDTH,
 } from './embeddable-chat';
 export * from './proxy-credentials-panel';
