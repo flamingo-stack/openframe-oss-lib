@@ -1,3 +1,4 @@
+import type { AgentName } from '../../agent-mark';
 import type { PendingToolCallData } from '../../chat/types';
 import type { TicketStatus } from '../../ui/ticket-status-tag';
 
@@ -68,6 +69,8 @@ export interface BoardTicket {
   escalatedByUser?: boolean;
   /** Single live-activity indicator rendered as the card's footer row. */
   activity?: BoardTicketActivity;
+  /** The AI agent that owns the ticket: its mark is shown with the assignees. */
+  agent?: AgentName;
 }
 
 export interface BoardColumnDef {
