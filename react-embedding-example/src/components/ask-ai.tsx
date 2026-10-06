@@ -8,7 +8,7 @@ import { DOCS_BASE_ROUTE } from '../config/content'
  * Identity (Michael) is resolved server-side via the proxy's act-as headers, so the
  * greeting just works.
  *
- * ENTRY POINT: the shared header's Mingo launcher (`HeaderConfig.mingo` in
+ * ENTRY POINT: the shared header's Mingo launcher (`SiteHeader`'s `mingo` in
  * app-shell.tsx) — the same `ask-ai:open` event bus the hub uses. The lib's
  * floating internal trigger is disabled (`showInternalTrigger={false}`),
  * matching the hub's retired-dock model.
@@ -58,7 +58,7 @@ export function AskAi() {
       </div>
 
       {/* Headless panel — the floating internal trigger is DISABLED (same as
-          the hub): the shared header's MingoAiButton (HeaderConfig.mingo in
+          the hub): the shared header's MingoAiButton (SiteHeader's mingo in
           app-shell.tsx) is the ONLY chat entry; it dispatches `ask-ai:open`
           and this always-mounted panel listens. */}
       <EmbeddableChat

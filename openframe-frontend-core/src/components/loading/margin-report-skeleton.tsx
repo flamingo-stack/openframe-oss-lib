@@ -12,7 +12,7 @@ interface MarginReportSkeletonProps {
 export function MarginReportSkeleton({ animate = true, description, overlayContent }: MarginReportSkeletonProps) {
   return (
     <main className={`bg-ods-bg ${animate ? 'animate-pulse' : ''} relative min-h-screen`}>
-      <div className="mx-auto max-w-[1920px] space-y-10 px-6 py-6 md:px-20 md:py-10">
+      <div className="mx-auto max-w-[1920px] space-y-10 px-6 py-6 content-md:px-20 content-md:py-10">
         {/* Header */}
         <div className="space-y-3">
           <div className="h-10 w-72 rounded bg-ods-skeleton" />
@@ -20,14 +20,14 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 content-md:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="h-32 rounded border border-ods-border bg-ods-card" />
           ))}
         </div>
 
         {/* MSP Profile & Report Info cards */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2">
           {/* MSP profile skeleton */}
           <div className="flex animate-pulse items-center gap-4 rounded-lg border border-ods-border bg-ods-card p-6">
             <div className="h-14 w-14 rounded-lg bg-ods-skeleton" />
@@ -54,7 +54,7 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
         </div>
 
         {/* Vendor solution lists (Commercial & Open-Source) */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2">
           {['Commercial Stack', 'Open-Source Stack'].map((label, idx) => (
             <div
               key={idx}
@@ -81,7 +81,7 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
                       <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-ods-skeleton" />
                       <div className="flex min-w-0 flex-col">
                         <div className="h-4 w-32 rounded bg-ods-skeleton" />
-                        <div className="mt-1 hidden h-3 w-24 rounded bg-ods-skeleton md:block" />
+                        <div className="mt-1 hidden h-3 w-24 rounded bg-ods-skeleton content-md:block" />
                       </div>
                     </div>
                     {/* right addon: cost text */}
@@ -100,7 +100,7 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
         <div className="h-6 w-60 rounded bg-ods-skeleton" />
 
         {/* Recommendations grid */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2 content-lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="h-48 rounded border border-ods-border bg-ods-card" />
           ))}
@@ -119,7 +119,7 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
           </div>
 
           {/* Value cards grid */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2 content-lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-32 rounded border border-ods-border bg-ods-card" />
             ))}

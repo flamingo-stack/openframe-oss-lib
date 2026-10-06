@@ -8,8 +8,8 @@ export const BREAKPOINT_ORDER: TailwindBreakpoint[] = ['md', 'lg', 'xl', '2xl'];
  * Generates Tailwind hide classes based on breakpoint configuration.
  *
  * @example
- * getHideClasses('md')           // 'hidden md:flex'
- * getHideClasses(['md', 'lg'])   // 'md:hidden lg:hidden xl:flex'
+ * getHideClasses('md')           // 'hidden content-md:flex'
+ * getHideClasses(['md', 'lg'])   // 'content-md:hidden content-lg:hidden content-xl:flex'
  */
 export function getHideClasses(hideAt?: TailwindBreakpoint | TailwindBreakpoint[]): string {
   if (!hideAt) return '';
@@ -17,13 +17,13 @@ export function getHideClasses(hideAt?: TailwindBreakpoint | TailwindBreakpoint[
   const breakpoints = Array.isArray(hideAt) ? hideAt : [hideAt];
 
   if (breakpoints.length === 1) {
-    return `hidden ${breakpoints[0]}:flex`;
+    return `hidden content-${breakpoints[0]}:flex`;
   }
 
   const maxIdx = Math.max(...breakpoints.map(bp => BREAKPOINT_ORDER.indexOf(bp)));
-  const hideClasses = breakpoints.map(bp => `${bp}:hidden`).join(' ');
+  const hideClasses = breakpoints.map(bp => `content-${bp}:hidden`).join(' ');
   const showBreakpoint = BREAKPOINT_ORDER[maxIdx + 1];
-  return showBreakpoint ? `${hideClasses} ${showBreakpoint}:flex` : hideClasses;
+  return showBreakpoint ? `${hideClasses} content-${showBreakpoint}:flex` : hideClasses;
 }
 
 /**

@@ -53,7 +53,7 @@ export function TestResultsSkeleton() {
         <div className="animate-pulse overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
           {/* Same INNER row heights as the DataTable (66/78px + the 1px card
               border on each side = 68/80px total, per design). */}
-          <div className="flex h-[66px] items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] md:h-[78px]">
+          <div className="flex h-[66px] items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] content-md:h-[78px]">
             {Array.from({ length: SKELETON_COLUMNS }).map((_, i) => (
               <div key={`skeleton-cell-${i}`} className="w-[160px] shrink-0">
                 <div className="h-5 w-3/4 rounded-sm bg-ods-bg-surface" />
@@ -114,7 +114,7 @@ export function TestResultsTable({ rows, loading }: { rows: QueryResultRow[]; lo
     <ScrollShadow axis="horizontal">
       <div style={{ minWidth: Math.max(1, columnKeys.length) * RESULT_COLUMN_MIN_WIDTH }}>
         <DataTable table={table}>
-          {/* "flex" overrides the header's default "hidden md:flex" so the
+          {/* "flex" overrides the header's default "hidden content-md:flex" so the
               headers render on mobile too. */}
           <DataTable.Header className="flex flex-col" />
           <DataTable.Body loading={false} />
