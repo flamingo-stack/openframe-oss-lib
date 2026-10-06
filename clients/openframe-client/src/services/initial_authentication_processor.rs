@@ -20,7 +20,11 @@ impl InitialAuthenticationProcessor {
     }
 
     pub async fn process(&self) -> Result<()> {
-        let access_token = self.config_service.get_access_token().await?;
+        let access_token = self
+            .config_service
+            .get_access_token()
+            .await
+            .context("Failed to read existing access token")?;
         if !access_token.is_empty() {
             info!("Existing access_token detected. Skipping initial authentication.");
 

@@ -3,6 +3,7 @@ import Image from '../../../embed-shims/next-image';
 import { getProxiedImageUrl } from '../../../utils/image-proxy-stub';
 import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
 import { AdminContentCard } from './admin-content-card';
+import { AdminContentCardSkeleton } from './admin-content-card-grid';
 
 /** The fields every people-hub employee entry shares. Entity-specific bindings
  *  (`WhatIShippedCard`, `HowIWorkCard`) map their own date column to `dateLabel`
@@ -102,7 +103,9 @@ export function EmployeeEntryCard({
               <Image
                 src={getProxiedImageUrl(entry.author.avatar_url) ?? entry.author.avatar_url}
                 alt=""
-                className="h-5 w-5 shrink-0 rounded-full object-cover"
+                // One line of the meta row tall (16px on a phone, 20px from md), so the
+                // row is exactly the line the skeleton reserves.
+                className="h-[1lh] w-[1lh] shrink-0 rounded-full object-cover"
                 width={20}
                 height={20}
                 unoptimized
@@ -114,6 +117,12 @@ export function EmployeeEntryCard({
         </>
       }
       actions={actions}
+      // Every row keeps its space, so every card in a rail or a grid is one
+      // height with its rows aligned, and `EmployeeEntryCardSkeleton` (the
+      // shared AdminContentCardSkeleton) matches it box for box.
+      reserveRows
+      // An entry has no subtitle line: nothing to reserve between title and summary.
+      subtitleRow={false}
       className={className}
     />
   );
@@ -126,27 +135,12 @@ export function EmployeeEntryCard({
   );
 }
 
-/** Loading skeleton matching EmployeeEntryCard's AdminContentCard shape (3:2 cover
- *  + title / summary / meta lines). Used by the related-content rail while a
- *  group hydrates so there's no shape jump when the real card lands. */
-export function EmployeeEntryCardSkeleton({ className }: { className?: string }) {
-  // Same convention as BlogCardSkeleton et al.: animate-pulse on the container,
-  // `bg-ods-bg` placeholder blocks, flex-grow body with an `mt-auto` avatar+name
-  // row. Shape mirrors EmployeeEntryCard's AdminContentCard (rounded-2xl, 3:2 cover).
-  return (
-    <div
-      className={`group flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-ods-border bg-ods-card ${className ?? ''}`}
-    >
-      <div className="aspect-[3/2] bg-ods-bg" />
-      <div className="flex flex-grow flex-col space-y-3 p-4">
-        <div className="h-5 w-3/4 rounded bg-ods-bg" />
-        <div className="h-3 w-full rounded bg-ods-bg/60" />
-        <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
-        <div className="mt-auto flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-ods-bg" />
-          <div className="h-3 w-24 rounded bg-ods-bg/60" />
-        </div>
-      </div>
-    </div>
-  );
+/**
+ * The employee-entry card's placeholder: THE admin card skeleton, the same
+ * component every `AdminContentCard reserveRows` grid uses, so the loading card
+ * and the real one are the same box. `actions` matches a card rendered with an
+ * owner action row (the dashboards); a read-only card (rails) has none.
+ */
+export function EmployeeEntryCardSkeleton({ className, actions = false }: { className?: string; actions?: boolean }) {
+  return <AdminContentCardSkeleton className={className} actions={actions} subtitleRow={false} />;
 }

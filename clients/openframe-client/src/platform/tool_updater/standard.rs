@@ -31,7 +31,10 @@ impl ToolUpdater for StandardToolUpdater {
             .await
             .with_context(|| format!("Failed to stop tool: {}", tool_agent_id))?;
 
-        let agent_path = self.deps.directory_manager.get_agent_path(tool_agent_id);
+        let agent_path = self
+            .deps
+            .directory_manager
+            .get_tool_executable_path(&tool.tool_agent_id, tool.installation.executable_path());
         clear_aside_binary(&agent_path, tool_agent_id).await;
         log_update_survivors(&self.deps, tool).await;
 
@@ -52,7 +55,10 @@ impl ToolUpdater for StandardToolUpdater {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Applying Standard tool update");
 
-        let agent_path = self.deps.directory_manager.get_agent_path(tool_agent_id);
+        let agent_path = self
+            .deps
+            .directory_manager
+            .get_tool_executable_path(&tool.tool_agent_id, tool.installation.executable_path());
         download_and_write_binary(&self.deps, config, &agent_path, tool_agent_id).await?;
         Ok(None)
     }
@@ -74,7 +80,10 @@ impl ToolUpdater for StandardToolUpdater {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Rolling back Standard tool update");
 
-        let agent_path = self.deps.directory_manager.get_agent_path(tool_agent_id);
+        let agent_path = self
+            .deps
+            .directory_manager
+            .get_tool_executable_path(&tool.tool_agent_id, tool.installation.executable_path());
         restore_from_backup(ctx.backup_path.as_ref(), &agent_path, tool_agent_id).await
     }
 }

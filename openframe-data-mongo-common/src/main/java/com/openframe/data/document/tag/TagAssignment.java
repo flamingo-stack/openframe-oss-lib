@@ -22,8 +22,17 @@ public class TagAssignment implements TenantScoped {
     @Id
     private String id;
     private String tenantId;
+    /**
+     * Identifier of the tagged entity. The type of entity this id refers to
+     * (e.g., a device, a script, etc.) is determined by the sibling
+     * {@link #entityType} field.
+     */
     private String entityId;
     private String tagId;
+    /**
+     * Discriminator for {@link #entityId}, indicating which kind of entity
+     * (device, script, etc.) the id refers to.
+     */
     private TagEntityType entityType;
     /**
      * Per-device values for the tag key (e.g., ["site1", "site2"] for key "site").
@@ -31,5 +40,9 @@ public class TagAssignment implements TenantScoped {
      */
     private List<String> values;
     private Instant taggedAt;
+    /**
+     * Identifier of the user or system that created this tag assignment.
+     */
     private String taggedBy;
 }
+

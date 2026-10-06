@@ -52,7 +52,7 @@ export function EntityIcon({
   }
   if (icon?.name && BRAND_MARK_NAMES.has(icon.name)) {
     // Size via `className` when provided (so responsive Tailwind sizing like
-    // `w-6 md:w-8` works); fall back to a fixed `size` px box ONLY when no
+    // `w-6 content-md:w-8` works); fall back to a fixed `size` px box ONLY when no
     // className is given — an inline `style` would otherwise override the class.
     return (
       <span

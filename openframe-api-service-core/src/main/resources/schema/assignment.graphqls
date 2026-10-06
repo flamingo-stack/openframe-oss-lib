@@ -48,6 +48,7 @@ interface AssignableTarget {
 enum AssignmentItemType {
     TICKET
     KNOWLEDGE_ARTICLE
+    INSIGHT
 }
 
 enum AssignmentTargetType {
@@ -72,6 +73,11 @@ type Ticket implements AssignableTarget & Node {
     title: String
     description: String
     status: String
+    # The lifecycle status: the kind drives the canonical chip styling, the definition carries the
+    # name and colour a custom column is drawn from. `status` above is the legacy string and reports
+    # every custom column as TECH_REQUIRED — it stays only for clients that have not migrated.
+    statusKind: TicketStatusKind
+    statusDefinition: TicketStatusDefinition
     creationSource: String
 
     deviceId: String
@@ -89,4 +95,22 @@ type Ticket implements AssignableTarget & Node {
     createdAt: Instant
     updatedAt: Instant
     resolvedAt: Instant
+}
+
+# Mirrors the lifecycle status types in ai-agent's ticket.graphqls so a client can reuse the same
+# mapping for an assigned ticket as for the board.
+# TODO: Remove after Apollo Federation migration — single shared Ticket type.
+enum TicketStatusKind {
+    AI_ASSISTANCE
+    TECH_REQUIRED
+    RESOLVED
+    ARCHIVED
+    CUSTOM
+}
+
+type TicketStatusDefinition {
+    id: ID!
+    name: String!
+    color: String!
+    kind: TicketStatusKind!
 }

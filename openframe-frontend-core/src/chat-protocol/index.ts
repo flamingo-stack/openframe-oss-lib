@@ -11,6 +11,8 @@
 
 export * from './frames';
 export * from './events';
+// The stages a turn reports before its first answer token, and their copy.
+export * from './progress';
 export * from './encode';
 export * from './decode';
 export * from './nats-decoder';
@@ -23,3 +25,6 @@ export * from './ip-normalize';
 // forwarding above must be parsed IDENTICALLY on both sides of the seam.
 export * from './env-flag';
 export { isRecord, unwrapEnvelope } from './wire-narrow';
+// The `[card://<type>:<id>]` grammar — the renderer's and the server's one
+// definition, so a reference the hub emits is one the client expands.
+export * from './card-marker';

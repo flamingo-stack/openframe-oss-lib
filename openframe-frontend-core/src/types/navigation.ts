@@ -165,6 +165,14 @@ export interface NavigationSidebarItem {
   icon: React.ReactNode;
   path?: string;
   unreadCount?: number;
+  /**
+   * A stamp after the label — "Beta" on a module still behind a flag. One short
+   * word, drawn as a chip beside the label in the expanded sidebar and the mobile
+   * menu; the minimized rail carries it only in the row's tooltip and accessible
+   * name. Cased as it should be read ("Beta"): the surfaces upper-case it
+   * themselves, and the accessible name becomes "Devices (Beta)".
+   */
+  badge?: string;
   isActive?: boolean;
   onClick?: () => void;
   children?: NavigationSidebarItem[];

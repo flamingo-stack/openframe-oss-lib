@@ -27,14 +27,17 @@ import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterOption;
 import com.openframe.api.dto.rmm.script.ScriptFilters;
+import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
+import com.openframe.api.mapper.ScriptEnvVarMapper;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLScriptMapper;
 import com.openframe.api.service.rmm.script.ScriptDispatchService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.api.service.rmm.script.ScriptFilterService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import jakarta.validation.Valid;
@@ -43,14 +46,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 
-/**
- * GraphQL resolver for RMM script CRUD.
- *
- * <p>Pure passthrough to {@link ScriptService} — tenant scoping is resolved
- * inside the service via {@code TenantIdProvider}. Authorisation (which roles
- * may invoke which mutation) is intentionally not enforced here yet — it will
- * be added in a dedicated security pass once the RMM role model is agreed.
- */
 @DgsComponent
 @RequiredArgsConstructor
 @Slf4j
@@ -109,7 +104,8 @@ public class ScriptDataFetcher {
     @DgsMutation
     public ScriptResponse createScript(@InputArgument @Valid CreateScriptInput input) {
         input.setTagIds(decodeIds(input.getTagIds()));
-        return scriptService.create(input, getCurrentUserId());
+        String userId = getCurrentUserId();
+        return scriptService.create(input, userId, ScriptCreationSource.MANUAL);
     }
 
     @DgsMutation
@@ -146,7 +142,6 @@ public class ScriptDataFetcher {
         return scriptDispatchService.batchRunScript(input, getCurrentUserId(), ExecutionSource.MANUAL);
     }
 
-    /** Returns the Relay global id (Base64 "Script:&lt;rawId&gt;") for the {@code id} field. */
     @DgsData(parentType = "Script", field = "id")
     public String scriptNodeId(DgsDataFetchingEnvironment dfe) {
         ScriptResponse script = dfe.getSource();
@@ -161,12 +156,17 @@ public class ScriptDataFetcher {
         return globalIds == null ? null : globalIds.stream().map(ScriptDataFetcher::decodeId).toList();
     }
 
-    /** Re-encode a facet's raw option values to Relay global ids of the given node type (in place). */
     private static void encodeNodeOptions(List<ScriptFilterOption> options, String nodeType) {
         if (options == null) {
             return;
         }
         options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
+    }
+
+    @DgsData(parentType = "Script", field = "envVars")
+    public List<ScriptEnvVarInput> envVars(DgsDataFetchingEnvironment dfe) {
+        ScriptResponse script = dfe.getSource();
+        return ScriptEnvVarMapper.mask(script.getEnvVars());
     }
 
     /** Resolves the {@code Script.tags} field, batched per request via the data loader. */
@@ -177,7 +177,6 @@ public class ScriptDataFetcher {
         return loader.load(script.getId());
     }
 
-    /** Resolves the {@code Script.author} field from {@code createdBy}, batched via the user loader. */
     @DgsData(parentType = "Script", field = "author")
     public CompletableFuture<UserResponse> author(DgsDataFetchingEnvironment dfe) {
         ScriptResponse script = dfe.getSource();

@@ -9,7 +9,7 @@ use tokio::runtime::Runtime;
 use tracing::{error, info};
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(name = "openframe-client", author, version = env!("OPENFRAME_VERSION"), about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -130,7 +130,7 @@ pub fn run() -> Result<()> {
                         if parameterless {
                             println!("\nNot authenticated yet. Get your auth command from your OpenFrame dashboard → Devices → Add device.");
                             #[cfg(target_os = "windows")]
-                            println!("Open a new terminal first so the 'openframe' command is on PATH.");
+                            println!("Open a new terminal first so the 'openframe-client' command is on PATH.");
                             println!("Updates are managed by the OpenFrame platform.");
                         }
                         process::exit(0);
@@ -152,7 +152,7 @@ pub fn run() -> Result<()> {
 
             if report.has_failures() {
                 println!(
-                    "\n{} check(s) failed. Nothing was saved — fix the issues above and run 'openframe auth' again.",
+                    "\n{} check(s) failed. Nothing was saved — fix the issues above and run 'openframe-client auth' again.",
                     report.failure_count()
                 );
                 process::exit(1);
@@ -279,7 +279,7 @@ pub fn run() -> Result<()> {
             .map(|service| service.is_configured())
             .unwrap_or(false)
             {
-                println!("Not authenticated yet. Run 'openframe auth' with your tenant parameters first.");
+                println!("Not authenticated yet. Run 'openframe-client auth' with your tenant parameters first.");
                 process::exit(1);
             }
 

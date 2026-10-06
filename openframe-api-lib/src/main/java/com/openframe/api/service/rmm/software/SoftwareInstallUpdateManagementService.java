@@ -6,8 +6,10 @@ import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
+import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class SoftwareInstallUpdateManagementService {
     private final PackageManagerRegistry packageManagerRegistry;
     private final ScriptService scriptService;
     private final SoftwareDispatchService softwareDispatchService;
+    private final MachinePlatformResolver machinePlatformResolver;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -41,6 +44,7 @@ public class SoftwareInstallUpdateManagementService {
     private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,
                                                   String initiatedBy, ExecutionSource source) {
         List<String> machineIds = input.getMachineIds();
+        Map<String, OsType> osTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         Map<SoftwareScriptCode, ScriptResponse> scriptCache = new EnumMap<>(SoftwareScriptCode.class);
 
         List<SoftwareDispatchResult> results = new ArrayList<>(input.getPackages().size());
@@ -48,9 +52,17 @@ public class SoftwareInstallUpdateManagementService {
             PackageManagerHandler handler = packageManagerRegistry.handlerFor(pkg.getPackageManager());
             SoftwareScriptCode code = handler.scriptCode(action);
             ScriptResponse script = scriptCache.computeIfAbsent(code, scriptService::getSoftwareScript);
-            List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
 
-            String executionId = softwareDispatchService.dispatch(script, machineIds, args, initiatedBy, source,
+            List<String> targets = machinePlatformResolver.compatible(machineIds, osTypes, script.getSupportedPlatforms());
+            if (targets.isEmpty()) {
+                log.warn("Software {} skipped package {}/{}: no OS-compatible device among {} target(s) (supports {})",
+                        action, pkg.getPackageManager(), pkg.getPackageName(), machineIds.size(),
+                        script.getSupportedPlatforms());
+                continue;
+            }
+
+            List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
+            String executionId = softwareDispatchService.dispatch(script, targets, args, initiatedBy, source,
                     pkg.getPackageManager(), pkg.getPackageName(), action);
 
             results.add(SoftwareDispatchResult.builder()
@@ -60,8 +72,8 @@ public class SoftwareInstallUpdateManagementService {
                     .build());
         }
 
-        log.info("Software {} dispatched: packages={} machines={} initiatedBy={} source={}",
-                action, input.getPackages().size(), machineIds.size(), initiatedBy, source);
+        log.info("Software {} dispatched: packages={}/{} machines={} initiatedBy={} source={}",
+                action, results.size(), input.getPackages().size(), machineIds.size(), initiatedBy, source);
         return results;
     }
 }

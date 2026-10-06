@@ -1,8 +1,10 @@
 'use client';
 
 import type React from 'react';
+import { RESCUE_FORMS } from '../../utils/form-rescue';
 import { ContactForm, type ContactFormProps } from '../contact';
 import { G2Icon, CapterraIcon, TrustpilotIcon, GetAppIcon } from '../icons';
+import { accentSentenceMarks } from '../layout/page-heading';
 import { BenefitCard, BenefitCardGrid } from '../ui';
 
 /**
@@ -93,6 +95,7 @@ const DEFAULT_CONTACT_FORM_PROPS = {
   buttonVariant: 'outline' as ContactFormProps['buttonVariant'],
   buttonClassName: 'w-full',
   successToastMessage: "Thank you! We'll reach out to schedule your case study.",
+  rescue: RESCUE_FORMS.caseStudyPitch,
 } satisfies Partial<ContactFormProps>;
 
 export function ShareExperienceSection({
@@ -106,7 +109,7 @@ export function ShareExperienceSection({
   return (
     <section className={`flex flex-col gap-10${className ? ` ${className}` : ''}`}>
       <div className="text-ods-text-primary">
-        <h2 className="text-ods-text-primary text-h1">{title}</h2>
+        <h2 className="text-ods-text-primary text-h1">{accentSentenceMarks(title)}</h2>
         <p className="mt-6 max-w-[765px] text-h4">{subtitle}</p>
       </div>
 

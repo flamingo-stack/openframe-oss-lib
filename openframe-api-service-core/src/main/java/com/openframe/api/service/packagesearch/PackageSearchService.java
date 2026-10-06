@@ -30,7 +30,6 @@ public class PackageSearchService {
     // hasMore exactly, so a page is at most 39; a uniform cap keeps paging identical across managers.
     private static final int MAX_LIMIT = 39;
     private static final int DEFAULT_LIMIT = 25;
-    private static final int MIN_QUERY_LENGTH = 2;
 
     private final Map<PackageManagerType, PackageManagerClient> clients;
     private final PackageManagerProperties packageManagerProperties;
@@ -45,9 +44,6 @@ public class PackageSearchService {
     public CountedGenericConnection<GenericEdge<PackageSearchItem>> search(
             PackageManagerType packageManager, String rawSearch, CursorPaginationCriteria pagination) {
         String search = rawSearch == null ? "" : rawSearch.trim();
-        if (search.length() < MIN_QUERY_LENGTH) {
-            throw new IllegalArgumentException("search must be at least " + MIN_QUERY_LENGTH + " characters long");
-        }
         Page page = resolvePage(pagination);
 
         PackageManagerClient client = clientFor(packageManager);

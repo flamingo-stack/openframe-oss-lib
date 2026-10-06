@@ -30,6 +30,11 @@ export type { AppHeaderProps, HeaderLoadingCell } from './app-header';
 
 export { AppLayout, useAppLayoutDrawerContainer } from './app-layout';
 export type { AppLayoutProps } from './app-layout';
+export type {
+  AppLayoutSidePanelConfig,
+  AppLayoutSidePanelMode,
+  AppLayoutSidePanelRenderState,
+} from './app-layout-side-panel';
 
 export {
   AppLayoutDrawer,
@@ -51,6 +56,8 @@ export { HeaderButton } from './header-button';
 export type { HeaderButtonProps } from './header-button';
 export { UnreadDot, UnreadCountBadge } from './unread-dot';
 export type { UnreadDotProps, UnreadCountBadgeProps } from './unread-dot';
+export { NavigationItemBadge } from './navigation-item-badge';
+export type { NavigationItemBadgeProps } from './navigation-item-badge';
 export { TicketAlertsButton } from './ticket-alerts-button';
 export type { TicketAlertsButtonProps } from './ticket-alerts-button';
 

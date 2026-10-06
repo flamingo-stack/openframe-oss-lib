@@ -19,7 +19,27 @@ pub fn write<'a>(
     }
 
     for (key, value) in &prefs {
-        let status = Command::new("sudo")
+        let status = Command::new("launchctl")
+            .args([
+                "asuser",
+                &user.uid.to_string(),
+                "sudo",
+                "-u",
+                &user.username,
+                "defaults",
+                "write",
+                bundle_id,
+                key,
+                value,
+            ])
+            .status()
+            .with_context(|| format!("Failed to write preference '{}'", key))?;
+
+        if status.success() {
+            continue;
+        }
+
+        let fallback = Command::new("sudo")
             .args([
                 "-u",
                 &user.username,
@@ -32,8 +52,8 @@ pub fn write<'a>(
             .status()
             .with_context(|| format!("Failed to write preference '{}'", key))?;
 
-        if !status.success() {
-            anyhow::bail!("defaults write failed for '{}': exit {}", key, status);
+        if !fallback.success() {
+            anyhow::bail!("defaults write failed for '{}': {}", key, fallback);
         }
     }
 

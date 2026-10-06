@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
+use std::process::{Output, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 use tokio::sync::{Notify, RwLock};
 use tokio::time::{sleep, timeout};
@@ -9,6 +11,9 @@ use tracing::{error, info, warn};
 
 use crate::models::installed_tool::InstalledTool;
 use crate::models::ToolConnection;
+use crate::platform::orphan_reaper;
+use crate::platform::process_tree::ProcessTree;
+use crate::platform::DirectoryManager;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
@@ -27,6 +32,10 @@ const AGENT_ID_MAX_FAST_RETRIES: u32 = 5;
 const AGENT_ID_DEGRADED_BACKOFF_SECONDS: u64 = 300;
 /// Cadence of the periodic re-resolve + re-publish, so a mid-run re-key heals within the hour.
 const REPUBLISH_INTERVAL_SECONDS: u64 = 3600;
+/// Asset whose orphaned processes are swept for tools that launch it (Fleet's `uuid` and orbit).
+const OSQUERYD_ASSET_ID: &str = "osqueryd";
+/// Upper bound on one orphan sweep, so a stuck process snapshot can't wedge the loop.
+const ORPHAN_SWEEP_TIMEOUT_SECONDS: u64 = 30;
 
 // TODO: refactor class
 #[derive(Clone)]
@@ -159,6 +168,7 @@ impl ToolConnectionProcessingManager {
             // Counts consecutive agentId-resolution failures so a hung agent backs off
             // (and is reported as degraded) instead of spinning a tight retry loop forever.
             let mut agent_id_failures: u32 = 0;
+            reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;
             loop {
                 // Stop if the tool was uninstalled while we were retrying; don't proceed on a failed registry read.
                 match installed_tools_service
@@ -226,19 +236,15 @@ impl ToolConnectionProcessingManager {
                     if !std::path::Path::new(&command_path).exists() {
                         warn!("Executable not found at: {}", command_path);
                     }
-                    // kill_on_drop: a timed-out agent must die with the future, or it leaks and holds the tool's db open
-                    let command_future = Command::new(&command_path)
-                        .args(&processed_args)
-                        .kill_on_drop(true)
-                        .output();
-                    let output = match timeout(
+                    let output = match run_agent_id_command(
+                        &command_path,
+                        &processed_args,
                         Duration::from_secs(AGENT_ID_COMMAND_TIMEOUT_SECONDS),
-                        command_future,
                     )
                     .await
                     {
                         // Command finished within timeout
-                        Ok(Ok(out)) => {
+                        Ok(Some(out)) => {
                             info!(
                                 "Command completed successfully: {}",
                                 String::from_utf8_lossy(&out.stdout)
@@ -246,17 +252,18 @@ impl ToolConnectionProcessingManager {
                             out
                         }
                         // Command returned an error before timeout
-                        Ok(Err(e)) => {
+                        Err(e) => {
                             error!(
                                 tool_id = %tool.tool_id,
                                 command_path = %command_path,
                                 "Failed to execute agentId command: {:#} – retrying", e
                             );
+                            reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;
                             backoff_agent_id_failure(&tool.tool_id, &mut agent_id_failures).await;
                             continue;
                         }
                         // Timeout expired
-                        Err(_) => {
+                        Ok(None) => {
                             let service_running = tool_service_running(&tool).await;
                             error!(
                                 tool_id = %tool.tool_id,
@@ -264,6 +271,7 @@ impl ToolConnectionProcessingManager {
                                 service_running = ?service_running,
                                 "agentId command timed out after {AGENT_ID_COMMAND_TIMEOUT_SECONDS} seconds – killed it, retrying"
                             );
+                            reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;
                             backoff_agent_id_failure(&tool.tool_id, &mut agent_id_failures).await;
                             continue;
                         }
@@ -285,6 +293,7 @@ impl ToolConnectionProcessingManager {
                                 tool_id = %tool.tool_id,
                                 "agentId command returned empty output - retrying"
                             );
+                            reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;
                             backoff_agent_id_failure(&tool.tool_id, &mut agent_id_failures).await;
                             continue;
                         }
@@ -298,6 +307,7 @@ impl ToolConnectionProcessingManager {
                             stdout,
                             stderr
                         );
+                        reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;
                         backoff_agent_id_failure(&tool.tool_id, &mut agent_id_failures).await;
                         continue;
                     }
@@ -330,6 +340,7 @@ impl ToolConnectionProcessingManager {
                         }
 
                         info!(tool_id = %tool.tool_id, agent_tool_id = %agent_tool_id, "Tool connection message published successfully and saved");
+                        reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;
                         tokio::select! {
                             _ = sleep(Duration::from_secs(REPUBLISH_INTERVAL_SECONDS)) => {}
                             _ = wake.notified() => info!(tool_id = %tool.tool_id, "Immediate re-publish requested - re-resolving agent id now"),
@@ -349,6 +360,78 @@ impl ToolConnectionProcessingManager {
         });
 
         Ok(())
+    }
+}
+
+/// Runs the agentId command; on timeout kills its whole process tree and returns None.
+async fn run_agent_id_command(
+    command_path: &str,
+    args: &[String],
+    limit: Duration,
+) -> std::io::Result<Option<Output>> {
+    let mut cmd = Command::new(command_path);
+    cmd.args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let mut child = cmd.spawn()?;
+    let tree = ProcessTree::attach(&child);
+
+    let (mut stdout, mut stderr) = (child.stdout.take(), child.stderr.take());
+    // Reap only after the pipes close, so the root stays unreaped (pid not reusable) until a timeout kill.
+    let run = async {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        tokio::try_join!(
+            read_pipe(&mut stdout, &mut out),
+            read_pipe(&mut stderr, &mut err)
+        )?;
+        let status = child.wait().await?;
+        Ok(Output {
+            status,
+            stdout: out,
+            stderr: err,
+        })
+    };
+    match timeout(limit, run).await {
+        Ok(result) => result.map(Some),
+        Err(_) => {
+            let _ = tokio::task::spawn_blocking(move || tree.kill()).await;
+            Ok(None)
+        }
+    }
+}
+
+async fn read_pipe<R: AsyncRead + Unpin>(
+    pipe: &mut Option<R>,
+    buf: &mut Vec<u8>,
+) -> std::io::Result<()> {
+    match pipe {
+        Some(r) => r.read_to_end(buf).await.map(drop),
+        None => Ok(()),
+    }
+}
+
+/// True when the tool's commands launch the given asset (Fleet passes `${client.assetPath.osqueryd}`).
+fn tool_launches_asset(tool: &InstalledTool, asset_id: &str) -> bool {
+    let placeholder = format!("${{client.assetPath.{asset_id}}}");
+    tool.tool_agent_id_command_args
+        .iter()
+        .chain(&tool.run_command_args)
+        .any(|arg| arg.contains(&placeholder))
+}
+
+/// Kills orphaned copies of the osqueryd asset the tool's commands launch; no-op for tools that don't use it.
+async fn reap_orphaned_helpers(tool: &InstalledTool, directory_manager: &DirectoryManager) {
+    if !tool_launches_asset(tool, OSQUERYD_ASSET_ID) {
+        return;
+    }
+    let target = directory_manager.get_asset_path(&tool.tool_agent_id, OSQUERYD_ASSET_ID, true);
+    let sweep = tokio::task::spawn_blocking(move || orphan_reaper::reap_orphans(&target));
+    match timeout(Duration::from_secs(ORPHAN_SWEEP_TIMEOUT_SECONDS), sweep).await {
+        Ok(Ok(_)) => {}
+        Ok(Err(e)) => warn!(tool_id = %tool.tool_id, "Orphaned osqueryd sweep failed: {e}"),
+        Err(_) => warn!(tool_id = %tool.tool_id, "Orphaned osqueryd sweep timed out; continuing"),
     }
 }
 
@@ -389,3 +472,7 @@ async fn backoff_agent_id_failure(tool_id: &str, failures: &mut u32) {
     };
     sleep(Duration::from_secs(delay)).await;
 }
+
+#[cfg(test)]
+#[path = "tool_connection_processing_manager_tests.rs"]
+mod tests;

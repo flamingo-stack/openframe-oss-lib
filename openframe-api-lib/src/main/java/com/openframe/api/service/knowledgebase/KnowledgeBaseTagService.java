@@ -82,6 +82,9 @@ public class KnowledgeBaseTagService {
     @Transactional
     public void addTagToItem(String itemId, String tagId) {
         log.info("Adding tag {} to KB item {}", tagId, itemId);
+        if (tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE).isPresent()) {
+            return;
+        }
         TagAssignment assignment = TagAssignment.builder()
                 .entityId(itemId)
                 .tagId(tagId)

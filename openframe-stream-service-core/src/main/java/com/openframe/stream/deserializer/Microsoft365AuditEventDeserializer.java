@@ -1,0 +1,144 @@
+package com.openframe.stream.deserializer;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openframe.data.cassandra.model.enums.UnifiedEventType;
+import com.openframe.data.model.enums.MessageType;
+import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
+import com.openframe.stream.mapping.EventTypeMapper;
+import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Component;
+
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Deserializes Microsoft 365 Entra directory audit events polled from Graph
+ * {@code auditLogs/directoryAudits}. Events are hand-built by the poller (not CDC), arrive
+ * pre-enriched with tenant/organization fields in the payload and carry no agent reference —
+ * hence {@link com.openframe.data.model.enums.DataEnrichmentServiceType#PRE_ENRICHED}.
+ * {@code toolEventId} is {@code <graphAuditId>-<organizationId>} — the same shape as the poller's
+ * Kafka key. The org suffix matters: one Graph audit fans out once per organization linked to the
+ * connection, and toolEventId is part of the storage primary key (organizationId is not), so bare
+ * audit ids would make the per-organization copies overwrite each other. Replays from the
+ * poller's cursor overlap window still upsert idempotently (same suffix on every replay).
+ * {@code connectionId}/{@code connectionName} (multi-connection orgs) are passed through into details.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class Microsoft365AuditEventDeserializer implements KafkaMessageDeserializer {
+
+    private static final DateTimeFormatter DAY_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.of("UTC"));
+    // Graph result values that mean the operation did not succeed (result can be
+    // success | failure | timeout | unknownFutureValue).
+    private static final Set<String> FAILED_RESULTS = Set.of("failure", "timeout");
+    private static final String UNKNOWN = "unknown";
+
+    private final ObjectMapper mapper;
+
+    @Override
+    public MessageType getType() {
+        return MessageType.MICROSOFT_365_AUDIT_EVENT;
+    }
+
+    @Override
+    public DeserializedDebeziumMessage deserialize(CommonDebeziumMessage debeziumMessage, MessageType messageType) {
+        JsonNode after = debeziumMessage.getPayload().getAfter();
+        if (after == null || after.isNull()) {
+            return null;
+        }
+        long eventTimestamp = getEventTimestamp(after)
+                .orElse(debeziumMessage.getPayload().getTimestamp());
+        String category = textField(after, "category").orElse(UNKNOWN);
+        String toolEventId = perOrganizationToolEventId(after);
+
+        return DeserializedDebeziumMessage.builder()
+                .payload(debeziumMessage.getPayload())
+                .agentId(null)
+                .ingestDay(DAY_FORMATTER.format(Instant.ofEpochMilli(eventTimestamp)))
+                .sourceEventType(category)
+                .toolEventId(toolEventId)
+                .unifiedEventType(resolveEventType(after, category))
+                .message(textField(after, "activityDisplayName").orElse(null))
+                .integratedToolType(messageType.getIntegratedToolType())
+                .debeziumMessage(after.toString())
+                .details(buildDetails(after))
+                .eventTimestamp(eventTimestamp)
+                .skipProcessing(false)
+                .isVisible(true)
+                .tenantId(textField(after, "tenantId").orElse(null))
+                .organizationId(textField(after, "organizationId").orElse(null))
+                .organizationName(textField(after, "organizationName").orElse(null))
+                .userId(textPath(after.path("initiatedBy").path("user"), "userPrincipalName"))
+                .build();
+    }
+
+    private String perOrganizationToolEventId(JsonNode after) {
+        String auditId = textField(after, "auditId").orElse(null);
+        String organizationId = textField(after, "organizationId").orElse(null);
+        if (auditId == null || organizationId == null) {
+            return auditId;
+        }
+        return auditId + "-" + organizationId;
+    }
+
+    private UnifiedEventType resolveEventType(JsonNode after, String category) {
+        if (textField(after, "result").map(String::toLowerCase).filter(FAILED_RESULTS::contains).isPresent()) {
+            return UnifiedEventType.M365_AUDIT_FAILURE;
+        }
+        UnifiedEventType mapped = EventTypeMapper.mapToUnifiedType(getType().getIntegratedToolType(), category);
+        return mapped == UnifiedEventType.UNKNOWN ? UnifiedEventType.M365_AUDIT_OTHER : mapped;
+    }
+
+    private Optional<Long> getEventTimestamp(JsonNode after) {
+        return textField(after, "activityDateTime")
+                .flatMap(value -> {
+                    try {
+                        return Optional.of(Instant.parse(value).toEpochMilli());
+                    } catch (Exception e) {
+                        log.warn("Unparseable activityDateTime '{}', falling back to processing timestamp", value);
+                        return Optional.empty();
+                    }
+                });
+    }
+
+    private String buildDetails(JsonNode after) {
+        ObjectNode details = mapper.createObjectNode();
+        JsonNode initiatedBy = after.get("initiatedBy");
+        if (initiatedBy != null && !initiatedBy.isNull()) {
+            details.set("initiatedBy", initiatedBy);
+        }
+        JsonNode targetResources = after.get("targetResources");
+        if (targetResources != null && !targetResources.isNull()) {
+            details.set("targetResources", targetResources);
+        }
+        JsonNode additionalDetails = after.get("additionalDetails");
+        if (additionalDetails != null && !additionalDetails.isNull()) {
+            details.set("additionalDetails", additionalDetails);
+        }
+        textField(after, "connectionId").ifPresent(value -> details.put("connectionId", value));
+        textField(after, "connectionName").ifPresent(value -> details.put("connectionName", value));
+        return details.toString();
+    }
+
+    private Optional<String> textField(JsonNode node, String fieldName) {
+        return Optional.ofNullable(node.get(fieldName))
+                .filter(field -> !field.isNull())
+                .map(JsonNode::asText)
+                .filter(StringUtils::isNotBlank);
+    }
+
+    private String textPath(JsonNode node, String fieldName) {
+        String value = node.path(fieldName).asText(null);
+        return StringUtils.isNotBlank(value) ? value : null;
+    }
+}

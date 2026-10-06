@@ -71,16 +71,16 @@ export interface HelpCenterCreateFormProps {
  * content swaps an `<Input>` / `<Textarea>` / `<Button>` for a
  * same-sized animated `bg-ods-border` bar.
  *
- *   wrapper          → `p-6 md:p-8 lg:p-10` + border + rounded-3xl
- *   heading area     → 56px (`mb-6 md:mb-8` container, h-10 inner bar
- *                       + `mb-3 md:mb-4` = 40 + 16)
+ *   wrapper          → `p-6 content-md:p-8 content-lg:p-10` + border + rounded-3xl
+ *   heading area     → 56px (`mb-6 content-md:mb-8` container, h-10 inner bar
+ *                       + `mb-3 content-md:mb-4` = 40 + 16)
  *   subject section  → 79px (`h-[27px]` label + `mb-1` (4px) + h-12
  *                       input = 27 + 4 + 48)
  *   message section  → 127px (`h-[27px]` label + `mb-1` + h-24
  *                       textarea = 27 + 4 + 96)
  *   attachments row  → 28px (h-7 add button + helper label)
  *   footer           → 56px (h-12 button + `pt-2 mt-auto`)
- *   between sections → `space-y-4 md:space-y-6` (16/24px)
+ *   between sections → `space-y-4 content-md:space-y-6` (16/24px)
  *
  * One non-obvious detail: the real `<ContactForm>` renders 4
  * `<input type="hidden">` registrations BEFORE the visible Subject
@@ -93,15 +93,15 @@ export interface HelpCenterCreateFormProps {
  */
 export function HelpCenterCreateFormSkeleton() {
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-ods-border p-6 md:rounded-3xl md:p-8 lg:p-10">
-      {/* Heading container — mirrors `mb-6 md:mb-8` + h2 with its own
-          `mb-3 md:mb-4` and `text-h2` height (32px font, line-height
+    <div className="flex h-full flex-col rounded-2xl border border-ods-border p-6 content-md:rounded-3xl content-md:p-8 content-lg:p-10">
+      {/* Heading container — mirrors `mb-6 content-md:mb-8` + h2 with its own
+          `mb-3 content-md:mb-4` and `text-h2` height (32px font, line-height
           ~1.25 → 40px). h-10 bar matches the rendered h2 height. */}
-      <div className="mb-6 md:mb-8">
-        <div className="mb-3 h-10 w-72 animate-pulse rounded bg-ods-border md:mb-4" />
+      <div className="mb-6 content-md:mb-8">
+        <div className="mb-3 h-10 w-72 animate-pulse rounded bg-ods-border content-md:mb-4" />
       </div>
 
-      {/* Form body — same `space-y-4 md:space-y-6` gap stack.
+      {/* Form body — same `space-y-4 content-md:space-y-6` gap stack.
           IMPORTANT: the real `<ContactForm>` prepends 4
           `<input type="hidden">` registrations for the hidden
           name/email/helpCategory/message fields (see contact-form.tsx).
@@ -112,7 +112,7 @@ export function HelpCenterCreateFormSkeleton() {
           same 4 hidden inputs so the Subject placeholder lands at the
           same Y as the real Subject input. Removing them would shift
           the whole stack up by 24px on every page load. */}
-      <div className="flex flex-grow flex-col space-y-4 md:space-y-6">
+      <div className="flex flex-grow flex-col space-y-4 content-md:space-y-6">
         <input type="hidden" aria-hidden />
         <input type="hidden" aria-hidden />
         <input type="hidden" aria-hidden />
@@ -152,7 +152,7 @@ export function HelpCenterCreateFormSkeleton() {
         {/* Footer — same `pt-2 mt-auto` so it sticks to the bottom.
             Button bar is h-12 to match the real `<Button>` height
             (48px). */}
-        <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 md:flex-row md:gap-6">
+        <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 content-md:flex-row content-md:gap-6">
           <div className="h-4 w-72 animate-pulse rounded bg-ods-border" />
           <div className="h-12 w-32 animate-pulse rounded bg-ods-border" />
         </div>
@@ -205,6 +205,8 @@ export function HelpCenterCreateForm({
 
   return (
     <ContactForm
+      // A signed-in support ticket, not a lead: nothing to rescue.
+      rescue={null}
       title="Open a new ticket"
       footerText="The support team typically responds within one business day."
       hideFields={['name', 'email', 'companySize', 'referralSource', 'helpCategory']}

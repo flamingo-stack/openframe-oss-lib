@@ -51,7 +51,11 @@ export interface SearchInputProps {
   defaultValue?: string;
   /** Called when input value changes (raw, not debounced) */
   onChange?: (value: string) => void;
-  /** Called when user presses Enter */
+  /**
+   * Called when the user presses Enter, AND with `''` when the box is emptied (the clear button, or deleting the
+   * text): a search that was submitted must not stay applied after its text is gone. Read the argument, never the
+   * host's own state, which has not re-rendered yet when this fires.
+   */
   onSubmit?: (value: string) => void;
   /** Search results to display in the dropdown */
   results?: SearchResult[];
@@ -113,7 +117,7 @@ export interface SearchInputProps {
 
 const containerStyles = cn(
   // Layout & spacing — matches lib Input component
-  'flex h-11 cursor-text items-center gap-2 rounded-[6px] border px-3 md:h-12',
+  'flex h-11 cursor-text items-center gap-2 rounded-[6px] border px-3 content-md:h-12',
   'has-[:focus-visible]:outline-none',
   'group',
   'transition-colors duration-200',
@@ -292,6 +296,7 @@ export function SearchInput({
     } else {
       setInternalValue(newVal);
     }
+    if (newVal === '' && currentValue !== '') onSubmit?.('');
     if (!isOpen) setIsOpen(true);
     setHighlightedIndex(-1);
   };
@@ -304,6 +309,7 @@ export function SearchInput({
     } else {
       setInternalValue('');
     }
+    if (currentValue !== '') onSubmit?.('');
     inputRef.current?.focus();
   };
 
@@ -450,7 +456,7 @@ export function SearchInput({
             }}
           >
             {/* Start Adornment — pinned left, shrink-0 */}
-            <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent [&_svg]:size-4 md:[&_svg]:size-6">
+            <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent [&_svg]:size-4 content-md:[&_svg]:size-6">
               {startAdornment !== undefined ? startAdornment : <SearchIcon />}
             </span>
 

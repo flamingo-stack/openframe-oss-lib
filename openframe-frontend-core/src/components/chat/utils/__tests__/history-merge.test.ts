@@ -332,6 +332,68 @@ describe('mergeHistoryWithRealtime', () => {
     expect(ids(merged)).toEqual([U0.id, A0.id, persistedFirst.id, asstFirst.id, synSecond.id]);
   });
 
+  // Technician and system lines render under role `user` on every host, so a
+  // user row's twin must match on author kind too. Repro (tickets client chat):
+  // the technician typed "?", the end user replied "?", the refetch raced the
+  // persistence of the reply - the reply's bubble was taken for the twin of
+  // the technician's row and dropped, and the user's message vanished.
+  it('keeps the own `user-` bubble when only a TECHNICIAN row holds the same text', () => {
+    const techQ: TestMessage = { id: 'aaaa0008', role: 'user', authorType: 'admin', content: '?', timestamp: t(3000) };
+    const ownQ: TestMessage = { id: 'user-4000-q', role: 'user', content: '?', timestamp: t(4000) };
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, techQ],
+      existingMessages: [U0, A0, techQ, ownQ],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, techQ.id, ownQ.id]);
+  });
+
+  it('still drops the own `user-` bubble once its OWN row is persisted beside a same-text technician row', () => {
+    const techQ: TestMessage = { id: 'aaaa0008', role: 'user', authorType: 'admin', content: '?', timestamp: t(3000) };
+    const ownPersisted: TestMessage = {
+      id: 'aaaa0009',
+      role: 'user',
+      authorType: 'user',
+      content: '?',
+      timestamp: t(4500),
+    };
+    const ownQ: TestMessage = { id: 'user-4000-q', role: 'user', content: '?', timestamp: t(4000) };
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, techQ, ownPersisted],
+      existingMessages: [U0, A0, techQ, ownQ],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, techQ.id, ownPersisted.id]);
+  });
+
+  it('twins an admin-authored optimistic row with its admin-authored persisted row (Mingo)', () => {
+    // The rule is per author kind, not "admin rows never twin": on Mingo the
+    // operator IS the admin, so the host stamps `admin` on both copies.
+    const adminRow: TestMessage = {
+      id: 'aaaa0010',
+      role: 'user',
+      authorType: 'admin',
+      content: 'hello',
+      timestamp: t(3000),
+    };
+    const adminOpt: TestMessage = {
+      id: 'optimistic-2500-a',
+      role: 'user',
+      authorType: 'admin',
+      content: 'hello',
+      timestamp: t(2500),
+    };
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, adminRow],
+      existingMessages: [U0, A0, adminOpt],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, adminRow.id]);
+  });
+
   it('KEEPS a `user-` synthetic when a seq-stamped ASSISTANT row raised the global max but the user turn is not persisted', () => {
     // The reload+stop loss: history has a seq-stamped assistant row (so
     // anyHistoryRowSeq is true and the global max is high) and a live `user-`

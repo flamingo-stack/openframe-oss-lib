@@ -40,6 +40,7 @@ public class EventTypeMapper {
         // OpenFrame native RMM (command and script execution results)
         registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.CMD_RUN_FINISHED, UnifiedEventType.COMMAND_RUN_FINISHED);
         registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED, UnifiedEventType.SCRIPT_EXECUTED);
+        registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.SCRIPT_RUN_FAILED, UnifiedEventType.SCRIPT_FAILED);
 
         // Core MeshCentral mappings
         registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.SERVER_STARTED, UnifiedEventType.SYSTEM_START);
@@ -269,5 +270,20 @@ public class EventTypeMapper {
         // Policy Membership
         registerMapping(IntegratedToolType.FLEET, SourceEventTypes.Fleet.POLICY_MEMBERSHIP_PASS, UnifiedEventType.POLICY_APPLIED);
         registerMapping(IntegratedToolType.FLEET, SourceEventTypes.Fleet.POLICY_MEMBERSHIP_FAIL, UnifiedEventType.POLICY_VIOLATION);
+
+        // Microsoft 365 Entra directory audit mappings (directoryAudits category values)
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.USER_MANAGEMENT, UnifiedEventType.M365_USER_MANAGEMENT);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.GROUP_MANAGEMENT, UnifiedEventType.M365_GROUP_MANAGEMENT);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.APPLICATION_MANAGEMENT, UnifiedEventType.M365_APPLICATION_MANAGEMENT);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.ROLE_MANAGEMENT, UnifiedEventType.M365_ROLE_MANAGEMENT);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.POLICY, UnifiedEventType.M365_POLICY);
+        registerMapping(IntegratedToolType.MICROSOFT_365, SourceEventTypes.Microsoft365.DIRECTORY_MANAGEMENT, UnifiedEventType.M365_DIRECTORY_MANAGEMENT);
+
+        // Google Workspace directory audit mappings (admin application event types)
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.USER_SETTINGS, UnifiedEventType.GWS_USER_MANAGEMENT);
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.GROUP_SETTINGS, UnifiedEventType.GWS_GROUP_MANAGEMENT);
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.SECURITY_SETTINGS, UnifiedEventType.GWS_SECURITY_SETTINGS);
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.DOMAIN_SETTINGS, UnifiedEventType.GWS_DOMAIN_SETTINGS);
+        registerMapping(IntegratedToolType.GOOGLE_WORKSPACE, SourceEventTypes.GoogleWorkspace.DELEGATED_ADMIN_SETTINGS, UnifiedEventType.GWS_DELEGATED_ADMIN);
     }
 }

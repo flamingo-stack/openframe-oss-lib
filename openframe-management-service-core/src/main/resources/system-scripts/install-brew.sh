@@ -10,19 +10,17 @@ for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
   fi
 done
 
+PREFIX=/opt/homebrew
+BREW_BIN="$PREFIX/bin/brew"
+
 CONSOLE_USER=$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" \
-  | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }')
+  | /usr/bin/awk -F' : ' '/^[[:space:]]*Name[[:space:]]*:/ && ! /loginwindow/ { print $2; exit }')
 if [ -z "$CONSOLE_USER" ] || [ "$CONSOLE_USER" = "root" ]; then
   echo "no active console user; deferring"; exit 75
 fi
-CONSOLE_UID=$(/usr/bin/id -u "$CONSOLE_USER")
-
-if [ "$(/usr/bin/uname -m)" = "arm64" ]; then
-  PREFIX=/opt/homebrew
-else
-  PREFIX=/usr/local
+if ! CONSOLE_UID=$(/usr/bin/id -u "$CONSOLE_USER" 2>/dev/null); then
+  echo "console user '$CONSOLE_USER' does not resolve to a uid; deferring"; exit 75
 fi
-BREW_BIN="$PREFIX/bin/brew"
 
 if ! /usr/bin/xcode-select -p >/dev/null 2>&1; then
   CLT_FLAG=/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
@@ -50,13 +48,7 @@ if [ ! -x "$BREW_BIN" ]; then
 fi
 /bin/rm -f "$INSTALL_LOG"
 
-if [ "$PREFIX" = "/opt/homebrew" ]; then
-  /usr/sbin/chown -R "$CONSOLE_USER:admin" "$PREFIX"
-else
-  for d in Homebrew Cellar Caskroom Frameworks bin etc include lib sbin share var opt; do
-    [ -e "$PREFIX/$d" ] && /usr/sbin/chown -R "$CONSOLE_USER:admin" "$PREFIX/$d" || true
-  done
-fi
+/usr/sbin/chown -R "$CONSOLE_USER:admin" "$PREFIX"
 
 /bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" -H "$BREW_BIN" update --force >/dev/null 2>&1 || true
 BREW_VERSION=$(/bin/launchctl asuser "$CONSOLE_UID" /usr/bin/sudo -u "$CONSOLE_USER" -H "$BREW_BIN" --version 2>/dev/null | /usr/bin/head -n1)

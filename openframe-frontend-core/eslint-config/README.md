@@ -71,6 +71,28 @@ Two rules are deliberately **absent** from the base and belong in a repo's local
 - `@typescript-eslint/naming-convention` — Biome's equivalent produced 1 715 findings in
   multi-platform-hub alone and was never enforced.
 
+## WebKit performance rules
+
+`base` carries two rules from `./webview-performance.js` for patterns that are cheap in Chrome and
+expensive in WebKit (Safari, and the WKWebView the desktop and iOS shells run in). They are not
+applied to tests or stories.
+
+- `flamingo/no-inline-style-element`: no `<style>` element in JSX. React rewrites its text on
+  re-render, and each rewrite makes WebKit restyle and relayout the whole document.
+- `flamingo/no-whole-store-subscription`: a `use…Store` hook called with no selector, or with
+  `s => s`, re-renders on every write to the store. The rule goes by the name, so a `use…Store`
+  hook that is not a zustand subscription (a context getter, say) is a false positive: carry it in
+  a named `files:` block.
+
+## Layout variant rule
+
+`base` carries `flamingo/no-mixed-layout-variants` from `./layout-variants.js`: one class string may
+not hold both a viewport breakpoint (`md:`) and a content-area one (`content-md:`). Tailwind emits
+every `content-*` rule before the viewport ones, so where the two set the same property the viewport
+class wins at any content width, and nothing says so. A class that stacks them
+(`md:content-max-md:`) is the deliberate form and is allowed. The rule reads one string at a time:
+classes split across `cn()` arguments are not compared.
+
 ## Why not ESLint 10
 
 ESLint 10 is out, and `eslint@9` is marked deprecated on npm. It still does not work here:

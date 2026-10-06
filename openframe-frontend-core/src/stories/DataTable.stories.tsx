@@ -99,6 +99,9 @@ const DEVICES_10 = DEVICES.slice(0, 10);
 const DEVICES_12 = DEVICES.slice(0, 12);
 const DEVICES_30 = makeDevices(30);
 const DEVICES_50 = makeDevices(50);
+/** Stable empty page for the loading-state stories (`data` must be reference-stable). */
+const NO_DEVICES: Device[] = [];
+const noopLoadMore = () => undefined;
 
 /* ─────────────────────────── shared cell renderers ──────────────────────────── */
 
@@ -904,6 +907,124 @@ export const InfiniteScroll: Story = {
 };
 
 /**
+ * **Infinite scroll inside a scroll container** — the layout the apps actually
+ * ship: `AppLayout` scrolls its `<main className="overflow-y-auto">`, not the
+ * window. The table sits in a fixed-height scroller here for the same reason.
+ *
+ * This is the case to test pre-fetching against. An observer rooted on the
+ * viewport has its `rootMargin` clipped by every scrolling ancestor, so a
+ * margin that works in the window-scrolled story above does nothing in here.
+ */
+export const InfiniteScrollInScrollContainer: Story = {
+  render: () => {
+    const [rows, setRows] = useState<Device[]>(() => makeDevices(20));
+    const [isFetching, setIsFetching] = useState(false);
+    const [hasNext, setHasNext] = useState(true);
+    const pageRef = useRef(1);
+
+    const columns = useMemo<ColumnDef<Device>[]>(
+      () => [
+        { accessorKey: 'hostname', header: 'Hostname', meta: { width: 'w-[200px]' } },
+        { accessorKey: 'ipAddress', header: 'IP', meta: { width: 'w-[140px]' } },
+        {
+          accessorKey: 'status',
+          header: 'Status',
+          cell: ({ row }) => <StatusTag status={row.original.status} />,
+          meta: { width: 'w-[140px]' },
+        },
+        { accessorKey: 'os', header: 'OS', meta: { width: 'flex-1 min-w-0' } },
+      ],
+      [],
+    );
+
+    const table = useDataTable<Device>({ data: rows, columns });
+
+    const loadMore = useCallback(() => {
+      if (isFetching || !hasNext) return;
+      setIsFetching(true);
+      window.setTimeout(() => {
+        pageRef.current += 1;
+        setRows(prev => [...prev, ...makeDevices(20, prev.length + 1)]);
+        setIsFetching(false);
+        if (pageRef.current >= 6) setHasNext(false);
+      }, 700);
+    }, [isFetching, hasNext]);
+
+    return (
+      <div data-testid="scroller" className="h-[640px] overflow-y-auto rounded-md border border-ods-border">
+        <div className="p-[var(--spacing-system-mf)]">
+          <DataTable table={table}>
+            <DataTable.Header stickyHeader stickyHeaderOffset="top-0" />
+            <DataTable.Body rowClassName="mb-1" />
+            <DataTable.InfiniteFooter
+              hasNextPage={hasNext}
+              isFetchingNextPage={isFetching}
+              onLoadMore={loadMore}
+              skeletonRows={2}
+            />
+          </DataTable>
+        </div>
+      </div>
+    );
+  },
+};
+
+/**
+ * **A page that adds nothing** — the request failed, or the server answered an
+ * empty page that still claims a next one. The footer used to re-arm with the
+ * sentinel still in view and send the same request again, forever. It now parks
+ * the auto-trigger and offers **Load more**; a fetch that makes progress
+ * re-arms it.
+ *
+ * Here the second page fails once: scroll down, press Load more, keep scrolling.
+ */
+export const InfiniteScrollStalledPage: Story = {
+  render: () => {
+    const [rows, setRows] = useState<Device[]>(() => makeDevices(20));
+    const [isFetching, setIsFetching] = useState(false);
+    const attemptsRef = useRef(0);
+
+    const columns = useMemo<ColumnDef<Device>[]>(
+      () => [
+        { accessorKey: 'hostname', header: 'Hostname', meta: { width: 'w-[200px]' } },
+        { accessorKey: 'ipAddress', header: 'IP', meta: { width: 'flex-1 min-w-0' } },
+      ],
+      [],
+    );
+
+    const table = useDataTable<Device>({ data: rows, columns });
+
+    const loadMore = useCallback(() => {
+      if (isFetching) return;
+      setIsFetching(true);
+      window.setTimeout(() => {
+        attemptsRef.current += 1;
+        // The first attempt comes back with nothing.
+        if (attemptsRef.current > 1) setRows(prev => [...prev, ...makeDevices(20, prev.length + 1)]);
+        setIsFetching(false);
+      }, 700);
+    }, [isFetching]);
+
+    return (
+      <div data-testid="scroller" className="h-[640px] overflow-y-auto rounded-md border border-ods-border">
+        <div className="p-[var(--spacing-system-mf)]">
+          <DataTable table={table}>
+            <DataTable.Header stickyHeader stickyHeaderOffset="top-0" />
+            <DataTable.Body rowClassName="mb-1" />
+            <DataTable.InfiniteFooter
+              hasNextPage={rows.length < 100}
+              isFetchingNextPage={isFetching}
+              onLoadMore={loadMore}
+              skeletonRows={2}
+            />
+          </DataTable>
+        </div>
+      </div>
+    );
+  },
+};
+
+/**
  * **Cursor pagination** — use `<DataTable.CursorFooter>` for a prev/next
  * footer with "Showing X of Y" summary. Pair with Relay's `usePaginationFragment`
  * (`loadNext` / `loadPrevious`) or any cursor-based REST endpoint.
@@ -1103,6 +1224,52 @@ export const SimulatedInitialLoad: Story = {
         <DataTable.Header />
         <DataTable.Body loading={loading} skeletonRows={10} />
       </DataTable>
+    );
+  },
+};
+
+/**
+ * **Skeleton parity** — every skeleton row occupies the slot of the row it
+ * stands in for, so nothing moves when data arrives.
+ *
+ * Left: the loading state. Right: the same table loaded, with the infinite
+ * footer frozen mid-fetch. Both pass `rowClassName="mb-1"` — where tables put
+ * their row spacing — and the string form reaches the skeleton rows too. The
+ * load-more rows are drawn by the BODY, inside the rows' own container, so they
+ * continue the list at the same pitch instead of stacking glued together under
+ * it. Row N on the left lines up with row N on the right.
+ */
+export const SkeletonParity: Story = {
+  render: () => {
+    // Few enough columns that two tables fit side by side without scrolling.
+    const columns = useMemo<ColumnDef<Device>[]>(
+      () => [
+        { accessorKey: 'hostname', header: 'Hostname', meta: { width: 'flex-1 min-w-0' } },
+        { accessorKey: 'ipAddress', header: 'IP', meta: { width: 'w-[120px] shrink-0', hideAt: 'md' } },
+        {
+          accessorKey: 'status',
+          header: 'Status',
+          cell: ({ row }) => <StatusTag status={row.original.status} />,
+          meta: { width: 'w-[120px] shrink-0' },
+        },
+      ],
+      [],
+    );
+    const loadingTable = useDataTable<Device>({ data: NO_DEVICES, columns });
+    const loadedTable = useDataTable<Device>({ data: DEVICES_6, columns });
+
+    return (
+      <div className="grid grid-cols-2 gap-[var(--spacing-system-lf)] [&>*]:min-w-0">
+        <DataTable table={loadingTable}>
+          <DataTable.Header />
+          <DataTable.Body loading skeletonRows={8} rowClassName="mb-1" />
+        </DataTable>
+        <DataTable table={loadedTable}>
+          <DataTable.Header />
+          <DataTable.Body rowClassName="mb-1" />
+          <DataTable.InfiniteFooter hasNextPage isFetchingNextPage onLoadMore={noopLoadMore} skeletonRows={2} />
+        </DataTable>
+      </div>
     );
   },
 };

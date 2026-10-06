@@ -6,6 +6,7 @@ import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
 import com.openframe.data.document.assignment.ItemAssignment;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
@@ -55,6 +56,9 @@ public class NodeTypeResolver {
         }
         if (node instanceof ScheduleRunResponse) {
             return "ScheduleRun";
+        }
+        if (node instanceof SoftwareBundleResponse) {
+            return "SoftwareBundle";
         }
         throw new IllegalArgumentException("Unknown Node type: " + node.getClass().getName());
     }

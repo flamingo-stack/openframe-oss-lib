@@ -30,4 +30,6 @@ public interface SoftwareScheduleRepository extends MongoRepository<SoftwareSche
     List<SoftwareSchedule> findByStatusAndTriggerAndTimeReference(ScriptStatus status, ScheduleScriptTrigger trigger, ScheduleTimeReference timeReference);
 
     List<SoftwareSchedule> findByTenantIdAndStatusInOrderByIdDesc(String tenantId, Collection<ScriptStatus> statuses);
+
+    List<SoftwareSchedule> findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(String tenantId, ScriptStatus status, Instant now);
 }

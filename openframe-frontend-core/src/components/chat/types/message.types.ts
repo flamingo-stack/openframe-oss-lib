@@ -74,6 +74,12 @@ export interface ToolExecutionData {
   result?: string;
   success?: boolean;
   /**
+   * The words of the row's status line where it is drawn as a card (the
+   * end-client view): e.g. "Fixed on its own". Omitted: "Working on it",
+   * "Done" or "Failed" by state.
+   */
+  statusLabel?: string;
+  /**
    * Backend-issued id (matches `PendingToolCallData.toolExecutionRequestId`).
    * When present, lets the accumulator merge this execution event into the
    * matching approval batch row instead of emitting a standalone segment.

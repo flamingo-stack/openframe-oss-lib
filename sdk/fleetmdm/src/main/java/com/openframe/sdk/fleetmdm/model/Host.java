@@ -3,6 +3,8 @@ package com.openframe.sdk.fleetmdm.model;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.List;
+
 /**
  * Host model from Fleet MDM
  */
@@ -58,6 +60,8 @@ public class Host {
 
     @JsonProperty("os_version")
     private String osVersion;
+
+    private List<FleetSoftware> software;
 
     private String build;
 
@@ -179,6 +183,9 @@ public class Host {
 
     public String getHardwareModel() { return hardwareModel; }
     public void setHardwareModel(String hardwareModel) { this.hardwareModel = hardwareModel; }
+
+    public List<FleetSoftware> getSoftware() { return software; }
+    public void setSoftware(List<FleetSoftware> software) { this.software = software; }
 
     public String getHardwareSerial() { return hardwareSerial; }
     public void setHardwareSerial(String hardwareSerial) { this.hardwareSerial = hardwareSerial; }

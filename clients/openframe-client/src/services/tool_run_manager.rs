@@ -29,6 +29,8 @@ use windows::{
 };
 
 const RETRY_DELAY_SECONDS: u64 = 5;
+/// Ceiling for the escalating retry delay after a leftover process refuses to die.
+const KILL_RETRY_MAX_DELAY_SECONDS: u64 = 300;
 
 /// Under the supervision lock, so a concurrent resume either finds the loop alive or relaunches its tool.
 async fn shutdown_break(
@@ -554,10 +556,7 @@ impl ToolRunManager {
             }
             let tool_id = tool.tool_agent_id.clone();
             info!(tool_id = %tool_id, "Relaunching tool supervisor after the aborted update");
-            if let Err(e) = self.run_tool(tool, false).await {
-                warn!(tool_id = %tool_id, "Failed to relaunch tool after the aborted update: {:#}", e);
-                self.clear_running_tool(&tool_id).await;
-            }
+            self.run_tool(tool, false).await;
         }
         info!("Tool run manager: supervision resumed after the aborted update");
         Ok(())
@@ -664,11 +663,12 @@ impl ToolRunManager {
         }
 
         for tool in tools {
-            if self.try_mark_running(&tool.tool_agent_id).await {
-                info!("Running tool {}", tool.tool_agent_id);
-                self.run_tool(tool, false).await?;
+            let tool_id = tool.tool_agent_id.clone();
+            if self.try_mark_running(&tool_id).await {
+                info!("Running tool {}", tool_id);
+                self.run_tool(tool, false).await;
             } else {
-                warn!("Tool {} is already running - skipping", tool.tool_agent_id);
+                warn!("Tool {} is already running - skipping", tool_id);
             }
         }
 
@@ -685,7 +685,8 @@ impl ToolRunManager {
         }
 
         info!("Running new single tool {}", installed_tool.tool_agent_id);
-        self.run_tool(installed_tool, true).await
+        self.run_tool(installed_tool, true).await;
+        Ok(())
     }
 
     async fn try_mark_running(&self, tool_id: &str) -> bool {
@@ -704,27 +705,14 @@ impl ToolRunManager {
     }
 
     #[allow(unused_variables)]
-    async fn run_tool(&self, tool: InstalledTool, new_tool: bool) -> Result<()> {
+    async fn run_tool(&self, tool: InstalledTool, new_tool: bool) {
         if tool.installation.is_service() {
             info!(
                 "Installation::Service for {} - self-managed, skipping launch",
                 tool.tool_agent_id
             );
             self.clear_running_tool(&tool.tool_agent_id).await;
-            return Ok(());
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        self.tool_kill_service
-            .stop_tool(&tool.tool_agent_id)
-            .await?;
-
-        // Windows GUI apps are owned by the HKLM Run autorun, not us — never kill them.
-        #[cfg(target_os = "windows")]
-        if !tool.installation.is_gui_app() {
-            self.tool_kill_service
-                .stop_tool(&tool.tool_agent_id)
-                .await?;
+            return;
         }
 
         let updating_tools = self.updating_tools.clone();
@@ -732,11 +720,13 @@ impl ToolRunManager {
         let params_processor = self.params_processor.clone();
         let running_tools = self.running_tools.clone();
         let installed_tools_service = self.installed_tools_service.clone();
+        let tool_kill_service = self.tool_kill_service.clone();
         let mut installation = tool.installation.clone();
         let mut run_command_args = tool.run_command_args.clone();
 
         tokio::spawn(async move {
             let mut launch_backoff = FailureLogBackoff::new();
+            let mut kill_leftovers_now = true;
             loop {
                 // Self-update in progress — stop the loop entirely
                 if shutdown_break(&shutting_down, &running_tools, &tool.tool_agent_id).await {
@@ -767,6 +757,28 @@ impl ToolRunManager {
                 }
 
                 let log_attempt = launch_backoff.should_log();
+
+                // Windows GUI apps belong to the HKLM Run autorun — never kill them.
+                #[cfg(target_os = "windows")]
+                let kill_leftovers = !installation.is_gui_app();
+                #[cfg(not(target_os = "windows"))]
+                let kill_leftovers = true;
+
+                if kill_leftovers && kill_leftovers_now {
+                    if let Err(e) = tool_kill_service.stop_tool(&tool.tool_agent_id).await {
+                        let failures = launch_backoff.record_failure(log_attempt);
+                        let delay =
+                            (RETRY_DELAY_SECONDS * failures).min(KILL_RETRY_MAX_DELAY_SECONDS);
+                        if log_attempt {
+                            error!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                   "Failed to stop leftover tool processes - not launching, retrying in {} seconds: {:#}",
+                                   delay, e);
+                        }
+                        sleep(Duration::from_secs(delay)).await;
+                        continue;
+                    }
+                    kill_leftovers_now = false;
+                }
 
                 let processed_args =
                     match params_processor.process(&tool.tool_agent_id, run_command_args.clone()) {
@@ -880,7 +892,14 @@ impl ToolRunManager {
                                     if let Err(e) =
                                         crate::platform::preferences_writer::write(bid, prefs)
                                     {
-                                        error!(tool_id = %tool.tool_agent_id, "Failed to write preferences: {:#}", e);
+                                        let failures = launch_backoff.record_failure(log_attempt);
+                                        if log_attempt {
+                                            error!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                                   "Failed to write GuiApp preferences - not launching, retrying in {} seconds: {:#}",
+                                                   RETRY_DELAY_SECONDS, e);
+                                        }
+                                        sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+                                        continue;
                                     }
 
                                     if tool.tool_agent_id == "openframe-chat" {
@@ -1033,11 +1052,47 @@ impl ToolRunManager {
                                "Failed to wait for tool process - restarting in {} seconds: {:#}", RETRY_DELAY_SECONDS, e);
                     }
                 }
+                kill_leftovers_now = true;
                 sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
             }
         });
+    }
+}
 
-        Ok(())
+/// Clears the updating flag on drop, releasing the tool lock only once the flag is clear.
+pub struct UpdatingGuard {
+    tool_run_manager: ToolRunManager,
+    tool_agent_id: String,
+    lock_guard: Option<tokio::sync::OwnedMutexGuard<()>>,
+}
+
+impl UpdatingGuard {
+    /// Marks the tool as updating and holds `lock_guard` (if any) until the flag clears again.
+    pub async fn acquire(
+        tool_run_manager: &ToolRunManager,
+        tool_agent_id: &str,
+        lock_guard: Option<tokio::sync::OwnedMutexGuard<()>>,
+    ) -> Self {
+        tool_run_manager.mark_updating(tool_agent_id).await;
+        Self {
+            tool_run_manager: tool_run_manager.clone(),
+            tool_agent_id: tool_agent_id.to_string(),
+            lock_guard,
+        }
+    }
+}
+
+impl Drop for UpdatingGuard {
+    fn drop(&mut self) {
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            let manager = self.tool_run_manager.clone();
+            let tool_agent_id = self.tool_agent_id.clone();
+            let lock_guard = self.lock_guard.take();
+            handle.spawn(async move {
+                manager.clear_updating(&tool_agent_id).await;
+                drop(lock_guard);
+            });
+        }
     }
 }
 

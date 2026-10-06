@@ -15,8 +15,8 @@ import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -181,7 +181,7 @@ public class SoftwareDeviceLocalScheduleService {
     }
 
     private List<String> resolveTargets(SoftwareSchedule schedule) {
-        return targetResolver.resolveMachineIds(schedule.getTenantId(), schedule.getId());
+        return targetResolver.resolveMachineIds(schedule);
     }
 
     private ZoneId parseZone(SoftwareSchedule schedule, String machineId, String zoneId) {

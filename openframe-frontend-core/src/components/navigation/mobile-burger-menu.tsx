@@ -8,6 +8,7 @@ import { cn } from '../../utils';
 import { Logout02Icon, PenEditIcon, UserSearchIcon } from '../icons-v2-generated';
 import { Button, SquareAvatar } from '../ui';
 import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer';
+import { NavigationItemBadge } from './navigation-item-badge';
 
 // Header height constant — the unified top-navigation `small` bar (56px on all screens)
 const HEADER_HEIGHT = 56;
@@ -93,6 +94,9 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
           disabled && 'cursor-not-allowed opacity-50',
         )}
         aria-current={isActive ? 'page' : undefined}
+        // The same name the sidebar row announces — "Scripts (Beta)" — rather than
+        // the content read raw, which Chrome hands over as "Scripts BETA".
+        aria-label={item.badge ? `${item.label} (${item.badge})` : undefined}
       >
         {/* Icon */}
         {item.icon && (
@@ -104,14 +108,18 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
           </div>
         )}
 
-        {/* Label */}
-        <span
-          className={cn(
-            'flex-1 truncate text-left text-h6',
-            isActive && !disabled ? 'text-ods-accent' : 'text-ods-text-primary',
-          )}
-        >
-          {item.label}
+        {/* Label, with its stamp when the entry carries one. The button's
+            accessible name is its content, so the stamp reads as part of it. */}
+        <span className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xxs)]">
+          <span
+            className={cn(
+              'min-w-0 truncate text-left text-h6',
+              isActive && !disabled ? 'text-ods-accent' : 'text-ods-text-primary',
+            )}
+          >
+            {item.label}
+          </span>
+          {item.badge && <NavigationItemBadge compact label={item.badge} />}
         </span>
       </button>
     );

@@ -32,4 +32,11 @@ public final class RelayIds {
             return globalId;
         }
     }
+
+    // The raw id inside a global id, as the External API takes it; returns the input unchanged if it is not Typename:rawId.
+    public static String rawId(String globalId) {
+        String decoded = decode(globalId);
+        int separator = decoded.indexOf(':');
+        return separator < 0 ? globalId : decoded.substring(separator + 1);
+    }
 }

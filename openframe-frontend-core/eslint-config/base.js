@@ -6,6 +6,14 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 import { ignores } from './ignores.js';
+import { layoutVariantsPlugin } from './layout-variants.js';
+import { webviewPerformancePlugin } from './webview-performance.js';
+
+/** The rules this config ships itself, under one `flamingo/` namespace. */
+const flamingoPlugin = {
+  meta: { name: 'flamingo' },
+  rules: { ...webviewPerformancePlugin.rules, ...layoutVariantsPlugin.rules },
+};
 
 /**
  * Promote every `warn` in a third-party config to `error`.
@@ -289,6 +297,29 @@ export const base = [
     name: 'flamingo/base/jsx-pragma',
     files: ['**/*.{jsx,tsx}'],
     languageOptions: { parserOptions: { jsxPragma: null } },
+  },
+
+  // Patterns measured to be cheap in Chrome and expensive in WebKit (Safari and
+  // the desktop/iOS shells' WKWebView) — see ./webview-performance.js. Tests and
+  // stories are not render paths users sit on.
+  {
+    name: 'flamingo/base/webview-performance',
+    files: ['**/*.{js,mjs,jsx,ts,mts,tsx}'],
+    ignores: ['**/*.{test,spec}.{js,mjs,jsx,ts,mts,tsx}', '**/__tests__/**', '**/*.stories.{js,jsx,ts,tsx,mdx}'],
+    plugins: { flamingo: flamingoPlugin },
+    rules: {
+      'flamingo/no-inline-style-element': 'error',
+      'flamingo/no-whole-store-subscription': 'error',
+    },
+  },
+
+  // `md:` and `content-md:` in one class string — see ./layout-variants.js.
+  {
+    name: 'flamingo/base/layout-variants',
+    files: ['**/*.{js,mjs,jsx,ts,mts,tsx}'],
+    ignores: ['**/*.{test,spec}.{js,mjs,jsx,ts,mts,tsx}', '**/__tests__/**'],
+    plugins: { flamingo: flamingoPlugin },
+    rules: { 'flamingo/no-mixed-layout-variants': 'error' },
   },
 
   // Type declaration files describe other people's shapes; most of the base

@@ -7,7 +7,9 @@ import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
@@ -59,6 +61,12 @@ class ScriptExecutedEnrichmentIntegrationTest {
     private MachineIdCacheService machineIdCacheService;
     @Mock
     private TenantIdProvider tenantIdProvider;
+    @Mock
+    private ScriptExecutionRepository scriptExecutionRepository;
+    @Mock
+    private ScriptRepository scriptRepository;
+    @Mock
+    private CommandExecutionRepository commandExecutionRepository;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -73,9 +81,8 @@ class ScriptExecutedEnrichmentIntegrationTest {
         //    we want to lock in that the agentId really IS extracted from machineId).
         // Repository mocks — this test focuses on agentId extraction + enrichment,
         // not on getMessage name formatting; the deserializer is invoked with mocks present.
-        ScriptResultDeserializer deserializer = new ScriptResultDeserializer(mapper,
-                org.mockito.Mockito.mock(ScriptExecutionRepository.class),
-                org.mockito.Mockito.mock(com.openframe.data.repository.rmm.ScriptRepository.class));
+        ScriptResultDeserializer deserializer =
+                new ScriptResultDeserializer(mapper, scriptExecutionRepository, scriptRepository);
         DeserializedDebeziumMessage deserialized = deserializer.deserialize(inbound, MessageType.SCRIPT_EXECUTED);
         assertThat(deserialized.getAgentId())
                 .as("ScriptResultDeserializer must use machineId as agentId — that's the key the new enrichment looks up")
@@ -90,7 +97,8 @@ class ScriptExecutedEnrichmentIntegrationTest {
 
         // 4. Enrich via the new direct-Machine-lookup service (Option C path).
         RmmEnrichmentService enrichmentService =
-                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider);
+                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
+                        scriptExecutionRepository, scriptRepository);
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         // 5. The four dashboard-visible fields must ALL be non-null — that's the
@@ -120,7 +128,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
         // Same RmmResultEvent envelope shape as a script result — commands and scripts share it.
         CommonDebeziumMessage inbound = inboundScriptResult();
 
-        CommandResultDeserializer deserializer = new CommandResultDeserializer(mapper);
+        CommandResultDeserializer deserializer = new CommandResultDeserializer(mapper, commandExecutionRepository);
         DeserializedDebeziumMessage deserialized = deserializer.deserialize(inbound, MessageType.COMMAND_EXECUTED);
         assertThat(deserialized.getAgentId())
                 .as("CommandResultDeserializer must use machineId as agentId — the key the native enrichment looks up")
@@ -133,7 +141,8 @@ class ScriptExecutedEnrichmentIntegrationTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
 
         RmmEnrichmentService enrichmentService =
-                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider);
+                new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
+                        scriptExecutionRepository, scriptRepository);
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         assertThat(enriched.getMachineId()).isEqualTo(MACHINE_ID);

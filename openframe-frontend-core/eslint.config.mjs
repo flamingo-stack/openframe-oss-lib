@@ -167,6 +167,22 @@ export default defineConfig([
       // reaches it; the attributes ARE the contract under test (an artifact is
       // user-authored HTML, so losing the sandbox is a security regression).
       'src/components/embeds/__tests__/claude-embed.test.tsx',
+      // The filters panel has no role and no name of its own — it is a plain
+      // box of checkboxes with Reset/Apply — and what is under test is WHERE
+      // it hangs: the `left-0` / `right-0` class on that box. No `screen`
+      // query reaches a role-less element, so the test walks up from Apply.
+      'src/components/features/__tests__/filters-dropdown-placement.test.tsx',
+      // Same shape again: FieldWrapper's wrapper is a role-less <div>, and what
+      // is under test is its display mode — `contents` versus a positioned box —
+      // which no `screen` query can reach, so the test walks up from the control.
+      'src/components/ui/__tests__/field-wrapper-error-slot.test.tsx',
+      // The store badges paint through <linearGradient>/<clipPath> elements addressed
+      // by id, and the contract is that those ids are unique PER INSTANCE — two badge
+      // rows on one page must not resolve each other's <defs>. A <defs> child has no
+      // role, no name and no text, so `screen` cannot see it at all; the test collects
+      // every `[id]` in the container and asserts the set size, which is the only
+      // formulation of that claim.
+      'src/components/ui/__tests__/store-badges.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',
@@ -325,6 +341,37 @@ export default defineConfig([
       'src/components/chat/hooks/use-nats-chat-adapter.ts',
     ],
     rules: { 'react-hooks/set-state-in-effect': 'off' },
+  },
+
+  {
+    // Components that rendered a <style> element before the rule existed. None
+    // is on the chat streaming or drawer-resize paths the rule was measured on,
+    // and their re-render frequency in WebKit has not been measured. Move the
+    // CSS to the Tailwind preset or a stylesheet when touching one, and drop it
+    // from this list.
+    name: 'openframe-frontend-core/pre-existing-style-elements',
+    files: [
+      'src/components/chart.tsx',
+      'src/components/date-time-picker.tsx',
+      'src/components/icons-block.tsx',
+      'src/components/loading/openmsp-heartbeat.tsx',
+      'src/components/ui/date-picker.tsx',
+      'src/components/ui/markdown/mermaid-diagram.tsx',
+      'src/components/ui/toaster.tsx',
+    ],
+    rules: { 'flamingo/no-inline-style-element': 'off' },
+  },
+
+  {
+    // `useDataTableLoadMoreStore` reads a store object from React context; it
+    // is not a zustand subscription, so there is no selector to pass. Its
+    // updates arrive through `useSyncExternalStore` on the line that follows.
+    name: 'openframe-frontend-core/context-store-getter',
+    files: [
+      'src/components/ui/data-table/data-table-body.tsx',
+      'src/components/ui/data-table/data-table-infinite-footer.tsx',
+    ],
+    rules: { 'flamingo/no-whole-store-subscription': 'off' },
   },
 
   ...prettierCompat,

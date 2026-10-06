@@ -27,7 +27,6 @@ pub mod service;
 /// management details behind a common API.
 pub mod service_adapter;
 pub mod system;
-pub mod updater;
 pub mod utils;
 
 pub mod cli;
@@ -72,9 +71,8 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
-use crate::services::package_manager::presence_report::{
-    PackageManagerPresenceReporter, PackageManagerPresenceRunManager,
-};
+use crate::services::package_manager::report_publisher::PackageManagerReportPublisher;
+use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
 use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
@@ -181,7 +179,7 @@ pub struct Client {
     mesh_self_heal_service: MeshSelfHealService,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
-    package_manager_presence_run_manager: PackageManagerPresenceRunManager,
+    package_manager_report_run_manager: PackageManagerReportRunManager,
     package_manager_update_run_manager: PackageManagerUpdateRunManager,
     hostname_report_publisher: HostnameReportPublisher,
     machine_timezone_run_manager: MachineTimezoneRunManager,
@@ -564,6 +562,12 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let package_manager_report_run_manager =
+            PackageManagerReportRunManager::new(PackageManagerReportPublisher::new(
+                nats_message_publisher.clone(),
+                config_service.clone(),
+            ));
+
         let script_bootstrap_execution_listener = ExecutionListener::<BootstrapScriptMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
@@ -571,7 +575,8 @@ impl Client {
             config_service.clone(),
             result_store.clone(),
             flush_notify.clone(),
-        );
+        )
+        .on_message_handled(package_manager_report_run_manager.wake_handle());
         let software_execution_listener = ExecutionListener::<SoftwareScriptMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
@@ -596,11 +601,6 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
-        let package_manager_presence_run_manager =
-            PackageManagerPresenceRunManager::new(PackageManagerPresenceReporter::new(
-                nats_message_publisher.clone(),
-                config_service.clone(),
-            ));
         let package_manager_update_run_manager = PackageManagerUpdateRunManager::new();
 
         let hostname_report_publisher = HostnameReportPublisher::new(
@@ -637,7 +637,7 @@ impl Client {
             mesh_self_heal_service,
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
-            package_manager_presence_run_manager,
+            package_manager_report_run_manager,
             package_manager_update_run_manager,
             hostname_report_publisher,
             machine_timezone_run_manager,
@@ -717,8 +717,6 @@ impl Client {
 
         self.package_manager_update_run_manager.start();
 
-        self.package_manager_presence_run_manager.start();
-
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
 
@@ -762,8 +760,11 @@ impl Client {
         self.script_schedule_execution_listener.start().await?;
         info!("Script schedule execution listener started");
 
-        // Start tool run manager
-        self.tool_run_manager.run().await?;
+        self.package_manager_report_run_manager.start();
+
+        if let Err(e) = self.tool_run_manager.run().await {
+            error!("Failed to start tool run manager: {:#}", e);
+        }
 
         // Start mesh self-heal watcher (re-fetch .msh + bounce agent if held on a stale MeshID).
         self.mesh_self_heal_service.run().await?;

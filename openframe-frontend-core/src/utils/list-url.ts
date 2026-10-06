@@ -28,6 +28,8 @@
  * mappers can import it from `@flamingo-stack/openframe-frontend-core/utils`.
  */
 
+import { TRUST_CENTER_API_PATH, TRUST_CENTER_DOCUMENT_TYPE } from '../types/trust-center';
+
 /**
  * Legacy ContentRef aliases that predate the RAG `documentType`
  * unification — direct lib/embedder callers (e.g. the chat dispatcher's
@@ -114,6 +116,23 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
   openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
   prospect_call: (ids, b) => `${b}/api/prospect-calls?ids=${ids.join(',')}`,
+  // Code intelligence — per-object card hydration, same `handleEntityCardList`
+  // shape as the internal objects above.
+  code_rule: (ids, b) => `${b}/api/code-rules/cards?ids=${ids.join(',')}`,
+  code_repo: (ids, b) => `${b}/api/code-graph/repos?ids=${ids.join(',')}`,
+  code_deployment: (ids, b) => `${b}/api/code-graph/deployments?ids=${ids.join(',')}`,
+  code_file: (ids, b) => `${b}/api/code-graph/files?ids=${ids.join(',')}`,
+  // `code_symbol` / `code_duplicate` ids are SYMBOL KEYS with their member
+  // separator re-spelled `~` (`codeGraphCardId`), because the ids are joined
+  // RAW here and the hub's `?ids=` reader refuses `#`.
+  code_symbol: (ids, b) => `${b}/api/code-graph/symbols?ids=${ids.join(',')}`,
+  code_duplicate: (ids, b) => `${b}/api/code-graph/duplicates?ids=${ids.join(',')}`,
+  code_impact: (ids, b) => `${b}/api/code-graph/impacts?ids=${ids.join(',')}`,
+  change_set: (ids, b) => `${b}/api/code-graph/change-sets?ids=${ids.join(',')}`,
+  // Single-record live source: the route ignores `?ids=` and returns the ONE
+  // `TrustCenterPublic` object (card id `TRUST_CENTER_CARD_ID`); see
+  // `extractCardItems` for how the loader matches it back.
+  [TRUST_CENTER_DOCUMENT_TYPE]: (ids, b) => `${b}${TRUST_CENTER_API_PATH}?ids=${ids.join(',')}`,
 };
 
 /**

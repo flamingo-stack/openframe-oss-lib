@@ -42,17 +42,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { completeFormRescue } from '../../hooks/use-form-rescue';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { BOOKING_IN_FLIGHT_MESSAGE, useMeetingBooking } from '../../hooks/use-meeting-booking';
 import { useToast } from '../../hooks/use-toast';
 import {
-  isSupportedFormField,
+  blocksNativeBooking,
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
   type MeetingHost,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
+import { FORM_RESCUE_ATTEMPT_FIELD, type FormRescueDefinition } from '../../utils/form-rescue';
 import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
 import { Alert, AlertDescription, Button } from '../ui';
 import { BookingForm, BookingFormSkeleton, DEFAULT_SUBMIT_LABEL, type BookingFormProps } from './booking-form';
@@ -145,11 +147,15 @@ export interface HubSpotMeetingSchedulerProps {
    */
   detailsForm?: ComponentType<BookingFormProps>;
   /**
-   * The DATA form of the same override: `fieldRows` and a host consent row,
-   * spread onto whichever form renders. Serialisable, so a Server Component
-   * can pass it across the RSC boundary where a component cannot.
+   * The DATA form of the same override: `fieldRows`, a host consent row and
+   * per-field display copy, spread onto whichever form renders. Serialisable,
+   * so a Server Component can pass it across the RSC boundary where a component
+   * cannot.
    */
-  detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent'>;
+  detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent' | 'fieldCopy' | 'deniedEmailDomains'>;
+  /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
+   *  omitted or `null` saves nothing. */
+  rescue?: FormRescueDefinition | null;
 }
 
 type Step = 'slot' | 'details' | 'confirmed';
@@ -166,7 +172,7 @@ type StashedDetails = {
 /** Context-panel geometry — ONE definition for the loaded card and the
  *  loading skeleton, which is what keeps the two footprint-identical. */
 const CONTEXT_PANEL_CLASS =
-  'p-[var(--spacing-system-l)] shrink-0 lg:w-[280px] border-b lg:border-b-0 lg:border-r border-ods-border lg:min-h-0 lg:overflow-y-auto';
+  'p-[var(--spacing-system-l)] shrink-0 content-lg:w-[280px] border-b content-lg:border-b-0 content-lg:border-r border-ods-border content-lg:min-h-0 content-lg:overflow-y-auto';
 
 /**
  * Action panel: the elastic half, scrolling inside the fixed card.
@@ -176,7 +182,7 @@ const CONTEXT_PANEL_CLASS =
  * inset that divider from the card's edges instead of letting it run the full
  * width the way every other rule in this card does.
  */
-const ACTION_PANEL_CLASS = 'flex-1 min-w-0 flex flex-col md:min-h-0 lg:p-[var(--spacing-system-l)]';
+const ACTION_PANEL_CLASS = 'flex-1 min-w-0 flex flex-col content-md:min-h-0 content-lg:p-[var(--spacing-system-l)]';
 
 /**
  * The action panel's inset for the steps that are ONE block — details,
@@ -189,12 +195,12 @@ const ACTION_PANEL_CLASS = 'flex-1 min-w-0 flex flex-col md:min-h-0 lg:p-[var(--
  * sections has to bring the same inset with it — without it the form ran edge
  * to edge on tablet, its inputs touching the card's border.
  *
- * `md:min-h-0 md:overflow-y-auto` comes with it: from `md` up the card states
+ * `content-md:min-h-0 content-md:overflow-y-auto` comes with it: from `md` up the card states
  * a height, and these steps have no inner scroller of their own the way the
  * times column does, so this is where a long form gets to scroll instead of
  * being cut off at the card's edge.
  */
-const PANEL_STEP_CLASS = 'p-[var(--spacing-system-l)] md:min-h-0 md:overflow-y-auto lg:p-0';
+const PANEL_STEP_CLASS = 'p-[var(--spacing-system-l)] content-md:min-h-0 content-md:overflow-y-auto content-lg:p-0';
 /** A step's panel: the inset above on a column that fills the action side. */
 const STEP_PANEL_CLASS = cn('flex flex-1 flex-col', PANEL_STEP_CLASS);
 
@@ -242,7 +248,7 @@ const STEP_PANEL_CLASS = cn('flex flex-1 flex-col', PANEL_STEP_CLASS);
  * video take the leftover space at 16:9; a stand-in that just stacks fixed
  * blocks will overflow the shorter of the two.
  */
-export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
+export const MEETING_SCHEDULER_H = 'content-md:h-[34.375rem] content-lg:h-[23.75rem]';
 
 /**
  * The box for `flow="details-first"`'s CALENDAR and confirmation stages (and its
@@ -259,7 +265,7 @@ export const MEETING_SCHEDULER_H = 'md:h-[34.375rem] lg:h-[23.75rem]';
  *
  * Hosts read it through `SCHEDULER_FLOW_PRESETS[flow].height`, never directly.
  */
-export const MEETING_SCHEDULER_DETAILS_FIRST_H = 'h-[50.75rem] md:h-[39.875rem]';
+export const MEETING_SCHEDULER_DETAILS_FIRST_H = 'h-[50.75rem] content-md:h-[39.875rem]';
 
 export type SchedulerFlow = 'slot-first' | 'details-first';
 
@@ -308,24 +314,24 @@ export const SCHEDULER_FLOW_PRESETS: Record<
  * it on a calendar sized to fit (no scroll) and a times list that scrolls on
  * its own.
  *
- * `md:flex md:flex-col` is what makes that possible at all. A stated height on
+ * `content-md:flex content-md:flex-col` is what makes that possible at all. A stated height on
  * a plain block only clips (this card is `overflow-hidden` for its corners) —
  * it is the flex column plus the inner wrapper's `min-h-0` that lets the
  * content shrink into the height instead of being cut off by it.
  */
 const CARD_CLASS = cn(
   'overflow-hidden rounded-md border border-ods-border bg-ods-card',
-  'md:flex md:flex-col',
+  'content-md:flex content-md:flex-col',
   // The height is NOT baked in any more: it is chosen per flow at each render
   // site (`cardClass`), because details-first needs a taller box and both
   // constants are module scope.
 );
 
-/** Context strip over action panel, side by side from `lg`. `md:flex-1
- *  md:min-h-0` is the pair that makes it exactly as tall as the card states —
+/** Context strip over action panel, side by side from `lg`. `content-md:flex-1
+ *  content-md:min-h-0` is the pair that makes it exactly as tall as the card states —
  *  grow into a stated height that content does not reach, shrink into one it
  *  overruns — so neither a short stage nor a long one changes the box. */
-const CARD_INNER_CLASS = 'flex flex-col md:min-h-0 md:flex-1 lg:h-full lg:flex-row';
+const CARD_INNER_CLASS = 'flex flex-col content-md:min-h-0 content-md:flex-1 content-lg:h-full content-lg:flex-row';
 
 /** The two-line stages (load failure, "booked on HubSpot") — the SAME box as
  *  the booking card, because these are stages of one widget in one slot and a
@@ -334,7 +340,7 @@ const CARD_INNER_CLASS = 'flex flex-col md:min-h-0 md:flex-1 lg:h-full lg:flex-r
  *  outgrows it. */
 const CARD_DEGRADED_CLASS = cn(
   'flex flex-col items-start gap-[var(--spacing-system-m)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)]',
-  'md:justify-center md:overflow-y-auto',
+  'content-md:justify-center content-md:overflow-y-auto',
 );
 
 /**
@@ -369,13 +375,16 @@ export function SchedulerDegradedCard({
 }
 
 /**
- * Fail-closed gate: a link whose declared questions include an unsupported
- * type, or whose consent block is malformed, must NOT render a half-working
- * native form (a silently dropped required question or missing consent copy
- * is worse than no native form) — the escape hatch takes over.
+ * Fail-closed gate: a link with a REQUIRED question no control can answer (a
+ * file upload), or whose consent block is malformed, must NOT render a
+ * half-working native form (a silently dropped required question or missing
+ * consent copy is worse than no native form) — the escape hatch takes over.
+ * An unfamiliar question TYPE is not a reason: it resolves to the nearest
+ * control (`resolveFormFieldControl`), so one new HubSpot type can no longer
+ * take the whole booking form down.
  */
 function isNativelyBookable(availability: MeetingAvailability): boolean {
-  if (!availability.formFields.every(isSupportedFormField)) return false;
+  if (availability.formFields.some(blocksNativeBooking)) return false;
   const consent = availability.legalConsent;
   if (consent) {
     if (typeof consent.processingConsentText !== 'string') return false;
@@ -400,6 +409,7 @@ export function HubSpotMeetingScheduler({
   flow = DEFAULT_SCHEDULER_FLOW,
   detailsForm: DetailsForm = BookingForm,
   detailsFormProps,
+  rescue = null,
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -639,6 +649,8 @@ export function HubSpotMeetingScheduler({
         return;
       }
       if (result.ok && result.confirmation) {
+        // The details form may have unmounted (details-first); its attempt id rides the payload.
+        completeFormRescue(rescue, payload[FORM_RESCUE_ATTEMPT_FIELD]);
         setConfirmation(result.confirmation);
         setStep('confirmed');
         onBooked?.(result.confirmation);
@@ -678,7 +690,7 @@ export function HubSpotMeetingScheduler({
         });
       }
     },
-    [book, bookingError, detailsFirst, onBooked, refetchAvailability, resetSignals, toast],
+    [book, bookingError, detailsFirst, onBooked, refetchAvailability, rescue, resetSignals, toast],
   );
 
   const escapeHatch = fallbackUrl ? (
@@ -711,7 +723,7 @@ export function HubSpotMeetingScheduler({
   const boxed = !formOnly;
   const cardClass = cn(
     CARD_CLASS,
-    boxed ? preset.height : 'md:h-auto',
+    boxed ? preset.height : 'content-md:h-auto',
     detailsFirst && 'flex flex-col',
     formOnly && 'bg-ods-bg',
     className,
@@ -864,14 +876,15 @@ export function HubSpotMeetingScheduler({
                 onSubmit={detailsFirst ? stashDetails : handleSubmit}
                 honeypotInputProps={honeypotInputProps}
                 getSignals={getSignals}
+                rescue={rescue}
               />
             </div>
           ) : (
-            <div className="flex flex-col gap-[var(--spacing-system-m)] md:min-h-0 md:flex-1">
+            <div className="flex flex-col gap-[var(--spacing-system-m)] content-md:min-h-0 content-md:flex-1">
               {bookingError === 'SLOT_TAKEN' && (
                 <Alert
                   variant="warning"
-                  className="mx-[var(--spacing-system-l)] mt-[var(--spacing-system-l)] w-auto lg:m-0 lg:w-full"
+                  className="mx-[var(--spacing-system-l)] mt-[var(--spacing-system-l)] w-auto content-lg:m-0 content-lg:w-full"
                 >
                   <AlertDescription>
                     That time was just taken — pick another slot below. (If you already submitted, check your email for
@@ -974,6 +987,7 @@ export {
   type BookingFormProps,
   type BookingFieldRow,
   type BookingFieldSlot,
+  type BookingFieldCopy,
   type BookingFormConsent,
 } from './booking-form';
 
@@ -983,4 +997,4 @@ export {
   type MeetingSchedulerDirectoryProps,
 } from './directory';
 export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost };
-export type { SchedulingLink, SchedulingLinksPayload } from '../../schemas/meeting-booking-schema';
+export type { SchedulingLink, SchedulingLinksPayload, DeniedEmailDomains } from '../../schemas/meeting-booking-schema';

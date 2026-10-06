@@ -14,10 +14,12 @@ import { useStickToBottom } from 'use-stick-to-bottom';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon, Arrow02DownIcon } from '../icons-v2-generated';
 import { OverlayOpenRegistryProvider } from '../ui/overlay-open-registry';
+import { ChatAppearanceContext } from './chat-appearance-context';
 import { ChatMessageEnhanced } from './chat-message-enhanced';
 import { ChatMessageListSkeleton } from './chat-message-skeleton';
 import { CyclingPhrase } from './cycling-phrase';
 import type { ChatMessageListProps } from './types';
+import { CHAT_APPEARANCE } from './types/chat.types';
 import { SCROLL_ANCHOR } from './types/message.types';
 import type { MessageContent } from './types/message.types';
 
@@ -48,6 +50,15 @@ const BOTTOM_THRESHOLD_PX = 70;
  *  spring re-reads `calculatedTargetScrollTop` every frame instead of
  *  finishing against the target captured when the call was made. */
 const FOLLOW_RETAIN_MS = 350;
+
+/** How long the scrollHeight poll keeps running after the thread last grew,
+ *  in ms. Long enough for the async growth that lands after a message —
+ *  images settling, entity cards resolving out of their skeletons — and
+ *  short enough that an idle open drawer stops waking the page every frame. */
+const GROWTH_WATCH_IDLE_MS = 10_000;
+
+/** Media events after which the thread's height can have changed. */
+const MEDIA_SETTLE_EVENTS = ['load', 'error', 'loadedmetadata'] as const;
 
 /*
  * Stick-to-bottom: `use-stick-to-bottom` (stackblitz-labs)
@@ -120,6 +131,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       dialogId,
       isLoading = false,
       isTyping = false,
+      typingMessage,
       autoScroll = true,
       overscrollContain = true,
       pinBottom = false,
@@ -128,6 +140,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       contentClassName,
       assistantType,
       approvalVariant,
+      appearance = CHAT_APPEARANCE.CLASSIC,
       assistantIcon,
       pendingApprovals,
       hasNextPage,
@@ -248,6 +261,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // because that call also re-sets the library's `isAtBottom`, a lost
     // lock self-heals instead of being permanent.
     const followBottomRef = useRef(false);
+    // Restarts the follow effect's scrollHeight poll; null while it is not
+    // installed.
+    const kickGrowthWatchRef = useRef<(() => void) | null>(null);
 
     // Drives the jump-to-bottom affordance. Derived from GEOMETRY, not
     // from the library's `isAtBottom`: that flag is the one this list
@@ -421,11 +437,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         measure();
       };
 
-      const ro = new ResizeObserver(reassert);
-      ro.observe(content); // tokens, entity cards, images
-      ro.observe(scroller); // streaming loader / source chips below it
-
-      // GROWTH WATCH — the load-bearing one, because the ResizeObserver above
+      // GROWTH WATCH — the load-bearing one, because the ResizeObserver below
       // is not reliable for this list.
       //
       // `content` is a SNAPSHOT taken when this effect installed, and the deps
@@ -439,20 +451,42 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // A poll on `scrollHeight` sidesteps the whole question of WHICH node is
       // live: it reads the scroller (always mounted, it owns the listeners)
       // and reacts to growth from any source — tokens, images settling, cards
-      // resolving. Gated on the intent, so it costs one rAF-tick comparison
-      // per frame only while actually following, and stops the moment a
-      // gesture disarms.
+      // resolving. It stops once the thread has not grown for
+      // GROWTH_WATCH_IDLE_MS — polled every frame forever it kept an idle open
+      // drawer rendering at 60fps (~5% of a core in WebKit) — and `kick`
+      // restarts it on everything that can grow the thread: new messages and
+      // typing-state changes (the effect below), scroll, the observer, and
+      // media inside the thread settling (an image loading or failing, a video
+      // learning its size) — that can land well after the last message, when
+      // the observer may be watching a detached node.
       let growthRaf = 0;
       let lastScrollHeight = scroller.scrollHeight;
-      const watchGrowth = () => {
-        growthRaf = requestAnimationFrame(watchGrowth);
-
+      let lastGrowthAt = performance.now();
+      const watchGrowth = (now: number) => {
         const height = scroller.scrollHeight;
-        if (height === lastScrollHeight) return;
-        lastScrollHeight = height;
-        reassert();
+        if (height !== lastScrollHeight) {
+          lastScrollHeight = height;
+          lastGrowthAt = now;
+          reassert();
+        } else if (now - lastGrowthAt > GROWTH_WATCH_IDLE_MS) {
+          growthRaf = 0;
+          return;
+        }
+        growthRaf = requestAnimationFrame(watchGrowth);
       };
-      growthRaf = requestAnimationFrame(watchGrowth);
+      const kick = () => {
+        lastGrowthAt = performance.now();
+        if (!growthRaf) growthRaf = requestAnimationFrame(watchGrowth);
+      };
+      kick();
+      kickGrowthWatchRef.current = kick;
+
+      const ro = new ResizeObserver(() => {
+        kick();
+        reassert();
+      });
+      ro.observe(content); // tokens, entity cards, images
+      ro.observe(scroller); // streaming loader / source chips below it
 
       // --- user-intent disarm ---------------------------------------
       // Only a deliberate move AWAY from the bottom releases the lock.
@@ -539,6 +573,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         rearmIfAtBottom();
       };
       const onScroll = () => {
+        kick();
         const st = scroller.scrollTop;
         if (pointerDown && st < lastScrollTop) disarm();
         lastScrollTop = st;
@@ -574,6 +609,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       scroller.addEventListener('touchmove', onTouchMove, { passive: true });
       window.addEventListener('pointerdown', onPointerDown, winCapture);
       scroller.addEventListener('scroll', onScroll, { passive: true });
+      // Media events do not bubble — capture them from the elements inside.
+      for (const type of MEDIA_SETTLE_EVENTS) scroller.addEventListener(type, kick, { capture: true, passive: true });
       window.addEventListener('pointerup', endPointer, winCapture);
       window.addEventListener('pointercancel', endPointer, winCapture);
       // Bubble phase, NOT capture — see the note above.
@@ -582,6 +619,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       return () => {
         ro.disconnect();
         cancelAnimationFrame(growthRaf);
+        kickGrowthWatchRef.current = null;
         scroller.removeEventListener('wheel', onWheel);
         scroller.removeEventListener('keydown', onKeyDown);
         scroller.removeEventListener('touchstart', onTouchStart);
@@ -589,6 +627,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // `capture` must match the add call or the listener is not removed.
         window.removeEventListener('pointerdown', onPointerDown, { capture: true });
         scroller.removeEventListener('scroll', onScroll);
+        for (const type of MEDIA_SETTLE_EVENTS) scroller.removeEventListener(type, kick, { capture: true });
         window.removeEventListener('pointerup', endPointer, { capture: true });
         window.removeEventListener('pointercancel', endPointer, { capture: true });
         // Added WITHOUT capture — the remove must match.
@@ -606,6 +645,12 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // dialog) also swaps the scroller element, so the stale closure kept
       // observing and listening on DETACHED nodes.
     }, [autoScroll, scrollRef, contentRef, scrollToBottom, stopScroll, isLoading]);
+
+    // Restart the growth watch (see GROWTH WATCH above) whenever the thread
+    // can be about to grow; it stops itself again once growth settles.
+    useEffect(() => {
+      kickGrowthWatchRef.current?.();
+    }, [messages, isTyping]);
 
     // ---- Passive-demo hard pin (pinBottom) ---------------------------
     // Scripted in-page replays (the Fae/Mingo demos) have no human at the
@@ -915,118 +960,119 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     const showStreamingLoader = isTyping && !isPausedOnApproval && !(pendingApprovals && pendingApprovals.length > 0);
 
     return (
-      <OverlayOpenRegistryProvider onOpenChange={handleOverlayOpenChange}>
-        <div className="flex min-h-0 flex-1 flex-col">
-          {/* Positioning box for the jump-to-bottom button: it wraps ONLY the
+      <ChatAppearanceContext.Provider value={appearance}>
+        <OverlayOpenRegistryProvider onOpenChange={handleOverlayOpenChange}>
+          <div className="flex min-h-0 flex-1 flex-col">
+            {/* Positioning box for the jump-to-bottom button: it wraps ONLY the
             scroller, so `absolute bottom-…` really is the scroller's lower
             edge. The outer flex column also holds the streaming loader and the
             approvals bar, and anchoring against THAT box put the button over
             the loader for the whole of every stream — precisely when it is
             most likely to be visible. */}
-          <div className="relative flex min-h-0 flex-1 flex-col">
-            <div
-              ref={setScrollRef}
-              className={cn(
-                'flex h-full w-full flex-1 flex-col overflow-y-auto overflow-x-hidden',
-                // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
-                // reaching the top/bottom of the thread must NOT chain the wheel/
-                // touch scroll to the page behind the chat — e.g. the company-hub
-                // deck (native body scroll + sticky slide panels) would otherwise
-                // advance slides while you scroll the chat (fixed in #1501; kept as
-                // the prop default here). Passive in-page DEMO chats disable it so
-                // the surrounding page keeps scrolling normally when the pointer is
-                // over the (non-interactive) thread.
-                overscrollContain && 'overscroll-contain',
-                'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30',
-                className,
-              )}
-              {...props}
-            >
+            <div className="relative flex min-h-0 flex-1 flex-col">
               <div
-                ref={setContentRef}
+                ref={setScrollRef}
                 className={cn(
-                  // `fullWidth=true` drops the centered-narrow column for
-                  // side-panel hosts (e.g. multi-platform-hub Mingo). Same
-                  // semantics as ChatHeader / ChatInput / ChatFooter.
-                  fullWidth
-                    ? 'flex w-full min-w-0 flex-col pb-[var(--spacing-system-xs)]'
-                    : 'mx-auto flex w-full min-w-0 max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)]',
-                  contentClassName ?? 'px-[var(--spacing-system-m)]',
+                  'flex h-full w-full flex-1 flex-col overflow-y-auto overflow-x-hidden',
+                  // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
+                  // reaching the top/bottom of the thread must NOT chain the wheel/
+                  // touch scroll to the page behind the chat — e.g. the company-hub
+                  // deck (native body scroll + sticky slide panels) would otherwise
+                  // advance slides while you scroll the chat (fixed in #1501; kept as
+                  // the prop default here). Passive in-page DEMO chats disable it so
+                  // the surrounding page keeps scrolling normally when the pointer is
+                  // over the (non-interactive) thread.
+                  overscrollContain && 'overscroll-contain',
+                  'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30',
+                  className,
                 )}
-                style={{ minHeight: '100%' }}
+                {...props}
               >
-                {hasNextPage && <div ref={sentinelRef} className="h-px" />}
-                <div className="flex-1" />
-                {messages.map((message, index) => {
-                  // Hidden messages (synthetic continuation prompts the host
-                  // injects after an approval card) are part of the API
-                  // conversation history but never render. Skipping here
-                  // keeps the visible thread coherent — see
-                  // `Message.hidden` doc-comment in message.types.ts.
-                  if (message.hidden) return null;
-                  // ONE OWNER for the pending turn. Both send paths mint an empty
-                  // assistant placeholder (the accumulation target — it MUST stay
-                  // in state) and flip the phase to 'thinking'. Rendering it here
-                  // too would put an author label with no body in the transcript
-                  // WHILE the footer loader below already represents the same
-                  // pending turn — two owners, and an `aria-live` log that
-                  // announces a bare "Mingo". The footer loader wins (it is
-                  // already `role="status" aria-live="polite"`, sits outside the
-                  // scroller so it can't jitter the thread, and cycles the
-                  // progress phrase), so the placeholder is not rendered AT ALL
-                  // until it carries something visible — removed from the live
-                  // region, not merely hidden. Mirrors `endSseTurn`, which prunes
-                  // an empty trailing assistant AFTER a turn; this closes the same
-                  // window BEFORE the first token. Any non-text segment (tool
-                  // execution, approval card, thinking) counts as visible.
-                  const isEmptyPendingTurn =
-                    index === messages.length - 1 &&
-                    isTyping &&
-                    message.role === 'assistant' &&
-                    !hasNonEmptyContent(message.content) &&
-                    (!Array.isArray(message.content) || message.content.every(s => s.type === 'text'));
-                  if (isEmptyPendingTurn) return null;
-                  const ownedContent = renderAfterMessage?.(message, index);
-                  const row = (
-                    <ChatMessageEnhanced
-                      key={message.id}
-                      ref={getRegisterMessageEl(message.id)}
-                      role={message.role}
-                      name={message.name}
-                      content={message.content}
-                      timestamp={message.timestamp}
-                      isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                      avatar={showAvatars ? message.avatar : null}
-                      showAvatar={showAvatars}
-                      assistantType={message.assistantType || assistantType}
-                      approvalVariant={approvalVariant}
-                      authorType={message.authorType}
-                      assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
-                      contextItems={message.contextItems}
-                      resolveContextIcon={resolveContextIcon}
-                      renderContextItem={renderContextItem}
-                      renderMention={renderMention}
-                      renderEntityCard={renderEntityCard}
-                      refs={message.refs}
-                      onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
-                      NavLinkAnchor={NavLinkAnchor}
-                    />
-                  );
-                  // Only wrap when there IS owned content: the bare row keeps
-                  // its own key and its place as a direct flex child, so a
-                  // thread without any stays byte-identical to before.
-                  if (!ownedContent) return row;
-                  return (
-                    <div key={message.id} className="flex w-full min-w-0 flex-col">
-                      {row}
-                      {ownedContent}
-                    </div>
-                  );
-                })}
+                <div
+                  ref={setContentRef}
+                  className={cn(
+                    // `fullWidth=true` drops the centered-narrow column for
+                    // side-panel hosts (e.g. multi-platform-hub Mingo). Same
+                    // semantics as ChatHeader / ChatInput / ChatFooter.
+                    fullWidth
+                      ? 'flex w-full min-w-0 flex-col pb-[var(--spacing-system-xs)]'
+                      : 'mx-auto flex w-full min-w-0 max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)]',
+                    contentClassName ?? 'px-[var(--spacing-system-m)]',
+                  )}
+                  style={{ minHeight: '100%' }}
+                >
+                  {hasNextPage && <div ref={sentinelRef} className="h-px" />}
+                  <div className="flex-1" />
+                  {messages.map((message, index) => {
+                    // Hidden messages (synthetic continuation prompts the host
+                    // injects after an approval card) are part of the API
+                    // conversation history but never render. Skipping here
+                    // keeps the visible thread coherent — see
+                    // `Message.hidden` doc-comment in message.types.ts.
+                    if (message.hidden) return null;
+                    // ONE OWNER for the pending turn. Both send paths mint an empty
+                    // assistant placeholder (the accumulation target — it MUST stay
+                    // in state) and flip the phase to 'thinking'. Rendering it here
+                    // too would put an author label with no body in the transcript
+                    // WHILE the footer loader below already represents the same
+                    // pending turn — two owners, and an `aria-live` log that
+                    // announces a bare "Mingo". The footer loader wins (it is
+                    // already `role="status" aria-live="polite"`, sits outside the
+                    // scroller so it can't jitter the thread, and cycles the
+                    // progress phrase), so the placeholder is not rendered AT ALL
+                    // until it carries something visible — removed from the live
+                    // region, not merely hidden. Mirrors `endSseTurn`, which prunes
+                    // an empty trailing assistant AFTER a turn; this closes the same
+                    // window BEFORE the first token. Any non-text segment (tool
+                    // execution, approval card, thinking) counts as visible.
+                    const isEmptyPendingTurn =
+                      index === messages.length - 1 &&
+                      isTyping &&
+                      message.role === 'assistant' &&
+                      !hasNonEmptyContent(message.content) &&
+                      (!Array.isArray(message.content) || message.content.every(s => s.type === 'text'));
+                    if (isEmptyPendingTurn) return null;
+                    const ownedContent = renderAfterMessage?.(message, index);
+                    const row = (
+                      <ChatMessageEnhanced
+                        key={message.id}
+                        ref={getRegisterMessageEl(message.id)}
+                        role={message.role}
+                        name={message.name}
+                        content={message.content}
+                        timestamp={message.timestamp}
+                        isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
+                        avatar={showAvatars ? message.avatar : null}
+                        showAvatar={showAvatars}
+                        assistantType={message.assistantType || assistantType}
+                        approvalVariant={approvalVariant}
+                        authorType={message.authorType}
+                        assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
+                        contextItems={message.contextItems}
+                        resolveContextIcon={resolveContextIcon}
+                        renderContextItem={renderContextItem}
+                        renderMention={renderMention}
+                        renderEntityCard={renderEntityCard}
+                        refs={message.refs}
+                        onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
+                        NavLinkAnchor={NavLinkAnchor}
+                      />
+                    );
+                    // Only wrap when there IS owned content: the bare row keeps
+                    // its own key and its place as a direct flex child, so a
+                    // thread without any stays byte-identical to before.
+                    if (!ownedContent) return row;
+                    return (
+                      <div key={message.id} className="grid w-full min-w-0 grid-cols-1">
+                        {row}
+                        {ownedContent}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            {/* Jump to bottom. The manual escape hatch from auto-scroll that
+              {/* Jump to bottom. The manual escape hatch from auto-scroll that
               every 2026 chat surface ships (AI Elements calls it
               `ConversationScrollButton`) and the WCAG 2.2.2 counterpart to
               moving content: the reader can always get back to the live
@@ -1037,79 +1083,88 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               height either way — a sibling would shrink the scroller and
               move the very bottom it points at. Hidden while at the bottom
               and in passive demo hosts. */}
-            {autoScroll && !atBottom && messages.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  // Clicking IS the intent to return to the live end, so it
-                  // re-arms the follow lock a scroll-up had released.
-                  followBottomRef.current = true;
-                  void scrollToBottom({ animation: 'smooth' });
-                }}
-                aria-label="Scroll to latest message"
-                className={cn(
-                  'absolute bottom-[var(--spacing-system-s)] left-1/2 z-10 -translate-x-1/2',
-                  'flex size-9 items-center justify-center rounded-full',
-                  'border border-ods-border bg-ods-card text-ods-text-primary shadow-lg',
-                  'transition-colors hover:bg-ods-bg-hover',
-                )}
-              >
-                <Arrow02DownIcon size={16} />
-              </button>
-            )}
-          </div>
+              {autoScroll && !atBottom && messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Clicking IS the intent to return to the live end, so it
+                    // re-arms the follow lock a scroll-up had released.
+                    followBottomRef.current = true;
+                    void scrollToBottom({ animation: 'smooth' });
+                  }}
+                  aria-label="Scroll to latest message"
+                  className={cn(
+                    'absolute bottom-[var(--spacing-system-s)] left-1/2 z-10 -translate-x-1/2',
+                    'flex size-9 items-center justify-center rounded-full',
+                    'border border-ods-border bg-ods-card text-ods-text-primary shadow-lg',
+                    'transition-colors hover:bg-ods-bg-hover',
+                  )}
+                >
+                  <Arrow02DownIcon size={16} />
+                </button>
+              )}
+            </div>
 
-          {/* Footer-pinned streaming loader — outside the scroller so it
+            {/* Footer-pinned streaming loader — outside the scroller so it
             doesn't jitter as the streaming message grows. Color is set
             via inline style (CSS var) rather than a Tailwind class so it
             is JIT-independent when this lib is consumed via yalc. */}
-          {showStreamingLoader && (
-            <div
-              className={cn(
-                fullWidth
-                  ? 'flex w-full items-center gap-[var(--spacing-system-xxs)] py-[var(--spacing-system-xs)]'
-                  : 'mx-auto flex w-full max-w-ods-content-narrow items-center gap-[var(--spacing-system-xxs)] py-[var(--spacing-system-xs)]',
-                contentClassName ?? 'px-[var(--spacing-system-m)]',
-              )}
-              style={{ color: 'var(--color-text-muted)' }}
-              role="status"
-              aria-live="polite"
-            >
-              <DotsLoaderIcon className="h-6 w-6" />
-              <CyclingPhrase words={STREAMING_WORDS} className="text-h6" />
-            </div>
-          )}
+            {showStreamingLoader && (
+              <div
+                className={cn(
+                  fullWidth
+                    ? 'flex w-full items-center gap-[var(--spacing-system-xxs)] py-[var(--spacing-system-xs)]'
+                    : 'mx-auto flex w-full max-w-ods-content-narrow items-center gap-[var(--spacing-system-xxs)] py-[var(--spacing-system-xs)]',
+                  contentClassName ?? 'px-[var(--spacing-system-m)]',
+                )}
+                style={{ color: 'var(--color-text-muted)' }}
+                role="status"
+                aria-live="polite"
+              >
+                <DotsLoaderIcon className="h-6 w-6" />
+                {/* What the turn is actually doing, when the host knows; the
+                    cycling phrase when it does not. One line, updated in place. */}
+                {typingMessage ? (
+                  <span className="text-h6" aria-atomic="true">
+                    {typingMessage}
+                  </span>
+                ) : (
+                  <CyclingPhrase words={STREAMING_WORDS} className="text-h6" />
+                )}
+              </div>
+            )}
 
-          {/* Sticky Pending Approvals — outside the scroller; same
+            {/* Sticky Pending Approvals — outside the scroller; same
             structure as the v1 baseline. The library's RO watches
             `contentRef` (INSIDE the scroller), so height changes to
             this sibling don't trigger the library directly. If a
             future UX requires snapping to bottom when approvals
             appear, that hookup goes here. */}
-          {pendingApprovals && pendingApprovals.length > 0 && (
-            <div
-              className={cn(
-                'border-t border-ods-border bg-ods-bg/95 backdrop-blur-sm',
-                fullWidth ? 'w-full' : 'mx-auto w-full max-w-ods-content-narrow',
-                contentClassName ?? 'px-[var(--spacing-system-m)]',
-              )}
-            >
-              <ChatMessageEnhanced
-                role="assistant"
-                name={assistantType === 'mingo' ? 'Mingo' : 'Fae'}
-                content={pendingApprovals}
-                timestamp={new Date()}
-                showAvatar={showAvatars}
-                assistantType={assistantType}
-                approvalVariant={approvalVariant}
-                assistantIcon={assistantIcon}
-                NavLinkAnchor={NavLinkAnchor}
-                className="py-3"
-              />
-            </div>
-          )}
-        </div>
-      </OverlayOpenRegistryProvider>
+            {pendingApprovals && pendingApprovals.length > 0 && (
+              <div
+                className={cn(
+                  'border-t border-ods-border bg-ods-bg/95 backdrop-blur-sm',
+                  fullWidth ? 'w-full' : 'mx-auto w-full max-w-ods-content-narrow',
+                  contentClassName ?? 'px-[var(--spacing-system-m)]',
+                )}
+              >
+                <ChatMessageEnhanced
+                  role="assistant"
+                  name={assistantType === 'mingo' ? 'Mingo' : 'Fae'}
+                  content={pendingApprovals}
+                  timestamp={new Date()}
+                  showAvatar={showAvatars}
+                  assistantType={assistantType}
+                  approvalVariant={approvalVariant}
+                  assistantIcon={assistantIcon}
+                  NavLinkAnchor={NavLinkAnchor}
+                  className="py-3"
+                />
+              </div>
+            )}
+          </div>
+        </OverlayOpenRegistryProvider>
+      </ChatAppearanceContext.Provider>
     );
   },
 );

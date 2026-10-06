@@ -4,6 +4,7 @@ import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon, ClockHistoryIcon, XmarkIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
+import { chatDialogMenuItems, chatMenuIconClassName } from './chat-dialog-menu-items';
 import type { ChatPanelHeaderProps } from './chat-panel-header';
 
 export interface ChatPanelHeaderMobileProps extends ChatPanelHeaderProps {
@@ -38,6 +39,7 @@ export function ChatPanelHeaderMobile({
   onRestore,
   onRename,
   onArchive,
+  onCompact,
   onCopyLink,
   onOpenArchive,
   className,
@@ -49,15 +51,13 @@ export function ChatPanelHeaderMobile({
     !showBack &&
       onOpenArchive && {
         id: 'open-archive',
-        label: 'Chat archive',
-        icon: <ClockHistoryIcon className="h-full w-full" />,
+        label: 'Chat Archive',
+        icon: <ClockHistoryIcon className={chatMenuIconClassName} />,
         onClick: onOpenArchive,
       },
-    isArchivedView && onRestore && { id: 'unarchive', label: 'Unarchive chat', onClick: onRestore },
-    !isArchivedView && onCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: onCopyLink },
-    !isArchivedView && onRename && { id: 'rename', label: 'Rename chat', onClick: onRename },
-    !isArchivedView && onArchive && { id: 'archive', label: 'Archive chat', onClick: onArchive },
-  ].filter(Boolean) as ActionsMenuItem[];
+    isArchivedView && onRestore && { id: 'unarchive', label: 'Unarchive Chat', onClick: onRestore },
+    ...(isArchivedView ? [] : chatDialogMenuItems({ onCopyLink, onRename, onCompact, onArchive })),
+  ].filter((item): item is ActionsMenuItem => !!item);
 
   return (
     <div

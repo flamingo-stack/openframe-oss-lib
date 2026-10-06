@@ -59,6 +59,7 @@ type Machine implements Node {
     lastSeen: Instant
     organizationId: String
     organization: Organization
+    userId: String
     hostname: String
     displayName: String
     nickname: String
@@ -75,6 +76,18 @@ type Machine implements Node {
     tags: [Tag]
     toolConnections: [ToolConnection]
     installedAgents: [InstalledAgent]
+    """Package managers as last reported by the device agent. Null until the first report."""
+    packageManagers: MachinePackageManagers
+    """False when no enabled package manager can ever work on this device. Software Management then hides it
+    from device pickers and skips it at dispatch; inventory and vulnerabilities still show it."""
+    softwareManagementSupported: Boolean!
+}
+
+"""Per-manager state reported by the agent. A manager of another OS reads as UNSUPPORTED."""
+type MachinePackageManagers {
+    brew: PackageManagerState
+    winget: PackageManagerState
+    choco: PackageManagerState
 }
 
 

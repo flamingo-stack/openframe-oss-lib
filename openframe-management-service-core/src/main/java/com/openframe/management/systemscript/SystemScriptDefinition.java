@@ -18,7 +18,7 @@ public enum SystemScriptDefinition implements ManagedScriptDefinition {
             ScriptShell.BASH,
             OsType.MAC_OS,
             PrivilegeLevel.ADMIN,
-            900,
+            1200,
             "Installs Homebrew for the console user. Managed by OpenFrame."),
 
     INSTALL_CHOCOLATEY(

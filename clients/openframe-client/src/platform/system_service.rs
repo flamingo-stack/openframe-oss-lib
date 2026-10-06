@@ -1,15 +1,19 @@
 //! System service management utilities (launchctl, systemctl, SCM).
 
+use crate::config::service_stop::SERVICE_START_RETRY_DELAYS_SECS;
 #[cfg(target_os = "windows")]
 use crate::config::service_stop::{
     PROCESS_CHECK_INTERVAL_MS, SCM_QUERY_MAX_CONSECUTIVE_FAILURES, SCM_QUERY_TIMEOUT_SECS,
-    SERVICE_FORCE_KILL_MAX_ATTEMPTS, SERVICE_START_CALL_TIMEOUT_SECS, SERVICE_START_MAX_ATTEMPTS,
+    SERVICE_FORCE_KILL_MAX_ATTEMPTS, SERVICE_START_CALL_TIMEOUT_SECS,
     SERVICE_STOP_CALL_TIMEOUT_SECS, SERVICE_STOP_MAX_ATTEMPTS,
 };
+#[cfg(target_os = "windows")]
+use crate::utils::timed_permit_pool::PermitPoolError;
 use anyhow::{Context, Result};
+use std::time::Duration;
 use tokio::process::Command;
 #[cfg(target_os = "windows")]
-use tokio::time::{sleep, Duration};
+use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 /// Shared pool bounding in-flight SCM calls; timed-out calls can park at most SCM_MAX_IN_FLIGHT threads.
@@ -22,7 +26,12 @@ fn scm_pool() -> &'static crate::utils::timed_permit_pool::TimedPermitPool {
 
 /// Run a blocking SCM call off-runtime with a timeout, so a wedged SCM can never hang an async task.
 #[cfg(target_os = "windows")]
-async fn scm_call_timed<T, F>(service_name: &str, what: &str, timeout_secs: u64, f: F) -> Result<T>
+async fn scm_call_timed<T, F>(
+    service_name: &str,
+    what: &str,
+    timeout_secs: u64,
+    f: F,
+) -> std::result::Result<T, PermitPoolError>
 where
     F: FnOnce() -> T + Send + 'static,
     T: Send + 'static,
@@ -51,13 +60,13 @@ async fn query_service_status_timed(
     service_name: &str,
 ) -> Result<windows_service::Result<windows_service::service::ServiceStatus>> {
     let name = service_name.to_string();
-    scm_call_timed(
+    Ok(scm_call_timed(
         service_name,
         "status query",
         SCM_QUERY_TIMEOUT_SECS,
         move || query_service_status_windows(&name),
     )
-    .await
+    .await?)
 }
 
 /// Start a macOS service via launchctl load
@@ -81,13 +90,73 @@ pub async fn start_service(service_name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Start a Windows service via the Service Control Manager, retrying transient failures.
+/// Delay before the attempt after `attempt` (1-based); None once the backoff schedule is exhausted.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn service_start_retry_delay(attempt: usize) -> Option<Duration> {
+    SERVICE_START_RETRY_DELAYS_SECS
+        .get(attempt.checked_sub(1)?)
+        .map(|secs| Duration::from_secs(*secs))
+}
+
+/// Codes no retry can fix: 2/3 image path missing, 1058 disabled, 1060 does not exist, 1072 marked for delete.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn is_permanent_service_start_code(code: i32) -> bool {
+    matches!(code, 2 | 3 | 1058 | 1060 | 1072)
+}
+
+/// Outcome of one failed start attempt; decides whether the loop backs off or bails.
+#[cfg(target_os = "windows")]
+enum ServiceStartFailure {
+    /// Retry after the backoff delay.
+    Transient(String),
+    /// Bail: no retry can fix it.
+    Permanent(String),
+    /// Bail: the start call is still parked in SCM holding a permit; another would park one more.
+    ScmUnresponsive(String),
+}
+
+#[cfg(target_os = "windows")]
+impl ServiceStartFailure {
+    fn from_scm(stage: &str, e: &windows_service::Error) -> Self {
+        let message = format!("{}: {}", stage, scm_error_detail(e));
+        match e {
+            windows_service::Error::Winapi(io)
+                if io
+                    .raw_os_error()
+                    .is_some_and(is_permanent_service_start_code) =>
+            {
+                Self::Permanent(message)
+            }
+            _ => Self::Transient(message),
+        }
+    }
+
+    fn message(&self) -> &str {
+        match self {
+            Self::Transient(m) | Self::Permanent(m) | Self::ScmUnresponsive(m) => m,
+        }
+    }
+}
+
+/// A busy pool issued no call, so nothing is parked and a retry is free; a timed-out call left a thread in SCM.
+#[cfg(target_os = "windows")]
+fn classify_pool_failure(e: PermitPoolError) -> ServiceStartFailure {
+    let message = e.to_string();
+    if e.is_busy() {
+        ServiceStartFailure::Transient(message)
+    } else {
+        ServiceStartFailure::ScmUnresponsive(message)
+    }
+}
+
+/// Start a Windows service via the Service Control Manager, backing off on transient failures and failing fast otherwise.
 #[cfg(target_os = "windows")]
 pub async fn start_service(service_name: &str) -> Result<()> {
     info!("Starting Windows service via SCM: {}", service_name);
 
+    let total_attempts = SERVICE_START_RETRY_DELAYS_SECS.len() + 1;
     let mut last_err = String::new();
-    for attempt in 1..=SERVICE_START_MAX_ATTEMPTS {
+    for attempt in 1..=total_attempts {
         let name = service_name.to_string();
         let start_result = scm_call_timed(
             service_name,
@@ -96,46 +165,77 @@ pub async fn start_service(service_name: &str) -> Result<()> {
             move || try_start_service_windows(&name),
         )
         .await
-        .map_err(|e| format!("{e:#}"))
-        .and_then(|r| r);
-        match start_result {
-            Ok(()) => match wait_for_service_running_windows(service_name).await {
-                Some(true) => {
-                    info!("Service {} confirmed running", service_name);
-                    return Ok(());
-                }
-                Some(false) => {
-                    last_err = "service did not reach RUNNING after start".to_string();
-                    warn!(
-                        "Start attempt {}/{} for service {}: {}",
-                        attempt, SERVICE_START_MAX_ATTEMPTS, service_name, last_err
-                    );
-                }
-                None => {
-                    last_err = "could not confirm RUNNING (SCM unresponsive)".to_string();
-                    warn!(
-                        "Start attempt {}/{} for service {}: {}",
-                        attempt, SERVICE_START_MAX_ATTEMPTS, service_name, last_err
-                    );
-                }
-            },
-            Err(e) => {
-                last_err = e;
+        .unwrap_or_else(|e| Err(classify_pool_failure(e)));
+        let failure = match start_result {
+            Ok(()) => {
+                let failure = match wait_for_service_running_windows(service_name).await {
+                    Some(true) => {
+                        info!("Service {} confirmed running", service_name);
+                        return Ok(());
+                    }
+                    Some(false) => ServiceStartFailure::Transient(
+                        "service did not reach RUNNING after start".to_string(),
+                    ),
+                    // The start call itself succeeded, so retry: re-issuing it costs one
+                    // already-running no-op, while failing here reports a service that may well be up.
+                    None => ServiceStartFailure::Transient(
+                        "could not confirm RUNNING (SCM unresponsive)".to_string(),
+                    ),
+                };
+                warn!(
+                    "Start attempt {}/{} for service {}: {}",
+                    attempt,
+                    total_attempts,
+                    service_name,
+                    failure.message()
+                );
+                failure
+            }
+            Err(failure) => {
                 warn!(
                     "Start attempt {}/{} for service {} failed: {}",
-                    attempt, SERVICE_START_MAX_ATTEMPTS, service_name, last_err
+                    attempt,
+                    total_attempts,
+                    service_name,
+                    failure.message()
                 );
+                failure
             }
-        }
-        if attempt < SERVICE_START_MAX_ATTEMPTS {
-            sleep(Duration::from_millis(PROCESS_CHECK_INTERVAL_MS)).await;
+        };
+        last_err = match failure {
+            ServiceStartFailure::Transient(message) => message,
+            ServiceStartFailure::Permanent(message) => anyhow::bail!(
+                "Failed to start service {} on attempt {}/{}, not retrying a permanent SCM error: {}",
+                service_name,
+                attempt,
+                total_attempts,
+                message
+            ),
+            ServiceStartFailure::ScmUnresponsive(message) => anyhow::bail!(
+                "Failed to start service {} on attempt {}/{}, not retrying while SCM is unresponsive: {}",
+                service_name,
+                attempt,
+                total_attempts,
+                message
+            ),
+        };
+        match service_start_retry_delay(attempt) {
+            Some(delay) => {
+                info!(
+                    "Retrying start of service {} in {}s",
+                    service_name,
+                    delay.as_secs()
+                );
+                sleep(delay).await;
+            }
+            None => break,
         }
     }
 
     anyhow::bail!(
         "Failed to start service {} after {} attempts: {}",
         service_name,
-        SERVICE_START_MAX_ATTEMPTS,
+        total_attempts,
         last_err
     )
 }
@@ -166,19 +266,19 @@ async fn wait_for_service_running_windows(service_name: &str) -> Option<bool> {
 }
 
 #[cfg(target_os = "windows")]
-fn try_start_service_windows(service_name: &str) -> std::result::Result<(), String> {
+fn try_start_service_windows(service_name: &str) -> std::result::Result<(), ServiceStartFailure> {
     use winapi::shared::winerror::ERROR_SERVICE_ALREADY_RUNNING;
     use windows_service::service::ServiceAccess;
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
-        .map_err(|e| format!("connect to SCM: {}", scm_error_detail(&e)))?;
+        .map_err(|e| ServiceStartFailure::from_scm("connect to SCM", &e))?;
     let service = manager
         .open_service(
             service_name,
             ServiceAccess::START | ServiceAccess::QUERY_STATUS,
         )
-        .map_err(|e| format!("open service: {}", scm_error_detail(&e)))?;
+        .map_err(|e| ServiceStartFailure::from_scm("open service", &e))?;
 
     match service.start::<&std::ffi::OsStr>(&[]) {
         Ok(()) => Ok(()),
@@ -187,7 +287,7 @@ fn try_start_service_windows(service_name: &str) -> std::result::Result<(), Stri
         {
             Ok(())
         }
-        Err(e) => Err(format!("start call: {}", scm_error_detail(&e))),
+        Err(e) => Err(ServiceStartFailure::from_scm("start call", &e)),
     }
 }
 
@@ -853,11 +953,15 @@ async fn delete_service_windows(service_name: &str) -> Result<()> {
 #[cfg(target_os = "windows")]
 async fn service_missing_timed(service_name: &str) -> Result<bool> {
     let name = service_name.to_string();
-    scm_call_timed(
+    Ok(scm_call_timed(
         service_name,
         "existence query",
         SCM_QUERY_TIMEOUT_SECS,
         move || service_missing_windows(&name),
     )
-    .await
+    .await?)
 }
+
+#[cfg(test)]
+#[path = "system_service_tests.rs"]
+mod tests;

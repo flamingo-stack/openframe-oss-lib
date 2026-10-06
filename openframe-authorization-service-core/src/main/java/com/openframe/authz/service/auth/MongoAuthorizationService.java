@@ -12,7 +12,11 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
+
+import static org.springframework.security.oauth2.server.authorization.OAuth2Authorization.Token.INVALIDATED_METADATA_NAME;
 
 @Service
 @RequiredArgsConstructor
@@ -27,32 +31,53 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
     public void save(OAuth2Authorization authorization) {
         log.debug("Saving authorization: {}", authorization.getId());
 
-        // Debug logging for PKCE parameters before save
-        OAuth2AuthorizationRequest request = authorization.getAttribute(OAuth2AuthorizationRequest.class.getName());
-        if (request != null) {
-            log.debug("PKCE in request before save: {}", request.getAdditionalParameters());
-        }
-
-        OAuth2Authorization.Token<OAuth2AuthorizationCode> code = authorization.getToken(OAuth2AuthorizationCode.class);
-        if (code != null) {
-            log.debug("PKCE in code metadata before save: {}", code.getMetadata());
-        }
-
         MongoOAuth2Authorization entity = MongoAuthorizationMapper.toEntity(authorization);
         repository.save(entity);
-
-        // Verify PKCE parameters after mapping
-        if (entity.getArAdditional() != null) {
-            log.debug("PKCE in entity additional params: {}", entity.getArAdditional());
-        }
-        if (entity.getAuthorizationCodeMetadata() != null) {
-            log.debug("PKCE in entity code metadata: {}", entity.getAuthorizationCodeMetadata());
-        }
     }
 
     @Override
     public void remove(OAuth2Authorization authorization) {
         repository.deleteById(authorization.getId());
+    }
+
+    /**
+     * Revokes every refresh token issued to the principal, the same way /oauth2/revoke does on logout:
+     * the refresh token (and its access token) is marked invalidated, so it can no longer be exchanged.
+     * Already revoked or expired tokens are left alone, and a record that fails to revoke is logged and
+     * skipped so it can't keep the rest alive; returns how many were revoked.
+     * Principal names are the user's email; matched case-insensitively because SSO logins carry the
+     * provider's email claim as-is.
+     */
+    public int revokeAllForPrincipal(String principalName) {
+        int revoked = 0;
+        for (MongoOAuth2Authorization entity : repository.findAllByPrincipalNameIgnoreCaseAndRefreshTokenValueNotNull(principalName)) {
+            if (revoke(entity)) {
+                revoked++;
+            }
+        }
+        return revoked;
+    }
+
+    private boolean revoke(MongoOAuth2Authorization entity) {
+        try {
+            OAuth2Authorization authorization = MongoAuthorizationMapper.toDomain(entity, registeredClientRepository);
+            if (!authorization.getRefreshToken().isActive()) {
+                return false;
+            }
+            save(invalidate(authorization));
+            return true;
+        } catch (RuntimeException e) {
+            log.error("Failed to revoke authorization {}", entity.getId(), e);
+            return false;
+        }
+    }
+
+    private static OAuth2Authorization invalidate(OAuth2Authorization authorization) {
+        OAuth2Authorization.Builder builder = OAuth2Authorization.from(authorization);
+        Stream.of(authorization.getRefreshToken(), authorization.getAccessToken())
+                .filter(Objects::nonNull)
+                .forEach(token -> builder.token(token.getToken(), md -> md.put(INVALIDATED_METADATA_NAME, true)));
+        return builder.build();
     }
 
     @Override
@@ -64,7 +89,7 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
 
     @Override
     public OAuth2Authorization findByToken(String token, OAuth2TokenType tokenType) {
-        log.debug("Finding authorization by token: {}, type: {}", token, tokenType);
+        log.debug("Finding authorization by token type: {}", tokenType);
 
         Optional<MongoOAuth2Authorization> found;
         if (tokenType == null) {
@@ -82,22 +107,8 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
             found = Optional.empty();
         }
 
-        return found.map(entity -> {
-            OAuth2Authorization auth = MongoAuthorizationMapper.toDomain(entity, registeredClientRepository);
-
-            // Debug logging for PKCE parameters
-            OAuth2AuthorizationRequest request = auth.getAttribute(OAuth2AuthorizationRequest.class.getName());
-            if (request != null) {
-                log.debug("PKCE in request: {}", request.getAdditionalParameters());
-            }
-
-            OAuth2Authorization.Token<OAuth2AuthorizationCode> code = auth.getToken(OAuth2AuthorizationCode.class);
-            if (code != null) {
-                log.debug("PKCE in code metadata: {}", code.getMetadata());
-            }
-
-            return auth;
-        }).orElse(null);
+        return found.map(entity -> MongoAuthorizationMapper.toDomain(entity, registeredClientRepository))
+                .orElse(null);
     }
 }
 

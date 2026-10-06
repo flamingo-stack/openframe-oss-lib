@@ -22,8 +22,6 @@ public class TicketStatisticsResponse {
 
     private Integer totalCount;
 
-    private List<StatusCount> statusCounts;
-
     private List<StatusDefinitionCount> statusDefinitionCounts;
 
     private String averageResolutionTimeFormatted;

@@ -3,7 +3,6 @@ package com.openframe.api.service.ticket.spi;
 import com.openframe.api.dto.ticket.CreateTicketInput;
 import com.openframe.api.dto.ticket.UpdateTicketInput;
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.security.authentication.AuthPrincipal;
 
@@ -27,10 +26,6 @@ public interface TicketEventListener {
 
     /** The ticket was (re)assigned to a user and saved. */
     default void onTicketAssigned(Ticket ticket, AuthPrincipal principal) {
-    }
-
-    /** Legacy (lifecycle-off) status change was saved. */
-    default void onLegacyStatusChanged(Ticket ticket, TicketStatus previousStatus, AuthPrincipal principal) {
     }
 
     /** Bulk archive of resolved tickets completed. */

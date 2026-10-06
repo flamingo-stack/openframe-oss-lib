@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -13,6 +14,7 @@ import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
+import com.openframe.api.dto.device.MachinePackageManagersResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -28,6 +30,7 @@ import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import graphql.relay.Relay;
 import graphql.schema.DataFetchingFieldSelectionSet;
 import jakarta.validation.Valid;
@@ -56,6 +59,7 @@ public class DeviceDataFetcher {
     private final TagService tagService;
     private final FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     private final GraphQLDeviceMapper mapper;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     @DgsQuery
     public CompletableFuture<DeviceFilters> deviceFilters(@InputArgument @Valid DeviceFilterInput filter,
@@ -181,7 +185,7 @@ public class DeviceDataFetcher {
 
     @DgsData(parentType = "Machine")
     public CompletableFuture<Organization> organization(DgsDataFetchingEnvironment dfe) {
-        DataLoader<String, Organization> dataLoader = dfe.getDataLoader("organizationDataLoader");
+        DataLoader<String, Organization> dataLoader = dfe.getDataLoader(OrganizationDataLoader.NAME);
         Machine machine = dfe.getSource();
         String organizationId = machine.getOrganizationId();
         
@@ -191,6 +195,18 @@ public class DeviceDataFetcher {
         
         return dataLoader.load(organizationId)
                 .thenApply(org -> org != null && org.getStatus() == OrganizationStatus.ACTIVE ? org : null);
+    }
+
+    @DgsData(parentType = "Machine")
+    public MachinePackageManagersResponse packageManagers(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return mapper.toPackageManagers(machine.getPackageManagers());
+    }
+
+    @DgsData(parentType = "Machine")
+    public boolean softwareManagementSupported(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return packageManagerAvailability.isSoftwareManageable(machine);
     }
 
 }

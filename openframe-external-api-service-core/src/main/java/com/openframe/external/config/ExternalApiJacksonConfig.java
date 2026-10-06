@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoUnit;
 
 /**
@@ -22,13 +23,16 @@ import java.time.temporal.ChronoUnit;
 @Configuration
 public class ExternalApiJacksonConfig {
 
+    /** Always three fraction digits, so a whole-second instant is ...05.000Z rather than ...05Z. */
+    private static final DateTimeFormatter ISO_INSTANT_MILLIS = new DateTimeFormatterBuilder().appendInstant(3).toFormatter();
+
     @Bean
     public Jackson2ObjectMapperBuilderCustomizer externalApiInstantMillisCustomizer() {
         SimpleModule module = new SimpleModule("external-api-instant-millis");
         module.addSerializer(Instant.class, new JsonSerializer<>() {
             @Override
             public void serialize(Instant value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-                gen.writeString(DateTimeFormatter.ISO_INSTANT.format(value.truncatedTo(ChronoUnit.MILLIS)));
+                gen.writeString(ISO_INSTANT_MILLIS.format(value.truncatedTo(ChronoUnit.MILLIS)));
             }
         });
         return builder -> builder.modulesToInstall(module);

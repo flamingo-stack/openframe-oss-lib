@@ -389,6 +389,7 @@ public class TicketQueries {
                         title
                         description
                         status
+                        statusDefinition { id name kind }
                         owner {
                             ... on ClientTicketOwner { type machineId }
                             ... on AdminTicketOwner { type userId }
@@ -412,6 +413,16 @@ public class TicketQueries {
                         createdAt
                         updatedAt
                     }
+                    userErrors { field message }
+                }
+            }
+            """;
+
+    // Moves every RESOLVED ticket the filter matches to ARCHIVED; only organizationIds and assigneeIds narrow it.
+    public static final String ARCHIVE_RESOLVED_TICKETS = """
+            mutation ArchiveResolvedTickets($filter: TicketFilterInput) {
+                archiveResolvedTickets(filter: $filter) {
+                    count
                     userErrors { field message }
                 }
             }

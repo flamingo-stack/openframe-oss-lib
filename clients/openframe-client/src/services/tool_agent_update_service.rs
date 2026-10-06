@@ -1,18 +1,21 @@
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
+use crate::config::update_config::ALLOW_DOWNGRADE;
 use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 use crate::models::{Installation, InstalledAsset, ToolRecordState};
 use crate::platform::{
     binary_writer, clear_aside_binary, detect_actual_installation, needs_migration, run_migration,
-    run_update, DirectoryManager, ToolUpdaterDeps,
+    run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
-use crate::services::tool_run_manager::ToolRunManager;
+use crate::services::tool_run_manager::{ToolRunManager, UpdatingGuard};
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
 use crate::services::InstalledToolsService;
 use crate::services::ToolCommandParamsResolver;
 use crate::services::ToolKillService;
+use crate::utils::version_comparator::compare_versions;
 use anyhow::{Context, Result};
+use std::cmp::Ordering;
 use tracing::{error, info, warn};
 
 #[derive(Clone)]
@@ -69,6 +72,21 @@ impl ToolAgentUpdateService {
             tool_agent_id, new_version
         );
 
+        let tool_lock = self.tool_run_manager.tool_lock(tool_agent_id).await;
+        let _lock_guard = match tool_lock.try_lock_owned() {
+            Ok(guard) => guard,
+            Err(_) => {
+                info!(
+                    "Tool {} busy with another operation, deferring update",
+                    tool_agent_id
+                );
+                anyhow::bail!(
+                    "tool {} busy, deferring update for redelivery",
+                    tool_agent_id
+                );
+            }
+        };
+
         // Check if tool is installed
         let mut installed_tool = match self
             .installed_tools_service
@@ -119,7 +137,28 @@ impl ToolAgentUpdateService {
             }
         }
 
-        let needs_tool_update = needs_repair || installed_tool.version != *new_version;
+        let version_order = compare_versions(&installed_tool.version, new_version);
+        let tool_downgrade =
+            !ALLOW_DOWNGRADE && !needs_repair && version_order == Some(Ordering::Less);
+        if tool_downgrade {
+            warn!(
+                "Tool {} refusing downgrade to {} — installed {} is newer, skipping stale update message",
+                tool_agent_id, new_version, installed_tool.version
+            );
+        }
+        let version_changed = match version_order {
+            Some(order) => order != Ordering::Equal,
+            None => {
+                if installed_tool.version != *new_version {
+                    warn!(
+                        "Tool {} versions {:?} -> {:?} are not semver, applying without downgrade check",
+                        tool_agent_id, installed_tool.version, new_version
+                    );
+                }
+                installed_tool.version != *new_version
+            }
+        };
+        let needs_tool_update = needs_repair || (!tool_downgrade && version_changed);
         let assets_to_update: Vec<_> = message
             .assets
             .as_ref()
@@ -137,8 +176,22 @@ impl ToolAgentUpdateService {
                         {
                             return false;
                         }
-                        let existing = installed_tool.assets.iter().find(|ia| ia.id == a.asset_id);
-                        existing.map(|e| e.version.as_str()) != Some(new_version)
+                        let Some(existing) =
+                            installed_tool.assets.iter().find(|ia| ia.id == a.asset_id)
+                        else {
+                            return true;
+                        };
+                        match compare_versions(&existing.version, new_version) {
+                            Some(Ordering::Less) if !ALLOW_DOWNGRADE => {
+                                warn!(
+                                    "Asset {} refusing downgrade to {} — installed {} is newer",
+                                    a.asset_id, new_version, existing.version
+                                );
+                                false
+                            }
+                            Some(order) => order != Ordering::Equal,
+                            None => existing.version != new_version,
+                        }
                     })
                     .collect()
             })
@@ -152,8 +205,8 @@ impl ToolAgentUpdateService {
             return Ok(());
         }
 
-        // Mark as updating once for all updates
-        self.tool_run_manager.mark_updating(tool_agent_id).await;
+        let _updating =
+            UpdatingGuard::acquire(&self.tool_run_manager, tool_agent_id, Some(_lock_guard)).await;
 
         // A Standard->GuiApp migration self-relaunches, so only relaunch here if it was already a GUI app.
         let was_gui_before_update =
@@ -167,9 +220,6 @@ impl ToolAgentUpdateService {
                 &assets_to_update,
             )
             .await;
-
-        // Clear updating flag - for Standard tools the run manager relaunches them via this flag.
-        self.tool_run_manager.clear_updating(tool_agent_id).await;
 
         if result.is_ok() && needs_repair {
             if let Err(e) = self
@@ -210,24 +260,65 @@ impl ToolAgentUpdateService {
             );
             self.do_tool_update(new_version, message, installed_tool)
                 .await?;
-        } else if !assets_to_update.is_empty() {
-            // Only assets to update - stop tool once before all asset updates
+        }
+
+        let mut stopped_for_assets = false;
+        if !needs_tool_update && !assets_to_update.is_empty() {
+            // Only assets to update - stop tool once before all asset updates.
             info!(tool_id = %tool_agent_id, "Stopping tool for asset updates");
+            stopped_for_assets = true;
             self.tool_kill_service
-                .stop_tool(tool_agent_id)
+                .stop_installed_tool(installed_tool, false)
                 .await
                 .with_context(|| {
                     format!("Failed to stop tool {} for asset updates", tool_agent_id)
                 })?;
         }
 
-        // 2. Asset updates (tool already stopped by tool_update or above)
+        // 2. Asset updates (tool already stopped by tool_update or above).
+        let mut asset_result = Ok(());
         for asset in assets_to_update {
-            self.do_asset_update(tool_agent_id, asset, installed_tool)
-                .await?;
+            asset_result = self
+                .do_asset_update(tool_agent_id, asset, installed_tool)
+                .await;
+            if asset_result.is_err() {
+                break;
+            }
         }
 
-        Ok(())
+        if stopped_for_assets {
+            match &installed_tool.installation {
+                Installation::Service { service_name, .. } => {
+                    self.restart_service_after_assets(tool_agent_id, service_name)
+                        .await;
+                }
+                #[cfg(target_os = "macos")]
+                Installation::GuiApp { .. } => {
+                    if let Err(e) = self
+                        .tool_run_manager
+                        .run_new_tool(installed_tool.clone())
+                        .await
+                    {
+                        warn!(tool_id = %tool_agent_id, "Failed to relaunch GuiApp after asset updates: {:#}", e);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        asset_result
+    }
+
+    async fn restart_service_after_assets(&self, tool_agent_id: &str, service_name: &str) {
+        info!(tool_id = %tool_agent_id, service = %service_name, "Restarting service tool after asset updates");
+
+        if let Err(e) = system_service::start_service(service_name).await {
+            error!(
+                tool_id = %tool_agent_id, service = %service_name,
+                "Service tool could not be restarted after asset updates - it will stay down until a reinstall or reboot: {:#}",
+                e
+            );
+        }
     }
 
     async fn do_tool_update(

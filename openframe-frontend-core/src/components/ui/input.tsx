@@ -30,134 +30,144 @@ const invalidBorderClasses = {
   warning: '!border-ods-warning hover:!border-ods-warning has-[:focus]:!border-ods-warning',
 } as const;
 
-const Input = forwardRef<HTMLInputElement, InputProps>(
-  (
-    {
-      className,
-      type,
-      invalid = false,
-      startAdornment,
-      endAdornment,
-      label,
-      labelVariant,
-      error,
-      errorVariant = 'error',
-      loading = false,
-      ...props
-    },
-    ref,
-  ) => {
-    // success/muted are informational — they never paint the invalid border
-    const variantIsInvalid = errorVariant === 'error' || errorVariant === 'warning';
-    const isInvalid = invalid || (!!error && variantIsInvalid);
+const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
+  const {
+    className,
+    type,
+    invalid = false,
+    startAdornment,
+    endAdornment,
+    label,
+    labelVariant,
+    error,
+    errorVariant = 'error',
+    loading = false,
+    ...props
+  } = allProps;
+  // Wired for a message even while `error` is undefined — see `FieldWrapper.errorSlot`.
+  const errorSlot = 'error' in allProps;
+  // success/muted are informational — they never paint the invalid border
+  const variantIsInvalid = errorVariant === 'error' || errorVariant === 'warning';
+  const isInvalid = invalid || (!!error && variantIsInvalid);
 
-    // Range inputs get a clean slider rendering — no label wrapper, borders, or adornments
-    if (type === 'range') {
-      const rangeInput = (
-        <input
-          type="range"
-          className={cn(
-            'h-1 w-full cursor-pointer appearance-none rounded-full bg-white/30',
-            // Webkit (Chrome/Safari) thumb
-            '[&::-webkit-slider-thumb]:appearance-none',
-            '[&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3',
-            '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white',
-            '[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm',
-            // Firefox thumb
-            '[&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3',
-            '[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white',
-            '[&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0',
-            // Firefox track
-            '[&::-moz-range-track]:bg-transparent',
-            // Disabled
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            className,
-          )}
-          ref={ref}
-          {...props}
-        />
-      );
-      return label ? (
-        <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorVariant={errorVariant}>
-          {rangeInput}
-        </FieldWrapper>
-      ) : (
-        rangeInput
-      );
-    }
-
-    const content = (
-      <label
-        data-invalid={isInvalid || undefined}
+  // Range inputs get a clean slider rendering — no label wrapper, borders, or adornments
+  if (type === 'range') {
+    const rangeInput = (
+      <input
+        type="range"
         className={cn(
-          // Layout & spacing
-          'flex h-11 w-full cursor-text items-center gap-2 rounded-[6px] border px-3 md:h-12',
-          // Focus-within states
-          'has-[:focus-visible]:outline-none',
-          'group',
-          // Animations & touch UX
-          'transition-colors duration-200',
-          // Theme palette
-          'border-ods-border bg-ods-card has-[:focus]:border-ods-accent',
-          // Hover & active (not disabled)
-          !props.disabled &&
-            'hover:border-ods-border-hover hover:bg-ods-bg-hover active:border-ods-border-active active:bg-ods-bg-active',
-          // Disabled. The adornments (and any icon inside them) carry their own
-          // `text-ods-text-secondary`, so grey them from here — a disabled field
-          // must read as one flat colour, not grey text next to a live icon.
-          // Scoped to the DIRECT span children (the two adornment wrappers): a
-          // descendant rule would also repaint whatever the caller renders INSIDE
-          // an adornment, which is passed verbatim precisely so it can own its
-          // colour (a `Tag` there went invisible against its own fill).
-          props.disabled && '!cursor-not-allowed bg-ods-bg',
-          'has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled',
-          // Invalid
-          isInvalid && invalidBorderClasses[variantIsInvalid ? errorVariant : 'error'],
+          'h-1 w-full cursor-pointer appearance-none rounded-full bg-white/30',
+          // Webkit (Chrome/Safari) thumb
+          '[&::-webkit-slider-thumb]:appearance-none',
+          '[&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3',
+          '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white',
+          '[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm',
+          // Firefox thumb
+          '[&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3',
+          '[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white',
+          '[&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0',
+          // Firefox track
+          '[&::-moz-range-track]:bg-transparent',
+          // Disabled
+          'disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
+        ref={ref}
+        {...props}
+      />
+    );
+    return label ? (
+      <FieldWrapper
+        label={label}
+        labelVariant={labelVariant}
+        error={error}
+        errorVariant={errorVariant}
+        errorSlot={errorSlot}
       >
-        {startAdornment && (
-          <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 text-h6 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
-            {startAdornment}
-          </span>
-        )}
-        <input
-          type={type}
-          className={cn(
-            // Layout
-            'min-w-0 flex-1 border-none bg-transparent outline-none',
-            // Typography
-            'text-h4',
-            // Colors
-            'text-ods-text-primary placeholder:text-ods-text-secondary',
-            // File input adjustments
-            'file:border-0 file:bg-transparent',
-            // Disabled
-            'disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border',
-            // Touch
-            'touch-manipulation',
-            // Autofill override
-            '[&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_9999px_transparent_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-text-primary)] [&:-webkit-autofill]:[caret-color:var(--color-text-primary)] [&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s]',
-          )}
-          ref={ref}
-          {...props}
-        />
-        {loading && <Loader2 className="size-4 flex-shrink-0 animate-spin text-ods-text-secondary md:size-6" />}
-        {!loading && endAdornment && (
-          <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 text-h6 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
-            {endAdornment}
-          </span>
-        )}
-      </label>
-    );
-
-    return (
-      <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorVariant={errorVariant}>
-        {content}
+        {rangeInput}
       </FieldWrapper>
+    ) : (
+      rangeInput
     );
-  },
-);
+  }
+
+  const content = (
+    <label
+      data-invalid={isInvalid || undefined}
+      className={cn(
+        // Layout & spacing
+        'flex h-11 w-full cursor-text items-center gap-2 rounded-[6px] border px-3 md:h-12',
+        // Focus-within states
+        'has-[:focus-visible]:outline-none',
+        'group',
+        // Animations & touch UX
+        'transition-colors duration-200',
+        // Theme palette
+        'border-ods-border bg-ods-card has-[:focus]:border-ods-accent',
+        // Hover & active (not disabled)
+        !props.disabled &&
+          'hover:border-ods-border-hover hover:bg-ods-bg-hover active:border-ods-border-active active:bg-ods-bg-active',
+        // Disabled. The adornments (and any icon inside them) carry their own
+        // `text-ods-text-secondary`, so grey them from here — a disabled field
+        // must read as one flat colour, not grey text next to a live icon.
+        // Scoped to the DIRECT span children (the two adornment wrappers): a
+        // descendant rule would also repaint whatever the caller renders INSIDE
+        // an adornment, which is passed verbatim precisely so it can own its
+        // colour (a `Tag` there went invisible against its own fill).
+        props.disabled && '!cursor-not-allowed bg-ods-bg',
+        'has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled',
+        // Invalid
+        isInvalid && invalidBorderClasses[variantIsInvalid ? errorVariant : 'error'],
+        className,
+      )}
+    >
+      {startAdornment && (
+        <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 text-h6 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
+          {startAdornment}
+        </span>
+      )}
+      <input
+        type={type}
+        className={cn(
+          // Layout
+          'min-w-0 flex-1 border-none bg-transparent outline-none',
+          // Typography
+          'text-h4',
+          // Colors
+          'text-ods-text-primary placeholder:text-ods-text-secondary',
+          // File input adjustments
+          'file:border-0 file:bg-transparent',
+          // Disabled
+          'disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border',
+          // Touch
+          'touch-manipulation',
+          // Autofill override
+          '[&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_9999px_transparent_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-text-primary)] [&:-webkit-autofill]:[caret-color:var(--color-text-primary)] [&:-webkit-autofill]:[transition:background-color_9999s_ease-in-out_0s]',
+        )}
+        ref={ref}
+        {...props}
+      />
+      {loading && <Loader2 className="size-4 flex-shrink-0 animate-spin text-ods-text-secondary md:size-6" />}
+      {!loading && endAdornment && (
+        <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 text-h6 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
+          {endAdornment}
+        </span>
+      )}
+    </label>
+  );
+
+  return (
+    <FieldWrapper
+      label={label}
+      labelVariant={labelVariant}
+      error={error}
+      errorVariant={errorVariant}
+      errorSlot={errorSlot}
+    >
+      {content}
+    </FieldWrapper>
+  );
+});
 Input.displayName = 'Input';
 
 export { Input };

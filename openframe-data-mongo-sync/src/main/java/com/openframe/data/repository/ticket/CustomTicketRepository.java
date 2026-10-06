@@ -1,7 +1,6 @@
 package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import org.springframework.data.mongodb.core.query.Query;
@@ -25,8 +24,6 @@ public interface CustomTicketRepository {
 
     long countTickets(Query query);
 
-    Map<TicketStatus, Long> countTicketsByStatus();
-
     Map<TicketStatusKind, Long> countTicketsByStatusKind();
 
     Map<String, Long> countTicketsByStatusId();
@@ -34,8 +31,6 @@ public interface CustomTicketRepository {
     long getTotalCount();
 
     Optional<Long> getAverageResolutionTimeMs();
-
-    int updateStatusBulk(TicketStatus fromStatus, TicketStatus toStatus);
 
     int reassignTicketsToStatus(String fromStatusId, String toStatusId, TicketStatusKind toKind);
 

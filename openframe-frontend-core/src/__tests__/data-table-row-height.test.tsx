@@ -37,13 +37,7 @@ function Table({
   const table = useDataTable({ data, columns });
   return (
     <DataTable table={table}>
-      <DataTable.Body<Row>
-        loading={loading}
-        minRows={4}
-        skeletonRows={4}
-        autoHeight
-        rowHeightClassName={rowHeightClassName}
-      />
+      <DataTable.Body<Row> loading={loading} minRows={4} skeletonRows={4} rowHeightClassName={rowHeightClassName} />
     </DataTable>
   );
 }
