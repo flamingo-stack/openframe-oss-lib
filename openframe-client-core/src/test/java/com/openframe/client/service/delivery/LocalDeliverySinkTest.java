@@ -18,6 +18,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -66,6 +69,22 @@ class LocalDeliverySinkTest {
         // verifications
         verify(publisher).publish(SUBJECT, payload);
         verify(metrics).recordDispatched(DeliveryType.TOOL_INSTALLATION, "local");
+    }
+
+    @Test
+    void accept_natsDown_rowKeptAndNothingThrown() {
+        // setup
+        when(recorder.record(request)).thenReturn(true);
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.subject(MACHINE_ID)).thenReturn(SUBJECT);
+        doThrow(new IllegalStateException("nats down")).when(publisher).publish(SUBJECT, payload);
+
+        // execution
+        sink.accept(request);
+
+        // verifications
+        verify(metrics).recordPublishFailed(DeliveryType.TOOL_INSTALLATION);
+        verify(metrics, never()).recordDispatched(any(), any());
     }
 
     @Test

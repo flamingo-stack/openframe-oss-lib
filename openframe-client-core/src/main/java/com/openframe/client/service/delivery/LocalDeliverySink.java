@@ -38,10 +38,24 @@ public class LocalDeliverySink implements DeliverySink {
                     type, request.getTargetId(), machineId);
             return;
         }
+        publish(request);
+    }
+
+    // the row is the source of truth: a publish that fails here is retried by the sweep, never by the caller or Kafka
+    private void publish(DeliveryRequest<?> request) {
+        DeliveryType type = request.getType();
+        String machineId = request.getMachineId();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         String subject = spec.subject(machineId);
         DeliveryPayload payload = request.getPayload();
-        publisher.publish(subject, payload);
+        try {
+            publisher.publish(subject, payload);
+        } catch (RuntimeException natsDown) {
+            metrics.recordPublishFailed(type);
+            log.warn("Delivery recorded but not published, left to the sweep: type={} targetId={} machineId={}",
+                    type, request.getTargetId(), machineId, natsDown);
+            return;
+        }
         metrics.recordDispatched(type, SINK);
         log.info("Delivery dispatched: type={} targetId={} machineId={} dispatchId={}",
                 type, request.getTargetId(), machineId, payload.getDelivery().getDispatchId());
