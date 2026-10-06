@@ -80,7 +80,7 @@ const PolicyRow: FC<{
   };
 
   return (
-    <div className="flex items-start gap-[var(--spacing-system-m)] border-b border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] last:border-b-0 md:items-center">
+    <div className="flex items-start gap-[var(--spacing-system-m)] border-b border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] last:border-b-0 content-md:items-center">
       {/* Tool Icon */}
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-ods-border bg-ods-bg">
         <ToolIcon toolType={policy.toolName} size={16} />
@@ -93,7 +93,7 @@ const PolicyRow: FC<{
         </p>
         <p className="break-all text-ods-text-secondary text-h6">{policy.commandPattern}</p>
         {editMode ? (
-          <div className="mt-[var(--spacing-system-xsf)] md:hidden">
+          <div className="mt-[var(--spacing-system-xsf)] content-md:hidden">
             <ApprovalLevelDropdown
               value={policy.approvalLevel}
               onChange={handleChange}
@@ -102,12 +102,14 @@ const PolicyRow: FC<{
             />
           </div>
         ) : policy.approvalLevel ? (
-          <span className="text-ods-text-primary text-h4 md:hidden">{getApprovalLevelLabel(policy.approvalLevel)}</span>
+          <span className="text-ods-text-primary text-h4 content-md:hidden">
+            {getApprovalLevelLabel(policy.approvalLevel)}
+          </span>
         ) : null}
       </div>
 
       {/* Approval Level column (desktop only) */}
-      <div className="hidden shrink-0 md:block">
+      <div className="hidden shrink-0 content-md:block">
         {editMode ? (
           <ApprovalLevelDropdown
             value={policy.approvalLevel}
@@ -159,7 +161,7 @@ const CategorySection: FC<{
           </p>
           <p className="text-ods-text-secondary text-h6">{category.policies.length} Configurations</p>
           {editMode && (
-            <div className="mt-[var(--spacing-system-xsf)] md:hidden" onClick={e => e.stopPropagation()}>
+            <div className="mt-[var(--spacing-system-xsf)] content-md:hidden" onClick={e => e.stopPropagation()}>
               <ApprovalLevelDropdown
                 value={bulkLevel}
                 onChange={handleBulkChange}
@@ -173,7 +175,7 @@ const CategorySection: FC<{
 
         {/* Global Permission column (desktop only) */}
         {editMode ? (
-          <div className="hidden shrink-0 md:block" onClick={e => e.stopPropagation()}>
+          <div className="hidden shrink-0 content-md:block" onClick={e => e.stopPropagation()}>
             <ApprovalLevelDropdown
               value={bulkLevel}
               onChange={handleBulkChange}
@@ -185,7 +187,7 @@ const CategorySection: FC<{
         ) : (
           <div
             className={cn(
-              'hidden shrink-0 px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] md:block',
+              'hidden shrink-0 px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] content-md:block',
               CATEGORY_LEVEL_WIDTH,
             )}
           />
