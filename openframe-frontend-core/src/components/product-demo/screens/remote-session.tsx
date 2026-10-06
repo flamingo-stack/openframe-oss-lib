@@ -8,7 +8,7 @@ import type { ProductScreenViewProps } from '../types';
 import { RemoteDesktopPicture } from './remote-desktop-picture';
 
 const noop = () => {};
-const keepDraft = async () => false;
+const keepDraft = () => Promise.resolve(false);
 
 /**
  * The product's remote desktop page mid-session: the device header, the remote

@@ -348,9 +348,7 @@ describe('useScrollSpy: two levels of anchors and reloads (syncHash)', () => {
     placeSections(0);
     const real = window.getComputedStyle.bind(window);
     vi.spyOn(window, 'getComputedStyle').mockImplementation(el =>
-      el === created.get('b')
-        ? ({ ...real(el), scrollMarginTop: '144px', overflowY: 'visible' } as CSSStyleDeclaration)
-        : real(el),
+      el === created.get('b') ? { ...real(el), scrollMarginTop: '144px', overflowY: 'visible' } : real(el),
     );
     const { result } = renderHook(() => useScrollSpy(sections, { headerOffset: 72 }));
     scrollTo(756); // b lands at 900 - 144: on its line although 756 + 72 < 900
