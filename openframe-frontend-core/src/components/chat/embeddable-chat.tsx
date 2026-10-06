@@ -131,6 +131,8 @@ const HISTORY_RAIL_WIDTH = 320;
 /** The v2 chat list (`MingoChatRail`, Figma `chat-sidebar`): the narrowest the v2 chat draws. */
 export const MINGO_V2_RAIL_WIDTH = 296;
 const CHAT_BLOCK_MIN_WIDTH = 400;
+/** Mingo v2: the list and the chat side by side at their narrowest. */
+export const MINGO_V2_SPLIT_WIDTH = MINGO_V2_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 
 // Desktop drawer is this fraction of the viewport width (clamped to the
@@ -364,6 +366,12 @@ export interface EmbeddableChatProps {
    * the open chat, which stays open.
    */
   collapseTo?: 'list' | 'column';
+  /**
+   * v2: the |← control on the chat list while the panel shows the list alone.
+   * The host widens its panel; the chat opens the conversation open last (or
+   * the newest in the list), or a new chat when there is none.
+   */
+  onExpand?: () => void;
 
   /** v2: the status glyph at the end of a chat's row (working / unread / approval). */
   dialogStatusOf?: (dialog: DialogItem) => MingoDialogStatus | undefined;
@@ -1024,6 +1032,7 @@ function EmbeddableChatInner({
   appearance = CHAT_APPEARANCE.CLASSIC,
   onCollapse,
   collapseTo = 'list',
+  onExpand,
   dialogStatusOf,
   userDisplayName,
   userAvatarUrl,
@@ -2207,6 +2216,13 @@ function EmbeddableChatInner({
     discussRef(reference);
   }, [activeDialogId, discussRef]);
 
+  // The conversation open last, for the |← control: going back to the list
+  // closes it, and widening the panel again should bring it back.
+  const lastDialogIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeDialogId && !isViewingArchived) lastDialogIdRef.current = activeDialogId;
+  }, [activeDialogId, isViewingArchived]);
+
   // Host prefill (`prefillDraft`) — staged, not written at once. The composer
   // it goes into may only mount on the commit `resetToNewChat` +
   // `setComposeOpen(true)` produce (narrow layout: list → compose; or the
@@ -2685,6 +2701,17 @@ function EmbeddableChatInner({
                       <MingoChatRail
                         {...mingoRailProps}
                         onNewChat={() => setComposeOpen(true)}
+                        onExpand={
+                          onExpand &&
+                          (() => {
+                            const last = lastDialogIdRef.current;
+                            const target = last && dialogs.some(d => d.id === last) ? last : dialogs[0]?.id;
+                            if (archiveOpen) closeArchive();
+                            if (target) handleSelectDialog(target);
+                            else handleNewChat();
+                            onExpand();
+                          })
+                        }
                         className="w-full border-r-0 duration-200 animate-in fade-in-0"
                       />
                     ) : stackedListView ? (

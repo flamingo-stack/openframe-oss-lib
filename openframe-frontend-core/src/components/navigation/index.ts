@@ -35,6 +35,7 @@ export type {
   AppLayoutSidePanelMode,
   AppLayoutSidePanelRenderState,
 } from './app-layout-side-panel';
+export { SIDE_PANEL_FRAME_WIDTH } from './app-layout-side-panel';
 
 export {
   AppLayoutDrawer,
