@@ -29,7 +29,11 @@ function Menus({ pathname = '/' }: { pathname?: string }) {
 const openId = () => screen.getByTestId('open').textContent;
 const trigger = (id: string) => screen.getByRole('button', { name: `trigger ${id}` });
 const panel = (id: string) => screen.getByTestId(`panel-${id}`);
-const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+const advance = (ms: number) => {
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
+};
 
 describe('useNavMenus', () => {
   beforeEach(() => {
