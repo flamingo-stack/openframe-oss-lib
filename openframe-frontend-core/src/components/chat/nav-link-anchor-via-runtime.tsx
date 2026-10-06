@@ -18,11 +18,14 @@
  * the lib should never silently fall back when the runtime is missing
  * (the chat tree always provides one in both host + embed modes).
  *
- * For surfaces OUTSIDE the chat tree (header chrome, marketing pages, …)
- * the hub keeps its own `useNavLink`-based anchor.
+ * The same component serves a host's own chrome and pages (site header,
+ * footer, call-to-action links): the host mounts the runtime app-wide, names
+ * the destination's platform in `targetPlatform`, and may pass its own
+ * `onClick` (it runs first; `preventDefault()` cancels the navigation) and
+ * plain anchor attributes (`aria-*`, `title`, `data-*`, `style`, `rel`).
  */
 
-import type { ReactNode, MouseEvent } from 'react';
+import type { AnchorHTMLAttributes, ReactNode, MouseEvent } from 'react';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useChatPanel } from './chat-panel-context';
@@ -30,7 +33,10 @@ import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { executeNavigation } from './utils/execute-navigation';
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
 
-export interface NavLinkAnchorViaRuntimeProps {
+export interface NavLinkAnchorViaRuntimeProps extends Omit<
+  AnchorHTMLAttributes<HTMLAnchorElement>,
+  'href' | 'target' | 'onClick' | 'className' | 'children'
+> {
   href: string;
   path?: string | null;
   targetPlatform?: string | null;
@@ -38,6 +44,8 @@ export interface NavLinkAnchorViaRuntimeProps {
   /** Optional — matches `NavLinkAnchorComponent`'s contract so the
    *  markdown-anchor slot can render an empty anchor (rare but legal). */
   children?: ReactNode;
+  /** Runs before the navigation; `preventDefault()` cancels it. */
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
 export function NavLinkAnchorViaRuntime({
@@ -46,6 +54,8 @@ export function NavLinkAnchorViaRuntime({
   targetPlatform,
   className,
   children,
+  onClick: onClickProp,
+  ...anchorAttrs
 }: NavLinkAnchorViaRuntimeProps) {
   const runtime = useRequiredChatRuntime();
   const router = useRouter();
@@ -54,6 +64,8 @@ export function NavLinkAnchorViaRuntime({
   const isNewTab = computeIsNewTab(runtime, resolvedHref, targetPlatform ?? null);
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    onClickProp?.(e);
+    if (e.defaultPrevented) return;
     const handled = executeNavigation({
       event: e,
       runtime,
@@ -65,7 +77,7 @@ export function NavLinkAnchorViaRuntime({
     if (handled && !isNewTab && panel?.closeChat) panel.closeChat();
   };
   return (
-    <a href={resolvedHref} {...newTabAnchorAttrs(isNewTab)} onClick={onClick} className={className}>
+    <a href={resolvedHref} {...newTabAnchorAttrs(isNewTab)} {...anchorAttrs} onClick={onClick} className={className}>
       {children}
     </a>
   );
