@@ -129,7 +129,7 @@ export function FileManager({
   return (
     <div className={cn('flex h-full flex-col bg-ods-bg', className)}>
       <div className="flex min-h-0 flex-1 flex-col space-y-6 py-2">
-        <div className="mb-4 flex flex-col justify-between gap-4 md:flex-row">
+        <div className="mb-4 flex flex-col justify-between gap-4 content-md:flex-row">
           <FileManagerBreadcrumb items={breadcrumbItems} onItemClick={handleBreadcrumbClick} />
 
           {showActions && (

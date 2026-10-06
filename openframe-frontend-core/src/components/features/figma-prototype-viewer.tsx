@@ -370,7 +370,10 @@ function UnifiedUI({ state, handlers, config, iframeRef }: UnifiedUIProps) {
 
   return (
     <div
-      className={cn(config.hideControls ? '' : 'grid grid-cols-1 gap-10 lg:grid-cols-[296px_1fr]', config.className)}
+      className={cn(
+        config.hideControls ? '' : 'grid grid-cols-1 gap-10 content-lg:grid-cols-[296px_1fr]',
+        config.className,
+      )}
     >
       {/* Section Controls */}
       {showSectionSelector && !config.hideControls && (

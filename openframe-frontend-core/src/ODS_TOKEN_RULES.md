@@ -109,6 +109,46 @@ for it on badges and chips instead of a raw `text-[10px]`; anything a user reads
 `text-h5`/`text-h6` or larger. Stamps are fixed on purpose — growing them on desktop is what
 balloons a badge out of the row it sits in.
 
+## Content area breakpoints
+
+The tokens and `md:` / `lg:` above follow the **viewport**. When `AppLayout` has a `sidePanel` (the
+docked Mingo chat), the panel narrows the content without the viewport changing, so the content lays
+out by **its own width** instead. `<main>` becomes an `.ods-content-area` container, and:
+
+| Content width | Layout | Tokens (`text-h*`, `--spacing-system-*`) |
+|---------------|--------|-------------------------------------------|
+| < 720px | mobile | mobile values |
+| 720-1023px | tablet (`content-md:`) | the viewport's (desktop sizes on a desktop) |
+| ≥ 1024px | desktop (`content-lg:`) | the viewport's |
+
+- **Tokens need nothing.** `ods-content-area-tokens.css` (generated from the responsive tokens)
+  re-declares the mobile values on the content scope while it is narrower than 720px; every
+  `text-h*` and spacing var below it follows.
+- **The steps are written once**, in `styles/layout-steps.ts`: the Tailwind screens, the
+  `content-*` variants and the JS hooks all read them from there.
+- **Layout switches in page content use `content-md:` / `content-lg:`**, not `md:` / `lg:` — e.g.
+  `grid-cols-2 content-lg:grid-cols-4`. Outside a content area (apps without a side panel, overlays
+  portalled to `<body>`) they fall back to the viewport `md` / `lg` steps, so a shared component can
+  switch to them without changing anywhere else it renders.
+- **Keep `md:` / `lg:` for chrome and overlays** that follow the window: header, navigation,
+  modals, dropdowns, toasts. Never mix `md:` and `content-md:` on one element: lint rejects the two
+  in one class string (`flamingo/no-mixed-layout-variants`).
+- **Window chrome that renders inside the content area** (not portalled to `<body>`: `ModalV2`,
+  `Modal`, `SlidingSidebar`) carries `ods-viewport-layer`, which restates the viewport's tokens on its
+  subtree; otherwise a modal opened from a narrow content area inherits the area's mobile fonts.
+  `content-*` classes under the layer follow the window as well. The JS hooks need their own reset,
+  because React context crosses a portal: `ModalV2`, `Modal`, `Dialog`, `Sheet` and `Drawer` wrap
+  their content in `<ViewportBreakpoints>`.
+- **Chrome inside the content area that ALSO depends on the window** stacks the two:
+  `md:content-max-md:` is "narrow content in a wide window" and never matches outside a content
+  area. `PageActions` `primary-buttons` uses it: the bottom bar spans the window (`md:hidden`),
+  so a docked panel narrowing the content compacts the actions into the title row instead.
+- **JS layout decisions** use `useContentBreakpoint()` / `useContentMdUp()` / `useContentLgUp()`
+  from `hooks` instead of `useMdUp()` / `useLgUp()` — the same steps, the same viewport fallback.
+- **Things that measure the window** (`vw`, `w-screen`, `fixed left-0 right-0`, a `resize` listener
+  on `window`) do not see the panel. Measure the element (`ResizeObserver`) or the container
+  (`cqw`) instead.
+
 ## General
 
 - Convert hardcoded values to ODS tokens even when copying patterns from existing code.

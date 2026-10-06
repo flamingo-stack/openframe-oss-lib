@@ -33,7 +33,7 @@
  */
 
 import type React from 'react';
-import { cn } from '../../utils/common';
+import { cn } from '../../utils/cn';
 import { PackageIcon, WindowsIcon, MacOSIcon, LinuxIcon } from '../icons';
 
 export type SoftwareSource =

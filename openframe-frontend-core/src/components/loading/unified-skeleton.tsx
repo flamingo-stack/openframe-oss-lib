@@ -97,7 +97,7 @@ export const TextSkeleton = {
   Heading: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
     <UnifiedSkeleton
       variant="text"
-      className={cn('h-8 md:h-10 lg:h-12', className)}
+      className={cn('h-8 content-md:h-10 content-lg:h-12', className)}
       aria-label="Loading heading"
       {...props}
     />
@@ -109,7 +109,7 @@ export const TextSkeleton = {
   Subheading: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
     <UnifiedSkeleton
       variant="text"
-      className={cn('h-6 md:h-7 lg:h-8', className)}
+      className={cn('h-6 content-md:h-7 content-lg:h-8', className)}
       aria-label="Loading subheading"
       {...props}
     />
@@ -119,14 +119,24 @@ export const TextSkeleton = {
    * Body text skeleton
    */
   Body: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton variant="text" className={cn('h-4 md:h-5', className)} aria-label="Loading text" {...props} />
+    <UnifiedSkeleton
+      variant="text"
+      className={cn('h-4 content-md:h-5', className)}
+      aria-label="Loading text"
+      {...props}
+    />
   ),
 
   /**
    * Small text skeleton (captions, metadata)
    */
   Caption: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton variant="text" className={cn('h-3 md:h-4', className)} aria-label="Loading caption" {...props} />
+    <UnifiedSkeleton
+      variant="text"
+      className={cn('h-3 content-md:h-4', className)}
+      aria-label="Loading caption"
+      {...props}
+    />
   ),
 };
 
@@ -140,7 +150,7 @@ export const InteractiveSkeleton = {
   Button: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
     <UnifiedSkeleton
       variant="default"
-      className={cn('h-10 w-32 md:h-12 md:w-40', className)}
+      className={cn('h-10 w-32 content-md:h-12 content-md:w-40', className)}
       aria-label="Loading button"
       {...props}
     />
@@ -152,7 +162,7 @@ export const InteractiveSkeleton = {
   Input: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
     <UnifiedSkeleton
       variant="default"
-      className={cn('h-10 w-full md:h-12', className)}
+      className={cn('h-10 w-full content-md:h-12', className)}
       aria-label="Loading input field"
       {...props}
     />

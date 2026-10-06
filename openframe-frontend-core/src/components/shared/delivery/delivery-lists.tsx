@@ -202,7 +202,7 @@ export function DeliveryLists({
       {/* Completed Tasks Table */}
       {showCompleted && (hasResults || isLoading) && (
         <div className="w-full">
-          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 md:tracking-[-0.56px] lg:tracking-[-0.64px]">
+          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 content-md:tracking-[-0.56px] content-lg:tracking-[-0.64px]">
             Recently Completed<span className="text-ods-accent">:</span>
           </h3>
           <DeliveryTable items={filteredCompleted} isLoading={isLoading} />
@@ -212,7 +212,7 @@ export function DeliveryLists({
       {/* In Progress Tasks Table */}
       {showInProgress && (hasResults || isLoading) && (
         <div className="w-full">
-          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 md:tracking-[-0.56px] lg:tracking-[-0.64px]">
+          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 content-md:tracking-[-0.56px] content-lg:tracking-[-0.64px]">
             Active Tasks<span className="text-ods-accent">:</span>
           </h3>
           <DeliveryTable items={filteredInProgress} isLoading={isLoading} />
