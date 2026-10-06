@@ -41,6 +41,7 @@ use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIM
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
+use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
 use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
 use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
@@ -169,6 +170,7 @@ pub struct Client {
     openframe_client_update_listener: OpenFrameClientUpdateListener,
     tool_agent_update_listener: ToolAgentUpdateListener,
     client_uninstall_message_listener: ClientUninstallMessageListener,
+    remote_access_message_listener: RemoteAccessMessageListener,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
@@ -531,6 +533,14 @@ impl Client {
             config_service.clone(),
         );
 
+        // Relaunches the chat app on remote-access traffic so sessions reach a device whose chat has exited
+        let remote_access_message_listener = RemoteAccessMessageListener::new(
+            nats_connection_manager.clone(),
+            config_service.clone(),
+            installed_tools_service.clone(),
+            tool_run_manager.clone(),
+        );
+
         let execution_service = ExecutionService::new();
 
         let result_store = Arc::new(ResultStore::open_or_degrade(
@@ -627,6 +637,7 @@ impl Client {
             openframe_client_update_listener,
             tool_agent_update_listener,
             client_uninstall_message_listener,
+            remote_access_message_listener,
             command_execution_listener,
             script_execution_listener,
             script_bootstrap_execution_listener,
@@ -736,6 +747,8 @@ impl Client {
 
         // Start client uninstall listener in background
         self.client_uninstall_message_listener.start().await?;
+
+        self.remote_access_message_listener.start().await?;
 
         // Recover interrupted scheduled scripts, then start the outbox flusher,
         // both strictly before any execution listener can accept new batches

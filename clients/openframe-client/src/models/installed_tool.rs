@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub const CHAT_TOOL_AGENT_ID: &str = "openframe-chat";
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Installation {

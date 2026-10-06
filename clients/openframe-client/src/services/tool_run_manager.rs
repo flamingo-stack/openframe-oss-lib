@@ -827,24 +827,24 @@ impl ToolRunManager {
                                 break;
                             }
 
-                            // Fresh install: launch once now (Run autorun only fires at next logon); else autorun owns it.
+                            // Fresh install or remote-access relaunch: launch once now (Run autorun only fires at logon); else autorun owns it.
                             if new_tool {
                                 let mut launch_args = processed_args.clone();
                                 // For openframe-chat, add --background flag to start in tray
-                                if tool.tool_agent_id == "openframe-chat" {
+                                if tool.tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                                     launch_args.push("--background".to_string());
                                 }
                                 match launch_process_in_user_session(&command_path, &launch_args) {
                                     Ok((pid, process_handle)) => {
                                         info!(tool_id = %tool.tool_agent_id, pid,
-                                              "GuiApp launched once in user session after install (fire-and-forget)");
+                                              "GuiApp launched once in user session (fire-and-forget)");
                                         unsafe {
                                             let _ = CloseHandle(process_handle);
                                         }
                                     }
                                     Err(e) => {
                                         warn!(tool_id = %tool.tool_agent_id, error = %e,
-                                              "Failed to launch GuiApp in user session after install");
+                                              "Failed to launch GuiApp in user session");
                                     }
                                 }
                             } else {
@@ -902,7 +902,7 @@ impl ToolRunManager {
                                         continue;
                                     }
 
-                                    if tool.tool_agent_id == "openframe-chat" {
+                                    if tool.tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                                         vec!["--background".to_string()]
                                     } else {
                                         vec![]

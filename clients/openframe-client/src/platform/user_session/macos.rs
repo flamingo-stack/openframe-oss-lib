@@ -102,20 +102,15 @@ async fn launch_via_launchctl(
         let mut cmd = Command::new("launchctl");
         cmd.arg("asuser")
             .arg(uid.to_string())
-            .arg("open")
-            .arg("-a")
-            .arg(&app_path);
-
-        if !args.is_empty() {
-            cmd.arg("--args");
-            cmd.args(args);
-        }
+            .args(open_args(&app_path, args));
 
         let child = cmd
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .with_context(|| format!("launchctl asuser {} open -a {} failed", uid, app_path))?;
+            .with_context(|| {
+                format!("launchctl asuser {} open -n -g -a {} failed", uid, app_path)
+            })?;
 
         info!("App launched, PID: {:?}", child.id());
         return Ok(child);
@@ -136,6 +131,19 @@ async fn launch_via_launchctl(
 
     info!("Spawned via launchctl, PID: {:?}", child.id());
     Ok(child)
+}
+
+// -n: a running app gets argv via its single-instance guard (plain `open -a` only re-opens its window); -g: no focus steal.
+fn open_args(app_path: &str, args: &[String]) -> Vec<String> {
+    let mut open: Vec<String> = ["open", "-n", "-g", "-a", app_path]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    if !args.is_empty() {
+        open.push("--args".to_string());
+        open.extend(args.iter().cloned());
+    }
+    open
 }
 
 fn extract_app_bundle_path(executable: &str) -> Option<String> {
@@ -169,4 +177,44 @@ async fn launch_via_sudo(
 
     info!("Spawned via sudo, PID: {:?}", child.id());
     Ok(child)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn open_starts_a_new_instance_without_focus_and_forwards_args() {
+        let args = open_args("/Applications/OpenFrame.app", &["--background".to_string()]);
+        assert_eq!(
+            args,
+            [
+                "open",
+                "-n",
+                "-g",
+                "-a",
+                "/Applications/OpenFrame.app",
+                "--args",
+                "--background"
+            ]
+        );
+    }
+
+    #[test]
+    fn open_without_args_has_no_args_separator() {
+        assert_eq!(
+            open_args("/Applications/OpenFrame.app", &[]),
+            ["open", "-n", "-g", "-a", "/Applications/OpenFrame.app"]
+        );
+    }
+
+    #[test]
+    fn app_bundle_path_is_the_dot_app_ancestor() {
+        assert_eq!(
+            extract_app_bundle_path("/Applications/OpenFrame.app/Contents/MacOS/openframe-chat")
+                .as_deref(),
+            Some("/Applications/OpenFrame.app")
+        );
+        assert_eq!(extract_app_bundle_path("/usr/local/bin/agent"), None);
+    }
 }
