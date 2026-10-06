@@ -39,7 +39,9 @@ public class DeliveryDispatchListener {
     // a bad message is logged and skipped; a Mongo failure propagates and the record is retried until the row is written
     @KafkaListener(
             topics = "${openframe.delivery.dispatch-topic}",
-            groupId = "client-service-delivery-dispatch",
+            // the cluster is shared by every tenant: one group id for all would put ~400 consumers in a single group
+            // and a pod restart in any tenant would rebalance all of them; the topic name is already per tenant
+            groupId = "${openframe.delivery.dispatch-topic}",
             containerFactory = DeliveryDispatchListenerConfiguration.CONTAINER_FACTORY)
     public void onDispatch(DeliveryDispatchMessage message) {
         if (!isComplete(message)) {
