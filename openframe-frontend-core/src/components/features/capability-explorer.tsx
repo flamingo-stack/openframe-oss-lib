@@ -4,6 +4,7 @@ import { type KeyboardEvent, type ReactNode, useRef } from 'react';
 import { useContentLgUp } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
 import { EntityIcon } from '../icon-display';
+import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { Skeleton } from '../ui/skeleton';
 import { SnapCarousel } from '../ui/snap-carousel';
@@ -36,6 +37,10 @@ export interface CapabilityExplorerLabels {
   requester: string;
   /** Who answers in the example (the assistant's configured name). */
   responder: string;
+  /** A note beside the requester ("to Mingo"). */
+  requesterNote?: string;
+  /** A note beside the responder ("a few seconds later"). */
+  responderNote?: string;
   /** Carousel controls. */
   previous?: string;
   next?: string;
@@ -58,19 +63,23 @@ export interface CapabilityExplorerProps {
  * Heights are constants so the panel never moves between jobs and the
  * skeleton is the loaded box: every text is clamped to fit them.
  */
-const PANEL_HEIGHT_CLASS = 'h-[760px]';
-const CARD_HEIGHT_CLASS = 'h-[640px]';
+const PANEL_HEIGHT_CLASS = 'h-[824px]';
+/** The panel's rows: the copy beside the example, the screen, the footer line. */
+const PANEL_TOP_HEIGHT_CLASS = 'h-[256px]';
+const PANEL_SCREEN_HEIGHT_CLASS = 'h-[420px]';
+const PANEL_FOOTER_HEIGHT_CLASS = 'h-[52px]';
+const CARD_HEIGHT_CLASS = 'h-[700px]';
 /** Both, for the box shown before the layout is known (literal, so the class is generated). */
-const SKELETON_HEIGHT_CLASS = 'h-[640px] content-lg:h-[760px]';
+const SKELETON_HEIGHT_CLASS = 'h-[700px] content-lg:h-[824px]';
 
-function Highlights({ items }: { items: readonly string[] }) {
+function Highlights({ items, className }: { items: readonly string[]; className?: string }) {
   if (items.length === 0) return null;
   return (
-    <ul className="flex flex-col gap-1.5">
+    <ul className={cn('flex flex-col gap-2', className)}>
       {items.slice(0, 3).map(text => (
-        <li key={text} className="flex min-w-0 items-center gap-2">
-          <CheckIcon size={16} className="shrink-0 text-ods-accent" />
-          <TruncateText variant="h6" tone="secondary" triggerClassName="flex-1">
+        <li key={text} className="flex min-w-0 items-center gap-2.5">
+          <CheckIcon size={16} className="shrink-0 text-ods-success" />
+          <TruncateText variant="h6" triggerClassName="flex-1">
             {text}
           </TruncateText>
         </li>
@@ -92,28 +101,44 @@ function Example({
   responderMark?: ReactNode;
   className?: string;
 }) {
-  const turn = (mark: ReactNode, who: string, text: string, tone: 'primary' | 'secondary') => (
-    <div className="flex min-w-0 gap-3">
-      {mark && (
-        <span className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full">{mark}</span>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="text-ods-text-secondary text-h6">{who}</p>
-        <TruncateText lines={2} variant="h5" tone={tone}>
-          {text}
-        </TruncateText>
-      </div>
-    </div>
+  const who = (name: string, note?: string) => (
+    <p className="flex min-w-0 items-baseline gap-2 text-ods-text-primary text-h6">
+      <span className="shrink-0">{name}</span>
+      {note && <span className="truncate text-ods-text-secondary">{note}</span>}
+    </p>
   );
+  const mark = (node: ReactNode) =>
+    node ? (
+      <span className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full">{node}</span>
+    ) : null;
   return (
     <div
       className={cn(
-        'flex flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-m)]',
+        'flex min-w-0 flex-col justify-center gap-3 overflow-hidden rounded-xl border border-ods-border bg-ods-bg px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]',
         className,
       )}
     >
-      {turn(requesterMark, labels.requester, example.request, 'primary')}
-      {turn(responderMark, labels.responder, example.outcome, 'secondary')}
+      <div className="flex min-w-0 gap-2.5">
+        {mark(requesterMark)}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {who(labels.requester, labels.requesterNote)}
+          <TruncateText lines={2} variant="h4" className="min-h-[2lh]">
+            {`\u201c${example.request}\u201d`}
+          </TruncateText>
+        </div>
+      </div>
+      <div className="flex min-w-0 gap-2.5 border-t border-ods-border pt-3">
+        {mark(responderMark)}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {who(labels.responder, labels.responderNote)}
+          <div className="flex min-w-0 items-start gap-2">
+            <CheckIcon size={16} className="mt-0.5 shrink-0 text-ods-success" />
+            <TruncateText lines={2} variant="h6" tone="secondary" className="min-h-[2lh]" triggerClassName="flex-1">
+              {example.outcome}
+            </TruncateText>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -162,12 +187,12 @@ export function CapabilityExplorer({
         prevLabel={labels.previous}
         nextLabel={labels.next}
         getKey={item => item.id}
-        slideClassName="basis-[86%]"
+        slideClassName="min-w-0 basis-[86%]"
         renderItem={item => (
           <article
             id={item.id}
             className={cn(
-              'flex scroll-mt-32 flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-m)]',
+              'flex w-full min-w-0 scroll-mt-36 flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-xl border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
               CARD_HEIGHT_CLASS,
             )}
           >
@@ -191,10 +216,10 @@ export function CapabilityExplorer({
                 )}
               </div>
             </div>
-            <TruncateText lines={3} variant="h5" tone="secondary">
+            <TruncateText lines={3} variant="h6" tone="secondary" className="min-h-[3lh]">
               {item.intro}
             </TruncateText>
-            <div className="shrink-0 overflow-hidden rounded-md border border-ods-border">
+            <div className="shrink-0 overflow-hidden rounded-lg border border-ods-border">
               {renderScreen(item, { compact: true })}
             </div>
             {item.example && (
@@ -203,10 +228,10 @@ export function CapabilityExplorer({
                 labels={labels}
                 requesterMark={requesterMark}
                 responderMark={responderMark}
-                className="border-0 bg-transparent p-0"
+                className="shrink-0"
               />
             )}
-            {item.footer && <div className="mt-auto min-w-0 shrink-0">{item.footer}</div>}
+            {item.footer && <div className="mt-auto min-w-0 shrink-0 overflow-hidden">{item.footer}</div>}
           </article>
         )}
       />
@@ -241,7 +266,7 @@ export function CapabilityExplorer({
   return (
     <div
       className={cn(
-        'grid grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-[var(--spacing-system-l)]',
+        'grid grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-[var(--spacing-system-lf)]',
         PANEL_HEIGHT_CLASS,
         className,
       )}
@@ -267,24 +292,41 @@ export function CapabilityExplorer({
               tabIndex={selected ? 0 : -1}
               onClick={() => onActiveChange(item.id)}
               className={cn(
-                'flex min-w-0 scroll-mt-32 items-center gap-[var(--spacing-system-sf)] rounded-lg border p-[var(--spacing-system-sf)] text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
-                selected
-                  ? 'border-ods-border bg-ods-card text-ods-text-primary'
-                  : 'border-transparent text-ods-text-secondary hover:bg-ods-bg-hover hover:text-ods-text-primary',
+                'flex min-w-0 shrink-0 items-center gap-3.5 rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+                selected ? 'border-ods-border bg-ods-card' : 'border-transparent hover:bg-ods-bg-hover',
               )}
             >
               {item.iconName && (
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg text-ods-text-primary">
+                <span
+                  className={cn(
+                    'flex size-9 shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg',
+                    selected ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                  )}
+                >
                   <EntityIcon icon={{ name: item.iconName }} size={18} />
                 </span>
               )}
               <span className="min-w-0 flex-1">
-                <span className="flex min-w-0 items-center gap-2 text-h5">
+                <span
+                  className={cn(
+                    'flex min-w-0 items-center gap-2 text-h4',
+                    selected ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                  )}
+                >
                   <span className="truncate">{item.title}</span>
                   {item.badge}
                 </span>
-                {item.caption && <span className="block truncate text-ods-text-secondary text-h6">{item.caption}</span>}
+                {item.caption && (
+                  <span className="mt-0.5 block truncate text-ods-text-secondary text-h6" title={item.caption}>
+                    {item.caption}
+                  </span>
+                )}
               </span>
+              <Chevron02RightIcon
+                size={16}
+                className={cn('shrink-0', selected ? 'text-ods-text-primary' : 'invisible')}
+                aria-hidden
+              />
             </button>
           );
         })}
@@ -294,15 +336,24 @@ export function CapabilityExplorer({
         id={panelId}
         role="tabpanel"
         aria-labelledby={active.id}
-        className="flex min-h-0 min-w-0 flex-col gap-[var(--spacing-system-m)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-l)]"
+        className="flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7"
       >
-        <div className="grid shrink-0 grid-cols-2 gap-[var(--spacing-system-l)]">
-          <div className="flex min-w-0 flex-col gap-[var(--spacing-system-sf)]">
-            <TruncateText variant="h3">{active.title}</TruncateText>
-            <TruncateText lines={3} variant="h5" tone="secondary">
+        <div
+          className={cn(
+            'grid shrink-0 gap-8',
+            // A job with no example gives its copy the whole row.
+            active.example ? 'grid-cols-[minmax(0,1fr)_minmax(0,380px)]' : 'grid-cols-1',
+            PANEL_TOP_HEIGHT_CLASS,
+          )}
+        >
+          <div className="flex min-w-0 flex-col overflow-hidden">
+            <TruncateText lines={2} variant="h2" className="mb-2">
+              {active.title}
+            </TruncateText>
+            <TruncateText lines={3} variant="h4" tone="secondary" className="min-h-[3lh]">
               {active.intro}
             </TruncateText>
-            <Highlights items={active.highlights ?? []} />
+            <Highlights items={active.highlights ?? []} className="mt-auto" />
           </div>
           {active.example && (
             <Example
@@ -310,14 +361,17 @@ export function CapabilityExplorer({
               labels={labels}
               requesterMark={requesterMark}
               responderMark={responderMark}
-              className="self-start"
             />
           )}
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-ods-border">
+        <div className={cn('shrink-0 overflow-hidden rounded-xl border border-ods-border', PANEL_SCREEN_HEIGHT_CLASS)}>
           {renderScreen(active, { compact: false })}
         </div>
-        {active.footer && <div className="min-w-0 shrink-0">{active.footer}</div>}
+        {active.footer && (
+          <div className={cn('flex min-w-0 shrink-0 items-center overflow-hidden', PANEL_FOOTER_HEIGHT_CLASS)}>
+            {active.footer}
+          </div>
+        )}
       </div>
     </div>
   );

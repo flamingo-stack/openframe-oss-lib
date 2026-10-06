@@ -8,6 +8,13 @@ import { CollisionBoundaryContext, PortalContainerContext } from './portal-conta
 /** The widest content step: a product screen is drawn at this width and scaled to its frame. */
 export const PRODUCT_SCREEN_DESIGN_WIDTH = LAYOUT_STEPS['2xl'].content;
 
+/**
+ * A narrower layout width for a frame that is itself narrow (a hero's window, a
+ * tab panel): the product's desktop layout at its smallest, so the scaled text
+ * stays readable.
+ */
+export const PRODUCT_SCREEN_READABLE_WIDTH = LAYOUT_STEPS.lg.content;
+
 /** Under this frame width the screen is not scaled: it takes the product's own narrow layout. */
 export const PRODUCT_SCREEN_SCALE_FROM = LAYOUT_STEPS.md.content;
 
@@ -22,6 +29,8 @@ export interface ProductScreenFrameProps {
   appType?: string;
   /** Width the screen is laid out at before scaling. Default the widest content step. */
   designWidth?: number;
+  /** The frame width from which the screen is scaled; under it the product's narrow layout renders. Default the content `md` step. */
+  scaleFrom?: number;
   /** Fade the cropped bottom edge into the surface behind the frame. Default true. */
   fade?: boolean;
   className?: string;
@@ -48,6 +57,7 @@ export function ProductScreenFrame({
   height,
   appType = 'openframe',
   designWidth = PRODUCT_SCREEN_DESIGN_WIDTH,
+  scaleFrom = PRODUCT_SCREEN_SCALE_FROM,
   fade = true,
   className,
 }: ProductScreenFrameProps) {
@@ -68,7 +78,7 @@ export function ProductScreenFrame({
     return () => observer.disconnect();
   }, []);
 
-  const scaled = width !== null && width >= PRODUCT_SCREEN_SCALE_FROM && width < designWidth;
+  const scaled = width !== null && width >= scaleFrom && width < designWidth;
   const scale = scaled ? width / designWidth : 1;
   const screenStyle: CSSProperties = scaled
     ? {
@@ -78,7 +88,9 @@ export function ProductScreenFrame({
         transform: `scale(${scale})`,
         transformOrigin: 'top left',
       }
-    : { width: '100%', height: '100%' };
+    : // Unscaled, the screen still needs to be the containing block of anything the
+      // product pins with `position: fixed` (a form's action bar), or it escapes to the window.
+      { width: '100%', height: '100%', transform: 'translateZ(0)' };
 
   return (
     <div
