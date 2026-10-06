@@ -40,6 +40,9 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   podcasts: 'headphones',
   'customer-interviews': 'users',
   faqs: 'info',
+  // Not a chat source: listed so the site menus and the admin sidebar draw the
+  // media library with one glyph, from this registry like every other kind.
+  media: 'image',
 
   // Trust (single-record live source over the public Vanta projection)
   'trust-center': 'shield',
