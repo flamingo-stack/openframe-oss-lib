@@ -39,7 +39,7 @@ export function ListSkeleton({
         <div key={index} className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {showIcons && <MediaSkeleton.Icon size="sm" />}
-            <TextSkeleton.Body className="w-32 md:w-48" />
+            <TextSkeleton.Body className="w-32 content-md:w-48" />
           </div>
           {showActions && (
             <div className="flex items-center gap-2">
@@ -126,12 +126,12 @@ export function NavigationSkeleton({
 }) {
   return (
     <nav
-      className={cn('flex gap-4 md:gap-6', !horizontal && 'flex-col', className)}
+      className={cn('flex gap-4 content-md:gap-6', !horizontal && 'flex-col', className)}
       role="status"
       aria-label="Loading navigation"
     >
       {Array.from({ length: items }).map((_, index) => (
-        <TextSkeleton.Body key={index} className="w-16 md:w-20" />
+        <TextSkeleton.Body key={index} className="w-16 content-md:w-20" />
       ))}
     </nav>
   );
@@ -336,9 +336,9 @@ export function PricingSkeleton({ className, plans = 3 }: ContentSkeletonProps &
     <div
       className={cn(
         'grid gap-6',
-        plans === 2 && 'grid-cols-1 md:grid-cols-2',
-        plans === 3 && 'grid-cols-1 md:grid-cols-3',
-        plans === 4 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
+        plans === 2 && 'grid-cols-1 content-md:grid-cols-2',
+        plans === 3 && 'grid-cols-1 content-md:grid-cols-3',
+        plans === 4 && 'grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-4',
         className,
       )}
     >

@@ -1,0 +1,12 @@
+"""
+The message for what the /auth/error page received in `ref`: a catalog code name, or the 8-character reference of a
+stored dynamic message. Anything else, and an expired reference, resolves to the generic UNEXPECTED entry.
+"""
+type AuthErrorMessage {
+    code: String!
+    message: String!
+}
+
+type Query {
+    authErrorMessage(reference: String!): AuthErrorMessage!
+}

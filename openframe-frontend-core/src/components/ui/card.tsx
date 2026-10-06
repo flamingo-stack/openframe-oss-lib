@@ -57,7 +57,7 @@ export function CardHorizontal({ icon, title, description, className = '', borde
   return (
     <div
       className={cn(
-        'flex min-h-[80px] w-full flex-row items-center gap-3 bg-ods-card p-4 md:gap-4 md:p-6',
+        'flex min-h-[80px] w-full flex-row items-center gap-3 bg-ods-card p-4 content-md:gap-4 content-md:p-6',
         borderLeft ? 'border-l border-ods-border' : '',
         className,
       )}

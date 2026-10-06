@@ -37,6 +37,9 @@ export * from './msp-organization-card';
 export * from './msp-organization-card-skeleton';
 export * from './guide-mode-banner';
 export * from './mingo-chat-history';
+export * from './mingo-archive-list';
+export * from './mingo-chat-header';
+export * from './mingo-chat-rail';
 export * from './mingo-history-rail';
 export * from './mingo-chat-modals';
 export * from './chat-header-icon-button';
@@ -95,5 +98,6 @@ export {
   EmbeddableChat,
   type EmbeddableChatHandle,
   type EmbeddableChatProps,
+  MINGO_V2_RAIL_WIDTH,
 } from './embeddable-chat';
 export * from './proxy-credentials-panel';

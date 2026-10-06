@@ -79,7 +79,7 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
           openInNewTab
           leftIcon={<ClaudeIcon className="h-4 w-4" />}
           rightIcon={<ExternalLink className="h-4 w-4" />}
-          className="w-full sm:w-auto"
+          className="w-full content-sm:w-auto"
         >
           Open in Claude
         </Button>
