@@ -232,8 +232,7 @@ export function TrustCenterPage({
       lead: TRUST_SECTION_LEADS.subprocessors,
       render: d => <SubprocessorsSection subprocessors={d.subprocessors} />,
     },
-    // The Trust Center's own FAQs (compliance answers): never the product's "ask" card.
-    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} ask={false} /> },
+    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} /> },
     contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };
 
