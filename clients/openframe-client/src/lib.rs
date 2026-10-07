@@ -537,7 +537,6 @@ impl Client {
         let remote_access_message_listener = RemoteAccessMessageListener::new(
             nats_connection_manager.clone(),
             config_service.clone(),
-            installed_tools_service.clone(),
             tool_run_manager.clone(),
         );
 

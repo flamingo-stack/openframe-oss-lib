@@ -1,41 +1,31 @@
 use crate::config::update_config::RECONNECTION_DELAY_MS;
-use crate::models::{InstalledTool, ToolRecordState, CHAT_TOOL_AGENT_ID};
+use crate::models::CHAT_TOOL_AGENT_ID;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::tool_run_manager::ToolRunManager;
-use crate::services::{AgentConfigurationService, InstalledToolsService};
-use anyhow::{anyhow, Context, Result};
+use crate::services::AgentConfigurationService;
+use anyhow::{anyhow, Result};
 use futures::StreamExt;
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
 use tokio::time::Duration;
-use tracing::{debug, error, info, warn};
-
-// The backend republishes a pending request every 2 s for up to 10 s; one launch attempt per window is enough.
-const LAUNCH_WINDOW: Duration = Duration::from_secs(10);
+use tracing::{error, info, warn};
 
 /// Starts the chat app on every remote-access message: an exited chat misses them, a fresh one resyncs through `sessions/current`.
 #[derive(Clone)]
 pub struct RemoteAccessMessageListener {
     nats_connection_manager: NatsConnectionManager,
     config_service: AgentConfigurationService,
-    installed_tools_service: InstalledToolsService,
     tool_run_manager: ToolRunManager,
-    last_launch: Arc<Mutex<Option<Instant>>>,
 }
 
 impl RemoteAccessMessageListener {
     pub fn new(
         nats_connection_manager: NatsConnectionManager,
         config_service: AgentConfigurationService,
-        installed_tools_service: InstalledToolsService,
         tool_run_manager: ToolRunManager,
     ) -> Self {
         Self {
             nats_connection_manager,
             config_service,
-            installed_tools_service,
             tool_run_manager,
-            last_launch: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -89,20 +79,16 @@ impl RemoteAccessMessageListener {
 
     // Spawned so a launch that waits for a console user never stalls the subscription.
     fn on_message(&self, subject: &str) {
-        if !open_launch_window(&self.last_launch, Instant::now()) {
-            debug!(
-                subject,
-                "Remote access message inside the launch window, chat launch already attempted"
-            );
-            return;
-        }
         info!(
             subject,
             "Remote access message received, making sure the chat app is running"
         );
-        let listener = self.clone();
+        let tool_run_manager = self.tool_run_manager.clone();
         tokio::spawn(async move {
-            if let Err(e) = listener.launch_chat().await {
+            if let Err(e) = tool_run_manager
+                .ensure_gui_app_running(CHAT_TOOL_AGENT_ID)
+                .await
+            {
                 warn!(
                     "Failed to start the chat app for a remote access message: {:#}",
                     e
@@ -110,46 +96,10 @@ impl RemoteAccessMessageListener {
             }
         });
     }
-
-    async fn launch_chat(&self) -> Result<()> {
-        if self.tool_run_manager.is_updating(CHAT_TOOL_AGENT_ID).await {
-            info!("Chat app is being updated, the updater relaunches it");
-            return Ok(());
-        }
-        let tool = self
-            .installed_tools_service
-            .get_by_tool_agent_id(CHAT_TOOL_AGENT_ID)
-            .await
-            .context("Failed to look up the chat app in the installed tools registry")?;
-        match launchable_chat(tool) {
-            Some(tool) => self.tool_run_manager.run_new_tool(tool).await,
-            None => {
-                info!("Chat app is not installed as a GuiApp, nothing to start");
-                Ok(())
-            }
-        }
-    }
 }
 
 pub fn remote_access_subject(machine_id: &str) -> String {
     format!("machine.{}.remote-access.>", machine_id)
-}
-
-// One attempt per window: a later message inside it finds the chat running or still starting.
-fn open_launch_window(last_launch: &Mutex<Option<Instant>>, now: Instant) -> bool {
-    let mut last = last_launch
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if last.is_some_and(|at| now.duration_since(at) < LAUNCH_WINDOW) {
-        return false;
-    }
-    *last = Some(now);
-    true
-}
-
-// Only a fully installed GuiApp record is launched; an install still in progress launches itself when it completes.
-fn launchable_chat(tool: Option<InstalledTool>) -> Option<InstalledTool> {
-    tool.filter(|t| t.installation.is_gui_app() && t.state == ToolRecordState::Installed)
 }
 
 #[cfg(test)]

@@ -1,13 +1,12 @@
 use super::*;
 
 #[test]
-fn open_starts_a_new_instance_without_focus_and_forwards_args() {
+fn open_launches_without_focus_and_forwards_args() {
     let args = open_args("/Applications/OpenFrame.app", &["--background".to_string()]);
     assert_eq!(
         args,
         [
             "open",
-            "-n",
             "-g",
             "-a",
             "/Applications/OpenFrame.app",
@@ -21,7 +20,7 @@ fn open_starts_a_new_instance_without_focus_and_forwards_args() {
 fn open_without_args_has_no_args_separator() {
     assert_eq!(
         open_args("/Applications/OpenFrame.app", &[]),
-        ["open", "-n", "-g", "-a", "/Applications/OpenFrame.app"]
+        ["open", "-g", "-a", "/Applications/OpenFrame.app"]
     );
 }
 

@@ -1,4 +1,5 @@
-use super::{shutdown_break, ClientUpdatePendingFlag};
+use super::{launchable_gui_app, shutdown_break, ClientUpdatePendingFlag};
+use crate::models::{Installation, InstalledTool, ToolRecordState};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -63,4 +64,46 @@ async fn clear_releases_the_flag() {
     assert!(flag.is_pending(LONG_TTL).await);
     flag.clear().await;
     assert!(!flag.is_pending(LONG_TTL).await);
+}
+
+fn gui_app_record(state: ToolRecordState) -> InstalledTool {
+    InstalledTool {
+        tool_agent_id: "openframe-chat".to_string(),
+        installation: Installation::GuiApp {
+            executable_path: "/Applications/OpenFrame.app/Contents/MacOS/openframe-chat".into(),
+            bundle_id: Some("com.openframe.chat".into()),
+        },
+        state,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn an_installed_gui_app_is_launchable() {
+    let tool = launchable_gui_app(Some(gui_app_record(ToolRecordState::Installed)));
+    assert_eq!(
+        tool.map(|t| t.tool_agent_id).as_deref(),
+        Some("openframe-chat")
+    );
+}
+
+#[test]
+fn a_missing_record_is_not_launchable() {
+    assert!(launchable_gui_app(None).is_none());
+}
+
+#[test]
+fn a_record_still_installing_is_not_launchable() {
+    assert!(launchable_gui_app(Some(gui_app_record(ToolRecordState::Installing))).is_none());
+}
+
+#[test]
+fn a_standard_record_is_not_launchable() {
+    let standard = InstalledTool {
+        installation: Installation::Standard {
+            executable_path: Some("agent".into()),
+        },
+        ..gui_app_record(ToolRecordState::Installed)
+    };
+    assert!(launchable_gui_app(Some(standard)).is_none());
 }

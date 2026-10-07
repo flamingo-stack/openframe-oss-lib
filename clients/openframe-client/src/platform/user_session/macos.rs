@@ -108,9 +108,7 @@ async fn launch_via_launchctl(
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .with_context(|| {
-                format!("launchctl asuser {} open -n -g -a {} failed", uid, app_path)
-            })?;
+            .with_context(|| format!("launchctl asuser {} open -g -a {} failed", uid, app_path))?;
 
         info!("App launched, PID: {:?}", child.id());
         return Ok(child);
@@ -133,9 +131,9 @@ async fn launch_via_launchctl(
     Ok(child)
 }
 
-// -n: a running app gets argv via its single-instance guard (plain `open -a` only re-opens its window); -g: no focus steal.
+// -g: a daemon launch must not steal focus. No -n: liveness is re-checked right before launching, and a plain open coalesces onto a starting instance.
 fn open_args(app_path: &str, args: &[String]) -> Vec<String> {
-    let mut open: Vec<String> = ["open", "-n", "-g", "-a", app_path]
+    let mut open: Vec<String> = ["open", "-g", "-a", app_path]
         .iter()
         .map(|s| s.to_string())
         .collect();
