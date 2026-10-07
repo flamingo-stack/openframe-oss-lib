@@ -230,6 +230,7 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       // Dialog management (forwarded from active adapter)
       dialogs: activeState.dialogs,
       activeDialogId: activeState.activeDialogId,
+      activeDialog: activeState.activeDialog,
       selectDialog,
       startNewDialog,
       deleteDialog,

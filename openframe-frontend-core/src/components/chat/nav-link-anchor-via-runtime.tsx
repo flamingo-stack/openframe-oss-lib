@@ -18,11 +18,14 @@
  * the lib should never silently fall back when the runtime is missing
  * (the chat tree always provides one in both host + embed modes).
  *
- * For surfaces OUTSIDE the chat tree (header chrome, marketing pages, …)
- * the hub keeps its own `useNavLink`-based anchor.
+ * The same component serves a host's own chrome and pages (site header,
+ * footer, call-to-action links): the host mounts the runtime app-wide, names
+ * the destination's platform in `targetPlatform`, and may pass its own
+ * `onClick` (it runs first; `preventDefault()` cancels the navigation) and
+ * plain anchor attributes (`aria-*`, `title`, `data-*`, `style`, `rel`).
  */
 
-import type { ReactNode, MouseEvent } from 'react';
+import type { AnchorHTMLAttributes, ReactNode, MouseEvent } from 'react';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useChatPanel } from './chat-panel-context';
@@ -30,7 +33,10 @@ import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { executeNavigation } from './utils/execute-navigation';
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
 
-export interface NavLinkAnchorViaRuntimeProps {
+export interface NavLinkAnchorViaRuntimeProps extends Omit<
+  AnchorHTMLAttributes<HTMLAnchorElement>,
+  'href' | 'target' | 'onClick' | 'className' | 'children'
+> {
   href: string;
   path?: string | null;
   targetPlatform?: string | null;
@@ -38,15 +44,41 @@ export interface NavLinkAnchorViaRuntimeProps {
   /** Optional — matches `NavLinkAnchorComponent`'s contract so the
    *  markdown-anchor slot can render an empty anchor (rare but legal). */
   children?: ReactNode;
+  /** Runs before the navigation; `preventDefault()` cancels it. */
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
-export function NavLinkAnchorViaRuntime({
+export interface NavLinkViaRuntimeInput {
+  href: string;
+  path?: string | null;
+  /** The platform that owns `href`, by name. */
+  targetPlatform?: string | null;
+  /** Runs before the navigation; `preventDefault()` cancels it. */
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
+}
+
+export interface NavLinkViaRuntimeProps {
+  href: string;
+  target?: '_blank';
+  rel?: 'noopener' | 'noopener noreferrer';
+  onClick: (event: MouseEvent<HTMLAnchorElement>) => void;
+}
+
+/**
+ * The anchor props of {@link NavLinkAnchorViaRuntime}, for an element that is
+ * not a bare `<a>` (a `Button`'s `linkProps`). ONE decision and ONE click
+ * handler for both forms.
+ *
+ * A new-tab link to a NAMED platform is one of our own sites and keeps the
+ * Referer (`noopener` alone: the cross-domain analytics attribute the visit by
+ * it); any other new-tab link also gets `noreferrer`.
+ */
+export function useNavLinkViaRuntime({
   href,
   path,
   targetPlatform,
-  className,
-  children,
-}: NavLinkAnchorViaRuntimeProps) {
+  onClick: onClickProp,
+}: NavLinkViaRuntimeInput): NavLinkViaRuntimeProps {
   const runtime = useRequiredChatRuntime();
   const router = useRouter();
   const panel = useChatPanel();
@@ -54,6 +86,8 @@ export function NavLinkAnchorViaRuntime({
   const isNewTab = computeIsNewTab(runtime, resolvedHref, targetPlatform ?? null);
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    onClickProp?.(e);
+    if (e.defaultPrevented) return;
     const handled = executeNavigation({
       event: e,
       runtime,
@@ -64,8 +98,27 @@ export function NavLinkAnchorViaRuntime({
     });
     if (handled && !isNewTab && panel?.closeChat) panel.closeChat();
   };
+  const attrs = newTabAnchorAttrs(isNewTab);
+  return {
+    href: resolvedHref,
+    ...attrs,
+    ...(isNewTab && targetPlatform && { rel: 'noopener' as const }),
+    onClick,
+  };
+}
+
+export function NavLinkAnchorViaRuntime({
+  href,
+  path,
+  targetPlatform,
+  className,
+  children,
+  onClick,
+  ...anchorAttrs
+}: NavLinkAnchorViaRuntimeProps) {
+  const linkProps = useNavLinkViaRuntime({ href, path, targetPlatform, onClick });
   return (
-    <a href={resolvedHref} {...newTabAnchorAttrs(isNewTab)} onClick={onClick} className={className}>
+    <a {...linkProps} {...anchorAttrs} className={className}>
       {children}
     </a>
   );

@@ -56,14 +56,23 @@ interface RadioGroupBlockProps extends Omit<ComponentPropsWithoutRef<typeof Radi
    * - `grouped`: options share a single outer border with dividers between rows.
    */
   variant?: 'separated' | 'grouped';
+  /**
+   * `vertical` (default): one option per row. `horizontal`: the options side
+   * by side in equal columns, for a short choice on a wide form.
+   */
+  orientation?: 'vertical' | 'horizontal';
   /** Error message displayed below the group (also triggers red borders) */
   error?: string;
   itemClassName?: string;
 }
 
 const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>, RadioGroupBlockProps>(
-  ({ className, options, variant = 'separated', error, itemClassName, disabled, ...props }, ref) => {
+  (
+    { className, options, variant = 'separated', orientation = 'vertical', error, itemClassName, disabled, ...props },
+    ref,
+  ) => {
     const isGrouped = variant === 'grouped';
+    const isHorizontal = orientation === 'horizontal';
     return (
       <div className={cn('relative flex w-full flex-col', className)}>
         <RadioGroupPrimitive.Root
@@ -72,14 +81,16 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
           // scrolls to) the first control that failed validation. The GROUP is
           // the field here; the individual options are not separately invalid.
           data-invalid={error ? true : undefined}
+          orientation={orientation}
           className={cn(
             'w-full',
             isGrouped
               ? cn(
-                  'flex flex-col overflow-hidden rounded-[6px] border bg-ods-card',
+                  'flex overflow-hidden rounded-[6px] border bg-ods-card',
+                  isHorizontal ? 'flex-row items-stretch' : 'flex-col',
                   error ? 'border-ods-error' : 'border-ods-border',
                 )
-              : 'grid gap-2',
+              : cn('grid gap-2', isHorizontal && 'auto-cols-fr grid-flow-col'),
           )}
           disabled={disabled}
           {...props}
@@ -95,6 +106,7 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                 aria-disabled={isDisabled || undefined}
                 className={cn(
                   'flex w-full items-center gap-3',
+                  isHorizontal && 'min-w-0 flex-1',
                   'transition-colors duration-200',
                   isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
                   // Hover / active move the BACKGROUND only, like Input and
@@ -104,7 +116,7 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                   isGrouped
                     ? cn(
                         'bg-ods-card px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs,8px)]',
-                        !isLast && 'border-b',
+                        !isLast && (isHorizontal ? 'border-r' : 'border-b'),
                         error ? 'border-ods-error' : 'border-ods-border',
                       )
                     : cn(

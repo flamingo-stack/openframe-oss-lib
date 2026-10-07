@@ -714,6 +714,10 @@ export interface DialogItem {
     /** Absolute avatar URL; falls back to initials when absent or failing. */
     avatarUrl?: string | null;
   };
+  /** The conversation is archived - read-only until restored. Read off
+   *  `UnifiedChatState.activeDialog`, the host's own record of the open
+   *  conversation; rows of the active list never carry it. */
+  archived?: boolean;
 }
 
 // ========== Chat Sidebar Props ==========

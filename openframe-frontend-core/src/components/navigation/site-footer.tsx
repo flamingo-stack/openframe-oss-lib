@@ -19,6 +19,12 @@ export interface SiteFooterProps {
   renderLink?: SiteNavLinkRenderer;
   /** The closing band's primary CTA when `nav.primaryCta` is `'trial'` or `'waitlist'`. */
   cta?: React.ReactNode;
+  /**
+   * Replaces the closing band's secondary button (`nav.closingBand.secondary`).
+   * For a host that renders it through its own navigation rule: a link to
+   * another of its platforms, named.
+   */
+  secondaryCta?: React.ReactNode;
   /** Replaces the default social row built from `nav.brand.social` (each
    *  link's `iconName` is its social platform key). */
   social?: React.ReactNode;
@@ -129,6 +135,7 @@ export function SiteFooter({
   name,
   renderLink = defaultRenderSiteNavLink,
   cta,
+  secondaryCta,
   social,
   brandExtra,
   backgroundClassName,
@@ -174,11 +181,12 @@ export function SiteFooter({
           </div>
           <div className="flex shrink-0 flex-col gap-[var(--spacing-system-sf)] md:flex-row">
             {bandPrimary}
-            {band.secondary && (
-              <Button variant="outline" href={band.secondary.href} openInNewTab={band.secondary.external}>
-                {navLinkLabel(band.secondary)}
-              </Button>
-            )}
+            {band.secondary &&
+              (secondaryCta ?? (
+                <Button variant="outline" href={band.secondary.href} openInNewTab={band.secondary.external}>
+                  {navLinkLabel(band.secondary)}
+                </Button>
+              ))}
           </div>
         </div>
       )}

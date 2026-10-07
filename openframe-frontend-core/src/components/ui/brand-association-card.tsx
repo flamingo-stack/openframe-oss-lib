@@ -2,6 +2,7 @@
 
 import { ExternalLink } from 'lucide-react';
 import React from 'react';
+import { useNavLinkViaRuntime } from '../chat/nav-link-anchor-via-runtime';
 import { Button } from './button';
 
 export interface BrandAssociationItem {
@@ -10,11 +11,28 @@ export interface BrandAssociationItem {
   description: string;
   buttonText: string;
   link: string;
+  /**
+   * The platform `link` leads to, by name, when it is another of the host's
+   * own platforms. The button then opens it through the shared navigation rule
+   * (the one chat cards use); the host must mount the chat runtime. Omitted, it
+   * is a plain outside link in a new tab.
+   */
+  targetPlatform?: string | null;
 }
 
 export interface BrandAssociationCardProps {
   item: BrandAssociationItem;
   className?: string;
+}
+
+/** The button to a NAMED platform: the shared navigation rule decides how it opens. */
+function PlatformBrowseButton({ item }: { item: BrandAssociationItem }) {
+  const linkProps = useNavLinkViaRuntime({ href: item.link, targetPlatform: item.targetPlatform });
+  return (
+    <Button variant="outline" linkProps={linkProps} rightIcon={<ExternalLink className="h-4 w-4" />}>
+      Browse {item.buttonText}
+    </Button>
+  );
 }
 
 export function BrandAssociationCard({ item, className = '' }: BrandAssociationCardProps) {
@@ -43,9 +61,13 @@ export function BrandAssociationCard({ item, className = '' }: BrandAssociationC
         <p className="text-ods-text-secondary text-h6">{item.description}</p>
 
         {/* Browse Button */}
-        <Button variant="outline" href={item.link} openInNewTab rightIcon={<ExternalLink className="h-4 w-4" />}>
-          Browse {item.buttonText}
-        </Button>
+        {item.targetPlatform ? (
+          <PlatformBrowseButton item={item} />
+        ) : (
+          <Button variant="outline" href={item.link} openInNewTab rightIcon={<ExternalLink className="h-4 w-4" />}>
+            Browse {item.buttonText}
+          </Button>
+        )}
       </div>
     </div>
   );

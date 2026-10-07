@@ -23,6 +23,7 @@ export * from './chat-message-row';
 export * from './chat-message-skeleton';
 
 export * from './quick-action-chip';
+export * from './ask-prompts';
 export * from './quick-action-marquee';
 export * from './quick-action-wall';
 export * from './chat-ticket-list';
@@ -61,7 +62,13 @@ export { remarkCardLinks } from './remark-card-links';
 export { remarkMentionChips } from './remark-mention-chips';
 
 // Card-supporting UI migrated from hub `components/shared/*` + `components/blog/*`
-export { NavLinkAnchorViaRuntime, type NavLinkAnchorViaRuntimeProps } from './nav-link-anchor-via-runtime';
+export {
+  NavLinkAnchorViaRuntime,
+  type NavLinkAnchorViaRuntimeProps,
+  type NavLinkViaRuntimeInput,
+  type NavLinkViaRuntimeProps,
+  useNavLinkViaRuntime,
+} from './nav-link-anchor-via-runtime';
 export { SourceActionButton, type SourceActionButtonProps, type SourceActionDensity } from './source-action-button';
 export {
   ChatAttachmentAddButton,
