@@ -14,8 +14,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AssistantRuntimeContext, type AssistantRuntime } from '../../../contexts/assistant-runtime-context';
 import type { Faq } from '../../../types/faq';
+import { AssistantAskPrompts } from '../../chat/assistant-ask-prompts';
+import { buildAskPromptsUrl, resetShownAskPrompts } from '../../chat/hooks/use-ask-prompts';
 import { ASK_AI_OPEN_EVENT } from '../../navigation/mingo-ai-button';
-import { buildAskPromptsUrl } from '../faq-ask-card';
 import { FaqSection } from '../faq-section';
 
 const FAQS = [{ id: 1, question: 'What is OpenFrame?', answer: 'A platform.', section: null }] as unknown as Faq[];
@@ -48,6 +49,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockResolvedValue({ ok: true, json: async () => ({ prompts: PROMPTS }) });
   vi.stubGlobal('fetch', fetchMock);
+  resetShownAskPrompts();
 });
 
 afterEach(() => {
@@ -172,6 +174,52 @@ describe('FaqSection ask card', () => {
       prompt: 'Explain the pricing',
     });
     window.removeEventListener(ASK_AI_OPEN_EVENT, siteChat);
+  });
+});
+
+describe('AssistantAskPrompts', () => {
+  it('shows the launcher and the questions of its topic, and opens the runtime chat', async () => {
+    const open = vi.fn();
+    const onAsk = vi.fn();
+    renderFaq({ ...RUNTIME, open, onAsk }, <AssistantAskPrompts topic="pricing" count={2} />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const url = new URL(requestedUrl(), 'https://host.test');
+    expect(url.searchParams.get('section')).toBe('pricing');
+    expect(url.searchParams.get('count')).toBe('2');
+
+    fireEvent.click(await screen.findByText('Is it open source?'));
+    expect(open).toHaveBeenCalledWith({ prompt: 'Is it open source?', topic: 'pricing' });
+    expect(onAsk).toHaveBeenCalledWith({ promptId: 'q2', topic: 'pricing' });
+    expect(screen.getByRole('button', { name: 'Mingo' })).toBeInTheDocument();
+  });
+
+  it('renders nothing with no chat, and fetches nothing', () => {
+    const { container } = renderFaq({ ...RUNTIME, available: false }, <AssistantAskPrompts topic="pricing" />);
+    expect(container).toBeEmptyDOMElement();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps its questions out of the FAQ's card, which waits for the row's pick", async () => {
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = new URL(String(input), 'https://host.test');
+      const row = url.searchParams.get('section') === 'pricing';
+      return { ok: true, json: async () => ({ prompts: row ? [PROMPTS[0]] : [PROMPTS[1]] }) };
+    });
+    renderFaq(
+      RUNTIME,
+      <>
+        <AssistantAskPrompts topic="pricing" count={1} />
+        <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq' }} />
+      </>,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const card = fetchMock.mock.calls
+      .map(call => new URL(String(call[0]), 'https://host.test'))
+      .find(url => url.searchParams.get('section') === 'faq');
+    // One request for the card, made after the row's pick: it names the row's question.
+    expect(card?.searchParams.get('exclude')).toBe('q1');
   });
 });
 

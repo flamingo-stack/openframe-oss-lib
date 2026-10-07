@@ -11,4 +11,4 @@
 // block and exposed via "./components/faq/json-ld" in package.json#exports.)
 export { FaqSection, type FaqSectionProps } from './faq-section';
 export { FaqDocumentPage, type FaqDocumentPageProps } from './faq-document-page';
-export { FaqAskCard, buildAskPromptsUrl, type FaqAskOptions } from './faq-ask-card';
+export { FaqAskCard, type FaqAskOptions } from './faq-ask-card';

@@ -39,3 +39,4 @@ export * from './use-embedded-chat';
 // `ChatRuntime.endpoints`, so hub vs. embedders share one image-proxy
 // resolver.
 export * from './use-proxied-image-url';
+export * from './use-ask-prompts';
