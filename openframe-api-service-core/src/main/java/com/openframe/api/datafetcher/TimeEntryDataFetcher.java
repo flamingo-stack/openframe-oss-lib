@@ -26,9 +26,9 @@ import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryInput;
 import com.openframe.api.dto.user.UserResponse;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.ParsedRelayId;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.ParsedRelayId;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.TimeEntryService;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.ticket.Ticket;
@@ -50,10 +50,10 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import static com.openframe.api.relay.NodeType.ORGANIZATION;
-import static com.openframe.api.relay.NodeType.TICKET;
-import static com.openframe.api.relay.NodeType.TIME_ENTRY;
-import static com.openframe.api.relay.NodeType.USER;
+import static com.openframe.graphql.relay.NodeType.ORGANIZATION;
+import static com.openframe.graphql.relay.NodeType.TICKET;
+import static com.openframe.graphql.relay.NodeType.TIME_ENTRY;
+import static com.openframe.graphql.relay.NodeType.USER;
 import static org.springframework.util.StringUtils.hasText;
 
 @DgsComponent
@@ -175,13 +175,6 @@ public class TimeEntryDataFetcher {
         String actingUserId = getCurrentUserId();
         String rawId = relayIdCodec.decode(id, TIME_ENTRY);
         return timeEntryService.deleteTimeEntry(actingUserId, rawId);
-    }
-
-    @DgsData(parentType = "TimeEntry", field = "id")
-    public String timeEntryNodeId(DgsDataFetchingEnvironment dfe) {
-        TimeEntry entry = dfe.getSource();
-        String entryId = entry.getId();
-        return relayIdCodec.encode(TIME_ENTRY, entryId);
     }
 
     @DgsData(parentType = "TimeEntry", field = "state")

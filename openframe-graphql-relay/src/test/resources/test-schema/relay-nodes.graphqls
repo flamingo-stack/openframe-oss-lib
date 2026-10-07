@@ -1,0 +1,39 @@
+type Query {
+    script: Script!
+    machine: Machine!
+    notification: Notification!
+    ticket: Ticket!
+    user: User!
+    tag: Tag!
+}
+
+interface Node {
+    id: ID!
+}
+
+type Script implements Node {
+    id: ID!
+}
+
+type Machine implements Node {
+    id: ID!
+    machineId: String!
+}
+
+type Notification implements Node {
+    id: ID!
+}
+
+type Ticket {
+    id: ID!
+}
+
+extend type Ticket implements Node
+
+type User implements Node {
+    id: ID!
+}
+
+type Tag {
+    id: ID!
+}

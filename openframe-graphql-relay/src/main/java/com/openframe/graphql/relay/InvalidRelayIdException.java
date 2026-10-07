@@ -1,4 +1,4 @@
-package com.openframe.api.relay;
+package com.openframe.graphql.relay;
 
 public class InvalidRelayIdException extends RuntimeException {
 

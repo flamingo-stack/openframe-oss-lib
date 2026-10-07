@@ -20,7 +20,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.MutationDeleteInput;
 import com.openframe.api.dto.shared.MutationDeletePayload;
 import com.openframe.api.mapper.GraphQLKnowledgeBaseMapper;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseAttachmentService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseTempAttachmentService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseService;
@@ -46,8 +46,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static com.openframe.api.relay.NodeType.KNOWLEDGE_BASE_ITEM;
-import static com.openframe.api.relay.NodeType.TAG;
+import static com.openframe.graphql.relay.NodeType.KNOWLEDGE_BASE_ITEM;
+import static com.openframe.graphql.relay.NodeType.TAG;
 
 @DgsComponent
 @Slf4j
@@ -302,13 +302,6 @@ public class KnowledgeBaseDataFetcher {
     public String tempAttachmentUploadUrl(DgsDataFetchingEnvironment dfe) {
         TempAttachment temp = dfe.getSource();
         return knowledgeBaseTempAttachmentService.generateUploadUrl(temp);
-    }
-
-    @DgsData(parentType = "KnowledgeBaseItem", field = "id")
-    public String knowledgeBaseItemNodeId(DgsDataFetchingEnvironment dfe) {
-        KnowledgeBaseItem item = dfe.getSource();
-        String itemId = item.getId();
-        return relayIdCodec.encode(KNOWLEDGE_BASE_ITEM, itemId);
     }
 
     @DgsData(parentType = "KnowledgeBaseItem", field = "parentId")

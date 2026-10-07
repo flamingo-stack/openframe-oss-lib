@@ -12,7 +12,7 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.NotificationService;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.data.document.notification.NotificationCategory;
@@ -31,7 +31,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import java.util.List;
 import java.util.Map;
 
-import static com.openframe.api.relay.NodeType.NOTIFICATION;
+import static com.openframe.graphql.relay.NodeType.NOTIFICATION;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @DgsComponent
@@ -43,13 +43,6 @@ public class NotificationDataFetcher {
     private final NotificationReadStateService readStateService;
     private final GraphQLNotificationMapper notificationMapper;
     private final RelayIdCodec relayIdCodec;
-
-    @DgsData(parentType = "Notification", field = "id")
-    public String notificationNodeId(DgsDataFetchingEnvironment dfe) {
-        NotificationView view = dfe.getSource();
-        String notificationId = view.id();
-        return relayIdCodec.encode(NOTIFICATION, notificationId);
-    }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsQuery

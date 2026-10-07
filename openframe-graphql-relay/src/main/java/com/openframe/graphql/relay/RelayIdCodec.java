@@ -1,6 +1,5 @@
-package com.openframe.api.relay;
+package com.openframe.graphql.relay;
 
-import org.springframework.stereotype.Component;
 
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -19,8 +18,7 @@ import java.util.stream.Collectors;
 
 import static org.springframework.util.StringUtils.hasText;
 
-// Byte-for-byte graphql.relay.Relay (URL-safe base64, no padding) without a graphql-java dependency in this lib.
-@Component
+// Byte-for-byte graphql.relay.Relay (URL-safe base64, no padding), usable without graphql-java on the classpath.
 public class RelayIdCodec {
 
     private static final String SEPARATOR = ":";

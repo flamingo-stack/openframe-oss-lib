@@ -1,8 +1,8 @@
 package com.openframe.api.datafetcher;
 
-import com.openframe.api.relay.InvalidRelayIdException;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.device.Machine;
 import org.junit.jupiter.api.Test;

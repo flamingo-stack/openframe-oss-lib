@@ -51,6 +51,7 @@
         <module>openframe-notification-mail</module>
         <module>openframe-notification-core</module>
         <module>openframe-data-kafka</module>
+        <module>openframe-graphql-relay</module>
         <module>openframe-api-lib</module>
         <module>openframe-data-cassandra</module>
         <module>openframe-data-pinot</module>
@@ -152,6 +153,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-data-kafka</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-graphql-relay</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

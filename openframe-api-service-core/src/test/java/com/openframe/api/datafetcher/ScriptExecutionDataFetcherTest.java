@@ -1,6 +1,6 @@
 package com.openframe.api.datafetcher;
 
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.datafetcher.rmm.ScriptExecutionDataFetcher;
 import com.openframe.api.dto.CountedGenericConnection;
@@ -212,15 +212,6 @@ class ScriptExecutionDataFetcherTest {
         assertThat(dataFetcher.softwareExecutionFilters(PackageManagerType.WINGET, "Google.Chrome", SoftwareAction.INSTALL, null, null))
                 .isSameAs(filters);
         verify(scriptExecutionFilterService).getExecutionFilters(owner, null, null);
-    }
-
-    @Test
-    @DisplayName("ScriptExecution.id resolver returns the Relay global id (Base64 \"ScriptExecution:<rawId>\") — the opaque node handle, not the raw Mongo id")
-    void scriptExecutionNodeId_returnsGlobalId() {
-        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
-        doReturn(ScriptExecutionResponse.builder().id("doc-1").build()).when(dfe).getSource();
-
-        assertThat(dataFetcher.scriptExecutionNodeId(dfe)).isEqualTo(new Relay().toGlobalId("ScriptExecution", "doc-1"));
     }
 
     @Test

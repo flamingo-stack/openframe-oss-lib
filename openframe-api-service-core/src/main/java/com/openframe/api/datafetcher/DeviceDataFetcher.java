@@ -19,7 +19,7 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
@@ -46,9 +46,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-import static com.openframe.api.relay.NodeType.INSTALLED_AGENT;
-import static com.openframe.api.relay.NodeType.MACHINE;
-import static com.openframe.api.relay.NodeType.TOOL_CONNECTION;
+import static com.openframe.graphql.relay.NodeType.MACHINE;
 
 @DgsComponent
 @Slf4j
@@ -138,20 +136,6 @@ public class DeviceDataFetcher {
         return deviceService.updateNickname(machineId, nickname);
     }
 
-    @DgsData(parentType = "Machine", field = "id")
-    public String machineNodeId(DgsDataFetchingEnvironment dfe) {
-        Machine machine = dfe.getSource();
-        String machineId = machine.getMachineId();
-        return relayIdCodec.encode(MACHINE, machineId);
-    }
-
-    @DgsData(parentType = "ToolConnection", field = "id")
-    public String toolConnectionNodeId(DgsDataFetchingEnvironment dfe) {
-        ToolConnection tc = dfe.getSource();
-        String toolConnectionId = tc.getId();
-        return relayIdCodec.encode(TOOL_CONNECTION, toolConnectionId);
-    }
-
     @DgsData(parentType = "ToolConnection", field = "vulnerabilitiesUpdatedAt")
     public Instant toolConnectionVulnerabilitiesUpdatedAt(DgsDataFetchingEnvironment dfe) {
         ToolConnection tc = dfe.getSource();
@@ -159,13 +143,6 @@ public class DeviceDataFetcher {
             return null;
         }
         return fleetVulnerabilityStatusService.getLastCompletedVulnerabilityRunAt();
-    }
-
-    @DgsData(parentType = "InstalledAgent", field = "id")
-    public String installedAgentNodeId(DgsDataFetchingEnvironment dfe) {
-        InstalledAgent agent = dfe.getSource();
-        String agentId = agent.getId();
-        return relayIdCodec.encode(INSTALLED_AGENT, agentId);
     }
 
     @DgsData(parentType = "Machine")

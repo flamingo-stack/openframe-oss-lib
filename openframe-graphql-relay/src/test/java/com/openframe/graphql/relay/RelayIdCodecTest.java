@@ -1,4 +1,4 @@
-package com.openframe.api.relay;
+package com.openframe.graphql.relay;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -13,9 +13,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static com.openframe.api.relay.NodeType.INSIGHT;
-import static com.openframe.api.relay.NodeType.KNOWLEDGE_BASE_ITEM;
-import static com.openframe.api.relay.NodeType.TICKET;
+import static com.openframe.graphql.relay.NodeType.INSIGHT;
+import static com.openframe.graphql.relay.NodeType.KNOWLEDGE_BASE_ITEM;
+import static com.openframe.graphql.relay.NodeType.TICKET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;

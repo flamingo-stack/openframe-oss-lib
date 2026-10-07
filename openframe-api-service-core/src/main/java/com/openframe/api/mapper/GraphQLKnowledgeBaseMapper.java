@@ -12,8 +12,8 @@ import com.openframe.api.dto.knowledgebase.UpdateArticleInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -21,11 +21,11 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.openframe.api.relay.NodeType.KNOWLEDGE_BASE_ITEM;
-import static com.openframe.api.relay.NodeType.MACHINE;
-import static com.openframe.api.relay.NodeType.ORGANIZATION;
-import static com.openframe.api.relay.NodeType.TAG;
-import static com.openframe.api.relay.NodeType.TICKET;
+import static com.openframe.graphql.relay.NodeType.KNOWLEDGE_BASE_ITEM;
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+import static com.openframe.graphql.relay.NodeType.ORGANIZATION;
+import static com.openframe.graphql.relay.NodeType.TAG;
+import static com.openframe.graphql.relay.NodeType.TICKET;
 
 @Component
 @RequiredArgsConstructor

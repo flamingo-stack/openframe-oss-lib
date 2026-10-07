@@ -19,7 +19,7 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.data.document.device.Machine;
@@ -39,8 +39,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static com.openframe.api.relay.NodeType.MACHINE;
-import static com.openframe.api.relay.NodeType.SOFTWARE_BUNDLE;
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+import static com.openframe.graphql.relay.NodeType.SOFTWARE_BUNDLE;
 
 @DgsComponent
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -121,13 +121,6 @@ public class SoftwareBundleDataFetcher {
         String bundleId = relayIdCodec.decode(id, SOFTWARE_BUNDLE);
         String userId = getCurrentUserId();
         return softwareBundleService.delete(bundleId, userId);
-    }
-
-    @DgsData(parentType = "SoftwareBundle", field = "id")
-    public String softwareBundleNodeId(DgsDataFetchingEnvironment dfe) {
-        SoftwareBundleResponse bundle = dfe.getSource();
-        String bundleId = bundle.getId();
-        return relayIdCodec.encode(SOFTWARE_BUNDLE, bundleId);
     }
 
     @DgsData(parentType = "SoftwareBundle", field = "deviceCount")

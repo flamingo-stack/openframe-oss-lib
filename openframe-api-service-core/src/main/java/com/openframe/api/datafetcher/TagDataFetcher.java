@@ -2,7 +2,7 @@ package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
 import com.openframe.api.dto.device.DeviceFilterOption;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.rmm.script.ScriptTagService;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.tag.Tag;
@@ -15,7 +15,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
-import static com.openframe.api.relay.NodeType.TAG;
+import static com.openframe.graphql.relay.NodeType.TAG;
 
 @DgsComponent
 @Slf4j
@@ -26,13 +26,6 @@ public class TagDataFetcher {
     private final TagService tagService;
     private final ScriptTagService scriptTagService;
     private final RelayIdCodec relayIdCodec;
-
-    @DgsData(parentType = "Tag", field = "id")
-    public String tagNodeId(DgsDataFetchingEnvironment dfe) {
-        Tag tag = dfe.getSource();
-        String tagId = tag.getId();
-        return relayIdCodec.encode(TAG, tagId);
-    }
 
     @DgsQuery
     public List<Tag> tags() {

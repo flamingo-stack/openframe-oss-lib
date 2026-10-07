@@ -1,7 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.InstalledAgentService;
 import com.openframe.api.service.TagService;
 import com.openframe.api.service.ToolConnectionService;
