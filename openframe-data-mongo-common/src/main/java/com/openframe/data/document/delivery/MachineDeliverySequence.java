@@ -3,6 +3,7 @@ package com.openframe.data.document.delivery;
 import com.openframe.data.document.TenantScoped;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -14,6 +15,8 @@ public class MachineDeliverySequence implements TenantScoped {
 
     @Id
     private String id;
+    @Version
+    private Long version;
     private String tenantId;
     @Indexed
     private String machineId;

@@ -13,7 +13,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.retry.annotation.EnableRetry;
 
+// @RetryOnOptimisticLockingFailure on DeliverySequence is a no-op without a retry proxy; only management enables one
+@EnableRetry
 @AutoConfiguration(afterName = "com.openframe.kafka.config.OssTenantKafkaAutoConfiguration")
 @ComponentScan(basePackages = "com.openframe.delivery")
 public class DeliveryAutoConfiguration {

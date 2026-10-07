@@ -5,7 +5,6 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
-import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -37,7 +36,7 @@ class DeliveryRecorderTest {
     private static final int SEQUENCE = 7;
 
     @Mock private MachineDeliveryRepository repository;
-    @Mock private MachineDeliverySequenceRepository sequences;
+    @Mock private DeliverySequence sequences;
 
     @Captor private ArgumentCaptor<MachineDelivery> deliveryCaptor;
 

@@ -6,7 +6,6 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
-import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.spec.DeliveryPayload;
@@ -25,7 +24,7 @@ import java.time.Instant;
 public class DeliveryRecorder {
 
     private final MachineDeliveryRepository repository;
-    private final MachineDeliverySequenceRepository sequences;
+    private final DeliverySequence sequences;
     private final DeliveryProperties properties;
     private final ObjectMapper objectMapper;
 
