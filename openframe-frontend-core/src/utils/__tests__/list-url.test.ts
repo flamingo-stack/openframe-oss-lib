@@ -57,7 +57,6 @@ const BASELINE: Record<string, string> = {
   openframe_tenant: '/api/openframe-tenants?ids=a,b',
   prospect_call: '/api/prospect-calls?ids=a,b',
   site_page: '/api/site-pages?ids=a,b',
-  openframe_generation: '/api/openframe-generations?ids=a,b',
   vendor: '/api/vendors/cards?ids=a,b',
   // 2026-09: code intelligence — the review rules and the code graph as chat
   // sources on product-hub.

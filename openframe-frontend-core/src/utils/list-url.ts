@@ -118,8 +118,6 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   prospect_call: (ids, b) => `${b}/api/prospect-calls?ids=${ids.join(',')}`,
   // The public website's own pages (live source; ChatRef-shaped items like the objects above).
   site_page: (ids, b) => `${b}/api/site-pages?ids=${ids.join(',')}`,
-  // The product's generations (live source over the vendor database).
-  openframe_generation: (ids, b) => `${b}/api/openframe-generations?ids=${ids.join(',')}`,
   // The OpenMSP vendor directory (indexed source).
   vendor: (ids, b) => `${b}/api/vendors/cards?ids=${ids.join(',')}`,
   // Code intelligence — per-object card hydration, same `handleEntityCardList`

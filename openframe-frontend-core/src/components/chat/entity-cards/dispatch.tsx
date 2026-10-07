@@ -1484,9 +1484,6 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   // A page of the public website (pricing, product, legal, and every page the navigation lists), read live
   // from the data the page shows. A glyph card: a page has no cover of its own, and the card opens the page.
   site_page: { label: 'Website page', icon: () => <Globe01Icon size={24} /> },
-  // One OpenFrame generation (Gen1, Gen2, Gen3): its price, its status and every category it includes, read live
-  // from the vendor database. A glyph card; it opens the pricing page, where the generations are shown.
-  openframe_generation: { label: 'OpenFrame generation', icon: () => <OpenFrameGlyph size={24} /> },
   // A vendor (product) of the OpenMSP directory. A glyph card; it opens the vendor's page there.
   vendor: { label: 'Vendor', icon: () => <PackageIcon size={24} /> },
 };

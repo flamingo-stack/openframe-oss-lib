@@ -39,16 +39,6 @@ describe('site_page source wiring', () => {
   });
 });
 
-describe('openframe_generation source wiring', () => {
-  it('maps the document type to its table id, label, icon and card route', () => {
-    expect(chatCardLabel('openframe_generation')).toBe('OpenFrame generation');
-    expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.openframe_generation).toBe('openframe-generations');
-    expect(getSourceLabel('openframe-generations')).toBe('OpenFrame Generations');
-    expect(SOURCE_ICON_NAMES['openframe-generations']).toBe('openframe');
-    expect(buildListUrl('openframe_generation', ['gen1', 'gen2'])).toBe('/api/openframe-generations?ids=gen1,gen2');
-  });
-});
-
 describe('vendor source wiring', () => {
   it('maps the document type to its table id, label, icon and card route', () => {
     expect(chatCardLabel('vendor')).toBe('Vendor');
