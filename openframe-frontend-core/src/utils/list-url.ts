@@ -116,6 +116,10 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
   openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
   prospect_call: (ids, b) => `${b}/api/prospect-calls?ids=${ids.join(',')}`,
+  // The public website's own pages (live source; ChatRef-shaped items like the objects above).
+  site_page: (ids, b) => `${b}/api/site-pages?ids=${ids.join(',')}`,
+  // The product's generations (live source over the vendor database).
+  openframe_generation: (ids, b) => `${b}/api/openframe-generations?ids=${ids.join(',')}`,
   // Code intelligence — per-object card hydration, same `handleEntityCardList`
   // shape as the internal objects above.
   code_rule: (ids, b) => `${b}/api/code-rules/cards?ids=${ids.join(',')}`,

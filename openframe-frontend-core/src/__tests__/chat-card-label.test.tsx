@@ -29,6 +29,26 @@ describe('prospect_call source wiring', () => {
   });
 });
 
+describe('site_page source wiring', () => {
+  it('maps the document type to its table id, label, icon and card route', () => {
+    expect(chatCardLabel('site_page')).toBe('Website page');
+    expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.site_page).toBe('website-pages');
+    expect(getSourceLabel('website-pages')).toBe('Website');
+    expect(SOURCE_ICON_NAMES['website-pages']).toBe('globe-01');
+    expect(buildListUrl('site_page', ['pricing', 'openframe'])).toBe('/api/site-pages?ids=pricing,openframe');
+  });
+});
+
+describe('openframe_generation source wiring', () => {
+  it('maps the document type to its table id, label, icon and card route', () => {
+    expect(chatCardLabel('openframe_generation')).toBe('OpenFrame generation');
+    expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.openframe_generation).toBe('openframe-generations');
+    expect(getSourceLabel('openframe-generations')).toBe('OpenFrame Generations');
+    expect(SOURCE_ICON_NAMES['openframe-generations']).toBe('openframe');
+    expect(buildListUrl('openframe_generation', ['gen1', 'gen2'])).toBe('/api/openframe-generations?ids=gen1,gen2');
+  });
+});
+
 describe('trust_center source wiring', () => {
   it('maps the document type to its table id, label, icon and route', () => {
     expect(chatCardLabel('trust_center')).toBe('Trust center');

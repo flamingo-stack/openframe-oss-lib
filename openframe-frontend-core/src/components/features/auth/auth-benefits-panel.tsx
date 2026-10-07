@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
+import { TRIAL_LABELS } from '../../../utils/trial';
 import { OpenFrameLogo } from '../../icons';
 import { FileOffIcon } from '../../icons-v2-generated/documents/file-off-icon';
 import { CreditCardXmarkIcon } from '../../icons-v2-generated/finance/credit-card-xmark-icon';
@@ -29,10 +30,10 @@ const DEFAULT_DESCRIPTION =
   'All your core ops in one place - built for MSPs who are done duct-taping tools together. Unified stack, AI-ready, no vendor tax. Just solid software that lets you run lean and fast.';
 
 const DEFAULT_BENEFITS: AuthBenefit[] = [
-  { icon: <CreditCardXmarkIcon />, label: 'No card required' },
-  { icon: <XmarkAltIcon />, label: 'Cancel Anytime' },
-  { icon: <FlaskVialIcon />, label: '14 day free trial' },
-  { icon: <FileOffIcon />, label: 'No Contract' },
+  { icon: <CreditCardXmarkIcon />, label: TRIAL_LABELS.noCard },
+  { icon: <XmarkAltIcon />, label: TRIAL_LABELS.cancel },
+  { icon: <FlaskVialIcon />, label: TRIAL_LABELS.length },
+  { icon: <FileOffIcon />, label: TRIAL_LABELS.noContract },
 ];
 
 /**

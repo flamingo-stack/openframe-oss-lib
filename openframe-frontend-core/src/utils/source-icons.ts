@@ -56,6 +56,10 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
 
   // Trust (single-record live source over the public Vanta projection)
   'trust-center': 'shield',
+  // The public website's own pages (live source)
+  'website-pages': 'globe-01',
+  // The product's generations (live source over the vendor database)
+  'openframe-generations': 'openframe',
 
   // Financials
   'investor-updates': 'mail',
@@ -145,6 +149,8 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
 
   // Trust
   'trust-center': 'Trust Center',
+  'website-pages': 'Website',
+  'openframe-generations': 'OpenFrame Generations',
 
   // Financials
   'investor-updates': 'Investor Updates',
@@ -248,6 +254,8 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
 
   // Trust
   trust_center: 'trust-center',
+  site_page: 'website-pages',
+  openframe_generation: 'openframe-generations',
 
   // Financials
   investor_update: 'investor-updates',

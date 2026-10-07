@@ -88,6 +88,7 @@ import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-tria
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon';
 import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon';
 import { MapIcon } from '../../icons-v2-generated/map-and-travel/map-icon';
+import { Globe01Icon } from '../../icons-v2-generated/school/globe-01-icon';
 import { ShieldCheckIcon } from '../../icons-v2-generated/security/shield-check-icon';
 import { Megaphone01Icon } from '../../icons-v2-generated/shopping/megaphone-01-icon';
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon';
@@ -1480,6 +1481,12 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   // A change set: pull requests across repositories declared as one change, with the ClickUp tasks and design
   // docs its pull requests are attached to. ONE card for it wherever a set is shown (chat, a design doc's page).
   change_set: { label: 'Change set', icon: () => <CodingMergeIcon size={24} /> },
+  // A page of the public website (pricing, product, legal, and every page the navigation lists), read live
+  // from the data the page shows. A glyph card: a page has no cover of its own, and the card opens the page.
+  site_page: { label: 'Website page', icon: () => <Globe01Icon size={24} /> },
+  // One OpenFrame generation (Gen1, Gen2, Gen3): its price, its status and every category it includes, read live
+  // from the vendor database. A glyph card; it opens the pricing page, where the generations are shown.
+  openframe_generation: { label: 'OpenFrame generation', icon: () => <OpenFrameGlyph size={24} /> },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
