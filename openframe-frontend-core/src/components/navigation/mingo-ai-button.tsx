@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
@@ -30,6 +30,12 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
    *  component, so every Mingo launcher carries the same identity, ring and
    *  event. */
   variant?: 'inline' | 'button' | 'field';
+  /**
+   * What a click (and the shortcut) does. Absent: the `ask-ai:open` event of
+   * `source` (`openAskAi`). A launcher that opens another chat (an embedded
+   * one) passes its own.
+   */
+  onOpen?: () => void;
 }
 
 const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
@@ -82,6 +88,7 @@ export function MingoAiButton({
   label = 'Mingo AI',
   shortcutHint = false,
   variant = 'inline',
+  onOpen,
   className,
   onClick,
   ...props
@@ -93,6 +100,12 @@ export function MingoAiButton({
   const inPage = variant === 'button';
 
   const commandKey = visitor.known && usesCommandKey(visitor.os);
+  // The latest `onOpen`, for the shortcut listener: a host's inline callback must not re-bind it every render.
+  const onOpenRef = useRef(onOpen);
+  useEffect(() => {
+    onOpenRef.current = onOpen;
+  });
+  const open = () => (onOpenRef.current ? onOpenRef.current() : openAskAi(source));
 
   // The shortcut the key cap shows opens the same chat the click opens.
   useEffect(() => {
@@ -105,7 +118,8 @@ export function MingoAiButton({
       const modifier = commandKey ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
       if (event.key.toLowerCase() !== 'k' || !modifier) return;
       event.preventDefault();
-      openAskAi(source);
+      if (onOpenRef.current) onOpenRef.current();
+      else openAskAi(source);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -121,7 +135,7 @@ export function MingoAiButton({
       aria-label={label}
       aria-keyshortcuts={shortcutHint && visitor.known ? (commandKey ? 'Meta+K' : 'Control+K') : undefined}
       onClick={e => {
-        openAskAi(source);
+        open();
         onClick?.(e);
       }}
       className={cn(

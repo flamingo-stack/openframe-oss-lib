@@ -35,6 +35,12 @@ export interface AskPromptsProps {
   label?: string;
   /** The assistant's configured glyph. Absent: the packaged Mingo mark. */
   icon?: ReactNode;
+  /**
+   * How the chat is opened, and asked when `prompt` is set. Absent: the
+   * `ask-ai:open` event of `source` (`openAskAi`). A block that belongs to
+   * another chat (an embedded one) passes its own.
+   */
+  onOpen?: (request: { prompt?: string }) => void;
   /** After the chat was asked (analytics). */
   onAsk?: (prompt: AskPrompt) => void;
   /** The surface the row sits on, as a CSS colour: what its edge fade dissolves into. Default: the page background. */
@@ -86,9 +92,13 @@ function QuestionChips({
   count,
   loading,
   source,
+  onOpen,
   onAsk,
   slotClassName,
-}: Pick<AskPromptsProps, 'prompts' | 'loading' | 'source' | 'onAsk'> & { count: number; slotClassName?: string }) {
+}: Pick<AskPromptsProps, 'prompts' | 'loading' | 'source' | 'onOpen' | 'onAsk'> & {
+  count: number;
+  slotClassName?: string;
+}) {
   return (
     <>
       {Array.from({ length: count }, (_, slot) => {
@@ -106,7 +116,9 @@ function QuestionChips({
                 label={prompt.label}
                 icon={prompt.icon}
                 onSelect={() => {
-                  openAskAi(source, { prompt: prompt.prompt ?? prompt.label });
+                  const request = { prompt: prompt.prompt ?? prompt.label };
+                  if (onOpen) onOpen(request);
+                  else openAskAi(source, request);
                   onAsk?.(prompt);
                 }}
               />
@@ -137,6 +149,7 @@ export function AskPrompts({
   source,
   label,
   icon,
+  onOpen,
   onAsk,
   fadeColor,
   className,
@@ -151,12 +164,20 @@ export function AskPrompts({
       className="w-full min-w-0 content-md:w-auto"
       scrollClassName={cn(ASK_PROMPTS_ROW_CLASS, end ? 'content-md:items-end' : 'content-md:items-start', className)}
     >
-      <MingoAiButton variant="button" source={source} label={label} icon={icon} className="shrink-0" />
+      <MingoAiButton
+        variant="button"
+        source={source}
+        label={label}
+        icon={icon}
+        onOpen={onOpen && (() => onOpen({}))}
+        className="shrink-0"
+      />
       <QuestionChips
         prompts={prompts}
         count={count}
         loading={loading}
         source={source}
+        onOpen={onOpen}
         onAsk={onAsk}
         slotClassName={cn(ROW_CHIP_SLOT_CLASS, end && 'content-md:justify-end')}
       />
@@ -189,6 +210,7 @@ export function AskCard({
   source,
   label,
   icon,
+  onOpen,
   onAsk,
   shortcutHint = true,
   className,
@@ -210,7 +232,14 @@ export function AskCard({
       </div>
       {(loading || prompts.length > 0) && (
         <div className="flex min-w-0 flex-col items-start gap-2">
-          <QuestionChips prompts={prompts} count={count} loading={loading} source={source} onAsk={onAsk} />
+          <QuestionChips
+            prompts={prompts}
+            count={count}
+            loading={loading}
+            source={source}
+            onOpen={onOpen}
+            onAsk={onAsk}
+          />
         </div>
       )}
       <MingoAiButton
@@ -218,6 +247,7 @@ export function AskCard({
         source={source}
         label={label}
         icon={icon}
+        onOpen={onOpen && (() => onOpen({}))}
         shortcutHint={shortcutHint}
         className="self-start"
       />
