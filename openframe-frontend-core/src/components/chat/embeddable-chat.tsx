@@ -1861,8 +1861,10 @@ function EmbeddableChatInner({
   // also asks it, once, in Guide mode, in a new conversation. In any other mode
   // the chat only opens.
   // A question from the page starts its OWN conversation: it is never appended
-  // to whatever thread was open. An open thread is cleared to a draft first and
-  // the question is sent once that draft is what the panel holds.
+  // to whatever thread was open. An open thread is reset to a new chat first
+  // (`resetToNewChat`: the messages AND the active dialog id; clearing the
+  // messages alone leaves the id set, the draft never comes and the question
+  // would be lost) and the question is sent once that draft is what the panel holds.
   const pendingAskRef = useRef<string | null>(null);
   const isDraft = activeDialogId == null && messages.length === 0;
   const sendAskPrompt = useCallback(
@@ -1875,9 +1877,9 @@ function EmbeddableChatInner({
         return;
       }
       pendingAskRef.current = prompt;
-      clearMessages();
+      resetToNewChat();
     },
-    [activeMode, isDraft, sendMessage, clearMessages],
+    [activeMode, isDraft, sendMessage, resetToNewChat],
   );
   useEffect(() => {
     const prompt = pendingAskRef.current;

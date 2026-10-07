@@ -76,7 +76,7 @@ export function RemoteDesktopChatPanel({
               <RemoteDesktopChatMessageRow
                 key={message.id}
                 authorName={
-                  message.name ??
+                  message.name ||
                   (message.author === 'technician' ? technician.name : REMOTE_DESKTOP_CHAT_END_USER_NAME)
                 }
                 isTechnician={message.author === 'technician'}

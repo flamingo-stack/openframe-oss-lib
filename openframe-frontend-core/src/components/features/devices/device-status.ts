@@ -19,8 +19,10 @@ export interface DeviceStatusConfig {
  * Get status configuration for display
  * Used by both table and grid views for consistent status representation
  */
-export function getDeviceStatusConfig(status: string): DeviceStatusConfig {
-  switch (status.toUpperCase()) {
+export function getDeviceStatusConfig(status: string | null | undefined): DeviceStatusConfig {
+  // A device may carry no status yet: it reads as the unknown one, never a crash.
+  const known = (status ?? '').toUpperCase();
+  switch (known) {
     case 'ONLINE':
       return {
         label: 'ONLINE',
@@ -82,7 +84,7 @@ export function getDeviceStatusConfig(status: string): DeviceStatusConfig {
       };
     default:
       return {
-        label: status.toUpperCase(),
+        label: known,
         variant: 'grey',
         cardStatus: 'inactive',
       };

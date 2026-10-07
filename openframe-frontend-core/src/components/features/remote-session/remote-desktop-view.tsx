@@ -167,13 +167,15 @@ export function RemoteDesktopView({
         )}
         {/* One wrapper in both modes: the screen must keep its DOM node across
             the fullscreen toggle (the host attaches a stream to its canvas once),
-            so the tree shape never changes - only the side panel comes and goes. */}
-        <div className={`flex min-h-0 min-w-0 flex-1 ${fullscreen ? '' : 'gap-[var(--spacing-system-mf)]'}`}>
+            so the tree shape never changes. The chat keeps ONE place in the tree
+            too, so its draft and scroll survive the toggle: beside the screen as
+            the `side` panel, and in fullscreen the `overlay` panel positions
+            itself over the screen against this wrapper (the screen fills it). */}
+        <div className={`relative flex min-h-0 min-w-0 flex-1 ${fullscreen ? '' : 'gap-[var(--spacing-system-mf)]'}`}>
           <div className={`relative min-h-0 min-w-0 flex-1 overflow-hidden bg-black ${fullscreen ? '' : 'rounded-lg'}`}>
             {screen}
-            {fullscreen && chat}
           </div>
-          {!fullscreen && chat}
+          {chat}
         </div>
       </div>
 

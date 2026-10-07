@@ -298,9 +298,9 @@ export function QuickActionChipButton({
       onBlur={onHoverEnd}
       aria-pressed={selected || undefined}
       className={cn(
-        'rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
-        // A question may be longer than a narrow column: it shrinks and clips there.
-        question ? 'min-w-0 max-w-full' : 'shrink-0',
+        'rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        // A question may be longer than a narrow column: it shrinks and clips there, read from its start.
+        question ? 'min-w-0 max-w-full text-left' : 'shrink-0',
         className,
       )}
     >

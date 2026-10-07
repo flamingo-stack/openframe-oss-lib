@@ -168,7 +168,8 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
   const table = useDataTable<T>({
     data: devices,
     columns,
-    getRowId: row => String(row.machineId ?? row.id),
+    // `machineId` is EMPTY (not absent) while the agent is not connected: those rows key on their id.
+    getRowId: row => String(row.machineId || row.id),
     enableSorting: false,
     state: columnFilters !== undefined ? { columnFilters } : undefined,
     onColumnFiltersChange,
