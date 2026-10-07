@@ -29,8 +29,9 @@ export interface AskPromptsProps {
   align?: 'start' | 'end';
   /** The chat source the page's chat panel runs on (the `ask-ai:open` filter). */
   source?: string;
-  /** The assistant's configured name: the launcher before the chips ("Ask Mingo"). */
-  label: string;
+  /** The assistant's configured name: the launcher before the chips ("Ask Mingo").
+   *  Absent: the launcher's own default name. */
+  label?: string;
   /** The assistant's configured glyph. Absent: the packaged Mingo mark. */
   icon?: ReactNode;
   /** After the chat was asked (analytics). */

@@ -27,6 +27,9 @@ export function getDeviceStatusConfig(status: string): DeviceStatusConfig {
         variant: 'success',
         cardStatus: 'active',
       };
+    // ACTIVE reads as PENDING because the product app maps it so: this is its
+    // mapping, carried into the lib unchanged. What a status reads as is a
+    // product decision, not this module's.
     case 'PENDING':
     case 'ACTIVE':
       return {

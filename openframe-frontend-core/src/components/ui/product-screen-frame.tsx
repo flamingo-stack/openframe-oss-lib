@@ -18,6 +18,9 @@ export const PRODUCT_SCREEN_READABLE_WIDTH = LAYOUT_STEPS.lg.content;
 /** Under this frame width the screen is not scaled: it takes the product's own narrow layout. */
 export const PRODUCT_SCREEN_SCALE_FROM = LAYOUT_STEPS.md.content;
 
+/** The frame's CSS variable that carries the screen's scale. */
+const SCALE_VAR = '--product-screen-scale';
+
 export interface ProductScreenFrameProps {
   /** The product screen: the product's own component with fixture data. */
   children: ReactNode;
@@ -64,33 +67,41 @@ export function ProductScreenFrame({
   const frameRef = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
-  // Unknown until measured: the frame keeps its box and shows nothing, so the
-  // first paint is never the unscaled screen.
-  const [width, setWidth] = useState<number | null>(null);
+  // Which layout the screen takes. `pending` until measured: the frame keeps its
+  // box and shows nothing, so the first paint is never the unscaled screen.
+  // React holds only this (it changes at two widths); the scale itself changes
+  // with every pixel of a resize, so it is written to a CSS variable on the
+  // frame and never re-renders the screen.
+  const [mode, setMode] = useState<'pending' | 'scaled' | 'native'>('pending');
 
   useLayoutEffect(() => {
     const element = frameRef.current;
     if (!element) return undefined;
     setFrame(element);
-    setWidth(element.clientWidth);
-    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
+    const measure = () => {
+      const width = element.clientWidth;
+      const scaled = width >= scaleFrom && width < designWidth;
+      element.style.setProperty(SCALE_VAR, String(scaled ? width / designWidth : 1));
+      setMode(scaled ? 'scaled' : 'native');
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [designWidth, scaleFrom]);
 
-  const scaled = width !== null && width >= scaleFrom && width < designWidth;
-  const scale = scaled ? width / designWidth : 1;
-  const screenStyle: CSSProperties = scaled
-    ? {
-        width: designWidth,
-        // The crop is in frame pixels, so the unscaled box is taller by the same factor.
-        height: `calc(100% / ${scale})`,
-        transform: `scale(${scale})`,
-        transformOrigin: 'top left',
-      }
-    : // Unscaled, the screen still needs to be the containing block of anything the
-      // product pins with `position: fixed` (a form's action bar), or it escapes to the window.
-      { width: '100%', height: '100%', transform: 'translateZ(0)' };
+  const screenStyle: CSSProperties =
+    mode === 'scaled'
+      ? {
+          width: designWidth,
+          // The crop is in frame pixels, so the unscaled box is taller by the same factor.
+          height: `calc(100% / var(${SCALE_VAR}))`,
+          transform: `scale(var(${SCALE_VAR}))`,
+          transformOrigin: 'top left',
+        }
+      : // Unscaled, the screen still needs to be the containing block of anything the
+        // product pins with `position: fixed` (a form's action bar), or it escapes to the window.
+        { width: '100%', height: '100%', transform: 'translateZ(0)' };
 
   return (
     <div
@@ -103,7 +114,12 @@ export function ProductScreenFrame({
     >
       <PortalContainerContext.Provider value={portalHost}>
         <CollisionBoundaryContext.Provider value={frame}>
-          <div inert aria-hidden className={cn('ods-content-area', width === null && 'invisible')} style={screenStyle}>
+          <div
+            inert
+            aria-hidden
+            className={cn('ods-content-area', mode === 'pending' && 'invisible')}
+            style={screenStyle}
+          >
             <div className="ods-content-scope">{children}</div>
             <div ref={setPortalHost} style={{ display: 'contents' }} />
           </div>
