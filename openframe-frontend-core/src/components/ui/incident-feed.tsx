@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
-import { Skeleton } from './skeleton';
+import { AnalyzingState } from './analyzing-state';
 import { StatusLine, type StatusLineTone } from './status-line';
 
 /** Where one incident stands. `waiting` is the only state that needs a person. */
@@ -79,54 +79,6 @@ function ItemMeta({ item }: { item: IncidentFeedItem }) {
   );
 }
 
-/** How far each row being read has faded: the list trails off instead of ending. */
-const READING_ROWS = ['opacity-100', 'opacity-60', 'opacity-30'] as const;
-
-/**
- * The feed before its first incident: three rows still being read, pulsing one
- * after another, over the caller's words with a live ellipsis. It says the
- * agent is working, where a bare sentence in an empty window read as idle.
- */
-function ReadingState({ label }: { label: string }) {
-  return (
-    <div role="status" className="m-auto flex w-full max-w-sm flex-col items-center gap-4">
-      <div aria-hidden className="grid w-full grid-cols-1 gap-2">
-        {READING_ROWS.map((opacity, row) => (
-          <div
-            key={opacity}
-            className={cn('flex items-center gap-3 rounded-md border border-ods-border bg-ods-bg px-3.5 py-3', opacity)}
-          >
-            <Skeleton
-              className="h-2 w-2 shrink-0 rounded-full bg-ods-flamingo-cyan motion-reduce:animate-none"
-              style={{ animationDelay: `${row * 200}ms` }}
-            />
-            <Skeleton
-              className="h-2.5 min-w-0 flex-1 motion-reduce:animate-none"
-              style={{ animationDelay: `${row * 200}ms` }}
-            />
-            <Skeleton
-              className="h-2.5 w-12 shrink-0 motion-reduce:animate-none"
-              style={{ animationDelay: `${row * 200}ms` }}
-            />
-          </div>
-        ))}
-      </div>
-      <p className="m-0 flex items-baseline gap-1 text-center text-ods-text-secondary text-h4">
-        {label}
-        <span aria-hidden className="flex gap-0.5">
-          {[0, 1, 2].map(dot => (
-            <span
-              key={dot}
-              className="h-1 w-1 animate-pulse rounded-full bg-ods-text-secondary motion-reduce:animate-none"
-              style={{ animationDelay: `${dot * 200}ms` }}
-            />
-          ))}
-        </span>
-      </p>
-    </div>
-  );
-}
-
 /**
  * A feed of incidents an agent found and handled: the newest one is open
  * (source tag, title, one line of detail, status); the ones before it collapse
@@ -143,7 +95,7 @@ export function IncidentFeed({ items, statusLabels, emptyLabel, anchor = 'top', 
         className,
       )}
     >
-      {items.length === 0 && emptyLabel && <ReadingState label={emptyLabel} />}
+      {items.length === 0 && emptyLabel && <AnalyzingState label={emptyLabel} className="m-auto" />}
       {items.map((item, index) => {
         const open = index === lastIndex || item.status === 'waiting';
         if (!open) {
