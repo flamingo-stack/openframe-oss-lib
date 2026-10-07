@@ -35,6 +35,7 @@ pub use cli::run;
 #[cfg(any(unix, windows))]
 pub mod executor;
 
+use crate::clients::build_agent_http_client;
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
 use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
@@ -86,6 +87,7 @@ use crate::services::tool_installation_service::ToolInstallationService;
 use crate::services::tool_restart_service::ToolRestartService;
 use crate::services::tool_uninstall_service::ToolUninstallService;
 use crate::services::InstalledToolsService;
+use crate::services::MachineIdService;
 use crate::services::{
     AgentAuthService, AgentRegistrationService, InitialConfigurationService,
     ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolRunManager,
@@ -95,7 +97,6 @@ use crate::services::{
     InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
-use crate::services::{MachineIdService, MACHINE_ID_HEADER};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -228,32 +229,21 @@ impl Client {
             .get_or_create()
             .context("Failed to get or create machine ID")?;
 
-        let mut default_headers = reqwest::header::HeaderMap::new();
-        default_headers.insert(
-            MACHINE_ID_HEADER,
-            reqwest::header::HeaderValue::from_str(&machine_id)
-                .context("Invalid machine ID for header")?,
-        );
+        let local_mode = initial_configuration_service.is_local_mode()?;
 
-        let http_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS))
-            .default_headers(default_headers.clone())
-            // disable TLS verification for dev mode only
-            .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
-            .no_proxy()
-            // disable connection pooling to force fresh DNS lookup on each request
-            .pool_max_idle_per_host(0)
-            .build()
-            .context("Failed to create HTTP client")?;
+        let http_client = build_agent_http_client(
+            &machine_id,
+            Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS),
+            local_mode,
+        )
+        .context("Failed to create HTTP client")?;
 
-        let download_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS))
-            .default_headers(default_headers)
-            .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
-            .no_proxy()
-            .pool_max_idle_per_host(0)
-            .build()
-            .context("Failed to create download HTTP client")?;
+        let download_client = build_agent_http_client(
+            &machine_id,
+            Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS),
+            local_mode,
+        )
+        .context("Failed to create download HTTP client")?;
 
         // Initialize http url
         let http_url = format!(
