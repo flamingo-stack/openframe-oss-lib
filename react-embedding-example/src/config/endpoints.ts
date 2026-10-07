@@ -13,6 +13,10 @@ const AGENT_BASE = `${CONTENT}/chat/agent`
 export const EP = {
   // chat
   chatStream: `${CONTENT}/docs/chat`,
+  // The server-side conversation list behind the chat's "Current Chats" rail,
+  // archive and rename (GET list, PATCH `/<id>`). Never derived by the lib: a
+  // runtime that leaves it out gets the single-thread chat with no history.
+  chatConversations: `${CONTENT}/docs/chat/conversations`,
   // MCP server (streamable HTTP JSON-RPC) — the /mcp playground page's
   // official-SDK transport points here; the proxy injects Bearer + act-as.
   mcp: `${CONTENT}/mcp`,
