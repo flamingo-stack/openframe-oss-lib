@@ -2,11 +2,20 @@
 
 import { useEffect, useState } from 'react';
 
+/** The site header's own element (`SiteHeader`'s hook point). */
+const SITE_HEADER_SELECTOR = '[data-site-header]';
+
 /**
  * Returns the combined height (px) of the sticky page header and announcement
  * bar (if present), updated live via ResizeObserver / MutationObserver.
  * Useful for offsetting fixed/absolute-positioned panels so they don't
  * overlap the header.
+ *
+ * With `stuckOnly` it answers a different question: where the header's bottom
+ * edge sits once the page has scrolled, the `top` of anything that sticks
+ * directly under it. That is the site header ALONE (the announcement bar
+ * scrolls away with the page, so adding it leaves a gap the content shows
+ * through), and 0 while the header has slid itself out of view.
  */
 export function useHeaderHeight(
   // First-paint fallback = the unified top-navigation `big` bar (72px), the
@@ -21,13 +30,35 @@ export function useHeaderHeight(
      * @default true
      */
     enabled?: boolean;
+    /**
+     * Measure only what stays stuck to the top of a scrolled page: the site
+     * header, without the announcement bar, and 0 while the header is hidden.
+     * @default false
+     */
+    stuckOnly?: boolean;
   } = {},
 ): number {
-  const { enabled = true } = options;
+  const { enabled = true, stuckOnly = false } = options;
   const [height, setHeight] = useState(defaultHeight);
 
   useEffect(() => {
     if (!enabled) return undefined;
+
+    if (stuckOnly) {
+      const header = document.querySelector<HTMLElement>(SITE_HEADER_SELECTOR);
+      if (!header) return undefined;
+      // The header hides by translating itself up by its own height.
+      const measureStuck = () => setHeight(header.style.transform.includes('-100%') ? 0 : header.offsetHeight);
+      measureStuck();
+      const resize = new ResizeObserver(measureStuck);
+      resize.observe(header);
+      const mutation = new MutationObserver(measureStuck);
+      mutation.observe(header, { attributes: true, attributeFilter: ['style'] });
+      return () => {
+        resize.disconnect();
+        mutation.disconnect();
+      };
+    }
 
     const measure = () => {
       let total = 0;
@@ -66,7 +97,7 @@ export function useHeaderHeight(
       resizeObserver.disconnect();
       mutationObserver.disconnect();
     };
-  }, [defaultHeight, enabled]);
+  }, [defaultHeight, enabled, stuckOnly]);
 
   return height;
 }
