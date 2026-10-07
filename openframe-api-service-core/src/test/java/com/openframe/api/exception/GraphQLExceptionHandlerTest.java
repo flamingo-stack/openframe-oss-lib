@@ -1,6 +1,7 @@
 package com.openframe.api.exception;
 
 import com.openframe.api.dto.device.DeviceLogFilterInput;
+import com.openframe.api.relay.InvalidRelayIdException;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
@@ -43,6 +44,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 class GraphQLExceptionHandlerTest {
 
     private static final String UNEXPECTED = "An unexpected error occurred. Please try again later.";
+    private static final String WRONG_TYPE_ID = "Expected a Ticket id, got Tag";
 
     private final GraphQLExceptionHandler handler = new GraphQLExceptionHandler();
 
@@ -100,6 +102,21 @@ class GraphQLExceptionHandlerTest {
         assertThat(output.getOut())
                 .containsPattern("ERROR .*GraphQL error occurred")
                 .contains("java.lang.RuntimeException: boom");
+    }
+
+    @Test
+    void handleException_invalidRelayId_logsTheReasonAsAWarningOnly(CapturedOutput output) {
+        // setup
+        InvalidRelayIdException exception = new InvalidRelayIdException(WRONG_TYPE_ID);
+
+        // execution
+        handle(exception);
+
+        // verifications
+        assertThat(output.getOut())
+                .containsPattern("WARN .*GraphQL invalid id: " + WRONG_TYPE_ID)
+                .doesNotContain("GraphQL error occurred")
+                .doesNotContain("InvalidRelayIdException");
     }
 
     @Test
@@ -166,6 +183,7 @@ class GraphQLExceptionHandlerTest {
                 arguments(new ConflictException(ErrorCode.TAG_ALREADY_EXISTS, "Tag already exists: prod"),
                         "TAG_ALREADY_EXISTS", 409),
                 arguments(new BadRequestException("Unsupported image type"), "BAD_REQUEST", 400),
+                arguments(new InvalidRelayIdException(WRONG_TYPE_ID), "INVALID_ID", 400),
                 arguments(new IllegalArgumentException("page size too large"), "VALIDATION_ERROR", 400),
                 arguments(new IllegalStateException("range too wide"), "VALIDATION_ERROR", 400));
     }

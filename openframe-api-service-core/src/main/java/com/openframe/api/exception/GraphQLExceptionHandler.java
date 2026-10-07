@@ -1,5 +1,6 @@
 package com.openframe.api.exception;
 
+import com.openframe.api.relay.InvalidRelayIdException;
 import com.openframe.core.exception.BaseException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
@@ -35,6 +36,11 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             ErrorCode code = AccessDeniedErrorCode.forCurrentCaller();
             log.warn("GraphQL access denied ({}): {}", code.getCode(), exception.getMessage());
             return result(buildError(AccessDeniedErrorCode.MESSAGE, code));
+        }
+        if (exception instanceof InvalidRelayIdException) {
+            String message = exception.getMessage();
+            log.warn("GraphQL invalid id: {}", message);
+            return result(buildError(message, ErrorCode.INVALID_ID));
         }
         log.error("GraphQL error occurred", exception);
 
