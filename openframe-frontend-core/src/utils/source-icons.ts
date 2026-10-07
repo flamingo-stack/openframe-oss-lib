@@ -60,6 +60,8 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'website-pages': 'globe-01',
   // The product's generations (live source over the vendor database)
   'openframe-generations': 'openframe',
+  // The OpenMSP vendor directory
+  vendors: 'package',
 
   // Financials
   'investor-updates': 'mail',
@@ -151,6 +153,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   'trust-center': 'Trust Center',
   'website-pages': 'Website',
   'openframe-generations': 'OpenFrame Generations',
+  vendors: 'Vendor Directory',
 
   // Financials
   'investor-updates': 'Investor Updates',
@@ -256,6 +259,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   trust_center: 'trust-center',
   site_page: 'website-pages',
   openframe_generation: 'openframe-generations',
+  vendor: 'vendors',
 
   // Financials
   investor_update: 'investor-updates',

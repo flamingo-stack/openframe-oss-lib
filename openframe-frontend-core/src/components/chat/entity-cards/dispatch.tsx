@@ -1487,6 +1487,8 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   // One OpenFrame generation (Gen1, Gen2, Gen3): its price, its status and every category it includes, read live
   // from the vendor database. A glyph card; it opens the pricing page, where the generations are shown.
   openframe_generation: { label: 'OpenFrame generation', icon: () => <OpenFrameGlyph size={24} /> },
+  // A vendor (product) of the OpenMSP directory. A glyph card; it opens the vendor's page there.
+  vendor: { label: 'Vendor', icon: () => <PackageIcon size={24} /> },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>

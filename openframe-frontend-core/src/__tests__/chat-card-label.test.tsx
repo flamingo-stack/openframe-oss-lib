@@ -49,6 +49,16 @@ describe('openframe_generation source wiring', () => {
   });
 });
 
+describe('vendor source wiring', () => {
+  it('maps the document type to its table id, label, icon and card route', () => {
+    expect(chatCardLabel('vendor')).toBe('Vendor');
+    expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.vendor).toBe('vendors');
+    expect(getSourceLabel('vendors')).toBe('Vendor Directory');
+    expect(SOURCE_ICON_NAMES.vendors).toBe('package');
+    expect(buildListUrl('vendor', ['1', '2'])).toBe('/api/vendors/cards?ids=1,2');
+  });
+});
+
 describe('trust_center source wiring', () => {
   it('maps the document type to its table id, label, icon and route', () => {
     expect(chatCardLabel('trust_center')).toBe('Trust center');
