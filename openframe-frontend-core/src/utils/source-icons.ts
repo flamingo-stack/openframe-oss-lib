@@ -54,12 +54,12 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'audience-mssp': 'shield-lock',
   'audience-it-team': 'buildings',
 
-  // Trust (single-record live source over the public Vanta projection)
-  'trust-center': 'shield',
-  // The public website's own pages (live source)
-  'website-pages': 'globe-01',
-  // The OpenMSP vendor directory
-  vendors: 'package',
+  // Trust (single-record live source over the public Vanta projection): the icon its menu entry draws
+  'trust-center': 'shield-check',
+  // The public website's own pages (live source): the site's own mark
+  'website-pages': 'flamingo-logo',
+  // The OpenMSP vendor directory: the icon the site menu's "Tool directory" entry draws (it reads this one)
+  vendors: 'package-search',
 
   // Financials
   'investor-updates': 'mail',

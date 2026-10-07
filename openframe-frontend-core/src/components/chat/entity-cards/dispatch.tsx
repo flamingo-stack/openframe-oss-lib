@@ -89,7 +89,6 @@ import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-tria
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon';
 import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon';
 import { MapIcon } from '../../icons-v2-generated/map-and-travel/map-icon';
-import { Globe01Icon } from '../../icons-v2-generated/school/globe-01-icon';
 import { ShieldCheckIcon } from '../../icons-v2-generated/security/shield-check-icon';
 import { Megaphone01Icon } from '../../icons-v2-generated/shopping/megaphone-01-icon';
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon';
@@ -117,7 +116,7 @@ import { clickupTaskUrl } from '../utils/external-app-urls';
 import { resolveIcon } from '../utils/icon-library';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
-import { getSourceLabel } from '../utils/source-icons';
+import { getSourceLabel, SOURCE_ICON_NAMES } from '../utils/source-icons';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
 import { BlogCardSkeleton } from './blog-card';
@@ -1438,15 +1437,15 @@ function refText(ref: ChatRef | undefined, key: string): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-/** A vendor's own logo, through the shared `VendorIcon` (its logo rule and proxying); the package glyph without one. */
+/** A vendor's own logo, through the shared `VendorIcon` (its logo rule and proxying); the directory's source icon without one. */
 function VendorGlyph({ title, logoUrl }: { title: string; logoUrl: string | null }) {
-  if (!logoUrl) return <PackageIcon size={24} />;
+  if (!logoUrl) return <EntityIcon icon={{ name: SOURCE_ICON_NAMES.vendors }} size={24} />;
   return <VendorIcon vendor={{ title, logo_url: logoUrl }} size="xs" showBackground={false} />;
 }
 
-/** A website page's menu icon (the one its navigation entry draws), through `EntityIcon`; the globe for a page without one. */
+/** A website page's menu icon (the one its navigation entry draws), through `EntityIcon`; the site's own mark for a page without one. */
 function SitePageGlyph({ iconName }: { iconName: string | null }) {
-  return iconName ? <EntityIcon icon={{ name: iconName }} size={24} /> : <Globe01Icon size={24} />;
+  return <EntityIcon icon={{ name: iconName ?? SOURCE_ICON_NAMES['website-pages'] }} size={24} />;
 }
 
 interface GitHubCardConfig {
