@@ -47,7 +47,7 @@ const fetchMock = vi.fn();
 beforeEach(() => {
   vi.stubGlobal('IntersectionObserver', VisibleObserver);
   fetchMock.mockReset();
-  fetchMock.mockResolvedValue({ ok: true, json: async () => ({ prompts: PROMPTS }) });
+  fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({ prompts: PROMPTS }) });
   vi.stubGlobal('fetch', fetchMock);
   resetShownAskPrompts();
 });
@@ -201,10 +201,10 @@ describe('AssistantAskPrompts', () => {
   });
 
   it("keeps its questions out of the FAQ's card, which waits for the row's pick", async () => {
-    fetchMock.mockImplementation(async (input: unknown) => {
+    fetchMock.mockImplementation((input: unknown) => {
       const url = new URL(String(input), 'https://host.test');
       const row = url.searchParams.get('section') === 'pricing';
-      return { ok: true, json: async () => ({ prompts: row ? [PROMPTS[0]] : [PROMPTS[1]] }) };
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ prompts: row ? [PROMPTS[0]] : [PROMPTS[1]] }) });
     });
     renderFaq(
       RUNTIME,
