@@ -236,6 +236,7 @@ export { LazyMount, type LazyMountProps } from './lazy-mount';
 export * from './app-window-frame';
 export * from './product-screen-frame';
 export * from './phone-frame';
+export * from './analyzing-state';
 export * from './incident-feed';
 export * from './status-line';
 export * from './snap-carousel';
