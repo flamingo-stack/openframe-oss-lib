@@ -6,7 +6,7 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
-import com.openframe.data.repository.sequence.SequenceRepository;
+import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.spec.DeliveryPayload;
@@ -24,10 +24,8 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class DeliveryRecorder {
 
-    static final String SEQUENCE_PREFIX = "delivery.";
-
     private final MachineDeliveryRepository repository;
-    private final SequenceRepository sequences;
+    private final MachineDeliverySequenceRepository sequences;
     private final DeliveryProperties properties;
     private final ObjectMapper objectMapper;
 
@@ -42,8 +40,7 @@ public class DeliveryRecorder {
         if (repository.existsByIdAndDispatchId(id, dispatchId)) {
             return false;
         }
-        // the counter lives in `sequences`, not on the row: the row expires with its TTL, the sequence must not restart
-        int sequence = sequences.getNextValue(SEQUENCE_PREFIX + id);
+        int sequence = sequences.next(id, machineId);
         delivery.setSequence(sequence);
         MachineDelivery row = pendingRow(request, id);
         repository.upsertPending(row);
