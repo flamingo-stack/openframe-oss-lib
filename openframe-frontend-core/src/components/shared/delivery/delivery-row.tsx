@@ -82,12 +82,12 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
   const subtitle = `ACTIVE ${relativeTime}${item.listNames.length > 0 ? `, ${item.listNames.join(', ')}` : ''}, ${item.id}`;
 
   const inner = (
-    <div className="flex w-full flex-col items-start justify-between gap-[12px] md:flex-row md:gap-[16px]">
+    <div className="flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]">
       {/* Left: caption (optional) + title + subtitle + description */}
-      <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] md:w-auto md:gap-[16px]">
+      <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]">
         {caption && <p className="text-ods-text-secondary text-h5">{caption}</p>}
-        <div className="flex min-h-[24px] items-center md:min-h-[24px]">
-          <h3 className="line-clamp-2 flex-1 break-words tracking-[-0.36px] text-ods-text-primary text-h3 md:truncate">
+        <div className="flex min-h-[24px] items-center content-md:min-h-[24px]">
+          <h3 className="line-clamp-2 flex-1 break-words tracking-[-0.36px] text-ods-text-primary text-h3 content-md:truncate">
             {item.title}
           </h3>
         </div>
@@ -112,7 +112,7 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
           assignee owns the trailing slot of the meta row; a column of
           right-aligned orphans under the description reads as clutter
           on small screens). */}
-      <div className="flex w-full flex-shrink-0 flex-row items-center gap-2 self-stretch md:w-auto md:flex-col md:items-end md:self-start">
+      <div className="flex w-full flex-shrink-0 flex-row items-center gap-2 self-stretch content-md:w-auto content-md:flex-col content-md:items-end content-md:self-start">
         <StatusBadge
           text={item.status.toUpperCase()}
           colorScheme={statusBadgeScheme}
@@ -127,7 +127,7 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
         {item.assignees && item.assignees.length > 0 ? (
           <AvatarStack
             size="xs"
-            className="ml-auto md:ml-0"
+            className="ml-auto content-md:ml-0"
             people={item.assignees.map(a => ({
               key: a.id,
               name: a.name ?? 'Unknown',
@@ -140,7 +140,7 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
   );
 
   const baseClass = cn(
-    'block p-[12px] text-inherit no-underline transition-colors duration-150 md:p-[16px]',
+    'block p-[12px] text-inherit no-underline transition-colors duration-150 content-md:p-[16px]',
     // `scroll-mt-24` is paid for whether `id` is set or not (it's a
     // single Tailwind utility, no runtime cost). Keeping it
     // unconditional means a future caller adding `id` doesn't also

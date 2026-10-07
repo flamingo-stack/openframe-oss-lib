@@ -16,21 +16,21 @@ export function getHideClasses(hideAt?: TailwindBreakpoint | TailwindBreakpoint[
   const maxBreakpointIndex = Math.max(...breakpoints.map(bp => breakpointOrder.indexOf(bp)));
 
   // For single breakpoint: hide below, show at and above
-  // e.g., hideAt: 'md' -> 'hidden md:flex'
+  // e.g., hideAt: 'md' -> 'hidden content-md:flex'
   if (breakpoints.length === 1) {
-    return `hidden ${breakpoints[0]}:flex`;
+    return `hidden content-${breakpoints[0]}:flex`;
   }
 
   // For multiple breakpoints: hide at specified breakpoints, show after the largest one
-  // e.g., hideAt: ['md', 'lg'] -> 'md:hidden lg:hidden xl:flex'
-  const hideClasses = breakpoints.map(bp => `${bp}:hidden`).join(' ');
+  // e.g., hideAt: ['md', 'lg'] -> 'content-md:hidden content-lg:hidden content-xl:flex'
+  const hideClasses = breakpoints.map(bp => `content-${bp}:hidden`).join(' ');
 
   // Find next breakpoint after the max to show the column
   const nextBreakpointIndex = maxBreakpointIndex + 1;
   const showBreakpoint = breakpointOrder[nextBreakpointIndex];
 
   if (showBreakpoint) {
-    return `${hideClasses} ${showBreakpoint}:flex`;
+    return `${hideClasses} content-${showBreakpoint}:flex`;
   }
 
   // If no next breakpoint (e.g., hideAt: '2xl'), just hide

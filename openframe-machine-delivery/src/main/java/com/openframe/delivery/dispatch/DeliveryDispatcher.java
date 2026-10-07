@@ -25,7 +25,7 @@ public class DeliveryDispatcher {
     private final ObjectProvider<DeliveryPublisher> publisher;
 
     public void dispatch(DeliverySeed seed) {
-        DeliveryType type = seed.type();
+        DeliveryType type = seed.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         DeliveryRequest<DeliveryPayload> request = spec.request(seed);
         DeliveryPayload payload = request.getPayload();

@@ -59,10 +59,10 @@
  * responsive action layout on md+. This one intentionally CHANGES the baseline
  * for every caller, per the approved design (Figma open-design-system node
  * 2200-7452): instead of tablet always stacking actions below the title
- * (`md:flex-col`) and desktop always keeping one row (long titles clipped),
+ * (`content-md:flex-col`) and desktop always keeping one row (long titles clipped),
  * md+ is a single `flex-wrap` row — actions stay inline with a short title on
  * BOTH tablet and desktop, and wrap to a second row only when the title is
- * long enough to overflow. The title column is `md:flex-none md:max-w-full`
+ * long enough to overflow. The title column is `content-md:flex-none content-md:max-w-full`
  * so its natural width drives the wrap while `truncate` still clamps a title
  * that alone exceeds the container. The mobile (base) layout is untouched.
  * This is the new frozen baseline; do NOT re-introduce breakpoint stacking.
@@ -93,13 +93,13 @@ import { BackButton } from './back-button';
 /**
  * Minimum height of the title block's content column, matched to the action
  * button height: the icon button on mobile (`h-11` → 44px) and the default
- * button on desktop (`md:h-12` → 48px). Applied to the inner title column (which
+ * button on desktop (`content-md:h-12` → 48px). Applied to the inner title column (which
  * has no padding) rather than the root — the root's `pt`/`mb` are box-sizing
  * border-box and would otherwise absorb the floor. Keeps the header a consistent
  * height across pages whether or not they render action buttons, so the content
  * below starts at the same baseline. Exported so other page chrome can reuse it.
  */
-export const TITLE_BLOCK_MIN_HEIGHT = 'min-h-11 md:min-h-12';
+export const TITLE_BLOCK_MIN_HEIGHT = 'min-h-11 content-md:min-h-12';
 
 export interface TitleBlockProps {
   title?: string;
@@ -186,8 +186,8 @@ function TitleTextSkeleton({ widthClass, heightClass }: { widthClass: string; he
  * see `TitleTextSkeleton` for why that is what keeps the header height honest.
  */
 const TITLE_SKELETON_SIZE = {
-  h1: { width: 'w-56 md:w-80 lg:w-96', height: 'h-7 md:h-8 lg:h-9' },
-  h2: { width: 'w-48 md:w-72', height: 'h-4 md:h-6' },
+  h1: { width: 'w-56 content-md:w-80 content-lg:w-96', height: 'h-7 content-md:h-8 content-lg:h-9' },
+  h2: { width: 'w-48 content-md:w-72', height: 'h-4 content-md:h-6' },
 } as const;
 
 export function TitleBlock({
@@ -236,15 +236,15 @@ export function TitleBlock({
         'flex items-end justify-between gap-[var(--spacing-system-m)]',
         // md+: one wrapping row — actions stay inline with a short title and
         // wrap to a second row only when the title overflows (ClickUp 86ahd6uy5).
-        'md:flex-wrap md:content-end',
+        'content-md:flex-wrap content-md:content-end',
         'pt-[var(--spacing-system-l)]',
         variant === 'card'
           ? cn(
               'border-b border-ods-border bg-ods-card',
               'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
-              'md:border-b-0 md:bg-transparent',
-              'md:px-0 md:pb-0',
-              'md:mb-[var(--spacing-system-l)]',
+              'content-md:border-b-0 content-md:bg-transparent',
+              'content-md:px-0 content-md:pb-0',
+              'content-md:mb-[var(--spacing-system-l)]',
             )
           : 'mb-[var(--spacing-system-l)]',
         className,
@@ -255,12 +255,12 @@ export function TitleBlock({
           wrap line; a short title leaves them inline. Base (mobile) keeps flex-1. */}
       <div
         className={cn(
-          'flex min-w-0 flex-1 flex-col justify-center gap-[var(--spacing-system-xs)] md:max-w-full md:flex-none',
+          'flex min-w-0 flex-1 flex-col justify-center gap-[var(--spacing-system-xs)] content-md:max-w-full content-md:flex-none',
           TITLE_BLOCK_MIN_HEIGHT,
         )}
       >
         {backButton && (
-          <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden md:inline-flex" />
+          <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden content-md:inline-flex" />
         )}
         {image || hasSubtitleRow || loading ? (
           <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
@@ -306,7 +306,7 @@ export function TitleBlock({
                     aria-hidden={!loading && !subtitle ? true : undefined}
                   >
                     {loading ? (
-                      <TitleTextSkeleton widthClass="w-28 md:w-36" heightClass="h-2.5 md:h-3" />
+                      <TitleTextSkeleton widthClass="w-28 content-md:w-36" heightClass="h-2.5 content-md:h-3" />
                     ) : (
                       subtitle || '\u00A0'
                     )}

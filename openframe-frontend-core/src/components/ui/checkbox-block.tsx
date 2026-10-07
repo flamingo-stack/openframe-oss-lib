@@ -59,10 +59,10 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
         className={cn(
           'flex w-full items-center gap-[var(--spacing-system-s)] rounded-md ring-1 ring-inset',
           // Trailing content stacks full-width below the text on mobile.
-          trailing && 'flex-wrap md:flex-nowrap',
+          trailing && 'flex-wrap content-md:flex-nowrap',
           'p-[var(--spacing-system-sf)]',
-          !description && 'min-h-[44px] md:min-h-[48px]',
-          description && 'min-h-[60px] md:min-h-[64px]',
+          !description && 'min-h-[44px] content-md:min-h-[48px]',
+          description && 'min-h-[60px] content-md:min-h-[64px]',
           'bg-ods-card ring-ods-border',
           'cursor-pointer transition-colors duration-200',
           // States mirror Input: hover / active move the BACKGROUND, the ring
@@ -89,7 +89,7 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
           aria-required={required || undefined}
           aria-invalid={error ? true : undefined}
           className={cn(
-            'h-4 w-4 shrink-0 md:h-6 md:w-6',
+            'h-4 w-4 shrink-0 content-md:h-6 content-md:w-6',
             'rounded-[6px] border-2',
             error ? 'border-ods-error' : 'border-[var(--color-border-strong)]',
             'bg-ods-card',
@@ -103,7 +103,7 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
           )}
         >
           <CheckboxPrimitive.Indicator className="flex items-center justify-center text-ods-text-on-accent">
-            <CheckboxCheckmarkIcon className="h-2 w-2 md:h-2.5 md:w-2.5" />
+            <CheckboxCheckmarkIcon className="h-2 w-2 content-md:h-2.5 content-md:w-2.5" />
           </CheckboxPrimitive.Indicator>
         </CheckboxPrimitive.Root>
         <div
@@ -117,7 +117,7 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
         >
           <span
             className={cn(
-              '!leading-5 text-h4 md:!leading-6',
+              '!leading-5 text-h4 content-md:!leading-6',
               'select-none text-ods-text-primary',
               truncateLabel ? 'block truncate' : 'break-words',
             )}
@@ -131,7 +131,9 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
             </span>
           )}
         </div>
-        {trailing && <div className="flex w-full shrink-0 items-center md:ml-auto md:w-auto">{trailing}</div>}
+        {trailing && (
+          <div className="flex w-full shrink-0 items-center content-md:ml-auto content-md:w-auto">{trailing}</div>
+        )}
       </label>
       {error && (
         <p className="absolute bottom-0 left-0 right-0 translate-y-full truncate text-ods-error text-h6" title={error}>
