@@ -1,6 +1,6 @@
 /**
  * The source-metadata decoder is the ONE parse point for both arrival paths —
- * the live `GUIDE`/`SOURCES` chunk and the persisted row of the same name — so
+ * the live `ATTACHMENTS` chunk and the persisted row of the same name — so
  * what it accepts is exactly what a reloaded answer will show. These pin the
  * accept/reject line, because every rejection here is a chip, card or video the
  * reader silently does not get.
@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { safeHref } from '../../components/chat/utils/compact-card-classes';
 import { decodeNatsChunk } from '../nats-decoder';
-import { mergeSourceMetadata, sourceMetadataEvent, youtubeVideoId } from '../source-metadata';
+import { attachmentsEvent, mergeSourceMetadata, sourceMetadataEvent, youtubeVideoId } from '../source-metadata';
 
 const AGENT_GUIDE = {
   index: 1,
@@ -236,17 +236,63 @@ describe('youtubeVideoId', () => {
   });
 });
 
-describe('decodeNatsChunk — source metadata', () => {
-  it('decodes both chunk names through the same path', () => {
-    const payload = { sources: [{ index: 1, name: 'Doc', path: 'docs/x', documentType: 'markdown' }] };
-    const guide = decodeNatsChunk({ type: 'GUIDE', payload, streamSeq: 7 });
-    const sources = decodeNatsChunk({ type: 'SOURCES', payload, streamSeq: 7 });
+describe('attachmentsEvent', () => {
+  it('decodes a persisted row to what its live chunk decoded to', () => {
+    // GraphQL answers every unset field with `null`; the live chunk omits them.
+    const live = {
+      sources: [
+        { index: 1, name: 'Guide', documentType: 'onboarding_guide', externalUrl: '/onboarding-guides/x' },
+        { index: 2, name: 'Guides', items: [{ id: 'a', documentType: 'onboarding_guide', name: 'A' }] },
+      ],
+      videos: [{ ref: '[card://video:MdFJNoJeqZQ]', url: 'https://youtu.be/MdFJNoJeqZQ' }],
+      cards: [],
+    };
+    const unset = { path: null, targetPlatform: null, id: null, sourceRepo: null };
+    const persisted = {
+      sources: [
+        { ...unset, ...live.sources[0], items: null },
+        {
+          ...unset,
+          ...live.sources[1],
+          documentType: null,
+          externalUrl: null,
+          items: [{ ...live.sources[1].items?.[0], path: null, externalUrl: null, targetPlatform: null }],
+        },
+      ],
+      videos: [{ ...live.videos[0], type: null, sourceRepo: null, id: null, title: null, metadata: null }],
+      cards: [],
+    };
 
-    expect(guide).toEqual({ type: 'sources', sources: payload.sources, seq: 7 });
-    expect(sources).toEqual(guide);
+    const event = attachmentsEvent(persisted);
+    expect(event).toEqual(attachmentsEvent(live));
+    // `targetPlatform: null` means "no destination" — the live source never said so.
+    expect(event?.sources?.[0]).not.toHaveProperty('targetPlatform');
+    expect(event?.sources?.[1].items?.[0]).not.toHaveProperty('path');
+  });
+});
+
+describe('decodeNatsChunk — attachments', () => {
+  const sources = [{ index: 1, name: 'Doc', path: 'docs/x', documentType: 'markdown' }];
+
+  it('reads the arrays off the chunk itself', () => {
+    expect(decodeNatsChunk({ type: 'ATTACHMENTS', sources, videos: [], cards: [], streamSeq: 7 })).toEqual({
+      type: 'sources',
+      sources,
+      seq: 7,
+    });
   });
 
-  it('drops a chunk with an empty payload rather than emitting an empty event', () => {
+  it('still reads the GUIDE envelope it replaced', () => {
+    expect(decodeNatsChunk({ type: 'GUIDE', payload: { sources }, streamSeq: 7 })).toEqual({
+      type: 'sources',
+      sources,
+      seq: 7,
+    });
+  });
+
+  it('drops an empty chunk rather than emitting an empty event', () => {
+    expect(decodeNatsChunk({ type: 'ATTACHMENTS', sources: [], videos: [], cards: [] })).toBeNull();
+    expect(decodeNatsChunk({ type: 'ATTACHMENTS' })).toBeNull();
     expect(decodeNatsChunk({ type: 'GUIDE', payload: {} })).toBeNull();
     expect(decodeNatsChunk({ type: 'GUIDE' })).toBeNull();
   });

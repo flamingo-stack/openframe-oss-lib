@@ -87,6 +87,7 @@ export * from './highlight-video-combined-section';
 export * from './view-toggle';
 // AI Enrich components
 export * from './ai-enrich';
+export * from './approval-level';
 export * from './policy-configuration-panel';
 export * from './policies';
 export * from './cloud-tenants';

@@ -84,6 +84,12 @@ interface TabNavigationProps {
   /** Tabs grow to share the bar's full width equally (Figma segmented-underline
    *  look, e.g. the 480px homepage strip switcher). Default: natural width. */
   stretchTabs?: boolean;
+  /**
+   * Where a tab's content sits inside the tab. `center` (default) suits tabs of
+   * natural width; `start` reads better when `stretchTabs` makes each tab wide
+   * (a timed demo's tabs: avatar, name and caption from the left edge).
+   */
+  tabAlign?: 'center' | 'start';
   /** How long the underline takes to reach a new `TabItem.progress` value. Default 200. */
   progressTransitionMs?: number;
 
@@ -130,6 +136,7 @@ interface TabBarProps {
   showLeftGradient: boolean;
   showRightGradient: boolean;
   stretchTabs: boolean;
+  tabAlign: 'center' | 'start';
   progressTransitionMs: number;
 }
 
@@ -154,6 +161,7 @@ const TabBar = memo(function TabBarImpl({
   showLeftGradient,
   showRightGradient,
   stretchTabs,
+  tabAlign,
   progressTransitionMs,
 }: TabBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -367,7 +375,8 @@ const TabBar = memo(function TabBarImpl({
               onClick={() => onTabChange(tab.id)}
               aria-label={tab.badge ? `${tab.label} (${tab.badge})` : undefined}
               className={cn(
-                'relative flex shrink-0 cursor-pointer items-center justify-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]',
+                'relative flex shrink-0 cursor-pointer items-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]',
+                tabAlign === 'start' ? 'justify-start text-left' : 'justify-center',
                 // Named rather than `transition-all`: the only thing that moves
                 // here is colour. `all` also made the browser re-check every
                 // property each frame, including the background GRADIENT — which
@@ -503,6 +512,7 @@ export function TabNavigation({
   showRightGradient = false,
   showLeftGradient = false,
   stretchTabs = false,
+  tabAlign = 'center',
   progressTransitionMs = 200,
   urlSync = false,
   defaultTab,
@@ -677,6 +687,7 @@ export function TabNavigation({
         showLeftGradient={showLeftGradient}
         showRightGradient={showRightGradient}
         stretchTabs={stretchTabs}
+        tabAlign={tabAlign}
         progressTransitionMs={progressTransitionMs}
       />
 
