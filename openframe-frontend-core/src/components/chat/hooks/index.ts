@@ -39,4 +39,15 @@ export * from './use-embedded-chat';
 // `ChatRuntime.endpoints`, so hub vs. embedders share one image-proxy
 // resolver.
 export * from './use-proxied-image-url';
-export * from './use-ask-prompts';
+export {
+  ASK_PROMPTS_DEFAULT_COUNT,
+  assistantAvailable,
+  buildAskPromptsUrl,
+  useAskPrompts,
+  useAssistantOpen,
+  useShownAskPromptIds,
+  useShownAskPrompts,
+  type AskPromptsResponse,
+  type UseAskPromptsOptions,
+  type UseAskPromptsResult,
+} from './use-ask-prompts';
