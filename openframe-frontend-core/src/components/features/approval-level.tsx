@@ -30,8 +30,8 @@ export interface ApprovalLevelMeta {
 
 /**
  * THE look and wording of an approval level: its name, its one-line meaning,
- * its icon and its colour. The guardrails panel's dropdown, the icon control
- * below and any read-only mark read it, so a level is the same everywhere.
+ * its icon and its colour. The guardrails panel's dropdown and `ApprovalLevelView`
+ * below read it, so a level is the same everywhere.
  */
 export const APPROVAL_LEVEL_META: Record<ApprovalLevel, ApprovalLevelMeta> = {
   ALLOW: {
@@ -57,61 +57,79 @@ export const APPROVAL_LEVEL_META: Record<ApprovalLevel, ApprovalLevelMeta> = {
 
 const ICON_PX = 16;
 
-export interface ApprovalLevelMarkProps {
-  level: ApprovalLevel;
-  /** Icon only: the name is the mark's accessible name and its tooltip. Default false (icon and name). */
-  iconOnly?: boolean;
-  className?: string;
-}
-
-/** One level, read-only: its icon in its colour, with its name beside it or as its tooltip. */
-export function ApprovalLevelMark({ level, iconOnly = false, className }: ApprovalLevelMarkProps) {
-  const { label, hint, Icon, toneClassName } = APPROVAL_LEVEL_META[level];
-  const mark = (
-    <span className={cn('inline-flex items-center gap-[var(--spacing-system-xxs)] text-h6', toneClassName, className)}>
-      <Icon size={ICON_PX} className="shrink-0" aria-hidden />
-      {iconOnly ? <span className="sr-only">{label}</span> : label}
-    </span>
-  );
-  return iconOnly ? (
-    <TouchFriendlyTooltip content={`${label}: ${hint}`} side="top">
-      {mark}
-    </TouchFriendlyTooltip>
-  ) : (
-    mark
-  );
-}
-
-export interface ApprovalLevelControlProps {
+export interface ApprovalLevelViewProps {
+  /** The level in force. */
   value: ApprovalLevel;
-  onChange: (level: ApprovalLevel) => void;
-  /** The id of the element that names what is being decided (the rule's label). */
-  'aria-labelledby'?: string;
-  /** The level in force, written beside the icons. Default true: a row reads without hovering, and on touch. */
-  showLabel?: boolean;
+  /**
+   * Whether the level can be changed here. `false`: the level's own icon.
+   * `true`: four icons, one per level, in a single-choice group. Default: true
+   * when `onChange` is given.
+   */
+  editable?: boolean;
+  /** Editable: the level picked. */
+  onChange?: (level: ApprovalLevel) => void;
+  /** Editable: the group is shown and cannot be changed (a locked rule). */
   disabled?: boolean;
+  /**
+   * The level's name, written before the icons. Default true: a row reads
+   * without hovering, and on touch. False keeps the name as the accessible
+   * name (and, read-only, as the icon's tooltip).
+   */
+  showLabel?: boolean;
+  /** Editable: the id of the element that names what is being decided (the rule's label). */
+  'aria-labelledby'?: string;
   className?: string;
 }
 
 /**
- * A choice of approval level as four icons, one per level, in a single-choice
- * group (arrow keys move, like every toggle group). Each icon has the level's
- * name as its accessible name and a tooltip with what the level means (hover
- * or keyboard focus; a tap selects). The level in force wears its colour, and its name
- * is written beside the group, so the choice never depends on a tooltip.
+ * THE way a level is shown, read-only or editable, by one prop: the level's
+ * name in its colour, then its icon (read-only) or the four levels' icons as a
+ * single-choice group (editable; arrow keys move, like every toggle group).
+ * Name, icon, colour and tooltip are `APPROVAL_LEVEL_META`'s in both, so a
+ * rule reads the same on a page that shows it and on one that lets it change.
+ *
+ * Editable, each icon has its level's name as its accessible name and a
+ * tooltip with what the level means (hover or keyboard focus; a tap selects).
  */
-export function ApprovalLevelControl({
+export function ApprovalLevelView({
   value,
+  editable,
   onChange,
-  'aria-labelledby': labelledBy,
-  showLabel = true,
   disabled = false,
+  showLabel = true,
+  'aria-labelledby': labelledBy,
   className,
-}: ApprovalLevelControlProps) {
+}: ApprovalLevelViewProps) {
   const current = APPROVAL_LEVEL_META[value];
+  const canEdit = editable ?? onChange !== undefined;
+  const name = showLabel ? (
+    <span className={cn('whitespace-nowrap text-h6', current.toneClassName)}>{current.label}</span>
+  ) : null;
+
+  if (!canEdit) {
+    const icon = (
+      <span className={cn('inline-flex shrink-0', current.toneClassName)}>
+        <current.Icon size={ICON_PX} aria-hidden />
+        {!showLabel && <span className="sr-only">{current.label}</span>}
+      </span>
+    );
+    return (
+      <span className={cn('inline-flex shrink-0 items-center gap-[var(--spacing-system-xxs)]', className)}>
+        {name}
+        {showLabel ? (
+          icon
+        ) : (
+          <TouchFriendlyTooltip content={`${current.label}: ${current.hint}`} side="top">
+            {icon}
+          </TouchFriendlyTooltip>
+        )}
+      </span>
+    );
+  }
+
   return (
     <div className={cn('flex shrink-0 items-center gap-[var(--spacing-system-sf)]', className)}>
-      {showLabel && <span className={cn('whitespace-nowrap text-h6', current.toneClassName)}>{current.label}</span>}
+      {name}
       <TooltipProvider delayDuration={150}>
         <ToggleGroup
           type="single"
@@ -121,7 +139,7 @@ export function ApprovalLevelControl({
           disabled={disabled}
           // Clicking the level in force reports '' (deselect): a rule always has a level.
           onValueChange={(next: string) => {
-            if (next && next !== value) onChange(next as ApprovalLevel);
+            if (next && next !== value) onChange?.(next as ApprovalLevel);
           }}
           aria-labelledby={labelledBy}
         >

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
+import { AnalyzingState } from './analyzing-state';
 import { StatusLine, type StatusLineTone } from './status-line';
 
 /** Where one incident stands. `waiting` is the only state that needs a person. */
@@ -46,7 +47,10 @@ export interface IncidentFeedProps {
   /** Oldest first. The newest is open; earlier ones collapse to a row. */
   items: readonly IncidentFeedItem[];
   statusLabels: Record<IncidentStatus, string>;
-  /** Shown while there is nothing in the feed. */
+  /**
+   * Shown while there is nothing in the feed, under rows that are still being
+   * read: the agent is at work, it has just not found anything yet.
+   */
   emptyLabel?: string;
   /**
    * `top`: the list grows downward (a wide window). `bottom`: the newest item
@@ -91,7 +95,7 @@ export function IncidentFeed({ items, statusLabels, emptyLabel, anchor = 'top', 
         className,
       )}
     >
-      {items.length === 0 && emptyLabel && <p className="m-auto text-ods-text-secondary text-h4">{emptyLabel}</p>}
+      {items.length === 0 && emptyLabel && <AnalyzingState label={emptyLabel} className="m-auto" />}
       {items.map((item, index) => {
         const open = index === lastIndex || item.status === 'waiting';
         if (!open) {
