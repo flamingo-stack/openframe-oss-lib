@@ -104,7 +104,8 @@ export function RemoteDesktopView({
             groups={displayMenuGroups}
             customTrigger={
               <Button variant="outline" leftIcon={<MonitorIcon className="h-4 w-4 md:h-6 md:w-6" />}>
-                {currentDisplayLabel}
+                {/* A narrow page keeps the icon and drops the words: the bar never pushes the device's name out. */}
+                <span className="sr-only content-md:not-sr-only">{currentDisplayLabel}</span>
               </Button>
             }
           />
@@ -121,7 +122,7 @@ export function RemoteDesktopView({
               )
             }
           >
-            {chatOpen ? 'Close Chat' : 'Open Chat'}
+            <span className="sr-only content-md:not-sr-only">{chatOpen ? 'Close Chat' : 'Open Chat'}</span>
           </Button>
         )}
         <ActionsMenuDropdown groups={actionsMenuGroups} triggerAriaLabel="Actions" />

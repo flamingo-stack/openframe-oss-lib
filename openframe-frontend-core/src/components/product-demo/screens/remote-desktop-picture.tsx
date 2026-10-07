@@ -58,13 +58,14 @@ export function RemoteDesktopPicture({ desktop }: { desktop: RemoteSessionFixtur
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-ods-flamingo-cyan-secondary via-ods-bg-surface to-ods-flamingo-pink-secondary">
       <div className="relative min-h-0 flex-1">
-        <div className="absolute left-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] flex flex-col gap-[var(--spacing-system-sf)]">
+        {/* A narrow box shows the window alone: the shortcuts would leave it no room. */}
+        <div className="absolute left-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] hidden flex-col gap-[var(--spacing-system-sf)] content-md:flex">
           <DesktopShortcut icon={<TrashIcon className="h-5 w-5" />} label="Recycle Bin" />
           <DesktopShortcut icon={<FolderIcon className="h-5 w-5" />} label="Scans" />
           <DesktopShortcut icon={<ChromeIcon className="h-5 w-5" />} label="Chrome" />
         </div>
 
-        <div className="absolute bottom-[var(--spacing-system-mf)] left-28 right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card shadow-lg">
+        <div className="absolute bottom-[var(--spacing-system-mf)] left-[var(--spacing-system-mf)] right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card shadow-lg content-md:left-28">
           <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)] border-b border-ods-border bg-ods-bg-surface px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)]">
             <PrinterIcon className="h-4 w-4 flex-shrink-0 text-ods-text-secondary" />
             <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h6">Printers &amp; scanners</span>
@@ -96,7 +97,7 @@ export function RemoteDesktopPicture({ desktop }: { desktop: RemoteSessionFixtur
 
       <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)] border-t border-ods-border bg-ods-card px-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)]">
         <TaskbarApp icon={<WindowsIcon className="h-4 w-4" />} />
-        <span className="flex h-8 w-40 items-center gap-[var(--spacing-system-xs)] rounded-md bg-ods-bg-surface px-[var(--spacing-system-xs)] text-ods-text-secondary text-h6">
+        <span className="hidden h-8 w-40 items-center gap-[var(--spacing-system-xs)] rounded-md bg-ods-bg-surface px-[var(--spacing-system-xs)] text-ods-text-secondary text-h6 content-md:flex">
           <SearchIcon className="h-4 w-4 flex-shrink-0" />
           Search
         </span>

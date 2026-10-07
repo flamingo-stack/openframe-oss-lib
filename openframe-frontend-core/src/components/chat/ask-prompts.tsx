@@ -56,7 +56,13 @@ const slotCount = (count: number | undefined, loading: boolean, prompts: readonl
 /** A skeleton chip's label width (in `ch`), by slot: a believable spread that is the same on every load. */
 const SKELETON_LABEL_CH = [26, 22, 30, 24, 20, 28] as const;
 /** One chip's slot: the chip's own height, so an empty slot holds the same room. */
-const CHIP_SLOT_CLASS = 'flex h-9 min-w-0 max-w-full';
+/**
+ * In a narrow column (a phone) a chip takes the column's whole width, so the
+ * questions read as one list and no ragged space is left beside them; from the
+ * content `md` step a chip is as wide as its question.
+ */
+const CHIP_SLOT_CLASS =
+  'flex h-9 w-full min-w-0 max-w-full content-md:w-auto [&>button]:w-full [&>button>*]:w-full [&>button>*]:justify-start content-md:[&>button]:w-auto content-md:[&>button>*]:w-auto';
 
 /**
  * The questions themselves, in `count` fixed slots: a sentence-case chip each
@@ -125,7 +131,13 @@ export function AskPrompts({
   if (!loading && prompts.length === 0) return null;
   const end = align === 'end';
   return (
-    <div className={cn('flex min-w-0 flex-col gap-2', end ? 'items-end' : 'items-start', className)}>
+    <div
+      className={cn(
+        'flex w-full min-w-0 flex-col gap-2 content-md:w-auto',
+        end ? 'items-end' : 'items-start',
+        className,
+      )}
+    >
       <MingoAiButton variant="button" source={source} label={label} icon={icon} />
       <QuestionChips
         prompts={prompts}
