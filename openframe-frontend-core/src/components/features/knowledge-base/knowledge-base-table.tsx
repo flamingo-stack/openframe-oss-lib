@@ -9,9 +9,10 @@ import { type ColumnDef, DataTable, type Row, useDataTable } from '../../ui/data
 import { Tag as StatusTag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
 import { KNOWLEDGE_BASE_ITEM_ICON } from './knowledge-base-item-icon';
+import { KNOWLEDGE_BASE_STATUS_VARIANT, type KnowledgeBaseArticleStatus } from './knowledge-base-status';
 
 export type KnowledgeBaseRowType = 'ARTICLE' | 'FOLDER' | string;
-export type KnowledgeBaseRowStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | string | null | undefined;
+export type KnowledgeBaseRowStatus = KnowledgeBaseArticleStatus | string | null | undefined;
 
 export interface KnowledgeBaseRow {
   readonly id: string;
@@ -29,11 +30,6 @@ export type KnowledgeBaseTableMode = 'standard' | 'archive';
 
 /** Where a row leads: the article's page, or the folder's listing. */
 export type KnowledgeBaseRowHref = (item: KnowledgeBaseRow) => string;
-
-const STATUS_VARIANT: Record<'DRAFT' | 'ARCHIVED', 'warning' | 'grey'> = {
-  DRAFT: 'warning',
-  ARCHIVED: 'grey',
-};
 
 /**
  * Click handler that opens `href` in a new tab. The button sits inside a row
@@ -82,7 +78,13 @@ export function getKnowledgeBaseColumns(mode: KnowledgeBaseTableMode): ColumnDef
                 <div className="min-w-0">
                   <TruncateText>{item.name}</TruncateText>
                 </div>
-                {tagStatus && <StatusTag variant={STATUS_VARIANT[tagStatus]} label={tagStatus} className="shrink-0" />}
+                {tagStatus && (
+                  <StatusTag
+                    variant={KNOWLEDGE_BASE_STATUS_VARIANT[tagStatus]}
+                    label={tagStatus}
+                    className="shrink-0"
+                  />
+                )}
               </div>
               {item.type === 'ARTICLE' && item.summary && (
                 <TruncateText variant="h6" tone="secondary">

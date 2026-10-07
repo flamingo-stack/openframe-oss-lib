@@ -112,7 +112,13 @@ export function LogDrawer({
                         <TruncateText>{field.value}</TruncateText>
                       )
                     ) : (
-                      <span className="truncate text-ods-text-primary text-h4">{field.value || <EmptyMark />}</span>
+                      <span className="truncate text-ods-text-primary text-h4">
+                        {field.value === null || field.value === undefined || field.value === false ? (
+                          <EmptyMark />
+                        ) : (
+                          field.value
+                        )}
+                      </span>
                     )}
                     <span className="truncate text-ods-text-secondary text-h6">{field.label}</span>
                   </div>

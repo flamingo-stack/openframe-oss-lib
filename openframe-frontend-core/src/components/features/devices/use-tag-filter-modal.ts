@@ -22,9 +22,23 @@ interface UseTagFilterModalParams {
   columns: Array<{ key: string; label: string; filterable?: boolean; filterOptions?: FilterOption[] }>;
   /** `useApiParams`' setter, each device list param is a list of ids. */
   setParams: (params: Record<string, string[]>) => void;
+  /**
+   * Runs after the filters are applied, to bring the list back to its top.
+   * Default: the page's `<main>` scrolls to the top. A host whose list scrolls
+   * in another container passes its own.
+   */
+  onApplied?: () => void;
 }
 
-export function useTagFilterModal({ tags, deviceFilters, columns, setParams }: UseTagFilterModalParams) {
+const scrollMainToTop = () => document.querySelector('main')?.scrollTo({ top: 0, behavior: 'instant' });
+
+export function useTagFilterModal({
+  tags,
+  deviceFilters,
+  columns,
+  setParams,
+  onApplied = scrollMainToTop,
+}: UseTagFilterModalParams) {
   const isMdUp = useMdUp();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -76,9 +90,9 @@ export function useTagFilterModal({ tags, deviceFilters, columns, setParams }: U
         tags: newTags.filter(isCompleteTag),
       });
       pendingFiltersRef.current = {};
-      document.querySelector('main')?.scrollTo({ top: 0, behavior: 'instant' });
+      onApplied();
     },
-    [setParams],
+    [setParams, onApplied],
   );
 
   return {

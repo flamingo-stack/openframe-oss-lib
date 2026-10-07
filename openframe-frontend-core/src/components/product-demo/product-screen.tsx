@@ -75,7 +75,8 @@ export function ProductScreen({ screen, compact = false, label, height, designWi
   const compactWidth = compact ? COMPACT_LAYOUT_WIDTH[screen] : undefined;
   const layoutWidth =
     compactWidth ??
-    (designWidth !== undefined && minWidth !== undefined ? Math.max(designWidth, minWidth) : designWidth);
+    // A screen with a minimum keeps it whether or not the host names a width (the frame's default is narrower).
+    (minWidth !== undefined ? Math.max(designWidth ?? minWidth, minWidth) : designWidth);
   return (
     <ProductScreenFrame
       {...frame}

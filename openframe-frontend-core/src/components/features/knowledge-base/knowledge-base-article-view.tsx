@@ -11,14 +11,9 @@ import { Tag } from '../../ui/tag';
 import { type TicketAttachment, TicketAttachmentsList } from '../../ui/ticket-attachments-list';
 import { TicketDetailSection } from '../../ui/ticket-detail-section';
 import { TruncateText } from '../../ui/truncate-text';
+import { KNOWLEDGE_BASE_STATUS_VARIANT, type KnowledgeBaseArticleStatus } from './knowledge-base-status';
 
-export type KnowledgeBaseArticleStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-
-const STATUS_VARIANT: Record<KnowledgeBaseArticleStatus, 'success' | 'warning' | 'grey'> = {
-  PUBLISHED: 'success',
-  DRAFT: 'warning',
-  ARCHIVED: 'grey',
-};
+export type { KnowledgeBaseArticleStatus };
 
 export interface KnowledgeBaseArticleAuthor {
   /** Display name; null: "Unknown". */
@@ -119,7 +114,7 @@ export function KnowledgeBaseArticleView({
           />
 
           <div className="flex h-20 min-w-0 flex-col items-start justify-center gap-[var(--spacing-system-xxs)]">
-            <Tag variant={STATUS_VARIANT[status]} label={status} />
+            <Tag variant={KNOWLEDGE_BASE_STATUS_VARIANT[status]} label={status} />
             <p className="truncate text-heading-5 text-ods-text-secondary">Status</p>
           </div>
         </div>

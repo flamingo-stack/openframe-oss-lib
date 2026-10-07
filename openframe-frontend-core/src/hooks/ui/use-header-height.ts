@@ -45,18 +45,36 @@ export function useHeaderHeight(
     if (!enabled) return undefined;
 
     if (stuckOnly) {
-      const header = document.querySelector<HTMLElement>(SITE_HEADER_SELECTOR);
-      if (!header) return undefined;
-      // The header hides by translating itself up by its own height.
-      const measureStuck = () => setHeight(header.style.transform.includes('-100%') ? 0 : header.offsetHeight);
-      measureStuck();
-      const resize = new ResizeObserver(measureStuck);
-      resize.observe(header);
-      const mutation = new MutationObserver(measureStuck);
-      mutation.observe(header, { attributes: true, attributeFilter: ['style'] });
+      let stop: (() => void) | undefined;
+      const watch = (header: HTMLElement) => {
+        // The header hides by translating itself up by its own height.
+        const measureStuck = () => setHeight(header.style.transform.includes('-100%') ? 0 : header.offsetHeight);
+        measureStuck();
+        const resize = new ResizeObserver(measureStuck);
+        resize.observe(header);
+        const mutation = new MutationObserver(measureStuck);
+        mutation.observe(header, { attributes: true, attributeFilter: ['style'] });
+        stop = () => {
+          resize.disconnect();
+          mutation.disconnect();
+        };
+      };
+      const present = document.querySelector<HTMLElement>(SITE_HEADER_SELECTOR);
+      if (present) {
+        watch(present);
+        return () => stop?.();
+      }
+      // A header that mounts after this hook: wait for it, then watch it.
+      const arrival = new MutationObserver(() => {
+        const header = document.querySelector<HTMLElement>(SITE_HEADER_SELECTOR);
+        if (!header) return;
+        arrival.disconnect();
+        watch(header);
+      });
+      arrival.observe(document.body, { childList: true, subtree: true });
       return () => {
-        resize.disconnect();
-        mutation.disconnect();
+        arrival.disconnect();
+        stop?.();
       };
     }
 
