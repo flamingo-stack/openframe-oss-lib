@@ -90,7 +90,7 @@ const READING_ROWS = ['opacity-100', 'opacity-60', 'opacity-30'] as const;
 function ReadingState({ label }: { label: string }) {
   return (
     <div role="status" className="m-auto flex w-full max-w-sm flex-col items-center gap-4">
-      <div aria-hidden className="flex w-full flex-col gap-2">
+      <div aria-hidden className="grid w-full grid-cols-1 gap-2">
         {READING_ROWS.map((opacity, row) => (
           <div
             key={opacity}
