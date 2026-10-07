@@ -331,6 +331,7 @@ export * from './dev-sections';
 // pre-computed pixel value avoids the mid-animation jitter that
 // `element.scrollIntoView()` produces when layout shifts during the
 // scroll).
+export { openInNewTab } from './open-in-new-tab';
 export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scroll-into-view';
 
 // Same-page hash navigation — owns pushState + synthetic hashchange +
