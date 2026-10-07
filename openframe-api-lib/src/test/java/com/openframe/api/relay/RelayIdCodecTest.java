@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
-class GlobalIdCodecTest {
+class RelayIdCodecTest {
 
     private static final String OBJECT_ID = "665f1c2ab3e4d5f6a7b8c9d0";
     private static final String TICKET_GLOBAL_ID = "VGlja2V0OjY2NWYxYzJhYjNlNGQ1ZjZhN2I4YzlkMA";
@@ -28,7 +28,7 @@ class GlobalIdCodecTest {
     private static final String EMPTY_KEY_TICKET_ID = "VGlja2V0Og";
     private static final String NON_UTF8_BASE64 = "_w";
 
-    private final GlobalIdCodec codec = new GlobalIdCodec();
+    private final RelayIdCodec codec = new RelayIdCodec();
 
     @ParameterizedTest
     @MethodSource("relayEncodings")
@@ -93,7 +93,7 @@ class GlobalIdCodecTest {
     @Test
     void decode_globalIdOfOtherType_throwsInvalidGlobalId() {
         // execution
-        InvalidGlobalIdException exception = assertThrows(InvalidGlobalIdException.class,
+        InvalidRelayIdException exception = assertThrows(InvalidRelayIdException.class,
                 () -> codec.decode(MACHINE_GLOBAL_ID, TICKET));
 
         // verifications
@@ -103,7 +103,7 @@ class GlobalIdCodecTest {
     @Test
     void invalidGlobalIdException_code_invalidId() {
         // execution
-        InvalidGlobalIdException exception = new InvalidGlobalIdException("x");
+        InvalidRelayIdException exception = new InvalidRelayIdException("x");
 
         // verifications
         assertThat(exception.getCode()).isEqualTo("INVALID_ID");
@@ -112,7 +112,7 @@ class GlobalIdCodecTest {
     @Test
     void decode_globalIdWithEmptyKey_throwsInvalidGlobalId() {
         // execution
-        InvalidGlobalIdException exception = assertThrows(InvalidGlobalIdException.class,
+        InvalidRelayIdException exception = assertThrows(InvalidRelayIdException.class,
                 () -> codec.decode(EMPTY_KEY_TICKET_ID, TICKET));
 
         // verifications
@@ -137,7 +137,7 @@ class GlobalIdCodecTest {
         List<String> ids = List.of(TICKET_GLOBAL_ID, MACHINE_GLOBAL_ID);
 
         // execution
-        InvalidGlobalIdException exception = assertThrows(InvalidGlobalIdException.class,
+        InvalidRelayIdException exception = assertThrows(InvalidRelayIdException.class,
                 () -> codec.decodeAll(ids, TICKET));
 
         // verifications
@@ -156,19 +156,19 @@ class GlobalIdCodecTest {
     @Test
     void parse_machineGlobalId_typeNameAndRawId() {
         // execution
-        Optional<ParsedGlobalId> parsed = codec.parse(MACHINE_GLOBAL_ID);
+        Optional<ParsedRelayId> parsed = codec.parse(MACHINE_GLOBAL_ID);
 
         // verifications
         assertThat(parsed)
                 .get()
-                .extracting(ParsedGlobalId::getTypeName, ParsedGlobalId::getRawId)
+                .extracting(ParsedRelayId::getTypeName, ParsedRelayId::getRawId)
                 .containsExactly("Machine", MACHINE_RAW_ID);
     }
 
     @Test
     void parse_rawObjectId_empty() {
         // execution
-        Optional<ParsedGlobalId> parsed = codec.parse(OBJECT_ID);
+        Optional<ParsedRelayId> parsed = codec.parse(OBJECT_ID);
 
         // verifications
         assertThat(parsed).isEmpty();
@@ -179,7 +179,7 @@ class GlobalIdCodecTest {
     @ValueSource(strings = {"", " "})
     void parse_nullOrBlank_empty(String id) {
         // execution
-        Optional<ParsedGlobalId> parsed = codec.parse(id);
+        Optional<ParsedRelayId> parsed = codec.parse(id);
 
         // verifications
         assertThat(parsed).isEmpty();
@@ -188,7 +188,7 @@ class GlobalIdCodecTest {
     @Test
     void parse_nonUtf8Bytes_empty() {
         // execution
-        Optional<ParsedGlobalId> parsed = codec.parse(NON_UTF8_BASE64);
+        Optional<ParsedRelayId> parsed = codec.parse(NON_UTF8_BASE64);
 
         // verifications
         assertThat(parsed).isEmpty();

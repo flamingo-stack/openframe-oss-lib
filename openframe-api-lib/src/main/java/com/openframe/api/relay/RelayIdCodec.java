@@ -18,7 +18,7 @@ import static org.springframework.util.StringUtils.hasText;
 
 // Byte-for-byte graphql.relay.Relay (URL-safe base64, no padding) without a graphql-java dependency in this lib.
 @Component
-public class GlobalIdCodec {
+public class RelayIdCodec {
 
     private static final String SEPARATOR = ":";
     private static final Pattern GLOBAL_ID = Pattern.compile("([A-Z][A-Za-z0-9]*):(.*)", Pattern.DOTALL);
@@ -50,7 +50,7 @@ public class GlobalIdCodec {
                 .toList();
     }
 
-    public Optional<ParsedGlobalId> parse(String id) {
+    public Optional<ParsedRelayId> parse(String id) {
         if (!hasText(id)) {
             return Optional.empty();
         }
@@ -58,18 +58,18 @@ public class GlobalIdCodec {
         return decodeUtf8(canonical)
                 .map(GLOBAL_ID::matcher)
                 .filter(Matcher::matches)
-                .map(GlobalIdCodec::toParsedGlobalId);
+                .map(RelayIdCodec::toParsedRelayId);
     }
 
-    private String rawIdOf(ParsedGlobalId globalId, NodeType expected) {
+    private String rawIdOf(ParsedRelayId globalId, NodeType expected) {
         String expectedName = expected.getGraphqlTypeName();
         String actualTypeName = globalId.getTypeName();
         String rawId = globalId.getRawId();
         if (!globalId.isOfType(expected)) {
-            throw new InvalidGlobalIdException("Expected a " + expectedName + " id, got " + actualTypeName);
+            throw new InvalidRelayIdException("Expected a " + expectedName + " id, got " + actualTypeName);
         }
         if (!hasText(rawId)) {
-            throw new InvalidGlobalIdException("Empty " + expectedName + " id");
+            throw new InvalidRelayIdException("Empty " + expectedName + " id");
         }
         return rawId;
     }
@@ -94,9 +94,9 @@ public class GlobalIdCodec {
         }
     }
 
-    private static ParsedGlobalId toParsedGlobalId(Matcher matcher) {
+    private static ParsedRelayId toParsedRelayId(Matcher matcher) {
         String typeName = matcher.group(1);
         String rawId = matcher.group(2);
-        return new ParsedGlobalId(typeName, rawId);
+        return new ParsedRelayId(typeName, rawId);
     }
 }

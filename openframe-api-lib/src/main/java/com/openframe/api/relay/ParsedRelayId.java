@@ -5,7 +5,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class ParsedGlobalId {
+public class ParsedRelayId {
 
     private final String typeName;
     private final String rawId;

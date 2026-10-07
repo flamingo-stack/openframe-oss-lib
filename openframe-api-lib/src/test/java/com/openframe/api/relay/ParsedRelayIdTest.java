@@ -4,9 +4,9 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ParsedGlobalIdTest {
+class ParsedRelayIdTest {
 
-    private final ParsedGlobalId parsed = new ParsedGlobalId("Machine", "machine-1");
+    private final ParsedRelayId parsed = new ParsedRelayId("Machine", "machine-1");
 
     @Test
     void isOfType_sameGraphqlTypeName_true() {

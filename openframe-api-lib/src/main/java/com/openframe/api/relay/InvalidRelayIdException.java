@@ -1,10 +1,10 @@
 package com.openframe.api.relay;
 
-public class InvalidGlobalIdException extends RuntimeException {
+public class InvalidRelayIdException extends RuntimeException {
 
     public static final String CODE = "INVALID_ID";
 
-    public InvalidGlobalIdException(String message) {
+    public InvalidRelayIdException(String message) {
         super(message);
     }
 
