@@ -172,9 +172,7 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             NEW_VERSION=$GITHUB_REF_NAME
           else
-            # npm's `latest` trails a release by its scan (minutes to 2h); the release's git tag does not.
-            OLD_VERSION=$( { npm view "$(jq -r .name package.json)" dist-tags.latest 2>/dev/null; git ls-remote --tags --refs origin | cut -d/ -f3; } |
-                          grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+            OLD_VERSION=$(git ls-remote --tags --refs origin | cut -d/ -f3 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
             OLD_VERSION=${OLD_VERSION:-0.0.0}
             if [ "$RELEASE" = true ]; then
               IFS='.' read -r major minor patch <<< "$OLD_VERSION"

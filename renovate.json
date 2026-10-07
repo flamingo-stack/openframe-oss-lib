@@ -13,12 +13,6 @@
       "matchStrings": ["<revision>(?<currentValue>.*?)</revision>"],
       "depNameTemplate": "com.openframe.oss:openframe-oss-lib",
       "datasourceTemplate": "maven"
-    },
-    {
-      "fileMatch": ["^openframe-frontend-core/package\\.json$"],
-      "matchStrings": ["\"version\":\\s*\"(?<currentValue>.*?)\""],
-      "depNameTemplate": "@flamingo-stack/openframe-frontend-core",
-      "datasourceTemplate": "npm"
     }
   ],
 
@@ -39,19 +33,6 @@
       "schedule": ["at any time"],
       "prCreation": "immediate",
       "ignoreUnstable": true
-    },
-    {
-      "description": "Enable automerge for openframe-frontend-core version updates",
-      "matchManagers": ["regex"],
-      "matchPackageNames": ["@flamingo-stack/openframe-frontend-core"],
-      "enabled": true,
-      "automerge": true,
-      "automergeType": "pr",
-      "platformAutomerge": false,
-      "registryUrls": ["https://registry.npmjs.org"],
-      "schedule": ["at any time"],
-      "prCreation": "immediate",
-      "ignoreUnstable": true
     }
   ],
 
@@ -59,10 +40,6 @@
     {
       "hostType": "maven",
       "matchHost": "maven.pkg.github.com"
-    },
-    {
-      "hostType": "npm",
-      "matchHost": "registry.npmjs.org"
     }
   ]
 }
