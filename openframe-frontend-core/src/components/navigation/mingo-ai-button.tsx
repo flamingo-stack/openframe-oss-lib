@@ -23,10 +23,13 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
    *  key cap beside the label. Default false. */
   shortcutHint?: boolean;
   /** `inline` (default): the header launcher, the height and type of the menu
-   *  items beside it. `field`: the full-width row that opens the mobile menu
-   *  (the name reads as the field's prompt). ONE component, so every Mingo
-   *  launcher carries the same identity, ring and event. */
-  variant?: 'inline' | 'field';
+   *  items beside it; its name collapses with the menus below `lg`. `button`:
+   *  the same launcher inside a page (a card, the head of a row of questions):
+   *  the name and the key cap always show. `field`: the full-width row that
+   *  opens the mobile menu (the name reads as the field's prompt). ONE
+   *  component, so every Mingo launcher carries the same identity, ring and
+   *  event. */
+  variant?: 'inline' | 'button' | 'field';
 }
 
 const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
@@ -34,18 +37,29 @@ const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
 /** The event the mounted chat panel (`EmbeddableChat`) opens on. */
 export const ASK_AI_OPEN_EVENT = 'ask-ai:open';
 
-/**
- * Open the chat of `source`. Coalesced to '' so a source-less call still
- * matches the panel's own `runtime.source ?? ''` comparison (undefined !== ''
- * would make the panel silently ignore the event).
- */
-export function openAskAi(source?: string): void {
-  window.dispatchEvent(new CustomEvent(ASK_AI_OPEN_EVENT, { detail: { source: source ?? '' } }));
+/** What an `ask-ai:open` event carries. */
+export interface AskAiOpenDetail {
+  source: string;
+  /** A question to send as soon as the chat is open. Absent: the chat only opens. */
+  prompt?: string;
 }
 
 /**
- * THE Mingo AI launcher, in the site header's right cluster and at the top of
- * the mobile menu (`variant="field"`): the round identity glyph, the
+ * Open the chat of `source`, and with `prompt` ask it that question once.
+ * `source` is coalesced to '' so a source-less call still matches the panel's
+ * own `runtime.source ?? ''` comparison (undefined !== '' would make the panel
+ * silently ignore the event).
+ */
+export function openAskAi(source?: string, options?: { prompt?: string }): void {
+  const prompt = options?.prompt?.trim();
+  const detail: AskAiOpenDetail = prompt ? { source: source ?? '', prompt } : { source: source ?? '' };
+  window.dispatchEvent(new CustomEvent<AskAiOpenDetail>(ASK_AI_OPEN_EVENT, { detail }));
+}
+
+/**
+ * THE Mingo AI launcher, in the site header's right cluster, inside a page
+ * (`variant="button"`: the FAQ's ask card, the head of a row of questions) and
+ * at the top of the mobile menu (`variant="field"`): the round identity glyph, the
  * assistant's name and an optional shortcut hint, sized like the menu items
  * beside it. Stateless: clicking dispatches an `ask-ai:open`
  * CustomEvent (source-filtered) that the mounted `EmbeddableChat` panel
@@ -75,6 +89,8 @@ export function MingoAiButton({
   // Known after hydration only: until then the hint keeps its space, empty.
   const visitor = useVisitorOs();
   const field = variant === 'field';
+  // In a page nothing collapses: there is no menu beside it to make room for.
+  const inPage = variant === 'button';
 
   const commandKey = visitor.known && usesCommandKey(visitor.os);
 
@@ -162,7 +178,10 @@ export function MingoAiButton({
       {/* In the header the name collapses below lg, with the menus: on a phone
           the launcher is its glyph alone (the name stays the accessible name). */}
       <span
-        className={cn('relative whitespace-nowrap', field ? 'min-w-0 flex-1 truncate' : 'hidden text-h6 lg:inline')}
+        className={cn(
+          'relative whitespace-nowrap',
+          field ? 'min-w-0 flex-1 truncate' : inPage ? 'text-h6' : 'hidden text-h6 lg:inline',
+        )}
       >
         {label}
       </span>
@@ -170,7 +189,12 @@ export function MingoAiButton({
         // A key cap in the label's own type (never smaller: a hint nobody can
         // read is decoration) and the label's colour, which clears 4.5:1 on
         // the bar. It keeps its width before the platform is known.
-        <kbd className="relative hidden h-6 min-w-9 items-center justify-center rounded border border-ods-border px-[var(--spacing-system-xxs)] text-h6 lg:inline-flex">
+        <kbd
+          className={cn(
+            'relative h-6 min-w-9 items-center justify-center rounded border border-ods-border px-[var(--spacing-system-xxs)] text-h6',
+            inPage ? 'inline-flex' : 'hidden lg:inline-flex',
+          )}
+        >
           {visitor.known ? shortcutLabel(visitor.os, 'K') : ''}
         </kbd>
       )}

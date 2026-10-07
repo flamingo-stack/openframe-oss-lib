@@ -1,10 +1,14 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { normalizeHashFragment } from '../utils/same-page-hash-nav';
+import { LOCATION_HASH_SYNC_EVENT, normalizeHashFragment } from '../utils/same-page-hash-nav';
 
-/** `navigateSamePageHash` dispatches `hashchange` itself; `popstate` covers back and forward. */
-const HASH_EVENTS = ['hashchange', 'popstate'] as const;
+/**
+ * `navigateSamePageHash` dispatches `hashchange` itself; `popstate` covers back
+ * and forward; `replaceLocationHash` (a scroll spy, a tab naming itself)
+ * announces its silent writes with its own event.
+ */
+const HASH_EVENTS = ['hashchange', 'popstate', LOCATION_HASH_SYNC_EVENT] as const;
 
 function subscribe(onChange: () => void): () => void {
   for (const event of HASH_EVENTS) window.addEventListener(event, onChange);
@@ -24,8 +28,8 @@ function readHash(): string {
 
 /**
  * The URL's hash without its `#`, or `''`: the READ side of same-page anchor
- * navigation (`navigateSamePageHash` writes it, `useScrollToHash` scrolls to
- * it). For a component whose state follows the anchor: a tab group that opens
+ * navigation (`navigateSamePageHash` and `replaceLocationHash` write it,
+ * `useScrollToHash` scrolls to it when it was a navigation). For a component whose state follows the anchor: a tab group that opens
  * the tab a link names. Empty on the server and during hydration (the server
  * never sees a hash), then the real one.
  */
