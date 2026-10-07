@@ -15,6 +15,7 @@ import com.openframe.test.data.dto.ai.DialogStatistics;
 import com.openframe.test.data.dto.ai.SendMessageRequest;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.ticket.Ticket;
+import com.openframe.test.helpers.RelayIds;
 import com.openframe.test.helpers.ai.AgentSession;
 import com.openframe.test.helpers.ai.DialogFixture;
 import com.openframe.test.helpers.ai.RunId;
@@ -61,18 +62,18 @@ public class DialogsTest extends BaseTest {
         String title = "E2E-" + RUN_ID + " dialog";
 
         DialogResponse renamed = DialogApi.renameDialog(dialog.getDialogId(), title);
-        assertThat(renamed.getId()).as("Renaming keeps the id").isEqualTo(dialog.getDialogId());
+        assertThat(RelayIds.raw(renamed.getId())).as("Renaming keeps the id").isEqualTo(dialog.getDialogId());
         assertThat(renamed.getTitle()).as("The title is stored").isEqualTo(title);
         assertThat(renamed.getStatus()).as("A fresh dialog is ACTIVE").isEqualTo("ACTIVE");
 
         DialogConnection mine = DialogApi.listDialogs(
                 DialogFilterInput.builder().statuses(List.of("ACTIVE")).scope("MY").build(), 50, null);
         assertThat(mine.getPageInfo()).as("A connection carries pageInfo").isNotNull();
-        assertThat(mine.ids()).as("The renamed dialog is among my active dialogs").contains(dialog.getDialogId());
+        assertThat(mine.rawIds()).as("The renamed dialog is among my active dialogs").contains(dialog.getDialogId());
         assertThat(mine.nodes()).allSatisfy(d -> assertThat(d.getStatus()).as("statuses filter is honoured").isEqualTo("ACTIVE"));
 
         DialogConnection searched = DialogApi.listDialogs(null, 50, RUN_ID.value());
-        assertThat(searched.ids()).as("Search by the run id finds the dialog by its title").contains(dialog.getDialogId());
+        assertThat(searched.rawIds()).as("Search by the run id finds the dialog by its title").contains(dialog.getDialogId());
     }
 
     @Tag("feature")
@@ -101,15 +102,15 @@ public class DialogsTest extends BaseTest {
         assertThat(dialog).as("The dialog from the first case").isNotNull();
         String id = dialog.getDialogId();
         DialogApi.archiveDialog(id);
-        assertThat(DialogApi.listDialogs(DialogFilterInput.builder().statuses(List.of("ARCHIVED")).scope("MY").build(), 50, RUN_ID.value()).ids())
+        assertThat(DialogApi.listDialogs(DialogFilterInput.builder().statuses(List.of("ARCHIVED")).scope("MY").build(), 50, RUN_ID.value()).rawIds())
                 .as("An archived dialog is listed under ARCHIVED").contains(id);
-        assertThat(DialogApi.listDialogs(DialogFilterInput.builder().statuses(List.of("ACTIVE")).scope("MY").build(), 50, RUN_ID.value()).ids())
+        assertThat(DialogApi.listDialogs(DialogFilterInput.builder().statuses(List.of("ACTIVE")).scope("MY").build(), 50, RUN_ID.value()).rawIds())
                 .as("An archived dialog is not listed under ACTIVE").doesNotContain(id);
 
         DialogResponse restored = DialogApi.unarchiveDialog(id);
-        assertThat(restored.getId()).as("Unarchiving keeps the id").isEqualTo(id);
+        assertThat(RelayIds.raw(restored.getId())).as("Unarchiving keeps the id").isEqualTo(id);
         assertThat(restored.getStatus()).as("An unarchived dialog is ACTIVE again").isEqualTo("ACTIVE");
-        assertThat(DialogApi.listDialogs(DialogFilterInput.builder().statuses(List.of("ACTIVE")).scope("MY").build(), 50, RUN_ID.value()).ids())
+        assertThat(DialogApi.listDialogs(DialogFilterInput.builder().statuses(List.of("ACTIVE")).scope("MY").build(), 50, RUN_ID.value()).rawIds())
                 .as("The restored dialog is back under ACTIVE").contains(id);
     }
 
@@ -180,7 +181,7 @@ public class DialogsTest extends BaseTest {
         assumeTrue(unreadMinted, "No unread client message was minted in \"A client message in a technician-held dialog is unread for technicians only\"; see that failure");
         String id = clientDialog.getDialogId();
         DialogResponse marked = DialogApi.markDialogMessagesRead(id);
-        assertThat(marked.getId()).as("The payload carries the dialog").isEqualTo(id);
+        assertThat(RelayIds.raw(marked.getId())).as("The payload carries the dialog").isEqualTo(id);
         assertThat(marked.getUnreadMessageCount()).as("The technician side is zeroed in the payload").isZero();
         assertThat(DialogApi.getDialog(id).getUnreadMessageCount()).as("The zeroed counter reads back").isZero();
 

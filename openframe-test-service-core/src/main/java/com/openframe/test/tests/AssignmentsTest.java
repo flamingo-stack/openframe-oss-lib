@@ -80,8 +80,9 @@ public class AssignmentsTest extends BaseTest {
                 .title(TICKET_TITLE)
                 .description("created by the E2E suite to be an assignment target")
                 .build());
-        // The ai-agent answers the raw ticket id; the assignment mutations take the Relay global id.
-        ticketId = RelayIds.toGlobalId("Ticket", ticket.getId());
+        // The assignment mutations take the api-service's Ticket global id. The ai-agent answers a raw
+        // ticket id, or a global one once it has migrated, so build it from the raw id either way.
+        ticketId = RelayIds.toGlobalId("Ticket", RelayIds.raw(ticket.getId()));
         resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
         archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
         Machine found = DeviceApi.searchDevice(osDevicesFilter("WINDOWS"), WINDOWS_BOX);
