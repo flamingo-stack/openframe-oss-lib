@@ -1,6 +1,7 @@
 package com.openframe.api.service.packagesearch;
 
 import com.openframe.api.dto.packagesearch.PackageDetails;
+import com.openframe.api.dto.packagesearch.PackageSearchHit;
 import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.dto.packagesearch.PackageVersion;
@@ -8,10 +9,11 @@ import com.openframe.api.exception.PackageNotFoundException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.repository.packagesearch.PackageCatalogHit;
+import com.openframe.data.repository.packagesearch.PackageCatalogOrder;
 import com.openframe.data.repository.packagesearch.PackageCatalogPage;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,8 +21,6 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class BrewPackageClient implements PackageManagerClient {
-
-    private static final Sort MOST_POPULAR_FIRST = Sort.by(Sort.Order.desc("popularity"), Sort.Order.asc("packageId"));
 
     private final PackageCatalogRepository packageCatalogRepository;
 
@@ -30,18 +30,23 @@ public class BrewPackageClient implements PackageManagerClient {
     }
 
     @Override
-    public PackageSearchResult search(String query, int limit, int offset) {
-        PackageCatalogPage page = packageCatalogRepository.searchByName(PackageManagerType.BREW, query, MOST_POPULAR_FIRST, offset, limit);
-        List<PackageSearchItem> items = page.getEntries().stream()
-                .map(this::toItem)
+    public PackageSearchResult search(String query, String afterCursor, int limit) {
+        PackageCatalogPage page = packageCatalogRepository.searchByName(
+                PackageManagerType.BREW, query, PackageCatalogOrder.MOST_POPULAR_FIRST, afterCursor, limit);
+        List<PackageSearchHit> hits = page.getHits().stream()
+                .map(this::toHit)
                 .toList();
         int total = (int) page.getTotal();
-        boolean hasMore = offset + limit < total;
         return PackageSearchResult.builder()
-                .items(items)
+                .hits(hits)
                 .total(total)
-                .hasMore(hasMore)
+                .hasMore(page.isHasMore())
                 .build();
+    }
+
+    private PackageSearchHit toHit(PackageCatalogHit hit) {
+        PackageSearchItem item = toItem(hit.getEntry());
+        return new PackageSearchHit(item, hit.getCursor());
     }
 
     @Override

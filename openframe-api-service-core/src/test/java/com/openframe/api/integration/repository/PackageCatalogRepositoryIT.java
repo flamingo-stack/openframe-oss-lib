@@ -5,6 +5,8 @@ import com.mongodb.client.MongoClients;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.repository.packagesearch.PackageCatalogHit;
+import com.openframe.data.repository.packagesearch.PackageCatalogOrder;
 import com.openframe.data.repository.packagesearch.PackageCatalogPage;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepositoryImpl;
 import org.junit.jupiter.api.AfterAll;
@@ -13,13 +15,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.util.List;
 
+import static com.openframe.data.document.packagesearch.PackageManagerType.BREW;
+import static com.openframe.data.document.packagesearch.PackageManagerType.WINGET;
+import static com.openframe.data.repository.packagesearch.PackageCatalogOrder.BY_NAME;
+import static com.openframe.data.repository.packagesearch.PackageCatalogOrder.MOST_POPULAR_FIRST;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("integration")
@@ -27,9 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PackageCatalogRepositoryIT {
 
     private static final MongoDBContainer MONGO = new MongoDBContainer(DockerImageName.parse("mongo:7"));
-    private static final Sort MOST_POPULAR_FIRST = Sort.by(Sort.Order.desc("popularity"), Sort.Order.asc("packageId"));
-    private static final Sort BY_NAME = Sort.by(Sort.Order.asc("name"), Sort.Order.asc("packageId"));
-    private static final int FIRST_PAGE = 0;
+    private static final String FIRST_PAGE = null;
     private static final int PAGE_SIZE = 10;
 
     private static MongoTemplate mongoTemplate;
@@ -61,6 +64,7 @@ class PackageCatalogRepositoryIT {
                 brew("jq", "jq", 400, "Slack-friendly JSON processor"),
                 brew("slackish", "Totally Different", 1, null),
                 brew("cpp-tools", "C++ Tools", 2, null),
+                brew("unranked", "Unranked Tool", null, null),
                 winget("SlackTechnologies.Slack", "Slack"),
                 winget("Zoom.Zoom", "Zoom"),
                 winget("Google.AndroidSDK.adb", "adb"),
@@ -71,93 +75,175 @@ class PackageCatalogRepositoryIT {
     @Test
     void searchByName_query_exactThenPrefixThenContainsThenMostPopular() {
         // execution
-        PackageCatalogPage page = repository.searchByName(PackageManagerType.BREW, "slack", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
+        PackageCatalogPage page = repository.searchByName(BREW, "slack", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
 
         // verifications
-        assertThat(page.getEntries())
-                .extracting(PackageCatalogEntry::getPackageId)
+        assertThat(page.getHits())
+                .extracting(PackageCatalogRepositoryIT::packageId)
                 .containsExactly("slack", "slack@beta", "slack-cli", "font-slackey");
         assertThat(page.getTotal()).isEqualTo(4);
+        assertThat(page.isHasMore()).isFalse();
+    }
+
+    @Test
+    void searchByName_hitCursor_scorePackageIdSecondary() {
+        // execution
+        PackageCatalogPage brewPage = repository.searchByName(BREW, "slack", MOST_POPULAR_FIRST, FIRST_PAGE, 1);
+        PackageCatalogPage wingetPage = repository.searchByName(WINGET, "", BY_NAME, FIRST_PAGE, 1);
+
+        // verifications
+        assertThat(brewPage.getHits())
+                .extracting(PackageCatalogHit::getCursor)
+                .containsExactly("3|slack|7594");
+        assertThat(wingetPage.getHits())
+                .extracting(PackageCatalogHit::getCursor)
+                .containsExactly("2|7zip.7zip|7-Zip");
+    }
+
+    @Test
+    void searchByName_pageThenCursor_continuesWithoutOverlapOrGaps() {
+        // setup
+        PackageCatalogPage firstPage = repository.searchByName(BREW, "slack", MOST_POPULAR_FIRST, FIRST_PAGE, 2);
+        String afterSecondHit = lastCursor(firstPage);
+
+        // execution
+        PackageCatalogPage secondPage = repository.searchByName(BREW, "slack", MOST_POPULAR_FIRST, afterSecondHit, 2);
+
+        // verifications
+        assertThat(firstPage.getHits())
+                .extracting(PackageCatalogRepositoryIT::packageId)
+                .containsExactly("slack", "slack@beta");
+        assertThat(firstPage.isHasMore()).isTrue();
+        assertThat(secondPage.getHits())
+                .extracting(PackageCatalogRepositoryIT::packageId)
+                .containsExactly("slack-cli", "font-slackey");
+        assertThat(secondPage.isHasMore()).isFalse();
+        assertThat(secondPage.getTotal()).isEqualTo(4);
+    }
+
+    @Test
+    void searchByName_emptyQueryCursor_walksPopularityTiersDownToUnranked() {
+        // setup
+        PackageCatalogPage firstPage = repository.searchByName(BREW, "", MOST_POPULAR_FIRST, FIRST_PAGE, 3);
+        PackageCatalogPage secondPage = repository.searchByName(BREW, "", MOST_POPULAR_FIRST, lastCursor(firstPage), 3);
+
+        // execution
+        PackageCatalogPage thirdPage = repository.searchByName(BREW, "", MOST_POPULAR_FIRST, lastCursor(secondPage), 3);
+
+        // verifications
+        assertThat(firstPage.getHits())
+                .extracting(PackageCatalogRepositoryIT::packageId)
+                .containsExactly("gh", "slack", "slack-cli");
+        assertThat(secondPage.getHits())
+                .extracting(PackageCatalogRepositoryIT::packageId)
+                .containsExactly("jq", "slack@beta", "font-slackey");
+        assertThat(thirdPage.getHits())
+                .extracting(PackageCatalogRepositoryIT::packageId)
+                .containsExactly("cpp-tools", "slackish", "unranked");
+        assertThat(thirdPage.isHasMore()).isFalse();
+        assertThat(thirdPage.getTotal()).isEqualTo(9);
+    }
+
+    @Test
+    void searchByName_byNameCursor_continuesCaseInsensitively() {
+        // setup
+        PackageCatalogPage firstPage = repository.searchByName(WINGET, "", BY_NAME, FIRST_PAGE, 2);
+
+        // execution
+        PackageCatalogPage secondPage = repository.searchByName(WINGET, "", BY_NAME, lastCursor(firstPage), 2);
+
+        // verifications
+        assertThat(firstPage.getHits())
+                .extracting(PackageCatalogRepositoryIT::name)
+                .containsExactly("7-Zip", "adb");
+        assertThat(secondPage.getHits())
+                .extracting(PackageCatalogRepositoryIT::name)
+                .containsExactly("Slack", "Zoom");
+        assertThat(secondPage.isHasMore()).isFalse();
+    }
+
+    @Test
+    void searchByName_cursorOfLastHit_emptyPageKeepsTotal() {
+        // setup
+        PackageCatalogPage wholeResult = repository.searchByName(BREW, "slack", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
+
+        // execution
+        PackageCatalogPage pastTheEnd = repository.searchByName(BREW, "slack", MOST_POPULAR_FIRST, lastCursor(wholeResult), PAGE_SIZE);
+
+        // verifications
+        assertThat(pastTheEnd.getHits()).isEmpty();
+        assertThat(pastTheEnd.isHasMore()).isFalse();
+        assertThat(pastTheEnd.getTotal()).isEqualTo(4);
+    }
+
+    @Test
+    void searchByName_invalidCursor_firstPageServed() {
+        // execution
+        PackageCatalogPage page = repository.searchByName(BREW, "slack", MOST_POPULAR_FIRST, "garbage", 2);
+
+        // verifications
+        assertThat(page.getHits())
+                .extracting(PackageCatalogRepositoryIT::packageId)
+                .containsExactly("slack", "slack@beta");
     }
 
     @Test
     void searchByName_mixedCaseQuery_matchesCaseInsensitively() {
         // execution
-        PackageCatalogPage page = repository.searchByName(PackageManagerType.BREW, "SLACK CLI", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
+        PackageCatalogPage page = repository.searchByName(BREW, "SLACK CLI", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
 
         // verifications
-        assertThat(page.getEntries())
-                .extracting(PackageCatalogEntry::getPackageId)
+        assertThat(page.getHits())
+                .extracting(PackageCatalogRepositoryIT::packageId)
                 .containsExactly("slack-cli");
         assertThat(page.getTotal()).isEqualTo(1);
     }
 
     @Test
-    void searchByName_emptyQuery_wholeManagerCatalogPagedByTieBreak() {
-        // execution
-        PackageCatalogPage page = repository.searchByName(PackageManagerType.BREW, "", MOST_POPULAR_FIRST, 1, 2);
-
-        // verifications
-        assertThat(page.getEntries())
-                .extracting(PackageCatalogEntry::getPackageId)
-                .containsExactly("slack", "slack-cli");
-        assertThat(page.getTotal()).isEqualTo(8);
-    }
-
-    @Test
-    void searchByName_emptyQueryByName_orderIgnoresCase() {
-        // execution
-        PackageCatalogPage page = repository.searchByName(PackageManagerType.WINGET, "", BY_NAME, FIRST_PAGE, PAGE_SIZE);
-
-        // verifications
-        assertThat(page.getEntries())
-                .extracting(PackageCatalogEntry::getName)
-                .containsExactly("7-Zip", "adb", "Slack", "Zoom");
-        assertThat(page.getTotal()).isEqualTo(4);
-    }
-
-    @Test
-    void searchByName_offsetBeyondMatches_emptyPageKeepsTotal() {
-        // execution
-        PackageCatalogPage page = repository.searchByName(PackageManagerType.BREW, "slack", MOST_POPULAR_FIRST, 10, 5);
-
-        // verifications
-        assertThat(page.getEntries()).isEmpty();
-        assertThat(page.getTotal()).isEqualTo(4);
-    }
-
-    @Test
     void searchByName_noMatches_emptyPageZeroTotal() {
         // execution
-        PackageCatalogPage page = repository.searchByName(PackageManagerType.BREW, "nothing here", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
+        PackageCatalogPage page = repository.searchByName(BREW, "nothing here", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
 
         // verifications
-        assertThat(page.getEntries()).isEmpty();
+        assertThat(page.getHits()).isEmpty();
         assertThat(page.getTotal()).isZero();
+        assertThat(page.isHasMore()).isFalse();
     }
 
     @Test
     void searchByName_specialCharacters_matchedLiterally() {
         // execution
-        PackageCatalogPage page = repository.searchByName(PackageManagerType.BREW, "c++", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
+        PackageCatalogPage page = repository.searchByName(BREW, "c++", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
 
         // verifications
-        assertThat(page.getEntries())
-                .extracting(PackageCatalogEntry::getPackageId)
+        assertThat(page.getHits())
+                .extracting(PackageCatalogRepositoryIT::packageId)
                 .containsExactly("cpp-tools");
     }
 
     @Test
     void searchByName_dollarPrefixedQuery_notAFieldReference() {
         // execution
-        PackageCatalogPage page = repository.searchByName(PackageManagerType.BREW, "$name", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
+        PackageCatalogPage page = repository.searchByName(BREW, "$name", MOST_POPULAR_FIRST, FIRST_PAGE, PAGE_SIZE);
 
         // verifications
-        assertThat(page.getEntries()).isEmpty();
+        assertThat(page.getHits()).isEmpty();
         assertThat(page.getTotal()).isZero();
     }
 
-    private static PackageCatalogEntry brew(String packageId, String name, int popularity, String description) {
+    private static String lastCursor(PackageCatalogPage page) {
+        return page.getHits().getLast().getCursor();
+    }
+
+    private static String packageId(PackageCatalogHit hit) {
+        return hit.getEntry().getPackageId();
+    }
+
+    private static String name(PackageCatalogHit hit) {
+        return hit.getEntry().getName();
+    }
+
+    private static PackageCatalogEntry brew(String packageId, String name, Integer popularity, String description) {
         return PackageCatalogEntry.builder()
                 .id("BREW:CASK:" + packageId)
                 .manager(PackageManagerType.BREW)

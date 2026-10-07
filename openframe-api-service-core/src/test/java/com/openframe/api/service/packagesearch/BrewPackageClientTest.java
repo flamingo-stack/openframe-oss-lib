@@ -1,12 +1,15 @@
 package com.openframe.api.service.packagesearch;
 
 import com.openframe.api.dto.packagesearch.PackageDetails;
+import com.openframe.api.dto.packagesearch.PackageSearchHit;
 import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.exception.PackageNotFoundException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.repository.packagesearch.PackageCatalogHit;
+import com.openframe.data.repository.packagesearch.PackageCatalogOrder;
 import com.openframe.data.repository.packagesearch.PackageCatalogPage;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import org.junit.jupiter.api.Test;
@@ -14,7 +17,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
@@ -26,7 +28,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class BrewPackageClientTest {
 
-    private static final Sort MOST_POPULAR_FIRST = Sort.by(Sort.Order.desc("popularity"), Sort.Order.asc("packageId"));
+    private static final String SLACK_CURSOR = "3|slack|7594";
+    private static final String SLACK_CLI_CURSOR = "2|slack-cli|791";
 
     @Mock
     private PackageCatalogRepository packageCatalogRepository;
@@ -35,55 +38,60 @@ class BrewPackageClientTest {
     private BrewPackageClient client;
 
     @Test
-    void search_matchesFound_itemsKeepRepositoryOrderAndInstallCommands() {
+    void search_firstPage_hitsKeepRepositoryOrderCursorsAndInstallCommands() {
         // setup
-        PackageCatalogEntry slack = caskEntry("slack", "Slack", 7594);
-        PackageCatalogEntry slackFormula = formulaEntry("slack-cli", "Slack CLI", 791);
-        PackageCatalogPage page = new PackageCatalogPage(List.of(slack, slackFormula), 2);
-        when(packageCatalogRepository.searchByName(PackageManagerType.BREW, "slack", MOST_POPULAR_FIRST, 0, 3)).thenReturn(page);
+        PackageCatalogHit slack = new PackageCatalogHit(caskEntry("slack", "Slack", 7594), SLACK_CURSOR);
+        PackageCatalogHit slackCli = new PackageCatalogHit(formulaEntry("slack-cli", "Slack CLI", 791), SLACK_CLI_CURSOR);
+        PackageCatalogPage page = new PackageCatalogPage(List.of(slack, slackCli), 9, true);
+        when(packageCatalogRepository.searchByName(PackageManagerType.BREW, "slack", PackageCatalogOrder.MOST_POPULAR_FIRST, null, 2))
+                .thenReturn(page);
 
         // execution
-        PackageSearchResult result = client.search("slack", 3, 0);
+        PackageSearchResult result = client.search("slack", null, 2);
 
         // verifications
-        assertThat(result.getItems())
-                .extracting(PackageSearchItem::getId, PackageSearchItem::getInstallCommand, PackageSearchItem::getPackageManager)
+        assertThat(result.getHits())
+                .extracting(PackageSearchHit::getCursor, hit -> hit.getItem().getId(), hit -> hit.getItem().getInstallCommand())
                 .containsExactly(
-                        tuple("slack", "brew install --cask slack", PackageManagerType.BREW),
-                        tuple("slack-cli", "brew install slack-cli", PackageManagerType.BREW));
-        assertThat(result.getTotal()).isEqualTo(2);
-        assertThat(result.isHasMore()).isFalse();
-    }
-
-    @Test
-    void search_moreMatchesThanPage_hasMore() {
-        // setup
-        PackageCatalogEntry slack = caskEntry("slack", "Slack", 7594);
-        PackageCatalogPage page = new PackageCatalogPage(List.of(slack), 2);
-        when(packageCatalogRepository.searchByName(PackageManagerType.BREW, "slack", MOST_POPULAR_FIRST, 0, 1)).thenReturn(page);
-
-        // execution
-        PackageSearchResult result = client.search("slack", 1, 0);
-
-        // verifications
-        assertThat(result.getItems()).hasSize(1);
+                        tuple(SLACK_CURSOR, "slack", "brew install --cask slack"),
+                        tuple(SLACK_CLI_CURSOR, "slack-cli", "brew install slack-cli"));
+        assertThat(result.getTotal()).isEqualTo(9);
         assertThat(result.isHasMore()).isTrue();
     }
 
     @Test
-    void search_emptyQuery_wholeCatalogPagedMostPopularFirst() {
+    void search_afterCursor_cursorHandedToRepositoryUnchanged() {
         // setup
-        PackageCatalogEntry gh = formulaEntry("gh", "gh", 90000);
-        PackageCatalogPage page = new PackageCatalogPage(List.of(gh), 15323);
-        when(packageCatalogRepository.searchByName(PackageManagerType.BREW, "", MOST_POPULAR_FIRST, 1, 2)).thenReturn(page);
+        PackageCatalogHit slackCli = new PackageCatalogHit(formulaEntry("slack-cli", "Slack CLI", 791), SLACK_CLI_CURSOR);
+        PackageCatalogPage page = new PackageCatalogPage(List.of(slackCli), 9, false);
+        when(packageCatalogRepository.searchByName(PackageManagerType.BREW, "slack", PackageCatalogOrder.MOST_POPULAR_FIRST, SLACK_CURSOR, 5))
+                .thenReturn(page);
 
         // execution
-        PackageSearchResult result = client.search("", 2, 1);
+        PackageSearchResult result = client.search("slack", SLACK_CURSOR, 5);
 
         // verifications
-        assertThat(result.getItems())
-                .extracting(PackageSearchItem::getId)
-                .containsExactly("gh");
+        assertThat(result.getHits())
+                .extracting(hit -> hit.getItem().getId())
+                .containsExactly("slack-cli");
+        assertThat(result.isHasMore()).isFalse();
+    }
+
+    @Test
+    void search_emptyQuery_wholeCatalogRequestedMostPopularFirst() {
+        // setup
+        PackageCatalogHit gh = new PackageCatalogHit(formulaEntry("gh", "gh", 90000), "2|gh|90000");
+        PackageCatalogPage page = new PackageCatalogPage(List.of(gh), 15323, true);
+        when(packageCatalogRepository.searchByName(PackageManagerType.BREW, "", PackageCatalogOrder.MOST_POPULAR_FIRST, null, 1))
+                .thenReturn(page);
+
+        // execution
+        PackageSearchResult result = client.search("", null, 1);
+
+        // verifications
+        assertThat(result.getHits())
+                .extracting(hit -> hit.getItem().getPackageManager())
+                .containsExactly(PackageManagerType.BREW);
         assertThat(result.getTotal()).isEqualTo(15323);
         assertThat(result.isHasMore()).isTrue();
     }
@@ -91,14 +99,15 @@ class BrewPackageClientTest {
     @Test
     void search_noMatches_emptyResultWithZeroTotal() {
         // setup
-        PackageCatalogPage page = new PackageCatalogPage(List.of(), 0);
-        when(packageCatalogRepository.searchByName(PackageManagerType.BREW, "nothing", MOST_POPULAR_FIRST, 0, 25)).thenReturn(page);
+        PackageCatalogPage page = new PackageCatalogPage(List.of(), 0, false);
+        when(packageCatalogRepository.searchByName(PackageManagerType.BREW, "nothing", PackageCatalogOrder.MOST_POPULAR_FIRST, null, 25))
+                .thenReturn(page);
 
         // execution
-        PackageSearchResult result = client.search("nothing", 25, 0);
+        PackageSearchResult result = client.search("nothing", null, 25);
 
         // verifications
-        assertThat(result.getItems()).isEmpty();
+        assertThat(result.getHits()).isEmpty();
         assertThat(result.getTotal()).isZero();
         assertThat(result.isHasMore()).isFalse();
     }
