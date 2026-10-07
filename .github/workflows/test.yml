@@ -170,13 +170,16 @@ jobs:
 
       # --ignore-scripts skips a prepack rebuild.
       - name: Pack
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           OLD_VERSION=$(npm view "$(jq -r .name package.json)" dist-tags.latest)
           npm version "${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}.${{ github.run_number }}.${{ github.run_attempt }}" --no-git-tag-version
           echo "PACKAGE_TARBALL=$PWD/$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${HEAD_SHA::7}" >> "$GITHUB_ENV"
 
       # PR builds go to pkg.pr.new only.
-      - name: Preview registry (pkg.pr.new)
+      - name: Preview registry (pkg.pr.new) @${{ env.SHORT_SHA }} (@${{ github.event.pull_request.number }} tag)
         run: |
           npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --json pkg-pr-new.json "$PACKAGE_TARBALL"
           jq -r '.packages[0].url' pkg-pr-new.json >> "$GITHUB_STEP_SUMMARY"
