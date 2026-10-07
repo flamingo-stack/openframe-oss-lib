@@ -28,7 +28,6 @@ import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
 import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
 import static com.openframe.authz.web.Redirects.seeOther;
 import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
-import static java.util.Locale.ROOT;
 import static org.springframework.http.HttpStatus.OK;
 
 @Slf4j
@@ -56,7 +55,7 @@ public class TenantRegistrationController {
                            HttpServletRequest httpRequest,
                            HttpServletResponse httpResponse) {
         Tenant tenant = registrationService.registerTenant(request);
-        userService.findActiveByEmailAndTenant(request.getEmail().toLowerCase(ROOT), tenant.getId())
+        userService.findActiveById(tenant.getOwnerId())
                 .ifPresent(owner -> registrationSessionLogin.signIn(owner, httpRequest, httpResponse));
         return tenant;
     }
