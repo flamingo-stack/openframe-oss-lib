@@ -97,9 +97,10 @@ function Host({
     connectionState: 'connected',
     dialogCapabilities: {
       fetchArchivedDialogs: () => Promise.resolve({ dialogs: [], nextCursor: null }),
-      unarchiveDialog: async id => {
+      unarchiveDialog: id => {
         onUnarchive(id);
         setRecord(current => ({ ...current, archived: false }));
+        return Promise.resolve();
       },
     },
   };
