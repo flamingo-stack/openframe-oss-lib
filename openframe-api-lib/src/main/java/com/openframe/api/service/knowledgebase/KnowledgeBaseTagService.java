@@ -1,5 +1,7 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.tag.Tag;
@@ -82,6 +84,7 @@ public class KnowledgeBaseTagService {
     @Transactional
     public void addTagToItem(String itemId, String tagId) {
         log.info("Adding tag {} to KB item {}", tagId, itemId);
+        requireExistingTag(tagId);
         if (tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE).isPresent()) {
             return;
         }
@@ -91,6 +94,12 @@ public class KnowledgeBaseTagService {
                 .entityType(ENTITY_TYPE)
                 .build();
         tagAssignmentRepository.save(assignment);
+    }
+
+    private void requireExistingTag(String tagId) {
+        if (!tagRepository.existsById(tagId)) {
+            throw new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId);
+        }
     }
 
     @Transactional
