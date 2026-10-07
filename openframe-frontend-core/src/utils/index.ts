@@ -17,6 +17,15 @@ export {
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
 export { formatDate, formatNumber, formatPrice, formatBytes } from './format';
+export {
+  VENDOR_CLASSIFICATIONS,
+  OPENFRAME_CLASSIFICATIONS,
+  isVendorClassification,
+  isOpenFrameClassification,
+  type VendorClassificationValue,
+  type OpenFrameClassification,
+  type OpenFrameClassificationCopy,
+} from './vendor-classification';
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon';
 export {
@@ -107,6 +116,7 @@ export * from './shell-utils';
 export * from './video-bite-id';
 // OS type utilities
 export * from './os-utils';
+export * from './visitor-os';
 // Phone utilities
 export * from './country-phone-utils';
 export * from './compliance-standards';
@@ -321,6 +331,7 @@ export * from './dev-sections';
 // pre-computed pixel value avoids the mid-animation jitter that
 // `element.scrollIntoView()` produces when layout shifts during the
 // scroll).
+export { openInNewTab } from './open-in-new-tab';
 export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scroll-into-view';
 
 // Same-page hash navigation — owns pushState + synthetic hashchange +
@@ -328,8 +339,12 @@ export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scro
 // hub's `useUnifiedNav` + chat-runtime `navigate`, AND by every
 // embeddable surface that drives state off the URL hash.
 export {
+  ACTIVE_ANCHOR_ATTRIBUTE,
+  isScrollSyncedHash,
+  LOCATION_HASH_SYNC_EVENT,
   navigateSamePageHash,
   normalizeHashFragment,
+  replaceLocationHash,
   STICKY_HEADER_OFFSET_PX,
   HUB_HEADER_OFFSET_PX,
   type NavigateSamePageHashOptions,
@@ -451,3 +466,4 @@ export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './
 
 // Footer copyright line (one owner; never a double period after "Inc.").
 export { copyrightLine } from './copyright-line';
+export * from './path-pattern';

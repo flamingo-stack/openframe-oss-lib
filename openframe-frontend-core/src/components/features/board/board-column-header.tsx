@@ -29,7 +29,7 @@ export function BoardColumnHeader({
   const useStatusVariant = resolveTicketStatus(tagStatus) !== null;
   // The dense header size on every input mode — the mobile mock keeps the
   // lane's info/collapse buttons small, same as desktop.
-  const actionClass = 'h-8 w-8 p-0 md:h-8 md:w-8';
+  const actionClass = 'h-8 w-8 p-0 content-md:h-8 content-md:w-8';
 
   if (collapsed) {
     return (

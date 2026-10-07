@@ -88,10 +88,22 @@ export * from './view-toggle';
 // AI Enrich components
 export * from './ai-enrich';
 export * from './policy-configuration-panel';
+export * from './policies';
+export * from './cloud-tenants';
 export * from './waitlist-form';
 export * from './notifications';
 export * from './time-tracker';
 export * from './remote-session';
 export * from './board';
+export * from './devices';
+export * from './software';
+export * from './logs';
+export * from './knowledge-base';
 export * from './sortable-list';
 export * from './ticket-status-config-list';
+
+// A request and its outcome as two turns and a "your part" footer
+export * from './conversation-card';
+
+// The jobs a product does, one at a time with its real screen (marketing pages)
+export * from './capability-explorer';

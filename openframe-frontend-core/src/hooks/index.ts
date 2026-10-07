@@ -20,6 +20,9 @@ export * from './nats/use-nats-client';
 // Viewport / lazy-mount primitive (shared IO singleton)
 export * from './use-near-viewport';
 
+// The clock of a looping scripted demo (scenarios x steps, hold, pause, jump)
+export * from './use-scenario-player';
+
 // Access code integration — pairs with the standalone helpers in
 // `utils/access-code-client`. Lives in `hooks/` so the createContext
 // pulled in via EndpointsRuntimeContext doesn't end up in the
@@ -36,6 +39,7 @@ export * from './use-claude-mirror-src';
 // Deep-link "scroll to URL hash" after data loads. Pairs with URL
 // composers that emit `?<filter>=<id>#<prefix>-<id>` — the filter
 // narrows the list, the hash scrolls the matching DOM id.
+export * from './use-location-hash';
 export * from './use-scroll-to-hash';
 
 // Invisible bot-protection client primitive (honeypot ref + submit-timing).

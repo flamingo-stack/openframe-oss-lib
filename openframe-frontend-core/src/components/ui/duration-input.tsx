@@ -115,7 +115,7 @@ export function DurationInput({ value, onChange, invalid, className }: DurationI
         }
       }}
       className={cn(
-        'flex h-11 w-full items-center gap-[var(--spacing-system-xxs)] rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-sf)] transition-colors duration-200 md:h-12',
+        'flex h-11 w-full items-center gap-[var(--spacing-system-xxs)] rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-sf)] transition-colors duration-200 content-md:h-12',
         'cursor-text focus-within:border-ods-accent',
         invalid && 'border-ods-error focus-within:border-ods-error',
         className,

@@ -1,10 +1,12 @@
 // UI Hooks exports
 export * from './use-auto-limit-tags';
+export * from './use-content-breakpoint';
 export * from './use-debounce';
 export * from './use-deferred-error';
 export * from './use-drag-and-drop-enabled';
 export * from './use-focus-trap';
 export * from './use-header-height';
+export * from './use-sticky-toolbar';
 export * from './use-horizontal-scrollbar';
 export * from './use-image-edge-color';
 export * from './use-is-truncated';
@@ -27,3 +29,9 @@ export * from './use-window-size';
 // hub/app consumers have one import path; lib internals may import the
 // package directly (npm dedupes to one module instance either way).
 export { usePreventScroll } from '@react-aria/overlays';
+export * from './use-prefers-reduced-motion';
+export * from './use-in-view';
+export * from './use-autoplay';
+export * from './use-active-section';
+export * from './use-nav-menus';
+export * from './use-visitor-os';

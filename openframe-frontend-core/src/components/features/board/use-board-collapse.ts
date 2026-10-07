@@ -11,9 +11,14 @@ export interface UseBoardCollapseReturn {
   setCollapsed: (columnId: string, value: boolean) => void;
 }
 
-export function useBoardCollapse(storageKey?: string): UseBoardCollapseReturn {
+/**
+ * Which lanes are collapsed. With a `storageKey` the map is the user's, kept in
+ * local storage; without one it lives in memory and starts from `initial` (a
+ * host that shows a board with some lanes already folded).
+ */
+export function useBoardCollapse(storageKey?: string, initial?: BoardCollapseMap): UseBoardCollapseReturn {
   const [persisted, setPersisted] = useLocalStorage<BoardCollapseMap>(storageKey ?? '__board_collapse_unused__', {});
-  const [memory, setMemory] = useState<BoardCollapseMap>({});
+  const [memory, setMemory] = useState<BoardCollapseMap>(initial ?? {});
 
   const collapsed = storageKey ? persisted : memory;
   const setMap = storageKey ? setPersisted : setMemory;

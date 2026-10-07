@@ -138,7 +138,7 @@ export function PersistentSidebar({ isLoading, children, className }: Persistent
     <PersistentFilterControls
       isLoading={isLoading}
       disabledOpacity={0.5}
-      className={cn('lg:sticky lg:top-20', className)}
+      className={cn('content-lg:sticky content-lg:top-20', className)}
     >
       {children}
     </PersistentFilterControls>
@@ -156,7 +156,11 @@ interface PersistentMobileDropdownProps {
 
 export function PersistentMobileDropdown({ isLoading, children, className }: PersistentMobileDropdownProps) {
   return (
-    <PersistentFilterControls isLoading={isLoading} disabledOpacity={0.7} className={cn('lg:hidden', className)}>
+    <PersistentFilterControls
+      isLoading={isLoading}
+      disabledOpacity={0.7}
+      className={cn('content-lg:hidden', className)}
+    >
       {children}
     </PersistentFilterControls>
   );

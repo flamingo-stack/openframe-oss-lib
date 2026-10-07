@@ -5,6 +5,7 @@ import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.core.constants.SsoFlowCookieNames;
+import com.openframe.core.exception.AuthFlowException;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,9 +24,11 @@ import java.util.Optional;
 
 import static com.openframe.authz.support.SsoTestFixtures.authentication;
 import static com.openframe.authz.support.SsoTestFixtures.oidcUser;
+import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
+import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -93,7 +96,7 @@ class SsoFlowSuccessHandlerTest {
 
         assertThat(inviteHandler.handled || loginHandler.handled).isFalse();
         assertThat(clearedCookies()).containsExactlyInAnyOrderElementsOf(SsoFlowCookieNames.ALL);
-        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-flow-state-mismatch"), any(), anyString());
+        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-flow-state-mismatch"), any(AuthFlowException.class), eq(SSO_SESSION_EXPIRED));
         verify(ssoIdentityCapture, never()).capture(any());
     }
 
@@ -104,7 +107,7 @@ class SsoFlowSuccessHandlerTest {
         successHandler.onAuthenticationSuccess(request, response, authentication);
 
         assertThat(inviteHandler.handled).isFalse();
-        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-flow-state-mismatch"), any(), anyString());
+        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-flow-state-mismatch"), any(AuthFlowException.class), eq(SSO_SESSION_EXPIRED));
     }
 
     @Test
@@ -127,13 +130,13 @@ class SsoFlowSuccessHandlerTest {
 
         successHandler.onAuthenticationSuccess(request, response, authentication);
 
-        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-login-unverified-email"), any(), anyString());
+        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-login-unverified-email"), any(), eq(EMAIL_NOT_VERIFIED));
         verify(ssoIdentityCapture, never()).capture(any());
         verify(appleWebTokenCapture, never()).captureIfApple(any(), any());
     }
 
     @Test
-    void shouldClearFlowCookiesAndReportHandlerFailureVerbatim() throws Exception {
+    void shouldClearFlowCookiesAndReportHandlerFailure() throws Exception {
         inviteHandler.failure = new IllegalStateException("Invitation expired");
         MockHttpServletRequest request = callback("invite-state", new Cookie(SsoFlowCookieNames.OF_SSO_INVITE, "c"));
 
@@ -141,7 +144,7 @@ class SsoFlowSuccessHandlerTest {
 
         assertThat(clearedCookies()).containsExactlyInAnyOrderElementsOf(SsoFlowCookieNames.ALL);
         verify(authErrorResponder).send(eq(response), eq(request), eq("sso-flow-finalize"),
-                eq(inviteHandler.failure), anyString());
+                eq(inviteHandler.failure), eq(REGISTRATION_FAILED));
         verify(appleWebTokenCapture, never()).captureIfApple(any(), any());
     }
 

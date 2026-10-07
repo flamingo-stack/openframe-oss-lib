@@ -10,7 +10,15 @@
     "dist",
     "src",
     "eslint-config",
-    "tailwind.config.ts"
+    "tailwind.config.ts",
+    "!dist/__tests__",
+    "!src/**/__tests__",
+    "!src/**/__fixtures__",
+    "!src/**/*.test.*",
+    "!src/stories",
+    "!src/**/*.stories.*",
+    "!src/**/.*.md",
+    "!src/components/icons-v2/**/*.svg"
   ],
   "exports": {
     ".": {
@@ -42,6 +50,18 @@
       "import": "./dist/components/chat/index.js",
       "require": "./dist/components/chat/index.cjs",
       "default": "./dist/components/chat/index.js"
+    },
+    "./components/product-demo": {
+      "types": "./dist/components/product-demo/index.d.ts",
+      "import": "./dist/components/product-demo/index.js",
+      "require": "./dist/components/product-demo/index.cjs",
+      "default": "./dist/components/product-demo/index.js"
+    },
+    "./components/product-demo/screen-keys": {
+      "types": "./dist/components/product-demo/screen-keys.d.ts",
+      "import": "./dist/components/product-demo/screen-keys.js",
+      "require": "./dist/components/product-demo/screen-keys.cjs",
+      "default": "./dist/components/product-demo/screen-keys.js"
     },
     "./components/tickets": {
       "types": "./dist/components/tickets/index.d.ts",
@@ -347,6 +367,7 @@
     "yalc:push": "yalc push ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "yalc:publish": "yalc publish ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "generate:icons": "node scripts/generate-icons.mjs",
+    "generate:content-area": "vitest run src/__tests__/content-area-variants.test.ts -u",
     "format": "prettier --check .",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
@@ -495,6 +516,7 @@
     "next": "^16.1.3",
     "nodemon": "^3.1.11",
     "pkg-pr-new": "0.0.88",
+    "postcss": "^8.5.15",
     "prettier": "^3.9.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

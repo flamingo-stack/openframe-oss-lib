@@ -7,6 +7,7 @@ import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.service.user.InvitationRegistrationService;
+import com.openframe.core.exception.AuthFlowException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_INVALID;
 
 @Component
 @RequiredArgsConstructor
@@ -50,7 +52,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
         Cookie cookie = requireCookie(request);
         OidcUser user = requireOidcUser(authentication);
         SsoInviteCookiePayload payload = ssoCookieCodec.decodeInvite(cookie.getValue())
-                .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
+                .orElseThrow(() -> new AuthFlowException(SSO_SESSION_INVALID, "SSO session is invalid. Please try again."));
 
         requireEmail(user); // ensure email present even if not directly used
 

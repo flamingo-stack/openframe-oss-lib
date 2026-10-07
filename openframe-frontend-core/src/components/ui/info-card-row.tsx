@@ -14,7 +14,7 @@ export interface InfoCardRowProps {
 }
 
 const CELL =
-  'flex items-center gap-[var(--spacing-system-s)] min-w-0 p-[var(--spacing-system-xsf)] md:p-[var(--spacing-system-m)] min-h-[60px] md:min-h-[76px]';
+  'flex items-center gap-[var(--spacing-system-s)] min-w-0 p-[var(--spacing-system-xsf)] content-md:p-[var(--spacing-system-m)] min-h-[60px] content-md:min-h-[76px]';
 
 function StatCell({ section, className }: { section: InfoCardRowSection; className?: string }) {
   return (
@@ -24,11 +24,13 @@ function StatCell({ section, className }: { section: InfoCardRowSection; classNa
         <div className="flex min-w-0 items-center gap-[var(--spacing-system-s)]">
           <p className="min-w-0 flex-1 truncate text-ods-text-primary text-h3">{section.caption}</p>
           {section.icon && (
-            <div className="flex size-6 shrink-0 items-center justify-center md:hidden">{section.icon}</div>
+            <div className="flex size-6 shrink-0 items-center justify-center content-md:hidden">{section.icon}</div>
           )}
         </div>
       </div>
-      {section.icon && <div className="hidden size-6 shrink-0 items-center justify-center md:flex">{section.icon}</div>}
+      {section.icon && (
+        <div className="hidden size-6 shrink-0 items-center justify-center content-md:flex">{section.icon}</div>
+      )}
     </div>
   );
 }
@@ -37,11 +39,13 @@ export function InfoCardRow({ lead, stats, className }: InfoCardRowProps) {
   return (
     <div
       className={cn(
-        'flex shrink-0 flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card md:flex-row',
+        'flex shrink-0 flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card content-md:flex-row',
         className,
       )}
     >
-      <div className={cn(CELL, 'border-b border-ods-border md:flex-1 md:border-b-0 md:border-r')}>
+      <div
+        className={cn(CELL, 'border-b border-ods-border content-md:flex-1 content-md:border-b-0 content-md:border-r')}
+      >
         {lead.icon && (
           <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-ods-border [&>*]:size-full [&_img]:object-cover">
             {lead.icon}
@@ -53,7 +57,7 @@ export function InfoCardRow({ lead, stats, className }: InfoCardRowProps) {
         </div>
       </div>
 
-      <div className="flex md:flex-1">
+      <div className="flex content-md:flex-1">
         <StatCell section={stats[0]} className="border-r border-ods-border" />
         <StatCell section={stats[1]} />
       </div>
