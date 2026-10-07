@@ -6,7 +6,8 @@ import {
   TicketAlertsButton,
   type SiteNav,
 } from '@flamingo-stack/openframe-frontend-core/components/navigation'
-import { ASSISTANT_NAME, AskAi } from './ask-ai'
+import { AskAi } from './ask-ai'
+import { useAssistantIdentity } from '../providers/assistant-identity'
 import { WalkthroughVideo } from './walkthrough-video'
 import { DOCS_BASE_ROUTE } from '../config/content'
 
@@ -46,6 +47,13 @@ const SITE_NAV: SiteNav = {
 export function AppShell() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  // The launcher shows the SERVER's identity (name and glyph), the same one the
+  // FAQ's ask card uses; with none configured, the lib's own defaults.
+  const assistant = useAssistantIdentity()
+  const mingo = useMemo(
+    () => ({ label: assistant.name ?? undefined, icon: assistant.icon }),
+    [assistant.name, assistant.icon],
+  )
 
   // The SHARED lib header, the same `SiteHeader` every hub platform mounts,
   // proving it embeds cleanly too. Its links soft-navigate because
@@ -84,7 +92,7 @@ export function AppShell() {
         logoHref="/"
         // Mingo launcher in the header: THE chat entry (dispatches
         // `ask-ai:open`; the always-mounted panel in <AskAi /> listens).
-        mingo={{ label: ASSISTANT_NAME }}
+        mingo={mingo}
         sideActions={sideActions}
       />
       {/* No container constraint here — each route's lib component manages its

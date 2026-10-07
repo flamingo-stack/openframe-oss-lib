@@ -26,15 +26,12 @@ import { DOCS_BASE_ROUTE } from '../config/content'
  * chips land. Doc-card routing for other documentTypes is config-driven via
  * `content-runtime.ts`'s `docPlatformTargets`.
  */
-/** The assistant's name in THIS embed: the header launcher's label and the name the FAQ's ask card uses. */
-export const ASSISTANT_NAME = 'Mingo'
-
 /** The event this embed's chat opens on. Its OWN name: nothing but `<AskAi />` listens for it. */
 const EMBED_CHAT_OPEN_EVENT = 'embed-example:open-chat'
 
 /**
  * THIS embed's chat opener, handed to the lib through the assistant runtime
- * (`AssistantRuntimeContext.open`, app-providers.tsx). Every "ask" surface of
+ * (`AssistantRuntimeContext.open`, providers/assistant-identity.tsx). Every "ask" surface of
  * the lib under that provider (the FAQ's card) calls it instead of assuming
  * the site chat: `<AskAi />` below receives the request, and decides which
  * chat answers. An embedder with an inline chat, a second panel or a native

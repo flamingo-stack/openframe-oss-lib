@@ -6,28 +6,15 @@
 import { useMemo, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
-  AssistantRuntimeContext,
   ChatRuntimeContext,
   EndpointsRuntimeContext,
-  type AssistantRuntime,
 } from '@flamingo-stack/openframe-frontend-core/contexts'
 import { ChatIdentityProvider } from '@flamingo-stack/openframe-frontend-core/components/chat'
 import { RichMarkdownRuntimeProvider } from '@flamingo-stack/openframe-frontend-core/components/embeds'
 import { TicketLiveProvider } from '@flamingo-stack/openframe-frontend-core/components/tickets'
 import { buildChatRuntime, buildEndpointsRuntime } from './content-runtime'
 import { EP } from '../config/endpoints'
-import { ASSISTANT_NAME, openEmbedChat } from '../components/ask-ai'
-
-// What the lib's "ask" surfaces (the FAQ's card) need to offer THIS embed's
-// chat: the chat is always mounted here (`<AskAi />` in the shell), the
-// questions come through the /content proxy, and a click goes to the embed's
-// own opener, never to a chat the lib assumes. Constant, so one identity.
-const ASSISTANT_RUNTIME: AssistantRuntime = {
-  available: true,
-  name: ASSISTANT_NAME,
-  askPromptsUrl: EP.askPrompts,
-  open: openEmbedChat,
-}
+import { AssistantRuntimeProvider } from './assistant-identity'
 
 const queryClient = new QueryClient()
 
@@ -59,9 +46,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
                   TicketAlertsButton AND the /tickets page. Mounted inside
                   ChatIdentityProvider (streams only for authed identities)
                   and the runtime contexts (reads endpoints). */}
-              <AssistantRuntimeContext.Provider value={ASSISTANT_RUNTIME}>
+              {/* The assistant's identity (server-read) and this embed's chat
+                  opener, for the lib's "ask" surfaces (the FAQ's card). */}
+              <AssistantRuntimeProvider>
                 <TicketLiveProvider>{children}</TicketLiveProvider>
-              </AssistantRuntimeContext.Provider>
+              </AssistantRuntimeProvider>
             </RichMarkdownRuntimeProvider>
           </EndpointsRuntimeContext.Provider>
         </ChatIdentityProvider>
