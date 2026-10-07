@@ -1,4 +1,4 @@
-use crate::models::installed_tool::{Installation, InstalledTool, ToolRecordState};
+use crate::models::installed_tool::{FirstRunState, Installation, InstalledTool, ToolRecordState};
 use crate::platform::system_service;
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
@@ -35,6 +35,8 @@ const KILL_RETRY_MAX_DELAY_SECONDS: u64 = 300;
 const QUICK_EXIT_WINDOW: Duration = Duration::from_secs(60);
 /// Restart delays along a streak of failed starts; the last one repeats.
 const FAILED_START_RETRY_DELAYS_SECONDS: [u64; 5] = [5, 30, 120, 300, 900];
+#[cfg(windows)]
+const FIRST_RUN_RETRY_MAX_DELAY_SECONDS: u64 = 60;
 
 /// Under the supervision lock, so a concurrent resume either finds the loop alive or relaunches its tool.
 async fn shutdown_break(
@@ -736,6 +738,7 @@ impl ToolRunManager {
         let relaunch_requested = self.relaunch_requested.clone();
         let mut installation = tool.installation.clone();
         let mut run_command_args = tool.run_command_args.clone();
+        let mut first_run = tool.first_run;
 
         tokio::spawn(async move {
             let mut launch_backoff = FailureLogBackoff::new();
@@ -762,6 +765,7 @@ impl ToolRunManager {
                 {
                     installation = fresh.installation;
                     run_command_args = fresh.run_command_args;
+                    first_run = fresh.first_run;
                 }
 
                 if !running_tools.read().await.contains(&tool.tool_agent_id) {
@@ -843,19 +847,44 @@ impl ToolRunManager {
                             }
 
                             // Fresh install: launch once now (Run autorun only fires at next logon); else autorun owns it.
-                            if new_tool {
+                            let first_run_pending = first_run == FirstRunState::Pending;
+                            if new_tool || first_run_pending {
                                 let mut launch_args = processed_args.clone();
-                                // For openframe-chat, add --background flag to start in tray
-                                if tool.tool_agent_id == "openframe-chat" {
+                                if first_run_pending {
+                                    launch_args.push("--first-run".to_string());
+                                } else if tool.tool_agent_id == "openframe-chat" {
+                                    // For openframe-chat, add --background flag to start in tray
                                     launch_args.push("--background".to_string());
                                 }
                                 match launch_process_in_user_session(&command_path, &launch_args) {
                                     Ok((pid, process_handle)) => {
-                                        info!(tool_id = %tool.tool_agent_id, pid,
+                                        info!(tool_id = %tool.tool_agent_id, pid, first_run = first_run_pending,
                                               "GuiApp launched once in user session after install (fire-and-forget)");
                                         unsafe {
                                             let _ = CloseHandle(process_handle);
                                         }
+                                        if first_run_pending {
+                                            if let Err(e) = installed_tools_service
+                                                .set_first_run(
+                                                    &tool.tool_agent_id,
+                                                    FirstRunState::Done,
+                                                )
+                                                .await
+                                            {
+                                                warn!(tool_id = %tool.tool_agent_id, "Failed to mark first run done: {:#}", e);
+                                            }
+                                        }
+                                    }
+                                    Err(e) if first_run_pending => {
+                                        let failures = launch_backoff.record_failure(log_attempt);
+                                        let delay = (RETRY_DELAY_SECONDS * failures)
+                                            .min(FIRST_RUN_RETRY_MAX_DELAY_SECONDS);
+                                        if log_attempt {
+                                            warn!(tool_id = %tool.tool_agent_id, failed_attempts = failures, error = %e,
+                                                  "First-run launch failed, retrying in {} seconds", delay);
+                                        }
+                                        sleep(Duration::from_secs(delay)).await;
+                                        continue;
                                     }
                                     Err(e) => {
                                         warn!(tool_id = %tool.tool_agent_id, error = %e,
@@ -917,7 +946,9 @@ impl ToolRunManager {
                                         continue;
                                     }
 
-                                    if tool.tool_agent_id == "openframe-chat" {
+                                    if first_run == FirstRunState::Pending {
+                                        vec!["--first-run".to_string()]
+                                    } else if tool.tool_agent_id == "openframe-chat" {
                                         vec!["--background".to_string()]
                                     } else {
                                         vec![]
@@ -956,6 +987,17 @@ impl ToolRunManager {
                                         }
                                         info!(tool_id = %tool.tool_agent_id, pid = child.id().unwrap_or(0),
                                               user = %user.username, "GuiApp verified running");
+                                        if first_run == FirstRunState::Pending {
+                                            if let Err(e) = installed_tools_service
+                                                .set_first_run(
+                                                    &tool.tool_agent_id,
+                                                    FirstRunState::Done,
+                                                )
+                                                .await
+                                            {
+                                                warn!(tool_id = %tool.tool_agent_id, "Failed to mark first run done: {:#}", e);
+                                            }
+                                        }
                                         running_tools.write().await.remove(&tool.tool_agent_id);
                                         return;
                                     }
