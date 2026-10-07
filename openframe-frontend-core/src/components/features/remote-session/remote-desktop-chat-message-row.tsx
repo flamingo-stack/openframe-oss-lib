@@ -32,7 +32,7 @@ export function RemoteDesktopChatMessageRow({
   body,
 }: RemoteDesktopChatMessageRowProps) {
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
+    <div className="grid grid-cols-1 gap-[var(--spacing-system-xxs)]">
       <div className="flex items-center gap-[var(--spacing-system-xxs)]">
         {isTechnician && (
           <SquareAvatar variant="round" sizePx={24} src={avatarUrl} alt={authorName} className="shrink-0" />

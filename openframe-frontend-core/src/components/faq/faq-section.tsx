@@ -321,7 +321,7 @@ function GroupedFaqList({
     </div>
   );
 
-  if (aside === undefined || aside === null) {
+  if (!aside) {
     return (
       <div className="space-y-8">
         {categoryNav}

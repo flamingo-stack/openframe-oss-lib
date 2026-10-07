@@ -1,7 +1,8 @@
 'use client';
 
-import { type MouseEvent, type ReactNode, useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { formatDate, formatTime } from '../../../utils/format-date';
+import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { ArrowRightUpIcon } from '../../icons-v2-generated';
 import { Button } from '../../ui/button/button';
 import { type ColumnDef, DataTable, type Row, useDataTable } from '../../ui/data-table';
@@ -39,13 +40,6 @@ const STATUS_VARIANT: Record<'DRAFT' | 'ARCHIVED', 'warning' | 'grey'> = {
  * that renders as a link, and `<a>` cannot be nested inside `<a>`, so it is a
  * `<button>` that opens the tab itself.
  */
-function openInNewTab(href: string) {
-  return (event: MouseEvent) => {
-    event.preventDefault();
-    window.open(href, '_blank', 'noopener,noreferrer');
-  };
-}
-
 /** The trailing "open in new tab" column. */
 export function getKnowledgeBaseOpenColumn(getHref: KnowledgeBaseRowHref): ColumnDef<KnowledgeBaseRow> {
   return {

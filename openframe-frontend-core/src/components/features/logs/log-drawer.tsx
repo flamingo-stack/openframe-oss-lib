@@ -100,9 +100,9 @@ export function LogDrawer({
             )}
             {/* Info card: vertical fields, the value on top and its label below */}
             {infoFields && infoFields.length > 0 && (
-              <div className="flex flex-col gap-3 rounded-[6px] border border-ods-border bg-ods-card p-4">
+              <div className="grid grid-cols-1 gap-3 rounded-[6px] border border-ods-border bg-ods-card p-4">
                 {infoFields.map(field => (
-                  <div key={typeof field.label === 'string' ? field.label : ''} className="flex flex-col gap-0.5">
+                  <div key={typeof field.label === 'string' ? field.label : ''} className="grid grid-cols-1 gap-0.5">
                     {typeof field.value === 'string' ? (
                       field.value === '' || field.value === EMPTY_MARK ? (
                         <span className="text-h4">

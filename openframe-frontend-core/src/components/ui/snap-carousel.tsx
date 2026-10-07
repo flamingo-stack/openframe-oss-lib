@@ -98,9 +98,15 @@ export function SnapCarousel<T>({
     [count, slideStep],
   );
 
+  // Only a change of `focusIndex` moves the track: `goTo` is read through a ref,
+  // so more items arriving never pulls a visitor back to a slide named earlier.
+  const goToRef = useRef(goTo);
   useEffect(() => {
-    if (focusIndex !== undefined && focusIndex >= 0) goTo(focusIndex);
-  }, [focusIndex, goTo]);
+    goToRef.current = goTo;
+  }, [goTo]);
+  useEffect(() => {
+    if (focusIndex !== undefined && focusIndex >= 0) goToRef.current(focusIndex);
+  }, [focusIndex]);
 
   const onScroll = useCallback(() => {
     const track = trackRef.current;

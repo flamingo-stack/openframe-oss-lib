@@ -1,6 +1,7 @@
 'use client';
 
-import { type MouseEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { Button } from '../../ui/button';
 import { type ColumnDef, DataTable, type Row, type SortingState, useDataTable } from '../../ui/data-table';
@@ -15,13 +16,6 @@ import type { PolicyTableRow } from './policy-table-row';
  * Click handler that opens `href` in a new tab. The row is itself a link and
  * an `<a>` cannot be nested in an `<a>`, so the button opens it by script.
  */
-function openInNewTab(href: string) {
-  return (event: MouseEvent) => {
-    event.preventDefault();
-    window.open(href, '_blank', 'noopener,noreferrer');
-  };
-}
-
 const EMPTY_COLUMN_FILTERS: never[] = [];
 
 // An empty platform list means the policy applies to every OS, so we render the

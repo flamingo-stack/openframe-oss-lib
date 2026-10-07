@@ -100,7 +100,7 @@ export const capabilityTabId = (id: string): string => `${id}-tab`;
 function Highlights({ items, className }: { items: readonly string[]; className?: string }) {
   if (items.length === 0) return null;
   return (
-    <ul className={cn('flex flex-col gap-2', className)}>
+    <ul className={cn('grid grid-cols-1 gap-2', className)}>
       {items.slice(0, 3).map(text => (
         <li key={text} className="flex min-w-0 items-center gap-2.5">
           <CheckIcon size={16} className="shrink-0 text-ods-flamingo-cyan" />

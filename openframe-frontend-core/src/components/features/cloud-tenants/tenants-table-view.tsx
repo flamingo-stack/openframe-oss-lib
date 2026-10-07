@@ -1,7 +1,8 @@
 'use client';
 
-import { type MouseEvent, useMemo } from 'react';
+import { useMemo } from 'react';
 import { cn } from '../../../utils/cn';
+import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { Button } from '../../ui/button';
 import { type ColumnDef, DataTable, type Row, useDataTable } from '../../ui/data-table';
@@ -19,13 +20,6 @@ const columnMeta = ({ width, hideAt, align }: TenantsTableColumn) => ({ width, h
  * Click handler that opens `href` in a new tab. The row is itself the details
  * link and an `<a>` cannot be nested in an `<a>`, so the button opens it by script.
  */
-function openInNewTab(href: string) {
-  return (event: MouseEvent) => {
-    event.preventDefault();
-    window.open(href, '_blank', 'noopener,noreferrer');
-  };
-}
-
 export interface TenantsTableViewProps {
   rows: TenantRow[];
   /** Where a row leads: the row is a link to it, and its last cell opens it in a new tab. */

@@ -19,7 +19,8 @@ export interface AskPromptsProps {
   prompts: readonly AskPrompt[];
   /**
    * How many chips the block shows and reserves room for: the same number in
-   * the same slots on every load. Default: the prompts given.
+   * the same slots on every load. Default: the prompts given (while `loading`,
+   * when there are none yet, two).
    */
   count?: number;
   /** The questions are still being read: `count` chip skeletons in the chips' own slots. */
@@ -44,6 +45,12 @@ function AssistantGlyph({ icon, className }: { icon?: ReactNode; className: stri
     </span>
   );
 }
+
+/** How many slots a loading block reserves when its host names no `count`. */
+const DEFAULT_LOADING_SLOTS = 2;
+/** The slots a block shows: the host's `count`; else the prompts it has, or the default while they load. */
+const slotCount = (count: number | undefined, loading: boolean, prompts: readonly AskPrompt[]) =>
+  count ?? (loading ? DEFAULT_LOADING_SLOTS : prompts.length);
 
 /** A skeleton chip's label width (in `ch`), by slot: a believable spread that is the same on every load. */
 const SKELETON_LABEL_CH = [26, 22, 30, 24, 20, 28] as const;
@@ -104,7 +111,7 @@ function QuestionChips({
  */
 export function AskPrompts({
   prompts,
-  count = prompts.length,
+  count: countProp,
   loading = false,
   align = 'start',
   source,
@@ -113,6 +120,7 @@ export function AskPrompts({
   onAsk,
   className,
 }: AskPromptsProps) {
+  const count = slotCount(countProp, loading, prompts);
   if (!loading && prompts.length === 0) return null;
   const end = align === 'end';
   return (
@@ -150,7 +158,7 @@ export function AskCard({
   title,
   description,
   prompts,
-  count = prompts.length,
+  count: countProp,
   loading = false,
   source,
   label,
@@ -159,6 +167,7 @@ export function AskCard({
   shortcutHint = true,
   className,
 }: AskCardProps) {
+  const count = slotCount(countProp, loading, prompts);
   return (
     <div
       className={cn(

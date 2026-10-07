@@ -1,6 +1,7 @@
 'use client';
 
-import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo } from 'react';
+import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { normalizeToolTypeWithFallback, toToolLabel } from '../../../utils/tool-utils';
 import {
   ArrowRightUpIcon,
@@ -45,13 +46,6 @@ const EMPTY_DESCRIPTION =
  * Click handler that opens `href` in a new tab. The row is a link, and a link
  * cannot hold another link, so the button opens the tab itself.
  */
-function openInNewTab(href: string) {
-  return (event: MouseEvent) => {
-    event.preventDefault();
-    window.open(href, '_blank', 'noopener,noreferrer');
-  };
-}
-
 export interface LogsTableViewProps<T extends UiLogEntry = UiLogEntry> {
   /** The rows loaded so far. Keep the array stable between renders. */
   logs: T[];
