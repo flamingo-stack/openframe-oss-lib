@@ -22,6 +22,7 @@ import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils';
 import { holdMoveDragEffect } from '../../../utils/drag-effect';
 import { getReadableTextColor } from '../../../utils/ods-color-utils';
+import { AgentMark } from '../../agent-mark';
 import {
   ClockIcon,
   DotsLoaderIcon,
@@ -110,7 +111,7 @@ export function TicketCardBody({
   const showDeviceRow = !!(ticket.deviceHostnames?.length || ticket.organizationName);
   const deviceText = [ticket.deviceHostnames?.join(', '), ticket.organizationName].filter(Boolean).join(', ');
 
-  const hasRightSection = !!(ticket.priority || ticket.assignees?.length || renderAssignSlot);
+  const hasRightSection = !!(ticket.priority || ticket.agent || ticket.assignees?.length || renderAssignSlot);
   const rightSection = hasRightSection ? (
     <div className="pointer-events-auto flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
       {ticket.priority && (
@@ -118,6 +119,15 @@ export function TicketCardBody({
           className={cn('size-4', PRIORITY_COLOR_CLASS[ticket.priority])}
           aria-label={`Priority: ${ticket.priority}`}
         />
+      )}
+      {ticket.agent && (
+        <span
+          role="img"
+          aria-label={`Owned by ${ticket.agent === 'fae' ? 'Fae' : 'Mingo'}`}
+          className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-ods-border bg-ods-bg"
+        >
+          <AgentMark agent={ticket.agent} className={ticket.agent === 'fae' ? 'size-full' : 'size-5'} />
+        </span>
       )}
       {renderAssignSlot ? (
         renderAssignSlot(ticket)
