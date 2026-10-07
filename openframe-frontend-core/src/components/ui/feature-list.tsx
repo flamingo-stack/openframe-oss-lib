@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { Button } from './button';
 
 export interface FeatureListItemData {
   /** Shown in the boxed slot. Not used by the `numbered` variant. */
@@ -73,13 +74,17 @@ export function FeatureList({
               }`}
             >
               {onSelect ? (
-                <button
-                  type="button"
+                // The unified Button with no box of its own (`wrap`): it brings the
+                // target, the focus ring and the keyboard semantics; the row is the look.
+                <Button
+                  variant="transparent"
+                  size="wrap"
+                  fullWidth
                   onClick={() => onSelect(index)}
-                  className={`${layout} w-full cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus`}
+                  className={`${layout} justify-start whitespace-normal text-left hover:bg-transparent active:bg-transparent`}
                 >
                   {row}
-                </button>
+                </Button>
               ) : (
                 <div className={layout}>{row}</div>
               )}
