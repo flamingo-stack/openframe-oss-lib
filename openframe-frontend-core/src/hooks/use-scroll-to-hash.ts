@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { getHashTargetElement, normalizeHashFragment } from '../utils/same-page-hash-nav';
+import { getHashTargetElement, isScrollSyncedHash, normalizeHashFragment } from '../utils/same-page-hash-nav';
 import { scrollElementIntoView } from '../utils/scroll-into-view';
 
 /** ~1s at 60fps — long enough to outlast Radix accordion expand + SWR
@@ -20,6 +20,13 @@ export interface UseScrollToHashOptions {
  * reference change AND on `hashchange` (browser back/forward + the
  * synthetic event `navigateSamePageHash` dispatches).
  *
+ * A hash the reader's own scrolling left in the URL (`replaceLocationHash`,
+ * written by a scroll spy with `syncHash`) is not a navigation: on a reload,
+ * and on back or forward to such an entry, the browser restores the exact
+ * scroll position, which that hash only mirrors, so it is left alone
+ * (`isScrollSyncedHash`). On a load the spy checks the restored position
+ * against the hash and scrolls only when they disagree.
+ *
  * Skipped when `readyDep == null || readyDep === false`. Default
  * `true` makes the hook run on mount for pages whose target is in the
  * initial SSR render.
@@ -37,6 +44,7 @@ export function useScrollToHash(readyDep: unknown = true, options?: UseScrollToH
       }
     };
     const tryScrollToHash = () => {
+      if (isScrollSyncedHash()) return;
       // `normalizeHashFragment` heals a malformed multi-fragment hash
       // so `getElementById` resolves on deep-link entries that bypass
       // `navigateSamePageHash`'s own normalize.

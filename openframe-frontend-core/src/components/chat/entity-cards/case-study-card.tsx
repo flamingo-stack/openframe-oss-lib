@@ -1,9 +1,14 @@
 'use client';
 
 /**
- * CaseStudyCard (pure presentation). Four densities — `default` (vertical
+ * CaseStudyCard (pure presentation). Five densities — `default` (vertical
  * detail), `sm` (compact horizontal for chat-inline), `portrait` (rails and
- * strips) and `menu` (the site menu's card, hover-plays the highlight cut).
+ * strips), `menu` (the site menu's card, hover-plays the highlight cut) and
+ * `result` (a customer result: who, the headline metric large, the story's
+ * title and a link to read it; no cover).
+ *
+ * Only `result` shows a metric (the story's FIRST one). Every other density is
+ * the story's regular card and never changes its box for one.
  *
  * The card writes NO click logic — callers wrap with their own anchor
  * and pass the resolved detail URL via `href`.
@@ -16,7 +21,7 @@
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
-import type { CaseStudyCardData } from '../../../types/case-study';
+import type { CaseStudyCardData, CaseStudyMetric } from '../../../types/case-study';
 import { cn } from '../../../utils/cn';
 import { sortBitesByFeaturedAtDesc } from '../../features/video-bites-shared';
 import { CardHoverPlay } from '../../features/video-center-badge';
@@ -55,7 +60,10 @@ export interface CaseStudyCardProps {
   placeholderUrl?: string | null;
   /** `menu` is the site menu's card: the story's video plays muted on hover or
    *  focus (the video bites' hover grammar), then who it is about and who tells it. */
-  size?: 'default' | 'sm' | 'portrait' | 'menu';
+  size?: 'default' | 'sm' | 'portrait' | 'menu' | 'result';
+  /** `result`: the colour of the metric and the read link, as a text class
+   *  (a page that shows another product's brand). Default: the theme accent. */
+  accentClassName?: string;
   /** `menu`: mount the hover player (the host passes whether its panel is open,
    *  so a closed menu holds no player). Omitted: the card's own viewport gate. */
   mediaMounted?: boolean;
@@ -66,9 +74,88 @@ export interface CaseStudyCardProps {
   className?: string;
 }
 
+/** The `result` card's boxes: the card and its skeleton share them, so they are one height. */
+const CASE_STUDY_RESULT_STACK = 'flex h-full flex-col gap-5 p-6';
+const CASE_STUDY_RESULT_METRIC_BOX = 'flex h-[112px] shrink-0 flex-col justify-start gap-1 overflow-hidden';
+const CASE_STUDY_RESULT_FOOTER_BOX =
+  'mt-auto flex h-[60px] shrink-0 items-center justify-between gap-3 border-t border-ods-border pt-4';
+
+/** The metric a card shows: the story's first one, when it has both halves. */
+function headlineMetric(study: CaseStudyCardData): CaseStudyMetric | null {
+  const metric = study.metrics?.[0];
+  return metric?.value && metric.label ? metric : null;
+}
+
+/** Who tells the story: the portrait with the MSP's mark on it, the name and MSP, the job title. A fixed 60px zone. */
+function CaseStudyPersonRow({ study }: { study: CaseStudyCardData }) {
+  return (
+    <div className="flex h-[60px] shrink-0 items-center">
+      <div className="flex w-full min-w-0 items-center gap-3">
+        <div className="relative h-12 w-12 shrink-0">
+          {study.user?.avatar_url ? (
+            <Image
+              src={study.user.avatar_url}
+              alt={study.user?.full_name || 'User'}
+              className="h-12 w-12 rounded-full border border-ods-border bg-ods-bg object-cover"
+              width={48}
+              height={48}
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-ods-border bg-ods-bg">
+              <span className="text-ods-text-secondary text-h4">
+                {(study.user?.full_name || 'A').charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+          {study.msp?.icon_url && (
+            <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-ods-text-primary ring-1 ring-ods-bg">
+              <Image
+                src={study.msp.icon_url}
+                alt={study.msp.name || 'MSP'}
+                className="h-full w-full object-cover"
+                width={24}
+                height={24}
+                unoptimized
+              />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-ods-text-primary text-h6">
+            {study.user?.full_name || 'Anonymous'}
+            {study.msp?.name && <span className="text-ods-text-secondary"> • {study.msp.name}</span>}
+          </p>
+          <p className="truncate text-ods-text-secondary text-h6">{study.user?.job_title || ' '}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** `portrait` shares the default skeleton shape — the portrait anatomy uses the
  *  same zone boxes (media aspect → 72px title → 60px person footer). */
-export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
+export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' | 'result' }) {
+  if (size === 'result') {
+    return (
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, CASE_STUDY_RESULT_STACK, 'animate-pulse')}>
+        <div className="flex h-[60px] shrink-0 items-center gap-3">
+          <div className="h-12 w-12 rounded-full bg-ods-border" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-2/3 rounded bg-ods-border" />
+            <div className="h-3 w-1/2 rounded bg-ods-border" />
+          </div>
+        </div>
+        <div className={CASE_STUDY_RESULT_METRIC_BOX} data-testid="case-study-result-skeleton-metric">
+          <div className="h-10 w-1/3 rounded bg-ods-border" />
+          <div className="h-4 w-3/4 rounded bg-ods-border" />
+        </div>
+        <div className={CASE_STUDY_RESULT_FOOTER_BOX}>
+          <div className="h-4 w-2/3 rounded bg-ods-border" />
+        </div>
+      </div>
+    );
+  }
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
@@ -131,6 +218,7 @@ export function CaseStudyCard({
   placeholderUrl: placeholderUrlProp,
   size = 'default',
   showTypeBadge = true,
+  accentClassName = 'text-ods-accent',
   mediaMounted,
   onNavigate,
   className,
@@ -259,6 +347,34 @@ export function CaseStudyCard({
     );
   }
 
+  if (size === 'result') {
+    // A customer result: the person, the headline metric large, then the story's
+    // title and the way in. A story with no metric has no result to show.
+    const metric = headlineMetric(study);
+    if (!metric) return null;
+    return (
+      <Link
+        href={href}
+        target={target}
+        rel={rel}
+        className={cn('block h-full', className)}
+        aria-label={`Read ${study.title}`}
+      >
+        <Card className={cn(CONTENT_CARD_FRAME_CLASS, CASE_STUDY_RESULT_STACK)}>
+          <CaseStudyPersonRow study={study} />
+          <div className={CASE_STUDY_RESULT_METRIC_BOX} data-testid="case-study-metric">
+            <span className={cn('truncate text-h1', accentClassName)}>{metric.value}</span>
+            <span className="line-clamp-2 text-ods-text-secondary text-h4">{metric.label}</span>
+          </div>
+          <div className={CASE_STUDY_RESULT_FOOTER_BOX}>
+            <span className="line-clamp-2 min-w-0 text-ods-text-secondary text-h6">{study.title}</span>
+            <span className={cn('shrink-0 text-h6', accentClassName)}>Read</span>
+          </div>
+        </Card>
+      </Link>
+    );
+  }
+
   if (size === 'portrait') {
     // Rail/strip density — shared <EntityPortraitCard> shell.
     return (
@@ -309,47 +425,7 @@ export function CaseStudyCard({
           <p className="line-clamp-3 break-words text-ods-text-primary text-h4">{study.title}</p>
         </div>
 
-        <div className="flex h-[60px] shrink-0 items-center">
-          <div className="flex w-full min-w-0 items-center gap-3">
-            <div className="relative h-12 w-12 shrink-0">
-              {study.user?.avatar_url ? (
-                <Image
-                  src={study.user.avatar_url}
-                  alt={study.user?.full_name || 'User'}
-                  className="h-12 w-12 rounded-full border border-ods-border bg-ods-bg object-cover"
-                  width={48}
-                  height={48}
-                  unoptimized
-                />
-              ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-ods-border bg-ods-bg">
-                  <span className="text-ods-text-secondary text-h4">
-                    {(study.user?.full_name || 'A').charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-              {study.msp?.icon_url && (
-                <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-ods-text-primary ring-1 ring-ods-bg">
-                  <Image
-                    src={study.msp.icon_url}
-                    alt={study.msp.name || 'MSP'}
-                    className="h-full w-full object-cover"
-                    width={24}
-                    height={24}
-                    unoptimized
-                  />
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-ods-text-primary text-h6">
-                {study.user?.full_name || 'Anonymous'}
-                {study.msp?.name && <span className="text-ods-text-secondary"> • {study.msp.name}</span>}
-              </p>
-              <p className="truncate text-ods-text-secondary text-h6">{study.user?.job_title || ' '}</p>
-            </div>
-          </div>
-        </div>
+        <CaseStudyPersonRow study={study} />
       </Card>
     </a>
   );
