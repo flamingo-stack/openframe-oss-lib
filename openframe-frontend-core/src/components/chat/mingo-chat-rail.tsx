@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import {
   AlertCircleIcon,
+  Arrow02LeftIcon,
   ChatPlusIcon,
   ChatQuestionIcon,
   ChatsIcon,
@@ -69,6 +70,8 @@ export interface MingoChatRailProps {
   /** The list failed to load with nothing cached. */
   loadError?: boolean;
   onRetry?: () => void;
+  /** The |← control beside the logo: widen the panel to the list and the chat. */
+  onExpand?: () => void;
   className?: string;
 }
 
@@ -113,6 +116,7 @@ export function MingoChatRail({
   isLoadingHistory = false,
   loadError = false,
   onRetry,
+  onExpand,
   className,
 }: MingoChatRailProps) {
   const [searchOpen, setSearchOpen] = useState(!!searchQuery?.trim());
@@ -251,13 +255,26 @@ export function MingoChatRail({
       data-accent="mingo"
       aria-label="Mingo chats"
       logo={
-        <MingoIcon
-          color="currentColor"
-          eyesColor="var(--ods-flamingo-cyan-base)"
-          cornerColor="var(--ods-flamingo-cyan-base)"
-          className="size-6 text-ods-text-primary"
-          aria-hidden
-        />
+        <div className="flex flex-1 items-center justify-between">
+          <MingoIcon
+            color="currentColor"
+            eyesColor="var(--ods-flamingo-cyan-base)"
+            cornerColor="var(--ods-flamingo-cyan-base)"
+            className="size-6 text-ods-text-primary"
+            aria-hidden
+          />
+          {onExpand && (
+            <Button
+              variant="transparent"
+              size="icon"
+              aria-label="Expand chat"
+              onClick={onExpand}
+              className="size-6 p-0 text-ods-text-secondary hover:text-ods-text-primary md:size-6"
+            >
+              <Arrow02LeftIcon size={24} />
+            </Button>
+          )}
+        </div>
       }
       items={items}
       sectionLabel="Your Current Chats"

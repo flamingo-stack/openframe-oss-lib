@@ -38,6 +38,10 @@ interface ArrayEntryManagerProps<T extends object> {
   titleFieldKey?: keyof T;
   titlePlaceholder?: string;
   isSaving?: boolean; // Loading state for save button
+  /** The most entries the list holds; at the cap the add button is disabled. Omitted: no cap. */
+  maxItems?: number;
+  /** Where a new entry lands. Default `start` (the newest on top); `end` for a list whose ORDER is its meaning. */
+  addPosition?: 'start' | 'end';
 }
 
 export function ArrayEntryManager<T extends object>({
@@ -57,6 +61,8 @@ export function ArrayEntryManager<T extends object>({
   titleFieldKey,
   titlePlaceholder,
   isSaving = false,
+  maxItems,
+  addPosition = 'start',
 }: ArrayEntryManagerProps<T>) {
   // Local state for draft changes (when requireSave=true)
   const [draftItems, setDraftItems] = useState<T[]>(items);
@@ -100,7 +106,9 @@ export function ArrayEntryManager<T extends object>({
 
   const addItem = () => {
     const newItem = { [fieldKey]: '' } as T;
-    setWorkingItems([newItem, ...workingItems]); // Add at top for better UX
+    if (maxItems !== undefined && workingItems.length >= maxItems) return;
+    // On top by default (the newest is what is being typed); at the end for an ordered list.
+    setWorkingItems(addPosition === 'end' ? [...workingItems, newItem] : [newItem, ...workingItems]);
   };
 
   const removeItem = (index: number) => {
@@ -180,6 +188,7 @@ export function ArrayEntryManager<T extends object>({
             variant="outline"
             size="small-legacy"
             onClick={addItem}
+            disabled={maxItems !== undefined && workingItems.length >= maxItems}
             leftIcon={<Plus className="h-4 w-4" />}
             className="text-h6"
           >

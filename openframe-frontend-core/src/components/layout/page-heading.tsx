@@ -73,12 +73,22 @@ const SENTENCE_MARK = /([.:?!]+)(?=\s|$)/g;
 const ONLY_MARKS = /^\s*[.:?!]+\s*$/;
 
 /**
+ * Which of a brand's two colours a heading's eyebrow and marks take: its accent
+ * (the default) or its secondary colour (`PLATFORM_BRAND`'s `secondaryStem`:
+ * OpenFrame's marketing pages are cyan there, its product screens yellow).
+ * `secondary` needs a named `platform`.
+ */
+export type HeadingAccentTone = 'accent' | 'secondary';
+
+/**
  * The accent a heading's marks take, as an ODS class: a named platform's brand
  * accent (`getPlatformBrandClasses`, the one platform → token table), else the
  * accent of the platform the page runs on (`text-ods-accent`).
  */
-export function headingAccentClass(platform?: string | null): string {
-  return platform ? getPlatformBrandClasses(platform).accentText : 'text-ods-accent';
+export function headingAccentClass(platform?: string | null, tone: HeadingAccentTone = 'accent'): string {
+  if (!platform) return 'text-ods-accent';
+  const classes = getPlatformBrandClasses(platform);
+  return tone === 'secondary' ? classes.secondaryText : classes.accentText;
 }
 
 /**
@@ -92,8 +102,12 @@ export function headingAccentClass(platform?: string | null): string {
  * its own colour for its letters). A mark inside a number or a version
  * (`$6.7M`, `v1.5.0`) is not a sentence mark and is left alone.
  */
-export function accentSentenceMarks(node: ReactNode, platform?: string | null): ReactNode {
-  return accentMarks(node, headingAccentClass(platform));
+export function accentSentenceMarks(
+  node: ReactNode,
+  platform?: string | null,
+  tone: HeadingAccentTone = 'accent',
+): ReactNode {
+  return accentMarks(node, headingAccentClass(platform, tone));
 }
 
 function accentMarks(node: ReactNode, accentClassName: string): ReactNode {
@@ -157,6 +171,8 @@ export interface SectionHeadingProps {
    * that shows ANOTHER product. Omitted: the platform the page runs on.
    */
   platform?: string | null;
+  /** Which of `platform`'s colours: its accent (default) or its secondary colour. */
+  tone?: HeadingAccentTone;
   /** Extra classes on the outer row. */
   className?: string;
 }
@@ -175,16 +191,17 @@ export function SectionHeading({
   action,
   level = 'section',
   platform,
+  tone = 'accent',
   className,
 }: SectionHeadingProps) {
-  const accentClassName = headingAccentClass(platform);
+  const accentClassName = headingAccentClass(platform, tone);
   const layout = SECTION_HEADING_LAYOUT[level];
   const Tag = level === 'page' ? 'h1' : 'h2';
   const stack = (
     <div className={layout.stack}>
       {eyebrow ? <span className={`text-h5 ${accentClassName}`}>{eyebrow}</span> : null}
       <Tag className={layout.heading}>
-        {accentSentenceMarks(title, platform)}
+        {accentSentenceMarks(title, platform, tone)}
         {punctuation ? <span className={accentClassName}>{punctuation}</span> : null}
       </Tag>
       {intro ? <div className={layout.intro}>{intro}</div> : null}

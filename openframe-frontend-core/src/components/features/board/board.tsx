@@ -83,6 +83,8 @@ export interface BoardProps {
   onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>;
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>;
   collapseStorageKey?: string;
+  /** The lanes folded when the board mounts, by column id. Read only without `collapseStorageKey`. */
+  initialCollapsed?: Record<string, boolean>;
   loadMoreRootMargin?: string;
   className?: string;
 }
@@ -138,10 +140,11 @@ function DragBoard({
   onApprove,
   onReject,
   collapseStorageKey,
+  initialCollapsed,
   loadMoreRootMargin,
   className,
 }: BoardProps) {
-  const { collapsed, toggle } = useBoardCollapse(collapseStorageKey);
+  const { collapsed, toggle } = useBoardCollapse(collapseStorageKey, initialCollapsed);
 
   const {
     scrollRef,
