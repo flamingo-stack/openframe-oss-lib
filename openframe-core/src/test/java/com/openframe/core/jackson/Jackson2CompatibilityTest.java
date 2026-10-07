@@ -35,6 +35,23 @@ class Jackson2CompatibilityTest {
     }
 
     @Test
+    void shouldKeepTheDefaultConvertersOfARestClient() {
+        RestClient.Builder builder = RestClient.builder()
+                .configureMessageConverters(Jackson2Compatibility::restClientConverters);
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        byte[] archive = {0x1f, (byte) 0x8b, 0x08, 0x00};
+        server.expect(requestTo("/index.msix")).andRespond(withSuccess(archive, MediaType.APPLICATION_OCTET_STREAM));
+        server.expect(requestTo("/status")).andRespond(withSuccess("ok", MediaType.TEXT_PLAIN));
+        RestClient restClient = builder.build();
+
+        byte[] bytes = restClient.get().uri("/index.msix").retrieve().body(byte[].class);
+        String text = restClient.get().uri("/status").retrieve().body(String.class);
+
+        assertThat(bytes).isEqualTo(archive);
+        assertThat(text).isEqualTo("ok");
+    }
+
+    @Test
     void shouldLetAWebClientReadAResponseWithMissingAndNullPrimitives() {
         ExchangeStrategies strategies = ExchangeStrategies.builder().codecs(Jackson2Compatibility::webClientCodecs).build();
         WebClient webClient = WebClient.builder()

@@ -51,8 +51,13 @@ public final class Jackson2Compatibility {
         codecs.defaultCodecs().jacksonJsonEncoder(new JacksonJsonEncoder(mapper));
     }
 
-    /** For {@code RestClient.builder().configureMessageConverters(Jackson2Compatibility::restClientConverters)}. */
+    /**
+     * For {@code RestClient.builder().configureMessageConverters(Jackson2Compatibility::restClientConverters)}.
+     * Configuring the converters starts from an empty list, so the defaults (byte[], String, resources, form…)
+     * are registered first; only the JSON converter is swapped.
+     */
     public static void restClientConverters(HttpMessageConverters.ClientBuilder converters) {
-        converters.withJsonConverter(new JacksonJsonHttpMessageConverter(jsonMapper()));
+        converters.registerDefaults()
+                .withJsonConverter(new JacksonJsonHttpMessageConverter(jsonMapper()));
     }
 }
