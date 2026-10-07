@@ -701,6 +701,26 @@ impl ToolRunManager {
         Ok(())
     }
 
+    /// Relaunch a GuiApp that may have exited; a running instance or one mid-update is left alone.
+    pub async fn ensure_gui_app_running(&self, tool_agent_id: &str) -> Result<()> {
+        if self.is_updating(tool_agent_id).await {
+            info!(tool_id = %tool_agent_id, "Tool is being updated, the updater relaunches it");
+            return Ok(());
+        }
+        let tool = self
+            .installed_tools_service
+            .get_by_tool_agent_id(tool_agent_id)
+            .await
+            .with_context(|| format!("Failed to look up tool {} in the registry", tool_agent_id))?;
+        match launchable_gui_app(tool) {
+            Some(tool) => self.run_new_tool(tool).await,
+            None => {
+                info!(tool_id = %tool_agent_id, "Not installed as a GuiApp, nothing to start");
+                Ok(())
+            }
+        }
+    }
+
     async fn try_mark_running(&self, tool_id: &str) -> bool {
         let mut set = self.running_tools.write().await;
         if set.contains(tool_id) {
@@ -717,7 +737,7 @@ impl ToolRunManager {
     }
 
     #[allow(unused_variables)]
-    async fn run_tool(&self, tool: InstalledTool, new_tool: bool) {
+    async fn run_tool(&self, tool: InstalledTool, launch_now: bool) {
         if tool.installation.is_service() {
             info!(
                 "Installation::Service for {} - self-managed, skipping launch",
@@ -842,24 +862,29 @@ impl ToolRunManager {
                                 break;
                             }
 
-                            // Fresh install: launch once now (Run autorun only fires at next logon); else autorun owns it.
-                            if new_tool {
+                            // Fresh install or relaunch: launch once now (Run autorun only fires at logon); else autorun owns it.
+                            if launch_now
+                                && tool_kill_service.is_installed_tool_running(&tool).await
+                            {
+                                info!(tool_id = %tool.tool_agent_id,
+                                      "GuiApp already running in a user session, not launching another");
+                            } else if launch_now {
                                 let mut launch_args = processed_args.clone();
                                 // For openframe-chat, add --background flag to start in tray
-                                if tool.tool_agent_id == "openframe-chat" {
+                                if tool.tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                                     launch_args.push("--background".to_string());
                                 }
                                 match launch_process_in_user_session(&command_path, &launch_args) {
                                     Ok((pid, process_handle)) => {
                                         info!(tool_id = %tool.tool_agent_id, pid,
-                                              "GuiApp launched once in user session after install (fire-and-forget)");
+                                              "GuiApp launched once in user session (fire-and-forget)");
                                         unsafe {
                                             let _ = CloseHandle(process_handle);
                                         }
                                     }
                                     Err(e) => {
                                         warn!(tool_id = %tool.tool_agent_id, error = %e,
-                                              "Failed to launch GuiApp in user session after install");
+                                              "Failed to launch GuiApp in user session");
                                     }
                                 }
                             } else {
@@ -917,7 +942,7 @@ impl ToolRunManager {
                                         continue;
                                     }
 
-                                    if tool.tool_agent_id == "openframe-chat" {
+                                    if tool.tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                                         vec!["--background".to_string()]
                                     } else {
                                         vec![]
@@ -925,6 +950,13 @@ impl ToolRunManager {
                                 }
                                 None => processed_args.clone(),
                             };
+
+                            // The waits above can outlast an app start (e.g. macOS resuming it at login): re-check before launching.
+                            if is_process_running(&command_path).await {
+                                info!(tool_id = %tool.tool_agent_id, "Already running after the session wait, skipping launch");
+                                running_tools.write().await.remove(&tool.tool_agent_id);
+                                return;
+                            }
 
                             match launch_as_user(&command_path, &launch_args, &user).await {
                                 Ok(mut child) => {
@@ -1155,6 +1187,11 @@ impl Drop for UpdatingGuard {
             });
         }
     }
+}
+
+// Only a fully installed GuiApp record is launched; an install still in progress launches itself when it completes.
+pub(crate) fn launchable_gui_app(tool: Option<InstalledTool>) -> Option<InstalledTool> {
+    tool.filter(|t| t.installation.is_gui_app() && t.state == ToolRecordState::Installed)
 }
 
 #[cfg(test)]
