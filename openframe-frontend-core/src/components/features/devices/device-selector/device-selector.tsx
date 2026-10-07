@@ -221,32 +221,6 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     [server, clientToggleDevice, disabled, isDeviceDisabled, getDeviceKey],
   );
 
-  const addAllDevices = useCallback(() => {
-    if (disabled) return;
-    if (server) {
-      server.onAddAll();
-      return;
-    }
-    const base = addAllBehavior === 'replace' ? new Set<string>() : new Set(selectedIds);
-    for (const d of client.filteredDevices) {
-      if (isDeviceDisabled?.(d)) continue;
-      const key = getDeviceKey(d);
-      if (key !== undefined) {
-        base.add(key);
-      }
-    }
-    onSelectionChange(base);
-  }, [
-    disabled,
-    server,
-    isDeviceDisabled,
-    addAllBehavior,
-    selectedIds,
-    client.filteredDevices,
-    getDeviceKey,
-    onSelectionChange,
-  ]);
-
   const removeAllSelected = useCallback(() => {
     if (disabled) return;
     if (server) {
@@ -275,9 +249,9 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   // answer, here, the set the rule resolves to.
   const passThrough = !!server || isCriteria;
   const baseDevices = passThrough ? devices : singleSelect ? client.filteredDevices : client.displayDevices;
-  const devicesForTable = useMemo(() => {
-    if (passThrough || (columnFilters.length === 0 && selectedTagValues.length === 0)) return baseDevices;
-    return baseDevices.filter(d => {
+  /** The column filters (status, OS, customer) and the tag chips, as one test of a device. */
+  const matchesVisibleFilters = useCallback(
+    (d: T) => {
       for (const f of columnFilters) {
         const values = f.value as string[];
         if (!values || values.length === 0) continue;
@@ -298,8 +272,42 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         if (!hasMatchingTag) return false;
       }
       return true;
-    });
-  }, [passThrough, baseDevices, columnFilters, selectedTagValues]);
+    },
+    [columnFilters, selectedTagValues],
+  );
+  const devicesForTable = useMemo(() => {
+    if (passThrough || (columnFilters.length === 0 && selectedTagValues.length === 0)) return baseDevices;
+    return baseDevices.filter(matchesVisibleFilters);
+  }, [passThrough, baseDevices, columnFilters, selectedTagValues, matchesVisibleFilters]);
+
+  const addAllDevices = useCallback(() => {
+    if (disabled) return;
+    if (server) {
+      server.onAddAll();
+      return;
+    }
+    const base = addAllBehavior === 'replace' ? new Set<string>() : new Set(selectedIds);
+    // Only what the table can show: a device the status, OS, customer or tag filter hides is never added unseen.
+    for (const d of client.filteredDevices) {
+      if (!matchesVisibleFilters(d)) continue;
+      if (isDeviceDisabled?.(d)) continue;
+      const key = getDeviceKey(d);
+      if (key !== undefined) {
+        base.add(key);
+      }
+    }
+    onSelectionChange(base);
+  }, [
+    disabled,
+    server,
+    isDeviceDisabled,
+    addAllBehavior,
+    selectedIds,
+    client.filteredDevices,
+    matchesVisibleFilters,
+    getDeviceKey,
+    onSelectionChange,
+  ]);
 
   // Client-side `DeviceFilters`-shaped object, built from the prop list so
   // `useTagFilterModal` and `getDeviceFilterColumns` can drive the FilterModal

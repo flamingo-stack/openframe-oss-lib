@@ -47,6 +47,8 @@ export interface PoliciesTableProps {
   /** Infinite "load more" footer. */
   hasMore?: boolean;
   onLoadMore?: () => void;
+  /** The next page is being fetched: the footer shows it and asks for nothing more meanwhile. Default false (a host that pages rows it already holds). */
+  isLoadingMore?: boolean;
 }
 
 /**
@@ -69,6 +71,7 @@ export function PoliciesTable({
   skeletonRows = 10,
   hasMore = false,
   onLoadMore,
+  isLoadingMore = false,
 }: PoliciesTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -220,7 +223,12 @@ export function PoliciesTable({
         rowHref={rowHref}
       />
       {hasMore && onLoadMore && (
-        <DataTable.InfiniteFooter hasNextPage isFetchingNextPage={false} onLoadMore={onLoadMore} skeletonRows={2} />
+        <DataTable.InfiniteFooter
+          hasNextPage
+          isFetchingNextPage={isLoadingMore}
+          onLoadMore={onLoadMore}
+          skeletonRows={2}
+        />
       )}
     </DataTable>
   );
