@@ -66,7 +66,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             : session;
                     return defaultWebSocketHandler.handle(sessionToHandle);
                 } catch (Exception e) {
-                    log.warn(LOG_PREFIX + "JWT expiration read failed, closing: {}", sessionId, path, sub, e.getMessage(), e);
+                    log.warn(LOG_PREFIX + "JWT expiration read failed, closing", sessionId, path, sub, e);
                     sessionRegistry.remove(sessionId);
                     return session.close();
                 }
@@ -106,7 +106,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                                     log.debug(LOG_PREFIX + "closed by session remove job", sessionId, path, sub);
                                 }
                             })
-                            .doOnError(ex -> log.error(LOG_PREFIX + "session remove job close failed: {}", sessionId, path, sub, ex.getMessage(), ex));
+                            .doOnError(ex -> log.error(LOG_PREFIX + "session remove job close failed", sessionId, path, sub, ex));
                 })
                 .subscribe(
                         null,
@@ -140,7 +140,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             disposable.dispose();
                         },
                         ex -> {
-                            log.warn(LOG_PREFIX + "closeStatus observation error: {}", sessionId, path, sub, ex.getMessage(), ex);
+                            log.warn(LOG_PREFIX + "closeStatus observation error", sessionId, path, sub, ex);
                             disposable.dispose();
                         }
                 );

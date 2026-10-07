@@ -71,7 +71,7 @@ const meta = {
           'Owns the bar geometry only — 48px mobile / 56px md+ height, top/bottom borders, background — and the zone layout ' +
           '`[leading][logo][center][cta][sideActions]`. Dividers belong to the cells (`border-l` / `border-r`), not the bar. ' +
           'Consumers: the console `AppHeader` (centerBreakpoint `md`, global search in the center zone) and the marketing ' +
-          '`Header` (centerBreakpoint `lg`, nav links in the center zone). Resize the viewport to see the tablet burger and ' +
+          '`SiteHeader` (centerBreakpoint `lg`, nav links in the center zone). Resize the viewport to see the tablet burger and ' +
           'the mobile arrangement.',
       },
     },

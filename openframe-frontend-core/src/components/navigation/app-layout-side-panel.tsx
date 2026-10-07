@@ -44,13 +44,23 @@ export interface AppLayoutSidePanelRenderState {
   collapsesTo: 'column' | 'minimum' | null;
   /** Step the panel back (see `collapsesTo`), animated. */
   collapse: () => void;
+  /** Docked at its minimum with room for more: `expand` widens it. */
+  canExpand: boolean;
+  /** Widen the panel from its minimum to `defaultWidth` (as much as fits), animated. */
+  expand: () => void;
 }
 
 export interface AppLayoutSidePanelConfig {
   /** Panel body. Told its width so it can choose what fits. */
   children: (state: AppLayoutSidePanelRenderState) => ReactNode;
-  /** Narrowest docked width, and the width it starts at: the narrowest its content draws. */
+  /** Narrowest docked width: the narrowest its content draws. */
   minWidth: number;
+  /**
+   * Width it starts at until the user picks one (a first launch), and the
+   * width `expand` takes it back to from its minimum. As much of it as fits:
+   * with no room the panel stays narrower. Default `minWidth`.
+   */
+  defaultWidth?: number;
   /** Narrowest the content may get before the panel takes over. Default 400. */
   minContentWidth?: number;
   /** localStorage key for the chosen width. Without it the width lasts the session. */
@@ -75,6 +85,11 @@ export interface AppLayoutSidePanelConfig {
 
 /** Inset of the docked card from the window edge and the header. */
 export const SIDE_PANEL_INSET = 16;
+/**
+ * The docked card's 1px border on both sides: its body is this much narrower
+ * than the panel's width. Add it to a content width to size the panel by it.
+ */
+export const SIDE_PANEL_FRAME_WIDTH = 2;
 const MOBILE_QUERY = `not all and ${breakpoints.md}`;
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 /** Length of the docked <-> full morph; keep in step with `duration-300` below. */
@@ -228,6 +243,8 @@ export interface AppLayoutSidePanelState extends SidePanelLayout {
   endMorph: () => void;
   collapsesTo: AppLayoutSidePanelRenderState['collapsesTo'];
   collapse: () => void;
+  canExpand: boolean;
+  expand: () => void;
   toggle: () => void;
   close: () => void;
   resize: (next: number) => void;
@@ -256,6 +273,7 @@ export function useAppLayoutSidePanel(
   const minContentWidth = config?.minContentWidth ?? 400;
   const collapsed = config?.collapsed ?? false;
   const minimum: SidePanelSize = { width: minWidth, expanded: false };
+  const defaultWidth = Math.max(minWidth, config?.defaultWidth ?? minWidth);
 
   const [rowWidth, setRowWidth] = useState(0);
   useIsomorphicLayoutEffect(() => {
@@ -271,7 +289,7 @@ export function useAppLayoutSidePanel(
   const reduceMotion = useMediaQuery(REDUCED_MOTION_QUERY) === true;
   const [morph, setMorph] = useState<SidePanelMorph | null>(null);
   const [liveWidth, setLiveWidth] = useState<number | null>(null);
-  const [storedSize, setStoredSize] = useStoredSize(config?.storageKey, minimum);
+  const [storedSize, setStoredSize] = useStoredSize(config?.storageKey, { width: defaultWidth, expanded: false });
   const [ownIsOpen, setOwnIsOpen] = useState(false);
   const isOpen = config?.open ?? ownIsOpen;
   const onOpenChange = config?.onOpenChange;
@@ -340,6 +358,8 @@ export function useAppLayoutSidePanel(
   let collapsesTo: AppLayoutSidePanelRenderState['collapsesTo'] = null;
   if (layout.mode === 'full' && layout.canDock) collapsesTo = layout.dockedWidth > minWidth ? 'column' : 'minimum';
   else if (layout.mode === 'docked' && layout.width > minWidth) collapsesTo = 'minimum';
+  const canExpand =
+    layout.mode === 'docked' && layout.width <= minWidth && defaultWidth > minWidth && layout.maxDockedWidth > minWidth;
 
   return {
     ...layout,
@@ -361,6 +381,12 @@ export function useAppLayoutSidePanel(
         animate('narrow');
         setSize({ width: minWidth, expanded: false });
       }
+    },
+    canExpand,
+    expand: () => {
+      if (!canExpand) return;
+      animate('narrow');
+      dock(defaultWidth);
     },
     toggle: () => setIsOpen(!isOpen),
     close: () => setIsOpen(false),
@@ -586,6 +612,8 @@ export function AppLayoutSidePanel({ config, state }: AppLayoutSidePanelProps) {
             close,
             collapsesTo: state.collapsesTo,
             collapse: state.collapse,
+            canExpand: state.canExpand,
+            expand: state.expand,
           })}
         </div>
       </div>

@@ -201,6 +201,54 @@ describe('AppLayout side panel', () => {
     expect(screen.getByText(/panel full/)).toBeInTheDocument();
   });
 
+  function renderWithDefault(collapsed = false) {
+    return render(
+      <AppLayout
+        sidebarConfig={{ items: [], onNavigate: () => undefined }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        sidePanel={{
+          label: 'Mingo',
+          minWidth: 296,
+          defaultWidth: 698,
+          storageKey: 'test:side-panel',
+          collapsed,
+          children: ({ mode, width, collapse, canExpand, expand }) => (
+            <button type="button" onClick={canExpand ? expand : collapse}>
+              {`${mode} ${width}${canExpand ? ' can expand' : ''}`}
+            </button>
+          ),
+        }}
+      >
+        <h1>Page</h1>
+      </AppLayout>,
+    );
+  }
+
+  it('starts at its default width on a first launch, and expands back to it from the minimum', () => {
+    preferReducedMotion();
+    setLayoutWidth(1224);
+    renderWithDefault();
+    fireEvent.click(screen.getByRole('button', { name: 'docked 698' }));
+    fireEvent.click(screen.getByRole('button', { name: 'docked 296 can expand' }));
+    expect(screen.getByRole('button', { name: 'docked 698' })).toBeInTheDocument();
+  });
+
+  it('starts as wide as fits when the default does not', () => {
+    // A 1000px row leaves 1000 - 400 (content) - 16 (inset) for the panel.
+    setLayoutWidth(1000);
+    renderWithDefault();
+    expect(screen.getByRole('button', { name: 'docked 584' })).toBeInTheDocument();
+  });
+
+  it('starts at the minimum on a collapsed page, and can expand from it', () => {
+    preferReducedMotion();
+    setLayoutWidth(1224);
+    renderWithDefault(true);
+    fireEvent.click(screen.getByRole('button', { name: 'docked 296 can expand' }));
+    expect(screen.getByRole('button', { name: 'docked 698' })).toBeInTheDocument();
+  });
+
   it('collapses one step at a time: the whole area back to its column, then the minimum', () => {
     preferReducedMotion();
     window.localStorage.setItem('test:side-panel', JSON.stringify({ width: 520, expanded: true }));
