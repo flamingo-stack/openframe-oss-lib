@@ -6,6 +6,7 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.data.repository.sequence.SequenceRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.spec.DeliveryPayload;
@@ -23,30 +24,36 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class DeliveryRecorder {
 
+    static final String SEQUENCE_PREFIX = "delivery.";
+
     private final MachineDeliveryRepository repository;
+    private final SequenceRepository sequences;
     private final DeliveryProperties properties;
     private final ObjectMapper objectMapper;
 
     // false = a row for this very dispatch already exists: the hand-off was replayed, nothing to do
     public boolean record(DeliveryRequest<?> request) {
-        MachineDelivery delivery = pendingRow(request);
-        String id = delivery.getId();
-        String dispatchId = delivery.getDispatchId();
-        if (repository.existsByIdAndDispatchId(id, dispatchId)) {
-            return false;
-        }
-        repository.upsertPending(delivery);
-        log.info("Delivery recorded: type={} targetId={} machineId={}",
-                request.getType(), request.getTargetId(), request.getMachineId());
-        return true;
-    }
-
-    private MachineDelivery pendingRow(DeliveryRequest<?> request) {
-        Instant now = Instant.now();
         DeliveryType type = request.getType();
         String targetId = request.getTargetId();
         String machineId = request.getMachineId();
         String id = DeliveryId.of(type, targetId, machineId);
+        DeliveryRef delivery = request.getPayload().getDelivery();
+        String dispatchId = delivery.getDispatchId();
+        if (repository.existsByIdAndDispatchId(id, dispatchId)) {
+            return false;
+        }
+        // the counter lives in `sequences`, not on the row: the row expires with its TTL, the sequence must not restart
+        int sequence = sequences.getNextValue(SEQUENCE_PREFIX + id);
+        delivery.setSequence(sequence);
+        MachineDelivery row = pendingRow(request, id);
+        repository.upsertPending(row);
+        log.info("Delivery recorded: type={} targetId={} machineId={} sequence={}", type, targetId, machineId, sequence);
+        return true;
+    }
+
+    private MachineDelivery pendingRow(DeliveryRequest<?> request, String id) {
+        Instant now = Instant.now();
+        DeliveryType type = request.getType();
         DeliveryPayload payload = request.getPayload();
         DeliveryRef delivery = payload.getDelivery();
         String dispatchId = delivery.getDispatchId();
@@ -57,8 +64,8 @@ public class DeliveryRecorder {
         return MachineDelivery.builder()
                 .id(id)
                 .type(type)
-                .targetId(targetId)
-                .machineId(machineId)
+                .targetId(request.getTargetId())
+                .machineId(request.getMachineId())
                 .dispatchId(dispatchId)
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
