@@ -1,7 +1,6 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import graphql.relay.Relay;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -9,6 +8,7 @@ import com.openframe.api.dto.knowledgebase.CreateArticleInput;
 import com.openframe.api.dto.knowledgebase.CreateKnowledgeBaseAttachmentInput;
 import com.openframe.api.dto.knowledgebase.CreateKnowledgeBaseTempAttachmentInput;
 import com.openframe.api.dto.knowledgebase.DeleteFolderInput;
+import com.openframe.api.dto.knowledgebase.FolderChildrenAction;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseAttachmentUploadPayload;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseTempAttachmentPayload;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
@@ -20,6 +20,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.MutationDeleteInput;
 import com.openframe.api.dto.shared.MutationDeletePayload;
 import com.openframe.api.mapper.GraphQLKnowledgeBaseMapper;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseAttachmentService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseTempAttachmentService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseService;
@@ -45,19 +46,21 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static com.openframe.api.relay.NodeType.KNOWLEDGE_BASE_ITEM;
+import static com.openframe.api.relay.NodeType.TAG;
+
 @DgsComponent
 @Slf4j
 @Validated
 @RequiredArgsConstructor
 public class KnowledgeBaseDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final KnowledgeBaseService knowledgeBaseService;
     private final KnowledgeBaseTagService knowledgeBaseTagService;
     private final KnowledgeBaseTempAttachmentService knowledgeBaseTempAttachmentService;
     private final KnowledgeBaseAttachmentService knowledgeBaseAttachmentService;
     private final GraphQLKnowledgeBaseMapper mapper;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public CountedGenericConnection<GenericEdge<KnowledgeBaseItem>> knowledgeBaseItems(
@@ -78,7 +81,7 @@ public class KnowledgeBaseDataFetcher {
 
     @DgsQuery
     public KnowledgeBaseItem knowledgeBaseItem(@InputArgument @NotBlank String id) {
-        String rawId = RELAY.fromGlobalId(id).getId();
+        String rawId = relayIdCodec.decode(id, KNOWLEDGE_BASE_ITEM);
         log.debug("Fetching KB item by global ID: {}, rawId: {}", id, rawId);
         return knowledgeBaseService.getItem(rawId).orElse(null);
     }
@@ -87,7 +90,8 @@ public class KnowledgeBaseDataFetcher {
     public List<Tag> knowledgeBaseTags(@InputArgument String folderId,
                                        @InputArgument Boolean archived) {
         if (folderId != null) {
-            return knowledgeBaseService.getTagsInSubtree(RELAY.fromGlobalId(folderId).getId());
+            String rawFolderId = relayIdCodec.decode(folderId, KNOWLEDGE_BASE_ITEM);
+            return knowledgeBaseService.getTagsInSubtree(rawFolderId);
         }
         log.debug("Fetching all KB tags (archived={})", archived);
         return knowledgeBaseTagService.getAllTags(Boolean.TRUE.equals(archived));
@@ -113,20 +117,19 @@ public class KnowledgeBaseDataFetcher {
             @InputArgument String after) {
         log.debug("Fetching archived KB articles: search={}, tagIds={}", search, tagIds);
 
-        List<String> rawTagIds = tagIds != null
-                ? tagIds.stream().map(id -> RELAY.fromGlobalId(id).getId()).toList()
-                : null;
+        List<String> rawTagIds = relayIdCodec.decodeAll(tagIds, TAG);
         ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).build();
         CursorPaginationCriteria pagination = mapper.toCursorPaginationCriteria(connectionArgs);
-        return mapper.toItemConnection(
-                knowledgeBaseService.queryArchivedArticles(search, rawTagIds, pagination));
+        CountedGenericQueryResult<KnowledgeBaseItem> result =
+                knowledgeBaseService.queryArchivedArticles(search, rawTagIds, pagination);
+        return mapper.toItemConnection(result);
     }
 
     @DgsMutation
     public KnowledgeBaseItem createFolder(
             @InputArgument @NotBlank String name,
             @InputArgument String parentId) {
-        String rawParentId = parentId != null ? RELAY.fromGlobalId(parentId).getId() : null;
+        String rawParentId = relayIdCodec.decode(parentId, KNOWLEDGE_BASE_ITEM);
         log.info("Creating folder: {} under parent: {}", name, rawParentId);
         return knowledgeBaseService.createFolder(name, rawParentId);
     }
@@ -135,7 +138,7 @@ public class KnowledgeBaseDataFetcher {
     public KnowledgeBaseItem renameFolder(
             @InputArgument @NotBlank String id,
             @InputArgument @NotBlank String name) {
-        String rawId = RELAY.fromGlobalId(id).getId();
+        String rawId = relayIdCodec.decode(id, KNOWLEDGE_BASE_ITEM);
         log.info("Renaming folder {} to {}", rawId, name);
         return knowledgeBaseService.renameFolder(rawId, name);
     }
@@ -156,14 +159,14 @@ public class KnowledgeBaseDataFetcher {
 
     @DgsMutation
     public KnowledgeBaseItem publishArticle(@InputArgument @NotBlank String id) {
-        String rawId = RELAY.fromGlobalId(id).getId();
+        String rawId = relayIdCodec.decode(id, KNOWLEDGE_BASE_ITEM);
         log.info("Publishing article: {}", rawId);
         return knowledgeBaseService.publishArticle(rawId);
     }
 
     @DgsMutation
     public KnowledgeBaseItem unpublishArticle(@InputArgument @NotBlank String id) {
-        String rawId = RELAY.fromGlobalId(id).getId();
+        String rawId = relayIdCodec.decode(id, KNOWLEDGE_BASE_ITEM);
         log.info("Unpublishing article: {}", rawId);
         return knowledgeBaseService.unpublishArticle(rawId);
     }
@@ -172,15 +175,15 @@ public class KnowledgeBaseDataFetcher {
     public KnowledgeBaseItem moveToFolder(
             @InputArgument @NotBlank String id,
             @InputArgument String parentId) {
-        String rawId = RELAY.fromGlobalId(id).getId();
-        String rawParentId = parentId != null ? RELAY.fromGlobalId(parentId).getId() : null;
+        String rawId = relayIdCodec.decode(id, KNOWLEDGE_BASE_ITEM);
+        String rawParentId = relayIdCodec.decode(parentId, KNOWLEDGE_BASE_ITEM);
         log.info("Moving KB item {} to folder {}", rawId, rawParentId);
         return knowledgeBaseService.moveToFolder(rawId, rawParentId);
     }
 
     @DgsMutation
     public KnowledgeBaseItem archiveArticle(@InputArgument @NotBlank String id) {
-        String rawId = RELAY.fromGlobalId(id).getId();
+        String rawId = relayIdCodec.decode(id, KNOWLEDGE_BASE_ITEM);
         log.info("Archiving article: {}", rawId);
         return knowledgeBaseService.archiveArticle(rawId);
     }
@@ -189,20 +192,21 @@ public class KnowledgeBaseDataFetcher {
     public KnowledgeBaseItem unarchiveArticle(
             @InputArgument @NotBlank String id,
             @InputArgument String parentId) {
-        String rawId = RELAY.fromGlobalId(id).getId();
-        String rawParentId = parentId != null ? RELAY.fromGlobalId(parentId).getId() : null;
+        String rawId = relayIdCodec.decode(id, KNOWLEDGE_BASE_ITEM);
+        String rawParentId = relayIdCodec.decode(parentId, KNOWLEDGE_BASE_ITEM);
         log.info("Unarchiving article {} into folder {}", rawId, rawParentId);
         return knowledgeBaseService.unarchiveArticle(rawId, rawParentId);
     }
 
     @DgsMutation
     public boolean deleteFolder(@InputArgument @Valid DeleteFolderInput input) {
-        String rawId = RELAY.fromGlobalId(input.getId()).getId();
-        String rawTargetId = input.getMoveTargetFolderId() != null
-                ? RELAY.fromGlobalId(input.getMoveTargetFolderId()).getId()
-                : null;
-        log.info("Deleting folder: {} (childrenAction={})", rawId, input.getChildrenAction());
-        knowledgeBaseService.deleteFolder(rawId, input.getChildrenAction(), rawTargetId);
+        String folderId = input.getId();
+        String moveTargetFolderId = input.getMoveTargetFolderId();
+        FolderChildrenAction childrenAction = input.getChildrenAction();
+        String rawId = relayIdCodec.decode(folderId, KNOWLEDGE_BASE_ITEM);
+        String rawTargetId = relayIdCodec.decode(moveTargetFolderId, KNOWLEDGE_BASE_ITEM);
+        log.info("Deleting folder: {} (childrenAction={})", rawId, childrenAction);
+        knowledgeBaseService.deleteFolder(rawId, childrenAction, rawTargetId);
         return true;
     }
 
@@ -210,8 +214,8 @@ public class KnowledgeBaseDataFetcher {
     public KnowledgeBaseItem addTagToKnowledgeBaseItem(
             @InputArgument @NotBlank String itemId,
             @InputArgument @NotBlank String tagId) {
-        String rawItemId = RELAY.fromGlobalId(itemId).getId();
-        String rawTagId = RELAY.fromGlobalId(tagId).getId();
+        String rawItemId = relayIdCodec.decode(itemId, KNOWLEDGE_BASE_ITEM);
+        String rawTagId = relayIdCodec.decode(tagId, TAG);
         log.info("Adding tag {} to KB item {}", rawTagId, rawItemId);
         knowledgeBaseTagService.addTagToItem(rawItemId, rawTagId);
         return knowledgeBaseService.getItem(rawItemId).orElse(null);
@@ -221,8 +225,8 @@ public class KnowledgeBaseDataFetcher {
     public KnowledgeBaseItem removeTagFromKnowledgeBaseItem(
             @InputArgument @NotBlank String itemId,
             @InputArgument @NotBlank String tagId) {
-        String rawItemId = RELAY.fromGlobalId(itemId).getId();
-        String rawTagId = RELAY.fromGlobalId(tagId).getId();
+        String rawItemId = relayIdCodec.decode(itemId, KNOWLEDGE_BASE_ITEM);
+        String rawTagId = relayIdCodec.decode(tagId, TAG);
         log.info("Removing tag {} from KB item {}", rawTagId, rawItemId);
         knowledgeBaseTagService.removeTagFromItem(rawItemId, rawTagId);
         return knowledgeBaseService.getItem(rawItemId).orElse(null);
@@ -262,7 +266,8 @@ public class KnowledgeBaseDataFetcher {
     @DgsMutation
     public List<KnowledgeBaseItemAttachment> linkKnowledgeBaseTempAttachmentsToArticle(@InputArgument @Valid LinkKnowledgeBaseTempAttachmentsInput input) {
         String currentUserId = getCurrentUserId();
-        String rawArticleId = RELAY.fromGlobalId(input.getArticleId()).getId();
+        String articleId = input.getArticleId();
+        String rawArticleId = relayIdCodec.decode(articleId, KNOWLEDGE_BASE_ITEM);
         log.info("Linking {} temp attachments to Knowledge Base article: {} by user: {}",
                 input.getTempIds().size(), rawArticleId, currentUserId);
         return knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(rawArticleId, input.getTempIds(), currentUserId);
@@ -271,7 +276,8 @@ public class KnowledgeBaseDataFetcher {
     @DgsMutation
     public KnowledgeBaseAttachmentUploadPayload createKnowledgeBaseAttachmentUploadUrl(@InputArgument @Valid CreateKnowledgeBaseAttachmentInput input) {
         String currentUserId = getCurrentUserId();
-        String rawArticleId = RELAY.fromGlobalId(input.getArticleId()).getId();
+        String articleId = input.getArticleId();
+        String rawArticleId = relayIdCodec.decode(articleId, KNOWLEDGE_BASE_ITEM);
         log.info("Creating Knowledge Base attachment upload URL for article: {} by user: {}", rawArticleId, currentUserId);
         return executeMutation(
                 () -> knowledgeBaseAttachmentService.createUploadUrl(
@@ -301,15 +307,18 @@ public class KnowledgeBaseDataFetcher {
     @DgsData(parentType = "KnowledgeBaseItem", field = "id")
     public String knowledgeBaseItemNodeId(DgsDataFetchingEnvironment dfe) {
         KnowledgeBaseItem item = dfe.getSource();
-        return RELAY.toGlobalId("KnowledgeBaseItem", item.getId());
+        String itemId = item.getId();
+        return relayIdCodec.encode(KNOWLEDGE_BASE_ITEM, itemId);
     }
 
     @DgsData(parentType = "KnowledgeBaseItem", field = "parentId")
     public String knowledgeBaseItemParentId(DgsDataFetchingEnvironment dfe) {
         KnowledgeBaseItem item = dfe.getSource();
-        return item.getParentId() != null
-                ? RELAY.toGlobalId("KnowledgeBaseItem", item.getParentId())
-                : null;
+        String parentId = item.getParentId();
+        if (parentId == null) {
+            return null;
+        }
+        return relayIdCodec.encode(KNOWLEDGE_BASE_ITEM, parentId);
     }
 
     @DgsData(parentType = "KnowledgeBaseItem", field = "tags")

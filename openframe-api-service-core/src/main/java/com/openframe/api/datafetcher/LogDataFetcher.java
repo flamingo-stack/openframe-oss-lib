@@ -1,7 +1,6 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import graphql.relay.Relay;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.audit.*;
@@ -9,6 +8,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLLogMapper;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.LogService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -20,6 +20,9 @@ import org.springframework.validation.annotation.Validated;
 import java.time.Instant;
 import java.util.Optional;
 
+import static com.openframe.api.relay.NodeType.LOG_DETAILS;
+import static com.openframe.api.relay.NodeType.LOG_EVENT;
+
 @DgsComponent
 @Slf4j
 @Validated
@@ -27,21 +30,22 @@ import java.util.Optional;
 @ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
 public class LogDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final LogService logService;
     private final GraphQLLogMapper logMapper;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsData(parentType = "LogEvent", field = "id")
     public String logEventId(DgsDataFetchingEnvironment dfe) {
         LogEvent event = dfe.getSource();
-        return RELAY.toGlobalId("LogEvent", event.getId());
+        String eventId = event.getId();
+        return relayIdCodec.encode(LOG_EVENT, eventId);
     }
 
     @DgsData(parentType = "LogDetails", field = "id")
     public String logDetailsId(DgsDataFetchingEnvironment dfe) {
         LogDetails details = dfe.getSource();
-        return RELAY.toGlobalId("LogDetails", details.getId());
+        String detailsId = details.getId();
+        return relayIdCodec.encode(LOG_DETAILS, detailsId);
     }
 
     @DgsQuery

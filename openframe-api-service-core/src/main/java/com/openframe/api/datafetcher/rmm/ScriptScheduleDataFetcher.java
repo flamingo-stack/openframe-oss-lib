@@ -29,6 +29,8 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.mapper.GraphQLScriptScheduleMapper;
+import com.openframe.api.relay.NodeType;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.script.ScriptDispatchService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
@@ -40,7 +42,6 @@ import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.security.authentication.AuthPrincipal;
-import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.openframe.api.relay.NodeType.MACHINE;
+import static com.openframe.api.relay.NodeType.SCRIPT;
+import static com.openframe.api.relay.NodeType.SCRIPT_SCHEDULE;
+import static com.openframe.api.relay.NodeType.USER;
+
 /**
  * GraphQL resolver for RMM script-schedule CRUD. Pure passthrough to
  * {@link ScheduleScriptService} — tenant scoping is resolved inside the service
@@ -73,8 +79,6 @@ import java.util.stream.Collectors;
 @Validated
 public class ScriptScheduleDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final ScheduleScriptService scheduleService;
     private final ScheduleScriptFilterService scheduleFilterService;
     private final ScriptService scriptService;
@@ -83,10 +87,12 @@ public class ScriptScheduleDataFetcher {
     private final GraphQLScriptScheduleMapper scheduleMapper;
     private final DeviceService deviceService;
     private final GraphQLDeviceMapper deviceMapper;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public ScriptScheduleResponse scriptSchedule(@InputArgument @NotBlank String id) {
-        return scheduleService.get(decodeId(id));
+        String scheduleId = relayIdCodec.decode(id, SCRIPT_SCHEDULE);
+        return scheduleService.get(scheduleId);
     }
 
     @DgsQuery
@@ -99,9 +105,7 @@ public class ScriptScheduleDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before) {
 
-        if (filter != null) {
-            filter.setAuthorIds(decodeIds(filter.getAuthorIds()));
-        }
+        decodeAuthorIds(filter);
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
                 .build();
@@ -113,45 +117,56 @@ public class ScriptScheduleDataFetcher {
 
     @DgsQuery
     public ScriptScheduleFilters scriptScheduleFilters(@InputArgument @Valid ScriptScheduleFilterInput filter) {
-        if (filter != null) {
-            filter.setAuthorIds(decodeIds(filter.getAuthorIds()));
-        }
+        decodeAuthorIds(filter);
         ScriptScheduleFilters filters = scheduleFilterService.getScriptScheduleFilters(filter);
         // authors facet values are raw user ids — re-encode to User global ids so the dashboard
         // sends the same global id back in authorIds (which is decoded above).
-        encodeNodeOptions(filters.getAuthors(), "User");
+        List<ScriptFilterOption> authors = filters.getAuthors();
+        encodeNodeOptions(authors, USER);
         return filters;
     }
 
     @DgsMutation
     public ScriptScheduleResponse createScriptSchedule(@InputArgument @Valid CreateScriptScheduleInput input,
                                                        @AuthenticationPrincipal AuthPrincipal principal) {
-        input.setScriptIds(decodeIds(input.getScriptIds()));
-        decodeCustomParamsScriptIds(input.getScriptCustomParams());
-        return scheduleService.create(input, principal.getId());
+        List<String> scriptGlobalIds = input.getScriptIds();
+        List<String> scriptIds = relayIdCodec.decodeAll(scriptGlobalIds, SCRIPT);
+        input.setScriptIds(scriptIds);
+        List<ScheduledScriptCustomParamsInput> customParams = input.getScriptCustomParams();
+        decodeCustomParamsScriptIds(customParams);
+        String userId = principal.getId();
+        return scheduleService.create(input, userId);
     }
 
     @DgsMutation
     public ScriptScheduleResponse updateScriptSchedule(@InputArgument @Valid UpdateScriptScheduleInput input) {
-        input.setId(decodeId(input.getId()));
-        input.setScriptIds(decodeIds(input.getScriptIds()));
-        decodeCustomParamsScriptIds(input.getScriptCustomParams());
+        String scheduleGlobalId = input.getId();
+        List<String> scriptGlobalIds = input.getScriptIds();
+        String scheduleId = relayIdCodec.decode(scheduleGlobalId, SCRIPT_SCHEDULE);
+        List<String> scriptIds = relayIdCodec.decodeAll(scriptGlobalIds, SCRIPT);
+        input.setId(scheduleId);
+        input.setScriptIds(scriptIds);
+        List<ScheduledScriptCustomParamsInput> customParams = input.getScriptCustomParams();
+        decodeCustomParamsScriptIds(customParams);
         return scheduleService.update(input);
     }
 
     @DgsMutation
     public String deleteScriptSchedule(@InputArgument @NotBlank String id) {
-        return scheduleService.delete(decodeId(id));
+        String scheduleId = relayIdCodec.decode(id, SCRIPT_SCHEDULE);
+        return scheduleService.delete(scheduleId);
     }
 
     @DgsMutation
     public ScriptScheduleResponse archiveScriptSchedule(@InputArgument @NotBlank String id) {
-        return scheduleService.archive(decodeId(id));
+        String scheduleId = relayIdCodec.decode(id, SCRIPT_SCHEDULE);
+        return scheduleService.archive(scheduleId);
     }
 
     @DgsMutation
     public ScriptScheduleResponse unarchiveScriptSchedule(@InputArgument @NotBlank String id) {
-        return scheduleService.unarchive(decodeId(id));
+        String scheduleId = relayIdCodec.decode(id, SCRIPT_SCHEDULE);
+        return scheduleService.unarchive(scheduleId);
     }
 
     /**
@@ -161,8 +176,10 @@ public class ScriptScheduleDataFetcher {
     public ScriptScheduleResponse setScriptScheduleDevices(@InputArgument @NotBlank String scheduleId,
                                                            @InputArgument List<String> machineIds,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
-        String rawScheduleId = decodeId(scheduleId);
-        scheduleDeviceService.setDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
+        List<String> rawMachineIds = relayIdCodec.decodeAll(machineIds, MACHINE);
+        String userId = principal.getId();
+        scheduleDeviceService.setDevices(rawScheduleId, rawMachineIds, userId);
         return scheduleService.get(rawScheduleId);
     }
 
@@ -171,8 +188,10 @@ public class ScriptScheduleDataFetcher {
     public ScriptScheduleResponse addDevicesToSchedule(@InputArgument @NotBlank String scheduleId,
                                                        @InputArgument List<String> machineIds,
                                                        @AuthenticationPrincipal AuthPrincipal principal) {
-        String rawScheduleId = decodeId(scheduleId);
-        scheduleDeviceService.addDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
+        List<String> rawMachineIds = relayIdCodec.decodeAll(machineIds, MACHINE);
+        String userId = principal.getId();
+        scheduleDeviceService.addDevices(rawScheduleId, rawMachineIds, userId);
         return scheduleService.get(rawScheduleId);
     }
 
@@ -181,8 +200,10 @@ public class ScriptScheduleDataFetcher {
     public ScriptScheduleResponse removeDevicesFromSchedule(@InputArgument @NotBlank String scheduleId,
                                                             @InputArgument List<String> machineIds,
                                                             @AuthenticationPrincipal AuthPrincipal principal) {
-        String rawScheduleId = decodeId(scheduleId);
-        scheduleDeviceService.removeDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
+        List<String> rawMachineIds = relayIdCodec.decodeAll(machineIds, MACHINE);
+        String userId = principal.getId();
+        scheduleDeviceService.removeDevices(rawScheduleId, rawMachineIds, userId);
         return scheduleService.get(rawScheduleId);
     }
 
@@ -192,7 +213,7 @@ public class ScriptScheduleDataFetcher {
                                                           @InputArgument @Valid DeviceFilterInput filter,
                                                           @InputArgument String search,
                                                           @AuthenticationPrincipal AuthPrincipal principal) {
-        String rawScheduleId = decodeId(scheduleId);
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
         ScriptScheduleResponse schedule = scheduleService.get(rawScheduleId);
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
         List<String> ids = deviceService.findDeviceIdsForPlatforms(schedule.getSupportedPlatforms(), filterOptions, search);
@@ -209,7 +230,7 @@ public class ScriptScheduleDataFetcher {
                                                                @InputArgument @Valid DeviceFilterInput filter,
                                                                @InputArgument String search,
                                                                @AuthenticationPrincipal AuthPrincipal principal) {
-        String rawScheduleId = decodeId(scheduleId);
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
         List<String> assigned = scheduleDeviceService.getMachineIds(rawScheduleId);
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
         List<String> ids = deviceService.findAssignedDeviceIds(assigned, filterOptions, search);
@@ -226,7 +247,7 @@ public class ScriptScheduleDataFetcher {
     public ScriptScheduleResponse setScheduleDeviceCriteria(@InputArgument @NotBlank String scheduleId,
                                                             @InputArgument @Valid ScheduleDeviceCriteriaInput criteria,
                                                             @AuthenticationPrincipal AuthPrincipal principal) {
-        String rawScheduleId = decodeId(scheduleId);
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
         ScheduleDeviceCriteria domainCriteria = ScheduleDeviceCriteria.builder()
                 .organizationIds(criteria.getOrganizationIds())
                 .deviceTypes(criteria.getDeviceTypes())
@@ -241,14 +262,17 @@ public class ScriptScheduleDataFetcher {
      */
     @DgsMutation
     public DispatchResponse runScheduleJobNow(@InputArgument @NotBlank String scheduleId) {
-        return scriptDispatchService.runSchedule(decodeId(scheduleId), getCurrentUserId());
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
+        String userId = getCurrentUserId();
+        return scriptDispatchService.runSchedule(rawScheduleId, userId);
     }
 
     /** Returns the Relay global id ("ScriptSchedule:&lt;rawId&gt;") for the {@code id} field. */
     @DgsData(parentType = "ScriptSchedule", field = "id")
     public String scriptScheduleNodeId(DgsDataFetchingEnvironment dfe) {
         ScriptScheduleResponse schedule = dfe.getSource();
-        return RELAY.toGlobalId("ScriptSchedule", schedule.getId());
+        String scheduleId = schedule.getId();
+        return relayIdCodec.encode(SCRIPT_SCHEDULE, scheduleId);
     }
 
     /**
@@ -274,12 +298,20 @@ public class ScriptScheduleDataFetcher {
             return List.of();
         }
         return params.stream()
-                .map(p -> ScheduledScriptCustomParams.builder()
-                        .scriptId(RELAY.toGlobalId("Script", p.getScriptId()))
-                        .args(p.getArgs())
-                        .envVars(maskEnvVars(p.getEnvVars()))
-                        .build())
+                .map(this::toCustomParamsView)
                 .toList();
+    }
+
+    private ScheduledScriptCustomParams toCustomParamsView(ScheduledScriptCustomParams params) {
+        String rawScriptId = params.getScriptId();
+        List<ScriptEnvVar> envVars = params.getEnvVars();
+        String scriptId = relayIdCodec.encode(SCRIPT, rawScriptId);
+        List<ScriptEnvVar> maskedEnvVars = maskEnvVars(envVars);
+        return ScheduledScriptCustomParams.builder()
+                .scriptId(scriptId)
+                .args(params.getArgs())
+                .envVars(maskedEnvVars)
+                .build();
     }
 
     private static List<ScriptEnvVar> maskEnvVars(List<ScriptEnvVar> envVars) {
@@ -392,27 +424,40 @@ public class ScriptScheduleDataFetcher {
         return loader.load(schedule.getCreatedBy());
     }
 
-    private static String decodeId(String globalId) {
-        return globalId == null ? null : RELAY.fromGlobalId(globalId).getId();
-    }
-
-    private static List<String> decodeIds(List<String> globalIds) {
-        return globalIds == null ? null : globalIds.stream().map(ScriptScheduleDataFetcher::decodeId).toList();
+    private void decodeAuthorIds(ScriptScheduleFilterInput filter) {
+        if (filter == null) {
+            return;
+        }
+        List<String> authorGlobalIds = filter.getAuthorIds();
+        List<String> authorIds = relayIdCodec.decodeAll(authorGlobalIds, USER);
+        filter.setAuthorIds(authorIds);
     }
 
     /** Decode each custom-params {@code scriptId} (Script global id → raw) in place before the service. */
-    private static void decodeCustomParamsScriptIds(List<ScheduledScriptCustomParamsInput> customParams) {
+    private void decodeCustomParamsScriptIds(List<ScheduledScriptCustomParamsInput> customParams) {
         if (customParams == null) {
             return;
         }
-        customParams.forEach(p -> p.setScriptId(decodeId(p.getScriptId())));
+        customParams.forEach(this::decodeCustomParamsScriptId);
     }
 
-    private static void encodeNodeOptions(List<ScriptFilterOption> options, String nodeType) {
+    private void decodeCustomParamsScriptId(ScheduledScriptCustomParamsInput params) {
+        String scriptGlobalId = params.getScriptId();
+        String scriptId = relayIdCodec.decode(scriptGlobalId, SCRIPT);
+        params.setScriptId(scriptId);
+    }
+
+    private void encodeNodeOptions(List<ScriptFilterOption> options, NodeType nodeType) {
         if (options == null) {
             return;
         }
-        options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
+        options.forEach(option -> encodeNodeOption(option, nodeType));
+    }
+
+    private void encodeNodeOption(ScriptFilterOption option, NodeType nodeType) {
+        String rawId = option.getValue();
+        String globalId = relayIdCodec.encode(nodeType, rawId);
+        option.setValue(globalId);
     }
 
     private String getCurrentUserId() {

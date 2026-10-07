@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.relay.RelayIdCodec;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.datafetcher.rmm.ScriptExecutionDataFetcher;
 import com.openframe.api.dto.CountedGenericConnection;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.concurrent.CompletableFuture;
@@ -56,6 +58,8 @@ class ScriptExecutionDataFetcherTest {
     private ScriptExecutionFilterService scriptExecutionFilterService;
     @Mock
     private GraphQLScriptExecutionMapper executionMapper;
+    @Spy
+    private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks
     private ScriptExecutionDataFetcher dataFetcher;

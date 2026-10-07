@@ -18,13 +18,14 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
+import com.openframe.api.relay.NodeType;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.rmm.script.ScriptExecutionFilterService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.software.SoftwareAction;
-import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,11 @@ import org.dataloader.DataLoader;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.regex.Pattern;
+
+import static com.openframe.api.relay.NodeType.SCRIPT;
+import static com.openframe.api.relay.NodeType.SCRIPT_EXECUTION;
+import static com.openframe.api.relay.NodeType.SCRIPT_SCHEDULE;
+import static com.openframe.api.relay.NodeType.USER;
 
 /**
  * GraphQL resolver for the Execution History tab — the same handler backs both the
@@ -55,23 +60,23 @@ import java.util.regex.Pattern;
 @Slf4j
 public class ScriptExecutionDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-    private static final Pattern RAW_MONGO_OBJECT_ID = Pattern.compile("^[0-9a-fA-F]{24}$");
-
     private final ScriptExecutionService scriptExecutionService;
     private final ScriptExecutionFilterService scriptExecutionFilterService;
     private final GraphQLScriptExecutionMapper executionMapper;
+    private final RelayIdCodec relayIdCodec;
 
     /** Relay global id (Base64 "ScriptExecution:&lt;rawId&gt;") for the {@code id} field — the opaque node handle. */
     @DgsData(parentType = "ScriptExecution", field = "id")
     public String scriptExecutionNodeId(DgsDataFetchingEnvironment dfe) {
         ScriptExecutionResponse execution = dfe.getSource();
-        return RELAY.toGlobalId("ScriptExecution", execution.getId());
+        String executionId = execution.getId();
+        return relayIdCodec.encode(SCRIPT_EXECUTION, executionId);
     }
 
     @DgsQuery
     public ScriptExecutionResponse scriptExecution(@InputArgument @NotBlank String id) {
-        return scriptExecutionService.get(decodeId(id));
+        String executionId = relayIdCodec.decode(id, SCRIPT_EXECUTION);
+        return scriptExecutionService.get(executionId);
     }
 
     @DgsQuery
@@ -84,8 +89,9 @@ public class ScriptExecutionDataFetcher {
             @InputArgument String after,
             @InputArgument Integer last,
             @InputArgument String before) {
-        return listExecutions(ExecutionOwnerScope.forScript(decodeId(scriptId)),
-                filter, search, sort, first, after, last, before);
+        String rawScriptId = relayIdCodec.decode(scriptId, SCRIPT);
+        ExecutionOwnerScope owner = ExecutionOwnerScope.forScript(rawScriptId);
+        return listExecutions(owner, filter, search, sort, first, after, last, before);
     }
 
     @DgsQuery
@@ -98,8 +104,9 @@ public class ScriptExecutionDataFetcher {
             @InputArgument String after,
             @InputArgument Integer last,
             @InputArgument String before) {
-        return listExecutions(ExecutionOwnerScope.forSchedule(decodeId(scheduleId)),
-                filter, search, sort, first, after, last, before);
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
+        ExecutionOwnerScope owner = ExecutionOwnerScope.forSchedule(rawScheduleId);
+        return listExecutions(owner, filter, search, sort, first, after, last, before);
     }
 
     @DgsQuery
@@ -123,7 +130,9 @@ public class ScriptExecutionDataFetcher {
             @InputArgument @NotBlank String scriptId,
             @InputArgument ScriptExecutionFilterInput filter,
             @InputArgument String search) {
-        return facetExecutions(ExecutionOwnerScope.forScript(decodeId(scriptId)), filter, search);
+        String rawScriptId = relayIdCodec.decode(scriptId, SCRIPT);
+        ExecutionOwnerScope owner = ExecutionOwnerScope.forScript(rawScriptId);
+        return facetExecutions(owner, filter, search);
     }
 
     @DgsQuery
@@ -141,7 +150,9 @@ public class ScriptExecutionDataFetcher {
             @InputArgument @NotBlank String scheduleId,
             @InputArgument ScriptExecutionFilterInput filter,
             @InputArgument String search) {
-        return facetExecutions(ExecutionOwnerScope.forSchedule(decodeId(scheduleId)), filter, search);
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
+        ExecutionOwnerScope owner = ExecutionOwnerScope.forSchedule(rawScheduleId);
+        return facetExecutions(owner, filter, search);
     }
 
     /** Decode Relay-encoded initiator ids, build connection args, delegate to the service. */
@@ -149,9 +160,7 @@ public class ScriptExecutionDataFetcher {
             ExecutionOwnerScope owner,
             ScriptExecutionFilterInput filter, String search, SortInput sort,
             Integer first, String after, Integer last, String before) {
-        if (filter != null) {
-            filter.setInitiatorIds(decodeIds(filter.getInitiatorIds()));
-        }
+        decodeInitiatorIds(filter);
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
                 .build();
@@ -164,36 +173,36 @@ public class ScriptExecutionDataFetcher {
     /** Decode + re-encode initiator ids, delegate to the facet service. */
     private ScriptExecutionFilters facetExecutions(ExecutionOwnerScope owner,
                                                    ScriptExecutionFilterInput filter, String search) {
-        if (filter != null) {
-            filter.setInitiatorIds(decodeIds(filter.getInitiatorIds()));
-        }
+        decodeInitiatorIds(filter);
         ScriptExecutionFilters filters = scriptExecutionFilterService.getExecutionFilters(owner, filter, search);
         // initiators facet values are raw user ids — re-encode to User global ids so the
         // dashboard sends the same global id back in initiatorIds (which is decoded above).
-        encodeNodeOptions(filters.getInitiators(), "User");
+        List<ScriptFilterOption> initiators = filters.getInitiators();
+        encodeNodeOptions(initiators, USER);
         return filters;
     }
 
-    private static String decodeId(String id) {
-        if (id == null) {
-            return null;
+    private void decodeInitiatorIds(ScriptExecutionFilterInput filter) {
+        if (filter == null) {
+            return;
         }
-        if (RAW_MONGO_OBJECT_ID.matcher(id).matches()) {
-            return id;
-        }
-        return RELAY.fromGlobalId(id).getId();
-    }
-
-    private static List<String> decodeIds(List<String> globalIds) {
-        return globalIds == null ? null : globalIds.stream().map(ScriptExecutionDataFetcher::decodeId).toList();
+        List<String> initiatorGlobalIds = filter.getInitiatorIds();
+        List<String> initiatorIds = relayIdCodec.decodeAll(initiatorGlobalIds, USER);
+        filter.setInitiatorIds(initiatorIds);
     }
 
     /** Re-encode a facet's raw option values to Relay global ids of the given node type (in place). */
-    private static void encodeNodeOptions(List<ScriptFilterOption> options, String nodeType) {
+    private void encodeNodeOptions(List<ScriptFilterOption> options, NodeType nodeType) {
         if (options == null) {
             return;
         }
-        options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
+        options.forEach(option -> encodeNodeOption(option, nodeType));
+    }
+
+    private void encodeNodeOption(ScriptFilterOption option, NodeType nodeType) {
+        String rawId = option.getValue();
+        String globalId = relayIdCodec.encode(nodeType, rawId);
+        option.setValue(globalId);
     }
 
     @DgsData(parentType = "ScriptExecution", field = "initiator")

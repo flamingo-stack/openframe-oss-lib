@@ -7,9 +7,10 @@ import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.api.relay.NodeType;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.security.authentication.AuthPrincipal;
-import graphql.relay.Relay;
 import org.dataloader.DataLoader;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,22 +47,26 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 
+import static com.openframe.api.relay.NodeType.SCRIPT;
+import static com.openframe.api.relay.NodeType.TAG;
+import static com.openframe.api.relay.NodeType.USER;
+
 @DgsComponent
 @RequiredArgsConstructor
 @Slf4j
 @Validated
 public class ScriptDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final ScriptService scriptService;
     private final ScriptDispatchService scriptDispatchService;
     private final ScriptFilterService scriptFilterService;
     private final GraphQLScriptMapper scriptMapper;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public ScriptResponse script(@InputArgument @NotBlank String id) {
-        return scriptService.get(decodeId(id));
+        String scriptId = relayIdCodec.decode(id, SCRIPT);
+        return scriptService.get(scriptId);
     }
 
     @DgsQuery
@@ -74,11 +79,7 @@ public class ScriptDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before) {
 
-        // tagIds / authorIds arrive as Relay global ids (Tag / User) — decode to raw before filtering.
-        if (filter != null) {
-            filter.setTagIds(decodeIds(filter.getTagIds()));
-            filter.setAuthorIds(decodeIds(filter.getAuthorIds()));
-        }
+        decodeFilterIds(filter);
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
                 .build();
@@ -90,77 +91,102 @@ public class ScriptDataFetcher {
 
     @DgsQuery
     public ScriptFilters scriptFilters(@InputArgument @Valid ScriptFilterInput filter) {
-        if (filter != null) {
-            filter.setTagIds(decodeIds(filter.getTagIds()));
-            filter.setAuthorIds(decodeIds(filter.getAuthorIds()));
-        }
+        decodeFilterIds(filter);
         ScriptFilters filters = scriptFilterService.getScriptFilters(filter);
         // authors facet values are raw user ids — re-encode to User global ids so the dashboard
         // sends the same global id back in authorIds (which is decoded above).
-        encodeNodeOptions(filters.getAuthors(), "User");
+        List<ScriptFilterOption> authors = filters.getAuthors();
+        encodeNodeOptions(authors, USER);
         return filters;
     }
 
     @DgsMutation
     public ScriptResponse createScript(@InputArgument @Valid CreateScriptInput input) {
-        input.setTagIds(decodeIds(input.getTagIds()));
+        List<String> tagGlobalIds = input.getTagIds();
+        List<String> tagIds = relayIdCodec.decodeAll(tagGlobalIds, TAG);
+        input.setTagIds(tagIds);
         String userId = getCurrentUserId();
         return scriptService.create(input, userId, ScriptCreationSource.MANUAL);
     }
 
     @DgsMutation
     public ScriptResponse updateScript(@InputArgument @Valid UpdateScriptInput input) {
-        input.setId(decodeId(input.getId()));
-        input.setTagIds(decodeIds(input.getTagIds()));
+        String scriptGlobalId = input.getId();
+        List<String> tagGlobalIds = input.getTagIds();
+        String scriptId = relayIdCodec.decode(scriptGlobalId, SCRIPT);
+        List<String> tagIds = relayIdCodec.decodeAll(tagGlobalIds, TAG);
+        input.setId(scriptId);
+        input.setTagIds(tagIds);
         return scriptService.update(input);
     }
 
     @DgsMutation
     public String deleteScript(@InputArgument @NotBlank String id) {
-        return scriptService.delete(decodeId(id));
+        String scriptId = relayIdCodec.decode(id, SCRIPT);
+        return scriptService.delete(scriptId);
     }
 
     @DgsMutation
     public ScriptResponse archiveScript(@InputArgument @NotBlank String id) {
-        return scriptService.archive(decodeId(id));
+        String scriptId = relayIdCodec.decode(id, SCRIPT);
+        return scriptService.archive(scriptId);
     }
 
     @DgsMutation
     public ScriptResponse unarchiveScript(@InputArgument @NotBlank String id) {
-        return scriptService.unarchive(decodeId(id));
+        String scriptId = relayIdCodec.decode(id, SCRIPT);
+        return scriptService.unarchive(scriptId);
     }
 
     @DgsMutation
     public DispatchResponse runScript(@InputArgument @Valid RunScriptInput input) {
-        input.setScriptId(decodeId(input.getScriptId()));
-        return scriptDispatchService.runScript(input, getCurrentUserId(), ExecutionSource.MANUAL);
+        String scriptGlobalId = input.getScriptId();
+        String scriptId = relayIdCodec.decode(scriptGlobalId, SCRIPT);
+        input.setScriptId(scriptId);
+        String userId = getCurrentUserId();
+        return scriptDispatchService.runScript(input, userId, ExecutionSource.MANUAL);
     }
 
     @DgsMutation
     public DispatchResponse batchRunScript(@InputArgument @Valid BatchRunScriptInput input) {
-        input.setScriptId(decodeId(input.getScriptId()));
-        return scriptDispatchService.batchRunScript(input, getCurrentUserId(), ExecutionSource.MANUAL);
+        String scriptGlobalId = input.getScriptId();
+        String scriptId = relayIdCodec.decode(scriptGlobalId, SCRIPT);
+        input.setScriptId(scriptId);
+        String userId = getCurrentUserId();
+        return scriptDispatchService.batchRunScript(input, userId, ExecutionSource.MANUAL);
     }
 
     @DgsData(parentType = "Script", field = "id")
     public String scriptNodeId(DgsDataFetchingEnvironment dfe) {
         ScriptResponse script = dfe.getSource();
-        return RELAY.toGlobalId("Script", script.getId());
+        String scriptId = script.getId();
+        return relayIdCodec.encode(SCRIPT, scriptId);
     }
 
-    private static String decodeId(String globalId) {
-        return globalId == null ? null : RELAY.fromGlobalId(globalId).getId();
+    // tagIds / authorIds arrive as Relay global ids (Tag / User) — decode to raw before filtering.
+    private void decodeFilterIds(ScriptFilterInput filter) {
+        if (filter == null) {
+            return;
+        }
+        List<String> tagGlobalIds = filter.getTagIds();
+        List<String> authorGlobalIds = filter.getAuthorIds();
+        List<String> tagIds = relayIdCodec.decodeAll(tagGlobalIds, TAG);
+        List<String> authorIds = relayIdCodec.decodeAll(authorGlobalIds, USER);
+        filter.setTagIds(tagIds);
+        filter.setAuthorIds(authorIds);
     }
 
-    private static List<String> decodeIds(List<String> globalIds) {
-        return globalIds == null ? null : globalIds.stream().map(ScriptDataFetcher::decodeId).toList();
-    }
-
-    private static void encodeNodeOptions(List<ScriptFilterOption> options, String nodeType) {
+    private void encodeNodeOptions(List<ScriptFilterOption> options, NodeType nodeType) {
         if (options == null) {
             return;
         }
-        options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
+        options.forEach(option -> encodeNodeOption(option, nodeType));
+    }
+
+    private void encodeNodeOption(ScriptFilterOption option, NodeType nodeType) {
+        String rawId = option.getValue();
+        String globalId = relayIdCodec.encode(nodeType, rawId);
+        option.setValue(globalId);
     }
 
     @DgsData(parentType = "Script", field = "envVars")

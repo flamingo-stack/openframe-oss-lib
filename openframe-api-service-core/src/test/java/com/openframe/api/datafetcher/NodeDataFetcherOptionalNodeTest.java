@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.InstalledAgentService;
 import com.openframe.api.service.TagService;
 import com.openframe.api.service.ToolConnectionService;
@@ -110,7 +111,7 @@ class NodeDataFetcherOptionalNodeTest {
     private NodeDataFetcher fetcher(TenantRepository tenants, SoftwareBundleService bundles) {
         return new NodeDataFetcher(deviceService, organizationService, toolService, tagService,
                 toolConnectionService, installedAgentService, scriptService, scriptExecutionService,
-                scheduleScriptService, scheduleRunService, providerOf(tenants), providerOf(bundles));
+                scheduleScriptService, scheduleRunService, providerOf(tenants), providerOf(bundles), new RelayIdCodec());
     }
 
     @SuppressWarnings("unchecked")

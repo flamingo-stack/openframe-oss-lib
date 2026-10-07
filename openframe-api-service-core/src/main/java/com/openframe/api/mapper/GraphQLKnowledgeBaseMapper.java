@@ -12,26 +12,39 @@ import com.openframe.api.dto.knowledgebase.UpdateArticleInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.relay.NodeType;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
-import graphql.relay.Relay;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.openframe.api.relay.NodeType.KNOWLEDGE_BASE_ITEM;
+import static com.openframe.api.relay.NodeType.MACHINE;
+import static com.openframe.api.relay.NodeType.ORGANIZATION;
+import static com.openframe.api.relay.NodeType.TAG;
+import static com.openframe.api.relay.NodeType.TICKET;
+
 @Component
+@RequiredArgsConstructor
 public class GraphQLKnowledgeBaseMapper {
 
-    private static final Relay RELAY = new Relay();
+    private final RelayIdCodec relayIdCodec;
 
     public KnowledgeBaseFilterCriteria toFilterCriteria(KnowledgeBaseFilterInput input) {
         if (input == null) {
             return KnowledgeBaseFilterCriteria.builder().build();
         }
+        String parentGlobalId = input.getParentId();
+        List<String> tagGlobalIds = input.getTagIds();
+        String parentId = decodeId(parentGlobalId, KNOWLEDGE_BASE_ITEM);
+        List<String> tagIds = decodeIds(tagGlobalIds, TAG);
         return KnowledgeBaseFilterCriteria.builder()
-                .parentId(decodeId(input.getParentId()))
+                .parentId(parentId)
                 .type(input.getType())
-                .tagIds(decodeIds(input.getTagIds()))
+                .tagIds(tagIds)
                 .build();
     }
 
@@ -55,38 +68,51 @@ public class GraphQLKnowledgeBaseMapper {
     }
 
     public CreateArticleCommand toCreateCommand(CreateArticleInput input) {
+        String parentGlobalId = input.getParentId();
+        List<String> tagGlobalIds = input.getTagIds();
+        List<String> organizationGlobalIds = input.getAssignedOrganizationIds();
+        List<String> deviceGlobalIds = input.getAssignedDeviceIds();
+        List<String> ticketGlobalIds = input.getAssignedTicketIds();
+        List<String> knowledgeArticleGlobalIds = input.getAssignedKnowledgeArticleIds();
+        String parentId = decodeId(parentGlobalId, KNOWLEDGE_BASE_ITEM);
+        List<String> tagIds = decodeIds(tagGlobalIds, TAG);
+        List<String> organizationIds = decodeIds(organizationGlobalIds, ORGANIZATION);
+        List<String> deviceIds = decodeIds(deviceGlobalIds, MACHINE);
+        List<String> ticketIds = decodeIds(ticketGlobalIds, TICKET);
+        List<String> knowledgeArticleIds = decodeIds(knowledgeArticleGlobalIds, KNOWLEDGE_BASE_ITEM);
         return CreateArticleCommand.builder()
                 .name(input.getName())
-                .parentId(decodeId(input.getParentId()))
+                .parentId(parentId)
                 .content(input.getContent())
                 .summary(input.getSummary())
                 .status(input.getStatus())
-                .tagIds(decodeIds(input.getTagIds()))
-                .assignedOrganizationIds(decodeIds(input.getAssignedOrganizationIds()))
-                .assignedDeviceIds(decodeIds(input.getAssignedDeviceIds()))
-                .assignedTicketIds(decodeIds(input.getAssignedTicketIds()))
-                .assignedKnowledgeArticleIds(decodeIds(input.getAssignedKnowledgeArticleIds()))
+                .tagIds(tagIds)
+                .assignedOrganizationIds(organizationIds)
+                .assignedDeviceIds(deviceIds)
+                .assignedTicketIds(ticketIds)
+                .assignedKnowledgeArticleIds(knowledgeArticleIds)
                 .build();
     }
 
     public UpdateArticleCommand toUpdateCommand(UpdateArticleInput input) {
+        String articleGlobalId = input.getId();
+        String parentGlobalId = input.getParentId();
+        String articleId = decodeId(articleGlobalId, KNOWLEDGE_BASE_ITEM);
+        String parentId = decodeId(parentGlobalId, KNOWLEDGE_BASE_ITEM);
         return UpdateArticleCommand.builder()
-                .id(decodeId(input.getId()))
+                .id(articleId)
                 .name(input.getName())
-                .parentId(decodeId(input.getParentId()))
+                .parentId(parentId)
                 .content(input.getContent())
                 .summary(input.getSummary())
                 .build();
     }
 
-    private String decodeId(String globalId) {
-        return globalId != null ? RELAY.fromGlobalId(globalId).getId() : null;
+    private String decodeId(String globalId, NodeType type) {
+        return relayIdCodec.decode(globalId, type);
     }
 
-    private List<String> decodeIds(List<String> globalIds) {
-        if (globalIds == null) {
-            return null;
-        }
-        return globalIds.stream().map(this::decodeId).toList();
+    private List<String> decodeIds(List<String> globalIds, NodeType type) {
+        return relayIdCodec.decodeAll(globalIds, type);
     }
 }

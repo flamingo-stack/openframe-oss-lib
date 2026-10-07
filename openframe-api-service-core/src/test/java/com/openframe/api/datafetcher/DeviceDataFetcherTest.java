@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
@@ -32,6 +34,7 @@ class DeviceDataFetcherTest {
     @Mock private GraphQLDeviceMapper mapper;
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     @Mock private DgsDataFetchingEnvironment dfe;
+    @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private DeviceDataFetcher fetcher;
 

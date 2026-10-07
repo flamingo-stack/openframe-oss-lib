@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.relay.RelayIdCodec;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.datafetcher.rmm.ScheduleRunDataFetcher;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,6 +31,8 @@ class ScheduleRunDataFetcherTest {
     private ScheduleRunFilterService scheduleRunFilterService;
     @Mock
     private GraphQLScheduleRunMapper mapper;
+    @Spy
+    private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks
     private ScheduleRunDataFetcher dataFetcher;

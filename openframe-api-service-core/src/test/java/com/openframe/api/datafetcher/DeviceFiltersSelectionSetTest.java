@@ -2,6 +2,7 @@ package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
@@ -83,7 +84,7 @@ class DeviceFiltersSelectionSetTest {
     @BeforeEach
     void setUp() {
         DeviceDataFetcher dataFetcher = new DeviceDataFetcher(deviceService, deviceFilterService, tagService,
-                fleetVulnerabilityStatusService, mapper, packageManagerAvailability);
+                fleetVulnerabilityStatusService, mapper, packageManagerAvailability, new RelayIdCodec());
 
         TypeDefinitionRegistry registry = new SchemaParser().parse(SDL);
         RuntimeWiring wiring = RuntimeWiring.newRuntimeWiring()

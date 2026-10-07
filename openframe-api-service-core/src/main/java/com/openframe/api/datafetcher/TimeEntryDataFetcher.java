@@ -26,12 +26,14 @@ import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryInput;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.api.relay.NodeType;
+import com.openframe.api.relay.ParsedRelayId;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.TimeEntryService;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.security.authentication.AuthPrincipal;
-import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -48,15 +50,22 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.api.relay.NodeType.ORGANIZATION;
+import static com.openframe.api.relay.NodeType.TICKET;
+import static com.openframe.api.relay.NodeType.TIME_ENTRY;
+import static com.openframe.api.relay.NodeType.USER;
+import static org.springframework.util.StringUtils.hasText;
+
 @DgsComponent
 @Slf4j
 @Validated
 @RequiredArgsConstructor
 public class TimeEntryDataFetcher {
 
-    private static final Relay RELAY = new Relay();
+    private static final String CLEARED_ID = "";
 
     private final TimeEntryService timeEntryService;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public TimeEntry currentTimer() {
@@ -67,7 +76,7 @@ public class TimeEntryDataFetcher {
 
     @DgsQuery
     public TimeEntry timeEntry(@InputArgument @NotBlank String id) {
-        String rawId = RELAY.fromGlobalId(id).getId();
+        String rawId = relayIdCodec.decode(id, TIME_ENTRY);
         return timeEntryService.getTimeEntry(rawId).orElse(null);
     }
 
@@ -107,11 +116,7 @@ public class TimeEntryDataFetcher {
     public TimeEntry startTimer(@InputArgument StartTimerInput input) {
         String userId = getCurrentUserId();
         log.info("startTimer mutation by user {}", userId);
-        StartTimerCommand cmd = input == null ? null : StartTimerCommand.builder()
-                .ticketId(input.getTicketId() != null ? RELAY.fromGlobalId(input.getTicketId()).getId() : null)
-                .organizationId(input.getOrganizationId() != null ? RELAY.fromGlobalId(input.getOrganizationId()).getId() : null)
-                .notes(input.getNotes())
-                .build();
+        StartTimerCommand cmd = input == null ? null : toStartTimerCommand(input);
         return timeEntryService.startTimer(userId, cmd);
     }
 
@@ -133,11 +138,7 @@ public class TimeEntryDataFetcher {
     public TimeEntry stopTimer(@InputArgument StopTimerInput input) {
         String userId = getCurrentUserId();
         log.info("stopTimer mutation by user {}", userId);
-        StopTimerCommand cmd = input == null ? null : StopTimerCommand.builder()
-                .ticketId(input.getTicketId() != null ? RELAY.fromGlobalId(input.getTicketId()).getId() : null)
-                .organizationId(input.getOrganizationId() != null ? RELAY.fromGlobalId(input.getOrganizationId()).getId() : null)
-                .notes(input.getNotes())
-                .build();
+        StopTimerCommand cmd = input == null ? null : toStopTimerCommand(input);
         return timeEntryService.stopTimer(userId, cmd);
     }
 
@@ -151,48 +152,36 @@ public class TimeEntryDataFetcher {
     @DgsMutation
     public TimeEntry createTimeEntry(@InputArgument @Valid CreateTimeEntryInput input) {
         String actingUserId = getCurrentUserId();
-        CreateTimeEntryCommand cmd = CreateTimeEntryCommand.builder()
-                .userId(RELAY.fromGlobalId(input.getUserId()).getId())
-                .ticketId(input.getTicketId() != null ? RELAY.fromGlobalId(input.getTicketId()).getId() : null)
-                .organizationId(input.getOrganizationId() != null ? RELAY.fromGlobalId(input.getOrganizationId()).getId() : null)
-                .notes(input.getNotes())
-                .startedAt(input.getStartedAt())
-                .durationSeconds(input.getDurationSeconds())
-                .build();
+        CreateTimeEntryCommand cmd = toCreateTimeEntryCommand(input);
         return timeEntryService.createTimeEntry(actingUserId, cmd);
     }
 
     @DgsMutation
     public TimeEntry updateTimeEntry(@InputArgument @Valid UpdateTimeEntryInput input) {
         String actingUserId = getCurrentUserId();
-        UpdateTimeEntryCommand cmd = UpdateTimeEntryCommand.builder()
-                .id(RELAY.fromGlobalId(input.getId()).getId())
-                .userId(input.getUserId() != null ? RELAY.fromGlobalId(input.getUserId()).getId() : null)
-                .ticketId(input.getTicketId() != null ? RELAY.fromGlobalId(input.getTicketId()).getId() : null)
-                .organizationId(input.getOrganizationId() != null ? RELAY.fromGlobalId(input.getOrganizationId()).getId() : null)
-                .notes(input.getNotes())
-                .startedAt(input.getStartedAt())
-                .durationSeconds(input.getDurationSeconds())
-                .build();
+        UpdateTimeEntryCommand cmd = toUpdateTimeEntryCommand(input);
         return timeEntryService.updateTimeEntry(actingUserId, cmd);
     }
 
     @DgsMutation
     public TimeEntry unlinkTicketFromTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
-        return timeEntryService.unlinkTicketFromTimeEntry(actingUserId, RELAY.fromGlobalId(id).getId());
+        String rawId = relayIdCodec.decode(id, TIME_ENTRY);
+        return timeEntryService.unlinkTicketFromTimeEntry(actingUserId, rawId);
     }
 
     @DgsMutation
     public boolean deleteTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
-        return timeEntryService.deleteTimeEntry(actingUserId, RELAY.fromGlobalId(id).getId());
+        String rawId = relayIdCodec.decode(id, TIME_ENTRY);
+        return timeEntryService.deleteTimeEntry(actingUserId, rawId);
     }
 
     @DgsData(parentType = "TimeEntry", field = "id")
     public String timeEntryNodeId(DgsDataFetchingEnvironment dfe) {
         TimeEntry entry = dfe.getSource();
-        return RELAY.toGlobalId("TimeEntry", entry.getId());
+        String entryId = entry.getId();
+        return relayIdCodec.encode(TIME_ENTRY, entryId);
     }
 
     @DgsData(parentType = "TimeEntry", field = "state")
@@ -261,19 +250,92 @@ public class TimeEntryDataFetcher {
         return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 
-    private static void decodeFilterIds(TimeEntryFilterInput filter) {
+    private void decodeFilterIds(TimeEntryFilterInput filter) {
         if (filter == null) {
             return;
         }
-        if (filter.getEmployeeIds() != null) {
-            filter.setEmployeeIds(filter.getEmployeeIds().stream()
-                    .map(id -> RELAY.fromGlobalId(id).getId())
-                    .toList());
+        List<String> employeeGlobalIds = filter.getEmployeeIds();
+        List<String> organizationGlobalIds = filter.getOrganizationIds();
+        List<String> employeeIds = relayIdCodec.decodeAll(employeeGlobalIds, USER);
+        List<String> organizationIds = relayIdCodec.decodeAll(organizationGlobalIds, ORGANIZATION);
+        filter.setEmployeeIds(employeeIds);
+        filter.setOrganizationIds(organizationIds);
+    }
+
+    private StartTimerCommand toStartTimerCommand(StartTimerInput input) {
+        String ticketGlobalId = input.getTicketId();
+        String organizationGlobalId = input.getOrganizationId();
+        String ticketId = decodeClearable(ticketGlobalId, TICKET);
+        String organizationId = decodeClearable(organizationGlobalId, ORGANIZATION);
+        return StartTimerCommand.builder()
+                .ticketId(ticketId)
+                .organizationId(organizationId)
+                .notes(input.getNotes())
+                .build();
+    }
+
+    private StopTimerCommand toStopTimerCommand(StopTimerInput input) {
+        String ticketGlobalId = input.getTicketId();
+        String organizationGlobalId = input.getOrganizationId();
+        String ticketId = decodeClearable(ticketGlobalId, TICKET);
+        String organizationId = decodeClearable(organizationGlobalId, ORGANIZATION);
+        return StopTimerCommand.builder()
+                .ticketId(ticketId)
+                .organizationId(organizationId)
+                .notes(input.getNotes())
+                .build();
+    }
+
+    private CreateTimeEntryCommand toCreateTimeEntryCommand(CreateTimeEntryInput input) {
+        String userGlobalId = input.getUserId();
+        String ticketGlobalId = input.getTicketId();
+        String organizationGlobalId = input.getOrganizationId();
+        String userId = relayIdCodec.decode(userGlobalId, USER);
+        String ticketId = decodeClearable(ticketGlobalId, TICKET);
+        String organizationId = decodeClearable(organizationGlobalId, ORGANIZATION);
+        return CreateTimeEntryCommand.builder()
+                .userId(userId)
+                .ticketId(ticketId)
+                .organizationId(organizationId)
+                .notes(input.getNotes())
+                .startedAt(input.getStartedAt())
+                .durationSeconds(input.getDurationSeconds())
+                .build();
+    }
+
+    private UpdateTimeEntryCommand toUpdateTimeEntryCommand(UpdateTimeEntryInput input) {
+        String entryGlobalId = input.getId();
+        String userGlobalId = input.getUserId();
+        String ticketGlobalId = input.getTicketId();
+        String organizationGlobalId = input.getOrganizationId();
+        String entryId = relayIdCodec.decode(entryGlobalId, TIME_ENTRY);
+        String userId = relayIdCodec.decode(userGlobalId, USER);
+        String ticketId = decodeClearable(ticketGlobalId, TICKET);
+        String organizationId = decodeClearable(organizationGlobalId, ORGANIZATION);
+        return UpdateTimeEntryCommand.builder()
+                .id(entryId)
+                .userId(userId)
+                .ticketId(ticketId)
+                .organizationId(organizationId)
+                .notes(input.getNotes())
+                .startedAt(input.getStartedAt())
+                .durationSeconds(input.getDurationSeconds())
+                .build();
+    }
+
+    // The web clears a link by sending toGlobalId(type, ''); mobile and desktop ship that bundle frozen.
+    private String decodeClearable(String id, NodeType type) {
+        if (isClearSentinel(id, type)) {
+            return CLEARED_ID;
         }
-        if (filter.getOrganizationIds() != null) {
-            filter.setOrganizationIds(filter.getOrganizationIds().stream()
-                    .map(id -> RELAY.fromGlobalId(id).getId())
-                    .toList());
-        }
+        return relayIdCodec.decode(id, type);
+    }
+
+    private boolean isClearSentinel(String id, NodeType type) {
+        return relayIdCodec.parse(id)
+                .filter(parsed -> parsed.isOfType(type))
+                .map(ParsedRelayId::getRawId)
+                .filter(rawId -> !hasText(rawId))
+                .isPresent();
     }
 }

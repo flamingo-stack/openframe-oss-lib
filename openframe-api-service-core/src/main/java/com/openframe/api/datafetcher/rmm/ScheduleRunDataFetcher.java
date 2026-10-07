@@ -17,10 +17,10 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScheduleRunMapper;
+import com.openframe.api.relay.NodeType;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.rmm.schedule.ScheduleRunFilterService;
 import com.openframe.api.service.rmm.schedule.ScheduleRunService;
-
-import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +29,10 @@ import org.dataloader.DataLoader;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
+import static com.openframe.api.relay.NodeType.SCHEDULE_RUN;
+import static com.openframe.api.relay.NodeType.SCRIPT_SCHEDULE;
+import static com.openframe.api.relay.NodeType.USER;
 
 /**
  * GraphQL resolver for the "Schedule Runs" tab. Fires are always viewed per saved schedule —
@@ -41,22 +45,23 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class ScheduleRunDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final ScheduleRunService scheduleRunService;
     private final ScheduleRunFilterService scheduleRunFilterService;
     private final GraphQLScheduleRunMapper mapper;
+    private final RelayIdCodec relayIdCodec;
 
     /** Relay global id ("ScheduleRun:&lt;rawId&gt;") for the {@code id} field. */
     @DgsData(parentType = "ScheduleRun", field = "id")
     public String scheduleRunNodeId(DgsDataFetchingEnvironment dfe) {
         ScheduleRunResponse run = dfe.getSource();
-        return RELAY.toGlobalId("ScheduleRun", run.getId());
+        String runId = run.getId();
+        return relayIdCodec.encode(SCHEDULE_RUN, runId);
     }
 
     @DgsQuery
     public ScheduleRunResponse scheduleRun(@InputArgument @NotBlank String id) {
-        return scheduleRunService.get(decodeId(id));
+        String runId = relayIdCodec.decode(id, SCHEDULE_RUN);
+        return scheduleRunService.get(runId);
     }
 
     @DgsQuery
@@ -74,7 +79,9 @@ public class ScheduleRunDataFetcher {
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = mapper.toCursorPaginationCriteria(args);
-        CountedGenericQueryResult<ScheduleRunResponse> result = scheduleRunService.list(decodeId(scheduleId), filter, search, sort, pagination);
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
+        CountedGenericQueryResult<ScheduleRunResponse> result =
+                scheduleRunService.list(rawScheduleId, filter, search, sort, pagination);
         return mapper.toConnection(result);
     }
 
@@ -83,9 +90,11 @@ public class ScheduleRunDataFetcher {
             @InputArgument @NotBlank String scheduleId,
             @InputArgument @Valid ScheduleRunFilterInput filter,
             @InputArgument String search) {
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
         ScheduleRunFilters filters =
-                scheduleRunFilterService.getScheduleRunFilters(decodeId(scheduleId), filter, search);
-        encodeNodeOptions(filters.getInitiators(), "User");
+                scheduleRunFilterService.getScheduleRunFilters(rawScheduleId, filter, search);
+        List<ScriptFilterOption> initiators = filters.getInitiators();
+        encodeNodeOptions(initiators, USER);
         return filters;
     }
 
@@ -99,15 +108,17 @@ public class ScheduleRunDataFetcher {
         return loader.load(run.getInitiatedBy());
     }
 
-    private static String decodeId(String globalId) {
-        return globalId == null ? null : RELAY.fromGlobalId(globalId).getId();
-    }
-
     /** Re-encode a facet's raw option values to Relay global ids of the given node type (in place). */
-    private static void encodeNodeOptions(List<ScriptFilterOption> options, String nodeType) {
+    private void encodeNodeOptions(List<ScriptFilterOption> options, NodeType nodeType) {
         if (options == null) {
             return;
         }
-        options.forEach(o -> o.setValue(RELAY.toGlobalId(nodeType, o.getValue())));
+        options.forEach(option -> encodeNodeOption(option, nodeType));
+    }
+
+    private void encodeNodeOption(ScriptFilterOption option, NodeType nodeType) {
+        String rawId = option.getValue();
+        String globalId = relayIdCodec.encode(nodeType, rawId);
+        option.setValue(globalId);
     }
 }

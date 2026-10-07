@@ -3,6 +3,7 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.dataloader.TicketStatusDefinitionDataLoader;
 import com.openframe.api.mapper.GraphQLAssignmentMapper;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
@@ -38,7 +39,7 @@ class AssignmentDataFetcherTicketStatusTest {
     @Mock private DataLoader<String, TicketStatusDefinition> statusLoader;
 
     private AssignmentDataFetcher dataFetcher() {
-        return new AssignmentDataFetcher(assignmentService, mapper);
+        return new AssignmentDataFetcher(assignmentService, mapper, new RelayIdCodec());
     }
 
     @Test

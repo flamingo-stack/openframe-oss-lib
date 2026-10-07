@@ -1,7 +1,6 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import graphql.relay.Relay;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -12,6 +11,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLOrganizationMapper;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.organization.OrganizationQueryService;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.service.OrganizationService;
@@ -23,6 +23,8 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
 
+import static com.openframe.api.relay.NodeType.ORGANIZATION;
+
 /**
  * GraphQL DataFetcher for Organization queries.
  */
@@ -32,16 +34,16 @@ import java.time.Instant;
 @Validated
 public class OrganizationDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final OrganizationService organizationService;
     private final OrganizationQueryService organizationQueryService;
     private final GraphQLOrganizationMapper mapper;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsData(parentType = "Organization", field = "id")
     public String organizationNodeId(DgsDataFetchingEnvironment dfe) {
         Organization org = dfe.getSource();
-        return RELAY.toGlobalId("Organization", org.getOrganizationId());
+        String organizationId = org.getOrganizationId();
+        return relayIdCodec.encode(ORGANIZATION, organizationId);
     }
 
     /**
@@ -80,7 +82,7 @@ public class OrganizationDataFetcher {
 
     @DgsQuery
     public Organization organization(@InputArgument @NotBlank String id) {
-        String organizationId = RELAY.fromGlobalId(id).getId();
+        String organizationId = relayIdCodec.decode(id, ORGANIZATION);
         log.debug("Fetching organization by global ID: {}, organizationId: {}", id, organizationId);
         return organizationService.getOrganizationByOrganizationId(organizationId).orElse(null);
     }

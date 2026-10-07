@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.openframe.api.mapper.GraphQLAssignmentMapper;
+import com.openframe.api.relay.RelayIdCodec;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.data.document.ticket.Ticket;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
@@ -30,7 +31,7 @@ class AssignmentDataFetcherNodeIdTest {
     // the global form or it cannot be handed to unassignItem.
     @Test
     void theTicketIdIsHandedOutInTheFormTheMutationsAccept() {
-        AssignmentDataFetcher dataFetcher = new AssignmentDataFetcher(assignmentService, mapper);
+        AssignmentDataFetcher dataFetcher = new AssignmentDataFetcher(assignmentService, mapper, new RelayIdCodec());
         Ticket ticket = new Ticket();
         ticket.setId(RAW_TICKET_ID);
         when(dfe.<Ticket>getSource()).thenReturn(ticket);
