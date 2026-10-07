@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/components/chat'
+import { openAskAi } from '@flamingo-stack/openframe-frontend-core/components/navigation'
+import type { AssistantOpenRequest } from '@flamingo-stack/openframe-frontend-core/contexts'
 import { DOCS_BASE_ROUTE } from '../config/content'
 
 /**
@@ -24,6 +26,24 @@ import { DOCS_BASE_ROUTE } from '../config/content'
  * chips land. Doc-card routing for other documentTypes is config-driven via
  * `content-runtime.ts`'s `docPlatformTargets`.
  */
+/** The assistant's name in THIS embed: the header launcher's label and the name the FAQ's ask card uses. */
+export const ASSISTANT_NAME = 'Mingo'
+
+/** The event this embed's chat opens on. Its OWN name: nothing but `<AskAi />` listens for it. */
+const EMBED_CHAT_OPEN_EVENT = 'embed-example:open-chat'
+
+/**
+ * THIS embed's chat opener, handed to the lib through the assistant runtime
+ * (`AssistantRuntimeContext.open`, app-providers.tsx). Every "ask" surface of
+ * the lib under that provider (the FAQ's card) calls it instead of assuming
+ * the site chat: `<AskAi />` below receives the request, and decides which
+ * chat answers. An embedder with an inline chat, a second panel or a native
+ * shell does the same with its own function.
+ */
+export function openEmbedChat(request: AssistantOpenRequest): void {
+  window.dispatchEvent(new CustomEvent<AssistantOpenRequest>(EMBED_CHAT_OPEN_EVENT, { detail: request }))
+}
+
 const AGENT_CHOICES: ReadonlyArray<{ slug: string | undefined; label: string }> = [
   { slug: undefined, label: 'Guide' },
   { slug: 'fae', label: 'Fae' },
@@ -33,6 +53,19 @@ const AGENT_CHOICES: ReadonlyArray<{ slug: string | undefined; label: string }> 
 export function AskAi() {
   // `undefined` → default Guide mode; a slug → OpenFrame agent mode.
   const [activeAgentSlug, setActiveAgentSlug] = useState<string | undefined>(undefined)
+
+  // An "ask" surface asked for the chat (`openEmbedChat`). This embed answers
+  // every such request in the Guide chat, so it leaves agent mode first, then
+  // opens its panel with the question.
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const { prompt } = (event as CustomEvent<AssistantOpenRequest>).detail
+      setActiveAgentSlug(undefined)
+      openAskAi(undefined, { prompt })
+    }
+    window.addEventListener(EMBED_CHAT_OPEN_EVENT, onOpen)
+    return () => window.removeEventListener(EMBED_CHAT_OPEN_EVENT, onOpen)
+  }, [])
 
   return (
     <>

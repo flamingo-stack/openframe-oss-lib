@@ -25,6 +25,9 @@ export const EP = {
   // OpenFrame AI agents (Fae/Mingo) — public per-agent display config. Drives
   // EmbeddableChat "agent mode" via runtime.endpoints.aiAgentConfigUrl.
   aiAgent: (slug: string) => `${CONTENT}/ai-agents/${slug}`,
+  // The questions an "ask" surface offers (the FAQ's card): `?count&section&exclude`.
+  // `section` is the surface's topic, any string the hub's chat config knows.
+  askPrompts: `${CONTENT}/quick-actions/questions`,
   docsSearch: `${CONTENT}/docs/search`,
   // doc sources (knowledge-base mounts <DocsHubPage> against these)
   docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,

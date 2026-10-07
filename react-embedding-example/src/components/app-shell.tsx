@@ -6,7 +6,7 @@ import {
   TicketAlertsButton,
   type SiteNav,
 } from '@flamingo-stack/openframe-frontend-core/components/navigation'
-import { AskAi } from './ask-ai'
+import { ASSISTANT_NAME, AskAi } from './ask-ai'
 import { WalkthroughVideo } from './walkthrough-video'
 import { DOCS_BASE_ROUTE } from '../config/content'
 
@@ -84,7 +84,7 @@ export function AppShell() {
         logoHref="/"
         // Mingo launcher in the header: THE chat entry (dispatches
         // `ask-ai:open`; the always-mounted panel in <AskAi /> listens).
-        mingo={{}}
+        mingo={{ label: ASSISTANT_NAME }}
         sideActions={sideActions}
       />
       {/* No container constraint here — each route's lib component manages its
