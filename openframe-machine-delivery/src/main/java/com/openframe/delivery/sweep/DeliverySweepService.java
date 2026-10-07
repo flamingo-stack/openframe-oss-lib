@@ -22,6 +22,7 @@ import com.openframe.delivery.spec.DeliverySpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -49,7 +50,7 @@ public class DeliverySweepService {
     public void retryPending() {
         Instant now = Instant.now();
         int batchSize = properties.getSweep().getBatchSize();
-        List<MachineDelivery> due = repository.findDue(DeliveryStatus.PENDING, now, batchSize);
+        List<MachineDelivery> due = repository.findDue(DeliveryStatus.PENDING, now, Limit.of(batchSize));
         if (due.isEmpty()) {
             return;
         }
@@ -127,7 +128,7 @@ public class DeliverySweepService {
         Instant dueAt = now.plusSeconds(delaySeconds);
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
-        boolean counted = repository.markRepublished(id, DeliveryStatus.UNACKED, dispatchedAt, attempts, dueAt);
+        boolean counted = repository.markRepublished(id, DeliveryStatus.UNACKED, dispatchedAt, attempts, dueAt) > 0;
         if (!counted) {
             log.debug("Delivery moved on while being re-published: id={}", id);
             return;

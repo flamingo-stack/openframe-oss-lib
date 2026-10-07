@@ -45,8 +45,9 @@ public class DeliveryRecorder {
         // the counter lives in `sequences`, not on the row: the row expires with its TTL, the sequence must not restart
         int sequence = sequences.getNextValue(SEQUENCE_PREFIX + id);
         delivery.setSequence(sequence);
+        // save replaces the document: what a previous dispatch closed the row with (ackedAt, failure, error) goes away
         MachineDelivery row = pendingRow(request, id);
-        repository.upsertPending(row);
+        repository.save(row);
         log.info("Delivery recorded: type={} targetId={} machineId={} sequence={}", type, targetId, machineId, sequence);
         return true;
     }

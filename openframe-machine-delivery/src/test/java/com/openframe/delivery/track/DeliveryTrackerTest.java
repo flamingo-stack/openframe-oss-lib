@@ -49,7 +49,7 @@ class DeliveryTrackerTest {
     @Test
     void acknowledge_ref_unackedRowMarkedAckedWithResultDeadline() {
         // setup
-        when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
+        when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(1L);
 
         // execution
         tracker.acknowledge(REF, MACHINE_ID);
@@ -62,7 +62,7 @@ class DeliveryTrackerTest {
     @Test
     void done_ref_openOrFailedRowMarkedDoneWithTtlExpiry() {
         // setup
-        when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
+        when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), atCaptor.capture(), untilCaptor.capture())).thenReturn(1L);
 
         // execution
         tracker.done(REF, MACHINE_ID);

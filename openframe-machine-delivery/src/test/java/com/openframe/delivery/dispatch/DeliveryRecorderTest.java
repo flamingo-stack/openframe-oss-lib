@@ -70,7 +70,7 @@ class DeliveryRecorderTest {
 
         // verifications
         assertThat(recorded).isFalse();
-        verify(repository, never()).upsertPending(any(MachineDelivery.class));
+        verify(repository, never()).save(any(MachineDelivery.class));
         verifyNoInteractions(sequences);
     }
 
@@ -83,7 +83,7 @@ class DeliveryRecorderTest {
         recorder.record(request);
 
         // verifications
-        verify(repository).upsertPending(deliveryCaptor.capture());
+        verify(repository).save(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
         assertThat(saved.getId()).isEqualTo(ROW_ID);
         assertThat(saved.getType()).isEqualTo(DeliveryType.CLIENT_UNINSTALL);
@@ -106,7 +106,7 @@ class DeliveryRecorderTest {
 
         // verifications
         assertThat(payload.getDelivery().getSequence()).isEqualTo(SEQUENCE);
-        verify(repository).upsertPending(deliveryCaptor.capture());
+        verify(repository).save(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
         assertThat(saved.getPayloadJson()).contains("\"sequence\":7");
     }

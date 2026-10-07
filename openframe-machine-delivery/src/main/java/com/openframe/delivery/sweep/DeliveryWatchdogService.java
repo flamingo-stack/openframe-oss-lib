@@ -12,6 +12,7 @@ import com.openframe.delivery.metrics.DeliveryMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -31,7 +32,7 @@ public class DeliveryWatchdogService {
     public void reapAcked() {
         Instant now = Instant.now();
         int batchSize = properties.getSweep().getBatchSize();
-        List<MachineDelivery> silent = repository.findDue(DeliveryStatus.ACKED, now, batchSize);
+        List<MachineDelivery> silent = repository.findDue(DeliveryStatus.ACKED, now, Limit.of(batchSize));
         silent.forEach(delivery -> reapOne(delivery, now));
     }
 

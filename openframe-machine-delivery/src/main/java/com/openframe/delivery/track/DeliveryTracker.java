@@ -31,7 +31,7 @@ public class DeliveryTracker {
         Policy policy = properties.resolve(type);
         long resultTimeoutSeconds = policy.getResultTimeoutSeconds();
         Instant resultDueAt = now.plusSeconds(resultTimeoutSeconds);
-        boolean acked = repository.markAcked(id, dispatchId, DeliveryStatus.UNACKED, now, resultDueAt);
+        boolean acked = repository.markAcked(id, dispatchId, DeliveryStatus.UNACKED, now, resultDueAt) > 0;
         if (acked) {
             log.info("Delivery ACKED: type={} targetId={} machineId={} dispatchId={}", type, targetId, machineId, dispatchId);
         } else {
@@ -46,7 +46,7 @@ public class DeliveryTracker {
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Instant expiresAt = expiresAt(type, now);
-        boolean done = repository.markDone(id, dispatchId, DeliveryStatus.COMPLETABLE, now, expiresAt);
+        boolean done = repository.markDone(id, dispatchId, DeliveryStatus.COMPLETABLE, now, expiresAt) > 0;
         if (done) {
             log.info("Delivery DONE: type={} targetId={} machineId={} dispatchId={}", type, targetId, machineId, dispatchId);
         } else {

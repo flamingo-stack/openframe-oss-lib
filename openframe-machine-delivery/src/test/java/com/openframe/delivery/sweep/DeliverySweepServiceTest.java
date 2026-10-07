@@ -40,6 +40,8 @@ import static com.openframe.delivery.config.DeliveryTestPolicies.MAX_RETRY_INTER
 import static com.openframe.delivery.config.DeliveryTestPolicies.RECONNECT_WINDOW;
 import static com.openframe.delivery.config.DeliveryTestPolicies.SWEEP_INTERVAL_MILLIS;
 import static org.assertj.core.api.Assertions.assertThat;
+import org.springframework.data.domain.Limit;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -99,7 +101,7 @@ class DeliverySweepServiceTest {
         stubDue(delivery);
         stubMachineOnline();
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), dueAtCaptor.capture())).thenReturn(true);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), dueAtCaptor.capture())).thenReturn(1L);
 
         // execution
         service.retryPending();
@@ -123,7 +125,7 @@ class DeliverySweepServiceTest {
         stubDue(delivery);
         stubMachineOnline();
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(ATTEMPTS_PAST_CAP), dueAtCaptor.capture())).thenReturn(true);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(ATTEMPTS_PAST_CAP), dueAtCaptor.capture())).thenReturn(1L);
 
         // execution
         service.retryPending();
@@ -198,7 +200,7 @@ class DeliverySweepServiceTest {
         stubDue(delivery);
         stubMachineOnline();
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(false);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(0L);
 
         // execution
         service.retryPending();
@@ -343,7 +345,7 @@ class DeliverySweepServiceTest {
         when(machineOnlineStatus.online(both)).thenReturn(both);
         when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING));
         stubSpec();
-        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(1L);
 
         // execution
         service.retryPending();
@@ -385,7 +387,7 @@ class DeliverySweepServiceTest {
     }
 
     private void stubDue(MachineDelivery... rows) {
-        when(repository.findDue(eq(DeliveryStatus.PENDING), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
+        when(repository.findDue(eq(DeliveryStatus.PENDING), any(Instant.class), eq(Limit.of(BATCH_SIZE)))).thenReturn(List.of(rows));
     }
 
     private void stubMachineOnline() {

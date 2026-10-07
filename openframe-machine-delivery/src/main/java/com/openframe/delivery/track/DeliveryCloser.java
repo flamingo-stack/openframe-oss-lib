@@ -30,7 +30,7 @@ public class DeliveryCloser {
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
 
-        boolean stillIn = repository.markFailed(id, from, dispatchedAt, failure, now, expiresAt);
+        boolean stillIn = repository.markFailed(id, from, dispatchedAt, failure, now, expiresAt) > 0;
         if (!stillIn) {
             log.debug("Delivery moved on before the failure could be recorded: id={}", id);
             return;
@@ -48,7 +48,7 @@ public class DeliveryCloser {
     public void failReported(DeliveryType type, String targetId, String machineId, String dispatchId, String error, Instant now) {
         String id = DeliveryId.of(type, targetId, machineId);
         Instant expiresAt = expiresAt(type, now);
-        boolean stillOpen = repository.markFailed(id, dispatchId, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, error, now, expiresAt);
+        boolean stillOpen = repository.markFailed(id, dispatchId, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, error, now, expiresAt) > 0;
         if (!stillOpen) {
             log.debug("Delivery failure from agent ignored, no open row for this dispatch: id={} dispatchId={}", id, dispatchId);
             return;
@@ -63,7 +63,7 @@ public class DeliveryCloser {
         Instant expiresAt = expiresAt(type, now);
         Instant dispatchedAt = delivery.getDispatchedAt();
         String id = delivery.getId();
-        boolean cancelled = repository.markCancelled(id, from, dispatchedAt, now, expiresAt);
+        boolean cancelled = repository.markCancelled(id, from, dispatchedAt, now, expiresAt) > 0;
         if (cancelled) {
             log.info("Delivery CANCELLED by sweep: type={} targetId={} machineId={} reason={}",
                     type, delivery.getTargetId(), delivery.getMachineId(), reason);

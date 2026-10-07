@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.util.List;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.BATCH_SIZE;
+import org.springframework.data.domain.Limit;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -93,7 +95,7 @@ class DeliveryWatchdogServiceTest {
     }
 
     private void stubOverdue(MachineDelivery... rows) {
-        when(repository.findDue(eq(DeliveryStatus.ACKED), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
+        when(repository.findDue(eq(DeliveryStatus.ACKED), any(Instant.class), eq(Limit.of(BATCH_SIZE)))).thenReturn(List.of(rows));
     }
 
     private MachineDelivery silentRow(String id) {

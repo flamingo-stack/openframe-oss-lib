@@ -63,7 +63,7 @@ class DeliveryCloserTest {
     void fail_rowStillUnacked_rowFailedMetricCounted() {
         // setup
         Instant expiresAt = now.plusSeconds(TTL);
-        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, DeliveryFailure.EXHAUSTED, now, expiresAt)).thenReturn(true);
+        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, DeliveryFailure.EXHAUSTED, now, expiresAt)).thenReturn(1L);
 
         // execution
         closer.fail(delivery, DeliveryFailure.EXHAUSTED, DeliveryStatus.UNACKED, now);
@@ -80,7 +80,7 @@ class DeliveryCloserTest {
     void fail_rowAckedMeanwhile_nothingRecorded() {
         // setup
         Instant expiresAt = now.plusSeconds(TTL);
-        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, DeliveryFailure.EXHAUSTED, now, expiresAt)).thenReturn(false);
+        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, DeliveryFailure.EXHAUSTED, now, expiresAt)).thenReturn(0L);
 
         // execution
         closer.fail(delivery, DeliveryFailure.EXHAUSTED, DeliveryStatus.UNACKED, now);
@@ -93,7 +93,7 @@ class DeliveryCloserTest {
     @Test
     void failReported_openRowOfThisDispatch_rowFailedMetricCounted() {
         // setup
-        when(repository.markFailed(DELIVERY_ID, DISPATCH_ID, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, ERROR, now, now.plusSeconds(TTL))).thenReturn(true);
+        when(repository.markFailed(DELIVERY_ID, DISPATCH_ID, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, ERROR, now, now.plusSeconds(TTL))).thenReturn(1L);
 
         // execution
         closer.failReported(DeliveryType.CLIENT_UNINSTALL, TARGET_ID, MACHINE_ID, DISPATCH_ID, ERROR, now);
@@ -105,7 +105,7 @@ class DeliveryCloserTest {
     @Test
     void failReported_rowOfAnotherDispatchOrClosed_nothingRecorded() {
         // setup
-        when(repository.markFailed(DELIVERY_ID, DISPATCH_ID, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, ERROR, now, now.plusSeconds(TTL))).thenReturn(false);
+        when(repository.markFailed(DELIVERY_ID, DISPATCH_ID, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, ERROR, now, now.plusSeconds(TTL))).thenReturn(0L);
 
         // execution
         closer.failReported(DeliveryType.CLIENT_UNINSTALL, TARGET_ID, MACHINE_ID, DISPATCH_ID, ERROR, now);
@@ -118,7 +118,7 @@ class DeliveryCloserTest {
     void cancel_rowStillUnackedSameDispatch_rowCancelledWithTtlExpiry() {
         // setup
         Instant expiresAt = now.plusSeconds(TTL);
-        when(repository.markCancelled(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, now, expiresAt)).thenReturn(true);
+        when(repository.markCancelled(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, now, expiresAt)).thenReturn(1L);
 
         // execution
         closer.cancel(delivery, DeliveryStatus.UNACKED, REASON, now);
