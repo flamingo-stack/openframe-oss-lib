@@ -22,10 +22,8 @@ export interface PlaybackToggleProps {
  * `paused` / `setPaused`.
  *
  * It has to be there and easy to reach (a 32px target, a name, a focus ring),
- * never the thing the eye lands on: no border and no surface, a muted glyph
- * that comes up to full strength on hover and focus. While the visitor HAS
- * stopped it, the glyph stays at secondary strength, so the way back to
- * playing is not lost.
+ * never the thing the eye lands on: no border and no surface, only a small
+ * glyph in the accent. The target stays 32px; it is the glyph that is small.
  */
 export function PlaybackToggle({
   paused,
@@ -39,15 +37,14 @@ export function PlaybackToggle({
       variant="transparent"
       size="icon-sm"
       className={cn(
-        'shrink-0 rounded-full hover:text-ods-text-primary focus-visible:text-ods-text-primary',
-        paused ? 'text-ods-text-secondary' : 'text-ods-text-muted',
+        'shrink-0 rounded-full border-0 text-ods-accent hover:text-ods-accent-hover [&_svg]:h-3 [&_svg]:w-3',
         className,
       )}
       aria-label={paused ? playLabel : pauseLabel}
       aria-pressed={paused}
       onClick={() => onChange(!paused)}
     >
-      {paused ? <PlayIcon size={16} /> : <PauseIcon size={16} />}
+      {paused ? <PlayIcon size={12} /> : <PauseIcon size={12} />}
     </Button>
   );
 }
