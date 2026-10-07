@@ -6,16 +6,23 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.Document;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.FindAndReplaceOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationExpression;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOptions;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.ArrayOperators;
+import org.springframework.data.mongodb.core.aggregation.ComparisonOperators;
+import org.springframework.data.mongodb.core.aggregation.ConditionalOperators;
+import org.springframework.data.mongodb.core.aggregation.ConditionalOperators.Switch.CaseOperator;
+import org.springframework.data.mongodb.core.aggregation.ConvertOperators;
 import org.springframework.data.mongodb.core.aggregation.CountOperation;
+import org.springframework.data.mongodb.core.aggregation.LiteralOperators;
+import org.springframework.data.mongodb.core.aggregation.StringOperators;
 import org.springframework.data.mongodb.core.query.Collation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -26,13 +33,15 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Function;
 
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.ROOT;
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.addFields;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.count;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.facet;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.limit;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.match;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.newAggregation;
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.project;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.sort;
-import static org.springframework.data.mongodb.core.aggregation.Aggregation.stage;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.util.StringUtils.hasText;
 
@@ -40,36 +49,30 @@ import static org.springframework.util.StringUtils.hasText;
 @RequiredArgsConstructor
 public class PackageCatalogRepositoryImpl implements PackageCatalogRepositoryCustom {
 
-    private static final String QUERY = "query";
-    private static final String SCORE = "score";
-    private static final String POPULARITY_OR_ZERO = "popularityOrZero";
     private static final String NAME = "name";
     private static final String PACKAGE_ID = "packageId";
+    private static final String POPULARITY = "popularity";
+    private static final String SCORE = "score";
+    private static final String POPULARITY_OR_ZERO = "popularityOrZero";
     private static final String HITS = "hits";
+    private static final String ENTRY = "entry";
+    private static final String CURSOR = "cursor";
     private static final String TOTAL = "total";
+    private static final String COUNT = "n";
     private static final String HAS_MORE = "hasMore";
     private static final String CURSOR_SEPARATOR = "|";
+    private static final int EXACT = 3;
+    private static final int PREFIX = 2;
+    private static final int CONTAINS = 1;
     private static final int NO_MATCH = 0;
     private static final Collation CASE_INSENSITIVE = Collation.of("en").strength(2);
 
-    // exact 3 > prefix 2 > contains 1; $indexOfCP ignores the collation, hence $toLower
-    private static final String SCORE_BY_NAME_STAGE = """
-            { "$set": {
-                "popularityOrZero": { "$ifNull": [ "$popularity", 0 ] },
-                "score": { "$switch": {
-                    "branches": [
-                        { "case": { "$eq": [ { "$toLower": "$name" }, "$query" ] }, "then": 3 },
-                        { "case": { "$eq": [ { "$indexOfCP": [ { "$toLower": "$name" }, "$query" ] }, 0 ] }, "then": 2 },
-                        { "case": { "$gt": [ { "$indexOfCP": [ { "$toLower": "$name" }, "$query" ] }, 0 ] }, "then": 1 } ],
-                    "default": 0 } } } }
-            """;
-
     private static final Ordering MOST_POPULAR_FIRST = new Ordering(
             Sort.by(Sort.Order.desc(SCORE), Sort.Order.desc(POPULARITY_OR_ZERO), Sort.Order.asc(PACKAGE_ID)),
-            POPULARITY_OR_ZERO, Sort.Direction.DESC, new Document("$toString", "$" + POPULARITY_OR_ZERO), Integer::valueOf);
+            POPULARITY_OR_ZERO, Sort.Direction.DESC, Integer::valueOf);
     private static final Ordering BY_NAME = new Ordering(
             Sort.by(Sort.Order.desc(SCORE), Sort.Order.asc(NAME), Sort.Order.asc(PACKAGE_ID)),
-            NAME, Sort.Direction.ASC, "$" + NAME, secondary -> secondary);
+            NAME, Sort.Direction.ASC, secondary -> secondary);
 
     private final MongoTemplate mongoTemplate;
 
@@ -92,14 +95,13 @@ public class PackageCatalogRepositoryImpl implements PackageCatalogRepositoryCus
         Criteria matchedOnly = where(SCORE).gt(NO_MATCH);
 
         AggregationOperation ofManager = match(byManager);
-        AggregationOperation withQuery = withQuery(nameQuery);
-        AggregationOperation scored = stage(SCORE_BY_NAME_STAGE);
+        AggregationOperation scored = scoreByName(nameQuery);
         AggregationOperation matched = match(matchedOnly);
         AggregationOperation ranked = sort(ordering.getSort());
         AggregationOperation page = pageWithTotal(ordering, afterCursor, limit);
         AggregationOperation shaped = shapePage(limit);
         AggregationOptions options = AggregationOptions.builder().collation(CASE_INSENSITIVE).build();
-        Aggregation aggregation = newAggregation(ofManager, withQuery, scored, matched, ranked, page, shaped)
+        Aggregation aggregation = newAggregation(ofManager, scored, matched, ranked, page, shaped)
                 .withOptions(options);
 
         AggregationResults<PackageCatalogPage> results =
@@ -114,13 +116,25 @@ public class PackageCatalogRepositoryImpl implements PackageCatalogRepositoryCus
         };
     }
 
-    // $literal keeps a query like "$name" a string instead of a field path
-    private static AggregationOperation withQuery(String nameQuery) {
+    // exact 3 > prefix 2 > contains 1; $indexOfCP ignores the collation, hence $toLower;
+    // the query goes in as a $literal so that "$name" typed by a user stays a string
+    private static AggregationOperation scoreByName(String nameQuery) {
         String lowerCaseQuery = nameQuery.toLowerCase(Locale.ROOT);
-        Document literalQuery = new Document("$literal", lowerCaseQuery);
-        Document queryField = new Document(QUERY, literalQuery);
-        Document setQuery = new Document("$set", queryField);
-        return stage(setQuery);
+        AggregationExpression query = LiteralOperators.valueOf(lowerCaseQuery).asLiteral();
+        AggregationExpression lowerName = StringOperators.valueOf(NAME).toLower();
+        AggregationExpression position = StringOperators.valueOf(lowerName).indexOfCP(query);
+        AggregationExpression isExact = ComparisonOperators.valueOf(lowerName).equalTo(query);
+        AggregationExpression isPrefix = ComparisonOperators.valueOf(position).equalToValue(0);
+        AggregationExpression isContained = ComparisonOperators.valueOf(position).greaterThanValue(0);
+        CaseOperator exact = CaseOperator.when(isExact).then(EXACT);
+        CaseOperator prefix = CaseOperator.when(isPrefix).then(PREFIX);
+        CaseOperator contains = CaseOperator.when(isContained).then(CONTAINS);
+        AggregationExpression score = ConditionalOperators.switchCases(exact, prefix, contains).defaultTo(NO_MATCH);
+        AggregationExpression popularityOrZero = ConditionalOperators.ifNull(POPULARITY).then(0);
+        return addFields()
+                .addFieldWithValue(SCORE, score)
+                .addFieldWithValue(POPULARITY_OR_ZERO, popularityOrZero)
+                .build();
     }
 
     // total counts every match; only the hits branch is cut at the cursor, one row past the limit for hasMore
@@ -130,7 +144,7 @@ public class PackageCatalogRepositoryImpl implements PackageCatalogRepositoryCus
         hitStages.add(limit(limit + 1L));
         hitStages.add(ordering.hitProjection());
         AggregationOperation[] hits = hitStages.toArray(AggregationOperation[]::new);
-        CountOperation countAll = count().as("n");
+        CountOperation countAll = count().as(COUNT);
         return facet(hits).as(HITS).and(countAll).as(TOTAL);
     }
 
@@ -162,14 +176,15 @@ public class PackageCatalogRepositoryImpl implements PackageCatalogRepositoryCus
     }
 
     private static AggregationOperation shapePage(int limit) {
-        Document hitsSize = new Document("$size", "$" + HITS);
-        Document hasMore = new Document("$gt", List.of(hitsSize, limit));
-        Document hits = new Document("$slice", List.of("$" + HITS, limit));
-        Document firstTotal = new Document("$first", "$" + TOTAL + ".n");
-        Document totalOrZero = new Document("$ifNull", List.of(firstTotal, 0));
-        Document shape = new Document(HITS, hits).append(TOTAL, totalOrZero).append(HAS_MORE, hasMore);
-        Document project = new Document("$project", shape);
-        return stage(project);
+        AggregationExpression firstHits = ArrayOperators.arrayOf(HITS).slice().itemCount(limit);
+        AggregationExpression hitCount = ArrayOperators.arrayOf(HITS).length();
+        AggregationExpression hasMore = ComparisonOperators.valueOf(hitCount).greaterThanValue(limit);
+        AggregationExpression firstTotal = ArrayOperators.arrayOf(TOTAL + "." + COUNT).first();
+        AggregationExpression totalOrZero = ConditionalOperators.ifNull(firstTotal).then(0);
+        return project()
+                .and(firstHits).as(HITS)
+                .and(totalOrZero).as(TOTAL)
+                .and(hasMore).as(HAS_MORE);
     }
 
     @Getter
@@ -187,7 +202,6 @@ public class PackageCatalogRepositoryImpl implements PackageCatalogRepositoryCus
         private final Sort sort;
         private final String secondaryField;
         private final Sort.Direction secondaryDirection;
-        private final Object secondaryCursorExpression;
         private final Function<String, Object> secondaryParser;
 
         private Criteria after(CursorKey key) {
@@ -213,12 +227,16 @@ public class PackageCatalogRepositoryImpl implements PackageCatalogRepositoryCus
         }
 
         private AggregationOperation hitProjection() {
-            Document scoreAsString = new Document("$toString", "$" + SCORE);
-            List<Object> cursorParts = List.of(scoreAsString, CURSOR_SEPARATOR, "$" + PACKAGE_ID, CURSOR_SEPARATOR, secondaryCursorExpression);
-            Document cursor = new Document("$concat", cursorParts);
-            Document hit = new Document("entry", "$$ROOT").append("cursor", cursor);
-            Document project = new Document("$project", hit);
-            return stage(project);
+            AggregationExpression scoreText = ConvertOperators.valueOf(SCORE).convertToString();
+            AggregationExpression secondaryText = ConvertOperators.valueOf(secondaryField).convertToString();
+            AggregationExpression cursor = StringOperators.valueOf(scoreText)
+                    .concat(CURSOR_SEPARATOR)
+                    .concatValueOf(PACKAGE_ID)
+                    .concat(CURSOR_SEPARATOR)
+                    .concatValueOf(secondaryText);
+            return project()
+                    .and(ROOT).as(ENTRY)
+                    .and(cursor).as(CURSOR);
         }
     }
 }
