@@ -32,6 +32,17 @@ describe('chat appearance', () => {
     expect(screen.queryByText('John Smith')).toBeNull();
   });
 
+  it("an admin's own turn in Mingo is a bubble under their face, with no written name", () => {
+    render(
+      <ChatAppearanceContext.Provider value="v2">
+        <ChatMessageEnhanced role="user" authorType="admin" assistantType="mingo" name="Roman Smith" content="Hi" />
+      </ChatAppearanceContext.Provider>,
+    );
+    expect(screen.getByTitle('Roman Smith')).toBeTruthy();
+    expect(screen.queryByText('Roman Smith')).toBeNull();
+    expect(document.body).toContainHTML('bg-ods-bg-active');
+  });
+
   it('a turn can hide its face', () => {
     render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" showAvatar={false} />);
     expect(screen.queryByRole('img')).toBeNull();

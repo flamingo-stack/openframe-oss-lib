@@ -9,11 +9,11 @@ use std::collections::{HashMap, HashSet};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::{Mutex, RwLock};
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 use tracing::{debug, error, info, warn};
 
 #[cfg(target_os = "windows")]
@@ -31,6 +31,10 @@ use windows::{
 const RETRY_DELAY_SECONDS: u64 = 5;
 /// Ceiling for the escalating retry delay after a leftover process refuses to die.
 const KILL_RETRY_MAX_DELAY_SECONDS: u64 = 300;
+/// A tool that exits sooner than this after starting counts as a failed start.
+const QUICK_EXIT_WINDOW: Duration = Duration::from_secs(60);
+/// Restart delays along a streak of failed starts; the last one repeats.
+const FAILED_START_RETRY_DELAYS_SECONDS: [u64; 5] = [5, 30, 120, 300, 900];
 
 /// Under the supervision lock, so a concurrent resume either finds the loop alive or relaunches its tool.
 async fn shutdown_break(
@@ -440,6 +444,8 @@ pub struct ToolRunManager {
     /// Set by a deactivation stop, which a failed self-update must not undo
     tools_stopped: Arc<AtomicBool>,
     client_update_pending: ClientUpdatePendingFlag,
+    /// Tools a finished op wants relaunched without waiting out a restart delay.
+    relaunch_requested: Arc<RwLock<HashSet<String>>>,
 }
 
 impl ToolRunManager {
@@ -458,6 +464,7 @@ impl ToolRunManager {
             shutting_down: Arc::new(AtomicBool::new(false)),
             tools_stopped: Arc::new(AtomicBool::new(false)),
             client_update_pending: ClientUpdatePendingFlag::default(),
+            relaunch_requested: Arc::new(RwLock::new(HashSet::new())),
         }
     }
 
@@ -596,6 +603,11 @@ impl ToolRunManager {
             *count -= 1;
             if *count == 0 {
                 map.remove(tool_id);
+                // A run loop parked on a restart delay relaunches now instead of waiting it out.
+                self.relaunch_requested
+                    .write()
+                    .await
+                    .insert(tool_id.to_string());
                 info!("Tool {} update flag cleared", tool_id);
             } else {
                 info!(
@@ -721,6 +733,7 @@ impl ToolRunManager {
         let running_tools = self.running_tools.clone();
         let installed_tools_service = self.installed_tools_service.clone();
         let tool_kill_service = self.tool_kill_service.clone();
+        let relaunch_requested = self.relaunch_requested.clone();
         let mut installation = tool.installation.clone();
         let mut run_command_args = tool.run_command_args.clone();
 
@@ -756,7 +769,9 @@ impl ToolRunManager {
                     break;
                 }
 
-                let log_attempt = launch_backoff.should_log();
+                // An attempt a finished tool op asked for is logged in full.
+                let relaunch_asked = relaunch_requested.write().await.remove(&tool.tool_agent_id);
+                let log_attempt = launch_backoff.should_log() || relaunch_asked;
 
                 // Windows GUI apps belong to the HKLM Run autorun — never kill them.
                 #[cfg(target_os = "windows")]
@@ -993,14 +1008,7 @@ impl ToolRunManager {
                     .stderr(Stdio::piped())
                     .spawn()
                 {
-                    Ok(child) => {
-                        if let Some((failures, failing_for)) = launch_backoff.record_success() {
-                            info!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
-                                  failing_for_secs = failing_for.as_secs(),
-                                  "Tool process started after repeated launch failures");
-                        }
-                        child
-                    }
+                    Ok(child) => child,
                     Err(e) => {
                         let failures = launch_backoff.record_failure(log_attempt);
                         if log_attempt {
@@ -1012,14 +1020,20 @@ impl ToolRunManager {
                     }
                 };
 
+                // Forwarded output follows the attempt's log decision until the tool has stayed up.
+                let forward_output = Arc::new(AtomicBool::new(log_attempt));
+
                 // Capture stdout
                 if let Some(stdout) = child.stdout.take() {
                     let tool_id_clone = tool.tool_agent_id.clone();
+                    let forward_output = forward_output.clone();
                     tokio::spawn(async move {
                         let reader = BufReader::new(stdout);
                         let mut lines = reader.lines();
                         while let Ok(Some(line)) = lines.next_line().await {
-                            info!(tool_id = %tool_id_clone, "[stdout] {}", line);
+                            if forward_output.load(Ordering::Acquire) {
+                                info!(tool_id = %tool_id_clone, "[stdout] {}", line);
+                            }
                         }
                     });
                 }
@@ -1027,33 +1041,80 @@ impl ToolRunManager {
                 // Capture stderr
                 if let Some(stderr) = child.stderr.take() {
                     let tool_id_clone = tool.tool_agent_id.clone();
+                    let forward_output = forward_output.clone();
                     tokio::spawn(async move {
                         let reader = BufReader::new(stderr);
                         let mut lines = reader.lines();
                         while let Ok(Some(line)) = lines.next_line().await {
-                            info!(tool_id = %tool_id_clone, "[stderr] {}", line);
+                            if forward_output.load(Ordering::Acquire) {
+                                info!(tool_id = %tool_id_clone, "[stderr] {}", line);
+                            }
                         }
                     });
                 }
 
-                match child.wait().await {
-                    Ok(status) => {
-                        if status.success() {
-                            warn!(tool_id = %tool.tool_agent_id,
-                                  "Tool completed successfully but should keep running - restarting in {} seconds",
-                                  RETRY_DELAY_SECONDS);
-                        } else {
-                            error!(tool_id = %tool.tool_agent_id, exit_status = %status,
-                                   "Tool failed with exit status - restarting in {} seconds", RETRY_DELAY_SECONDS);
+                // Only a run that outlives the window counts as started.
+                let (exit, stayed_up) = match timeout(QUICK_EXIT_WINDOW, child.wait()).await {
+                    Ok(exit) => (exit, false),
+                    Err(_) => {
+                        forward_output.store(true, Ordering::Release);
+                        if let Some((failures, failing_for)) = launch_backoff.record_success() {
+                            info!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                  failing_for_secs = failing_for.as_secs(),
+                                  "Tool process stayed up after repeated launch failures");
                         }
+                        (child.wait().await, true)
                     }
-                    Err(e) => {
-                        error!(tool_id = %tool.tool_agent_id, error = %e,
-                               "Failed to wait for tool process - restarting in {} seconds: {:#}", RETRY_DELAY_SECONDS, e);
+                };
+
+                // A stop by a tool op in flight is deliberate, not a failed start.
+                let failed_start = !stayed_up
+                    && !updating_tools
+                        .read()
+                        .await
+                        .contains_key(&tool.tool_agent_id);
+                let (delay, failures) = if failed_start {
+                    let failures = launch_backoff.record_failure(log_attempt);
+                    let step = (failures as usize)
+                        .saturating_sub(1)
+                        .min(FAILED_START_RETRY_DELAYS_SECONDS.len() - 1);
+                    (FAILED_START_RETRY_DELAYS_SECONDS[step], failures)
+                } else {
+                    (RETRY_DELAY_SECONDS, 0)
+                };
+
+                if !failed_start || log_attempt {
+                    match exit {
+                        Ok(status) => {
+                            if status.success() {
+                                warn!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                      "Tool completed successfully but should keep running - restarting in {} seconds",
+                                      delay);
+                            } else {
+                                error!(tool_id = %tool.tool_agent_id, exit_status = %status, failed_attempts = failures,
+                                       "Tool failed with exit status - restarting in {} seconds", delay);
+                            }
+                        }
+                        Err(e) => {
+                            error!(tool_id = %tool.tool_agent_id, error = %e, failed_attempts = failures,
+                                   "Failed to wait for tool process - restarting in {} seconds: {:#}", delay, e);
+                        }
                     }
                 }
                 kill_leftovers_now = true;
-                sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+
+                // Slept in slices, so shutdown, unsupervision or a finished tool op cuts a long delay short.
+                let deadline = Instant::now() + Duration::from_secs(delay);
+                while Instant::now() < deadline
+                    && !shutting_down.load(Ordering::Acquire)
+                    && running_tools.read().await.contains(&tool.tool_agent_id)
+                    && !relaunch_requested
+                        .read()
+                        .await
+                        .contains(&tool.tool_agent_id)
+                {
+                    sleep(Duration::from_secs(1)).await;
+                }
             }
         });
     }

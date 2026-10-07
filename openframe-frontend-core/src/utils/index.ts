@@ -116,6 +116,7 @@ export * from './shell-utils';
 export * from './video-bite-id';
 // OS type utilities
 export * from './os-utils';
+export * from './visitor-os';
 // Phone utilities
 export * from './country-phone-utils';
 export * from './compliance-standards';
@@ -330,6 +331,7 @@ export * from './dev-sections';
 // pre-computed pixel value avoids the mid-animation jitter that
 // `element.scrollIntoView()` produces when layout shifts during the
 // scroll).
+export { openInNewTab } from './open-in-new-tab';
 export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scroll-into-view';
 
 // Same-page hash navigation — owns pushState + synthetic hashchange +
@@ -337,8 +339,12 @@ export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scro
 // hub's `useUnifiedNav` + chat-runtime `navigate`, AND by every
 // embeddable surface that drives state off the URL hash.
 export {
+  ACTIVE_ANCHOR_ATTRIBUTE,
+  isScrollSyncedHash,
+  LOCATION_HASH_SYNC_EVENT,
   navigateSamePageHash,
   normalizeHashFragment,
+  replaceLocationHash,
   STICKY_HEADER_OFFSET_PX,
   HUB_HEADER_OFFSET_PX,
   type NavigateSamePageHashOptions,
