@@ -10,7 +10,7 @@ import { getHideClasses } from './utils';
  * each side, so the outer block lands on the designed 68px / 80px total —
  * hence the 66/78 values here.
  */
-export const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]';
+export const ROW_HEIGHT_DESKTOP = 'h-[66px] content-md:h-[78px]';
 export const ROW_HEIGHT_MOBILE = 'h-[66px]';
 
 /**
@@ -44,7 +44,7 @@ export interface DataTableSkeletonProps {
    * REPLACES the design row height, for a table whose rows are not that tall.
    * Sizes the CARD, as a real row does.
    * Appending a height through `rowClassName` cannot do this: tailwind-merge
-   * drops the plain `h-[66px]` but keeps `md:h-[78px]`, so the override held
+   * drops the plain `h-[66px]` but keeps `content-md:h-[78px]`, so the override held
    * on a phone and lost on a desktop. See `DataTableBodyProps.rowHeightClassName`.
    */
   rowHeightClassName?: string;
@@ -69,7 +69,7 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
         >
           <div
             className={cn(
-              'hidden py-0 md:flex',
+              'hidden py-0 content-md:flex',
               ROW_SHELL_CLASSES,
               rowHeightClassName ? 'h-full' : ROW_HEIGHT_DESKTOP,
               rowClassName,
@@ -101,7 +101,7 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
           </div>
           <div
             className={cn(
-              'flex justify-start py-0 md:hidden',
+              'flex justify-start py-0 content-md:hidden',
               ROW_SHELL_CLASSES,
               rowHeightClassName ? 'h-full' : ROW_HEIGHT_MOBILE,
               rowClassName,
@@ -207,14 +207,14 @@ export function PlaceholderRows({
         >
           <div
             className={cn(
-              'hidden py-0 md:flex',
+              'hidden py-0 content-md:flex',
               ROW_SHELL_CLASSES,
               innerHeightClassName ?? (rowHeightClassName ? 'h-full' : ROW_HEIGHT_DESKTOP),
             )}
           />
           <div
             className={cn(
-              'flex justify-start py-0 md:hidden',
+              'flex justify-start py-0 content-md:hidden',
               ROW_SHELL_CLASSES,
               innerHeightClassName ?? (rowHeightClassName ? 'h-full' : ROW_HEIGHT_MOBILE),
             )}

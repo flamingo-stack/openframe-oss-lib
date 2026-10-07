@@ -277,7 +277,7 @@ export function TrustCenterPage({
             })}
           </div>
 
-          <aside className="hidden lg:block" aria-label="Trust center sections">
+          <aside className="hidden content-lg:block" aria-label="Trust center sections">
             <div className="sticky" style={{ top: STICKY_HEADER_OFFSET_PX }}>
               <StickySectionNav
                 sections={sections.map(section => ({ id: section.id, label: section.label }))}

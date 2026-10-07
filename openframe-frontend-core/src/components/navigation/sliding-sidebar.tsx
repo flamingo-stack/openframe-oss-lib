@@ -212,7 +212,8 @@ export function SlidingSidebar({ config }: SlidingSidebarProps) {
         role={config.isOpen ? 'dialog' : undefined}
         aria-label={config.isOpen ? 'Navigation sidebar' : undefined}
         className={cn(
-          'fixed bottom-0 top-0 z-[46] flex w-72 flex-col border-ods-border bg-ods-card shadow-xl',
+          // Window chrome: the window's tokens even when opened from a narrow content area.
+          'ods-viewport-layer fixed bottom-0 top-0 z-[46] flex w-72 flex-col border-ods-border bg-ods-card shadow-xl',
           config.position === 'right' ? 'right-0 border-l' : 'left-0 border-r',
           config.className,
         )}

@@ -231,7 +231,7 @@ export function ProductReleasesView({
             </div>
 
             {/* Pagination — always present at the bottom for consistent spacing. */}
-            <div className="mt-6 flex justify-center md:mt-8">
+            <div className="mt-6 flex justify-center content-md:mt-8">
               {isLoading ? (
                 <div className="m-3 h-12 w-64" />
               ) : releases.length > 0 && totalPages > 1 ? (

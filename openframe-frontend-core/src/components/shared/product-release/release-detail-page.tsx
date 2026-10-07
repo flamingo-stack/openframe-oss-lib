@@ -333,14 +333,14 @@ export function ReleaseDetailPage({
       titleWrap
       backButton={showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined}
     >
-      <div className="space-y-6 md:space-y-8">
+      <div className="space-y-6 content-md:space-y-8">
         {/* Tags — flat product_release_tags[] from entity_tags */}
         <EntityTagBadges tags={release.product_release_tags as TagAssoc[] | undefined} />
 
         {/* Metadata Grid */}
-        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border md:grid-cols-4">
+        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border content-md:grid-cols-4">
           {/* Release Type */}
-          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r">
+          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 content-md:border-b-0 content-md:border-r">
             <div className="flex flex-col gap-0">
               <p className="text-ods-text-primary text-h4">{releaseType.toLocaleUpperCase()}</p>
               <p className="text-ods-text-secondary text-h6">Release Type</p>
@@ -348,7 +348,7 @@ export function ReleaseDetailPage({
           </div>
 
           {/* Release Status */}
-          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r">
+          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 content-md:border-b-0 content-md:border-r">
             <div className="flex flex-col gap-0">
               <p className="text-ods-text-primary text-h4">{releaseStatus.toLocaleUpperCase()}</p>
               <p className="text-ods-text-secondary text-h6">Release Status</p>
@@ -356,7 +356,7 @@ export function ReleaseDetailPage({
           </div>
 
           {/* Release Date */}
-          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r">
+          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 content-md:border-b-0 content-md:border-r">
             <div className="flex flex-col gap-0">
               <p className="text-ods-text-primary text-h4">{formatReleaseDate(releaseDate)}</p>
               <p className="text-ods-text-secondary text-h6">Release Date</p>

@@ -165,7 +165,7 @@ export function ListPageLayout({
             onChange={e => setLocalSearchValue(e.target.value)}
             value={localSearchValue}
             className="flex-1"
-            startAdornment={<SearchIcon className="h-4 w-4 md:h-6 md:w-6" />}
+            startAdornment={<SearchIcon className="h-4 w-4 content-md:h-6 content-md:w-6" />}
           />
 
           {/* Mobile Filter Button - only visible on mobile when filter is enabled */}
@@ -173,7 +173,7 @@ export function ListPageLayout({
             <Button
               variant="outline"
               size="icon"
-              className="md:hidden"
+              className="content-md:hidden"
               onClick={() => setMobileFilterOpen(true)}
               aria-label="Open filters"
             >

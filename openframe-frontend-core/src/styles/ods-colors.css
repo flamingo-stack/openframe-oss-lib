@@ -417,6 +417,21 @@
   --color-bg: color-mix(in srgb, var(--color-accent-primary) 2%, var(--ods-system-greys-background));
 }
 
+/* Mingo's own surface (Figma backgrounds/mingo-background): 2% of its cyan
+ * over the page background, whatever the tenant accent. */
+[data-surface='mingo'] {
+  --color-bg: color-mix(in srgb, var(--ods-flamingo-cyan-base) 2%, var(--ods-system-greys-background));
+  --glow-color: var(--ods-flamingo-cyan-base);
+}
+
+/* Mingo-branded controls (its chat list): the cyan as the accent, and the
+ * selection fill (Figma flamingo-colors/cyan-sec) as its secondary. Scoped to
+ * those controls, not the whole panel: an approval's Approve stays yellow. */
+[data-accent='mingo'] {
+  --color-accent-primary: var(--ods-flamingo-cyan-base);
+  --color-accent-secondary: color-mix(in srgb, var(--ods-flamingo-cyan-base) 31%, var(--color-bg));
+}
+
 /* ===================================================================== */
 /* PLATFORM OVERRIDES — brand/accent ONLY.                               */
 /* Reference `--ods-*` so they follow the active theme; never touch      */

@@ -7,6 +7,7 @@ import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.track.DeliveryCloser;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static java.util.stream.Collectors.toSet;
@@ -52,14 +54,14 @@ public class DeliverySweepService {
             return;
         }
         Set<String> machineIds = due.stream().map(MachineDelivery::getMachineId).collect(toSet());
-        Set<String> gone = machineOnlineStatus.gone(machineIds);
+        Map<String, DeviceStatus> statuses = machineOnlineStatus.statuses(machineIds);
         Set<String> online = machineOnlineStatus.online(machineIds);
-        due.forEach(delivery -> retryOne(delivery, gone, online, now));
+        due.forEach(delivery -> retryOne(delivery, statuses, online, now));
     }
 
-    private void retryOne(MachineDelivery delivery, Set<String> gone, Set<String> online, Instant now) {
+    private void retryOne(MachineDelivery delivery, Map<String, DeviceStatus> statuses, Set<String> online, Instant now) {
         try {
-            retryOrClose(delivery, gone, online, now);
+            retryOrClose(delivery, statuses, online, now);
         } catch (Exception e) {
             metrics.recordRowError();
             countErrorAndBackOff(delivery, now);
@@ -67,13 +69,14 @@ public class DeliverySweepService {
         }
     }
 
-    private void retryOrClose(MachineDelivery delivery, Set<String> gone, Set<String> online, Instant now) {
+    private void retryOrClose(MachineDelivery delivery, Map<String, DeviceStatus> statuses, Set<String> online, Instant now) {
         String machineId = delivery.getMachineId();
-        if (gone.contains(machineId)) {
-            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine gone", now);
+        DeliveryType type = delivery.getType();
+        DeviceStatus status = statuses.get(machineId);
+        if (status != null && !registry.require(type).getDeliverableStatuses().contains(status)) {
+            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine in status " + status + " takes no " + type, now);
             return;
         }
-        DeliveryType type = delivery.getType();
         Policy policy = properties.resolve(type);
         if (!online.contains(machineId)) {
             parkSkipOrFailOffline(delivery, policy, now);

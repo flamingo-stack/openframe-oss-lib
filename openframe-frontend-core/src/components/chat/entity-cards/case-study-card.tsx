@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * CaseStudyCard (pure presentation). Two densities — `default` (vertical
- * detail) and `sm` (compact horizontal for chat-inline).
+ * CaseStudyCard (pure presentation). Four densities — `default` (vertical
+ * detail), `sm` (compact horizontal for chat-inline), `portrait` (rails and
+ * strips) and `menu` (the site menu's card, hover-plays the highlight cut).
  *
  * The card writes NO click logic — callers wrap with their own anchor
  * and pass the resolved detail URL via `href`.
@@ -12,9 +13,15 @@
  *   `useOgPlaceholderUrl(...)`) → `bg-ods-bg`.
  */
 
+import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
-import type { CaseStudy } from '../../../types/case-study';
+import Link from '../../../embed-shims/next-link';
+import type { CaseStudyCardData } from '../../../types/case-study';
 import { cn } from '../../../utils/cn';
+import { sortBitesByFeaturedAtDesc } from '../../features/video-bites-shared';
+import { CardHoverPlay } from '../../features/video-center-badge';
+import { VideoHoverPreviewSurface } from '../../features/video-hover-preview';
+import { EntityIcon } from '../../icon-display';
 import { Card } from '../../ui/card';
 import {
   COMPACT_CARD_IMAGE_SLOT,
@@ -36,7 +43,7 @@ import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
 export interface CaseStudyCardProps {
-  study: CaseStudy;
+  study: CaseStudyCardData;
   /** Detail URL resolved by the caller. */
   href: string;
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
@@ -46,7 +53,14 @@ export interface CaseStudyCardProps {
   targetPlatform?: string | null;
   /** OG placeholder URL, used when `study.featured_image` is missing. */
   placeholderUrl?: string | null;
-  size?: 'default' | 'sm' | 'portrait';
+  /** `menu` is the site menu's card: the story's video plays muted on hover or
+   *  focus (the video bites' hover grammar), then who it is about and who tells it. */
+  size?: 'default' | 'sm' | 'portrait' | 'menu';
+  /** `menu`: mount the hover player (the host passes whether its panel is open,
+   *  so a closed menu holds no player). Omitted: the card's own viewport gate. */
+  mediaMounted?: boolean;
+  /** `menu`: runs on click, before the navigation (the host closes its panel). */
+  onNavigate?: () => void;
   /** Portrait density: render the content-type chip. Mixed rails only; single-type rails pass false. Default true. */
   showTypeBadge?: boolean;
   className?: string;
@@ -92,6 +106,22 @@ export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' |
   );
 }
 
+/**
+ * A story's HIGHLIGHT cut, the short video a card previews: its highlight
+ * video, else the bite an admin featured (the newest when several are; featuring
+ * is independent of the bite's own `published` flag, as on every featured surface). Never
+ * the full video: that plays on the story's own page. Null when it has neither.
+ */
+function caseStudyHighlight(study: CaseStudyCardData): { url: string; posterUrl: string | null } | null {
+  if (study.highlight_video_url) {
+    return { url: study.highlight_video_url, posterUrl: study.highlight_video_thumbnail ?? null };
+  }
+  const bite = (study.video_bites ?? [])
+    .filter(candidate => candidate.featured === true && candidate.url)
+    .sort(sortBitesByFeaturedAtDesc)[0];
+  return bite ? { url: bite.url, posterUrl: bite.thumbnail_url ?? null } : null;
+}
+
 export function CaseStudyCard({
   study,
   href,
@@ -101,8 +131,11 @@ export function CaseStudyCard({
   placeholderUrl: placeholderUrlProp,
   size = 'default',
   showTypeBadge = true,
+  mediaMounted,
+  onNavigate,
   className,
 }: CaseStudyCardProps) {
+  const [hovered, setHovered] = useState(false);
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -146,6 +179,83 @@ export function CaseStudyCard({
           </span>
         </span>
       </a>
+    );
+  }
+
+  if (size === 'menu') {
+    const preview = caseStudyHighlight(study);
+    const videoUrl = preview?.url ?? null;
+    const hasAnyVideo = !!(videoUrl || study.main_video_url);
+    // The cover is the FULL video's poster (wide, like the card); the highlight
+    // cut's own frame is usually upright and would not fill a 16:9 slot.
+    const poster = study.main_video_thumbnail || study.featured_image || preview?.posterUrl || null;
+    return (
+      <Link
+        href={href}
+        target={target}
+        rel={rel}
+        onClick={onNavigate}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        onFocus={() => setHovered(true)}
+        onBlur={() => setHovered(false)}
+        className={cn(
+          // `group/card` is what the shared play glyph accents on.
+          'group/card group flex min-w-0 flex-col gap-[var(--spacing-system-sf)] rounded-xl border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)] text-ods-text-primary transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
+          className,
+        )}
+      >
+        {/* The media never takes the click: the whole card is the link. */}
+        <span className="pointer-events-none relative block aspect-video w-full shrink-0 overflow-hidden rounded-md bg-ods-bg">
+          {videoUrl ? (
+            // The shared hover surface, filled the way the walkthrough card fills
+            // its own 16:9 slot (`cover`): an upright cut is cropped to the slot,
+            // never letterboxed. Sound on hover, muted when the browser blocks it.
+            <VideoHoverPreviewSurface
+              url={videoUrl}
+              posterUrl={poster}
+              active={hovered}
+              playerMounted={mediaMounted}
+              fit="cover"
+              posterSizes="360px"
+            />
+          ) : (
+            <>
+              {(poster ?? placeholderUrl) && (
+                <Image
+                  src={poster ?? placeholderUrl ?? ''}
+                  alt=""
+                  className="object-cover"
+                  fill
+                  sizes="360px"
+                  unoptimized
+                  onError={hideOnError}
+                />
+              )}
+              {hasAnyVideo && <CardHoverPlay size="md" />}
+            </>
+          )}
+        </span>
+        {study.msp?.name && (
+          <span className="flex items-center gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h6">
+            {study.msp.icon_url && (
+              <EntityIcon
+                icon={{ url: study.msp.icon_url }}
+                size={20}
+                className="size-5 shrink-0 rounded object-contain"
+              />
+            )}
+            <span className="min-w-0 truncate">{study.msp.name}</span>
+          </span>
+        )}
+        <span className="line-clamp-2 text-h6">{study.title}</span>
+        {study.user?.full_name && (
+          <span className="truncate text-ods-text-muted text-h6">
+            {study.user.job_title ? `${study.user.full_name}, ${study.user.job_title}` : study.user.full_name}
+          </span>
+        )}
+        <span className="mt-auto text-ods-accent text-h6">{hasAnyVideo ? 'Watch the story' : 'Read the story'}</span>
+      </Link>
     );
   }
 
