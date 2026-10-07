@@ -40,6 +40,19 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   podcasts: 'headphones',
   'customer-interviews': 'users',
   faqs: 'info',
+  // Not a chat source: listed so the site menus and the admin sidebar draw the
+  // media library with one glyph, from this registry like every other kind.
+  media: 'image',
+
+  // Admin sections that are not chat sources, and the case-study audiences:
+  // listed so every glyph a menu, a sidebar or a dashboard tile shows is named
+  // here and nowhere else.
+  campaigns: 'megaphone-01',
+  'contact-submissions': 'email',
+  'code-documentation': 'book-open',
+  'audience-msp': 'hierarchy-02',
+  'audience-mssp': 'shield-lock',
+  'audience-it-team': 'buildings',
 
   // Trust (single-record live source over the public Vanta projection)
   'trust-center': 'shield',

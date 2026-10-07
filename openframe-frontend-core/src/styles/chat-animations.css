@@ -134,12 +134,12 @@
   }
 }
 
-/* Ring mask: clips the rotating conic layer to a 3px band along the frame's
+/* Ring mask: clips the rotating conic layer to a 1px band along the frame's
    rounded outline (padding-box XOR), so the interior stays fully transparent
    and the host background shows through — no opaque cover element. */
 .mingo-edge-frame {
   overflow: hidden;
-  padding: 3px;
+  padding: 1px;
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
@@ -196,5 +196,60 @@
   .group\/mingo:hover .mingo-shimmer {
     animation: none;
     opacity: 0;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+ * Site header mega menus: how a panel's CONTENT arrives.
+ *   open        from a closed bar: a short fade and settle.
+ *   from-start  from the menu before it in the row: slides in from the left.
+ *   from-end    from the menu after it: slides in from the right.
+ * Between two mega menus the surface itself does not animate (NavPanel hands it
+ * over in one frame), so only the content moves, in the direction the pointer
+ * travelled. Short and ease-out: it must never make the menu feel slower.
+ * Reduced motion: no movement, a plain fade.
+ * ---------------------------------------------------------------------------*/
+@keyframes nav-panel-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes nav-panel-from-start {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+@keyframes nav-panel-from-end {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@keyframes nav-panel-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.nav-panel-content[data-motion='open'] {
+  animation: nav-panel-open 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.nav-panel-content[data-motion='from-start'] {
+  animation: nav-panel-from-start 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.nav-panel-content[data-motion='from-end'] {
+  animation: nav-panel-from-end 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-panel-content[data-motion] {
+    animation: nav-panel-fade 120ms linear;
   }
 }
