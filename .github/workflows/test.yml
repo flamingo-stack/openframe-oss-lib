@@ -109,182 +109,111 @@ jobs:
 
 
   test-node:
-    name: Test Node (${{ matrix.name }})
+    name: Test Node (openframe-frontend-core)
     runs-on: ubuntu-latest
     needs: [changes]
+    if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
     # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
       NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
       NPM_CONFIG_LOGLEVEL: http
-    strategy:
-      matrix:
-        include: ${{ fromJson(needs.changes.outputs.node_matrix) }}
-
+    defaults:
+      run:
+        shell: bash
+        working-directory: openframe-frontend-core
     steps:
-      - name: Check if should run
-        id: should_run
-        run: echo "run=${{ fromJSON(needs.changes.outputs.changes || '{}')[matrix.name] == 'true' }}" >> $GITHUB_OUTPUT
-
       - uses: actions/checkout@v4
-        if: steps.should_run.outputs.run == 'true'
 
       - name: Setup Node.js
-        if: steps.should_run.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # Caches ~/.npm so a run does not re-download the whole tree.
-          # Keyed on package.json, NOT package-lock.json: this repo ignores
-          # lockfiles (.gitignore), so none is committed and pointing the key at
-          # one fails the step outright with "paths were not resolved".
+          # No lockfile is committed (.gitignore), so the cache keys on package.json.
           cache: npm
-          cache-dependency-path: ${{ matrix.path }}/package.json
+          cache-dependency-path: openframe-frontend-core/package.json
 
-      # Works around an Arborist bug in the npm version `actions/setup-node`'s
-      # Node 22 image currently bundles: resolving this project's tree with no
-      # lockfile to pin it (see the comment on Install Dependencies below)
-      # intermittently throws "Cannot read properties of null (reading
-      # 'edgesOut')" — reproduced on unrelated PRs the same day, not
-      # reproducible locally on npm 11.9.0. Pin removed once the bundled npm
-      # on that image picks up the fix upstream.
-      - name: Upgrade npm (workaround for a bundled-npm Arborist bug)
-        if: steps.should_run.outputs.run == 'true'
+      # Bundled npm intermittently throws "Cannot read properties of null (reading 'edgesOut')" without a lockfile.
+      - name: Upgrade npm
         run: npm install -g npm@11.9.0
 
-      # `install`, not `ci`: `npm ci` requires a committed lockfile and this
-      # repo has none. The consequence is that CI resolves dependencies afresh
-      # and can test a different tree than a developer has — worth fixing, but
-      # by committing lockfiles, which is a repo-wide policy call.
+      # `install`, not `ci`: `ci` needs a lockfile.
       - name: Install Dependencies
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm install
 
-      # Config smoke first: it is ~1s and a broken eslint config makes every
-      # lint result below meaningless rather than failing honestly.
+      # ~1s; a broken eslint config makes every lint result below meaningless.
       - name: Lint Config Smoke
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm run lint:config-smoke
 
-      # No `continue-on-error` — a failing tsc MUST block the merge.
       - name: Type Check
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm run type-check
 
       - name: Lint
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm run lint
 
-      # Separate step, not folded into Lint: it needs a TypeScript program and
-      # an 8 GB heap, and it is the slowest check in the job. Keeping it apart
-      # makes a failure legible at a glance and lets the fast pass fail early.
+      # Needs a TypeScript program and an 8 GB heap; the slowest check, so kept apart.
       - name: Lint (type-aware)
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm run lint:types
 
       - name: Format
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm run format
 
       - name: Test
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm run test:run
 
       - name: Build
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm run build
 
-      - name: Resolve PR Version
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
-        run: |
-          OLD_VERSION=$(npm view "$(jq -r .name package.json)" dist-tags.latest)
-          echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}.${{ github.run_number }}.${{ github.run_attempt }}" >> $GITHUB_ENV
-
+      # No local (file:/link:/.yalc) specs may reach the registry - see the script.
       - name: Check publish manifest
-        if: steps.should_run.outputs.run == 'true'
-        # No local (file:/link:/.yalc) specs may reach the registry - see the script.
-        run: node openframe-frontend-core/scripts/check-publish-manifest.mjs "${{ matrix.path }}/package.json"
+        run: node scripts/check-publish-manifest.mjs package.json
 
       # --ignore-scripts skips a prepack rebuild.
-      - name: Pack ${{ env.NEW_VERSION }}
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
-        shell: bash
+      - name: Pack
         run: |
-          npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
+          OLD_VERSION=$(npm view "$(jq -r .name package.json)" dist-tags.latest)
+          npm version "${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}.${{ github.run_number }}.${{ github.run_attempt }}" --no-git-tag-version
           echo "PACKAGE_TARBALL=$PWD/$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_ENV"
 
       # PR builds go to pkg.pr.new only.
-      - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
-        shell: bash
+      - name: Preview registry (pkg.pr.new)
         run: |
           npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --json pkg-pr-new.json "$PACKAGE_TARBALL"
           jq -r '.packages[0].url' pkg-pr-new.json >> "$GITHUB_STEP_SUMMARY"
 
 
-  # `lint:cycles` gets its OWN job, purely for wall-clock. It is graph-wide —
-  # a cycle is a property of the whole import graph, so it cannot be cached or
-  # narrowed to a diff — and on this runner it takes longer than every other
-  # step in `test-node` put together. Run sequentially it made a PR's checks
-  # ~16 min; run in parallel the two jobs overlap and the wall clock is roughly
-  # this job alone. The price is a second `npm install`: about a minute of
-  # machine time, none of it wall time.
-  #
-  # Keep it a REQUIRED check (it is in `all-checks` below). It sat misconfigured
-  # and reporting zero for months while a real cycle was in the tree, so a
-  # cheaper-looking arrangement that quietly drops it is the one thing to avoid.
+  # Own job for wall clock: graph-wide and slower than all of test-node; sequential made PR checks ~16 min.
+  # Keep it in all-checks; it once reported zero for months with a real cycle in the tree.
   test-node-cycles:
-    name: Test Node Cycles (${{ matrix.name }})
+    name: Test Node Cycles (openframe-frontend-core)
     runs-on: ubuntu-latest
     needs: [changes]
+    if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
       NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
       NPM_CONFIG_LOGLEVEL: http
-    strategy:
-      matrix:
-        include: ${{ fromJson(needs.changes.outputs.node_matrix) }}
-
+    defaults:
+      run:
+        working-directory: openframe-frontend-core
     steps:
-      - name: Check if should run
-        id: should_run
-        run: echo "run=${{ fromJSON(needs.changes.outputs.changes || '{}')[matrix.name] == 'true' }}" >> $GITHUB_OUTPUT
-
       - uses: actions/checkout@v4
-        if: steps.should_run.outputs.run == 'true'
 
       - name: Setup Node.js
-        if: steps.should_run.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: ${{ matrix.path }}/package.json
+          cache-dependency-path: openframe-frontend-core/package.json
 
-      # See the identical step in test-node above for why this is here.
-      - name: Upgrade npm (workaround for a bundled-npm Arborist bug)
-        if: steps.should_run.outputs.run == 'true'
+      # Same bundled-npm bug as in test-node.
+      - name: Upgrade npm
         run: npm install -g npm@11.9.0
 
       - name: Install Dependencies
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm install
 
       - name: Lint (import cycles)
-        if: steps.should_run.outputs.run == 'true'
-        working-directory: ${{ matrix.path }}
         run: npm run lint:cycles
 
 
