@@ -21,6 +21,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.springframework.util.CollectionUtils.isEmpty;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -94,6 +96,13 @@ public class KnowledgeBaseTagService {
                 .entityType(ENTITY_TYPE)
                 .build();
         tagAssignmentRepository.save(assignment);
+    }
+
+    public void requireExistingTags(List<String> tagIds) {
+        if (isEmpty(tagIds)) {
+            return;
+        }
+        tagIds.forEach(this::requireExistingTag);
     }
 
     private void requireExistingTag(String tagId) {

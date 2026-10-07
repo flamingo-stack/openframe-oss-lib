@@ -15,12 +15,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +32,7 @@ class KnowledgeBaseTagServiceTest {
 
     private static final String ITEM_ID = "article-1";
     private static final String TAG_ID = "tag-1";
+    private static final String UNKNOWN_TAG_ID = "tag-unknown";
 
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
@@ -89,5 +93,44 @@ class KnowledgeBaseTagServiceTest {
 
         // verifications
         verify(tagAssignmentRepository, never()).save(any(TagAssignment.class));
+    }
+
+    @Test
+    void requireExistingTags_oneUnknown_throwsTagNotFound() {
+        // setup
+        when(tagRepository.existsById(TAG_ID)).thenReturn(true);
+        when(tagRepository.existsById(UNKNOWN_TAG_ID)).thenReturn(false);
+        List<String> tagIds = List.of(TAG_ID, UNKNOWN_TAG_ID);
+
+        // execution
+        NotFoundException exception = assertThrows(NotFoundException.class,
+                () -> service.requireExistingTags(tagIds));
+
+        // verifications
+        assertThat(exception)
+                .hasMessage("Tag not found: " + UNKNOWN_TAG_ID)
+                .returns(ErrorCode.TAG_NOT_FOUND, NotFoundException::getErrorCode);
+    }
+
+    @Test
+    void requireExistingTags_allExist_passes() {
+        // setup
+        when(tagRepository.existsById(anyString())).thenReturn(true);
+        List<String> tagIds = List.of(TAG_ID);
+
+        // execution
+        service.requireExistingTags(tagIds);
+
+        // verifications
+        verify(tagRepository).existsById(TAG_ID);
+    }
+
+    @Test
+    void requireExistingTags_noTags_noLookup() {
+        // execution
+        service.requireExistingTags(null);
+
+        // verifications
+        verifyNoInteractions(tagRepository);
     }
 }

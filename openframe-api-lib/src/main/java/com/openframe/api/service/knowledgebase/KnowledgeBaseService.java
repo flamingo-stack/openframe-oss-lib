@@ -166,6 +166,8 @@ public class KnowledgeBaseService {
     public KnowledgeBaseItem createArticle(String currentUserId, CreateArticleCommand cmd) {
         log.info("Creating article: {} by user: {} under parent: {}", cmd.getName(), currentUserId, cmd.getParentId());
         validateParentIsFolder(cmd.getParentId());
+        List<String> tagIds = cmd.getTagIds();
+        knowledgeBaseTagService.requireExistingTags(tagIds);
         KnowledgeBaseItem article = KnowledgeBaseItem.builder()
                 .type(KnowledgeBaseItemType.ARTICLE)
                 .name(cmd.getName())
@@ -178,7 +180,7 @@ public class KnowledgeBaseService {
                 .build();
         KnowledgeBaseItem saved = repository.save(article);
 
-        addTags(saved.getId(), cmd.getTagIds());
+        addTags(saved.getId(), tagIds);
         createAssignments(saved.getId(), AssignmentTargetType.ORGANIZATION, cmd.getAssignedOrganizationIds());
         createAssignments(saved.getId(), AssignmentTargetType.DEVICE, cmd.getAssignedDeviceIds());
         createAssignments(saved.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
