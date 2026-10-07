@@ -9,10 +9,13 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -21,6 +24,7 @@ import static org.springframework.util.StringUtils.hasText;
 public class RelayIdCodec {
 
     private static final String SEPARATOR = ":";
+    private static final String TYPE_NAME_DELIMITER = " or ";
     private static final Pattern GLOBAL_ID = Pattern.compile("([A-Z][A-Za-z0-9]*):(.*)", Pattern.DOTALL);
     private static final Pattern TRAILING_PADDING = Pattern.compile("=+$");
     private static final Base64.Encoder URL_SAFE_ENCODER = Base64.getUrlEncoder().withoutPadding();
@@ -33,6 +37,11 @@ public class RelayIdCodec {
     }
 
     public String decode(String id, NodeType expected) {
+        Set<NodeType> expectedTypes = EnumSet.of(expected);
+        return decodeOneOf(id, expectedTypes);
+    }
+
+    public String decodeOneOf(String id, Set<NodeType> expected) {
         if (!hasText(id)) {
             return id;
         }
@@ -61,17 +70,27 @@ public class RelayIdCodec {
                 .map(RelayIdCodec::toParsedRelayId);
     }
 
-    private String rawIdOf(ParsedRelayId globalId, NodeType expected) {
-        String expectedName = expected.getGraphqlTypeName();
+    private String rawIdOf(ParsedRelayId globalId, Set<NodeType> expected) {
         String actualTypeName = globalId.getTypeName();
         String rawId = globalId.getRawId();
-        if (!globalId.isOfType(expected)) {
-            throw new InvalidRelayIdException("Expected a " + expectedName + " id, got " + actualTypeName);
+        if (!isOfAnyType(globalId, expected)) {
+            String expectedNames = joinTypeNames(expected);
+            throw new InvalidRelayIdException("Expected a " + expectedNames + " id, got " + actualTypeName);
         }
         if (!hasText(rawId)) {
-            throw new InvalidRelayIdException("Empty " + expectedName + " id");
+            throw new InvalidRelayIdException("Empty " + actualTypeName + " id");
         }
         return rawId;
+    }
+
+    private static boolean isOfAnyType(ParsedRelayId globalId, Set<NodeType> types) {
+        return types.stream().anyMatch(globalId::isOfType);
+    }
+
+    private static String joinTypeNames(Set<NodeType> types) {
+        return types.stream()
+                .map(NodeType::getGraphqlTypeName)
+                .collect(Collectors.joining(TYPE_NAME_DELIMITER));
     }
 
     private static String toUrlSafeUnpadded(String id) {

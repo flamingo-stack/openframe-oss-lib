@@ -7,10 +7,14 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
+import static com.openframe.api.relay.NodeType.INSIGHT;
+import static com.openframe.api.relay.NodeType.KNOWLEDGE_BASE_ITEM;
 import static com.openframe.api.relay.NodeType.TICKET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,6 +31,8 @@ class RelayIdCodecTest {
     private static final String UNPADDED_URL_SAFE_TICKET_ID = "VGlja2V0Oj8_Pw";
     private static final String EMPTY_KEY_TICKET_ID = "VGlja2V0Og";
     private static final String NON_UTF8_BASE64 = "_w";
+    private static final String TAG_GLOBAL_ID = "VGFnOnRhZy0x";
+    private static final Set<NodeType> ASSIGNABLE_ITEM_TYPES = EnumSet.of(TICKET, KNOWLEDGE_BASE_ITEM, INSIGHT);
 
     private final RelayIdCodec codec = new RelayIdCodec();
 
@@ -153,6 +159,59 @@ class RelayIdCodecTest {
         assertThat(decoded).isNull();
     }
 
+    @ParameterizedTest
+    @MethodSource("assignableItemGlobalIds")
+    void decodeOneOf_globalIdOfAnyExpectedType_returnsRawId(NodeType type, String rawId) {
+        // setup
+        String globalId = codec.encode(type, rawId);
+
+        // execution
+        String decoded = codec.decodeOneOf(globalId, ASSIGNABLE_ITEM_TYPES);
+
+        // verifications
+        assertThat(decoded).isEqualTo(rawId);
+    }
+
+    @Test
+    void decodeOneOf_rawId_returnedUnchanged() {
+        // execution
+        String decoded = codec.decodeOneOf(OBJECT_ID, ASSIGNABLE_ITEM_TYPES);
+
+        // verifications
+        assertThat(decoded).isEqualTo(OBJECT_ID);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void decodeOneOf_nullOrBlank_returnedUnchanged(String id) {
+        // execution
+        String decoded = codec.decodeOneOf(id, ASSIGNABLE_ITEM_TYPES);
+
+        // verifications
+        assertThat(decoded).isEqualTo(id);
+    }
+
+    @Test
+    void decodeOneOf_globalIdOfOtherType_throwsListingExpectedTypes() {
+        // execution
+        InvalidRelayIdException exception = assertThrows(InvalidRelayIdException.class,
+                () -> codec.decodeOneOf(TAG_GLOBAL_ID, ASSIGNABLE_ITEM_TYPES));
+
+        // verifications
+        assertThat(exception.getMessage()).isEqualTo("Expected a Ticket or KnowledgeBaseItem or Insight id, got Tag");
+    }
+
+    @Test
+    void decodeOneOf_globalIdWithEmptyKey_throwsEmptyId() {
+        // execution
+        InvalidRelayIdException exception = assertThrows(InvalidRelayIdException.class,
+                () -> codec.decodeOneOf(EMPTY_KEY_TICKET_ID, ASSIGNABLE_ITEM_TYPES));
+
+        // verifications
+        assertThat(exception.getMessage()).isEqualTo("Empty Ticket id");
+    }
+
     @Test
     void parse_machineGlobalId_typeNameAndRawId() {
         // execution
@@ -194,6 +253,13 @@ class RelayIdCodecTest {
         assertThat(parsed).isEmpty();
     }
 
+    private static Stream<Arguments> assignableItemGlobalIds() {
+        return Stream.of(
+                arguments(TICKET, OBJECT_ID),
+                arguments(KNOWLEDGE_BASE_ITEM, "kb-1"),
+                arguments(INSIGHT, "insight-1"));
+    }
+
     // Produced by graphql.relay.Relay 22 (URL-safe, unpadded), i.e. what api-service-core emits today:
     // Machine <- machineId (DeviceDataFetcher), Ticket <- _id (AssignmentDataFetcher.ticketNodeId), Tag, Organization
     // <- organizationId, User <- _id (encodeNodeOptions).
@@ -206,6 +272,10 @@ class RelayIdCodecTest {
                 arguments(NodeType.USER, "user-1", "VXNlcjp1c2VyLTE"),
                 arguments(NodeType.DIALOG, "dialog-1", "RGlhbG9nOmRpYWxvZy0x"),
                 arguments(NodeType.TICKET_STATUS_DEFINITION, "status-1",
-                        "VGlja2V0U3RhdHVzRGVmaW5pdGlvbjpzdGF0dXMtMQ"));
+                        "VGlja2V0U3RhdHVzRGVmaW5pdGlvbjpzdGF0dXMtMQ"),
+                arguments(NodeType.ITEM_ASSIGNMENT, "assignment-1", "SXRlbUFzc2lnbm1lbnQ6YXNzaWdubWVudC0x"),
+                arguments(NodeType.TIME_ENTRY, "entry-1", "VGltZUVudHJ5OmVudHJ5LTE"),
+                arguments(NodeType.NOTIFICATION, "notification-1", "Tm90aWZpY2F0aW9uOm5vdGlmaWNhdGlvbi0x"),
+                arguments(NodeType.SOFTWARE_SCHEDULE, "schedule-1", "U29mdHdhcmVTY2hlZHVsZTpzY2hlZHVsZS0x"));
     }
 }

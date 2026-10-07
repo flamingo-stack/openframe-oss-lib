@@ -23,7 +23,11 @@ public enum NodeType {
     TICKET_STATUS_DEFINITION("TicketStatusDefinition"),
     USER("User"),
     KNOWLEDGE_BASE_ITEM("KnowledgeBaseItem"),
-    INSIGHT("Insight");
+    INSIGHT("Insight"),
+    ITEM_ASSIGNMENT("ItemAssignment"),
+    TIME_ENTRY("TimeEntry"),
+    NOTIFICATION("Notification"),
+    SOFTWARE_SCHEDULE("SoftwareSchedule");
 
     private final String graphqlTypeName;
 
