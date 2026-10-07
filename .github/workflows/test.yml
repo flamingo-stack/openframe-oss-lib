@@ -177,7 +177,7 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          OLD_VERSION=$(npm view "$(jq -r .name package.json)" dist-tags.latest)
+          OLD_VERSION=$(git ls-remote --tags --refs origin | cut -d/ -f3 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           npm version "${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}.${{ github.run_number }}.${{ github.run_attempt }}" --no-git-tag-version
           echo "PACKAGE_TARBALL=$PWD/$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_ENV"
           echo "SHORT_SHA=${HEAD_SHA::7}" >> "$GITHUB_ENV"

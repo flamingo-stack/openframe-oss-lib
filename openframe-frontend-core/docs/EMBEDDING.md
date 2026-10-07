@@ -20,7 +20,7 @@ embedded apps mount their own provider(s) with overrides.
 ## 1. Install
 
 ```bash
-npm install @flamingo-stack/openframe-frontend-core
+npm install https://pkg.pr.new/flamingo-stack/openframe-oss-lib/@flamingo-stack/openframe-frontend-core@<x.y.z>
 ```
 
 Peer dependencies (install whichever your components touch): `react`,
