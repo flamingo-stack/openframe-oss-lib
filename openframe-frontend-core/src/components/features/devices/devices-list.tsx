@@ -1,11 +1,11 @@
 'use client';
 
 import { type ReactNode, useCallback, useMemo } from 'react';
+import { useStickyToolbar } from '../../../hooks/ui/use-sticky-toolbar';
 import { type ColumnFiltersState, DataTable, type NoDataProps, type OnChangeFn } from '../../ui';
 import { DevicesFilterToolbar } from './devices-filter-toolbar';
 import { DevicesTableBody, getDeviceActionsColumn, getDeviceFilterColumns } from './devices-table-columns';
 import type { DeviceFilters, DeviceRow } from './types';
-import { useStickyToolbar } from './use-sticky-toolbar';
 import { useTagFilterModal } from './use-tag-filter-modal';
 
 /**

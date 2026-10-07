@@ -2,8 +2,10 @@
 
 import type React from 'react';
 import { useEffect, useState, useCallback, useRef } from 'react';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils';
 import { scrollElementIntoView } from '../../utils/scroll-into-view';
+import { ScrollShadow } from '../ui/scroll-fade';
 
 export interface StickyNavSection {
   id: string;
@@ -41,11 +43,12 @@ function HorizontalSectionNav({
   action,
   label,
 }: Omit<StickySectionNavProps, 'ribbonPosition' | 'ribbonColor' | 'orientation'>) {
-  const rowRef = useRef<HTMLDivElement>(null);
-  // Keep the pill of the section being read in view when the row scrolls.
+  const navRef = useRef<HTMLElement>(null);
+  // Keep the pill of the section being read in view when the row scrolls. The
+  // row is the pill's parent: the lib's `ScrollShadow` owns the scrolling element.
   useEffect(() => {
-    const row = rowRef.current;
-    const pill = row?.querySelector<HTMLElement>(`[data-section="${CSS.escape(activeSection)}"]`);
+    const pill = navRef.current?.querySelector<HTMLElement>(`[data-section="${CSS.escape(activeSection)}"]`);
+    const row = pill?.parentElement;
     if (!row || !pill) return;
     const left = pill.offsetLeft - row.offsetLeft;
     if (left < row.scrollLeft || left + pill.offsetWidth > row.scrollLeft + row.clientWidth) {
@@ -54,20 +57,22 @@ function HorizontalSectionNav({
   }, [activeSection]);
 
   return (
-    <nav aria-label={label} className={cn('flex h-14 items-stretch gap-6 bg-ods-bg', className)}>
+    <nav ref={navRef} aria-label={label} className={cn('flex h-14 items-stretch gap-6 bg-ods-bg', className)}>
       {brand && (
         <div className="hidden shrink-0 items-center gap-2.5 border-r border-ods-border pr-6 text-ods-text-primary text-h4 content-lg:flex">
           {brand}
         </div>
       )}
-      <div
-        ref={rowRef}
-        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] content-lg:items-stretch"
+      {/* The scrolling row and its edge fades are the lib's one pattern (`ScrollShadow`), not a second one. */}
+      <ScrollShadow
+        axis="horizontal"
+        className="min-w-0 flex-1"
+        scrollClassName="flex h-full items-center gap-1 [scrollbar-width:none] content-lg:items-stretch"
       >
         {sections.map(section => {
           const active = activeSection === section.id;
           return (
-            <a
+            <Link
               key={section.id}
               href={`#${section.id}`}
               data-section={section.id}
@@ -86,10 +91,10 @@ function HorizontalSectionNav({
               )}
             >
               {section.label}
-            </a>
+            </Link>
           );
         })}
-      </div>
+      </ScrollShadow>
       {action && <div className="hidden shrink-0 items-center content-lg:flex">{action}</div>}
     </nav>
   );

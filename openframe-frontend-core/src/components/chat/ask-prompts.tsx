@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import { MingoAiButton, openAskAi } from '../navigation/mingo-ai-button';
+import { ScrollShadow } from '../ui/scroll-fade';
 import { QuickActionChipButton, QuickActionChipSkeleton, type QuickActionIconSpec } from './quick-action-chip';
 
 /** One question a page offers: the chip shows `label` as written, the chat is sent `prompt`. */
@@ -36,6 +37,8 @@ export interface AskPromptsProps {
   icon?: ReactNode;
   /** After the chat was asked (analytics). */
   onAsk?: (prompt: AskPrompt) => void;
+  /** The surface the row sits on, as a CSS colour: what its edge fade dissolves into. Default: the page background. */
+  fadeColor?: string;
   className?: string;
 }
 
@@ -65,12 +68,13 @@ const CHIP_SLOT_CLASS = 'flex h-9 min-w-0 max-w-full';
 const ROW_CHIP_SLOT_CLASS = 'flex h-9 shrink-0 content-md:min-w-0 content-md:max-w-full content-md:shrink';
 /**
  * `AskPrompts`' block. Narrow (a phone): the launcher and the chips are one row
- * that scrolls sideways and fades at its far edge, the suggestion-chip row of
- * Material's guidance: one row high whatever the questions are, and no ragged
- * space beside them. From the content `md` step: stacked, one chip per row.
+ * that scrolls sideways and fades where it continues (the lib's `ScrollShadow`),
+ * the suggestion-chip row of Material's guidance: one row high whatever the
+ * questions are, and no ragged space beside them. From the content `md` step:
+ * stacked, one chip per row.
  */
-const ASK_PROMPTS_BLOCK_CLASS =
-  'flex w-full min-w-0 flex-row items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] content-md:w-auto content-md:flex-col content-md:overflow-visible content-md:[mask-image:none]';
+const ASK_PROMPTS_ROW_CLASS =
+  'flex min-w-0 flex-row items-center gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden content-md:flex-col content-md:overflow-visible';
 
 /**
  * The questions themselves, in `count` fixed slots: a sentence-case chip each
@@ -134,13 +138,19 @@ export function AskPrompts({
   label,
   icon,
   onAsk,
+  fadeColor,
   className,
 }: AskPromptsProps) {
   const count = slotCount(countProp, loading, prompts);
   if (!loading && prompts.length === 0) return null;
   const end = align === 'end';
   return (
-    <div className={cn(ASK_PROMPTS_BLOCK_CLASS, end ? 'content-md:items-end' : 'content-md:items-start', className)}>
+    <ScrollShadow
+      axis="horizontal"
+      color={fadeColor}
+      className="w-full min-w-0 content-md:w-auto"
+      scrollClassName={cn(ASK_PROMPTS_ROW_CLASS, end ? 'content-md:items-end' : 'content-md:items-start', className)}
+    >
       <MingoAiButton variant="button" source={source} label={label} icon={icon} className="shrink-0" />
       <QuestionChips
         prompts={prompts}
@@ -150,7 +160,7 @@ export function AskPrompts({
         onAsk={onAsk}
         slotClassName={cn(ROW_CHIP_SLOT_CLASS, end && 'content-md:justify-end')}
       />
-    </div>
+    </ScrollShadow>
   );
 }
 

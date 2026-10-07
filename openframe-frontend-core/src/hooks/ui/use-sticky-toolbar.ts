@@ -12,7 +12,11 @@ interface StickyToolbar {
 }
 
 /**
- * Keeps a sticky filter toolbar pinned above a sticky table header. The toolbar
+ * Keeps a sticky filter toolbar pinned above a sticky table header. (The page's
+ * OWN header and announcement bar are `useHeaderHeight`'s: that one reads the
+ * document's chrome; this one measures the toolbar element it is handed.)
+ *
+ * How: The toolbar
  * height is measured (it changes as the single-row tag list appears or collapses)
  * and published as `--sticky-toolbar-h` on the container, which the table header
  * reads via `top-[var(--sticky-toolbar-h)]`, so the header always pins flush

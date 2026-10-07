@@ -85,5 +85,5 @@ export type {
   DeviceTag,
   TagFilterOption,
 } from './types';
-export { useStickyToolbar } from './use-sticky-toolbar';
+export { useStickyToolbar } from '../../../hooks/ui/use-sticky-toolbar';
 export { useTagFilterModal } from './use-tag-filter-modal';

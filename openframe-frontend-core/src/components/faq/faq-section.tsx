@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from '../../embed-shims/next-link';
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { Faq } from '../../types/faq';
@@ -282,7 +283,7 @@ function GroupedFaqList({
       {navGroups.map(group => {
         const isActive = group.slug === activeSlug;
         return (
-          <a
+          <Link
             key={group.slug}
             href={`#${group.slug}`}
             aria-current={isActive ? 'true' : undefined}
@@ -295,7 +296,7 @@ function GroupedFaqList({
             )}
           >
             {group.section}
-          </a>
+          </Link>
         );
       })}
     </nav>
