@@ -7,7 +7,7 @@ import { EntityIcon } from '../icon-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { Skeleton } from '../ui/skeleton';
-import { SnapCarousel } from '../ui/snap-carousel';
+import { SnapCarousel, SnapCarouselControlsSkeleton } from '../ui/snap-carousel';
 import { TruncateText } from '../ui/truncate-text';
 
 /** One job the product does, as the explorer shows it. Every field is the host's data. */
@@ -169,9 +169,14 @@ function Example({
   );
 }
 
-/** The box the explorer occupies while its data loads, at both layouts. */
+/** The box the explorer occupies while its data loads, at both layouts: the panel, or the carousel's card over its controls. */
 export function CapabilityExplorerSkeleton({ className }: { className?: string }) {
-  return <Skeleton className={cn(SKELETON_HEIGHT_CLASS, 'w-full', className)} />;
+  return (
+    <div className={className}>
+      <Skeleton className={cn(SKELETON_HEIGHT_CLASS, 'w-full')} />
+      <SnapCarouselControlsSkeleton className="content-lg:hidden" />
+    </div>
+  );
 }
 
 /**

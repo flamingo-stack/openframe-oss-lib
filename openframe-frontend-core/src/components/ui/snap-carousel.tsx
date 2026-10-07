@@ -8,6 +8,18 @@ import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { PlaybackToggle } from './playback-toggle';
 
+/** The row under the track: the dots, the counter, the pause and the two arrows (the arrows set its height). */
+const SNAP_CAROUSEL_CONTROLS_CLASS = 'mt-3 flex items-center gap-2';
+
+/**
+ * The carousel's controls row while its slides load: the same box (margin and
+ * height), empty. A skeleton of a carousel is its slides' skeleton over this,
+ * so the block keeps its height when the slides land.
+ */
+export function SnapCarouselControlsSkeleton({ className }: { className?: string }) {
+  return <div aria-hidden className={cn(SNAP_CAROUSEL_CONTROLS_CLASS, 'h-11', className)} />;
+}
+
 export interface SnapCarouselProps<T> {
   items: readonly T[];
   renderItem: (item: T, index: number) => ReactNode;
@@ -175,7 +187,7 @@ export function SnapCarousel<T>({
           </div>
         ))}
       </div>
-      <div className="mt-3 flex items-center gap-2">
+      <div className={SNAP_CAROUSEL_CONTROLS_CLASS}>
         <span className="flex gap-1.5" aria-hidden>
           {items.map((_, dotIndex) => (
             <span
