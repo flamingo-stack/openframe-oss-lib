@@ -349,21 +349,6 @@ jobs:
               xargs -r -I{} gh api --silent -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
           done
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Delete PR ${{ github.event.pull_request.number }} npm versions
-        working-directory: openframe-frontend-core
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          PKG=$(jq -r .name package.json)
-          npm dist-tag rm "$PKG" "pr-${{ github.event.pull_request.number }}" || true
-          npm view "$PKG" versions | grep -oE "[0-9.]+-${{ github.event.pull_request.number }}\.[0-9.]+" |
-            xargs -r -I{} npm unpublish "$PKG@{}"
-
-
   all-checks:
     name: "All Checks"
     needs: [changes, test-java, test-node, test-node-cycles, test-rust]

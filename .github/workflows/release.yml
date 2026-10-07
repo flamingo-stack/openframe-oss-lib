@@ -237,7 +237,7 @@ jobs:
         shell: bash
         run: echo "PACKAGE_TARBALL=$PWD/$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_ENV"
 
-      # Where our apps install from; needs the pkg.pr.new GitHub App.
+      # Where our apps install from; the only registry a snapshot goes to. Needs the pkg.pr.new GitHub App.
       - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }}
         if: steps.should_run.outputs.run == 'true'
         working-directory: ${{ matrix.path }}
@@ -245,16 +245,6 @@ jobs:
         run: |
           npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --json pkg-pr-new.json "$PACKAGE_TARBALL"
           jq -r '.packages[0].url' pkg-pr-new.json >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Publish ${{ env.NEW_VERSION }} to npmjs
-        if: steps.should_run.outputs.run == 'true' && inputs.release_tag == ''
-        working-directory: ${{ matrix.path }}
-        run: |
-          npm publish "$PACKAGE_TARBALL" --tag "$PUBLISH_TAG" --access public
-          echo "Uploaded $NEW_VERSION to npmjs ($PUBLISH_TAG); served after npm's scan." >> "$GITHUB_STEP_SUMMARY"
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PUBLISH_TAG: ${{ (github.event_name == 'push' || inputs.snapshot) && 'snapshot' || 'latest' }}
 
       # A RELEASE gets an address named after its version:
       #   https://pkg.pr.new/<owner>/<repo>/<package>@<x.y.z>
@@ -273,6 +263,16 @@ jobs:
           git push origin "refs/tags/$NEW_VERSION"
           gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$NEW_VERSION" -f target=node -f release_tag="$NEW_VERSION"
           echo "Tagged \`$NEW_VERSION\`; https://pkg.pr.new/$GITHUB_REPOSITORY/$(jq -r '.name' package.json)@$NEW_VERSION is live when the run on that tag finishes." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Fallback registry, releases only; last, so an npm failure leaves both pkg.pr.new addresses in place.
+      - name: Publish ${{ env.NEW_VERSION }} to npmjs
+        if: steps.should_run.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && !inputs.snapshot && inputs.release_tag == ''
+        working-directory: ${{ matrix.path }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish "$PACKAGE_TARBALL" --access public
+          echo "Uploaded $NEW_VERSION to npmjs (latest); served after npm's scan." >> "$GITHUB_STEP_SUMMARY"
 
   release-rust:
     name: Release Rust
