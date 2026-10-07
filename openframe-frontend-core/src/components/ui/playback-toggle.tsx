@@ -23,7 +23,10 @@ export interface PlaybackToggleProps {
  *
  * It has to be there and easy to reach (a 32px target, a name, a focus ring),
  * never the thing the eye lands on: no border and no surface, only a small
- * glyph in the accent. The target stays 32px; it is the glyph that is small.
+ * grey glyph that takes the accent on hover and focus. The grey is the muted
+ * text token, the quietest one that still clears the 3:1 a control's glyph
+ * needs against the page (WCAG 1.4.11); the next grey down does not. The
+ * target stays 32px; it is the glyph that is small.
  */
 export function PlaybackToggle({
   paused,
@@ -37,7 +40,7 @@ export function PlaybackToggle({
       variant="transparent"
       size="icon-sm"
       className={cn(
-        'shrink-0 rounded-full border-0 text-ods-accent hover:text-ods-accent-hover [&_svg]:h-3 [&_svg]:w-3',
+        'shrink-0 rounded-full border-0 text-ods-text-muted hover:text-ods-accent focus-visible:text-ods-accent [&_svg]:h-3 [&_svg]:w-3',
         className,
       )}
       aria-label={paused ? playLabel : pauseLabel}
