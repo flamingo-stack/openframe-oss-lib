@@ -1300,6 +1300,7 @@ function EmbeddableChatInner({
     // ─── Dialog management (Mingo-mode inline history) ───
     dialogs,
     activeDialogId,
+    activeDialog: hostActiveDialog,
     selectDialog,
     renameDialog,
     archiveDialog,
@@ -1819,6 +1820,7 @@ function EmbeddableChatInner({
   } = useChatDialogManager({
     dialogs,
     activeDialogId,
+    activeDialog: hostActiveDialog,
     selectDialog,
     clearMessages,
     renameDialog,
