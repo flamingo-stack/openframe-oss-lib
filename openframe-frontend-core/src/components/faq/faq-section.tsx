@@ -408,13 +408,8 @@ export function FaqSection({
   ask,
 }: FaqSectionProps) {
   const assistant = useAssistantRuntime();
-  // The host's own block wins; else the card, where a chat is there to open. Its
-  // topic is the host's, else the entity the FAQ is attached to.
-  const aside =
-    asideProp ??
-    (ask !== false && faqAskCardShown(assistant) ? (
-      <FaqAskCard {...ask} topic={ask?.topic ?? entityType} />
-    ) : undefined);
+  // The host's own block wins; else the card, where a chat is there to open.
+  const aside = asideProp ?? (ask !== false && faqAskCardShown(assistant) ? <FaqAskCard {...ask} /> : undefined);
   const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl);
   // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
   // wrapper object would setState-loop under re-rendering parents.

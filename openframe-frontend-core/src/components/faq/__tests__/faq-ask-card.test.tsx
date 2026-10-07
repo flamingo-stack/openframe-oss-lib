@@ -113,10 +113,10 @@ describe('FaqSection ask card', () => {
     expect(url.searchParams.get('exclude')).toBe('a,b');
   });
 
-  it("falls back to the FAQ's entity type as its topic", async () => {
+  it("asks for the FAQ's own questions when the host states no topic, whatever entity it is attached to", async () => {
     renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} entityType="case_study" entityId={7} />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('case_study');
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('faq');
   });
 
   it('waits while the page is still picking its own questions', () => {
