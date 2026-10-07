@@ -180,7 +180,9 @@ export function CapabilityExplorerSkeleton({ className }: { className?: string }
  * From the content `lg` step: a vertical tablist (roving focus, arrow keys,
  * Home and End) beside one panel of fixed height: the job's copy and example
  * on top, its screen full width below, the footer pinned. Below it: a swipe
- * carousel of equal-height cards, each with the compact screen.
+ * carousel of equal-height cards, each with the compact screen, that moves to
+ * the next job by itself under the carousel's own rule (`useAutoplay`: on
+ * screen, tab visible, not paused, motion allowed), like every carousel.
  *
  * The host owns which job is shown (it reads the URL hash) through `activeId`
  * and `onActiveChange`, and the element a link to a job lands on: nothing here
@@ -211,7 +213,6 @@ export function CapabilityExplorer({
         className={className}
         items={items}
         label={labels.list}
-        autoAdvanceMs={0}
         prevLabel={labels.previous}
         nextLabel={labels.next}
         getKey={item => item.id}

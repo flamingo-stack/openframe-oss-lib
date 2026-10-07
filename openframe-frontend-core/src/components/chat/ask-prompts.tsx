@@ -55,14 +55,22 @@ const slotCount = (count: number | undefined, loading: boolean, prompts: readonl
 
 /** A skeleton chip's label width (in `ch`), by slot: a believable spread that is the same on every load. */
 const SKELETON_LABEL_CH = [26, 22, 30, 24, 20, 28] as const;
-/** One chip's slot: the chip's own height, so an empty slot holds the same room. */
+/** One chip's slot in a stacked block (a card): the chip's own height, so an empty slot holds the same room. */
+const CHIP_SLOT_CLASS = 'flex h-9 min-w-0 max-w-full';
 /**
- * In a narrow column (a phone) a chip takes the column's whole width, so the
- * questions read as one list and no ragged space is left beside them; from the
- * content `md` step a chip is as wide as its question.
+ * One chip's slot in `AskPrompts`. In a narrow column the block is ONE row that
+ * scrolls sideways, so a chip keeps its question's width and never shrinks;
+ * from the content `md` step the block stacks and a long question clips.
  */
-const CHIP_SLOT_CLASS =
-  'flex h-9 w-full min-w-0 max-w-full content-md:w-auto [&>button]:w-full [&>button>*]:w-full [&>button>*]:justify-start content-md:[&>button]:w-auto content-md:[&>button>*]:w-auto';
+const ROW_CHIP_SLOT_CLASS = 'flex h-9 shrink-0 content-md:min-w-0 content-md:max-w-full content-md:shrink';
+/**
+ * `AskPrompts`' block. Narrow (a phone): the launcher and the chips are one row
+ * that scrolls sideways and fades at its far edge, the suggestion-chip row of
+ * Material's guidance: one row high whatever the questions are, and no ragged
+ * space beside them. From the content `md` step: stacked, one chip per row.
+ */
+const ASK_PROMPTS_BLOCK_CLASS =
+  'flex w-full min-w-0 flex-row items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] content-md:w-auto content-md:flex-col content-md:overflow-visible content-md:[mask-image:none]';
 
 /**
  * The questions themselves, in `count` fixed slots: a sentence-case chip each
@@ -82,7 +90,7 @@ function QuestionChips({
       {Array.from({ length: count }, (_, slot) => {
         const prompt = loading ? undefined : prompts[slot];
         return (
-          <span key={prompt?.id ?? `slot-${slot}`} className={cn(CHIP_SLOT_CLASS, slotClassName)}>
+          <span key={prompt?.id ?? `slot-${slot}`} className={slotClassName ?? CHIP_SLOT_CLASS}>
             {loading ? (
               <QuickActionChipSkeleton
                 variant="question"
@@ -109,8 +117,9 @@ function QuestionChips({
 /**
  * A row of questions that open the site chat and ask it: THE assistant
  * launcher (`MingoAiButton`, its in-page variant: the mark and the name), then
- * `count` question chips, ONE PER ROW in fixed slots, so the block's height is
- * known before the questions are (a chip is one line: a longer question clips
+ * `count` question chips in fixed slots, so the block's height is known before
+ * the questions are: ONE scrolling row on a narrow column, one chip per row
+ * from the content `md` step (a chip is one line: a longer question clips there
  * and its tooltip shows it whole). A click on a chip opens the
  * chat and sends that question once (`openAskAi` with a prompt); the launcher
  * only opens it. While `loading` the slots hold chip skeletons and the launcher
@@ -131,21 +140,15 @@ export function AskPrompts({
   if (!loading && prompts.length === 0) return null;
   const end = align === 'end';
   return (
-    <div
-      className={cn(
-        'flex w-full min-w-0 flex-col gap-2 content-md:w-auto',
-        end ? 'items-end' : 'items-start',
-        className,
-      )}
-    >
-      <MingoAiButton variant="button" source={source} label={label} icon={icon} />
+    <div className={cn(ASK_PROMPTS_BLOCK_CLASS, end ? 'content-md:items-end' : 'content-md:items-start', className)}>
+      <MingoAiButton variant="button" source={source} label={label} icon={icon} className="shrink-0" />
       <QuestionChips
         prompts={prompts}
         count={count}
         loading={loading}
         source={source}
         onAsk={onAsk}
-        slotClassName={end ? 'justify-end' : undefined}
+        slotClassName={cn(ROW_CHIP_SLOT_CLASS, end && 'content-md:justify-end')}
       />
     </div>
   );
