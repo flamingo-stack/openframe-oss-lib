@@ -11,8 +11,12 @@ import { ToggleGroup, ToggleGroupItem } from '../toggle-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { TouchFriendlyTooltip } from '../ui/touch-friendly-tooltip';
 
-/** The approval levels, in the order a choice reads: from "runs on its own" to "never runs". */
-export const APPROVAL_LEVELS: readonly ApprovalLevel[] = ['ALLOW', 'ASK_USER', 'ASK_TECHNICIAN', 'DENY'];
+/**
+ * The approval levels, in the order a choice reads: the two that need nobody
+ * (allow, never) side by side, then the two that ask someone (a technician,
+ * the user) side by side.
+ */
+export const APPROVAL_LEVELS: readonly ApprovalLevel[] = ['ALLOW', 'DENY', 'ASK_TECHNICIAN', 'ASK_USER'];
 
 export interface ApprovalLevelMeta {
   /** The level's name, as every surface writes it. */
