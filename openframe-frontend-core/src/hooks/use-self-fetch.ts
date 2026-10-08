@@ -5,6 +5,9 @@ import { contentFetch } from '../utils/embed-content-fetch';
 
 export interface UseSelfFetchResult<T> {
   data: T | null;
+  /** The url `data` came from (`null` until something lands). While a new url
+   *  loads, `data` still holds the previous one — compare before trusting it. */
+  dataUrl: string | null;
   /** Imperatively patch the fetched data (e.g. optimistic vote updates). */
   setData: Dispatch<SetStateAction<T | null>>;
   isLoading: boolean;
@@ -48,6 +51,7 @@ export function useSelfFetch<T>(
   const initialData = options?.initialData;
   const revalidateOnVisibleAfterMs = options?.revalidateOnVisibleAfterMs;
   const [data, setData] = useState<T | null>(initialData ?? null);
+  const [dataUrl, setDataUrl] = useState<string | null>(initialData !== undefined ? url : null);
   const [isLoading, setIsLoading] = useState(initialData === undefined && url !== null);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -78,6 +82,7 @@ export function useSelfFetch<T>(
     // `initialData` is `undefined`.
     if (syncedProps.initialData !== initialData && initialData !== undefined) {
       setData(initialData);
+      setDataUrl(url);
     }
     // Fetching just got disabled — nothing will land to clear the spinner.
     if (syncedProps.url !== url && url === null) {
@@ -101,6 +106,7 @@ export function useSelfFetch<T>(
         const json = (await res.json()) as T;
         if (!cancelled) {
           setData(json);
+          setDataUrl(url);
           dataUrlRef.current = url; // remember the url we now hold data for
           dataAtRef.current = Date.now();
         }
@@ -149,6 +155,7 @@ export function useSelfFetch<T>(
 
   return {
     data,
+    dataUrl,
     setData,
     isLoading,
     error,
