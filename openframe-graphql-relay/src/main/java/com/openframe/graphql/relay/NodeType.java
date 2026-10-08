@@ -32,7 +32,8 @@ public enum NodeType {
     ITEM_ASSIGNMENT("ItemAssignment", "id"),
     TIME_ENTRY("TimeEntry", "id"),
     NOTIFICATION("Notification", "id"),
-    SOFTWARE_SCHEDULE("SoftwareSchedule", "id");
+    SOFTWARE_SCHEDULE("SoftwareSchedule", "id"),
+    GUARDRAIL_POLICY("GuardrailPolicy", "id");
 
     private final String graphqlTypeName;
     private final String rawIdProperty;

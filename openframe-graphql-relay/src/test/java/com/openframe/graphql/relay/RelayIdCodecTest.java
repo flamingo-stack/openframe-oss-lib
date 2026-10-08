@@ -276,6 +276,7 @@ class RelayIdCodecTest {
                 arguments(NodeType.ITEM_ASSIGNMENT, "assignment-1", "SXRlbUFzc2lnbm1lbnQ6YXNzaWdubWVudC0x"),
                 arguments(NodeType.TIME_ENTRY, "entry-1", "VGltZUVudHJ5OmVudHJ5LTE"),
                 arguments(NodeType.NOTIFICATION, "notification-1", "Tm90aWZpY2F0aW9uOm5vdGlmaWNhdGlvbi0x"),
-                arguments(NodeType.SOFTWARE_SCHEDULE, "schedule-1", "U29mdHdhcmVTY2hlZHVsZTpzY2hlZHVsZS0x"));
+                arguments(NodeType.SOFTWARE_SCHEDULE, "schedule-1", "U29mdHdhcmVTY2hlZHVsZTpzY2hlZHVsZS0x"),
+                arguments(NodeType.GUARDRAIL_POLICY, "policy-1", "R3VhcmRyYWlsUG9saWN5OnBvbGljeS0x"));
     }
 }
