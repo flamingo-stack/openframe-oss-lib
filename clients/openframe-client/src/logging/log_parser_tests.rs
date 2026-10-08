@@ -166,3 +166,27 @@ fn test_deduplicate_tool_level_logs() {
     assert_eq!(deduped[0].msg, "Connection FAILED: Network timeout");
     assert_eq!(deduped[0].count, Some(3));
 }
+
+fn log_batch(organization_id: Option<&str>) -> LogBatchMessage {
+    LogBatchMessage {
+        machine_id: Some("machine-1".to_string()),
+        hostname: "pc-1".to_string(),
+        tenant_domain: "acme.openframe.ai".to_string(),
+        organization_id: organization_id.map(str::to_string),
+        logs: vec![],
+    }
+}
+
+#[test]
+fn test_log_batch_serializes_organization_id_at_top_level() {
+    let json = serde_json::to_value(log_batch(Some("org-7"))).unwrap();
+
+    assert_eq!(json["organizationId"], "org-7");
+}
+
+#[test]
+fn test_log_batch_omits_missing_organization_id() {
+    let json = serde_json::to_value(log_batch(None)).unwrap();
+
+    assert!(json.get("organizationId").is_none());
+}
