@@ -4,13 +4,13 @@ import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.sso.SignupTicketService.SignupTicketPayload;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.authz.util.AuthUserPrincipals;
 import com.openframe.data.document.auth.AuthUser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -87,8 +87,7 @@ public class SignupTicketGrantAuthenticationProvider extends AbstractTokenMintin
         userService.touchLastLogin(user.getEmail(), tenantId);
 
         Authentication userPrincipal = new UsernamePasswordAuthenticationToken(
-                user.getEmail(), null,
-                user.getRoles().stream().map(r -> new SimpleGrantedAuthority("ROLE_" + r.name())).toList());
+                user.getEmail(), null, AuthUserPrincipals.authorities(user));
 
         OAuth2AccessTokenAuthenticationToken result = mintTokens(
                 registeredClient, clientPrincipal, userPrincipal,
