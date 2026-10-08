@@ -213,15 +213,30 @@ describe('recording retention', () => {
       keptBy: 'Dana Whitfield',
       keptOn: '27 Jul 2026',
       reason: 'Client dispute',
-      ticket: 'TKT-4631',
+      tickets: ['TKT-4631', 'TKT-4702'],
       expiresOn: '3 Sep 2026',
     };
     const { rerender } = render(<ReleaseKeepingModal {...props} dueOn="31 Aug 2026" />);
     expect(screen.getByText('Kept by Dana Whitfield on 27 Jul 2026 for Client dispute.')).toBeInTheDocument();
-    expect(screen.getByText('Ticket: TKT-4631')).toBeInTheDocument();
+    expect(screen.getByText('Ticket: TKT-4631, TKT-4702')).toBeInTheDocument();
     expect(screen.getByText(/3 days' grace/)).toBeInTheDocument();
     rerender(<ReleaseKeepingModal {...props} />);
     expect(screen.queryByText(/3 days' grace/)).toBeNull();
+  });
+
+  it('leaves out the ticket line when no ticket is assigned to the recording', () => {
+    render(
+      <ReleaseKeepingModal
+        isOpen
+        onClose={() => {}}
+        onConfirm={() => {}}
+        keptBy="Dana Whitfield"
+        keptOn="27 Jul 2026"
+        reason="Internal review"
+        expiresOn="14 Sep 2026"
+      />,
+    );
+    expect(screen.queryByText(/^Ticket:/)).toBeNull();
   });
 });
 
