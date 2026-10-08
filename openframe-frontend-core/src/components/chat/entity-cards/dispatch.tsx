@@ -56,7 +56,6 @@ import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
-import { EntityIcon } from '../../icon-display';
 import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
@@ -98,7 +97,6 @@ import { TrophyIcon } from '../../icons-v2-generated/sport/trophy-icon';
 import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
 import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/truck-fast-icon';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
-import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
 import { useChatCardItem } from '../hooks/use-chat-card-item';
@@ -116,7 +114,7 @@ import { clickupTaskUrl } from '../utils/external-app-urls';
 import { resolveIcon } from '../utils/icon-library';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
-import { getSourceLabel, SOURCE_ICON_NAMES } from '../utils/source-icons';
+import { getSourceLabel } from '../utils/source-icons';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
 import { BlogCardSkeleton } from './blog-card';
@@ -1431,23 +1429,6 @@ function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   );
 }
 
-/** A string field the card route attached to a hydrated ref beside the `ChatRef` ones (`logo_url`, `icon_name`). */
-function refText(ref: ChatRef | undefined, key: string): string | null {
-  const value = (ref as Record<string, unknown> | undefined)?.[key];
-  return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-/** A vendor's own logo, through the shared `VendorIcon` (its logo rule and proxying); the directory's source icon without one. */
-function VendorGlyph({ title, logoUrl }: { title: string; logoUrl: string | null }) {
-  if (!logoUrl) return <EntityIcon icon={{ name: SOURCE_ICON_NAMES.vendors }} size={24} />;
-  return <VendorIcon vendor={{ title, logo_url: logoUrl }} size="xs" showBackground={false} />;
-}
-
-/** A website page's menu icon (the one its navigation entry draws), through `EntityIcon`; the site's own mark for a page without one. */
-function SitePageGlyph({ iconName }: { iconName: string | null }) {
-  return <EntityIcon icon={{ name: iconName ?? SOURCE_ICON_NAMES['website-pages'] }} size={24} />;
-}
-
 interface GitHubCardConfig {
   label: string;
   kind: GitHubActivityKind;
@@ -1462,12 +1443,7 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
 };
 interface GlyphCardConfig {
   label: string;
-  /**
-   * The card's leading glyph. It is handed the hydrated ref, so a type whose
-   * records carry their own mark (a vendor's logo, a page's menu icon) draws
-   * that and keeps a generic glyph for a record without one.
-   */
-  icon: (ref?: ChatRef) => React.ReactNode;
+  icon: () => React.ReactNode;
   /**
    * Video-bearing ref types: render the media card (cover from the ref's
    * `metadata.videoPoster`, else the host's OG placeholder; the type label as the
@@ -1504,11 +1480,6 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   // A change set: pull requests across repositories declared as one change, with the ClickUp tasks and design
   // docs its pull requests are attached to. ONE card for it wherever a set is shown (chat, a design doc's page).
   change_set: { label: 'Change set', icon: () => <CodingMergeIcon size={24} /> },
-  // A page of the public website (pricing, product, legal, and every page the navigation lists), read live
-  // from the data the page shows. A glyph card: a page has no cover of its own, and the card opens the page.
-  site_page: { label: 'Website page', icon: ref => <SitePageGlyph iconName={refText(ref, 'icon_name')} /> },
-  // A vendor (product) of the OpenMSP directory. A glyph card; it opens the vendor's page there.
-  vendor: { label: 'Vendor', icon: ref => <VendorGlyph title={ref?.title ?? ''} logoUrl={refText(ref, 'logo_url')} /> },
 };
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
@@ -1521,7 +1492,7 @@ function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
             displayRef.metadata?.videoPoster,
             opts.extras?.buildOgPlaceholderUrl?.(displayRef.title ?? '') ?? null,
           )}
-          fallbackIcon={cfg.icon(displayRef)}
+          fallbackIcon={cfg.icon()}
           status={{ label: cfg.label, variant: 'grey' }}
           chatRef={displayRef}
           isNewTab={opts.isNewTab}
@@ -1529,12 +1500,7 @@ function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
           menuAriaLabel={`${cfg.label} actions`}
         />
       ) : (
-        <GlyphChatCard
-          chatRef={displayRef}
-          icon={cfg.icon(displayRef)}
-          isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
-        />
+        <GlyphChatCard chatRef={displayRef} icon={cfg.icon()} isNewTab={opts.isNewTab} discuss={opts.discuss} />
       ),
     ),
   );
