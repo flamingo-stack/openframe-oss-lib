@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 #[cfg(target_os = "windows")]
 use windows::core::{PCWSTR, PWSTR};
 #[cfg(target_os = "windows")]
-use windows::Win32::Foundation::FILETIME;
+use windows::Win32::Foundation::{ERROR_MORE_DATA, FILETIME};
 #[cfg(target_os = "windows")]
 use windows::Win32::System::RestartManager::{
     RmEndSession, RmGetList, RmRegisterResources, RmStartSession, RM_PROCESS_INFO,
@@ -102,7 +102,7 @@ fn query_rm_holders(wide_paths: &[Vec<u16>]) -> Result<Vec<LockHolder>, String> 
         );
 
         if let Err(ref e) = first_result {
-            if e.code().0 as u32 != 234 {
+            if e.code() != ERROR_MORE_DATA.to_hresult() {
                 return Err(format!("RmGetList (count) failed: {:?}", e));
             }
         }
@@ -272,3 +272,7 @@ pub fn log_file_lock_info(error: &std::io::Error, file_path: &str, operation: &s
 
     true
 }
+
+#[cfg(all(test, target_os = "windows"))]
+#[path = "file_lock_tests.rs"]
+mod tests;
