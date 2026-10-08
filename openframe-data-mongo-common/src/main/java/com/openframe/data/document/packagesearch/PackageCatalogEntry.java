@@ -37,7 +37,6 @@ public class PackageCatalogEntry {
     private String hashPrefix;
     private Integer popularity;
     private List<String> aliases;
-    private String searchBlob;
     private Instant updatedAt;
 
 }

@@ -41,7 +41,7 @@ pub use hostname_report_message::HostnameReportMessage;
 pub use initial_configuration::InitialConfiguration;
 pub use installed_agent_message::InstalledAgentMessage;
 pub use installed_tool::{
-    FirstRunState, Installation, InstalledAsset, InstalledTool, ToolRecordState,
+    FirstRunState, Installation, InstalledAsset, InstalledTool, ToolRecordState, CHAT_TOOL_AGENT_ID,
 };
 pub use machine_heartbeat_message::MachineHeartbeatMessage;
 pub use machine_timezone_message::MachineTimezoneMessage;

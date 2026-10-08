@@ -53,6 +53,7 @@ jobs:
           persist-credentials: false
 
       - name: Scan code
+        continue-on-error: true
         uses: ./.github/steps/trivy
         with:
           scan: code

@@ -119,7 +119,7 @@ impl ToolInstallationService {
         // Create tool-specific directory
         let base_folder_path = self.directory_manager.app_support_dir();
         let tool_folder_path = base_folder_path.join(tool_agent_id);
-        let mut first_run = if tool_agent_id == "openframe-chat" {
+        let mut first_run = if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
             FirstRunState::Pending
         } else {
             FirstRunState::Done
@@ -811,7 +811,7 @@ impl ToolInstallationService {
                 .process(tool_agent_id, installed_tool.run_command_args.clone())
                 .unwrap_or_else(|_| installed_tool.run_command_args.clone());
             // For openframe-chat, add --background flag to start in tray
-            if tool_agent_id == "openframe-chat" {
+            if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                 launch_args.push("--background".to_string());
             }
             let command_path = self
