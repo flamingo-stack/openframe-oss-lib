@@ -5,6 +5,7 @@ extend type Query {
     deviceLogs(
         machineId: String @deprecated(reason: "Use machineIds; a value given here is added to that list")
         machineIds: [String!]  # 1-50 devices. Omit for every device in the tenant; an empty list is rejected
+        organizationIds: [String!]  # 1-50 organizations (customers) of this tenant; with machineIds, lines must match both. Omit for every organization; an empty list is rejected. Only matches lines from agents that send their organization
         filter: DeviceLogFilterInput
         first: Int       # Lines per page: 1-500, default 100
         after: String
@@ -42,6 +43,7 @@ type DeviceLogEntry {
     level: String!
     message: String!
     machineId: String          # Device the line came from
+    organizationId: String     # Organization of the device, when its agent sends it
     hostname: String
     count: Long                # Identical lines the agent collapsed into this entry
 }
