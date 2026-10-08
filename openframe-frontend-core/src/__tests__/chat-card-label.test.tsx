@@ -34,7 +34,7 @@ describe('site_page source wiring', () => {
     expect(chatCardLabel('site_page')).toBe('Website page');
     expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.site_page).toBe('website-pages');
     expect(getSourceLabel('website-pages')).toBe('Website');
-    expect(SOURCE_ICON_NAMES['website-pages']).toBe('flamingo-logo');
+    expect(SOURCE_ICON_NAMES['website-pages']).toBe('flamingo-logo-grey');
     expect(buildListUrl('site_page', ['pricing', 'openframe'])).toBe('/api/site-pages?ids=pricing,openframe');
   });
 });
