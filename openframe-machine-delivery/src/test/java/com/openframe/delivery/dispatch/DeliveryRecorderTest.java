@@ -64,6 +64,7 @@ class DeliveryRecorderTest {
     void record_sequenceAssignedByARollout_keptAndCounterUntouched() {
         // setup
         payload.getDelivery().setSequence(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
 
         // execution
         recorder.record(request);
@@ -81,10 +82,10 @@ class DeliveryRecorderTest {
         when(repository.existsByIdAndDispatchId(any(), any())).thenReturn(true);
 
         // execution
-        boolean recorded = recorder.record(request);
+        DeliveryRecordOutcome outcome = recorder.record(request);
 
         // verifications
-        assertThat(recorded).isFalse();
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.REPLAYED);
         verify(repository, never()).upsertPending(any(MachineDelivery.class));
         verifyNoInteractions(sequences);
     }
@@ -93,14 +94,17 @@ class DeliveryRecorderTest {
     void record_request_pendingRowUpsertedDueAfterAckThreshold() {
         // setup
         when(sequences.next()).thenReturn(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
 
         // execution
-        recorder.record(request);
+        DeliveryRecordOutcome outcome = recorder.record(request);
 
         // verifications
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.RECORDED);
         verify(repository).upsertPending(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
         assertThat(saved.getId()).isEqualTo(ROW_ID);
+        assertThat(saved.getSequence()).isEqualTo(SEQUENCE);
         assertThat(saved.getType()).isEqualTo(DeliveryType.CLIENT_UNINSTALL);
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(saved.getAttempts()).isZero();
@@ -115,6 +119,7 @@ class DeliveryRecorderTest {
     void record_request_sequenceStampedIntoThePayloadBeforeItIsStored() {
         // setup
         when(sequences.next()).thenReturn(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
 
         // execution
         recorder.record(request);
@@ -124,5 +129,18 @@ class DeliveryRecorderTest {
         verify(repository).upsertPending(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
         assertThat(saved.getPayloadJson()).contains("\"sequence\":7");
+    }
+
+    @Test
+    void record_rowHeldByANewerDispatch_outrankedNothingElse() {
+        // setup
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(false);
+
+        // execution
+        DeliveryRecordOutcome outcome = recorder.record(request);
+
+        // verifications
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.OUTRANKED);
     }
 }

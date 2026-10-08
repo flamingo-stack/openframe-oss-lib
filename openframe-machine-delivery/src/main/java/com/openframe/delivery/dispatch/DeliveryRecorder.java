@@ -28,8 +28,7 @@ public class DeliveryRecorder {
     private final DeliveryProperties properties;
     private final DeliveryPayloadJson payloadJson;
 
-    // false = a row for this very dispatch already exists: the hand-off was replayed, nothing to do
-    public boolean record(DeliveryRequest<?> request) {
+    public DeliveryRecordOutcome record(DeliveryRequest<?> request) {
         DeliveryType type = request.getType();
         String targetId = request.getTargetId();
         String machineId = request.getMachineId();
@@ -37,14 +36,19 @@ public class DeliveryRecorder {
         DeliveryRef delivery = request.getPayload().getDelivery();
         String dispatchId = delivery.getDispatchId();
         if (repository.existsByIdAndDispatchId(id, dispatchId)) {
-            return false;
+            return DeliveryRecordOutcome.REPLAYED;
         }
         int sequence = sequenceOf(delivery);
         delivery.setSequence(sequence);
         MachineDelivery row = pendingRow(request, id);
-        repository.upsertPending(row);
+        boolean taken = repository.upsertPending(row);
+        if (!taken) {
+            log.info("Delivery outranked, a newer dispatch holds the row: type={} targetId={} machineId={} sequence={}",
+                    type, targetId, machineId, sequence);
+            return DeliveryRecordOutcome.OUTRANKED;
+        }
         log.info("Delivery recorded: type={} targetId={} machineId={} sequence={}", type, targetId, machineId, sequence);
-        return true;
+        return DeliveryRecordOutcome.RECORDED;
     }
 
     // a rollout gives all its rows the sequence it started with; a single dispatch takes the next one
@@ -68,6 +72,7 @@ public class DeliveryRecorder {
                 .targetId(request.getTargetId())
                 .machineId(request.getMachineId())
                 .dispatchId(dispatchId)
+                .sequence(delivery.getSequence())
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
                 .errors(0)

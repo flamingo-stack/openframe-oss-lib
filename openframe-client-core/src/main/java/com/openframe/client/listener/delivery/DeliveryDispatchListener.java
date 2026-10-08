@@ -76,10 +76,9 @@ public class DeliveryDispatchListener {
         sink.accept(request);
     }
 
-    // no machineId is a valid message: a rollout to every machine the type delivers to
     private static boolean isComplete(DeliveryDispatchMessage message) {
         JsonNode command = message.getPayload();
-        return command != null && command.has(DELIVERY_FIELD);
+        return hasText(message.getMachineId()) && command != null && command.has(DELIVERY_FIELD);
     }
 
     private static boolean isComplete(DeliveryRef delivery) {

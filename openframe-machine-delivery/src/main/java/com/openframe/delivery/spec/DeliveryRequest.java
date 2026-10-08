@@ -12,8 +12,10 @@ public class DeliveryRequest<P extends DeliveryPayload> {
     private final String machineId;
     private final P payload;
 
-    // no machine = every machine the type delivers to; client-service turns such a request into a rollout
+    // the NATS wildcard as a machine: every machine the type delivers to; client-service turns it into a rollout
+    public static final String EVERY_MACHINE = "*";
+
     public boolean isForEveryMachine() {
-        return machineId == null;
+        return EVERY_MACHINE.equals(machineId);
     }
 }

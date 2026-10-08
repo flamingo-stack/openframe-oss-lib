@@ -8,6 +8,9 @@ import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRequest;
+import com.openframe.delivery.spec.DeliverySeed;
+import com.openframe.delivery.spec.DeliverySpec;
+import com.openframe.delivery.spec.DeliverySpecRegistry;
 import com.openframe.delivery.track.DeliveryId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,12 +27,17 @@ public class DeliveryRolloutRecorder {
 
     private final MachineDeliveryRolloutRepository repository;
     private final MachineDeliverySequenceRepository sequences;
+    private final DeliverySpecRegistry registry;
     private final DeliveryPayloadJson payloadJson;
 
     // the sequence is taken once, when the rollout starts: a dispatch recorded later outranks every row of this
     // rollout on the agent, however long the batches take
     public void record(DeliveryRequest<?> request) {
         DeliveryType type = request.getType();
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        if (!spec.canDeliverToEveryMachine()) {
+            throw new IllegalArgumentException("Delivery type delivers to one machine at a time: " + type);
+        }
         String targetId = request.getTargetId();
         String id = DeliveryId.of(type, targetId);
         int sequence = sequences.next();
