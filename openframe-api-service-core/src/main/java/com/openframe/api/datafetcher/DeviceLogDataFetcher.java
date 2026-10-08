@@ -34,16 +34,17 @@ public class DeviceLogDataFetcher {
     public GenericConnection<GenericEdge<DeviceLogEntry>> deviceLogs(
             @InputArgument String machineId,
             @InputArgument List<String> machineIds,
+            @InputArgument List<String> organizationIds,
             @InputArgument @Valid DeviceLogFilterInput filter,
             @InputArgument Integer first,
             @InputArgument String after) {
 
         List<String> devices = devices(machineId, machineIds);
-        log.debug("Fetching device logs for machineIds: {}, filter: {}, first: {}, after: {}",
-                devices, filter, first, after);
+        log.debug("Fetching device logs for machineIds: {}, organizationIds: {}, filter: {}, first: {}, after: {}",
+                devices, organizationIds, filter, first, after);
 
-        GenericQueryResult<DeviceLogEntry> result = deviceLogService.queryLogs(
-                devices, mapper.toFilterCriteria(filter), mapper.toCursorPaginationCriteria(first, after));
+        GenericQueryResult<DeviceLogEntry> result = deviceLogService.queryLogs(devices, organizationIds,
+                mapper.toFilterCriteria(filter), mapper.toCursorPaginationCriteria(first, after));
         return mapper.toConnection(result);
     }
 
