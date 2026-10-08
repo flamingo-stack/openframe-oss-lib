@@ -34,7 +34,12 @@ import {
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
 import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
-import { mergeSourceMetadata, sourceMetadataEvent, type SourceMetadata } from '../../../chat-protocol/source-metadata';
+import {
+  attachmentsEvent,
+  mergeSourceMetadata,
+  sourceMetadataEvent,
+  type SourceMetadata,
+} from '../../../chat-protocol/source-metadata';
 import { applyApprovalStatusToSegment } from '../stream/message-mutations';
 import {
   MESSAGE_TYPE,
@@ -122,11 +127,14 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
       }
       return null;
 
-    // Persisted source metadata, through the SAME decoder the live chunk uses
-    // (`sourceMetadataEvent`). That shared parse is the whole reason a reloaded
+    // Persisted attachments, through the SAME decoder the live chunk uses
+    // (`attachmentsEvent`). That shared parse is the whole reason a reloaded
     // answer renders identically to the one the reader watched arrive.
+    case MESSAGE_TYPE.ATTACHMENTS:
+      return attachmentsEvent(data);
+
+    // The envelope `ATTACHMENTS` replaced (see `MESSAGE_TYPE.GUIDE`).
     case MESSAGE_TYPE.GUIDE:
-    case MESSAGE_TYPE.SOURCES:
       return 'payload' in data ? sourceMetadataEvent(data.payload) : null;
 
     // Same completeness gate as the live decoder (`decodeNatsChunk`): a

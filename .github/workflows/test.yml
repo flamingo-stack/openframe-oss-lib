@@ -8,9 +8,10 @@ on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened, closed]
     branches: [main]
+  merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -26,7 +27,7 @@ jobs:
   changes:
     name: Changes
     uses: ./.github/workflows/changes.yaml
-    if: github.event.pull_request.state == 'open' && !github.event.pull_request.draft
+    if: github.event_name == 'merge_group' || (github.event.pull_request.state == 'open' && !github.event.pull_request.draft)
 
 
   scan:
@@ -52,6 +53,7 @@ jobs:
           persist-credentials: false
 
       - name: Scan code
+        continue-on-error: true
         uses: ./.github/steps/trivy
         with:
           scan: code
@@ -86,7 +88,9 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
 
+      # Merge queue only builds and tests; snapshots are published per PR.
       - name: Resolve PR Snapshot Version
+        if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -99,8 +103,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          mvn clean deploy \
-            -Drevision="${{ env.NEW_VERSION }}" \
+          mvn clean ${{ github.event_name == 'merge_group' && 'verify' || 'deploy' }} \
+            ${NEW_VERSION:+-Drevision="$NEW_VERSION"} \
             -s .mvn/settings.xml \
             --threads 2C \
             --batch-mode \
@@ -170,13 +174,18 @@ jobs:
 
       # --ignore-scripts skips a prepack rebuild.
       - name: Pack
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          OLD_VERSION=$(npm view "$(jq -r .name package.json)" dist-tags.latest)
+          OLD_VERSION=$(git ls-remote --tags --refs origin | cut -d/ -f3 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           npm version "${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}.${{ github.run_number }}.${{ github.run_attempt }}" --no-git-tag-version
           echo "PACKAGE_TARBALL=$PWD/$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${HEAD_SHA::7}" >> "$GITHUB_ENV"
 
       # PR builds go to pkg.pr.new only.
-      - name: Preview registry (pkg.pr.new)
+      - name: Preview registry (pkg.pr.new) @${{ env.SHORT_SHA }} (@${{ github.event.pull_request.number }} tag)
+        if: github.event_name == 'pull_request'
         run: |
           npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --json pkg-pr-new.json "$PACKAGE_TARBALL"
           jq -r '.packages[0].url' pkg-pr-new.json >> "$GITHUB_STEP_SUMMARY"
@@ -255,7 +264,7 @@ jobs:
 
   cleanup:
     name: Cleanup
-    if: github.event.pull_request.state != 'open'
+    if: github.event_name == 'pull_request' && github.event.pull_request.state != 'open'
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -6,6 +6,7 @@ export * from './use-deferred-error';
 export * from './use-drag-and-drop-enabled';
 export * from './use-focus-trap';
 export * from './use-header-height';
+export * from './use-sticky-toolbar';
 export * from './use-horizontal-scrollbar';
 export * from './use-image-edge-color';
 export * from './use-is-truncated';

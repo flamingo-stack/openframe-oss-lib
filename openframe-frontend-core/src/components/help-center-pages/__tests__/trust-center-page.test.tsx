@@ -421,7 +421,7 @@ describe('TrustCenterPage', () => {
       // event lands (inside a `<main overflow-y-auto>` shell none ever did).
       expect(rail.getByRole('button', { name: 'Documents' })).toHaveAttribute('aria-current', 'location');
       expect(rail.getByRole('button', { name: 'Compliance' })).not.toHaveAttribute('aria-current');
-      expect(replaceState).toHaveBeenCalledWith(null, '', '/trust-center#documents');
+      expect(replaceState).toHaveBeenCalledWith({ __hashSync: '#documents' }, '', '/trust-center#documents');
       expect(pushState).not.toHaveBeenCalled();
     } finally {
       replaceState.mockRestore();

@@ -9,6 +9,7 @@ import com.openframe.api.service.packagesearch.PackageSearchProperties;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.api.dto.packagesearch.PackageDetails;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.api.dto.packagesearch.PackageSearchHit;
 import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.dto.packagesearch.PackageVersion;
@@ -25,6 +26,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
 @Service
 public class ChocoPackageClient implements PackageManagerClient {
@@ -57,9 +59,22 @@ public class ChocoPackageClient implements PackageManagerClient {
     }
 
     @Override
-    public PackageSearchResult search(String query, int limit, int offset) {
+    public PackageSearchResult search(String query, String afterCursor, int limit) {
         String trimmedQuery = query.trim();
+        int offset = offsetAfter(afterCursor);
         return requestSearchPage(trimmedQuery, limit, offset);
+    }
+
+    // the community feed pages by $skip, so a hit's cursor is its 0-based index; a missing or tampered one restarts at 0
+    private static int offsetAfter(String afterCursor) {
+        if (afterCursor == null) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(afterCursor) + 1);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     @Override
@@ -81,11 +96,24 @@ public class ChocoPackageClient implements PackageManagerClient {
         boolean hasMore = entries.size() > limit;
         List<ChocoEntry> page = entries.stream().limit(limit).toList();
         List<PackageSearchItem> items = rankAndMap(query, page);
+        List<PackageSearchHit> hits = withIndexCursors(items, offset);
         return PackageSearchResult.builder()
-                .items(items)
+                .hits(hits)
                 .total(null)
                 .hasMore(hasMore)
                 .build();
+    }
+
+    private static List<PackageSearchHit> withIndexCursors(List<PackageSearchItem> items, int offset) {
+        return IntStream.range(0, items.size())
+                .mapToObj(position -> indexedHit(items, offset, position))
+                .toList();
+    }
+
+    private static PackageSearchHit indexedHit(List<PackageSearchItem> items, int offset, int position) {
+        PackageSearchItem item = items.get(position);
+        String cursor = String.valueOf(offset + position);
+        return new PackageSearchHit(item, cursor);
     }
 
     private List<PackageSearchItem> rankAndMap(String query, List<ChocoEntry> page) {

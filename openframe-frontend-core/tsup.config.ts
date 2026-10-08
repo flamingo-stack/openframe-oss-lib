@@ -82,6 +82,9 @@ export default defineConfig([
       // (proxy.ts) + cors.ts can import `hostOf`/`expandWwwApex`/`isPreviewEnv`
       // without pulling the full utils barrel into the Edge bundle.
       'platform-domains': 'src/platform-domains.ts',
+      // Product-screen keys and labels: no React and no loaders, so the hub
+      // validates a stored key and fills a picker on the server.
+      'components/product-demo/screen-keys': 'src/components/product-demo/screen-keys.ts',
       // FAQ JSON-LD builder — pure (no React, no browser APIs), so Server
       // Components in consumers can import it via the './components/faq/json-ld'
       // subpath WITHOUT crossing the "use client" boundary that the sibling
@@ -119,6 +122,10 @@ export default defineConfig([
       'components/ui/index': 'src/components/ui/index.ts',
       'components/chat/index': 'src/components/chat/index.ts',
       'components/tickets/index': 'src/components/tickets/index.ts',
+      // Product screens for marketing pages: the product's own views with
+      // fixture data, one lazily loaded chunk per screen. Fixtures live here
+      // (published), never under `__fixtures__` (not shipped).
+      'components/product-demo/index': 'src/components/product-demo/index.ts',
       'components/onboarding-guides/index': 'src/components/onboarding-guides/index.ts',
       // Help Center pages subpath — ready-made full-page components (own
       // PageShell + PageLayout) shared by openframe-frontend + the hub. Client

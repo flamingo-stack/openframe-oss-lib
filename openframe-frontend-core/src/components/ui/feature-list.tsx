@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { Button } from './button';
 
 export interface FeatureListItemData {
   /** Shown in the boxed slot. Not used by the `numbered` variant. */
@@ -15,13 +16,13 @@ export interface FeatureListProps {
   iconBoxSize?: number;
   /**
    * `boxed` (default): one bordered card, a boxed icon per row.
-   * `numbered`: an ordered list of open rows separated by hairlines, each led
-   * by its two-digit number (process steps).
+   * `numbered`: an ordered list of open rows, each led by its number in a
+   * round marker (process steps).
    */
   variant?: 'boxed' | 'numbered';
   /**
-   * `numbered` only. The step being shown now: it stays at full strength and
-   * the others step back, so the list reads as "you are here" beside a timed
+   * `numbered` only. The step being shown now: it stays at full strength with
+   * its marker lit and the others step back, so the list reads as "you are here" beside a timed
    * demo. Omit for a plain list where every step is equal.
    */
   activeIndex?: number;
@@ -43,38 +44,47 @@ export function FeatureList({
   if (variant === 'numbered') {
     const dims = typeof activeIndex === 'number';
     return (
-      <ol className={`flex flex-col ${className}`}>
+      <ol className={`flex flex-col gap-[var(--spacing-system-lf)] ${className}`}>
         {items.map((item, index) => {
           const current = dims && index === activeIndex;
           const row = (
             <>
-              <span className={`text-h5 ${current ? 'text-ods-flamingo-pink' : 'text-ods-text-secondary'}`}>
-                {String(index + 1).padStart(2, '0')}
+              <span
+                className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition-colors duration-200 text-h5 motion-reduce:transition-none ${
+                  current
+                    ? 'border-ods-flamingo-pink bg-ods-flamingo-pink-secondary text-ods-text-primary'
+                    : 'border-ods-border text-ods-text-secondary'
+                }`}
+              >
+                {index + 1}
               </span>
               <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-                <h3 className="text-ods-text-primary text-h3">{item.title}</h3>
-                <p className="text-ods-text-secondary text-h4">{item.description}</p>
+                <h3 className="text-ods-text-primary text-h4">{item.title}</h3>
+                <p className="text-ods-text-secondary text-h6">{item.description}</p>
               </div>
             </>
           );
-          const layout =
-            'grid grid-cols-[48px_minmax(0,1fr)] gap-[var(--spacing-system-m)] py-[var(--spacing-system-l)]';
+          const layout = 'flex items-start gap-[var(--spacing-system-sf)]';
           return (
             <li
               key={index}
               aria-current={current ? 'step' : undefined}
-              className={`border-t border-ods-border transition-opacity duration-200 last:border-b motion-reduce:transition-none ${
+              className={`transition-opacity duration-200 motion-reduce:transition-none ${
                 dims && !current ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''
               }`}
             >
               {onSelect ? (
-                <button
-                  type="button"
+                // The unified Button with no box of its own (`wrap`): it brings the
+                // target, the focus ring and the keyboard semantics; the row is the look.
+                <Button
+                  variant="transparent"
+                  size="wrap"
+                  fullWidth
                   onClick={() => onSelect(index)}
-                  className={`${layout} w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus`}
+                  className={`${layout} justify-start whitespace-normal text-left hover:bg-transparent active:bg-transparent`}
                 >
                   {row}
-                </button>
+                </Button>
               ) : (
                 <div className={layout}>{row}</div>
               )}

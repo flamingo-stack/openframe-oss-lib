@@ -51,6 +51,18 @@
       "require": "./dist/components/chat/index.cjs",
       "default": "./dist/components/chat/index.js"
     },
+    "./components/product-demo": {
+      "types": "./dist/components/product-demo/index.d.ts",
+      "import": "./dist/components/product-demo/index.js",
+      "require": "./dist/components/product-demo/index.cjs",
+      "default": "./dist/components/product-demo/index.js"
+    },
+    "./components/product-demo/screen-keys": {
+      "types": "./dist/components/product-demo/screen-keys.d.ts",
+      "import": "./dist/components/product-demo/screen-keys.js",
+      "require": "./dist/components/product-demo/screen-keys.cjs",
+      "default": "./dist/components/product-demo/screen-keys.js"
+    },
     "./components/tickets": {
       "types": "./dist/components/tickets/index.d.ts",
       "import": "./dist/components/tickets/index.js",

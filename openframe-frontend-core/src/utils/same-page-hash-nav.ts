@@ -63,6 +63,63 @@ export function getHashTargetElement(id: string): HTMLElement | null {
   return findAnchorElementByNormalizedId(decoded, document);
 }
 
+/**
+ * Fired on `window` after {@link replaceLocationHash} changed the hash. NOT
+ * `hashchange`: a listener of this event follows the hash as STATE (which tab
+ * is open, `useLocationHash`); a listener of `hashchange` treats it as a
+ * NAVIGATION and scrolls (`useScrollToHash`). A scroll spy that keeps the URL
+ * on the section being read must reach the first and never the second.
+ */
+export const LOCATION_HASH_SYNC_EVENT = 'locationhashsync';
+
+/** Marks, on an element inside a section, the child anchor a scroll spy writes for that section (see `useScrollSpy`). */
+export const ACTIVE_ANCHOR_ATTRIBUTE = 'data-active-anchor';
+
+/** The key, in the history entry's state, of the hash {@link replaceLocationHash} last gave that entry. */
+const HASH_SYNC_STATE_KEY = '__hashSync';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+/**
+ * Point the URL's hash at `id` (or clear it) to say where the reader IS, as
+ * opposed to sending them somewhere: no history entry (`replaceState`), no
+ * `hashchange`, no scroll. THE writer for a scroll spy's hash and for a tab
+ * that names itself in the URL. State followers hear
+ * {@link LOCATION_HASH_SYNC_EVENT}.
+ *
+ * The hash is also noted in the history ENTRY's state (beside whatever the
+ * host router keeps there), which survives a reload and comes back on back
+ * and forward: {@link isScrollSyncedHash}. For such an entry the hash only
+ * mirrors a scroll position the browser restores by itself, so
+ * `useScrollToHash` does not scroll to it again. Any navigation writes its own
+ * state and drops the note.
+ */
+export function replaceLocationHash(id: string | null): void {
+  if (typeof window === 'undefined') return;
+  const { pathname, search, hash } = window.location;
+  const next = id ? `#${id}` : '';
+  const state: unknown = window.history.state;
+  const noted = isRecord(state) ? state[HASH_SYNC_STATE_KEY] : undefined;
+  if (hash === next && (noted === next || !next)) return;
+  window.history.replaceState(
+    { ...(isRecord(state) ? state : {}), [HASH_SYNC_STATE_KEY]: next },
+    '',
+    `${pathname}${search}${next}`,
+  );
+  if (hash !== next) window.dispatchEvent(new Event(LOCATION_HASH_SYNC_EVENT));
+}
+
+/**
+ * Whether the hash in the URL was put there by {@link replaceLocationHash}
+ * (the reader scrolled or opened a tab) rather than by a navigation. False
+ * with no hash, on a fresh visit, and once any navigation rewrote the entry.
+ */
+export function isScrollSyncedHash(): boolean {
+  if (typeof window === 'undefined' || !window.location.hash) return false;
+  const state: unknown = window.history.state;
+  return isRecord(state) && state[HASH_SYNC_STATE_KEY] === window.location.hash;
+}
+
 export interface NavigateSamePageHashOptions {
   /** Pixels to subtract for sticky chrome. */
   headerOffset?: number;

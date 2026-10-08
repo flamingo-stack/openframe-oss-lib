@@ -314,6 +314,16 @@ public class KnowledgeBaseDataFetcher {
         return relayIdCodec.encode(KNOWLEDGE_BASE_ITEM, parentId);
     }
 
+    @DgsData(parentType = "KnowledgeBaseItem", field = "parent")
+    public CompletableFuture<KnowledgeBaseItem> itemParent(DgsDataFetchingEnvironment dfe) {
+        KnowledgeBaseItem item = dfe.getSource();
+        if (item.getParentId() == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DataLoader<String, KnowledgeBaseItem> loader = dfe.getDataLoader("knowledgeBaseItemDataLoader");
+        return loader.load(item.getParentId());
+    }
+
     @DgsData(parentType = "KnowledgeBaseItem", field = "tags")
     public CompletableFuture<List<Tag>> itemTags(DgsDataFetchingEnvironment dfe) {
         KnowledgeBaseItem item = dfe.getSource();

@@ -1859,15 +1859,49 @@ function EmbeddableChatInner({
   // Listen for plain "open chat" events (no row context). Fired by the
   // header MingoAiButton. Same strict source filter as `ask-ai:open-with-ref`
   // above: events without a matching source are ignored.
+  // With a `prompt` in the detail (a page's "Ask Mingo" question) the panel
+  // also asks it, once, in Guide mode, in a new conversation. In any other mode
+  // the chat only opens.
+  // A question from the page starts its OWN conversation: it is never appended
+  // to whatever thread was open. An open thread is reset to a new chat first
+  // (`resetToNewChat`: the messages AND the active dialog id; clearing the
+  // messages alone leaves the id set, the draft never comes and the question
+  // would be lost) and the question is sent once that draft is what the panel holds.
+  const pendingAskRef = useRef<string | null>(null);
+  const isDraft = activeDialogId == null && messages.length === 0;
+  const sendAskPrompt = useCallback(
+    (prompt: string) => {
+      if (activeMode !== 'guide') return;
+      if (isDraft) {
+        void sendMessage(prompt).catch((err: unknown) => {
+          console.error('[EmbeddableChat] ask-ai:open prompt failed:', err);
+        });
+        return;
+      }
+      pendingAskRef.current = prompt;
+      resetToNewChat();
+    },
+    [activeMode, isDraft, sendMessage, resetToNewChat],
+  );
+  useEffect(() => {
+    const prompt = pendingAskRef.current;
+    if (!prompt || !isDraft) return;
+    pendingAskRef.current = null;
+    void sendMessage(prompt).catch((err: unknown) => {
+      console.error('[EmbeddableChat] ask-ai:open prompt failed:', err);
+    });
+  }, [isDraft, sendMessage]);
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ source?: string }>).detail;
+      const detail = (e as CustomEvent<{ source?: string; prompt?: unknown }>).detail;
       if (!detail || detail.source !== source) return;
       setIsOpen(true);
+      const prompt = typeof detail.prompt === 'string' ? detail.prompt.trim() : '';
+      if (prompt) setTimeout(() => sendAskPrompt(prompt), 0);
     };
     window.addEventListener('ask-ai:open', handler);
     return () => window.removeEventListener('ask-ai:open', handler);
-  }, [source, setIsOpen]);
+  }, [source, setIsOpen, sendAskPrompt]);
 
   const hasMessages = messages.length > 0;
   // First dialog page in flight and nothing cached yet — we don't yet know if
