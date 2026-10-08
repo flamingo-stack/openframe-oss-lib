@@ -5,6 +5,7 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -36,7 +37,7 @@ class DeliveryRecorderTest {
     private static final int SEQUENCE = 7;
 
     @Mock private MachineDeliveryRepository repository;
-    @Mock private DeliverySequence sequences;
+    @Mock private MachineDeliverySequenceRepository sequences;
 
     @Captor private ArgumentCaptor<MachineDelivery> deliveryCaptor;
 
@@ -76,7 +77,7 @@ class DeliveryRecorderTest {
     @Test
     void record_request_pendingRowUpsertedDueAfterAckThreshold() {
         // setup
-        when(sequences.next(ROW_ID, MACHINE_ID)).thenReturn(SEQUENCE);
+        when(sequences.next()).thenReturn(SEQUENCE);
 
         // execution
         recorder.record(request);
@@ -98,7 +99,7 @@ class DeliveryRecorderTest {
     @Test
     void record_request_sequenceStampedIntoThePayloadBeforeItIsStored() {
         // setup
-        when(sequences.next(ROW_ID, MACHINE_ID)).thenReturn(SEQUENCE);
+        when(sequences.next()).thenReturn(SEQUENCE);
 
         // execution
         recorder.record(request);
