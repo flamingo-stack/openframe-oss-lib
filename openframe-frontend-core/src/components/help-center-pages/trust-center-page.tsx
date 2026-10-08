@@ -142,6 +142,14 @@ function monitoringStatus(
     : { status: 'pending', label: 'Monitoring paused' };
 }
 
+/**
+ * The Trust Center FAQ's "ask" card asks for the questions a host wrote for
+ * its Trust Center (security, compliance, subprocessors), never for its
+ * product FAQ's. One identity, so the card never re-picks.
+ */
+export const TRUST_CENTER_ASK_TOPIC = 'trust-center';
+const TRUST_CENTER_ASK = { topic: TRUST_CENTER_ASK_TOPIC } as const;
+
 export function TrustCenterPage({
   endpoint = TRUST_CENTER_API_PATH,
   initialData,
@@ -232,7 +240,7 @@ export function TrustCenterPage({
       lead: TRUST_SECTION_LEADS.subprocessors,
       render: d => <SubprocessorsSection subprocessors={d.subprocessors} />,
     },
-    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} /> },
+    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} ask={TRUST_CENTER_ASK} /> },
     contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };
 

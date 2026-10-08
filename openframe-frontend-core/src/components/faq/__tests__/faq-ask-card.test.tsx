@@ -119,6 +119,18 @@ describe('FaqSection ask card', () => {
     expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('faq');
   });
 
+  it("uses the host's default FAQ section when the FAQ states none, and the FAQ's own over it", async () => {
+    const runtime = { ...RUNTIME, askCard: { topic: 'people-hub' } };
+    const { unmount } = renderFaq(runtime, <FaqSection initialFaqs={FAQS} />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('people-hub');
+    unmount();
+    fetchMock.mockClear();
+    renderFaq(runtime, <FaqSection initialFaqs={FAQS} ask={{ topic: 'prompts' }} />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('prompts');
+  });
+
   it('waits while the page is still picking its own questions', () => {
     renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} ask={{ exclude: null }} />);
     expect(screen.getByText('Still deciding?')).toBeInTheDocument();

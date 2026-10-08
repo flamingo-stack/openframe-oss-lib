@@ -37,12 +37,18 @@ export interface AssistantAskEvent {
   topic?: string;
 }
 
-/** The wording of the card beside a FAQ. `{assistant}` is replaced by the assistant's name. */
+/** The card beside a FAQ on this host. `{assistant}` in the wording is replaced by the assistant's name. */
 export interface AssistantAskCardCopy {
   title?: string;
   description?: string;
   /** How many questions the card offers. */
   count?: number;
+  /**
+   * The section a FAQ's card asks for when the FAQ itself states none: the
+   * questions this host wrote for its FAQs. A host with several sites sets it
+   * per site, so each site's FAQs get that site's questions.
+   */
+  topic?: string;
 }
 
 export interface AssistantRuntime {
@@ -72,7 +78,7 @@ export interface AssistantRuntime {
   open?: (request: AssistantOpenRequest) => void;
   /** After a question was sent (analytics). */
   onAsk?: (event: AssistantAskEvent) => void;
-  /** The wording of the card beside a FAQ. Absent: the lib's own. */
+  /** The card beside a FAQ: its wording and its default section. Absent: the lib's own. */
   askCard?: AssistantAskCardCopy;
 }
 

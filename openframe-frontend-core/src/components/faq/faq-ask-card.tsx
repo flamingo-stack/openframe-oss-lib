@@ -21,9 +21,9 @@ export interface FaqAskOptions {
   /**
    * What this FAQ is about: ANY string the host's questions endpoint knows (it
    * is sent as `section`, and reported with every click). Questions written
-   * for the topic are picked first. Absent: `FAQ_ASK_TOPIC`, the questions
-   * written for a FAQ. A FAQ about one thing (a product, an entity type)
-   * states its own.
+   * for the topic are picked first. Absent: the host's default FAQ section
+   * (`AssistantRuntime.askCard.topic`), else `FAQ_ASK_TOPIC`. A FAQ about one
+   * thing (a product area, a page) states its own.
    */
   topic?: string;
   /**
@@ -78,8 +78,9 @@ export function faqAskCardShown(assistant: AssistantRuntime | null): assistant i
  * height before and after the questions arrive. A host with no questions
  * endpoint gets the launcher with no questions.
  */
-export function FaqAskCard({ topic = FAQ_ASK_TOPIC, exclude, count, title, description, onOpen }: FaqAskOptions) {
+export function FaqAskCard({ topic: ownTopic, exclude, count, title, description, onOpen }: FaqAskOptions) {
   const assistant = useAssistantRuntime();
+  const topic = ownTopic ?? assistant?.askCard?.topic ?? FAQ_ASK_TOPIC;
   const { ref, inView } = useInView<HTMLDivElement>({ rootMargin: PICK_ROOT_MARGIN });
   const [reached, setReached] = useState(false);
   if (inView && !reached) setReached(true);
