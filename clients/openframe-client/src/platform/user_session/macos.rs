@@ -102,20 +102,13 @@ async fn launch_via_launchctl(
         let mut cmd = Command::new("launchctl");
         cmd.arg("asuser")
             .arg(uid.to_string())
-            .arg("open")
-            .arg("-a")
-            .arg(&app_path);
-
-        if !args.is_empty() {
-            cmd.arg("--args");
-            cmd.args(args);
-        }
+            .args(open_args(&app_path, args));
 
         let child = cmd
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .with_context(|| format!("launchctl asuser {} open -a {} failed", uid, app_path))?;
+            .with_context(|| format!("launchctl asuser {} open -g -a {} failed", uid, app_path))?;
 
         info!("App launched, PID: {:?}", child.id());
         return Ok(child);
@@ -136,6 +129,19 @@ async fn launch_via_launchctl(
 
     info!("Spawned via launchctl, PID: {:?}", child.id());
     Ok(child)
+}
+
+// -g: a daemon launch must not steal focus. No -n: liveness is re-checked right before launching, and a plain open coalesces onto a starting instance.
+fn open_args(app_path: &str, args: &[String]) -> Vec<String> {
+    let mut open: Vec<String> = ["open", "-g", "-a", app_path]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    if !args.is_empty() {
+        open.push("--args".to_string());
+        open.extend(args.iter().cloned());
+    }
+    open
 }
 
 fn extract_app_bundle_path(executable: &str) -> Option<String> {
@@ -170,3 +176,7 @@ async fn launch_via_sudo(
     info!("Spawned via sudo, PID: {:?}", child.id());
     Ok(child)
 }
+
+#[cfg(test)]
+#[path = "macos_tests.rs"]
+mod tests;

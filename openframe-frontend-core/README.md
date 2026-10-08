@@ -5,7 +5,7 @@ Shared design system and component library for Flamingo platforms (OpenMSP, Open
 ## Installation
 
 ```bash
-npm install @flamingo-stack/openframe-frontend-core
+npm install https://pkg.pr.new/flamingo-stack/openframe-oss-lib/@flamingo-stack/openframe-frontend-core@<x.y.z>
 ```
 
 ## Usage
