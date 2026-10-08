@@ -1,4 +1,4 @@
-use crate::models::installed_tool::{Installation, InstalledTool, ToolRecordState};
+use crate::models::installed_tool::{FirstRunState, Installation, InstalledTool, ToolRecordState};
 use crate::platform::system_service;
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
@@ -35,6 +35,34 @@ const KILL_RETRY_MAX_DELAY_SECONDS: u64 = 300;
 const QUICK_EXIT_WINDOW: Duration = Duration::from_secs(60);
 /// Restart delays along a streak of failed starts; the last one repeats.
 const FAILED_START_RETRY_DELAYS_SECONDS: [u64; 5] = [5, 30, 120, 300, 900];
+#[cfg(any(windows, target_os = "macos"))]
+const FIRST_RUN_FLAG: &str = "--first-run";
+#[cfg(windows)]
+const FIRST_RUN_LOGON_POLL_SECONDS: u64 = 30;
+#[cfg(windows)]
+const FIRST_RUN_MAX_LAUNCH_ATTEMPTS: u64 = 5;
+
+#[cfg(any(windows, target_os = "macos"))]
+fn gui_launch_flag(tool_agent_id: &str, first_run: FirstRunState) -> Option<&'static str> {
+    if first_run == FirstRunState::Pending {
+        Some(FIRST_RUN_FLAG)
+    } else if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
+        Some("--background")
+    } else {
+        None
+    }
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+async fn mark_first_run_done(installed_tools_service: &InstalledToolsService, tool_id: &str) {
+    match installed_tools_service
+        .set_first_run(tool_id, FirstRunState::Done)
+        .await
+    {
+        Ok(_) => info!(tool_id = %tool_id, "First run done"),
+        Err(e) => warn!(tool_id = %tool_id, "Failed to mark first run done: {:#}", e),
+    }
+}
 
 /// Under the supervision lock, so a concurrent resume either finds the loop alive or relaunches its tool.
 async fn shutdown_break(
@@ -756,9 +784,12 @@ impl ToolRunManager {
         let relaunch_requested = self.relaunch_requested.clone();
         let mut installation = tool.installation.clone();
         let mut run_command_args = tool.run_command_args.clone();
+        let mut first_run = tool.first_run;
 
         tokio::spawn(async move {
             let mut launch_backoff = FailureLogBackoff::new();
+            #[cfg(windows)]
+            let mut first_run_launch_failures: u64 = 0;
             let mut kill_leftovers_now = true;
             loop {
                 // Self-update in progress — stop the loop entirely
@@ -782,6 +813,7 @@ impl ToolRunManager {
                 {
                     installation = fresh.installation;
                     run_command_args = fresh.run_command_args;
+                    first_run = fresh.first_run;
                 }
 
                 if !running_tools.read().await.contains(&tool.tool_agent_id) {
@@ -862,27 +894,79 @@ impl ToolRunManager {
                                 break;
                             }
 
-                            // Fresh install or relaunch: launch once now (Run autorun only fires at logon); else autorun owns it.
+                            // Fresh install, relaunch or a pending first run: launch now (Run autorun only fires at logon); else autorun owns it.
+                            let first_run_pending = first_run == FirstRunState::Pending;
+                            if first_run_pending && !crate::executor::console_user_present().await {
+                                if log_attempt {
+                                    info!(tool_id = %tool.tool_agent_id,
+                                          "No user logged on yet, first-run launch waits for a logon");
+                                }
+                                launch_backoff.record_failure(log_attempt);
+                                sleep(Duration::from_secs(FIRST_RUN_LOGON_POLL_SECONDS)).await;
+                                continue;
+                            }
+
                             if launch_now
+                                && !first_run_pending
                                 && tool_kill_service.is_installed_tool_running(&tool).await
                             {
                                 info!(tool_id = %tool.tool_agent_id,
                                       "GuiApp already running in a user session, not launching another");
-                            } else if launch_now {
+                            } else if launch_now || first_run_pending {
                                 let mut launch_args = processed_args.clone();
-                                // For openframe-chat, add --background flag to start in tray
-                                if tool.tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
-                                    launch_args.push("--background".to_string());
-                                }
-                                match launch_process_in_user_session(&command_path, &launch_args) {
+                                launch_args.extend(
+                                    gui_launch_flag(&tool.tool_agent_id, first_run)
+                                        .map(String::from),
+                                );
+                                let launch_error = match launch_process_in_user_session(
+                                    &command_path,
+                                    &launch_args,
+                                ) {
                                     Ok((pid, process_handle)) => {
-                                        info!(tool_id = %tool.tool_agent_id, pid,
+                                        info!(tool_id = %tool.tool_agent_id, pid, first_run = first_run_pending,
                                               "GuiApp launched once in user session (fire-and-forget)");
                                         unsafe {
                                             let _ = CloseHandle(process_handle);
                                         }
+                                        if first_run_pending {
+                                            sleep(Duration::from_secs(3)).await;
+                                            if tool_kill_service
+                                                .is_installed_tool_running(&tool)
+                                                .await
+                                            {
+                                                None
+                                            } else {
+                                                Some(anyhow::anyhow!("not running after launch"))
+                                            }
+                                        } else {
+                                            None
+                                        }
                                     }
-                                    Err(e) => {
+                                    Err(e) => Some(e),
+                                };
+
+                                match launch_error {
+                                    None if first_run_pending => {
+                                        mark_first_run_done(
+                                            &installed_tools_service,
+                                            &tool.tool_agent_id,
+                                        )
+                                        .await;
+                                    }
+                                    None => {}
+                                    Some(e) if first_run_pending => {
+                                        first_run_launch_failures += 1;
+                                        if first_run_launch_failures < FIRST_RUN_MAX_LAUNCH_ATTEMPTS
+                                        {
+                                            warn!(tool_id = %tool.tool_agent_id, failed_attempts = first_run_launch_failures, error = %e,
+                                                  "First-run launch failed, retrying in {} seconds", RETRY_DELAY_SECONDS);
+                                            sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+                                            continue;
+                                        }
+                                        warn!(tool_id = %tool.tool_agent_id, failed_attempts = first_run_launch_failures, error = %e,
+                                              "First-run launch failed, giving up until the next agent start");
+                                    }
+                                    Some(e) => {
                                         warn!(tool_id = %tool.tool_agent_id, error = %e,
                                               "Failed to launch GuiApp in user session");
                                     }
@@ -906,7 +990,8 @@ impl ToolRunManager {
                                 info!(tool_id = %tool.tool_agent_id, "Launching as GuiApp on macOS");
                             }
 
-                            if is_process_running(&command_path).await {
+                            let first_run_pending = first_run == FirstRunState::Pending;
+                            if !first_run_pending && is_process_running(&command_path).await {
                                 info!(tool_id = %tool.tool_agent_id, "Already running, skipping launch");
                                 running_tools.write().await.remove(&tool.tool_agent_id);
                                 return;
@@ -942,17 +1027,22 @@ impl ToolRunManager {
                                         continue;
                                     }
 
-                                    if tool.tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
-                                        vec!["--background".to_string()]
-                                    } else {
-                                        vec![]
-                                    }
+                                    gui_launch_flag(&tool.tool_agent_id, first_run)
+                                        .map(String::from)
+                                        .into_iter()
+                                        .collect()
                                 }
-                                None => processed_args.clone(),
+                                None => {
+                                    let mut args = processed_args.clone();
+                                    if first_run_pending {
+                                        args.push(FIRST_RUN_FLAG.to_string());
+                                    }
+                                    args
+                                }
                             };
 
                             // The waits above can outlast an app start (e.g. macOS resuming it at login): re-check before launching.
-                            if is_process_running(&command_path).await {
+                            if !first_run_pending && is_process_running(&command_path).await {
                                 info!(tool_id = %tool.tool_agent_id, "Already running after the session wait, skipping launch");
                                 running_tools.write().await.remove(&tool.tool_agent_id);
                                 return;
@@ -988,6 +1078,13 @@ impl ToolRunManager {
                                         }
                                         info!(tool_id = %tool.tool_agent_id, pid = child.id().unwrap_or(0),
                                               user = %user.username, "GuiApp verified running");
+                                        if first_run_pending {
+                                            mark_first_run_done(
+                                                &installed_tools_service,
+                                                &tool.tool_agent_id,
+                                            )
+                                            .await;
+                                        }
                                         running_tools.write().await.remove(&tool.tool_agent_id);
                                         return;
                                     }
