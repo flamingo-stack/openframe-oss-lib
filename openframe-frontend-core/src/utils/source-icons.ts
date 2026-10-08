@@ -54,8 +54,12 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'audience-mssp': 'shield-lock',
   'audience-it-team': 'buildings',
 
-  // Trust (single-record live source over the public Vanta projection)
-  'trust-center': 'shield',
+  // Trust (single-record live source over the public Vanta projection): the icon its menu entry draws
+  'trust-center': 'shield-check',
+  // The public website's own pages (live source): the site's own mark, as a glyph in the slot's colour
+  'website-pages': 'flamingo-logo-grey',
+  // The OpenMSP vendor directory: the icon the site menu's "Tool directory" entry draws (it reads this one)
+  vendors: 'package-search',
 
   // Financials
   'investor-updates': 'mail',
@@ -145,6 +149,8 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
 
   // Trust
   'trust-center': 'Trust Center',
+  'website-pages': 'Website',
+  vendors: 'Vendor Directory',
 
   // Financials
   'investor-updates': 'Investor Updates',
@@ -248,6 +254,8 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
 
   // Trust
   trust_center: 'trust-center',
+  site_page: 'website-pages',
+  vendor: 'vendors',
 
   // Financials
   investor_update: 'investor-updates',
