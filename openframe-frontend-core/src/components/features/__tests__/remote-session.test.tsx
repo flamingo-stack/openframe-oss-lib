@@ -1,7 +1,7 @@
 /**
  * Remote session widgets: the elapsed format, the consent card's https-only
  * site link and its decision lock, the chat composer's send, and the admin
- * widgets (viewers, events, expiry, Keep dialogs).
+ * widgets (viewers, events, expiry, Keep and Assign Ticket dialogs).
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   formatRemoteSessionElapsed,
   formatRemoteSessionOffset,
+  AssignTicketModal,
   KeepRecordingModal,
   ReleaseKeepingModal,
   RemoteAccessRequestCard,
@@ -220,5 +221,35 @@ describe('recording retention', () => {
     expect(screen.getByText(/3 days' grace/)).toBeInTheDocument();
     rerender(<ReleaseKeepingModal {...props} />);
     expect(screen.queryByText(/3 days' grace/)).toBeNull();
+  });
+});
+
+describe('AssignTicketModal', () => {
+  const options = [
+    { value: 't-1', label: 'Privileged Access Audit' },
+    { value: 't-2', label: 'System Health & Performance' },
+  ];
+
+  it('assigns the picked tickets and stays off until one is picked', () => {
+    const onConfirm = vi.fn();
+    render(<AssignTicketModal isOpen onClose={() => {}} options={options} onConfirm={onConfirm} />);
+    const assign = screen.getByRole('button', { name: 'Assign' });
+    expect(assign).toBeDisabled();
+
+    fireEvent.click(screen.getByPlaceholderText('Add More...'));
+    fireEvent.click(screen.getByText('System Health & Performance'));
+    fireEvent.click(assign);
+    expect(onConfirm).toHaveBeenCalledWith(['t-2']);
+  });
+
+  it('keeps a picked ticket titled when a search drops it from the options', () => {
+    const props = { isOpen: true, onClose: () => {}, onConfirm: () => {}, onSearch: () => {} };
+    const { rerender } = render(<AssignTicketModal {...props} options={options} />);
+    fireEvent.click(screen.getByPlaceholderText('Add More...'));
+    fireEvent.click(screen.getByText('Privileged Access Audit'));
+    rerender(<AssignTicketModal {...props} options={[]} />);
+    // The tag (and its width-measuring copy) keeps the title, never the raw id.
+    expect(screen.getAllByText('Privileged Access Audit').length).toBeGreaterThan(0);
+    expect(screen.queryByText('t-1')).toBeNull();
   });
 });
