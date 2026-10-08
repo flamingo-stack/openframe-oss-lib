@@ -52,17 +52,23 @@ export function AskAi() {
   const [activeAgentSlug, setActiveAgentSlug] = useState<string | undefined>(undefined)
 
   // An "ask" surface asked for the chat (`openEmbedChat`). This embed answers
-  // every such request in the Guide chat, so it leaves agent mode first, then
-  // opens its panel with the question.
+  // every such request in the Guide chat, so it leaves agent mode first and
+  // opens its panel only once that switch has rendered (the effect below):
+  // the panel must read the Guide chat's config, never the agent's it just left.
+  const [pendingOpen, setPendingOpen] = useState<AssistantOpenRequest | null>(null)
   useEffect(() => {
     const onOpen = (event: Event) => {
-      const { prompt } = (event as CustomEvent<AssistantOpenRequest>).detail
       setActiveAgentSlug(undefined)
-      openAskAi(undefined, { prompt })
+      setPendingOpen({ prompt: (event as CustomEvent<AssistantOpenRequest>).detail.prompt })
     }
     window.addEventListener(EMBED_CHAT_OPEN_EVENT, onOpen)
     return () => window.removeEventListener(EMBED_CHAT_OPEN_EVENT, onOpen)
   }, [])
+  useEffect(() => {
+    if (!pendingOpen || activeAgentSlug !== undefined) return
+    openAskAi(undefined, { prompt: pendingOpen.prompt })
+    setPendingOpen(null)
+  }, [pendingOpen, activeAgentSlug])
 
   return (
     <>

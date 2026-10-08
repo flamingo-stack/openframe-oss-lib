@@ -29,7 +29,8 @@ interface AgentIdentity {
 
 async function fetchAssistantAgent(signal?: AbortSignal): Promise<AgentIdentity | null> {
   const res = await embedAuthedFetch(new URL(EP.aiAgents, window.location.origin).toString(), { signal, headers: {} })
-  if (!res.ok) return null
+  // A failed read is an ERROR, never "no agent": the query retries it and does not keep it as an answer.
+  if (!res.ok) throw new Error(`assistant agent read failed: ${res.status}`)
   const body = (await res.json()) as { agents?: AgentIdentity[] }
   return body.agents?.find((agent) => agent.audience === ASSISTANT_AUDIENCE) ?? null
 }
@@ -50,7 +51,6 @@ export function useAssistantIdentity(): AssistantIdentity {
     queryFn: ({ signal }) => fetchAssistantAgent(signal),
     enabled: needsAgent,
     staleTime: Infinity,
-    retry: false,
   })
   const name = config.name ?? agent?.name ?? null
   const icon = config.icon ?? agent?.icon ?? null

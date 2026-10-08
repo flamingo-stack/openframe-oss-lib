@@ -57,7 +57,7 @@ export function AssistantAskPrompts({
   useShownAskPrompts(shown ? (isLoading ? null : prompts.map(prompt => prompt.id)) : undefined);
   // The row's launcher opens the same chat as its questions, with the row's topic: it reads the runtime.
   const scoped = useMemo(() => (assistant ? { ...assistant, open } : null), [assistant, open]);
-  if (!shown) return null;
+  if (!assistantAvailable(assistant) || !supported) return null;
   return (
     <AssistantRuntimeContext.Provider value={scoped}>
       <AskPrompts
