@@ -45,7 +45,7 @@ import {
 } from '../../types/trust-center';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
-import { FaqSection } from '../faq/faq-section';
+import { FaqSection, type FaqSectionProps } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
@@ -83,6 +83,8 @@ export interface TrustCenterPageProps {
   title?: string;
   /** Page subtitle. Default the brand-neutral `TRUST_CENTER_TAGLINE` (a host adds its brand here). */
   subtitle?: string;
+  /** The FAQ section's "ask the assistant" card (`FaqSection`'s `ask`): the host states its topic. Absent: no card. */
+  ask?: FaqSectionProps['ask'];
 }
 
 /** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
@@ -149,6 +151,7 @@ export function TrustCenterPage({
   backButton = false,
   title = TRUST_CENTER_TITLE,
   subtitle = TRUST_CENTER_TAGLINE,
+  ask,
 }: TrustCenterPageProps) {
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
     initialData,
@@ -232,7 +235,7 @@ export function TrustCenterPage({
       lead: TRUST_SECTION_LEADS.subprocessors,
       render: d => <SubprocessorsSection subprocessors={d.subprocessors} />,
     },
-    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} /> },
+    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} ask={ask} /> },
     contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };
 

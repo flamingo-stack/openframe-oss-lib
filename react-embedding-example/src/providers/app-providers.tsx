@@ -14,6 +14,7 @@ import { RichMarkdownRuntimeProvider } from '@flamingo-stack/openframe-frontend-
 import { TicketLiveProvider } from '@flamingo-stack/openframe-frontend-core/components/tickets'
 import { buildChatRuntime, buildEndpointsRuntime } from './content-runtime'
 import { EP } from '../config/endpoints'
+import { AssistantRuntimeProvider } from './assistant-identity'
 
 const queryClient = new QueryClient()
 
@@ -45,7 +46,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
                   TicketAlertsButton AND the /tickets page. Mounted inside
                   ChatIdentityProvider (streams only for authed identities)
                   and the runtime contexts (reads endpoints). */}
-              <TicketLiveProvider>{children}</TicketLiveProvider>
+              {/* The assistant's identity (server-read) and this embed's chat
+                  opener, for the lib's "ask" surfaces (the FAQ's card). */}
+              <AssistantRuntimeProvider>
+                <TicketLiveProvider>{children}</TicketLiveProvider>
+              </AssistantRuntimeProvider>
             </RichMarkdownRuntimeProvider>
           </EndpointsRuntimeContext.Provider>
         </ChatIdentityProvider>
