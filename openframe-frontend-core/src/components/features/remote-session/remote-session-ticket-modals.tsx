@@ -104,3 +104,37 @@ export function AssignTicketModal({
     </ModalV2>
   );
 }
+
+export interface UnassignTicketModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  /** The unassignment is in flight: the button spins and the dialog refuses to close. */
+  isPending?: boolean;
+  onConfirm: () => void;
+}
+
+/** Unassign Ticket: unlinks a ticket from a recording; the ticket itself is unchanged. */
+export function UnassignTicketModal({ isOpen, onClose, isPending = false, onConfirm }: UnassignTicketModalProps) {
+  return (
+    <ModalV2 isOpen={isOpen} onClose={isPending ? () => {} : onClose} className="text-left md:max-w-[600px]">
+      <ModalV2Header>
+        <ModalV2Title>Unassign Ticket</ModalV2Title>
+      </ModalV2Header>
+
+      <p className="w-full text-ods-text-primary text-h4">
+        This Ticket will no longer be linked to this remote session. The ticket itself stays as it is, and you can
+        assign it again anytime.
+      </p>
+
+      <ModalV2Footer>
+        <Button type="button" variant="outline" onClick={onClose} disabled={isPending} className="flex-1 md:hidden">
+          Cancel
+        </Button>
+        <div className="hidden flex-1 md:block" />
+        <Button type="button" variant="destructive" onClick={onConfirm} loading={isPending} className="flex-1">
+          Unassign
+        </Button>
+      </ModalV2Footer>
+    </ModalV2>
+  );
+}

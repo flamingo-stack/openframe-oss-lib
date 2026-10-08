@@ -34,8 +34,8 @@ export type {
   KeepRecordingSelection,
   ReleaseKeepingModalProps,
 } from './remote-session-keep-modals';
-export { AssignTicketModal } from './remote-session-ticket-modals';
-export type { AssignTicketModalProps } from './remote-session-ticket-modals';
+export { AssignTicketModal, UnassignTicketModal } from './remote-session-ticket-modals';
+export type { AssignTicketModalProps, UnassignTicketModalProps } from './remote-session-ticket-modals';
 export {
   RemoteSessionEventList,
   RemoteSessionTimelineMarkers,

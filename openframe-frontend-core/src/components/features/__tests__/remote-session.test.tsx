@@ -1,7 +1,7 @@
 /**
  * Remote session widgets: the elapsed format, the consent card's https-only
  * site link and its decision lock, the chat composer's send, and the admin
- * widgets (viewers, events, expiry, Keep and Assign Ticket dialogs).
+ * widgets (viewers, events, expiry, Keep and Assign / Unassign Ticket dialogs).
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -21,6 +21,7 @@ import {
   RemoteSessionSummary,
   RemoteSessionTimelineMarkers,
   RemoteSessionViewers,
+  UnassignTicketModal,
 } from '../remote-session';
 
 const party = { organizationName: 'TechFlow Solutions', organizationSiteUrl: 'https://www.techflow.com' };
@@ -251,5 +252,22 @@ describe('AssignTicketModal', () => {
     // The tag (and its width-measuring copy) keeps the title, never the raw id.
     expect(screen.getAllByText('Privileged Access Audit').length).toBeGreaterThan(0);
     expect(screen.queryByText('t-1')).toBeNull();
+  });
+});
+
+describe('UnassignTicketModal', () => {
+  it('confirms the unassignment and holds the dialog while it is saved', () => {
+    const onConfirm = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(<UnassignTicketModal isOpen onClose={onClose} onConfirm={onConfirm} />);
+    expect(screen.getByText(/can assign it again anytime/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Unassign' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(<UnassignTicketModal isOpen isPending onClose={onClose} onConfirm={onConfirm} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

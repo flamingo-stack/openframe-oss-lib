@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 
-import { AssignTicketModal } from '../components/features/remote-session';
+import { AssignTicketModal, UnassignTicketModal } from '../components/features/remote-session';
 
 const tickets = [
   { value: 't-3891', label: 'Privileged Access Audit', description: '#3891' },
@@ -13,7 +13,7 @@ const tickets = [
 
 /**
  * Assign Ticket links one or more tickets to a recording; they show in the
- * Assigned Tickets table on the recording page.
+ * Assigned Tickets table on the recording page, where Unassign Ticket unlinks one.
  */
 const meta = {
   title: 'Remote Session/Admin/Assign Ticket',
@@ -41,4 +41,14 @@ export const Searching: Story = {
 /** The assignment is being saved. */
 export const Assigning: Story = {
   args: { isPending: true },
+};
+
+/** Unlinking one ticket from the recording. */
+export const Unassign: Story = {
+  render: () => <UnassignTicketModal isOpen onClose={fn()} onConfirm={fn()} />,
+};
+
+/** The unassignment is being saved. */
+export const Unassigning: Story = {
+  render: () => <UnassignTicketModal isOpen isPending onClose={fn()} onConfirm={fn()} />,
 };
