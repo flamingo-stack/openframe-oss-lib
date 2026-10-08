@@ -7,7 +7,8 @@ use crate::platform::{
     run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
-use crate::services::tool_run_manager::{ToolRunManager, UpdatingGuard};
+use crate::services::tool_ops::ToolOps;
+use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
 use crate::services::InstalledToolsService;
@@ -24,7 +25,9 @@ pub struct ToolAgentUpdateService {
     tool_agent_file_client: ToolAgentFileClient,
     installed_tools_service: InstalledToolsService,
     tool_kill_service: ToolKillService,
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
     directory_manager: DirectoryManager,
     config_service: AgentConfigurationService,
     installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -39,6 +42,7 @@ impl ToolAgentUpdateService {
         installed_tools_service: InstalledToolsService,
         tool_kill_service: ToolKillService,
         tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
         directory_manager: DirectoryManager,
         config_service: AgentConfigurationService,
         installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -56,6 +60,7 @@ impl ToolAgentUpdateService {
             installed_tools_service,
             tool_kill_service,
             tool_run_manager,
+            tool_ops,
             directory_manager,
             config_service,
             installed_agent_publisher,
@@ -72,9 +77,8 @@ impl ToolAgentUpdateService {
             tool_agent_id, new_version
         );
 
-        let tool_lock = self.tool_run_manager.tool_lock(tool_agent_id).await;
-        let _lock_guard = match tool_lock.try_lock_owned() {
-            Ok(guard) => guard,
+        let tool_lock = match self.tool_ops.try_lock(tool_agent_id) {
+            Ok(lock) => lock,
             Err(_) => {
                 info!(
                     "Tool {} busy with another operation, deferring update",
@@ -205,8 +209,7 @@ impl ToolAgentUpdateService {
             return Ok(());
         }
 
-        let _updating =
-            UpdatingGuard::acquire(&self.tool_run_manager, tool_agent_id, Some(_lock_guard)).await;
+        let _op = tool_lock.mark_busy();
 
         // A Standard->GuiApp migration self-relaunches, so only relaunch here if it was already a GUI app.
         let was_gui_before_update =
@@ -340,7 +343,6 @@ impl ToolAgentUpdateService {
         let deps = ToolUpdaterDeps {
             github_download_service: self.github_download_service.clone(),
             tool_kill_service: self.tool_kill_service.clone(),
-            tool_run_manager: self.tool_run_manager.clone(),
             directory_manager: self.directory_manager.clone(),
             command_params_resolver: self.command_params_resolver.clone(),
         };
@@ -666,15 +668,10 @@ impl ToolAgentUpdateService {
                 )
                 .to_string_lossy()
                 .to_string();
-            match crate::services::tool_run_manager::launch_process_in_user_session(
-                &command_path,
-                &launch_args,
-            ) {
-                Ok((pid, process_handle)) => {
+            match crate::platform::user_session::launch_in_user_session(&command_path, &launch_args)
+            {
+                Ok(pid) => {
                     info!(tool_id = %tool_agent_id, pid, "Relaunched updated GuiApp in user session (fire-and-forget)");
-                    unsafe {
-                        let _ = windows::Win32::Foundation::CloseHandle(process_handle);
-                    }
                 }
                 Err(e) => {
                     warn!(tool_id = %tool_agent_id, error = %e,

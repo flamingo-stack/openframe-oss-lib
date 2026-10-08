@@ -19,7 +19,7 @@ use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
 use crate::services::tool_connection_message_publisher::ToolConnectionMessagePublisher;
 use crate::services::tool_connection_service::ToolConnectionService;
-use crate::services::tool_run_manager::ToolRunManager;
+use crate::services::tool_ops::ToolOps;
 
 const RETRY_DELAY_SECONDS: u64 = 15;
 /// agentId command timeout; the spawned process is killed when it expires.
@@ -45,7 +45,7 @@ pub struct ToolConnectionProcessingManager {
     tool_connection_publisher: ToolConnectionMessagePublisher,
     config_service: AgentConfigurationService,
     tool_connection_service: ToolConnectionService,
-    tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
     running_tools: Arc<RwLock<HashSet<String>>>,
     wake_signals: Arc<RwLock<HashMap<String, Arc<Notify>>>>,
 }
@@ -57,7 +57,7 @@ impl ToolConnectionProcessingManager {
         tool_connection_publisher: ToolConnectionMessagePublisher,
         config_service: AgentConfigurationService,
         tool_connection_service: ToolConnectionService,
-        tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
     ) -> Self {
         Self {
             installed_tools_service,
@@ -65,7 +65,7 @@ impl ToolConnectionProcessingManager {
             tool_connection_publisher,
             config_service,
             tool_connection_service,
-            tool_run_manager,
+            tool_ops,
             running_tools: Arc::new(RwLock::new(HashSet::new())),
             wake_signals: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -159,7 +159,7 @@ impl ToolConnectionProcessingManager {
         let config_service = self.config_service.clone();
         let tool_connection_publisher = self.tool_connection_publisher.clone();
         let tool_connection_service = self.tool_connection_service.clone();
-        let tool_run_manager = self.tool_run_manager.clone();
+        let tool_ops = self.tool_ops.clone();
         let installed_tools_service = self.installed_tools_service.clone();
         let running_tools = self.running_tools.clone();
         let wake_signals = self.wake_signals.clone();
@@ -190,7 +190,7 @@ impl ToolConnectionProcessingManager {
                 }
 
                 // `continue` instead of an inner wait loop so an uninstall during the update window is caught by the registry check above.
-                if tool_run_manager.is_updating(&tool.tool_agent_id).await {
+                if tool_ops.is_busy(&tool.tool_agent_id) {
                     info!(tool_id = %tool.tool_id, "Tool is being updated, deferring node-id resolution...");
                     sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
                     continue;

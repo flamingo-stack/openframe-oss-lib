@@ -7,6 +7,7 @@ use crate::service::FULL_SERVICE_NAME;
 use crate::services::github_download_service::GithubDownloadService;
 use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
+use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
@@ -45,6 +46,7 @@ pub struct OpenFrameClientUpdateService {
     update_state_service: UpdateStateService,
     last_known_good_service: LastKnownGoodService,
     tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
     update_handler_service: UpdateHandlerService,
     /// Set from the update request until the updater is done with this process
     update_in_progress: Arc<AtomicBool>,
@@ -57,6 +59,7 @@ impl OpenFrameClientUpdateService {
         update_state_service: UpdateStateService,
         last_known_good_service: LastKnownGoodService,
         tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
         update_handler_service: UpdateHandlerService,
     ) -> Self {
         Self {
@@ -65,6 +68,7 @@ impl OpenFrameClientUpdateService {
             update_state_service,
             last_known_good_service,
             tool_run_manager,
+            tool_ops,
             update_handler_service,
             update_in_progress: Arc::new(AtomicBool::new(false)),
         }
@@ -76,7 +80,7 @@ impl OpenFrameClientUpdateService {
 
         self.tool_run_manager.mark_client_update_pending().await;
 
-        if self.tool_run_manager.any_tool_op_in_progress().await {
+        if self.tool_ops.any_busy() {
             warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
             return Err(anyhow!(
                 "Tool operation in progress, deferring client update"
@@ -306,7 +310,7 @@ impl OpenFrameClientUpdateService {
             rollback_only: false,
         };
 
-        if self.tool_run_manager.any_tool_op_in_progress().await {
+        if self.tool_ops.any_busy() {
             warn!("Tool operation started during client download, deferring client update (will redeliver)");
             if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
                 warn!(
