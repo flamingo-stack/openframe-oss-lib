@@ -1,7 +1,7 @@
 /**
  * Remote session widgets: the elapsed format, the consent card's https-only
  * site link and its decision lock, the chat composer's send, and the admin
- * widgets (viewers, events, expiry, Keep dialogs).
+ * widgets (viewers, events, expiry, Keep and Assign / Unassign Ticket dialogs).
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   formatRemoteSessionElapsed,
   formatRemoteSessionOffset,
+  AssignTicketModal,
   KeepRecordingModal,
   ReleaseKeepingModal,
   RemoteAccessRequestCard,
@@ -20,6 +21,7 @@ import {
   RemoteSessionSummary,
   RemoteSessionTimelineMarkers,
   RemoteSessionViewers,
+  UnassignTicketModal,
 } from '../remote-session';
 
 const party = { organizationName: 'TechFlow Solutions', organizationSiteUrl: 'https://www.techflow.com' };
@@ -211,14 +213,76 @@ describe('recording retention', () => {
       keptBy: 'Dana Whitfield',
       keptOn: '27 Jul 2026',
       reason: 'Client dispute',
-      ticket: 'TKT-4631',
+      tickets: ['TKT-4631', 'TKT-4702'],
       expiresOn: '3 Sep 2026',
     };
     const { rerender } = render(<ReleaseKeepingModal {...props} dueOn="31 Aug 2026" />);
     expect(screen.getByText('Kept by Dana Whitfield on 27 Jul 2026 for Client dispute.')).toBeInTheDocument();
-    expect(screen.getByText('Ticket: TKT-4631')).toBeInTheDocument();
+    expect(screen.getByText('Ticket: TKT-4631, TKT-4702')).toBeInTheDocument();
     expect(screen.getByText(/3 days' grace/)).toBeInTheDocument();
     rerender(<ReleaseKeepingModal {...props} />);
     expect(screen.queryByText(/3 days' grace/)).toBeNull();
+  });
+
+  it('leaves out the ticket line when no ticket is assigned to the recording', () => {
+    render(
+      <ReleaseKeepingModal
+        isOpen
+        onClose={() => {}}
+        onConfirm={() => {}}
+        keptBy="Dana Whitfield"
+        keptOn="27 Jul 2026"
+        reason="Internal review"
+        expiresOn="14 Sep 2026"
+      />,
+    );
+    expect(screen.queryByText(/^Ticket:/)).toBeNull();
+  });
+});
+
+describe('AssignTicketModal', () => {
+  const options = [
+    { value: 't-1', label: 'Privileged Access Audit' },
+    { value: 't-2', label: 'System Health & Performance' },
+  ];
+
+  it('assigns the picked tickets and stays off until one is picked', () => {
+    const onConfirm = vi.fn();
+    render(<AssignTicketModal isOpen onClose={() => {}} options={options} onConfirm={onConfirm} />);
+    const assign = screen.getByRole('button', { name: 'Assign' });
+    expect(assign).toBeDisabled();
+
+    fireEvent.click(screen.getByPlaceholderText('Add More...'));
+    fireEvent.click(screen.getByText('System Health & Performance'));
+    fireEvent.click(assign);
+    expect(onConfirm).toHaveBeenCalledWith(['t-2']);
+  });
+
+  it('keeps a picked ticket titled when a search drops it from the options', () => {
+    const props = { isOpen: true, onClose: () => {}, onConfirm: () => {}, onSearch: () => {} };
+    const { rerender } = render(<AssignTicketModal {...props} options={options} />);
+    fireEvent.click(screen.getByPlaceholderText('Add More...'));
+    fireEvent.click(screen.getByText('Privileged Access Audit'));
+    rerender(<AssignTicketModal {...props} options={[]} />);
+    // The tag (and its width-measuring copy) keeps the title, never the raw id.
+    expect(screen.getAllByText('Privileged Access Audit').length).toBeGreaterThan(0);
+    expect(screen.queryByText('t-1')).toBeNull();
+  });
+});
+
+describe('UnassignTicketModal', () => {
+  it('confirms the unassignment and holds the dialog while it is saved', () => {
+    const onConfirm = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(<UnassignTicketModal isOpen onClose={onClose} onConfirm={onConfirm} />);
+    expect(screen.getByText(/can assign it again anytime/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Unassign' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(<UnassignTicketModal isOpen isPending onClose={onClose} onConfirm={onConfirm} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
