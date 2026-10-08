@@ -11,4 +11,8 @@ public class DeliveryId {
     public String of(DeliveryType type, String targetId, String machineId) {
         return type.name() + SEPARATOR + targetId + SEPARATOR + machineId;
     }
+
+    public String of(DeliveryType type, String targetId) {
+        return type.name() + SEPARATOR + targetId;
+    }
 }

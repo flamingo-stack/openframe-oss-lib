@@ -5,6 +5,7 @@ import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.dispatch.DeliveryRecorder;
 import com.openframe.delivery.dispatch.DeliverySink;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.rollout.DeliveryRolloutRecorder;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySeed;
@@ -24,11 +25,16 @@ public class LocalDeliverySink implements DeliverySink {
 
     private final DeliverySpecRegistry registry;
     private final DeliveryRecorder recorder;
+    private final DeliveryRolloutRecorder rollouts;
     private final DeliveryPublisher publisher;
     private final DeliveryMetrics metrics;
 
     @Override
     public void accept(DeliveryRequest<?> request) {
+        if (request.isForEveryMachine()) {
+            rollouts.record(request);
+            return;
+        }
         DeliveryType type = request.getType();
         String machineId = request.getMachineId();
         boolean recorded = recorder.record(request);

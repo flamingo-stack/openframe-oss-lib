@@ -1,0 +1,65 @@
+package com.openframe.delivery.rollout;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.data.document.delivery.DeliveryRolloutStatus;
+import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.MachineDeliveryRollout;
+import com.openframe.data.repository.delivery.MachineDeliveryRolloutRepository;
+import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
+import com.openframe.delivery.dispatch.DeliveryPayloadJson;
+import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliveryRequest;
+import com.openframe.delivery.spec.TestPayload;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class DeliveryRolloutRecorderTest {
+
+    private static final String TARGET_ID = "openframe-client";
+    private static final int SEQUENCE = 7;
+
+    @Mock private MachineDeliveryRolloutRepository repository;
+    @Mock private MachineDeliverySequenceRepository sequences;
+
+    @Captor private ArgumentCaptor<MachineDeliveryRollout> rolloutCaptor;
+
+    @Test
+    void record_requestForEveryMachine_rolloutSavedAtTheStartWithOneSequence() {
+        // setup
+        DeliveryRolloutRecorder recorder = new DeliveryRolloutRecorder(repository, sequences, new DeliveryPayloadJson(new ObjectMapper()));
+        TestPayload payload = new TestPayload();
+        payload.setValue("1.5.11");
+        payload.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UPDATE, TARGET_ID, "d-rollout"));
+        DeliveryRequest<TestPayload> request = DeliveryRequest.<TestPayload>builder()
+                .type(DeliveryType.CLIENT_UPDATE)
+                .targetId(TARGET_ID)
+                .payload(payload)
+                .build();
+        when(sequences.next()).thenReturn(SEQUENCE);
+
+        // execution
+        recorder.record(request);
+
+        // verifications
+        verify(repository).save(rolloutCaptor.capture());
+        MachineDeliveryRollout rollout = rolloutCaptor.getValue();
+        assertThat(rollout.getId()).isEqualTo("CLIENT_UPDATE:openframe-client");
+        assertThat(rollout.getType()).isEqualTo(DeliveryType.CLIENT_UPDATE);
+        assertThat(rollout.getTargetId()).isEqualTo(TARGET_ID);
+        assertThat(rollout.getSequence()).isEqualTo(SEQUENCE);
+        assertThat(rollout.getStatus()).isEqualTo(DeliveryRolloutStatus.RUNNING);
+        assertThat(rollout.getCursor()).isEmpty();
+        assertThat(rollout.getDispatched()).isZero();
+        assertThat(rollout.getStartedAt()).isNotNull();
+        assertThat(rollout.getPayloadJson()).contains("1.5.11");
+    }
+}

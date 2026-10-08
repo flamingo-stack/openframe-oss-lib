@@ -5,6 +5,7 @@ import com.openframe.data.nats.model.ToolInstallationMessage;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.dispatch.DeliveryRecorder;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.rollout.DeliveryRolloutRecorder;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -35,6 +36,7 @@ class LocalDeliverySinkTest {
 
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliveryRecorder recorder;
+    @Mock private DeliveryRolloutRecorder rollouts;
     @Mock private DeliveryPublisher publisher;
     @Mock private DeliveryMetrics metrics;
     @Mock private DeliverySpec<DeliverySeed, DeliveryPayload> spec;
@@ -54,6 +56,23 @@ class LocalDeliverySinkTest {
                 .machineId(MACHINE_ID)
                 .payload(payload)
                 .build();
+    }
+
+    @Test
+    void accept_requestForEveryMachine_rolloutRecordedNothingPublished() {
+        // setup
+        DeliveryRequest<ToolInstallationMessage> forEveryMachine = DeliveryRequest.<ToolInstallationMessage>builder()
+                .type(DeliveryType.TOOL_INSTALLATION)
+                .targetId(TARGET_ID)
+                .payload(payload)
+                .build();
+
+        // execution
+        sink.accept(forEveryMachine);
+
+        // verifications
+        verify(rollouts).record(forEveryMachine);
+        verifyNoInteractions(recorder, publisher, registry);
     }
 
     @Test

@@ -57,7 +57,22 @@ class DeliveryRecorderTest {
                 .machineId(MACHINE_ID)
                 .payload(payload)
                 .build();
-        recorder = new DeliveryRecorder(repository, sequences, DeliveryTestPolicies.properties(), new ObjectMapper());
+        recorder = new DeliveryRecorder(repository, sequences, DeliveryTestPolicies.properties(), new DeliveryPayloadJson(new ObjectMapper()));
+    }
+
+    @Test
+    void record_sequenceAssignedByARollout_keptAndCounterUntouched() {
+        // setup
+        payload.getDelivery().setSequence(SEQUENCE);
+
+        // execution
+        recorder.record(request);
+
+        // verifications
+        verifyNoInteractions(sequences);
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getPayloadJson()).contains("\"sequence\":7");
     }
 
     @Test

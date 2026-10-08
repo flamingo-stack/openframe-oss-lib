@@ -1,7 +1,5 @@
 package com.openframe.delivery.dispatch;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
@@ -27,7 +25,7 @@ public class DeliveryRecorder {
     private final MachineDeliveryRepository repository;
     private final MachineDeliverySequenceRepository sequences;
     private final DeliveryProperties properties;
-    private final ObjectMapper objectMapper;
+    private final DeliveryPayloadJson payloadJson;
 
     // false = a row for this very dispatch already exists: the hand-off was replayed, nothing to do
     public boolean record(DeliveryRequest<?> request) {
@@ -40,12 +38,20 @@ public class DeliveryRecorder {
         if (repository.existsByIdAndDispatchId(id, dispatchId)) {
             return false;
         }
-        int sequence = sequences.next();
-        delivery.setSequence(sequence);
+        // a rollout gives all its rows the sequence it started with: one decision, one number
+        if (!hasSequence(delivery)) {
+            int sequence = sequences.next();
+            delivery.setSequence(sequence);
+        }
         MachineDelivery row = pendingRow(request, id);
         repository.upsertPending(row);
-        log.info("Delivery recorded: type={} targetId={} machineId={} sequence={}", type, targetId, machineId, sequence);
+        log.info("Delivery recorded: type={} targetId={} machineId={} sequence={}",
+                type, targetId, machineId, delivery.getSequence());
         return true;
+    }
+
+    private static boolean hasSequence(DeliveryRef delivery) {
+        return delivery.getSequence() != null;
     }
 
     private MachineDelivery pendingRow(DeliveryRequest<?> request, String id) {
@@ -54,7 +60,7 @@ public class DeliveryRecorder {
         DeliveryPayload payload = request.getPayload();
         DeliveryRef delivery = payload.getDelivery();
         String dispatchId = delivery.getDispatchId();
-        String payloadJson = toJson(payload);
+        String json = payloadJson.write(payload);
         Policy policy = properties.resolve(type);
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
         long ttlSeconds = policy.getTtlSeconds();
@@ -67,19 +73,10 @@ public class DeliveryRecorder {
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
                 .errors(0)
-                .payloadJson(payloadJson)
+                .payloadJson(json)
                 .dispatchedAt(now)
                 .dueAt(now.plusSeconds(ackThresholdSeconds))
                 .expiresAt(now.plusSeconds(ttlSeconds))
                 .build();
-    }
-
-    private String toJson(Object payload) {
-        try {
-            return objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
-            String payloadType = payload.getClass().getSimpleName();
-            throw new IllegalArgumentException("Delivery payload is not serializable: " + payloadType, e);
-        }
     }
 }
