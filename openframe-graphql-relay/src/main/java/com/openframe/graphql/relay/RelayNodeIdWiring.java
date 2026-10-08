@@ -29,6 +29,7 @@ public class RelayNodeIdWiring {
     private static final String ID_FIELD = "id";
 
     private final RelayIdCodec relayIdCodec;
+    private final RelayIdEncodingPolicy encodingPolicy;
 
     @DgsCodeRegistry
     public GraphQLCodeRegistry.Builder registerNodeIds(GraphQLCodeRegistry.Builder codeRegistry,
@@ -67,14 +68,24 @@ public class RelayNodeIdWiring {
         if (codeRegistry.hasDataFetcher(nodeId)) {
             return;
         }
-        DataFetcher<String> globalId = globalIdFetcher(nodeType);
-        codeRegistry.dataFetcher(nodeId, globalId);
+        DataFetcher<Object> nodeIdFetcher = nodeIdFetcher(nodeType);
+        codeRegistry.dataFetcher(nodeId, nodeIdFetcher);
     }
 
-    private DataFetcher<String> globalIdFetcher(NodeType nodeType) {
+    private DataFetcher<Object> nodeIdFetcher(NodeType nodeType) {
         String rawIdProperty = nodeType.getRawIdProperty();
         PropertyDataFetcher<Object> rawIdFetcher = PropertyDataFetcher.fetching(rawIdProperty);
-        return environment -> encodeGlobalId(nodeType, rawIdFetcher, environment);
+        PropertyDataFetcher<Object> plainIdFetcher = PropertyDataFetcher.fetching(ID_FIELD);
+        return environment -> resolveNodeId(nodeType, rawIdFetcher, plainIdFetcher, environment);
+    }
+
+    // A declined request gets the id property unchanged, the value the field had before Relay.
+    private Object resolveNodeId(NodeType nodeType, PropertyDataFetcher<Object> rawIdFetcher,
+                                 PropertyDataFetcher<Object> plainIdFetcher, DataFetchingEnvironment environment) {
+        if (!encodingPolicy.shouldEncode(environment)) {
+            return plainIdFetcher.get(environment);
+        }
+        return encodeGlobalId(nodeType, rawIdFetcher, environment);
     }
 
     private String encodeGlobalId(NodeType nodeType, PropertyDataFetcher<Object> rawIdFetcher,

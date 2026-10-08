@@ -19,7 +19,7 @@ class RelayNodeIdWiringTest {
             type Script { id: ID! }
             """;
 
-    private final RelayNodeIdWiring wiring = new RelayNodeIdWiring(new RelayIdCodec());
+    private final RelayNodeIdWiring wiring = new RelayNodeIdWiring(new RelayIdCodec(), new AlwaysEncodeRelayIds());
 
     @Test
     void registerNodeIds_nodeTypeUnknownToNodeType_failsTheSchema() {

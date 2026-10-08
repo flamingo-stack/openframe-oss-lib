@@ -22,8 +22,14 @@ public class RelayAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        public RelayNodeIdWiring relayNodeIdWiring(RelayIdCodec relayIdCodec) {
-            return new RelayNodeIdWiring(relayIdCodec);
+        public RelayIdEncodingPolicy relayIdEncodingPolicy() {
+            return new AlwaysEncodeRelayIds();
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public RelayNodeIdWiring relayNodeIdWiring(RelayIdCodec relayIdCodec, RelayIdEncodingPolicy encodingPolicy) {
+            return new RelayNodeIdWiring(relayIdCodec, encodingPolicy);
         }
     }
 }
