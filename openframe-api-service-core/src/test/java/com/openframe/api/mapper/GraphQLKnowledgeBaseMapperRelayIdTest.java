@@ -6,9 +6,9 @@ import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterInput;
 import com.openframe.api.dto.knowledgebase.UpdateArticleCommand;
 import com.openframe.api.dto.knowledgebase.UpdateArticleInput;
-import com.openframe.api.relay.InvalidRelayIdException;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

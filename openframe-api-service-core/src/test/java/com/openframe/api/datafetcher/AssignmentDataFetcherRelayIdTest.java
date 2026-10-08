@@ -1,14 +1,12 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.mapper.GraphQLAssignmentMapper;
-import com.openframe.api.relay.InvalidRelayIdException;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
-import com.openframe.data.document.assignment.ItemAssignment;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -27,7 +25,6 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AssignmentDataFetcherRelayIdTest {
@@ -38,7 +35,6 @@ class AssignmentDataFetcherRelayIdTest {
 
     @Mock private AssignmentService assignmentService;
     @Mock private GraphQLAssignmentMapper mapper;
-    @Mock private DgsDataFetchingEnvironment dfe;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private AssignmentDataFetcher dataFetcher;
@@ -162,19 +158,6 @@ class AssignmentDataFetcherRelayIdTest {
 
         // verifications
         verify(assignmentService).assignItem(RAW_ITEM_ID, AssignmentItemType.INSIGHT, AssignmentTargetType.TICKET, RAW_TARGET_ID);
-    }
-
-    @Test
-    void itemAssignmentNodeId_assignment_itemAssignmentGlobalId() {
-        // setup
-        ItemAssignment assignment = ItemAssignment.builder().id(RAW_ASSIGNMENT_ID).build();
-        when(dfe.<ItemAssignment>getSource()).thenReturn(assignment);
-
-        // execution
-        String nodeId = dataFetcher.itemAssignmentNodeId(dfe);
-
-        // verifications
-        assertThat(nodeId).isEqualTo("SXRlbUFzc2lnbm1lbnQ6YXNzaWdubWVudC0x");
     }
 
     private static Stream<Arguments> assignableItemTypes() {

@@ -5,7 +5,7 @@ import com.openframe.api.config.InstantScalarConfig;
 import com.openframe.api.config.LongScalarConfig;
 import com.openframe.api.datafetcher.NotificationDataFetcher;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.NotificationService;
 import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.data.repository.notification.NotificationRepository;

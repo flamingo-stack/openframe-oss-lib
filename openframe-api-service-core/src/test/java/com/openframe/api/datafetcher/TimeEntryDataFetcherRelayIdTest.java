@@ -1,6 +1,5 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.dto.timetracking.CreateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.CreateTimeEntryInput;
 import com.openframe.api.dto.timetracking.StartTimerCommand;
@@ -10,9 +9,9 @@ import com.openframe.api.dto.timetracking.StopTimerInput;
 import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryInput;
-import com.openframe.api.relay.InvalidRelayIdException;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.TimeEntryService;
 import com.openframe.data.document.timetracking.TimeEntry;
 import org.junit.jupiter.api.AfterEach;
@@ -36,7 +35,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TimeEntryDataFetcherRelayIdTest {
@@ -54,7 +52,6 @@ class TimeEntryDataFetcherRelayIdTest {
     private static final String PADDED_ORGANIZATION_SENTINEL = "T3JnYW5pemF0aW9uOg==";
 
     @Mock private TimeEntryService timeEntryService;
-    @Mock private DgsDataFetchingEnvironment dfe;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private TimeEntryDataFetcher dataFetcher;
@@ -216,18 +213,5 @@ class TimeEntryDataFetcherRelayIdTest {
 
         // verifications
         verify(timeEntryService).getEmployeeTimeStats(expected);
-    }
-
-    @Test
-    void timeEntryNodeId_entry_timeEntryGlobalId() {
-        // setup
-        TimeEntry entry = TimeEntry.builder().id(RAW_ENTRY_ID).build();
-        when(dfe.<TimeEntry>getSource()).thenReturn(entry);
-
-        // execution
-        String nodeId = dataFetcher.timeEntryNodeId(dfe);
-
-        // verifications
-        assertThat(nodeId).isEqualTo("VGltZUVudHJ5OmVudHJ5LTE");
     }
 }

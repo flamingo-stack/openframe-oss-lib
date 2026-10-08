@@ -23,7 +23,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.software.SoftwareScheduleService;
 import com.openframe.data.document.device.Machine;
@@ -44,8 +44,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-import static com.openframe.api.relay.NodeType.MACHINE;
-import static com.openframe.api.relay.NodeType.SOFTWARE_SCHEDULE;
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+import static com.openframe.graphql.relay.NodeType.SOFTWARE_SCHEDULE;
 
 @DgsComponent
 @RequiredArgsConstructor
@@ -156,13 +156,6 @@ public class SoftwareScheduleDataFetcher {
         String rawScheduleId = relayIdCodec.decode(scheduleId, SOFTWARE_SCHEDULE);
         String userId = principal.getId();
         return scheduleService.setDeviceCriteria(rawScheduleId, domainCriteria, userId);
-    }
-
-    @DgsData(parentType = "SoftwareSchedule", field = "id")
-    public String softwareScheduleNodeId(DgsDataFetchingEnvironment dfe) {
-        SoftwareScheduleResponse schedule = dfe.getSource();
-        String scheduleId = schedule.getId();
-        return relayIdCodec.encode(SOFTWARE_SCHEDULE, scheduleId);
     }
 
     @DgsData(parentType = "SoftwareSchedule", field = "assignedDevices")

@@ -7,8 +7,8 @@ import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.user.UserResponse;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.security.authentication.AuthPrincipal;
 import org.dataloader.DataLoader;
@@ -47,9 +47,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 
-import static com.openframe.api.relay.NodeType.SCRIPT;
-import static com.openframe.api.relay.NodeType.TAG;
-import static com.openframe.api.relay.NodeType.USER;
+import static com.openframe.graphql.relay.NodeType.SCRIPT;
+import static com.openframe.graphql.relay.NodeType.TAG;
+import static com.openframe.graphql.relay.NodeType.USER;
 
 @DgsComponent
 @RequiredArgsConstructor
@@ -154,13 +154,6 @@ public class ScriptDataFetcher {
         input.setScriptId(scriptId);
         String userId = getCurrentUserId();
         return scriptDispatchService.batchRunScript(input, userId, ExecutionSource.MANUAL);
-    }
-
-    @DgsData(parentType = "Script", field = "id")
-    public String scriptNodeId(DgsDataFetchingEnvironment dfe) {
-        ScriptResponse script = dfe.getSource();
-        String scriptId = script.getId();
-        return relayIdCodec.encode(SCRIPT, scriptId);
     }
 
     // tagIds / authorIds arrive as Relay global ids (Tag / User) — decode to raw before filtering.

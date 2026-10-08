@@ -1,11 +1,9 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
-import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
-import com.openframe.api.relay.InvalidRelayIdException;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.NotificationService;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.notification.readstate.NotificationReadStateService;
@@ -29,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationDataFetcherRelayIdTest {
@@ -41,7 +38,6 @@ class NotificationDataFetcherRelayIdTest {
     @Mock private NotificationService notificationService;
     @Mock private NotificationReadStateService readStateService;
     @Mock private GraphQLNotificationMapper notificationMapper;
-    @Mock private DgsDataFetchingEnvironment dfe;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private NotificationDataFetcher dataFetcher;
@@ -115,19 +111,5 @@ class NotificationDataFetcherRelayIdTest {
 
         // verifications
         verify(readStateService).deleteNotification(USER_ID, RecipientType.USER, RAW_NOTIFICATION_ID);
-    }
-
-    @Test
-    void notificationNodeId_view_notificationGlobalId() {
-        // setup
-        NotificationView view = new NotificationView(RAW_NOTIFICATION_ID, null, null, null, null, null, null, null,
-                false, null);
-        when(dfe.<NotificationView>getSource()).thenReturn(view);
-
-        // execution
-        String nodeId = dataFetcher.notificationNodeId(dfe);
-
-        // verifications
-        assertThat(nodeId).isEqualTo(NOTIFICATION_GLOBAL_ID);
     }
 }

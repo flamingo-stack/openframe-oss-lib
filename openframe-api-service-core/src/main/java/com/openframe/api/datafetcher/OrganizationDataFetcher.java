@@ -11,7 +11,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLOrganizationMapper;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.organization.OrganizationQueryService;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.service.OrganizationService;
@@ -23,7 +23,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
 
-import static com.openframe.api.relay.NodeType.ORGANIZATION;
+import static com.openframe.graphql.relay.NodeType.ORGANIZATION;
 
 /**
  * GraphQL DataFetcher for Organization queries.
@@ -38,13 +38,6 @@ public class OrganizationDataFetcher {
     private final OrganizationQueryService organizationQueryService;
     private final GraphQLOrganizationMapper mapper;
     private final RelayIdCodec relayIdCodec;
-
-    @DgsData(parentType = "Organization", field = "id")
-    public String organizationNodeId(DgsDataFetchingEnvironment dfe) {
-        Organization org = dfe.getSource();
-        String organizationId = org.getOrganizationId();
-        return relayIdCodec.encode(ORGANIZATION, organizationId);
-    }
 
     /**
      * Canonical last-activity timestamp for an organization. Backed by

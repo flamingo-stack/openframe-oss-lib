@@ -1,4 +1,4 @@
-package com.openframe.api.relay;
+package com.openframe.graphql.relay;
 
 import org.junit.jupiter.api.Test;
 

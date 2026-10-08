@@ -17,8 +17,8 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScheduleRunMapper;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.rmm.schedule.ScheduleRunFilterService;
 import com.openframe.api.service.rmm.schedule.ScheduleRunService;
 import jakarta.validation.Valid;
@@ -30,9 +30,9 @@ import org.dataloader.DataLoader;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import static com.openframe.api.relay.NodeType.SCHEDULE_RUN;
-import static com.openframe.api.relay.NodeType.SCRIPT_SCHEDULE;
-import static com.openframe.api.relay.NodeType.USER;
+import static com.openframe.graphql.relay.NodeType.SCHEDULE_RUN;
+import static com.openframe.graphql.relay.NodeType.SCRIPT_SCHEDULE;
+import static com.openframe.graphql.relay.NodeType.USER;
 
 /**
  * GraphQL resolver for the "Schedule Runs" tab. Fires are always viewed per saved schedule —
@@ -51,12 +51,6 @@ public class ScheduleRunDataFetcher {
     private final RelayIdCodec relayIdCodec;
 
     /** Relay global id ("ScheduleRun:&lt;rawId&gt;") for the {@code id} field. */
-    @DgsData(parentType = "ScheduleRun", field = "id")
-    public String scheduleRunNodeId(DgsDataFetchingEnvironment dfe) {
-        ScheduleRunResponse run = dfe.getSource();
-        String runId = run.getId();
-        return relayIdCodec.encode(SCHEDULE_RUN, runId);
-    }
 
     @DgsQuery
     public ScheduleRunResponse scheduleRun(@InputArgument @NotBlank String id) {

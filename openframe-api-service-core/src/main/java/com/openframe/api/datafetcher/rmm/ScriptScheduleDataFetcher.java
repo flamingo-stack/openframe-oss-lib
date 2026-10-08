@@ -29,8 +29,8 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.mapper.GraphQLScriptScheduleMapper;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.script.ScriptDispatchService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
@@ -62,10 +62,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.openframe.api.relay.NodeType.MACHINE;
-import static com.openframe.api.relay.NodeType.SCRIPT;
-import static com.openframe.api.relay.NodeType.SCRIPT_SCHEDULE;
-import static com.openframe.api.relay.NodeType.USER;
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+import static com.openframe.graphql.relay.NodeType.SCRIPT;
+import static com.openframe.graphql.relay.NodeType.SCRIPT_SCHEDULE;
+import static com.openframe.graphql.relay.NodeType.USER;
 
 /**
  * GraphQL resolver for RMM script-schedule CRUD. Pure passthrough to
@@ -268,12 +268,6 @@ public class ScriptScheduleDataFetcher {
     }
 
     /** Returns the Relay global id ("ScriptSchedule:&lt;rawId&gt;") for the {@code id} field. */
-    @DgsData(parentType = "ScriptSchedule", field = "id")
-    public String scriptScheduleNodeId(DgsDataFetchingEnvironment dfe) {
-        ScriptScheduleResponse schedule = dfe.getSource();
-        String scheduleId = schedule.getId();
-        return relayIdCodec.encode(SCRIPT_SCHEDULE, scheduleId);
-    }
 
     /**
      * Resolves {@code ScriptSchedule.scripts} from the stored script ids.

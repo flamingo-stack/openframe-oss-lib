@@ -1,6 +1,6 @@
 package com.openframe.api.exception;
 
-import com.openframe.api.relay.InvalidRelayIdException;
+import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.core.exception.BaseException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;

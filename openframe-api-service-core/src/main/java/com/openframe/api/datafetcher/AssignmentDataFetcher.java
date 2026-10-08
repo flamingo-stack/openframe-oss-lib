@@ -11,8 +11,8 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLAssignmentMapper;
 import com.openframe.api.dataloader.TicketStatusDefinitionDataLoader;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.relay.RelayIdCodec;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
@@ -114,22 +114,6 @@ public class AssignmentDataFetcher {
         String rawItemId = decodeAssignableItemId(itemId);
         assignmentService.unassignAllByType(rawItemId, targetType);
         return true;
-    }
-
-    @DgsData(parentType = "ItemAssignment", field = "id")
-    public String itemAssignmentNodeId(DgsDataFetchingEnvironment dfe) {
-        ItemAssignment assignment = dfe.getSource();
-        String assignmentId = assignment.getId();
-        return relayIdCodec.encode(NodeType.ITEM_ASSIGNMENT, assignmentId);
-    }
-
-    // Ticket declares Node here like Organization and Machine do, and the assignment mutations take
-    // global ids — without this the raw id a client reads back cannot be passed to unassignItem.
-    @DgsData(parentType = "Ticket", field = "id")
-    public String ticketNodeId(DgsDataFetchingEnvironment dfe) {
-        Ticket ticket = dfe.getSource();
-        String ticketId = ticket.getId();
-        return relayIdCodec.encode(NodeType.TICKET, ticketId);
     }
 
     /**
