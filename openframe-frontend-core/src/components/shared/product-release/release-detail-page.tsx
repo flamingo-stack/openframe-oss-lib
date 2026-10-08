@@ -47,8 +47,6 @@ import type { DeliveryResponse } from '../../../types/delivery';
 // shape once the entities barrel was added; re-exporting the canonical
 // type fixes the collision while keeping the same import path for
 // downstream consumers of `./release-detail-page`.
-import { ASK_TOPICS } from '../../chat/ask-topics';
-import { useAskPageTopic } from '../../chat/hooks/use-ask-prompts';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 // Re-export both types for source-compat with consumers importing
 // through this module. Canonical sources:
@@ -169,8 +167,6 @@ export function ReleaseDetailPage({
   shell = true,
 }: ReleaseDetailPageProps) {
   const router = useRouter();
-  // What this page is about, for every "ask" surface on it (a FAQ's card).
-  useAskPageTopic(ASK_TOPICS.releases);
   const captions = useCaptions();
   // `shell` true → standalone `<PageShell>`; false → padding-only box (no nested
   // <main>) for hosts whose layout already provides the container.

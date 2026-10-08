@@ -22,10 +22,8 @@ import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { VideoTeaser } from '../../types/video-processing';
 import { resolveContentHref } from '../../utils/content-href';
 import { buildOgPlaceholderUrl } from '../../utils/og-placeholder';
-import { ASK_TOPICS } from '../chat/ask-topics';
 import { EntityAuthorCard } from '../chat/entity-cards/entity-author-card';
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card';
-import { useAskPageTopic } from '../chat/hooks/use-ask-prompts';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
 import { EntityTagBadges } from '../features/entity-tag-badges';
 import { EntityVideoSection } from '../features/entity-video-section';
@@ -102,8 +100,6 @@ export function OnboardingGuideDetailView({
   relatedContent,
   shell = true,
 }: OnboardingGuideDetailViewProps) {
-  // What this page is about, for every "ask" surface on it (a FAQ's card).
-  useAskPageTopic(ASK_TOPICS.onboarding);
   const resolvedBackHref = backHref ?? basePath;
   const runtime = useChatRuntime();
   const captions = useCaptions();

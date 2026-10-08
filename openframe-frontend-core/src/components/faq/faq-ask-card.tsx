@@ -13,7 +13,6 @@ import { ASK_TOPICS } from '../chat/ask-topics';
 import {
   assistantAvailable,
   ASK_PROMPTS_DEFAULT_COUNT,
-  useAskPageTopicValue,
   useAskPrompts,
   useAssistantOpen,
   useShownAskPromptIds,
@@ -24,10 +23,8 @@ export interface FaqAskOptions {
   /**
    * What this FAQ is about: ANY string the host's questions endpoint knows (it
    * is sent as `section`, and reported with every click). Questions written
-   * for the topic are picked first. Absent: what the PAGE says it is about
-   * (`useAskPageTopic`: the onboarding guides, the roadmap, the Trust Center),
-   * else the host's default (`AssistantRuntime.askCard.topic`), else
-   * `ASK_TOPICS.faq`.
+   * for the topic are picked first. Whoever renders the FAQ passes it. Absent:
+   * `ASK_TOPICS.faq`, the general FAQ's questions.
    */
   topic?: string;
   /**
@@ -76,8 +73,7 @@ export function faqAskCardShown(assistant: AssistantRuntime | null): assistant i
  */
 export function FaqAskCard({ topic: ownTopic, exclude, count, title, description, onOpen }: FaqAskOptions) {
   const assistant = useAssistantRuntime();
-  const pageTopic = useAskPageTopicValue();
-  const topic = ownTopic ?? pageTopic ?? assistant?.askCard?.topic ?? ASK_TOPICS.faq;
+  const topic = ownTopic ?? ASK_TOPICS.faq;
   const { ref, inView } = useInView<HTMLDivElement>({ rootMargin: PICK_ROOT_MARGIN });
   const [reached, setReached] = useState(false);
   if (inView && !reached) setReached(true);

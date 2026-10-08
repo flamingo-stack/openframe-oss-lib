@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssistantRuntimeContext, type AssistantRuntime } from '../../../contexts/assistant-runtime-context';
 import type { Faq } from '../../../types/faq';
 import { AssistantAskPrompts } from '../../chat/assistant-ask-prompts';
-import { buildAskPromptsUrl, resetShownAskPrompts, useAskPageTopic } from '../../chat/hooks/use-ask-prompts';
+import { buildAskPromptsUrl, resetShownAskPrompts } from '../../chat/hooks/use-ask-prompts';
 import { ASK_AI_OPEN_EVENT, MingoAiButton } from '../../navigation/mingo-ai-button';
 import { FaqSection } from '../faq-section';
 
@@ -119,18 +119,6 @@ describe('FaqSection ask card', () => {
     expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('faq');
   });
 
-  it("uses the host's default FAQ section when the FAQ states none, and the FAQ's own over it", async () => {
-    const runtime = { ...RUNTIME, askCard: { topic: 'people-hub' } };
-    const { unmount } = renderFaq(runtime, <FaqSection initialFaqs={FAQS} />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('people-hub');
-    unmount();
-    fetchMock.mockClear();
-    renderFaq(runtime, <FaqSection initialFaqs={FAQS} ask={{ topic: 'prompts' }} />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('prompts');
-  });
-
   it('waits while the page is still picking its own questions', () => {
     renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} ask={{ exclude: null }} />);
     expect(screen.getByText('Still deciding?')).toBeInTheDocument();
@@ -186,35 +174,6 @@ describe('FaqSection ask card', () => {
       prompt: 'Explain the pricing',
     });
     window.removeEventListener(ASK_AI_OPEN_EVENT, siteChat);
-  });
-});
-
-function PageAbout({ topic, children }: { topic: string; children: ReactNode }) {
-  useAskPageTopic(topic);
-  return <>{children}</>;
-}
-
-describe('the page topic', () => {
-  it("makes every FAQ on the page ask for what the page is about, over the host's default", async () => {
-    renderFaq(
-      { ...RUNTIME, askCard: { topic: 'host-default' } },
-      <PageAbout topic="onboarding">
-        <FaqSection initialFaqs={FAQS} />
-      </PageAbout>,
-    );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('onboarding');
-  });
-
-  it("gives way to the FAQ's own topic", async () => {
-    renderFaq(
-      RUNTIME,
-      <PageAbout topic="onboarding">
-        <FaqSection initialFaqs={FAQS} ask={{ topic: 'releases' }} />
-      </PageAbout>,
-    );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('releases');
   });
 });
 

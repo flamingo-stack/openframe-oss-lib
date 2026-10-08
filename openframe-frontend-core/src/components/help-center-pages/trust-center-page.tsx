@@ -45,7 +45,6 @@ import {
 } from '../../types/trust-center';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { ASK_TOPICS } from '../chat/ask-topics';
-import { useAskPageTopic } from '../chat/hooks/use-ask-prompts';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
@@ -144,6 +143,9 @@ function monitoringStatus(
     : { status: 'pending', label: 'Monitoring paused' };
 }
 
+/** The Trust Center FAQ's ask card asks for the Trust Center's questions. */
+const TRUST_CENTER_ASK = { topic: ASK_TOPICS.trustCenter } as const;
+
 export function TrustCenterPage({
   endpoint = TRUST_CENTER_API_PATH,
   initialData,
@@ -152,8 +154,6 @@ export function TrustCenterPage({
   title = TRUST_CENTER_TITLE,
   subtitle = TRUST_CENTER_TAGLINE,
 }: TrustCenterPageProps) {
-  // What this page is about, for every "ask" surface on it: its own FAQ's card, and a host's FAQ around it.
-  useAskPageTopic(ASK_TOPICS.trustCenter);
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
     initialData,
     revalidateOnVisibleAfterMs: TRUST_CENTER_CACHE_SECONDS * 1000,
@@ -236,7 +236,7 @@ export function TrustCenterPage({
       lead: TRUST_SECTION_LEADS.subprocessors,
       render: d => <SubprocessorsSection subprocessors={d.subprocessors} />,
     },
-    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} /> },
+    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} ask={TRUST_CENTER_ASK} /> },
     contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };
 

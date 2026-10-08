@@ -43,8 +43,6 @@ export {
   ASK_PROMPTS_DEFAULT_COUNT,
   assistantAvailable,
   buildAskPromptsUrl,
-  useAskPageTopic,
-  useAskPageTopicValue,
   useAskPrompts,
   useAssistantOpen,
   useShownAskPromptIds,

@@ -22,8 +22,6 @@ import {
   type OpenframeDevSection,
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
-import { ASK_TOPICS } from '../../chat/ask-topics';
-import { useAskPageTopic } from '../../chat/hooks/use-ask-prompts';
 import { StatusFilterComponent } from '../../features';
 import { SearchInput } from '../../ui';
 
@@ -62,18 +60,8 @@ export interface DevSectionViewProps {
   showHeading?: boolean;
 }
 
-/** What each dev-center section is about, as an "ask" topic. A section with no topic of its own says nothing. */
-const DEV_SECTION_ASK_TOPIC: Partial<Record<OpenframeDevSectionKey, string>> = {
-  roadmap: ASK_TOPICS.roadmap,
-  delivery: ASK_TOPICS.delivery,
-  releases: ASK_TOPICS.releases,
-  onboarding: ASK_TOPICS.onboarding,
-};
-
 export function DevSectionView({ sectionKey, hero, preControls, children, showHeading = true }: DevSectionViewProps) {
   const section = OPENFRAME_DEV_SECTIONS[sectionKey];
-  // What this page is about, for every "ask" surface on it (a FAQ's card): the section itself.
-  useAskPageTopic(DEV_SECTION_ASK_TOPIC[sectionKey]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
