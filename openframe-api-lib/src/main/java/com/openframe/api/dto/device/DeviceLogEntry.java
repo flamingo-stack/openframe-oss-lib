@@ -31,6 +31,7 @@ public class DeviceLogEntry {
      * Device the line came from. Null for a line the agent shipped without a machine id.
      */
     private String machineId;
+    private String organizationId;
 
     private String hostname;
 

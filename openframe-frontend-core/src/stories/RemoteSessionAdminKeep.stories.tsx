@@ -30,7 +30,7 @@ export const Keeping: Story = {
   args: { isPending: true },
 };
 
-/** Releasing a recording already past its date: it gets 3 days' grace. */
+/** Releasing a recording already past its date: it gets 3 days' grace. Every ticket assigned to the recording is listed. */
 export const Release: Story = {
   render: () => (
     <ReleaseKeepingModal
@@ -38,11 +38,11 @@ export const Release: Story = {
       onClose={fn()}
       onConfirm={fn()}
       keptBy="Dana Whitfield"
-      keptOn="27 Jul 2026"
+      keptOn="09/15/23"
       reason="Client dispute"
-      ticket="TKT-4631"
-      expiresOn="3 Sep 2026"
-      dueOn="31 Aug 2026"
+      tickets={['TKT-4631', 'TKT-4702']}
+      expiresOn="09/18/23"
+      dueOn="09/15/23"
     />
   ),
 };
@@ -55,9 +55,9 @@ export const ReleaseBeforeExpiry: Story = {
       onClose={fn()}
       onConfirm={fn()}
       keptBy="Dana Whitfield"
-      keptOn="27 Jul 2026"
+      keptOn="09/15/23"
       reason="Internal review"
-      expiresOn="14 Sep 2026"
+      expiresOn="09/15/24"
     />
   ),
 };

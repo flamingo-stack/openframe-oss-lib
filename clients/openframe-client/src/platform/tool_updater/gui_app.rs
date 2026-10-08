@@ -181,7 +181,7 @@ impl ToolUpdater for GuiAppToolUpdater {
         info!(tool_id = %tool_agent_id, "Launching updated GUI app as user: {}", user.username);
         let launch_args = if bundle_id.is_some() {
             // Args passed via preferences, but openframe-chat needs --background flag
-            if tool_agent_id == "openframe-chat" {
+            if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                 vec!["--background".to_string()]
             } else {
                 vec![]
