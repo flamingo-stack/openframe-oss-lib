@@ -153,8 +153,56 @@ export function useShownAskPromptIds(): readonly string[] | null {
   );
 }
 
+// ─── What the page is about ──────────────────────────────────────────────────
+// A page says its topic once (`useAskPageTopic`: the onboarding guides, the
+// roadmap, the Trust Center); every FAQ on that page then asks for that topic,
+// whoever rendered the FAQ (the page itself, or the host's layout around it).
+// One page, one topic: the same kind of module store as the list above. With
+// several declarations on one page the latest mounted wins.
+
+const pageTopics = new Map<string, string>();
+const pageTopicListeners = new Set<() => void>();
+let pageTopic: string | undefined;
+
+function publishPageTopic(): void {
+  const next = [...pageTopics.values()].pop();
+  if (next === pageTopic) return;
+  pageTopic = next;
+  for (const listener of pageTopicListeners) listener();
+}
+
+function subscribePageTopic(listener: () => void): () => void {
+  pageTopicListeners.add(listener);
+  return () => pageTopicListeners.delete(listener);
+}
+
+/** Say what this page is about (`ASK_TOPICS`). `undefined`: say nothing. */
+export function useAskPageTopic(topic: string | undefined): void {
+  const surface = useId();
+  useLayoutEffect(() => {
+    if (!topic) return undefined;
+    pageTopics.set(surface, topic);
+    publishPageTopic();
+    return () => {
+      pageTopics.delete(surface);
+      publishPageTopic();
+    };
+  }, [surface, topic]);
+}
+
+/** The topic the page declared; `undefined` when it declared none. */
+export function useAskPageTopicValue(): string | undefined {
+  return useSyncExternalStore(
+    subscribePageTopic,
+    () => pageTopic,
+    () => undefined,
+  );
+}
+
 /** Tests only: forget every surface. */
 export function resetShownAskPrompts(): void {
   shownBySurface.clear();
   snapshot = NO_IDS;
+  pageTopics.clear();
+  pageTopic = undefined;
 }

@@ -1,16 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  AssistantRuntimeContext,
   useAssistantRuntime,
   type AssistantOpenRequest,
   type AssistantRuntime,
 } from '../../contexts/assistant-runtime-context';
 import { useInView } from '../../hooks/ui/use-in-view';
 import { AskCard } from '../chat/ask-prompts';
+import { ASK_TOPICS } from '../chat/ask-topics';
 import {
   assistantAvailable,
   ASK_PROMPTS_DEFAULT_COUNT,
+  useAskPageTopicValue,
   useAskPrompts,
   useAssistantOpen,
   useShownAskPromptIds,
@@ -21,9 +24,10 @@ export interface FaqAskOptions {
   /**
    * What this FAQ is about: ANY string the host's questions endpoint knows (it
    * is sent as `section`, and reported with every click). Questions written
-   * for the topic are picked first. Absent: the host's default FAQ section
-   * (`AssistantRuntime.askCard.topic`), else `FAQ_ASK_TOPIC`. A FAQ about one
-   * thing (a product area, a page) states its own.
+   * for the topic are picked first. Absent: what the PAGE says it is about
+   * (`useAskPageTopic`: the onboarding guides, the roadmap, the Trust Center),
+   * else the host's default (`AssistantRuntime.askCard.topic`), else
+   * `ASK_TOPICS.faq`.
    */
   topic?: string;
   /**
@@ -44,14 +48,6 @@ export interface FaqAskOptions {
    */
   onOpen?: (request: AssistantOpenRequest) => void;
 }
-
-/**
- * The topic of a FAQ's card when the host states none: the questions a host
- * wrote for its FAQ. A card with no topic at all would get only the questions
- * written for no place, which a host that sorts its questions by place has
- * none of.
- */
-export const FAQ_ASK_TOPIC = 'faq';
 
 /** The lib's own wording, when neither the host nor the runtime states it. */
 const DEFAULT_ASK_CARD = {
@@ -80,7 +76,8 @@ export function faqAskCardShown(assistant: AssistantRuntime | null): assistant i
  */
 export function FaqAskCard({ topic: ownTopic, exclude, count, title, description, onOpen }: FaqAskOptions) {
   const assistant = useAssistantRuntime();
-  const topic = ownTopic ?? assistant?.askCard?.topic ?? FAQ_ASK_TOPIC;
+  const pageTopic = useAskPageTopicValue();
+  const topic = ownTopic ?? pageTopic ?? assistant?.askCard?.topic ?? ASK_TOPICS.faq;
   const { ref, inView } = useInView<HTMLDivElement>({ rootMargin: PICK_ROOT_MARGIN });
   const [reached, setReached] = useState(false);
   if (inView && !reached) setReached(true);
@@ -95,25 +92,29 @@ export function FaqAskCard({ topic: ownTopic, exclude, count, title, description
     enabled: reached && excluded !== null,
   });
   const open = useAssistantOpen(topic, onOpen);
+  // The card's launcher opens the same chat as its questions, with the card's topic: it reads the runtime.
+  const scoped = useMemo(() => (assistant ? { ...assistant, open } : null), [assistant, open]);
 
   if (!faqAskCardShown(assistant) || !assistant.name) return null;
   const name = assistant.name;
   const cardDescription = description ?? assistant.askCard?.description ?? DEFAULT_ASK_CARD.description;
   return (
-    <div ref={ref}>
-      <AskCard
-        title={fillAssistant(title ?? assistant.askCard?.title ?? DEFAULT_ASK_CARD.title, name)}
-        description={cardDescription ? fillAssistant(cardDescription, name) : undefined}
-        prompts={prompts}
-        // Fixed slots, one question per row: chip skeletons until the pick lands, the same box after.
-        count={supported ? slots : 0}
-        loading={isLoading}
-        source={assistant.source}
-        label={name}
-        icon={assistant.icon}
-        onOpen={open}
-        onAsk={prompt => assistant.onAsk?.({ promptId: prompt.id, topic })}
-      />
-    </div>
+    <AssistantRuntimeContext.Provider value={scoped}>
+      <div ref={ref}>
+        <AskCard
+          title={fillAssistant(title ?? assistant.askCard?.title ?? DEFAULT_ASK_CARD.title, name)}
+          description={cardDescription ? fillAssistant(cardDescription, name) : undefined}
+          prompts={prompts}
+          // Fixed slots, one question per row: chip skeletons until the pick lands, the same box after.
+          count={supported ? slots : 0}
+          loading={isLoading}
+          source={assistant.source}
+          label={name}
+          icon={assistant.icon}
+          onOpen={open}
+          onAsk={prompt => assistant.onAsk?.({ promptId: prompt.id, topic })}
+        />
+      </div>
+    </AssistantRuntimeContext.Provider>
   );
 }

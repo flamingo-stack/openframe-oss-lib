@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useEffect, useRef } from 'react';
+import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
@@ -30,15 +31,12 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
    *  component, so every Mingo launcher carries the same identity, ring and
    *  event. */
   variant?: 'inline' | 'button' | 'field';
-  /**
-   * What a click (and the shortcut) does. Absent: the `ask-ai:open` event of
-   * `source` (`openAskAi`). A launcher that opens another chat (an embedded
-   * one) passes its own.
-   */
-  onOpen?: () => void;
 }
 
 const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
+
+/** The launcher's name when neither the host nor the assistant runtime names the assistant. */
+const DEFAULT_LABEL = 'Mingo AI';
 
 /** The event the mounted chat panel (`EmbeddableChat`) opens on. */
 export const ASK_AI_OPEN_EVENT = 'ask-ai:open';
@@ -84,11 +82,10 @@ export function openAskAi(source?: string, options?: { prompt?: string }): void 
  */
 export function MingoAiButton({
   source,
-  icon,
-  label = 'Mingo AI',
+  icon: iconProp,
+  label: labelProp,
   shortcutHint = false,
   variant = 'inline',
-  onOpen,
   className,
   onClick,
   ...props
@@ -100,12 +97,21 @@ export function MingoAiButton({
   const inPage = variant === 'button';
 
   const commandKey = visitor.known && usesCommandKey(visitor.os);
-  // The latest `onOpen`, for the shortcut listener: a host's inline callback must not re-bind it every render.
-  const onOpenRef = useRef(onOpen);
+  // The launcher is the assistant's: its name, glyph and the chat it opens are
+  // the assistant runtime's (the host's server-resolved identity and its own
+  // opener), so no launcher types a name or assumes which chat exists. A prop
+  // still wins (a header given its own); with no runtime the lib's own
+  // defaults apply, and the open is the `ask-ai:open` event of `source`.
+  const assistant = useAssistantRuntime();
+  const label = labelProp ?? assistant?.name ?? DEFAULT_LABEL;
+  const icon = iconProp ?? assistant?.icon;
+  const runtimeOpen = assistant?.open;
+  const eventSource = source ?? assistant?.source;
+  // The latest opener, for the shortcut listener: a host's inline callback must not re-bind it every render.
+  const openRef = useRef<() => void>(() => undefined);
   useEffect(() => {
-    onOpenRef.current = onOpen;
+    openRef.current = () => (runtimeOpen ? runtimeOpen({}) : openAskAi(eventSource));
   });
-  const open = () => (onOpenRef.current ? onOpenRef.current() : openAskAi(source));
 
   // The shortcut the key cap shows opens the same chat the click opens.
   useEffect(() => {
@@ -118,12 +124,11 @@ export function MingoAiButton({
       const modifier = commandKey ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
       if (event.key.toLowerCase() !== 'k' || !modifier) return;
       event.preventDefault();
-      if (onOpenRef.current) onOpenRef.current();
-      else openAskAi(source);
+      openRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [shortcutHint, source, commandKey]);
+  }, [shortcutHint, commandKey]);
 
   return (
     <Button
@@ -135,7 +140,8 @@ export function MingoAiButton({
       aria-label={label}
       aria-keyshortcuts={shortcutHint && visitor.known ? (commandKey ? 'Meta+K' : 'Control+K') : undefined}
       onClick={e => {
-        open();
+        if (runtimeOpen) runtimeOpen({});
+        else openAskAi(eventSource);
         onClick?.(e);
       }}
       className={cn(

@@ -1,6 +1,11 @@
 'use client';
 
-import { useAssistantRuntime, type AssistantOpenRequest } from '../../contexts/assistant-runtime-context';
+import { useMemo } from 'react';
+import {
+  AssistantRuntimeContext,
+  useAssistantRuntime,
+  type AssistantOpenRequest,
+} from '../../contexts/assistant-runtime-context';
 import { AskPrompts, type AskPromptsProps } from './ask-prompts';
 import {
   assistantAvailable,
@@ -50,20 +55,24 @@ export function AssistantAskPrompts({
   const shown = assistantAvailable(assistant) && supported;
   // Nothing to say where the row shows nothing; `null` while its pick is on its way.
   useShownAskPrompts(shown ? (isLoading ? null : prompts.map(prompt => prompt.id)) : undefined);
+  // The row's launcher opens the same chat as its questions, with the row's topic: it reads the runtime.
+  const scoped = useMemo(() => (assistant ? { ...assistant, open } : null), [assistant, open]);
   if (!shown) return null;
   return (
-    <AskPrompts
-      prompts={prompts}
-      loading={isLoading || loading}
-      count={count}
-      source={assistant.source}
-      label={label ?? assistant.name ?? undefined}
-      icon={assistant.icon}
-      onOpen={open}
-      onAsk={prompt => assistant.onAsk?.({ promptId: prompt.id, topic })}
-      align={align}
-      fadeColor={fadeColor}
-      className={className}
-    />
+    <AssistantRuntimeContext.Provider value={scoped}>
+      <AskPrompts
+        prompts={prompts}
+        loading={isLoading || loading}
+        count={count}
+        source={assistant.source}
+        label={label ?? assistant.name ?? undefined}
+        icon={assistant.icon}
+        onOpen={open}
+        onAsk={prompt => assistant.onAsk?.({ promptId: prompt.id, topic })}
+        align={align}
+        fadeColor={fadeColor}
+        className={className}
+      />
+    </AssistantRuntimeContext.Provider>
   );
 }

@@ -15,8 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssistantRuntimeContext, type AssistantRuntime } from '../../../contexts/assistant-runtime-context';
 import type { Faq } from '../../../types/faq';
 import { AssistantAskPrompts } from '../../chat/assistant-ask-prompts';
-import { buildAskPromptsUrl, resetShownAskPrompts } from '../../chat/hooks/use-ask-prompts';
-import { ASK_AI_OPEN_EVENT } from '../../navigation/mingo-ai-button';
+import { buildAskPromptsUrl, resetShownAskPrompts, useAskPageTopic } from '../../chat/hooks/use-ask-prompts';
+import { ASK_AI_OPEN_EVENT, MingoAiButton } from '../../navigation/mingo-ai-button';
 import { FaqSection } from '../faq-section';
 
 const FAQS = [{ id: 1, question: 'What is OpenFrame?', answer: 'A platform.', section: null }] as unknown as Faq[];
@@ -185,6 +185,57 @@ describe('FaqSection ask card', () => {
       source: 'flamingo',
       prompt: 'Explain the pricing',
     });
+    window.removeEventListener(ASK_AI_OPEN_EVENT, siteChat);
+  });
+});
+
+function PageAbout({ topic, children }: { topic: string; children: ReactNode }) {
+  useAskPageTopic(topic);
+  return <>{children}</>;
+}
+
+describe('the page topic', () => {
+  it("makes every FAQ on the page ask for what the page is about, over the host's default", async () => {
+    renderFaq(
+      { ...RUNTIME, askCard: { topic: 'host-default' } },
+      <PageAbout topic="onboarding">
+        <FaqSection initialFaqs={FAQS} />
+      </PageAbout>,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('onboarding');
+  });
+
+  it("gives way to the FAQ's own topic", async () => {
+    renderFaq(
+      RUNTIME,
+      <PageAbout topic="onboarding">
+        <FaqSection initialFaqs={FAQS} ask={{ topic: 'releases' }} />
+      </PageAbout>,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('releases');
+  });
+});
+
+describe('MingoAiButton', () => {
+  it('takes its name and its opener from the assistant runtime, with no prop', () => {
+    const open = vi.fn();
+    const siteChat = vi.fn();
+    window.addEventListener(ASK_AI_OPEN_EVENT, siteChat);
+    renderFaq({ ...RUNTIME, name: 'Server Name', open }, <MingoAiButton />);
+    fireEvent.click(screen.getByRole('button', { name: 'Server Name' }));
+    expect(open).toHaveBeenCalledWith({});
+    expect(siteChat).not.toHaveBeenCalled();
+    window.removeEventListener(ASK_AI_OPEN_EVENT, siteChat);
+  });
+
+  it('falls back to its own name and the site event with no runtime', () => {
+    const siteChat = vi.fn();
+    window.addEventListener(ASK_AI_OPEN_EVENT, siteChat);
+    render(<MingoAiButton source="flamingo" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Mingo AI' }));
+    expect((siteChat.mock.calls[0][0] as CustomEvent).detail).toEqual({ source: 'flamingo' });
     window.removeEventListener(ASK_AI_OPEN_EVENT, siteChat);
   });
 });

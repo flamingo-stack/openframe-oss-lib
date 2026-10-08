@@ -36,9 +36,9 @@ export interface AskPromptsProps {
   /** The assistant's configured glyph. Absent: the packaged Mingo mark. */
   icon?: ReactNode;
   /**
-   * How the chat is opened, and asked when `prompt` is set. Absent: the
-   * `ask-ai:open` event of `source` (`openAskAi`). A block that belongs to
-   * another chat (an embedded one) passes its own.
+   * How a question opens the chat and asks it. Absent: the `ask-ai:open`
+   * event of `source` (`openAskAi`). The launcher beside the questions takes
+   * its opener from the assistant runtime, never from here.
    */
   onOpen?: (request: { prompt?: string }) => void;
   /** After the chat was asked (analytics). */
@@ -164,14 +164,7 @@ export function AskPrompts({
       className="w-full min-w-0 content-md:w-auto"
       scrollClassName={cn(ASK_PROMPTS_ROW_CLASS, end ? 'content-md:items-end' : 'content-md:items-start', className)}
     >
-      <MingoAiButton
-        variant="button"
-        source={source}
-        label={label}
-        icon={icon}
-        onOpen={onOpen && (() => onOpen({}))}
-        className="shrink-0"
-      />
+      <MingoAiButton variant="button" source={source} label={label} icon={icon} className="shrink-0" />
       <QuestionChips
         prompts={prompts}
         count={count}
@@ -247,7 +240,6 @@ export function AskCard({
         source={source}
         label={label}
         icon={icon}
-        onOpen={onOpen && (() => onOpen({}))}
         shortcutHint={shortcutHint}
         className="self-start"
       />

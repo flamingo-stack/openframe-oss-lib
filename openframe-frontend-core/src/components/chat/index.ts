@@ -24,6 +24,7 @@ export * from './chat-message-skeleton';
 
 export * from './quick-action-chip';
 export * from './ask-prompts';
+export * from './ask-topics';
 export * from './assistant-ask-prompts';
 export * from './quick-action-marquee';
 export * from './quick-action-wall';
