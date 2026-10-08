@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -38,20 +39,17 @@ public class DeliveryRecorder {
         if (repository.existsByIdAndDispatchId(id, dispatchId)) {
             return false;
         }
-        // a rollout gives all its rows the sequence it started with: one decision, one number
-        if (!hasSequence(delivery)) {
-            int sequence = sequences.next();
-            delivery.setSequence(sequence);
-        }
+        int sequence = sequenceOf(delivery);
+        delivery.setSequence(sequence);
         MachineDelivery row = pendingRow(request, id);
         repository.upsertPending(row);
-        log.info("Delivery recorded: type={} targetId={} machineId={} sequence={}",
-                type, targetId, machineId, delivery.getSequence());
+        log.info("Delivery recorded: type={} targetId={} machineId={} sequence={}", type, targetId, machineId, sequence);
         return true;
     }
 
-    private static boolean hasSequence(DeliveryRef delivery) {
-        return delivery.getSequence() != null;
+    // a rollout gives all its rows the sequence it started with; a single dispatch takes the next one
+    private int sequenceOf(DeliveryRef delivery) {
+        return Optional.ofNullable(delivery.getSequence()).orElseGet(sequences::next);
     }
 
     private MachineDelivery pendingRow(DeliveryRequest<?> request, String id) {

@@ -33,8 +33,12 @@ public class LocalDeliverySink implements DeliverySink {
     public void accept(DeliveryRequest<?> request) {
         if (request.isForEveryMachine()) {
             rollouts.record(request);
-            return;
+        } else {
+            dispatchToMachine(request);
         }
+    }
+
+    private void dispatchToMachine(DeliveryRequest<?> request) {
         DeliveryType type = request.getType();
         String machineId = request.getMachineId();
         boolean recorded = recorder.record(request);
