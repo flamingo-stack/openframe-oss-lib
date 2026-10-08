@@ -205,6 +205,7 @@ impl LogStreamingRunManager {
                 connection,
                 self.hostname,
                 self.tenant_domain,
+                self.initial_config_service,
                 self.agent_config_service,
                 self.log_file_path,
             )
@@ -301,6 +302,7 @@ async fn log_streaming_loop(
     connection: NatsLogConnection,
     hostname: String,
     tenant_domain: String,
+    initial_config_service: InitialConfigurationService,
     agent_config_service: AgentConfigurationService,
     main_log_path: PathBuf,
 ) {
@@ -323,11 +325,16 @@ async fn log_streaming_loop(
         }
 
         let machine_id = agent_config_service.get_machine_id().ok();
+        let organization_id = initial_config_service
+            .get_org_id()
+            .ok()
+            .filter(|id| !id.trim().is_empty());
 
         let batch = LogBatchMessage {
             machine_id,
             hostname: hostname.clone(),
             tenant_domain: tenant_domain.clone(),
+            organization_id,
             logs,
         };
 
