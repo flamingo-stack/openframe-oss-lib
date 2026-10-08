@@ -91,6 +91,11 @@ const OpenmspLogoIcon: IconComponent = ({ size = 16, className }) => (
   />
 );
 const FlamingoLogoIcon = sizedLogo(FlamingoLogo);
+// The same mark as a GLYPH: it takes the colour of the slot it sits in, like every icon beside it (a source
+// chip, a command row, a card), where the brand pink would be the one coloured icon in the list.
+const FlamingoLogoGreyIcon: IconComponent = ({ size = 16, className, color }) => (
+  <FlamingoLogo className={className} fill={color ?? 'currentColor'} style={{ width: size, height: size }} />
+);
 // The two community marks size themselves through a `size` prop, the resolver's own contract.
 // Major League GitHub draws its mark in the theme's text colour on its own site
 // (its header, hero and footer), never in an accent: so does every glyph of it.
@@ -174,6 +179,7 @@ export const ICON_ALIASES: Record<string, IconComponent> = {
   'tmcg-logo': TmcgLogoIcon,
   flamingo: FlamingoLogoIcon,
   'flamingo-logo': FlamingoLogoIcon,
+  'flamingo-logo-grey': FlamingoLogoGreyIcon,
   megaphone: Megaphone,
   bell: Bell,
   info: Info,
