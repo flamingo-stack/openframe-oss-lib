@@ -20,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -69,12 +70,33 @@ class LocalDeliverySinkTest {
                 .payload(payload)
                 .build();
 
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.canDeliverToEveryMachine()).thenReturn(true);
+
         // execution
         sink.accept(forEveryMachine);
 
         // verifications
         verify(rollouts).record(forEveryMachine);
-        verifyNoInteractions(recorder, publisher, registry);
+        verifyNoInteractions(recorder, publisher);
+    }
+
+    @Test
+    void accept_wildcardOnATypeThatDeliversToOneMachineAtATime_goesTheOrdinaryWay() {
+        // setup
+        DeliveryRequest<ToolInstallationMessage> forEveryMachine = DeliveryRequest.<ToolInstallationMessage>builder()
+                .type(DeliveryType.TOOL_INSTALLATION)
+                .targetId(TARGET_ID)
+                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.canDeliverToEveryMachine()).thenReturn(false);
+        when(recorder.record(forEveryMachine)).thenThrow(new IllegalArgumentException("A wildcard is not a machine"));
+
+        // execution + verifications
+        assertThatThrownBy(() -> sink.accept(forEveryMachine)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(rollouts, publisher);
     }
 
     @Test

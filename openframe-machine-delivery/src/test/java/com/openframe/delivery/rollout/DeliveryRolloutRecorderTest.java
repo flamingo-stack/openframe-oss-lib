@@ -7,12 +7,8 @@ import com.openframe.data.document.delivery.MachineDeliveryRollout;
 import com.openframe.data.repository.delivery.MachineDeliveryRolloutRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
-import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
-import com.openframe.delivery.spec.DeliverySeed;
-import com.openframe.delivery.spec.DeliverySpec;
-import com.openframe.delivery.spec.DeliverySpecRegistry;
 import com.openframe.delivery.spec.TestPayload;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,10 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,8 +30,6 @@ class DeliveryRolloutRecorderTest {
 
     @Mock private MachineDeliveryRolloutRepository repository;
     @Mock private MachineDeliverySequenceRepository sequences;
-    @Mock private DeliverySpecRegistry registry;
-    @Mock private DeliverySpec<DeliverySeed, DeliveryPayload> spec;
 
     @Captor private ArgumentCaptor<MachineDeliveryRollout> rolloutCaptor;
 
@@ -47,7 +38,7 @@ class DeliveryRolloutRecorderTest {
 
     @BeforeEach
     void setUp() {
-        recorder = new DeliveryRolloutRecorder(repository, sequences, registry, new DeliveryPayloadJson(new ObjectMapper()));
+        recorder = new DeliveryRolloutRecorder(repository, sequences, new DeliveryPayloadJson(new ObjectMapper()));
         TestPayload payload = new TestPayload();
         payload.setValue("1.5.11");
         payload.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UPDATE, TARGET_ID, "d-rollout"));
@@ -57,13 +48,11 @@ class DeliveryRolloutRecorderTest {
                 .machineId(DeliveryRequest.EVERY_MACHINE)
                 .payload(payload)
                 .build();
-        doReturn(spec).when(registry).require(DeliveryType.CLIENT_UPDATE);
     }
 
     @Test
     void record_requestForEveryMachine_rolloutSavedAtTheStartWithOneSequence() {
         // setup
-        when(spec.canDeliverToEveryMachine()).thenReturn(true);
         when(sequences.next()).thenReturn(SEQUENCE);
 
         // execution
@@ -81,15 +70,5 @@ class DeliveryRolloutRecorderTest {
         assertThat(rollout.getDispatched()).isZero();
         assertThat(rollout.getStartedAt()).isNotNull();
         assertThat(rollout.getPayloadJson()).contains("1.5.11");
-    }
-
-    @Test
-    void record_typeThatDeliversToOneMachineAtATime_rejectedNothingSaved() {
-        // setup
-        when(spec.canDeliverToEveryMachine()).thenReturn(false);
-
-        // execution + verifications
-        assertThatThrownBy(() -> recorder.record(request)).isInstanceOf(IllegalArgumentException.class);
-        verifyNoInteractions(repository, sequences);
     }
 }

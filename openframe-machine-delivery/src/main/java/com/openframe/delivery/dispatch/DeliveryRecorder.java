@@ -30,6 +30,9 @@ public class DeliveryRecorder {
 
     public DeliveryRecordOutcome record(DeliveryRequest<?> request) {
         DeliveryType type = request.getType();
+        if (request.isForEveryMachine()) {
+            throw new IllegalArgumentException("A wildcard is not a machine, the type is not rolled out: " + type);
+        }
         String targetId = request.getTargetId();
         String machineId = request.getMachineId();
         String id = DeliveryId.of(type, targetId, machineId);

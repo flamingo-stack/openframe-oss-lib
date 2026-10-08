@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -142,5 +143,20 @@ class DeliveryRecorderTest {
 
         // verifications
         assertThat(outcome).isEqualTo(DeliveryRecordOutcome.OUTRANKED);
+    }
+
+    @Test
+    void record_wildcardMachine_rejectedNothingWritten() {
+        // setup
+        DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
+                .type(DeliveryType.CLIENT_UNINSTALL)
+                .targetId(MACHINE_ID)
+                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+
+        // execution + verifications
+        assertThatThrownBy(() -> recorder.record(forEveryMachine)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(repository, sequences);
     }
 }

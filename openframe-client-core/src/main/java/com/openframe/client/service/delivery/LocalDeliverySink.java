@@ -33,11 +33,20 @@ public class LocalDeliverySink implements DeliverySink {
 
     @Override
     public void accept(DeliveryRequest<?> request) {
-        if (request.isForEveryMachine()) {
+        if (isRollout(request)) {
             rollouts.record(request);
         } else {
             dispatchToMachine(request);
         }
+    }
+
+    // every machine, of a type that may be rolled out; anything else goes the ordinary way and fails there if it must
+    private boolean isRollout(DeliveryRequest<?> request) {
+        if (!request.isForEveryMachine()) {
+            return false;
+        }
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(request.getType());
+        return spec.canDeliverToEveryMachine();
     }
 
     private void dispatchToMachine(DeliveryRequest<?> request) {
