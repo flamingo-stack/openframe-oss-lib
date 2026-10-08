@@ -15,6 +15,8 @@ pub(super) fn run_direct(rt: &Runtime) {
     info!("Running in direct mode (without service wrapper)");
     PermissionUtils::warn_missing_capabilities();
 
+    // Direct mode is interactive, so it reports the missing configuration and
+    // exits instead of idling like the service does.
     if !is_configured() {
         println!(
             "Not authenticated yet. Run 'openframe-client auth' with your tenant parameters first."

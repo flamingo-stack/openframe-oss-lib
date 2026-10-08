@@ -65,6 +65,8 @@ fn save_authentication(params: InstallConfigParams) {
 }
 
 fn restart_service(rt: &Runtime) -> ! {
+    // Restart so the new configuration is picked up now — and so a
+    // re-auth on an already-running client takes effect at all.
     match rt.block_on(Service::nudge_restart()) {
         Ok(()) => {
             println!("Authentication saved. The device will register shortly.");

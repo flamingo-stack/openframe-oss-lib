@@ -24,6 +24,9 @@ pub(super) fn run(args: InstallArgs, rt: &Runtime) {
 }
 
 fn preflight(params: &InstallConfigParams, parameterless: bool, rt: &Runtime) -> DoctorReport {
+    // A parameterless (package-manager) install validates only what this step
+    // does — admin and the environment. Argument, network and WebView2 checks
+    // move to `auth`, where the tenant parameters finally exist.
     let report = if parameterless {
         crate::doctor::run_preinstall_parameterless()
     } else {
