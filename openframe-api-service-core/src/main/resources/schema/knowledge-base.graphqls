@@ -22,6 +22,23 @@ input KnowledgeBaseFilterInput {
     parentId: ID
     type: KnowledgeBaseItemType
     tagIds: [ID]
+    """
+    How far below parentId to look, for folders and articles alike. Omitted: CHILDREN, or
+    DESCENDANTS when the listing carries a search or tagIds.
+    """
+    scope: KnowledgeBaseScope
+}
+
+"""
+The reach of a knowledgeBaseItems listing. An absent parentId cannot say it on its own: it already
+means the root level, so it cannot also mean every level. In both scopes folders come first, by
+name (case-insensitive, digits by value), then articles, most recently updated first.
+"""
+enum KnowledgeBaseScope {
+    "The items directly under parentId; the root level when there is none."
+    CHILDREN
+    "Everything under parentId at any depth; the whole knowledge base when there is none."
+    DESCENDANTS
 }
 
 extend type Mutation {
@@ -93,6 +110,8 @@ type KnowledgeBaseItem implements AssignableTarget & Node {
     type: KnowledgeBaseItemType!
     name: String!
     parentId: ID
+    "The folder this item is in; null at the root level."
+    parent: KnowledgeBaseItem
     slug: String
     sortOrder: Int
     content: String
@@ -138,14 +157,36 @@ input CreateArticleInput {
     assignedDeviceIds: [ID!]
     assignedTicketIds: [ID!]
     assignedKnowledgeArticleIds: [ID!]
+    "Ids of temp attachments, already uploaded, to attach to the new article."
+    attachmentTempIds: [ID!]
 }
 
+"""
+One save of an article — everything the edit form can change, in a single mutation. A field left
+out (or null) is not touched; an empty list means none.
+"""
 input UpdateArticleInput {
     id: ID!
     name: String
+    "The folder to move the article into. Null leaves it where it is — see moveToRoot."
     parentId: ID
+    "True moves the article to the root level, which a null parentId cannot ask for."
+    moveToRoot: Boolean
     content: String
     summary: String
+    "DRAFT or PUBLISHED sets that status, restoring an archived article on the way; ARCHIVED archives it."
+    status: KnowledgeBaseArticleStatus
+    "The tags the article has after the save."
+    tagIds: [ID!]
+    "The assignments of each kind the article has after the save."
+    assignedOrganizationIds: [ID!]
+    assignedDeviceIds: [ID!]
+    assignedTicketIds: [ID!]
+    assignedKnowledgeArticleIds: [ID!]
+    "Ids of temp attachments, already uploaded, to attach."
+    attachmentTempIds: [ID!]
+    "Ids of this article's attachments to delete."
+    deleteAttachmentIds: [ID!]
 }
 
 enum KnowledgeBaseItemType {
