@@ -1,19 +1,17 @@
-package com.openframe.api.dto.packagesearch;
+package com.openframe.data.repository.packagesearch;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PackageSearchResult {
+public class PackageCatalogPage {
 
-    private List<PackageSearchHit> hits;
-    private Integer total;
+    private List<PackageCatalogHit> hits;
+    private long total;
     private boolean hasMore;
 }

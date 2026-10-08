@@ -151,8 +151,8 @@ export interface ReleaseKeepingModalProps {
   keptOn: string;
   /** The reason as it reads in the sentence, e.g. "Client dispute". */
   reason: string;
-  /** The ticket or reference the Keep was placed for. */
-  ticket?: string | null;
+  /** The tickets assigned to the recording, as they read in the line, e.g. "TKT-4631"; the line is left out without any. */
+  tickets?: string[];
   /** When the recording will be deleted once released, formatted. */
   expiresOn: string;
   /** The original expiry date when it has already passed, so the release adds the grace period. */
@@ -169,7 +169,7 @@ export function ReleaseKeepingModal({
   keptBy,
   keptOn,
   reason,
-  ticket,
+  tickets = [],
   expiresOn,
   dueOn,
   isPending = false,
@@ -185,7 +185,7 @@ export function ReleaseKeepingModal({
         <p>
           Kept by {keptBy} on {keptOn} for {reason}.
         </p>
-        {ticket && <p>Ticket: {ticket}</p>}
+        {tickets.length > 0 && <p>Ticket: {tickets.join(', ')}</p>}
       </div>
 
       <KeepNotice icon={<HourglassIcon size={24} color="currentColor" />} title={`It will expire on ${expiresOn}`}>
