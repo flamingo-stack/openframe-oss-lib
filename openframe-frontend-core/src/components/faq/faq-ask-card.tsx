@@ -9,7 +9,6 @@ import {
 } from '../../contexts/assistant-runtime-context';
 import { useInView } from '../../hooks/ui/use-in-view';
 import { AskCard } from '../chat/ask-prompts';
-import { ASK_TOPICS } from '../chat/ask-topics';
 import {
   assistantAvailable,
   ASK_PROMPTS_DEFAULT_COUNT,
@@ -24,7 +23,8 @@ export interface FaqAskOptions {
    * What this FAQ is about: ANY string the host's questions endpoint knows (it
    * is sent as `section`, and reported with every click). Questions written
    * for the topic are picked first. Whoever renders the FAQ passes it. Absent:
-   * `ASK_TOPICS.faq`, the general FAQ's questions.
+   * the entity the FAQ is attached to (`FaqSection`'s `entityType`). With
+   * neither, the FAQ has no card: the lib names no topic of its own.
    */
   topic?: string;
   /**
@@ -71,9 +71,8 @@ export function faqAskCardShown(assistant: AssistantRuntime | null): assistant i
  * height before and after the questions arrive. A host with no questions
  * endpoint gets the launcher with no questions.
  */
-export function FaqAskCard({ topic: ownTopic, exclude, count, title, description, onOpen }: FaqAskOptions) {
+export function FaqAskCard({ topic, exclude, count, title, description, onOpen }: FaqAskOptions & { topic: string }) {
   const assistant = useAssistantRuntime();
-  const topic = ownTopic ?? ASK_TOPICS.faq;
   const { ref, inView } = useInView<HTMLDivElement>({ rootMargin: PICK_ROOT_MARGIN });
   const [reached, setReached] = useState(false);
   if (inView && !reached) setReached(true);

@@ -57,13 +57,15 @@ export interface FaqSectionProps {
    */
   aside?: React.ReactNode;
   /**
-   * The "ask the assistant" card beside the questions. Shown by default
-   * wherever the host's assistant runtime says a chat is there to open
+   * The "ask the assistant" card beside the questions. Shown wherever the
+   * host's assistant runtime says a chat is there to open
    * (`AssistantRuntimeContext`: its name, glyph, questions endpoint and
-   * opener); with no such runtime the FAQ is the single column it always was.
-   * `false` switches the card off; an object shapes it: its `topic` (what this
-   * FAQ is about, any string), the questions to leave out, its wording, and
-   * the chat it opens (`onOpen`). An `aside` takes the card's place.
+   * opener) AND the FAQ has a topic: `ask.topic` (any string the host's
+   * questions endpoint knows), else the `entityType` the FAQ is attached to.
+   * No runtime or no topic: the FAQ is the single column it always was; the
+   * lib names no topic of its own. `false` switches the card off; the object
+   * also states the questions to leave out, the wording and the chat it opens
+   * (`onOpen`). An `aside` takes the card's place.
    */
   ask?: false | FaqAskOptions;
 }
@@ -408,8 +410,11 @@ export function FaqSection({
   ask,
 }: FaqSectionProps) {
   const assistant = useAssistantRuntime();
-  // The host's own block wins; else the card, where a chat is there to open.
-  const aside = asideProp ?? (ask !== false && faqAskCardShown(assistant) ? <FaqAskCard {...ask} /> : undefined);
+  // The host's own block wins; else the card, where a chat is there to open and the FAQ has a topic.
+  const askTopic = ask === false ? undefined : (ask?.topic ?? entityType);
+  const aside =
+    asideProp ??
+    (ask !== false && askTopic && faqAskCardShown(assistant) ? <FaqAskCard {...ask} topic={askTopic} /> : undefined);
   const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl);
   // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
   // wrapper object would setState-loop under re-rendering parents.

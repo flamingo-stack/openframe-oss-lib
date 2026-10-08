@@ -35,9 +35,6 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
 
 const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
 
-/** The launcher's name when neither the host nor the assistant runtime names the assistant. */
-const DEFAULT_LABEL = 'Mingo AI';
-
 /** The event the mounted chat panel (`EmbeddableChat`) opens on. */
 export const ASK_AI_OPEN_EVENT = 'ask-ai:open';
 
@@ -100,10 +97,11 @@ export function MingoAiButton({
   // The launcher is the assistant's: its name, glyph and the chat it opens are
   // the assistant runtime's (the host's server-resolved identity and its own
   // opener), so no launcher types a name or assumes which chat exists. A prop
-  // still wins (a header given its own); with no runtime the lib's own
-  // defaults apply, and the open is the `ask-ai:open` event of `source`.
+  // still wins (a header given its own). The lib holds no name of its own:
+  // with none from either, there is no launcher to render (below). With no
+  // runtime opener the open is the `ask-ai:open` event of `source`.
   const assistant = useAssistantRuntime();
-  const label = labelProp ?? assistant?.name ?? DEFAULT_LABEL;
+  const label = labelProp ?? assistant?.name;
   const icon = iconProp ?? assistant?.icon;
   const runtimeOpen = assistant?.open;
   const eventSource = source ?? assistant?.source;
@@ -129,6 +127,9 @@ export function MingoAiButton({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [shortcutHint, commandKey]);
+
+  // No name from the host or the runtime: nothing to launch under. The lib invents none.
+  if (!label) return null;
 
   return (
     <Button

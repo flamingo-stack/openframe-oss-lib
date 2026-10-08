@@ -71,7 +71,7 @@ const requestedUrl = () => String(fetchMock.mock.calls[0]?.[0]);
 
 describe('FaqSection ask card', () => {
   it('shows the card, with the assistant named, where a chat is available', async () => {
-    renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} />);
+    renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq' }} />);
 
     expect(screen.getByText('Still deciding?')).toBeInTheDocument();
     expect(screen.getByText('Mingo answers from our docs and customer stories.')).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe('FaqSection ask card', () => {
 
   it('shows no card with no runtime, an unavailable chat, or no name', () => {
     for (const runtime of [null, { ...RUNTIME, available: false }, { ...RUNTIME, name: null }]) {
-      const { unmount } = renderFaq(runtime, <FaqSection initialFaqs={FAQS} />);
+      const { unmount } = renderFaq(runtime, <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq' }} />);
       expect(screen.getByText('What is OpenFrame?')).toBeInTheDocument();
       expect(screen.queryByText('Still deciding?')).not.toBeInTheDocument();
       unmount();
@@ -95,7 +95,7 @@ describe('FaqSection ask card', () => {
   });
 
   it("gives way to the host's own aside", () => {
-    renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} aside={<p>Host block</p>} />);
+    renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq' }} aside={<p>Host block</p>} />);
     expect(screen.getByText('Host block')).toBeInTheDocument();
     expect(screen.queryByText('Still deciding?')).not.toBeInTheDocument();
   });
@@ -113,20 +113,27 @@ describe('FaqSection ask card', () => {
     expect(url.searchParams.get('exclude')).toBe('a,b');
   });
 
-  it("asks for the FAQ's own questions when the host states no topic, whatever entity it is attached to", async () => {
+  it('asks for the questions of the entity it is attached to when the host states no topic', async () => {
     renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} entityType="case_study" entityId={7} />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('faq');
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('case_study');
+  });
+
+  it('shows no card with no topic and no entity: the lib names no topic of its own', () => {
+    renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} />);
+    expect(screen.getByText('What is OpenFrame?')).toBeInTheDocument();
+    expect(screen.queryByText('Still deciding?')).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('waits while the page is still picking its own questions', () => {
-    renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} ask={{ exclude: null }} />);
+    renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq', exclude: null }} />);
     expect(screen.getByText('Still deciding?')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('shows the launcher with no questions on a host with no questions endpoint', () => {
-    renderFaq({ ...RUNTIME, askPromptsUrl: undefined }, <FaqSection initialFaqs={FAQS} />);
+    renderFaq({ ...RUNTIME, askPromptsUrl: undefined }, <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq' }} />);
     expect(screen.getByRole('button', { name: 'Mingo' })).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -165,7 +172,7 @@ describe('FaqSection ask card', () => {
   it('opens the site chat of the runtime source when no opener is supplied', async () => {
     const siteChat = vi.fn();
     window.addEventListener(ASK_AI_OPEN_EVENT, siteChat);
-    renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} />);
+    renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq' }} />);
 
     fireEvent.click(await screen.findByText('How does pricing work?'));
     expect(siteChat).toHaveBeenCalledTimes(1);
@@ -189,11 +196,16 @@ describe('MingoAiButton', () => {
     window.removeEventListener(ASK_AI_OPEN_EVENT, siteChat);
   });
 
-  it('falls back to its own name and the site event with no runtime', () => {
+  it('renders nothing with no name from the host or a runtime', () => {
+    const { container } = render(<MingoAiButton source="flamingo" />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('opens the site event of its source with no runtime', () => {
     const siteChat = vi.fn();
     window.addEventListener(ASK_AI_OPEN_EVENT, siteChat);
-    render(<MingoAiButton source="flamingo" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Mingo AI' }));
+    render(<MingoAiButton source="flamingo" label="Mingo" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Mingo' }));
     expect((siteChat.mock.calls[0][0] as CustomEvent).detail).toEqual({ source: 'flamingo' });
     window.removeEventListener(ASK_AI_OPEN_EVENT, siteChat);
   });

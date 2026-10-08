@@ -44,9 +44,8 @@ import {
   type TrustCenterSectionId,
 } from '../../types/trust-center';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
-import { ASK_TOPICS } from '../chat/ask-topics';
 import { useScrollSpy } from '../docs/use-scroll-spy';
-import { FaqSection } from '../faq/faq-section';
+import { FaqSection, type FaqSectionProps } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
@@ -84,6 +83,8 @@ export interface TrustCenterPageProps {
   title?: string;
   /** Page subtitle. Default the brand-neutral `TRUST_CENTER_TAGLINE` (a host adds its brand here). */
   subtitle?: string;
+  /** The FAQ section's "ask the assistant" card (`FaqSection`'s `ask`): the host states its topic. Absent: no card. */
+  ask?: FaqSectionProps['ask'];
 }
 
 /** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
@@ -143,9 +144,6 @@ function monitoringStatus(
     : { status: 'pending', label: 'Monitoring paused' };
 }
 
-/** The Trust Center FAQ's ask card asks for the Trust Center's questions. */
-const TRUST_CENTER_ASK = { topic: ASK_TOPICS.trustCenter } as const;
-
 export function TrustCenterPage({
   endpoint = TRUST_CENTER_API_PATH,
   initialData,
@@ -153,6 +151,7 @@ export function TrustCenterPage({
   backButton = false,
   title = TRUST_CENTER_TITLE,
   subtitle = TRUST_CENTER_TAGLINE,
+  ask,
 }: TrustCenterPageProps) {
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
     initialData,
@@ -236,7 +235,7 @@ export function TrustCenterPage({
       lead: TRUST_SECTION_LEADS.subprocessors,
       render: d => <SubprocessorsSection subprocessors={d.subprocessors} />,
     },
-    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} ask={TRUST_CENTER_ASK} /> },
+    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} ask={ask} /> },
     contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };
 
