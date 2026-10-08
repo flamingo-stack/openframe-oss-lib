@@ -18,6 +18,10 @@ export const ASK_TOPICS = {
   trustCenter: 'trust-center',
   customers: 'customers',
   pricing: 'pricing',
+  prompts: 'prompts',
+  howIWork: 'how-i-work',
+  whatIShipped: 'what-i-shipped',
+  investorUpdates: 'investor-updates',
 } as const;
 
 export type AskTopic = (typeof ASK_TOPICS)[keyof typeof ASK_TOPICS];
