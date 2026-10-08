@@ -228,6 +228,24 @@ describe('AssistantAskPrompts', () => {
     expect(screen.getByRole('button', { name: 'Mingo' })).toBeInTheDocument();
   });
 
+  it("leaves another assistant's rows out of its exclusions: one list per questions endpoint", async () => {
+    render(
+      <>
+        <AssistantRuntimeContext.Provider value={{ ...RUNTIME, askPromptsUrl: '/other/questions' }}>
+          <AssistantAskPrompts topic="pricing" count={1} />
+        </AssistantRuntimeContext.Provider>
+        <AssistantRuntimeContext.Provider value={RUNTIME}>
+          <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq' }} />
+        </AssistantRuntimeContext.Provider>
+      </>,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const card = fetchMock.mock.calls
+      .map(call => String(call[0]))
+      .find(url => url.startsWith('/api/quick-actions/questions'));
+    expect(new URL(card ?? '', 'https://host.test').searchParams.get('exclude')).toBeNull();
+  });
+
   it('renders nothing with no chat, and fetches nothing', () => {
     const { container } = renderFaq({ ...RUNTIME, available: false }, <AssistantAskPrompts topic="pricing" />);
     expect(container).toBeEmptyDOMElement();

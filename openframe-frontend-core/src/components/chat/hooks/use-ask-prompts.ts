@@ -102,26 +102,61 @@ export function useAssistantOpen(
 // ─── The questions the page already shows ────────────────────────────────────
 // Every surface that shows questions says which ones (`useShownAskPrompts`), so
 // a later surface (the FAQ's card) never repeats one, with no wiring by the
-// host. One page, one list: a module store, read through React's external-store
-// hook. `null` for a surface = it is still picking.
+// host. One list per QUESTIONS ENDPOINT (the runtime's `askPromptsUrl`): two
+// assistants on one page read different questions, and never leave out each
+// other's ids. A module store, read through React's external-store hook.
+// `null` for a surface = it is still picking.
 
-const shownBySurface = new Map<string, readonly string[] | null>();
-const listeners = new Set<() => void>();
 const NO_IDS: readonly string[] = [];
-let snapshot: readonly string[] | null = NO_IDS;
 
-function publish(): void {
-  const lists = [...shownBySurface.values()];
-  const next = lists.some(list => list === null) ? null : lists.flatMap(list => list ?? []);
-  const same = next === null ? snapshot === null : snapshot !== null && next.join(',') === snapshot.join(',');
-  if (same) return;
-  snapshot = next === null ? null : next.length > 0 ? next : NO_IDS;
-  for (const listener of listeners) listener();
+/** One endpoint's list: which questions each surface shows, and who is listening. */
+interface ShownList {
+  set(surface: string, ids: readonly string[] | null): void;
+  remove(surface: string): void;
+  subscribe(listener: () => void): () => void;
+  read(): readonly string[] | null;
 }
 
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+function createShownList(): ShownList {
+  const bySurface = new Map<string, readonly string[] | null>();
+  const listeners = new Set<() => void>();
+  let snapshot: readonly string[] | null = NO_IDS;
+  const publish = (): void => {
+    const lists = [...bySurface.values()];
+    const next = lists.some(list => list === null) ? null : lists.flatMap(list => list ?? []);
+    const same = next === null ? snapshot === null : snapshot !== null && next.join(',') === snapshot.join(',');
+    if (same) return;
+    snapshot = next === null ? null : next.length > 0 ? next : NO_IDS;
+    for (const listener of listeners) listener();
+  };
+  return {
+    set(surface, ids) {
+      bySurface.set(surface, ids);
+      publish();
+    },
+    remove(surface) {
+      bySurface.delete(surface);
+      publish();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    read: () => snapshot,
+  };
+}
+
+const shownLists = new Map<string, ShownList>();
+
+/** The list a surface belongs to: the questions endpoint of its assistant runtime. */
+function useShownList(): ShownList {
+  const scope = useAssistantRuntime()?.askPromptsUrl ?? '';
+  let list = shownLists.get(scope);
+  if (!list) {
+    list = createShownList();
+    shownLists.set(scope, list);
+  }
+  return list;
 }
 
 /**
@@ -131,30 +166,23 @@ function subscribe(listener: () => void): () => void {
  */
 export function useShownAskPrompts(ids: readonly string[] | null | undefined): void {
   const surface = useId();
+  const list = useShownList();
   const key = ids === undefined ? undefined : ids === null ? null : ids.join(',');
   // A layout effect: the list holds this surface before any reader's own effects run.
   useLayoutEffect(() => {
     if (key === undefined) return undefined;
-    shownBySurface.set(surface, key === null ? null : key ? key.split(',') : NO_IDS);
-    publish();
-    return () => {
-      shownBySurface.delete(surface);
-      publish();
-    };
-  }, [surface, key]);
+    list.set(surface, key === null ? null : key ? key.split(',') : NO_IDS);
+    return () => list.remove(surface);
+  }, [list, surface, key]);
 }
 
-/** The ids of the questions the page's other surfaces show; `null` while one of them is still picking. */
+/** The ids of the questions the page's other surfaces of the same assistant show; `null` while one is still picking. */
 export function useShownAskPromptIds(): readonly string[] | null {
-  return useSyncExternalStore(
-    subscribe,
-    () => snapshot,
-    () => NO_IDS,
-  );
+  const list = useShownList();
+  return useSyncExternalStore(list.subscribe, list.read, () => NO_IDS);
 }
 
 /** Tests only: forget every surface. */
 export function resetShownAskPrompts(): void {
-  shownBySurface.clear();
-  snapshot = NO_IDS;
+  shownLists.clear();
 }

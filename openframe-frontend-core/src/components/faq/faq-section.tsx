@@ -410,8 +410,9 @@ export function FaqSection({
   ask,
 }: FaqSectionProps) {
   const assistant = useAssistantRuntime();
-  // The host's own block wins; else the card, where a chat is there to open and the FAQ has a topic.
-  const askTopic = ask === false ? undefined : (ask?.topic ?? entityType);
+  // The host's own block wins; else the card, where a chat is there to open and the FAQ has a topic
+  // (an empty topic is no topic, as the questions request reads it).
+  const askTopic = ask === false ? undefined : ask?.topic || entityType;
   const aside =
     asideProp ??
     (ask !== false && askTopic && faqAskCardShown(assistant) ? <FaqAskCard {...ask} topic={askTopic} /> : undefined);
