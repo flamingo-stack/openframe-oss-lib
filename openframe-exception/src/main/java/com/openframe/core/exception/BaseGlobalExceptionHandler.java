@@ -114,7 +114,7 @@ public class BaseGlobalExceptionHandler {
     @ExceptionHandler(MissingRequestHeaderException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleMissingRequestHeader(MissingRequestHeaderException ex) {
-        log.error("Missing required header: ", ex);
+        log.warn("Missing required header: {}", ex.getHeaderName());
         return ErrorResponse.of(ErrorCode.BAD_REQUEST, "Required header '" + ex.getHeaderName() + "' is missing");
     }
 
