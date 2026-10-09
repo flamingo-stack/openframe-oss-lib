@@ -23,7 +23,7 @@
  * The chrome is the canonical `PageShell` + frozen `PageLayout`.
  */
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, type ComponentType, type ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
@@ -40,6 +40,7 @@ import {
   type DownloadActionEvent,
   type DownloadsPublic,
 } from '../../types/downloads';
+import { cn } from '../../utils/cn';
 import {
   APP_STORE_URL,
   DOWNLOAD_PAGE_STORE_PARAM,
@@ -57,7 +58,6 @@ import { PageLayout } from '../layout/page-layout';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { LoadError } from '../ui/error-state';
-import { FeatureCardGrid, type FeatureCardItem } from '../ui/feature-card';
 import { MobileAppQr } from '../ui/mobile-app-qr';
 import { StoreBadgeLinks } from '../ui/store-badges';
 
@@ -87,16 +87,36 @@ export interface DownloadAppsPageProps {
 
 const SECTIONS_CLASS = 'flex flex-col gap-[var(--spacing-system-xlf)]';
 const SECTION_CLASS = 'flex flex-col gap-[var(--spacing-system-lf)]';
-/** The frame around a card grid: the grid itself is only its hairlines. */
-const GRID_FRAME_CLASS = 'overflow-hidden rounded-md border border-ods-border bg-ods-card';
-const GRID_ITEM_CLASS = 'bg-transparent p-[var(--spacing-system-lf)]';
-const CARD_BODY_CLASS = 'flex flex-col gap-[var(--spacing-system-mf)]';
-const BUTTONS_CLASS = 'flex flex-col gap-[var(--spacing-system-sf)]';
+const CARDS_GRID_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-2';
+const CARD_CLASS =
+  'flex flex-col gap-[var(--spacing-system-lf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)]';
+const CARD_HEADER_CLASS = 'flex items-center gap-[var(--spacing-system-sf)]';
+const BUTTONS_CLASS = 'flex flex-wrap gap-[var(--spacing-system-sf)]';
+const COMMANDS_CLASS = 'flex flex-col gap-[var(--spacing-system-mf)]';
 
-const OS_ICONS: Partial<Record<DesktopOs, NonNullable<FeatureCardItem['icon']>>> = {
+const OS_ICONS: Partial<Record<DesktopOs, ComponentType<{ className?: string }>>> = {
   mac: AppleLogoIcon,
   windows: WindowsLogoGreyIcon,
 };
+
+/** A card's heading row: a small logo, the name, and one quiet line of detail at the far end. */
+function CardHeader({
+  icon: Icon,
+  title,
+  detail,
+}: {
+  icon?: ComponentType<{ className?: string }>;
+  title: string;
+  detail?: string;
+}) {
+  return (
+    <div className={CARD_HEADER_CLASS}>
+      {Icon && <Icon className="h-6 w-6 shrink-0 text-ods-text-secondary" />}
+      <h3 className="m-0 text-ods-text-primary text-h3">{title}</h3>
+      {detail && <p className="m-0 ml-auto text-right text-ods-text-secondary text-h6">{detail}</p>}
+    </div>
+  );
+}
 
 interface SystemRows {
   os: DesktopOs;
@@ -121,8 +141,8 @@ function installerLabel(download: AppDownload, siblings: number): string {
   return siblings > 1 && architecture ? `${label} (${architecture})` : label;
 }
 
-/** One system's card body: its installers, then each package manager as one line. */
-function SystemCardBody({
+/** One system's card: its logo and name, its installers side by side, then each package manager as one line. */
+function SystemCard({
   system,
   onDownloadAction,
 }: {
@@ -133,10 +153,16 @@ function SystemCardBody({
     successTitle: 'Copied',
     successDescription: 'Paste it into your terminal and press Return.',
   });
+  const requirements = [...new Set(system.installers.map(d => d.minOsLabel).filter((l): l is string => !!l))];
   const report = (action: DownloadActionEvent['action'], row: AppDownload) =>
     onDownloadAction?.({ action, id: row.id, os: row.os, architecture: row.architecture });
   return (
-    <div className={CARD_BODY_CLASS}>
+    <div className={CARD_CLASS}>
+      <CardHeader
+        icon={OS_ICONS[system.os]}
+        title={DESKTOP_OS_LABELS[system.os]}
+        detail={requirements.length > 0 ? `Requires ${requirements.join(' or ')}` : undefined}
+      />
       <div className={BUTTONS_CLASS}>
         {system.installers.map((download, index) => (
           <Button
@@ -145,56 +171,50 @@ function SystemCardBody({
             href={download.url ?? undefined}
             download
             leftIcon={<Download01Icon className="h-5 w-5" />}
-            className="w-full"
             onClick={() => report('installer', download)}
           >
             {installerLabel(download, system.installers.length)}
           </Button>
         ))}
       </div>
-      {system.commands.map(row =>
-        row.command ? (
-          <CommandBox
-            key={row.id}
-            title={row.label ?? undefined}
-            command={row.command}
-            maxLines={1}
-            commandClassName="text-ods-accent"
-            copyAriaLabel={`Copy the ${row.label ?? 'install'} command`}
-            onCopy={() => {
-              void copy(row.command as string);
-              report('command', row);
-            }}
-          />
-        ) : null,
+      {system.commands.length > 0 && (
+        <div className={COMMANDS_CLASS}>
+          {system.commands.map(row =>
+            row.command ? (
+              <CommandBox
+                key={row.id}
+                title={row.label ?? undefined}
+                command={row.command}
+                maxLines={1}
+                commandClassName="text-ods-accent"
+                copyAriaLabel={`Copy the ${row.label ?? 'install'} command`}
+                onCopy={() => {
+                  void copy(row.command as string);
+                  report('command', row);
+                }}
+              />
+            ) : null,
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-/** A system's card in the grid: its logo, its name, what it needs, then its ways in. */
-function systemItem(system: SystemRows, onDownloadAction: DownloadAppsPageProps['onDownloadAction']): FeatureCardItem {
-  const requirements = [...new Set(system.installers.map(d => d.minOsLabel).filter((l): l is string => !!l))];
-  const icon = OS_ICONS[system.os];
-  return {
-    ...(icon ? { icon } : {}),
-    title: DESKTOP_OS_LABELS[system.os],
-    ...(requirements.length > 0 ? { subtitle: `Requires ${requirements.join(' or ')}` } : {}),
-    content: <SystemCardBody system={system} onDownloadAction={onDownloadAction} />,
-  };
-}
-
-/** The grid's placeholder cards while the rows load: a title and subtitle bar each (the grid's own), and a button's box. */
-const LOADING_ITEMS: FeatureCardItem[] = ['mac', 'windows'].map(os => ({
-  title: os,
-  subtitle: os,
-  content: (
-    <div className={CARD_BODY_CLASS}>
-      <UnifiedSkeleton className="h-12 w-full rounded-md" />
-      <UnifiedSkeleton className="h-12 w-full rounded-md" />
+/** The cards while the rows load: the same grid and card frame, a button's box in each. */
+function DesktopSkeleton() {
+  return (
+    <div className={CARDS_GRID_CLASS} aria-busy="true" aria-label="Loading the installers">
+      {[0, 1].map(card => (
+        <div key={card} className={CARD_CLASS}>
+          <UnifiedSkeleton className="h-6 w-32 rounded" />
+          <UnifiedSkeleton className="h-12 w-56 rounded-md" />
+          <UnifiedSkeleton className="h-14 w-full rounded-md" />
+        </div>
+      ))}
     </div>
-  ),
-}));
+  );
+}
 
 function DesktopSection({
   data,
@@ -216,23 +236,16 @@ function DesktopSection({
     body = <LoadError message="Could not load the installers" onRetry={reload} />;
   } else if (!data) {
     if (!isLoading) return null;
-    body = (
-      <div className={GRID_FRAME_CLASS} aria-busy="true" aria-label="Loading the installers">
-        <FeatureCardGrid items={LOADING_ITEMS} columns={2} itemClassName={GRID_ITEM_CLASS} loading />
-      </div>
-    );
+    body = <DesktopSkeleton />;
   } else if (systems.length === 0) {
     // The deployment names no installer: the section is not shown.
     return null;
   } else {
     body = (
-      <div className={GRID_FRAME_CLASS}>
-        <FeatureCardGrid
-          items={systems.map(system => systemItem(system, onDownloadAction))}
-          columns={2}
-          itemClassName={GRID_ITEM_CLASS}
-          accentClassName="text-ods-text-secondary"
-        />
+      <div className={CARDS_GRID_CLASS}>
+        {systems.map(system => (
+          <SystemCard key={system.os} system={system} onDownloadAction={onDownloadAction} />
+        ))}
       </div>
     );
   }
@@ -296,35 +309,28 @@ export function DownloadAppsPage({
           <h2 id="download-mobile" className="m-0 text-ods-text-primary text-h2">
             Mobile app
           </h2>
-          <div className={GRID_FRAME_CLASS}>
-            <FeatureCardGrid
-              columns={2}
-              itemClassName={GRID_ITEM_CLASS}
-              accentClassName="text-ods-text-secondary"
-              items={[
-                {
-                  title: 'iPhone, iPad and Android',
-                  subtitle: 'Get alerts and respond to tickets on the go',
-                  content: (
-                    <StoreBadgeLinks
-                      appStoreUrl={APP_STORE_URL}
-                      googlePlayUrl={GOOGLE_PLAY_URL}
-                      openInNewTab={openStoresInNewTab}
-                    />
-                  ),
-                },
-                {
-                  title: 'Scan with your phone',
-                  subtitle: MOBILE_APP_INSTALL_HOST_PATH,
-                  // The plate is light on purpose: a QR code is read dark on light.
-                  content: (
-                    <div className="w-fit rounded-md bg-ods-bg-inverted p-[var(--spacing-system-sf)]">
-                      <MobileAppQr className="h-[120px] w-[120px]" />
-                    </div>
-                  ),
-                },
-              ]}
-            />
+          <div className={CARDS_GRID_CLASS}>
+            <div className={CARD_CLASS}>
+              <CardHeader title="iPhone, iPad and Android" />
+              <p className="m-0 text-ods-text-secondary text-h4">Get alerts and respond to tickets on the go.</p>
+              <StoreBadgeLinks
+                appStoreUrl={APP_STORE_URL}
+                googlePlayUrl={GOOGLE_PLAY_URL}
+                openInNewTab={openStoresInNewTab}
+              />
+            </div>
+            <div className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-center content-md:justify-between')}>
+              <div className="flex flex-col gap-[var(--spacing-system-sf)]">
+                <CardHeader title="Scan with your phone" />
+                <p className="m-0 text-ods-text-secondary text-h4">
+                  Point your camera at the code, or open {MOBILE_APP_INSTALL_HOST_PATH} on your phone.
+                </p>
+              </div>
+              {/* The plate is light on purpose: a QR code is read dark on light. */}
+              <div className="w-fit shrink-0 rounded-md bg-ods-bg-inverted p-[var(--spacing-system-sf)]">
+                <MobileAppQr className="h-[120px] w-[120px]" />
+              </div>
+            </div>
           </div>
         </section>
 
