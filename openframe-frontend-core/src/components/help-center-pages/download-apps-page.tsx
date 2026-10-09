@@ -341,10 +341,7 @@ export function DownloadAppsPage({
                       Point your camera at the code, or open {formatUrlForDisplay(mobile.install.url)} on your phone.
                     </p>
                   </div>
-                  {/* The plate is light on purpose: a QR code is read dark on light. */}
-                  <div className="w-fit shrink-0 rounded-md bg-ods-bg-inverted p-[var(--spacing-system-sf)]">
-                    <MobileAppQr install={mobile.install} className="h-[120px] w-[120px]" />
-                  </div>
+                  <MobileAppQr install={mobile.install} className="h-[144px] w-[144px] shrink-0" />
                 </div>
               )}
             </div>

@@ -9,19 +9,16 @@ export interface MobileAppQrProps {
 }
 
 /**
- * The install QR code, drawn inline so the modules take their colour from the
- * surface they sit on. The artwork and the address it encodes are the server's
+ * The install QR code, drawn inline: the modules are the ODS accent colour and
+ * the background is transparent, so the code sits directly on whatever surface
+ * it is placed on. The artwork and the address it encodes are the server's
  * (`MobileAppInstallLink`): this component holds neither.
  *
- * Dark modules, and the caller supplies a light plate. Decoders binarize the
- * image and expect dark-on-light; inverting that is one of the two things they
- * reliably fail on. The other is a missing quiet zone, which is why the server
- * bakes the margin into the viewBox: keep it even when the plate is larger.
- *
- * That polarity holds only under the dark theme, where `text-ods-bg` is the dark
- * value and `bg-ods-bg-inverted` the light one; both flip under `.theme-light`.
- * Do not render this inside a light-theme scope: an inverted code is silently
- * unscannable rather than visibly broken.
+ * On a dark surface that is a light-on-dark code. Phone cameras read both
+ * polarities; what they need is contrast between the accent and the surface, and
+ * the quiet zone, which the server bakes into the viewBox as a transparent
+ * margin. Place it on a plain surface (a card, the page), never over an image
+ * or a surface close to the accent in brightness.
  */
 export function MobileAppQr({ install, className }: MobileAppQrProps) {
   return (
@@ -30,7 +27,7 @@ export function MobileAppQr({ install, className }: MobileAppQrProps) {
       shapeRendering="crispEdges"
       role="img"
       aria-label={`QR code for ${install.url}`}
-      className={cn('h-[120px] w-[120px] text-ods-bg', className)}
+      className={cn('h-[120px] w-[120px] text-ods-accent', className)}
     >
       <path fill="currentColor" d={install.qrPath} />
     </svg>
