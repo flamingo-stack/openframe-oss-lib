@@ -23,8 +23,8 @@ public class InstantScalarConfig implements Coercing<Instant, String> {
     public String serialize(@NotNull Object dataFetcherResult,
                             @NotNull GraphQLContext graphQLContext,
                             @NotNull Locale locale) throws CoercingSerializeException {
-        if (dataFetcherResult instanceof Instant) {
-            return ((Instant) dataFetcherResult).toString();
+        if (dataFetcherResult instanceof Instant instant) {
+            return instant.toString();
         }
         throw new CoercingSerializeException("Expected an Instant object.");
     }
@@ -34,8 +34,8 @@ public class InstantScalarConfig implements Coercing<Instant, String> {
                               @NotNull GraphQLContext graphQLContext,
                               @NotNull Locale locale) throws CoercingParseValueException {
         try {
-            if (input instanceof String) {
-                return Instant.parse((String) input);
+            if (input instanceof String string) {
+                return Instant.parse(string);
             }
             throw new CoercingParseValueException("Expected a String");
         } catch (DateTimeParseException e) {
@@ -48,9 +48,9 @@ public class InstantScalarConfig implements Coercing<Instant, String> {
                                 @NotNull CoercedVariables variables,
                                 @NotNull GraphQLContext graphQLContext,
                                 @NotNull Locale locale) throws CoercingParseLiteralException {
-        if (input instanceof graphql.language.StringValue) {
+        if (input instanceof graphql.language.StringValue stringValue) {
             try {
-                String value = ((graphql.language.StringValue) input).getValue();
+                String value = stringValue.getValue();
                 return Instant.parse(value);
             } catch (DateTimeParseException e) {
                 throw new CoercingParseLiteralException("Invalid Instant format");

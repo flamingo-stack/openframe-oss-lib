@@ -1,5 +1,6 @@
 package com.openframe.core.rest;
 
+import com.openframe.core.jackson.Jackson2Compatibility;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
@@ -23,6 +24,7 @@ public final class PackageSearchRestClientFactory {
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
                 .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
+                .configureMessageConverters(Jackson2Compatibility::restClientConverters)
                 .build();
     }
 }

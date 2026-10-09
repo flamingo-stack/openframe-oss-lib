@@ -1,6 +1,7 @@
 package com.openframe.data.nats.rmm.model;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,7 @@ class RmmResultParserTest {
 
     @BeforeEach
     void setUp() {
-        parser = new RmmResultParser(new ObjectMapper());
+        parser = new RmmResultParser(new JsonMapper());
     }
 
     @Test
@@ -63,11 +64,11 @@ class RmmResultParserTest {
     }
 
     @Test
-    @DisplayName("parse: malformed JSON propagates an IOException — listeners are expected to catch it and keep the core-NATS dispatcher alive")
+    @DisplayName("parse: malformed JSON propagates a JacksonException — listeners are expected to catch it and keep the core-NATS dispatcher alive")
     void parse_malformedThrows() {
         byte[] payload = "not-json".getBytes(StandardCharsets.UTF_8);
 
         assertThatThrownBy(() -> parser.parse(payload, CommandResultMessage.class))
-                .isInstanceOf(java.io.IOException.class);
+                .isInstanceOf(tools.jackson.core.JacksonException.class);
     }
 }

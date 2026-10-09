@@ -1,8 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
@@ -133,12 +133,12 @@ public class Microsoft365AuditEventDeserializer implements KafkaMessageDeseriali
     private Optional<String> textField(JsonNode node, String fieldName) {
         return Optional.ofNullable(node.get(fieldName))
                 .filter(field -> !field.isNull())
-                .map(JsonNode::asText)
+                .map(JsonNode::asString)
                 .filter(StringUtils::isNotBlank);
     }
 
     private String textPath(JsonNode node, String fieldName) {
-        String value = node.path(fieldName).asText(null);
+        String value = node.path(fieldName).asString(null);
         return StringUtils.isNotBlank(value) ? value : null;
     }
 }

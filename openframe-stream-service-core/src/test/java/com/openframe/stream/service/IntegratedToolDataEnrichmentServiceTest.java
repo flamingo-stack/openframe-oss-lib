@@ -49,7 +49,7 @@ class IntegratedToolDataEnrichmentServiceTest {
     }
 
     private static DeserializedDebeziumMessage message(String agentId) {
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setOperation("c");
         return DeserializedDebeziumMessage.builder()
                 .payload(payload)

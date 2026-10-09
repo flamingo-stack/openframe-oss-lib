@@ -1,6 +1,7 @@
 package com.openframe.client.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.exception.AgentRegistrationSecretValidationErrorException;
 import com.openframe.client.exception.DuplicateConnectionException;
 import com.openframe.client.exception.InvalidClientSecretException;
@@ -23,7 +24,8 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,7 +56,7 @@ class AgentControllerTest {
                 .setControllerAdvice(new BaseGlobalExceptionHandler())
                 .build();
 
-        objectMapper = new ObjectMapper();
+        objectMapper = new JsonMapper();
         setupTestData();
     }
 

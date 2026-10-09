@@ -90,8 +90,10 @@ public class MingoEntityQueryTest extends MingoBaseTest {
         String reply = result.finalText() == null ? "" : result.finalText();
         for (Machine machine : onlineWindows) {
             assertThat(referencesMachine(reply, machine))
-                    .as("Reply should reference online Windows machine %s (hostname, or an "
-                                    + "@device: mention of id %s / machineId %s).\n%s",
+                    .as("""
+                                    Reply should reference online Windows machine %s (hostname, or an \
+                                    @device: mention of id %s / machineId %s).
+                                    %s""",
                             machine.getHostname(), machine.getId(), machine.getMachineId(), result)
                     .isTrue();
         }

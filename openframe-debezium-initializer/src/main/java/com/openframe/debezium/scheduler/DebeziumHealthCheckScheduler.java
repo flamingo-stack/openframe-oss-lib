@@ -29,7 +29,6 @@ public class DebeziumHealthCheckScheduler {
     private final TenantIdProvider tenantIdProvider;
     private final ConnectorNameStrategy nameStrategy;
 
-    @Autowired
     public DebeziumHealthCheckScheduler(DebeziumService debeziumService,
                                         ConnectorRecoveryManager recoveryManager,
                                         @Autowired(required = false) IntegratedToolService integratedToolService,

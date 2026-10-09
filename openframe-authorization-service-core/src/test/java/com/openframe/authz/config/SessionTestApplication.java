@@ -7,13 +7,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
-import org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration;
-import org.springframework.boot.autoconfigure.session.SessionAutoConfiguration;
-import org.springframework.boot.autoconfigure.web.servlet.DispatcherServletAutoConfiguration;
-import org.springframework.boot.autoconfigure.web.servlet.ServletWebServerFactoryAutoConfiguration;
-import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
+import org.springframework.boot.http.converter.autoconfigure.HttpMessageConvertersAutoConfiguration;
+import org.springframework.boot.session.autoconfigure.SessionAutoConfiguration;
+import org.springframework.boot.session.data.redis.autoconfigure.SessionDataRedisAutoConfiguration;
+import org.springframework.boot.webmvc.autoconfigure.DispatcherServletAutoConfiguration;
+import org.springframework.boot.tomcat.autoconfigure.servlet.TomcatServletWebServerAutoConfiguration;
+import org.springframework.boot.webmvc.autoconfigure.WebMvcAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
+import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,11 +41,13 @@ import static com.openframe.authz.web.AuthStateUtils.JSESSIONID;
  */
 @SpringBootConfiguration
 @ImportAutoConfiguration({
-        ServletWebServerFactoryAutoConfiguration.class,
+        TomcatServletWebServerAutoConfiguration.class,
         DispatcherServletAutoConfiguration.class,
         WebMvcAutoConfiguration.class,
         HttpMessageConvertersAutoConfiguration.class,
-        SessionAutoConfiguration.class
+        SessionAutoConfiguration.class,
+        // Spring Boot 4 splits the Redis-backed session setup out of SessionAutoConfiguration
+        SessionDataRedisAutoConfiguration.class
 })
 @Import({SessionConfig.class, OpenframeRedisKeyConfiguration.class, TenantContextFilter.class, TenantFilterConfig.class,
         SessionTestApplication.SessionController.class})

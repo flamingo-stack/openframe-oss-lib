@@ -1,7 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
@@ -21,7 +22,7 @@ class Microsoft365AuditEventDeserializerTest {
 
     private static final long PROCESSING_TS = 1753868000000L;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new JsonMapper();
     private final Microsoft365AuditEventDeserializer deserializer = new Microsoft365AuditEventDeserializer(mapper);
 
     private static final String AUDIT_EVENT_JSON = """
@@ -114,11 +115,11 @@ class Microsoft365AuditEventDeserializerTest {
         DeserializedDebeziumMessage result = deserialize(AUDIT_EVENT_JSON);
 
         JsonNode details = mapper.readTree(result.getDetails());
-        assertEquals("admin@x.com", details.path("initiatedBy").path("user").path("userPrincipalName").asText());
-        assertEquals("User", details.path("targetResources").path(0).path("type").asText());
-        assertEquals("UserType", details.path("additionalDetails").path(0).path("key").asText());
-        assertEquals("conn-1", details.get("connectionId").asText());
-        assertEquals("Main", details.get("connectionName").asText());
+        assertEquals("admin@x.com", details.path("initiatedBy").path("user").path("userPrincipalName").asString());
+        assertEquals("User", details.path("targetResources").path(0).path("type").asString());
+        assertEquals("UserType", details.path("additionalDetails").path(0).path("key").asString());
+        assertEquals("conn-1", details.get("connectionId").asString());
+        assertEquals("Main", details.get("connectionName").asString());
     }
 
     @Test

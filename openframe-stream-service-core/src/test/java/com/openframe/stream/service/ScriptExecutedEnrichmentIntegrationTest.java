@@ -1,8 +1,9 @@
 package com.openframe.stream.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
@@ -68,7 +69,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
     @Mock
     private CommandExecutionRepository commandExecutionRepository;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new JsonMapper();
 
     @Test
     @DisplayName("regression: a SCRIPT_EXECUTED Kafka message no longer produces null deviceId/hostname/organizationId/organizationName — the four fields the dashboard's LogEvent UI surfaces")

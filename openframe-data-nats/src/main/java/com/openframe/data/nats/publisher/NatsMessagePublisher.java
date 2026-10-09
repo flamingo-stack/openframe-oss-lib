@@ -1,6 +1,6 @@
 package com.openframe.data.nats.publisher;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.core.exception.NatsException;
 import io.nats.client.Connection;
 import io.nats.client.JetStream;

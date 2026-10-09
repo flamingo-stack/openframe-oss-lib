@@ -14,10 +14,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
@@ -59,7 +60,11 @@ class GatewayAuthSecurityConfigTest {
     void securityFilterChain_callerToken_grantsItsScopesAndBareRoles(JWTClaimsSet claims, List<String> authorities)
             throws Exception {
         mockMvc.perform(get(OPEN_PATH).header(HttpHeaders.AUTHORIZATION, bearer(claims)))
-                .andExpect(authenticated().withAuthorities(AuthorityUtils.createAuthorityList(authorities)));
+                // Spring Security 7 also records how the caller authenticated (FACTOR_BEARER); only the granted ones matter here
+                .andExpect(authenticated().withAuthentication(authentication -> assertThat(authentication.getAuthorities())
+                        .filteredOn(authority -> !(authority instanceof FactorGrantedAuthority))
+                        .extracting(GrantedAuthority::getAuthority)
+                        .containsExactlyInAnyOrderElementsOf(authorities)));
     }
 
     @Test

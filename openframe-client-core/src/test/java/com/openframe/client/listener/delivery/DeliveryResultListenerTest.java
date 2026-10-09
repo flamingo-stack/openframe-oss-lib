@@ -1,6 +1,7 @@
 package com.openframe.client.listener.delivery;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.metrics.DeliveryMetrics;
@@ -54,7 +55,7 @@ class DeliveryResultListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new DeliveryResultListener(natsConnection, new ObjectMapper(), new NatsTopicMachineIdExtractor(), deliveryTracker, metrics);
+        listener = new DeliveryResultListener(natsConnection, new JsonMapper(), new NatsTopicMachineIdExtractor(), deliveryTracker, metrics);
     }
 
     @Test

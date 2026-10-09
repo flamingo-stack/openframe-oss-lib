@@ -1,6 +1,9 @@
 package com.openframe.sdk.fleetmdm;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.sdk.fleetmdm.model.CreateUserRequest;
@@ -22,7 +25,12 @@ public class FleetMdmSetupClient {
     private static final String LOGIN_URL = "/api/v1/fleet/login";
     private static final String CREATE_USER_URL = "/api/v1/fleet/users/admin";
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    // Jackson 2 behaviour (lenient primitives, declaration order), as openframe-core's Jackson2Compatibility;
+    // the SDK does not depend on it
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+            .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+            .build();
 
     private final String baseUrl;
     private final String tenantId;

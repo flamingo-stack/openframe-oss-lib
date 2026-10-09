@@ -280,11 +280,13 @@ public class FaeDeviceTest extends FaeBaseTest {
     private void assertNotBlockedByPolicy(RunResult result, String path) {
         if (ClientWritePolicy.reportsBlock(result) && !ssh.fileExists(path)) {
             throw new AssertionError(String.format(
-                    "The tenant's guardrail refused the write rather than the assistant failing to perform "
-                            + "it — the reply reports a policy block and %s is absent, which is consistent. "
-                            + "U-FILE-01 assumes a tenant where the client assistant may write files. Either "
-                            + "that policy is a regression, or this case has to run against a tenant that "
-                            + "permits client RMM writes.\n%s", path, result));
+                    """
+                    The tenant's guardrail refused the write rather than the assistant failing to perform \
+                    it — the reply reports a policy block and %s is absent, which is consistent. \
+                    U-FILE-01 assumes a tenant where the client assistant may write files. Either \
+                    that policy is a regression, or this case has to run against a tenant that \
+                    permits client RMM writes.
+                    %s""", path, result));
         }
     }
 

@@ -24,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.support.GenericApplicationContext;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -88,7 +89,7 @@ class DeviceFiltersSelectionSetTest {
         TypeDefinitionRegistry registry = new SchemaParser().parse(SDL);
         RuntimeWiring wiring = RuntimeWiring.newRuntimeWiring()
                 .type("Query", builder -> builder.dataFetcher("deviceFilters",
-                        env -> dataFetcher.deviceFilters(null, new DgsDataFetchingEnvironment(env))))
+                        env -> dataFetcher.deviceFilters(null, new DgsDataFetchingEnvironment(env, new GenericApplicationContext()))))
                 .build();
         GraphQLSchema schema = new SchemaGenerator().makeExecutableSchema(registry, wiring);
         graphQL = GraphQL.newGraphQL(schema).build();

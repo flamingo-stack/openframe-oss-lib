@@ -61,7 +61,6 @@ public class ConnectorRecoveryManager {
     private final IntegratedToolService integratedToolService;
     private final ConcurrentHashMap<String, ConnectorBackoffState> backoffStates = new ConcurrentHashMap<>();
 
-    @Autowired
     public ConnectorRecoveryManager(DebeziumService debeziumService,
                                     ConnectorAlertRepository connectorAlertRepository,
                                     ConnectorNameStrategy nameStrategy,

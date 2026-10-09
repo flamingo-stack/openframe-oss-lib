@@ -197,10 +197,11 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
                         + "pushdown; should be as fast as Scenario 1.");
 
         recorder.describe(S_SPARSE,
-                "What we measure: search where only ~1% of titles match (one in every hundred notifications). One flat "
-                        + "find on `notification_read_states` — recipient+status indexed, title-regex pushdown over the "
-                        + "narrowed slice. Feed size 30 000 notifications.\n"
-                        + "Latency must stay within SEARCH_BUDGET_MS even on the sparse hit rate.");
+                """
+                What we measure: search where only ~1% of titles match (one in every hundred notifications). One flat \
+                find on `notification_read_states` — recipient+status indexed, title-regex pushdown over the \
+                narrowed slice. Feed size 30 000 notifications.
+                Latency must stay within SEARCH_BUDGET_MS even on the sparse hit rate.""");
 
         recorder.describe(S_BULK,
                 "What we measure: the user clicks \"mark all as read\". A bulk `update` over the biggest feed "
@@ -210,12 +211,13 @@ class NotificationLoadTestIT extends BaseMongoIntegrationTest {
                         + "noticeably lower.");
 
         recorder.describe(S_COUNTS,
-                "What we measure: unread counts grouped by category "
-                        + "(`{TICKETS: 7, MINGO: 3, …}`). Used to render the sidebar badges. The "
-                        + "aggregation must be fully covered by `recipient_category_status` — no FETCH stage. "
-                        + "Measured against the 10 000-notification feed.\n"
-                        + "We use the 10k slice rather than 100k because the bulk-mark-as-read scenario already marked "
-                        + "the 100k slice as READ; nothing left to count there.");
+                """
+                What we measure: unread counts grouped by category \
+                (`{TICKETS: 7, MINGO: 3, …}`). Used to render the sidebar badges. The \
+                aggregation must be fully covered by `recipient_category_status` — no FETCH stage. \
+                Measured against the 10 000-notification feed.
+                We use the 10k slice rather than 100k because the bulk-mark-as-read scenario already marked \
+                the 100k slice as READ; nothing left to count there.""");
     }
 
     @AfterAll

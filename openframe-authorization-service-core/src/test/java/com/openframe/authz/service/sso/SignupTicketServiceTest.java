@@ -62,7 +62,7 @@ class SignupTicketServiceTest {
 
     @Test
     void shouldBindUserAndTenantKeepingRemainingTtl() {
-        when(values.get(anyString())).thenReturn("{\"email\":\"a@acme.com\",\"provider\":\"google\"}");
+        when(values.get(anyString())).thenReturn("{\"email\":\"a@acme.com\",\"provider\":\"google\",\"emailVerified\":true}");
         when(redisTemplate.getExpire(anyString())).thenReturn(120L);
 
         service.bind("t", "user-1", "tenant-1");

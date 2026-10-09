@@ -13,17 +13,17 @@ import com.openframe.data.repository.notification.impl.CustomNotificationReposit
 import com.openframe.notification.readstate.NotificationReadStateService;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.cassandra.CassandraAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.cassandra.CassandraDataAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.cassandra.CassandraReactiveDataAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.cassandra.CassandraReactiveRepositoriesAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.cassandra.CassandraRepositoriesAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
-import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.cassandra.autoconfigure.CassandraAutoConfiguration;
+import org.springframework.boot.data.cassandra.autoconfigure.DataCassandraAutoConfiguration;
+import org.springframework.boot.data.cassandra.autoconfigure.DataCassandraReactiveAutoConfiguration;
+import org.springframework.boot.data.cassandra.autoconfigure.DataCassandraReactiveRepositoriesAutoConfiguration;
+import org.springframework.boot.data.cassandra.autoconfigure.DataCassandraRepositoriesAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration;
+import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
@@ -32,16 +32,16 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {
         SecurityAutoConfiguration.class,
-        OAuth2ResourceServerAutoConfiguration.class,
+        ServletWebSecurityAutoConfiguration.class,
         UserDetailsServiceAutoConfiguration.class,
         CassandraAutoConfiguration.class,
-        CassandraDataAutoConfiguration.class,
-        CassandraReactiveDataAutoConfiguration.class,
-        CassandraRepositoriesAutoConfiguration.class,
-        CassandraReactiveRepositoriesAutoConfiguration.class,
+        DataCassandraAutoConfiguration.class,
+        DataCassandraReactiveAutoConfiguration.class,
+        DataCassandraRepositoriesAutoConfiguration.class,
+        DataCassandraReactiveRepositoriesAutoConfiguration.class,
         KafkaAutoConfiguration.class,
-        RedisAutoConfiguration.class,
-        RedisRepositoriesAutoConfiguration.class
+        DataRedisAutoConfiguration.class,
+        DataRedisRepositoriesAutoConfiguration.class
 })
 @EnableMongoAuditing
 @EnableMongoRepositories(basePackageClasses = NotificationRepository.class)

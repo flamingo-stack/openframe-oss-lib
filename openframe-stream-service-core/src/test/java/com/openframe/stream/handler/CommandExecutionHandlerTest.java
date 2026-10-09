@@ -1,7 +1,8 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -45,7 +46,7 @@ class CommandExecutionHandlerTest {
     private CommandExecutionRepository commandExecutionRepository;
 
     private CommandExecutionHandler handler;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new JsonMapper();
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
@@ -178,7 +179,7 @@ class CommandExecutionHandlerTest {
     void handle_missingIds_skipsQuietly() {
         DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();
         ObjectNode after = mapper.createObjectNode().put("exitCode", 0);   // no executionId/machineId
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
         message.setPayload(payload);
 
@@ -203,7 +204,7 @@ class CommandExecutionHandlerTest {
         if (stdout != null) after.put("stdout", stdout);
         if (stderr != null) after.put("stderr", stderr);
 
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
 
         DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();

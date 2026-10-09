@@ -17,6 +17,7 @@ import org.apache.kafka.streams.processor.api.FixedKeyProcessorContext;
 import org.apache.kafka.streams.processor.api.FixedKeyRecord;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Service;
 import org.springframework.context.annotation.Bean;
 
@@ -27,6 +28,7 @@ import static com.openframe.kafka.enumeration.KafkaHeader.MESSAGE_TYPE_HEADER;
 
 @Service
 @ConditionalOnProperty(name = "kafka.stream.enabled", havingValue = "true", matchIfMissing = true)
+@Configuration
 @RequiredArgsConstructor
 @Slf4j
 public class ActivityEnrichmentService {

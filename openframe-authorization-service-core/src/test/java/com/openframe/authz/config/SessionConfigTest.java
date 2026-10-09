@@ -5,7 +5,7 @@ import com.openframe.data.redis.OpenframeRedisProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.boot.autoconfigure.web.ServerProperties;
+import org.springframework.boot.web.server.autoconfigure.ServerProperties;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.serializer.RedisSerializer;

@@ -1,6 +1,7 @@
 package com.openframe.client.integration.support;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.listener.rmm.CommandResultListener;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.client.service.rmm.RmmResultService;
@@ -41,7 +42,7 @@ public class CommandResultIntegrationTestApplication {
 
     @Bean
     public ObjectMapper objectMapper() {
-        return new ObjectMapper();
+        return new JsonMapper();
     }
 
     @Bean

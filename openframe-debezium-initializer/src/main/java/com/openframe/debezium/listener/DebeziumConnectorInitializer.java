@@ -30,7 +30,6 @@ public class DebeziumConnectorInitializer {
     @Value("${openframe.debezium.reconcile.delete-orphans:false}")
     private boolean deleteOrphans;
 
-    @Autowired
     public DebeziumConnectorInitializer(DebeziumService debeziumService,
                                         @Autowired(required = false) IntegratedToolService integratedToolService,
                                         TenantIdProvider tenantIdProvider) {

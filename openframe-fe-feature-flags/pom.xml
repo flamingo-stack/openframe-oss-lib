@@ -32,7 +32,6 @@
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-mongo-sync</artifactId>
-            <version>${revision}</version>
         </dependency>
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>

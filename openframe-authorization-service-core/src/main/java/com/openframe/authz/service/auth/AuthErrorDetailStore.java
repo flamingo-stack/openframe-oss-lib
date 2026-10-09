@@ -1,7 +1,7 @@
 package com.openframe.authz.service.auth;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.authz.dto.AuthErrorDetail;
 import com.openframe.core.exception.AuthErrorCode;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
@@ -67,7 +67,7 @@ public class AuthErrorDetailStore {
     private String toJson(AuthErrorDetail detail) {
         try {
             return objectMapper.writeValueAsString(detail);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("auth_error_detail_write_failed", e);
         }
     }
@@ -75,7 +75,7 @@ public class AuthErrorDetailStore {
     private AuthErrorDetail fromJson(String json) {
         try {
             return objectMapper.readValue(json, AuthErrorDetail.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("auth_error_detail_read_failed", e);
         }
     }
