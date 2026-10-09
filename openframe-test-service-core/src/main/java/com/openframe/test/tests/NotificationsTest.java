@@ -11,6 +11,7 @@ import com.openframe.test.data.dto.notification.UnreadCategoryCount;
 import com.openframe.test.data.dto.ticket.Ticket;
 import com.openframe.test.data.dto.ticket.TicketConnection;
 import com.openframe.test.data.generator.TicketGenerator;
+import com.openframe.test.helpers.RelayIds;
 import com.openframe.test.helpers.ai.RunId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
@@ -149,7 +150,8 @@ public class NotificationsTest extends BaseTest {
         TicketConnection tickets = TicketApi.getTickets(TicketGenerator.allTickets(), limit(1));
         Ticket ticket = tickets == null || tickets.getEdges() == null || tickets.getEdges().isEmpty()
                 ? null : TicketGenerator.firstTicket(tickets);
-        String entityId = ticket != null ? ticket.getId() : "e2e-" + RUN_ID + "-no-such-ticket";
+        // Notifications reference the ticket by its raw id; the ai-agent's GraphQL id is a global one after the Relay migration.
+        String entityId = ticket != null ? RelayIds.raw(ticket.getId()) : "e2e-" + RUN_ID + "-no-such-ticket";
         int before = NotificationApi.totalUnread();
 
         long marked = NotificationApi.markReadForEntity("TICKET", entityId);

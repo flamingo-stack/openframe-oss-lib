@@ -7,6 +7,7 @@ import com.openframe.test.api.AttachmentApi;
 import com.openframe.test.api.UserApi;
 import com.openframe.test.data.dto.knowledgebase.TempAttachment;
 import com.openframe.test.data.dto.shared.MutationDeletePayload;
+import com.openframe.test.helpers.RelayIds;
 import com.openframe.test.helpers.ai.RunId;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.shared.GraphqlError;
@@ -430,7 +431,8 @@ public class TicketsTest extends BaseTest {
 
         TicketNote note = TicketApi.addNote(ticket.getId(), text);
         assertThat(note.getId()).as("A note has an id").isNotBlank();
-        assertThat(note.getTicketId()).as("The note belongs to the ticket").isEqualTo(ticket.getId());
+        // ticketId is a raw id on every API version; the ticket's GraphQL id is a global id after the Relay migration.
+        assertThat(note.getTicketId()).as("The note belongs to the ticket").isEqualTo(RelayIds.raw(ticket.getId()));
         assertThat(note.getContent()).as("The note content is stored").isEqualTo(text);
         assertThat(note.getAuthorId()).as("The note records its author").isNotBlank();
         assertThat(TicketApi.getTicketDetails(ticket.getId()).getNotes()).extracting(TicketNote::getId)
@@ -443,7 +445,7 @@ public class TicketsTest extends BaseTest {
 
         MutationDeletePayload deletedNote = TicketApi.deleteNote(note.getId());
         assertThat(deletedNote.getUserErrors()).as("Deleting a note reports no userErrors").isNullOrEmpty();
-        assertThat(deletedNote.getDeletedId()).as("The deleted note id is echoed").isEqualTo(note.getId());
+        assertThat(RelayIds.raw(deletedNote.getDeletedId())).as("The deleted note id is echoed").isEqualTo(RelayIds.raw(note.getId()));
         assertThat(TicketApi.getTicketDetails(ticket.getId()).getNotes()).extracting(TicketNote::getId)
                 .as("The note left the ticket").doesNotContain(note.getId());
 
@@ -471,7 +473,7 @@ public class TicketsTest extends BaseTest {
 
         MutationDeletePayload deletedAttachment = TicketApi.deleteTicketAttachment(attachment.getId());
         assertThat(deletedAttachment.getUserErrors()).as("Deleting an attachment reports no userErrors").isNullOrEmpty();
-        assertThat(deletedAttachment.getDeletedId()).as("The deleted attachment id is echoed").isEqualTo(attachment.getId());
+        assertThat(RelayIds.raw(deletedAttachment.getDeletedId())).as("The deleted attachment id is echoed").isEqualTo(RelayIds.raw(attachment.getId()));
         assertThat(TicketApi.getTicketDetails(ticket.getId()).getAttachments()).extracting(TicketAttachment::getId)
                 .as("The attachment left the ticket").doesNotContain(attachment.getId());
 

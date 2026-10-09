@@ -57,6 +57,7 @@ jobs:
                 "openframe-external-api-service-core/**",
                 "openframe-fe-feature-flags/**",
                 "openframe-gateway-service-core/**",
+                "openframe-graphql-relay/**",
                 "openframe-idp-configuration/**",
                 "openframe-management-service-core/**",
                 "openframe-notification-core/**",

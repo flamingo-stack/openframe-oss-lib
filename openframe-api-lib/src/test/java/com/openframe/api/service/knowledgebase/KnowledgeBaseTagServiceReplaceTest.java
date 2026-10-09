@@ -1,5 +1,6 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
@@ -12,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -23,13 +25,16 @@ class KnowledgeBaseTagServiceReplaceTest {
 
     private static final TagEntityType TYPE = TagEntityType.KNOWLEDGE_ARTICLE;
 
+    private final TagRepository tags = mock(TagRepository.class);
     private final TagAssignmentRepository assignments = mock(TagAssignmentRepository.class);
     private final KnowledgeBaseTagService service = new KnowledgeBaseTagService(
-            mock(TagRepository.class), assignments, mock(KnowledgeBaseItemRepository.class));
+            tags, assignments, mock(KnowledgeBaseItemRepository.class));
 
     @Test
     @DisplayName("replacing tags adds the missing ones, removes the rest and leaves the kept ones alone")
     void replaceAppliesOnlyTheDifference() {
+        when(tags.existsById("t2")).thenReturn(true);
+        when(tags.existsById("t3")).thenReturn(true);
         when(assignments.findByEntityIdAndEntityType("a1", TYPE)).thenReturn(List.of(tagged("t1"), tagged("t2")));
 
         service.replaceItemTags("a1", List.of("t2", "t3"));
@@ -51,6 +56,19 @@ class KnowledgeBaseTagServiceReplaceTest {
         service.replaceItemTags("a1", List.of());
 
         verify(assignments).deleteByEntityIdAndTagIdAndEntityType("a1", "t1", TYPE);
+        verify(assignments, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("an unknown tag is rejected before any tag is removed or added")
+    void unknownTagRejectedBeforeAnyChange() {
+        when(tags.existsById("t9")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.replaceItemTags("a1", List.of("t9")))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Tag not found: t9");
+
+        verify(assignments, never()).deleteByEntityIdAndTagIdAndEntityType(any(), any(), any());
         verify(assignments, never()).save(any());
     }
 

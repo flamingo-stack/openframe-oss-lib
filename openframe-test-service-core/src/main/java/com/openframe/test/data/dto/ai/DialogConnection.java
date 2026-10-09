@@ -2,6 +2,7 @@ package com.openframe.test.data.dto.ai;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.openframe.test.data.dto.shared.PageInfo;
+import com.openframe.test.helpers.RelayIds;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,7 +24,11 @@ public class DialogConnection {
         return edges == null ? List.of() : edges.stream().map(DialogEdge::getNode).toList();
     }
 
-    public List<String> ids() {
-        return nodes().stream().map(DialogResponse::getId).toList();
+    /**
+     * The nodes' ids as raw ids, for comparing with a dialogId from REST. The GraphQL {@code id} is a Relay
+     * global id once the chat API has migrated and a raw id before, so it is normalised here and never sent back.
+     */
+    public List<String> rawIds() {
+        return nodes().stream().map(DialogResponse::getId).map(RelayIds::raw).toList();
     }
 }
