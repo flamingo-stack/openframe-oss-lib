@@ -8,17 +8,17 @@ import {
 } from '../mobile-app';
 
 /**
- * The install URL cannot change: it is printed into a QR code that also exists
- * on paper, and that code is committed as path data in `MobileAppQr`. If this
- * fails, REGENERATE THE QR; do not update the expectation.
+ * The install URL is committed twice: here, and as the QR path data in
+ * `MobileAppQr`. If this fails, REGENERATE THE QR (see that component); do not
+ * only update the expectation.
  */
 describe('MOBILE_APP_INSTALL_URL', () => {
   it('is exactly what the committed QR path data encodes', () => {
-    expect(MOBILE_APP_INSTALL_URL).toBe('https://openframe.ai/mobile');
+    expect(MOBILE_APP_INSTALL_URL).toBe('https://www.flamingo.run/download?store=1');
   });
 
-  it('prints without its scheme', () => {
-    expect(MOBILE_APP_INSTALL_HOST_PATH).toBe('openframe.ai/mobile');
+  it('prints as the download page, without scheme, www or query', () => {
+    expect(MOBILE_APP_INSTALL_HOST_PATH).toBe('flamingo.run/download');
   });
 });
 
