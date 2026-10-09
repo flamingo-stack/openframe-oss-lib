@@ -1,5 +1,7 @@
 package com.openframe.stream.service;
 
+import java.util.Optional;
+
 /**
  * Finds the Fleet URL for a given tenant.
  *
@@ -13,8 +15,8 @@ public interface FleetBaseUrlResolver {
 
     /**
      * @param tenantId canonical tenant id (the event's resolved tenant)
-     * @return the tenant's Fleet base URL, or {@code null} when it cannot be resolved —
+     * @return the tenant's Fleet base URL, or {@link Optional#empty()} when it cannot be resolved —
      *         the caller then falls back to the static {@code fleet.mdm.base-url}
      */
-    String resolveBaseUrl(String tenantId);
+    Optional<String> resolveBaseUrl(String tenantId);
 }
