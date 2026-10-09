@@ -69,7 +69,7 @@ public class AppleTokenService {
             doc.setUpdatedAt(Instant.now());
             tokenRepository.save(doc);
         } catch (Exception e) {
-            log.warn("Failed to store Apple refresh token for user {}: {}", userId, e.getMessage());
+            log.warn("Failed to store Apple refresh token for user {}", userId, e);
         }
     }
 
@@ -107,7 +107,7 @@ public class AppleTokenService {
             log.info("event=apple-token-revoked user={}", token.getUserId());
             return true;
         } catch (Exception e) {
-            log.warn("event=apple-token-revocation-failed user={} msg={}", token.getUserId(), e.getMessage());
+            log.warn("event=apple-token-revocation-failed user={}", token.getUserId(), e);
             return false;
         }
     }
