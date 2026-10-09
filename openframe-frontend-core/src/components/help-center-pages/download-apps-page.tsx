@@ -3,12 +3,12 @@
 /**
  * `<DownloadAppsPage>`: every way to install OpenFrame, on one page.
  *
- *   - The desktop app: a tab per system (the visitor's own is open). Inside, the
- *     installer is THE action (one accent button, the other architecture as a
- *     quieter one) and the package manager is the alternative beside it, as a
- *     command with its copy button. This is the layout download pages have
- *     settled on: one detected-system button first, the command second.
- *   - The mobile app: the store badges and the install QR code.
+ *   - The desktop app: every system at once, one card each (a download page
+ *     lists its platforms; it does not hide them behind tabs, so nothing moves
+ *     when a visitor looks for another system). In a card the installer is THE
+ *     action (the other architecture is a quieter button) and each package
+ *     manager is one line under it, with its copy button.
+ *   - The mobile app: the store badges, and the install QR code beside them.
  *   - `footer`: the host's own last word (the website's "start on the web" card).
  *
  * DATA: `useSelfFetch` against `endpoint` (default `DOWNLOADS_API_PATH`;
@@ -23,9 +23,8 @@
  * The chrome is the canonical `PageShell` + frozen `PageLayout`.
  */
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
-import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
@@ -41,7 +40,6 @@ import {
   type DownloadActionEvent,
   type DownloadsPublic,
 } from '../../types/downloads';
-import { cn } from '../../utils/cn';
 import {
   APP_STORE_URL,
   DOWNLOAD_PAGE_STORE_PARAM,
@@ -49,20 +47,19 @@ import {
   MOBILE_APP_INSTALL_HOST_PATH,
   resolveMobileStoreUrl,
 } from '../../utils/mobile-app';
-import { DESKTOP_OSES, desktopOsOf, type DesktopOs } from '../../utils/visitor-os';
+import { DESKTOP_OSES, type DesktopOs } from '../../utils/visitor-os';
 import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
 import { WindowsLogoGreyIcon } from '../icons-v2-generated/brand-logos/windows-logo-grey-icon';
-import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
 import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
-import { TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { LoadError } from '../ui/error-state';
+import { FeatureCardGrid, type FeatureCardItem } from '../ui/feature-card';
 import { MobileAppQr } from '../ui/mobile-app-qr';
 import { StoreBadgeLinks } from '../ui/store-badges';
-import { TabNavigation, type TabItem } from '../ui/tab-navigation';
 
 export interface DownloadAppsPageProps {
   /** GET endpoint for the public projection. Default `DOWNLOADS_API_PATH`. */
@@ -90,14 +87,15 @@ export interface DownloadAppsPageProps {
 
 const SECTIONS_CLASS = 'flex flex-col gap-[var(--spacing-system-xlf)]';
 const SECTION_CLASS = 'flex flex-col gap-[var(--spacing-system-lf)]';
-const CARD_CLASS =
-  'flex flex-col gap-[var(--spacing-system-lf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)]';
-const INSTALLERS_COLUMN_CLASS = 'flex flex-col gap-[var(--spacing-system-sf)] content-md:w-[320px] content-md:shrink-0';
+/** The frame around a card grid: the grid itself is only its hairlines. */
+const GRID_FRAME_CLASS = 'overflow-hidden rounded-md border border-ods-border bg-ods-card';
+const GRID_ITEM_CLASS = 'bg-transparent p-[var(--spacing-system-lf)]';
+const CARD_BODY_CLASS = 'flex flex-col gap-[var(--spacing-system-mf)]';
+const BUTTONS_CLASS = 'flex flex-col gap-[var(--spacing-system-sf)]';
 
-/** The tab bar hands its icon a class name only, so each system's logo takes exactly that. */
-const OS_ICONS: Partial<Record<DesktopOs, NonNullable<TabItem['icon']>>> = {
-  mac: ({ className }) => <AppleLogoIcon className={className} />,
-  windows: ({ className }) => <WindowsLogoGreyIcon className={className} />,
+const OS_ICONS: Partial<Record<DesktopOs, NonNullable<FeatureCardItem['icon']>>> = {
+  mac: AppleLogoIcon,
+  windows: WindowsLogoGreyIcon,
 };
 
 interface SystemRows {
@@ -123,7 +121,8 @@ function installerLabel(download: AppDownload, siblings: number): string {
   return siblings > 1 && architecture ? `${label} (${architecture})` : label;
 }
 
-function SystemPanel({
+/** One system's card body: its installers, then each package manager as one line. */
+function SystemCardBody({
   system,
   onDownloadAction,
 }: {
@@ -134,12 +133,11 @@ function SystemPanel({
     successTitle: 'Copied',
     successDescription: 'Paste it into your terminal and press Return.',
   });
-  const requirements = [...new Set(system.installers.map(d => d.minOsLabel).filter((l): l is string => !!l))];
   const report = (action: DownloadActionEvent['action'], row: AppDownload) =>
     onDownloadAction?.({ action, id: row.id, os: row.os, architecture: row.architecture });
   return (
-    <div className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-start')}>
-      <div className={INSTALLERS_COLUMN_CLASS}>
+    <div className={CARD_BODY_CLASS}>
+      <div className={BUTTONS_CLASS}>
         {system.installers.map((download, index) => (
           <Button
             key={download.id}
@@ -153,53 +151,50 @@ function SystemPanel({
             {installerLabel(download, system.installers.length)}
           </Button>
         ))}
-        {requirements.length > 0 && (
-          <p className="m-0 text-ods-text-secondary text-h6">Requires {requirements.join(' or ')}.</p>
-        )}
       </div>
-      {system.commands.length > 0 && (
-        <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-sf)]">
-          <p className="m-0 text-ods-text-secondary text-h6">Or install from the command line</p>
-          {system.commands.map(row =>
-            row.command ? (
-              <CommandBox
-                key={row.id}
-                title={row.label ?? undefined}
-                command={row.command}
-                primaryAction={{
-                  label: 'Copy command',
-                  icon: <Copy02Icon className="h-4 w-4" />,
-                  onClick: () => {
-                    void copy(row.command as string);
-                    report('command', row);
-                  },
-                }}
-              />
-            ) : null,
-          )}
-        </div>
+      {system.commands.map(row =>
+        row.command ? (
+          <CommandBox
+            key={row.id}
+            title={row.label ?? undefined}
+            command={row.command}
+            maxLines={1}
+            commandClassName="text-ods-accent"
+            copyAriaLabel={`Copy the ${row.label ?? 'install'} command`}
+            onCopy={() => {
+              void copy(row.command as string);
+              report('command', row);
+            }}
+          />
+        ) : null,
       )}
     </div>
   );
 }
 
-/** The desktop section while its rows load: the tab bar's and the panel's own boxes. */
-function DesktopSkeleton() {
-  return (
-    <div className={SECTION_CLASS} aria-busy="true" aria-label="Loading the installers">
-      <div className="flex gap-[var(--spacing-system-lf)]">
-        <TextSkeleton.Body className="w-20" />
-        <TextSkeleton.Body className="w-24" />
-      </div>
-      <div className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-start')}>
-        <div className={INSTALLERS_COLUMN_CLASS}>
-          <UnifiedSkeleton className="h-12 w-full rounded-md" />
-          <TextSkeleton.Body className="w-32" />
-        </div>
-      </div>
-    </div>
-  );
+/** A system's card in the grid: its logo, its name, what it needs, then its ways in. */
+function systemItem(system: SystemRows, onDownloadAction: DownloadAppsPageProps['onDownloadAction']): FeatureCardItem {
+  const requirements = [...new Set(system.installers.map(d => d.minOsLabel).filter((l): l is string => !!l))];
+  const icon = OS_ICONS[system.os];
+  return {
+    ...(icon ? { icon } : {}),
+    title: DESKTOP_OS_LABELS[system.os],
+    ...(requirements.length > 0 ? { subtitle: `Requires ${requirements.join(' or ')}` } : {}),
+    content: <SystemCardBody system={system} onDownloadAction={onDownloadAction} />,
+  };
 }
+
+/** The grid's placeholder cards while the rows load: a title and subtitle bar each (the grid's own), and a button's box. */
+const LOADING_ITEMS: FeatureCardItem[] = ['mac', 'windows'].map(os => ({
+  title: os,
+  subtitle: os,
+  content: (
+    <div className={CARD_BODY_CLASS}>
+      <UnifiedSkeleton className="h-12 w-full rounded-md" />
+      <UnifiedSkeleton className="h-12 w-full rounded-md" />
+    </div>
+  ),
+}));
 
 function DesktopSection({
   data,
@@ -214,39 +209,33 @@ function DesktopSection({
   reload: () => void;
   onDownloadAction?: DownloadAppsPageProps['onDownloadAction'];
 }) {
-  const visitor = useVisitorOs();
-  // The tab the visitor picked; until they pick, their own system's (else the first).
-  const [picked, setPicked] = useState<DesktopOs | null>(null);
   const systems = data ? rowsBySystem(data.desktop) : [];
-  const own = visitor.known ? desktopOsOf(visitor.os) : null;
-  const active = systems.find(s => s.os === picked) ?? systems.find(s => s.os === own) ?? systems[0];
 
   let body: ReactNode;
   if (error && !data) {
     body = <LoadError message="Could not load the installers" onRetry={reload} />;
   } else if (!data) {
-    body = isLoading ? <DesktopSkeleton /> : null;
-  } else if (!active) {
+    if (!isLoading) return null;
+    body = (
+      <div className={GRID_FRAME_CLASS} aria-busy="true" aria-label="Loading the installers">
+        <FeatureCardGrid items={LOADING_ITEMS} columns={2} itemClassName={GRID_ITEM_CLASS} loading />
+      </div>
+    );
+  } else if (systems.length === 0) {
     // The deployment names no installer: the section is not shown.
     return null;
   } else {
     body = (
-      <>
-        {systems.length > 1 && (
-          <TabNavigation
-            activeTab={active.os}
-            onTabChange={id => setPicked(id as DesktopOs)}
-            tabs={systems.map(system => {
-              const icon = OS_ICONS[system.os];
-              return { id: system.os, label: DESKTOP_OS_LABELS[system.os], ...(icon ? { icon } : {}) };
-            })}
-          />
-        )}
-        <SystemPanel key={active.os} system={active} onDownloadAction={onDownloadAction} />
-      </>
+      <div className={GRID_FRAME_CLASS}>
+        <FeatureCardGrid
+          items={systems.map(system => systemItem(system, onDownloadAction))}
+          columns={2}
+          itemClassName={GRID_ITEM_CLASS}
+          accentClassName="text-ods-text-secondary"
+        />
+      </div>
     );
   }
-  if (body === null) return null;
   return (
     <section aria-labelledby="download-desktop" className={SECTION_CLASS}>
       <h2 id="download-desktop" className="m-0 text-ods-text-primary text-h2">
@@ -273,9 +262,6 @@ export function DownloadAppsPage({
     initialData,
     revalidateOnVisibleAfterMs: DOWNLOADS_CACHE_SECONDS * 1000,
   });
-  const visitor = useVisitorOs();
-  // On a phone or a tablet the mobile app is what installs here, so it comes first.
-  const mobileFirst = visitor.known && desktopOsOf(visitor.os) === null;
   // The desktop app is "offered" until the data says the deployment names no installer.
   const offersDesktop = showDesktop && (!data || rowsBySystem(data.desktop).length > 0);
 
@@ -306,27 +292,39 @@ export function DownloadAppsPage({
           />
         )}
 
-        <section aria-labelledby="download-mobile" className={cn(SECTION_CLASS, mobileFirst && '-order-1')}>
+        <section aria-labelledby="download-mobile" className={SECTION_CLASS}>
           <h2 id="download-mobile" className="m-0 text-ods-text-primary text-h2">
             Mobile app
           </h2>
-          <div className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-center content-md:justify-between')}>
-            <div className="flex flex-col gap-[var(--spacing-system-mf)]">
-              <p className="m-0 text-ods-text-primary text-h4">Get alerts and respond to tickets on the go.</p>
-              <StoreBadgeLinks
-                appStoreUrl={APP_STORE_URL}
-                googlePlayUrl={GOOGLE_PLAY_URL}
-                openInNewTab={openStoresInNewTab}
-              />
-            </div>
-            {/* The code is for the screen you are NOT holding: hidden on a phone. The plate is
-                light on purpose, a QR code is read dark on light. */}
-            <div className="hidden flex-col items-center gap-[var(--spacing-system-xsf)] content-md:flex">
-              <div className="rounded-md bg-ods-bg-inverted p-[var(--spacing-system-sf)]">
-                <MobileAppQr className="h-[140px] w-[140px]" />
-              </div>
-              <p className="m-0 text-ods-text-secondary text-h6">{MOBILE_APP_INSTALL_HOST_PATH}</p>
-            </div>
+          <div className={GRID_FRAME_CLASS}>
+            <FeatureCardGrid
+              columns={2}
+              itemClassName={GRID_ITEM_CLASS}
+              accentClassName="text-ods-text-secondary"
+              items={[
+                {
+                  title: 'iPhone, iPad and Android',
+                  subtitle: 'Get alerts and respond to tickets on the go',
+                  content: (
+                    <StoreBadgeLinks
+                      appStoreUrl={APP_STORE_URL}
+                      googlePlayUrl={GOOGLE_PLAY_URL}
+                      openInNewTab={openStoresInNewTab}
+                    />
+                  ),
+                },
+                {
+                  title: 'Scan with your phone',
+                  subtitle: MOBILE_APP_INSTALL_HOST_PATH,
+                  // The plate is light on purpose: a QR code is read dark on light.
+                  content: (
+                    <div className="w-fit rounded-md bg-ods-bg-inverted p-[var(--spacing-system-sf)]">
+                      <MobileAppQr className="h-[120px] w-[120px]" />
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </div>
         </section>
 

@@ -49,19 +49,19 @@ afterEach(() => {
 });
 
 describe('DownloadAppsPage', () => {
-  it('renders the server-read rows without a request, one system at a time', () => {
+  it('renders the server-read rows without a request, every system at once', () => {
     render(<DownloadAppsPage initialData={DATA} />);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(DOWNLOADS_TITLE);
-    // jsdom names no system, so the first tab is open: the Mac installer and its command.
     expect(screen.getByRole('link', { name: 'Download for Mac' })).toHaveAttribute('href', 'https://gateway.test/mac');
     expect(screen.getByText('brew install --cask openframe')).toBeInTheDocument();
-    expect(screen.queryByText(/Download for Windows/)).not.toBeInTheDocument();
+    // No tab hides a system: nothing moves when a visitor looks for another one.
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Download for Windows (x64)' })).toBeInTheDocument();
   });
 
   it('tells two installers of one system apart by architecture, the first as the default', () => {
     render(<DownloadAppsPage initialData={DATA} />);
-    fireEvent.click(screen.getByText('Windows'));
     expect(screen.getByRole('link', { name: 'Download for Windows (x64)' })).toHaveAttribute(
       'href',
       'https://gateway.test/x64',
@@ -70,15 +70,13 @@ describe('DownloadAppsPage', () => {
       'href',
       'https://gateway.test/arm64',
     );
-    // A system with no package manager shows no command.
-    expect(screen.queryByText('Or install from the command line')).not.toBeInTheDocument();
   });
 
   it('reports an installer download and a copied command to the host', () => {
     const onDownloadAction = vi.fn();
     render(<DownloadAppsPage initialData={DATA} onDownloadAction={onDownloadAction} />);
     fireEvent.click(screen.getByRole('link', { name: 'Download for Mac' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy the Homebrew command' }));
     expect(onDownloadAction.mock.calls.map(([event]) => [event.action, event.id])).toEqual([
       ['installer', 'mac'],
       ['command', 'homebrew'],
