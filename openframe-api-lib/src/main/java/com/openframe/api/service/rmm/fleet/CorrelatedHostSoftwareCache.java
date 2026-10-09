@@ -7,6 +7,8 @@ import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -35,8 +37,11 @@ public class CorrelatedHostSoftwareCache {
             .expireAfterWrite(TTL)
             .build();
 
-    public record Snapshot(Map<Long, Machine> machinesByHostId,
-                           Map<Long, List<FleetSoftware>> softwareByHostId) {
+    @Getter
+    @AllArgsConstructor
+    public static class Snapshot {
+        private final Map<Long, Machine> machinesByHostId;
+        private final Map<Long, List<FleetSoftware>> softwareByHostId;
     }
 
     public Snapshot snapshot(Function<HostSearchRequest, List<Host>> hostSearch) {
@@ -45,7 +50,7 @@ public class CorrelatedHostSoftwareCache {
     }
 
     public Map<Long, List<FleetSoftware>> softwareByHostId(Function<HostSearchRequest, List<Host>> hostSearch) {
-        return snapshot(hostSearch).softwareByHostId();
+        return snapshot(hostSearch).getSoftwareByHostId();
     }
 
     private Snapshot load(String tenantId, Function<HostSearchRequest, List<Host>> hostSearch) {

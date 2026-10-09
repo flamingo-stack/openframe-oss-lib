@@ -1,16 +1,20 @@
 package com.openframe.data.document.ticket.filter;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+@Getter
 @Builder
-public record TicketActivityCriteria(
-        List<TicketActivityFilter> filters,
-        Map<String, Instant> staleCutoffByStatusId,
-        Instant defaultStaleCutoff) {
+@AllArgsConstructor
+public class TicketActivityCriteria {
+    private final List<TicketActivityFilter> filters;
+    private final Map<String, Instant> staleCutoffByStatusId;
+    private final Instant defaultStaleCutoff;
 
     public boolean isEmpty() {
         return filters == null || filters.isEmpty();

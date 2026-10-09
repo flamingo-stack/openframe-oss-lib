@@ -1,14 +1,15 @@
 package com.openframe.authz.security;
 
-public record SsoInviteCookiePayload(
-        String s,
-        String invitationId,
-        Boolean switchTenant,
-        String provider,
-        String redirectTo,
-        boolean authMobile,
-        long iat,
-        long exp
-) implements SsoCookiePayload {
+@lombok.Getter
+@lombok.AllArgsConstructor
+public class SsoInviteCookiePayload implements SsoCookiePayload {
+    private final String s;
+    private final String invitationId;
+    private final Boolean switchTenant;
+    private final String provider;
+    private final String redirectTo;
+    private final boolean authMobile;
+    private final long iat;
+    private final long exp;
 }
 
