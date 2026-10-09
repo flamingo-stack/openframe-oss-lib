@@ -32,18 +32,7 @@ public class Redis {
     private static volatile Boolean detectedCluster;
 
 
-    /**
-     * Find the password-reset token for {@code email}. The auth-server stores it under the tenant-scoped,
-     * hash-tagged key {@code of:{<tenant>}:pwdreset:<token>} with the email as the value.
-     *
-     * <p>The same scan works either way. On a cluster the hash tag is load-bearing: Jedis routes a
-     * cluster SCAN by the slot of the MATCH pattern and rejects a pattern without a tag, and every
-     * pwdreset key lands in that one slot. On a single instance the tag is just part of the key name.
-     *
-     * <p>Every failure - key absent, server unreachable, wrong tenant prefix - returns {@code null}.
-     * Callers poll this method, so a failure has to look like a miss; the cause is logged with its stack
-     * so a TLS or routing mistake is still diagnosable.
-     */
+    // Scans the tenant's hash-tagged pwdreset keys for the token whose value matches email; returns null on any failure so pollers see a miss.
     public static String getResetToken(String email) {
         String pattern = "of:{" + RedisConfig.getTenant() + "}:pwdreset:*";
         try {
@@ -87,7 +76,7 @@ public class Redis {
         }
     }
 
-    /** Walks one server's keyspace for the tenant's reset keys and returns the token whose value is the email. */
+    // Walks one server's keyspace for the tenant's reset keys and returns the token whose value is the email.
     private static String findToken(UnifiedJedis client, String pattern, String email) {
         ScanParams scanParams = new ScanParams().match(pattern).count(100);
         String cursor = ScanParams.SCAN_POINTER_START;
@@ -109,20 +98,7 @@ public class Redis {
         return null;
     }
 
-    /**
-     * Whether the server runs in cluster mode, asked once and remembered.
-     *
-     * <p>SaaS Redis is moving to Memorystore for Valkey — one node, cluster mode disabled, TLS and AUTH —
-     * one environment at a time, so this differs per environment and changes as the migration proceeds.
-     * {@code CLUSTER INFO} is answered by both topologies, so one round trip settles it and an
-     * environment migrates without anyone editing config. {@link RedisConfig#getConfiguredCluster()}
-     * still wins where someone pinned an answer.
-     *
-     * <p>A probe that cannot connect assumes a cluster for that one lookup - that is what every
-     * environment but dev is today, so it keeps the behaviour unchanged where the probe itself is the
-     * thing that is broken. Only an answer the server actually gave is remembered: this pod lives for
-     * days, and a probe lost to one dropped SYN must not pin a guess for all of them.
-     */
+    // Whether the server runs in cluster mode; probed once via CLUSTER INFO and cached, unless pinned by RedisConfig.
     private static boolean clusterMode(JedisClientConfig config) {
         Boolean pinned = RedisConfig.getConfiguredCluster();
         if (pinned != null) {
@@ -146,17 +122,7 @@ public class Redis {
         }
     }
 
-    /**
-     * What the server says about itself, or {@code null} when it did not answer.
-     *
-     * <p>{@code INFO cluster}, not {@code CLUSTER INFO}. The two are easy to confuse and only one of
-     * them answers this question: {@code cluster_enabled} lives in INFO's Cluster section, while
-     * CLUSTER INFO reports a cluster's <em>state</em> - {@code cluster_state}, {@code cluster_slots_*},
-     * {@code cluster_known_nodes} - and never carries {@code cluster_enabled} at all. Matching on it
-     * there is therefore false for every server alive, including a real cluster, which then takes the
-     * standalone path and answers MOVED to the first MGET. That is exactly how this broke the
-     * production tenant report on 2026-09-23.
-     */
+    // Reads INFO cluster's cluster_enabled flag (not CLUSTER INFO's cluster_state); null if the server did not answer.
     private static Boolean probeCluster(JedisClientConfig config) {
         HostAndPort node = RedisConfig.getNode();
         try (Jedis jedis = new Jedis(node, config)) {

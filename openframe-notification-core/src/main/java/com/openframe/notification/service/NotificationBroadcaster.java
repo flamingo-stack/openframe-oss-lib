@@ -39,7 +39,7 @@ public class NotificationBroadcaster {
     private final AudienceResolver audienceResolver;
     private final NotificationSettingsRepository settingsRepository;
 
-    @Value("${openframe.features.notifications.enabled:false}")
+    @Value("${openframe.features.notifications.enabled}")
     private boolean notificationsEnabled;
 
     public Notification broadcast(NotificationCommand command) {
@@ -138,11 +138,7 @@ public class NotificationBroadcaster {
         }
     }
 
-    /**
-     * Persists an in-place change to an already-broadcast notification and re-publishes it (UPDATED)
-     * to its original recipients so live clients upsert the existing card by id. Read-state rows are
-     * left untouched — only the notification content changes.
-     */
+    // Read-state rows are left untouched by this update path — only notification content changes.
     public void update(Notification updated) {
         if (!notificationsEnabled) {
             log.debug("Notifications feature disabled — update skipped");

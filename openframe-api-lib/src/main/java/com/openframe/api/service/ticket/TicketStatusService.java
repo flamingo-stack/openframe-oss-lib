@@ -31,9 +31,6 @@ import static com.openframe.api.exception.ticket.TicketStatusOperation.*;
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
 import static com.openframe.data.document.ticket.TicketStatusKind.*;
 
-/**
- * Tenant ticket status definitions: the seeded system statuses plus custom ones managed by admins.
- */
 @Service
 @Slf4j
 @Validated
