@@ -50,7 +50,7 @@ import {
   type MobileAppLinks,
 } from '../../types/downloads';
 import { cn } from '../../utils/cn';
-import { printableUrl } from '../../utils/mobile-app';
+import { formatUrlForDisplay } from '../../utils/format';
 import { DESKTOP_OSES, type DesktopOs } from '../../utils/visitor-os';
 import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
@@ -338,7 +338,7 @@ export function DownloadAppsPage({
                   <div className="flex flex-col gap-[var(--spacing-system-sf)]">
                     <CardHeader title="Scan with your phone" />
                     <p className="m-0 text-ods-text-secondary text-h4">
-                      Point your camera at the code, or open {printableUrl(mobile.install.url)} on your phone.
+                      Point your camera at the code, or open {formatUrlForDisplay(mobile.install.url)} on your phone.
                     </p>
                   </div>
                   {/* The plate is light on purpose: a QR code is read dark on light. */}

@@ -14,17 +14,6 @@ import { detectVisitorOs } from './visitor-os';
 export const DOWNLOAD_PAGE_PATH = '/download';
 
 /**
- * An address as it is printed for a human to read or type: no scheme, no `www`,
- * no query, no trailing slash. `https://www.example.com/mobile` reads `example.com/mobile`.
- */
-export function printableUrl(url: string): string {
-  return url
-    .replace(/^https?:\/\/(www\.)?/i, '')
-    .replace(/[?#].*$/, '')
-    .replace(/\/$/, '');
-}
-
-/**
  * The store for a phone or tablet, or `null` for every other system and for a
  * store the server names no listing for (`links` is the server's answer).
  *

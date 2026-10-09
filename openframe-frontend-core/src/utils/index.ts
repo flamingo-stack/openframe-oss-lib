@@ -16,7 +16,7 @@ export {
 // Number / currency / byte / date formatters live in `./format` (single
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
-export { formatDate, formatNumber, formatPrice, formatBytes } from './format';
+export { formatDate, formatNumber, formatPrice, formatBytes, formatUrlForDisplay } from './format';
 export { TRIAL_DAYS, TRIAL_LABELS } from './trial';
 export {
   VENDOR_CLASSIFICATIONS,

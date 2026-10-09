@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { printableUrl, resolveMobileStoreUrl } from '../mobile-app';
-
-describe('printableUrl', () => {
-  it('prints an address without scheme, www, query or trailing slash', () => {
-    expect(printableUrl('https://www.example.com/mobile')).toBe('example.com/mobile');
-    expect(printableUrl('http://example.com/mobile/?from=qr#top')).toBe('example.com/mobile');
-  });
-});
+import { resolveMobileStoreUrl } from '../mobile-app';
 
 const APP_STORE_URL = 'https://apps.test/app';
 const GOOGLE_PLAY_URL = 'https://play.test/app';
