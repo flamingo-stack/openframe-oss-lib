@@ -39,13 +39,6 @@ export const MOBILE_APP_INSTALL_HOST_PATH = MOBILE_APP_INSTALL_URL.replace(/^htt
 );
 
 /**
- * The install address before the download page existed, on the product's host.
- * Notifications already sent point at it, so the product keeps answering it with
- * a redirect (a phone to its store, everyone else to the download page).
- */
-export const LEGACY_MOBILE_APP_INSTALL_PATH = '/mobile';
-
-/**
  * The store for a phone or tablet, or `null` for every other system.
  *
  * The server passes the request's User-Agent; a browser also passes
