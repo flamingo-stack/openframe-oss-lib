@@ -55,7 +55,7 @@ export interface MobileAppInstallLink {
   url: string;
   /** The side of the artwork's square viewBox, quiet zone included. */
   qrViewBoxSize: number;
-  /** The dark modules as one SVG path of horizontal strokes one module tall (`stroke` draws them). */
+  /** The dark modules as one SVG path of filled rectangles (`fill` draws them). */
   qrPath: string;
 }
 

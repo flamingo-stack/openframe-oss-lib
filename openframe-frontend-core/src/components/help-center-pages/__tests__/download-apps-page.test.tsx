@@ -23,7 +23,7 @@ const binary = (id: string, os: AppDownload['os'], architecture: string, url: st
 
 const APP_STORE_URL = 'https://apps.test/app';
 const GOOGLE_PLAY_URL = 'https://play.test/app';
-const INSTALL = { url: 'https://www.site.test/mobile', qrViewBoxSize: 37, qrPath: 'M4 4.5h7' };
+const INSTALL = { url: 'https://www.site.test/mobile', qrViewBoxSize: 37, qrPath: 'M4 4h7v1h-7z' };
 const MOBILE = { appStoreUrl: APP_STORE_URL, googlePlayUrl: GOOGLE_PLAY_URL, install: INSTALL };
 
 const DATA: DownloadsPublic = {

@@ -27,13 +27,12 @@ export function MobileAppQr({ install, className }: MobileAppQrProps) {
   return (
     <svg
       viewBox={`0 0 ${install.qrViewBoxSize} ${install.qrViewBoxSize}`}
-      fill="none"
       shapeRendering="crispEdges"
       role="img"
       aria-label={`QR code for ${install.url}`}
       className={cn('h-[120px] w-[120px] text-ods-bg', className)}
     >
-      <path stroke="currentColor" d={install.qrPath} />
+      <path fill="currentColor" d={install.qrPath} />
     </svg>
   );
 }
