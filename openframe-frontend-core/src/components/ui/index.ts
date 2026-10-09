@@ -73,6 +73,7 @@ export * from './status-badge';
 export * from './palette-badge';
 export * from './department-badge';
 export * from './store-badges';
+export * from './mobile-app-qr';
 export * from './status-indicator';
 export * from './toaster';
 // TODO: Add other UI components as they are moved to ui-kit
