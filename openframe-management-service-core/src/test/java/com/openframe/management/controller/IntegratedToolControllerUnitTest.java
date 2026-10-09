@@ -20,6 +20,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,7 +47,7 @@ class IntegratedToolControllerUnitTest {
     void setUp() {
         controller = new IntegratedToolController(toolService, debeziumService, tenantIdProvider, List.of());
         when(tenantIdProvider.getTenantId()).thenReturn("tenant-1");
-        when(toolService.saveTool(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(toolService.saveTool(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
@@ -63,14 +65,13 @@ class IntegratedToolControllerUnitTest {
     }
 
     @Test
-    @DisplayName("re-registering without credentials at all keeps the stored API key")
-    void reRegistrationWithoutCredentialsKeepsStoredApiKey() {
-        ToolApiKey stored = apiKey("minted-token");
-        when(toolService.getToolByKey(KEY)).thenReturn(Optional.of(tool("existing-id", credentials(stored))));
+    @DisplayName("re-registering an unchanged tool does not write it")
+    void unchangedReRegistrationIsNotSaved() {
+        when(toolService.getToolByKey(KEY)).thenReturn(Optional.of(registered("existing-id", credentials(apiKey("minted-token")))));
 
-        controller.saveTool(KEY, request(tool(KEY, null)));
+        controller.saveTool(KEY, request(tool(KEY, credentials(null))));
 
-        assertThat(savedTool().getCredentials().getApiKey()).isSameAs(stored);
+        verify(toolService, never()).saveTool(any());
     }
 
     @Test
@@ -110,6 +111,13 @@ class IntegratedToolControllerUnitTest {
 
     private static IntegratedTool tool(String id, ToolCredentials credentials) {
         return IntegratedTool.builder().id(id).key(KEY).credentials(credentials).build();
+    }
+
+    private static IntegratedTool registered(String id, ToolCredentials credentials) {
+        IntegratedTool tool = tool(id, credentials);
+        tool.setTenantId("tenant-1");
+        tool.setEnabled(true);
+        return tool;
     }
 
     private static ToolCredentials credentials(ToolApiKey apiKey) {
