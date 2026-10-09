@@ -29,12 +29,32 @@ describe('prospect_call source wiring', () => {
   });
 });
 
+describe('site_page source wiring', () => {
+  it('maps the document type to its table id, label, icon and card route', () => {
+    expect(chatCardLabel('site_page')).toBe('Website page');
+    expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.site_page).toBe('website-pages');
+    expect(getSourceLabel('website-pages')).toBe('Website');
+    expect(SOURCE_ICON_NAMES['website-pages']).toBe('flamingo-logo-grey');
+    expect(buildListUrl('site_page', ['pricing', 'openframe'])).toBe('/api/site-pages?ids=pricing,openframe');
+  });
+});
+
+describe('vendor source wiring', () => {
+  it('maps the document type to its table id, label, icon and card route', () => {
+    expect(chatCardLabel('vendor')).toBe('Vendor');
+    expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.vendor).toBe('vendors');
+    expect(getSourceLabel('vendors')).toBe('Vendor Directory');
+    expect(SOURCE_ICON_NAMES.vendors).toBe('package-search');
+    expect(buildListUrl('vendor', ['1', '2'])).toBe('/api/vendors/cards?ids=1,2');
+  });
+});
+
 describe('trust_center source wiring', () => {
   it('maps the document type to its table id, label, icon and route', () => {
     expect(chatCardLabel('trust_center')).toBe('Trust center');
     expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.trust_center).toBe('trust-center');
     expect(getSourceLabel('trust-center')).toBe('Trust Center');
-    expect(SOURCE_ICON_NAMES['trust-center']).toBe('shield');
+    expect(SOURCE_ICON_NAMES['trust-center']).toBe('shield-check');
     expect(buildListUrl('trust_center', [TRUST_CENTER_CARD_ID], '/content')).toBe(
       `/content${TRUST_CENTER_API_PATH}?ids=main`,
     );

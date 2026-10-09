@@ -1,7 +1,8 @@
 'use client';
 
 import type React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
@@ -78,8 +79,8 @@ export function openAskAi(source?: string, options?: { prompt?: string }): void 
  */
 export function MingoAiButton({
   source,
-  icon,
-  label = 'Mingo AI',
+  icon: iconProp,
+  label: labelProp,
   shortcutHint = false,
   variant = 'inline',
   className,
@@ -93,6 +94,22 @@ export function MingoAiButton({
   const inPage = variant === 'button';
 
   const commandKey = visitor.known && usesCommandKey(visitor.os);
+  // The launcher is the assistant's: its name, glyph and the chat it opens are
+  // the assistant runtime's (the host's server-resolved identity and its own
+  // opener), so no launcher types a name or assumes which chat exists. A prop
+  // still wins (a header given its own). The lib holds no name of its own:
+  // with none from either, there is no launcher to render (below). With no
+  // runtime opener the open is the `ask-ai:open` event of `source`.
+  const assistant = useAssistantRuntime();
+  const label = labelProp ?? assistant?.name;
+  const icon = iconProp ?? assistant?.icon;
+  const runtimeOpen = assistant?.open;
+  const eventSource = source ?? assistant?.source;
+  // The latest opener, for the shortcut listener: a host's inline callback must not re-bind it every render.
+  const openRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    openRef.current = () => (runtimeOpen ? runtimeOpen({}) : openAskAi(eventSource));
+  });
 
   // The shortcut the key cap shows opens the same chat the click opens.
   useEffect(() => {
@@ -105,11 +122,14 @@ export function MingoAiButton({
       const modifier = commandKey ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
       if (event.key.toLowerCase() !== 'k' || !modifier) return;
       event.preventDefault();
-      openAskAi(source);
+      openRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [shortcutHint, source, commandKey]);
+  }, [shortcutHint, commandKey]);
+
+  // No name from the host or the runtime: nothing to launch under. The lib invents none.
+  if (!label) return null;
 
   return (
     <Button
@@ -121,7 +141,8 @@ export function MingoAiButton({
       aria-label={label}
       aria-keyshortcuts={shortcutHint && visitor.known ? (commandKey ? 'Meta+K' : 'Control+K') : undefined}
       onClick={e => {
-        openAskAi(source);
+        if (runtimeOpen) runtimeOpen({});
+        else openAskAi(eventSource);
         onClick?.(e);
       }}
       className={cn(

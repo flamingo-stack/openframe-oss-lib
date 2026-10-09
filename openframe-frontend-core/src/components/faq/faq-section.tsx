@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
 import Link from '../../embed-shims/next-link';
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
@@ -13,6 +14,7 @@ import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 import { FaqAccordion, type FaqItem } from '../faq-accordion';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { FaqAskCard, faqAskCardShown, type FaqAskOptions } from './faq-ask-card';
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld';
 
 export interface FaqSectionProps {
@@ -48,12 +50,24 @@ export interface FaqSectionProps {
    *  ('' = same-origin relative). */
   apiBaseUrl?: string;
   /**
-   * A block beside the questions (an "ask the assistant" card). From the
-   * content `lg` step the heading, the category nav and this block form a left
-   * column and the questions the right one; below it the block follows the
-   * questions. Absent: the single-column layout, unchanged.
+   * A block beside the questions, in place of the "ask the assistant" card.
+   * From the content `lg` step the heading, the category nav and this block
+   * form a left column and the questions the right one; below it the block
+   * follows the questions.
    */
   aside?: React.ReactNode;
+  /**
+   * The "ask the assistant" card beside the questions. Shown wherever the
+   * host's assistant runtime says a chat is there to open
+   * (`AssistantRuntimeContext`: its name, glyph, questions endpoint and
+   * opener) AND the FAQ has a topic: `ask.topic` (any string the host's
+   * questions endpoint knows), else the `entityType` the FAQ is attached to.
+   * No runtime or no topic: the FAQ is the single column it always was; the
+   * lib names no topic of its own. `false` switches the card off; the object
+   * also states the questions to leave out, the wording and the chat it opens
+   * (`onOpen`). An `aside` takes the card's place.
+   */
+  ask?: false | FaqAskOptions;
 }
 
 const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
@@ -392,8 +406,16 @@ export function FaqSection({
   className,
   minResults,
   apiBaseUrl = '',
-  aside,
+  aside: asideProp,
+  ask,
 }: FaqSectionProps) {
+  const assistant = useAssistantRuntime();
+  // The host's own block wins; else the card, where a chat is there to open and the FAQ has a topic
+  // (an empty topic is no topic, as the questions request reads it).
+  const askTopic = ask === false ? undefined : ask?.topic || entityType;
+  const aside =
+    asideProp ??
+    (ask !== false && askTopic && faqAskCardShown(assistant) ? <FaqAskCard {...ask} topic={askTopic} /> : undefined);
   const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl);
   // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
   // wrapper object would setState-loop under re-rendering parents.
