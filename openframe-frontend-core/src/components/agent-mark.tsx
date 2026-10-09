@@ -1,5 +1,6 @@
 import { FAE_AVATAR_DATA_URI } from '../assets/fae-avatar';
 import { MingoIcon } from './icons';
+import { Image } from '@flamingo-stack/openframe-frontend-core';
 
 export type AgentName = 'fae' | 'mingo';
 
@@ -22,6 +23,6 @@ export function AgentMark({ agent, className = '', faeAvatarSrc = FAE_AVATAR_DAT
   return agent === 'mingo' ? (
     <MingoIcon className={className} aria-hidden="true" focusable="false" />
   ) : (
-    <img src={faeAvatarSrc} alt="" className={className} />
+    <Image src={faeAvatarSrc} alt="" className={className} />
   );
 }

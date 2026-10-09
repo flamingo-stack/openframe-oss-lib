@@ -8,6 +8,7 @@
  */
 import type React from 'react';
 import type { Components, ExtraProps } from 'react-markdown';
+import { Table } from '@flamingo-stack/openframe-frontend-core';
 import Image from '../../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../../hooks/use-authed-image-src';
 import type { ResolveLinkResult } from '../../../types/doc-source';
@@ -398,7 +399,7 @@ export function buildBaseComponents({
     // doubled line.
     table: ({ children }: MdRenderProps<'table'>) => (
       <div className="table-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card">
-        <table className="w-full table-fixed md:table-auto [&_tr:last-child_td]:border-b-0">{children}</table>
+        <Table className="w-full table-fixed md:table-auto [&_tr:last-child_td]:border-b-0">{children}</Table>
       </div>
     ),
     thead: ({ children }: MdRenderProps<'thead'>) => <thead className="bg-ods-bg-surface">{children}</thead>,

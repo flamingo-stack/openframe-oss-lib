@@ -2,6 +2,7 @@
 
 import { cloneElement, memo, type ReactElement, type ReactNode, type MouseEvent } from 'react';
 import Link from '../../embed-shims/next-link';
+import { Button } from '@flamingo-stack/openframe-frontend-core';
 import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
 import { NavigationItemBadge } from './navigation-item-badge';
@@ -137,9 +138,9 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
   // disabled one must not be followable — both stay buttons.
   if (disabled || !item.path || item.onClick) {
     return (
-      <button type="button" onClick={event => onClick(item, event)} disabled={disabled} {...shared}>
+      <Button type="button" onClick={event => onClick(item, event)} disabled={disabled} {...shared}>
         {content}
-      </button>
+      </Button>
     );
   }
 
