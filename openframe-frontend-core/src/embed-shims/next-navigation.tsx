@@ -101,8 +101,8 @@ const noopRouter: RouterStub = {
 
 /**
  * SPA navigation for the unregistered fallback. Uses the History API instead of
- * `window.location.assign/replace` so a same-origin URL change (e.g. a table's
- * `?search=` write via `useApiParams`) never triggers a full document reload —
+ * `window.location.assign/replace` so a same-origin URL change (e.g. a tab bar's
+ * `?tab=` write through `router.replace`) never triggers a full document reload —
  * even if a real router was never registered, or the registration landed on a
  * DIFFERENT module instance than this one (duplicate lib copy / ESM-CJS dual
  * package). A synthetic `popstate` is dispatched so this file's own
@@ -130,6 +130,29 @@ function softNavigate(href: string, mode: 'push' | 'replace'): void {
     if (mode === 'push') window.location.assign(href);
     else window.location.replace(href);
   }
+}
+
+/**
+ * Rewrites the current URL in place — a query-string write that is NOT a
+ * navigation. `useApiParams` uses this for its filter/search/page writes.
+ *
+ * `router.replace` in a Next host is a soft navigation: the App Router fetches
+ * the route's RSC payload (`?_rsc=…`) and only then commits the URL, so a
+ * filter pick showed its label a server round trip later — and a full second or
+ * more where that fetch fails. The native History API skips the fetch: Next
+ * (14.1+) patches `history.replaceState` and syncs `useSearchParams` /
+ * `usePathname` from it, and the page's own queries react to the new params.
+ * The `null` state matters: Next copies its internal tree into the entry only
+ * for a state it did not write itself.
+ *
+ * Outside a Next host nothing patches the History API, so the synthetic
+ * `popstate` is what re-renders this file's fallback subscribers — the same
+ * signal {@link softNavigate} sends. Next ignores a `popstate` with no state.
+ */
+export function replaceUrlInPlace(href: string): void {
+  if (typeof window === 'undefined') return;
+  window.history.replaceState(null, '', href);
+  window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 // `useFallback*`, not `fallbackUse*`: two of these call hooks, and the

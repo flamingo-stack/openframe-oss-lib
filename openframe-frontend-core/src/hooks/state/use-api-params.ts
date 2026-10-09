@@ -20,7 +20,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from '../../embed-shims/next-navigation';
+import { replaceUrlInPlace, useSearchParams } from '../../embed-shims/next-navigation';
 import { createSearchParams, parseSchemaParams, type ParamSchema, type JSType } from '../../utils/search-params';
 import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
 
@@ -218,7 +218,6 @@ export function useApiParams<TSchema extends ParamSchema>(
   schema: TSchema,
   options: UseApiParamsOptions = {},
 ): UseApiParamsReturn<TSchema> {
-  const router = useRouter();
   const searchParamsLive = useSearchParams();
   const debug = options.debug || false;
 
@@ -349,9 +348,9 @@ export function useApiParams<TSchema extends ParamSchema>(
   const updateUrl = useCallback(
     (newParams: URLSearchParams, keysToRemove: string[] = []) => {
       // Base the write on the LAST WRITE WE ISSUED, not on the committed URL.
-      // Next commits each `router.replace` as its own navigation, so two writes
-      // fired before the first commits would both rebase on the pre-first URL
-      // and the first one's keys would be lost.
+      // The URL hook commits each write on a later render, so two writes fired
+      // before the first commits would both rebase on the pre-first URL and
+      // the first one's keys would be lost.
       const base = pendingRef.current[pendingRef.current.length - 1] ?? searchString;
       const finalParams = new URLSearchParams(base);
 
@@ -389,9 +388,9 @@ export function useApiParams<TSchema extends ParamSchema>(
       const merged = finalParams.toString();
 
       // A NO-OP write (re-selecting the current option, clearing an already
-      // empty picker) must not enter the queue: `router.replace` with an
-      // identical URL produces no commit, so the entry would never drain and
-      // every later write would rebase on a phantom.
+      // empty picker) must not enter the queue: rewriting the URL it already
+      // has produces no commit, so the entry would never drain and every later
+      // write would rebase on a phantom.
       if (merged === base) return;
 
       pendingRef.current = [...pendingRef.current, merged];
@@ -403,10 +402,11 @@ export function useApiParams<TSchema extends ParamSchema>(
         console.log('[useApiParams] Updating URL:', url);
       }
 
-      // Use replace for shallow routing (no page reload, no history spam)
-      router.replace(url, { scroll: false });
+      // In place, not a navigation: no history entry, no scroll, and no RSC
+      // round trip before the URL (and so the params) change.
+      replaceUrlInPlace(url);
     },
-    [router, debug, searchString, stableSchema, syncPendingTail],
+    [debug, searchString, stableSchema, syncPendingTail],
   );
 
   // Drain the queue as commits arrive. A commit EQUAL to a queued write drops
@@ -493,13 +493,12 @@ export function useApiParams<TSchema extends ParamSchema>(
       console.log('[useApiParams] Resetting params');
     }
 
-    router.replace(window.location.pathname, { scroll: false });
-  }, [router, debug]);
+    replaceUrlInPlace(window.location.pathname);
+  }, [debug]);
 
   // The params of the LAST write we issued, or `params` when nothing is in
   // flight. Adapters read this as "the user's latest intent" so a decision made
-  // while a `router.replace` is uncommitted compares against the click, not the
-  // stale URL.
+  // while a write is uncommitted compares against the click, not the stale URL.
   const pendingParams = useMemo((): InferParamsFromSchema<TSchema> => {
     if (pendingTail === undefined || pendingTail === searchString) return params;
     return parseSchemaParams(stableSchema, new URLSearchParams(pendingTail), {

@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mockReplace, setMockSearchParams } from '../../../../vitest.setup';
+import { mockReplaceState, setMockSearchParams, writtenUrl } from '../../../../vitest.setup';
 import { createSearchParams, useApiParams } from '../use-api-params';
 
 describe('useApiParams', () => {
@@ -8,7 +8,7 @@ describe('useApiParams', () => {
     // Reset URL before each test
     setMockSearchParams(new URLSearchParams());
     window.location.pathname = '/';
-    mockReplace.mockClear();
+    mockReplaceState.mockClear();
   });
 
   describe('Basic functionality', () => {
@@ -119,9 +119,9 @@ describe('useApiParams', () => {
         result.current.setParam('ids', ['1', '2', '3']);
       });
 
-      // Check that router.replace was called with correct URL
-      expect(mockReplace).toHaveBeenCalled();
-      const callArg = mockReplace.mock.calls[0][0];
+      // Check that the URL was rewritten with the correct query
+      expect(mockReplaceState).toHaveBeenCalled();
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
 
       expect(urlParams.getAll('ids')).toEqual(['1', '2', '3']);
@@ -148,8 +148,8 @@ describe('useApiParams', () => {
       });
 
       // Check that the parameter is removed from URL
-      expect(mockReplace).toHaveBeenCalled();
-      const callArg = mockReplace.mock.calls[0][0];
+      expect(mockReplaceState).toHaveBeenCalled();
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
 
       expect(urlParams.has('tags')).toBe(false);
@@ -168,8 +168,8 @@ describe('useApiParams', () => {
         result.current.setParam('search', 'laptop');
       });
 
-      expect(mockReplace).toHaveBeenCalled();
-      const callArg = mockReplace.mock.calls[0][0];
+      expect(mockReplaceState).toHaveBeenCalled();
+      const callArg = writtenUrl(0);
       expect(callArg).toContain('search=laptop');
     });
 
@@ -188,10 +188,10 @@ describe('useApiParams', () => {
         result.current.setParam('search', '');
       });
 
-      expect(mockReplace).toHaveBeenCalled();
+      expect(mockReplaceState).toHaveBeenCalled();
       // `isEmptyValue('')` is true, so the key is dropped and nothing else is
       // left in the query — `updateUrl` emits the bare pathname.
-      expect(mockReplace.mock.calls[0][0]).toBe('/');
+      expect(writtenUrl(0)).toBe('/');
     });
 
     it('should warn when setting unknown parameter', () => {
@@ -228,7 +228,7 @@ describe('useApiParams', () => {
 
       // `null` counts as empty (`isEmptyValue`), so the key is REMOVED — it is
       // not stringified to "null". The whole query empties out, leaving `/`.
-      expect(mockReplace.mock.calls[0][0]).toBe('/');
+      expect(writtenUrl(0)).toBe('/');
     });
   });
 
@@ -248,8 +248,8 @@ describe('useApiParams', () => {
         });
       });
 
-      expect(mockReplace).toHaveBeenCalled();
-      const callArg = mockReplace.mock.calls[0][0];
+      expect(mockReplaceState).toHaveBeenCalled();
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.get('search')).toBe('laptop');
       expect(urlParams.get('page')).toBe('5');
@@ -270,7 +270,7 @@ describe('useApiParams', () => {
         });
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.getAll('ids')).toEqual(['1', '2', '3']);
       expect(urlParams.getAll('tags')).toEqual(['a', 'b']);
@@ -315,8 +315,8 @@ describe('useApiParams', () => {
         result.current.clearParams(['search']);
       });
 
-      expect(mockReplace).toHaveBeenCalled();
-      const callArg = mockReplace.mock.calls[0][0];
+      expect(mockReplaceState).toHaveBeenCalled();
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.has('search')).toBe(false);
       expect(urlParams.has('page')).toBe(true);
@@ -341,7 +341,7 @@ describe('useApiParams', () => {
         result.current.clearParams(['search', 'tags']);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.has('search')).toBe(false);
       expect(urlParams.has('tags')).toBe(false);
@@ -367,7 +367,7 @@ describe('useApiParams', () => {
         result.current.resetParams();
       });
 
-      expect(mockReplace).toHaveBeenCalledWith('/', { scroll: false });
+      expect(mockReplaceState).toHaveBeenCalledWith(null, '', '/');
     });
   });
 
@@ -456,7 +456,7 @@ describe('useApiParams', () => {
       });
 
       // External param should be preserved
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.get('external')).toBe('value');
     });
@@ -480,7 +480,7 @@ describe('useApiParams', () => {
         result.current.setParam('search', 'desktop');
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.get('external1')).toBe('value1');
       expect(urlParams.get('external2')).toBe('value2');
@@ -509,7 +509,7 @@ describe('useApiParams', () => {
         result.current.setParam('page', 2);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
 
       // Check that parameters are not duplicated
@@ -540,7 +540,7 @@ describe('useApiParams', () => {
         result.current.setParam('tags', ['tag3', 'tag4']);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
 
       // Check that tags are not duplicated
@@ -564,7 +564,7 @@ describe('useApiParams', () => {
         result.current.setParam('tags', ['valid', '', 'also-valid']);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       const tags = urlParams.getAll('tags');
       // Empty strings should be filtered out
@@ -582,7 +582,7 @@ describe('useApiParams', () => {
         result.current.setParam('tags', ['valid', null, undefined, 'also-valid']);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       const tags = urlParams.getAll('tags');
       // null, undefined and empty strings are filtered out
@@ -601,7 +601,7 @@ describe('useApiParams', () => {
         result.current.setParam('search', specialChars);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.get('search')).toBe(specialChars);
     });
@@ -618,7 +618,7 @@ describe('useApiParams', () => {
         result.current.setParam('search', longValue);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.get('search')).toBe(longValue);
     });
@@ -700,7 +700,7 @@ describe('useApiParams', () => {
       });
 
       // Update mock to reflect first change and rerender
-      const firstCall = mockReplace.mock.calls[0][0];
+      const firstCall = writtenUrl(0);
       const firstParams = new URLSearchParams(firstCall.startsWith('?') ? firstCall.slice(1) : firstCall);
       setMockSearchParams(firstParams);
       rerender();
@@ -710,7 +710,7 @@ describe('useApiParams', () => {
       });
 
       // Update mock to reflect second change and rerender
-      const secondCall = mockReplace.mock.calls[1][0];
+      const secondCall = writtenUrl(1);
       const secondParams = new URLSearchParams(secondCall.startsWith('?') ? secondCall.slice(1) : secondCall);
       setMockSearchParams(secondParams);
       rerender();
@@ -720,7 +720,7 @@ describe('useApiParams', () => {
       });
 
       // Check last call - should have both search and page
-      const lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0];
+      const lastCall = writtenUrl(-1);
       const urlParams = new URLSearchParams(lastCall.startsWith('?') ? lastCall.slice(1) : lastCall);
       expect(urlParams.get('search')).toBe('second');
       expect(urlParams.get('page')).toBe('2');
@@ -738,7 +738,7 @@ describe('useApiParams', () => {
         result.current.setParam('ids', largeArray);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       const allIds = urlParams.getAll('ids');
       expect(allIds).toHaveLength(1000);
@@ -757,7 +757,7 @@ describe('useApiParams', () => {
         result.current.setParam('tags', ['tag1', 'tag2', 'tag1', 'tag2']);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       const tags = urlParams.getAll('tags');
       expect(tags).toEqual(['tag1', 'tag2', 'tag1', 'tag2']);
@@ -783,7 +783,7 @@ describe('useApiParams', () => {
         result.current.setParam('tags', ['new1', 'new2']);
       });
 
-      const lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0];
+      const lastCall = writtenUrl(-1);
       const urlParams = new URLSearchParams(lastCall.startsWith('?') ? lastCall.slice(1) : lastCall);
       const tags = urlParams.getAll('tags');
       expect(tags).toEqual(['new1', 'new2']);
@@ -802,7 +802,7 @@ describe('useApiParams', () => {
         result.current.setParam('page', 1);
       });
 
-      const written = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0];
+      const written = writtenUrl(-1);
       expect(written).not.toContain('page=1');
     });
 
@@ -881,7 +881,7 @@ describe('useApiParams', () => {
         result.current.setParam('search', unicodeValue);
       });
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.get('search')).toBe(unicodeValue);
     });
@@ -908,7 +908,7 @@ describe('useApiParams', () => {
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown parameter: invalid1'));
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown parameter: invalid2'));
 
-      const callArg = mockReplace.mock.calls[0][0];
+      const callArg = writtenUrl(0);
       const urlParams = new URLSearchParams(callArg.startsWith('?') ? callArg.slice(1) : callArg);
       expect(urlParams.get('search')).toBe('laptop');
       expect(urlParams.get('page')).toBe('5');
@@ -935,7 +935,7 @@ describe('useApiParams', () => {
       });
 
       // resetParams should clear everything, including external params
-      expect(mockReplace).toHaveBeenCalledWith('/', { scroll: false });
+      expect(mockReplaceState).toHaveBeenCalledWith(null, '', '/');
     });
 
     it('should handle array parameter with only empty values', () => {
@@ -952,9 +952,9 @@ describe('useApiParams', () => {
       // All values (empty string, null, undefined) are filtered out, so the
       // array becomes [] and the `tags` param is absent — which is what the URL
       // already said. The writer SKIPS a navigation that would not change the
-      // URL (a `router.replace` to an identical URL produces no commit, which
-      // would strand the entry in the pending-writes queue forever).
-      expect(mockReplace).not.toHaveBeenCalled();
+      // URL (rewriting the URL it already has produces no commit, which would
+      // strand the entry in the pending-writes queue forever).
+      expect(mockReplaceState).not.toHaveBeenCalled();
     });
   });
 

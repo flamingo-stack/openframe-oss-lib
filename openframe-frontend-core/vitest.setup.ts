@@ -137,6 +137,16 @@ installLocalStorageIfMissing();
 
 export const mockReplace = vi.fn<MockRouter['replace']>();
 export const mockPush = vi.fn<MockRouter['push']>();
+// `useApiParams` writes the URL in place through the History API, not the
+// router (see `replaceUrlInPlace`); its tests read the written URL from here.
+export const mockReplaceState = vi.spyOn(window.history, 'replaceState');
+
+/** The URL the n-th in-place write put in the address bar (negative = from the end). */
+export function writtenUrl(index = 0): string {
+  const calls = mockReplaceState.mock.calls;
+  const url = calls[index < 0 ? calls.length + index : index]?.[2];
+  return url == null ? '' : String(url);
+}
 
 // `currentSearchParams` is read on every render via the registered hook,
 // so tests can swap it between assertions and the next renderHook() call
@@ -199,5 +209,6 @@ Object.defineProperty(window, 'location', {
 beforeEach(() => {
   mockReplace.mockClear();
   mockPush.mockClear();
+  mockReplaceState.mockClear();
   currentSearchParams = new URLSearchParams();
 });
