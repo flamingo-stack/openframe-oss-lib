@@ -23,7 +23,8 @@ const binary = (id: string, os: AppDownload['os'], architecture: string, url: st
 
 const APP_STORE_URL = 'https://apps.test/app';
 const GOOGLE_PLAY_URL = 'https://play.test/app';
-const MOBILE = { appStoreUrl: APP_STORE_URL, googlePlayUrl: GOOGLE_PLAY_URL };
+const INSTALL = { url: 'https://www.site.test/mobile', qrViewBoxSize: 37, qrPath: 'M4 4.5h7' };
+const MOBILE = { appStoreUrl: APP_STORE_URL, googlePlayUrl: GOOGLE_PLAY_URL, install: INSTALL };
 
 const DATA: DownloadsPublic = {
   mobile: MOBILE,
@@ -91,12 +92,23 @@ describe('DownloadAppsPage', () => {
   });
 
   it('offers the mobile app only when the host turns the desktop app off', () => {
-    render(<DownloadAppsPage initialData={DATA} showDesktop={false} footer={<p>host footer</p>} />);
+    render(
+      <DownloadAppsPage
+        initialData={DATA}
+        showDesktop={false}
+        web={{
+          title: 'No install',
+          description: 'Runs in the browser.',
+          action: <button type="button">host action</button>,
+        }}
+      />,
+    );
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(DOWNLOADS_MOBILE_TITLE);
     expect(screen.queryByText('Desktop app')).not.toBeInTheDocument();
     const hrefs = screen.getAllByRole('link').map(link => link.getAttribute('href'));
     expect(hrefs).toEqual(expect.arrayContaining([APP_STORE_URL, GOOGLE_PLAY_URL]));
-    expect(screen.getByText('host footer')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No install' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'host action' })).toBeInTheDocument();
   });
 
   it('draws a badge only for a store the server names a listing for', () => {
@@ -151,5 +163,21 @@ describe('DownloadAppsPage', () => {
     render(<DownloadAppsPage initialData={{ desktop: [], mobile: MOBILE }} />);
     expect(screen.queryByText('Desktop app')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(DOWNLOADS_MOBILE_TITLE);
+  });
+
+  it('draws the install code and prints its address only when the server sends an install link', () => {
+    const { unmount } = render(<DownloadAppsPage initialData={{ desktop: [], mobile: MOBILE }} />);
+    expect(screen.getByRole('img', { name: `QR code for ${INSTALL.url}` })).toBeInTheDocument();
+    expect(screen.getByText(/site\.test\/mobile on your phone/)).toBeInTheDocument();
+    unmount();
+
+    resetDownloadsStore();
+    render(
+      <DownloadAppsPage
+        initialData={{ desktop: [], mobile: { appStoreUrl: APP_STORE_URL, googlePlayUrl: GOOGLE_PLAY_URL } }}
+      />,
+    );
+    expect(screen.queryByRole('img', { name: /QR code/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Scan with your phone')).not.toBeInTheDocument();
   });
 });

@@ -1,8 +1,8 @@
 /**
- * The website's addresses for getting the apps: the download page, the install
- * link that sends a phone on to its store, and the URL the install QR code
- * encodes. The store listings and installer links are NOT here: they are the
- * server's (`DownloadsPublic`, read through `useDownloads`).
+ * The download page's address, and what a server needs to send a phone on to
+ * its store. No link lives here: the store listings, the installer links and
+ * the install link the QR code encodes are all the server's (`DownloadsPublic`,
+ * read through `useDownloads`).
  *
  * Pure and server-safe; also published as the granular subpath
  * `./utils/mobile-app`, for an Edge proxy and other server-only consumers.
@@ -14,26 +14,15 @@ import { detectVisitorOs } from './visitor-os';
 export const DOWNLOAD_PAGE_PATH = '/download';
 
 /**
- * The website's install link. The SERVER answers it by the request's
- * User-Agent: an iPhone or iPad is redirected to the App Store, an Android
- * device to Google Play, and everyone else to the download page. One fixed
- * address, because a QR code holds a single string and whoever scans it is
- * holding the phone the app goes on.
+ * An address as it is printed for a human to read or type: no scheme, no `www`,
+ * no query, no trailing slash. `https://www.example.com/mobile` reads `example.com/mobile`.
  */
-export const MOBILE_APP_INSTALL_PATH = '/mobile';
-
-/**
- * The one URL the install QR code encodes: the website's install link.
- *
- * Absolute and on the production host on purpose: a code must point at
- * production whichever deployment rendered the page it came from. `MobileAppQr`
- * draws this value as committed path data, so the two change together: see the
- * regeneration note on the asset.
- */
-export const MOBILE_APP_INSTALL_URL = `https://www.flamingo.run${MOBILE_APP_INSTALL_PATH}`;
-
-/** The install link as it is printed for a human to read or type: no scheme, no `www`. */
-export const MOBILE_APP_INSTALL_HOST_PATH = MOBILE_APP_INSTALL_URL.replace(/^https:\/\/(www\.)?/, '');
+export function printableUrl(url: string): string {
+  return url
+    .replace(/^https?:\/\/(www\.)?/i, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/$/, '');
+}
 
 /**
  * The store for a phone or tablet, or `null` for every other system and for a

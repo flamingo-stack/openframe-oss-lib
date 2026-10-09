@@ -1,18 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MOBILE_APP_INSTALL_HOST_PATH, MOBILE_APP_INSTALL_URL, resolveMobileStoreUrl } from '../mobile-app';
+import { printableUrl, resolveMobileStoreUrl } from '../mobile-app';
 
-/**
- * The install URL is committed twice: here, and as the QR path data in
- * `assets/mobile-app-qr`. If this fails, REGENERATE THE QR (see that asset); do not
- * only update the expectation.
- */
-describe('MOBILE_APP_INSTALL_URL', () => {
-  it('is exactly what the committed QR path data encodes', () => {
-    expect(MOBILE_APP_INSTALL_URL).toBe('https://www.flamingo.run/mobile');
-  });
-
-  it('prints as the install link, without scheme or www', () => {
-    expect(MOBILE_APP_INSTALL_HOST_PATH).toBe('flamingo.run/mobile');
+describe('printableUrl', () => {
+  it('prints an address without scheme, www, query or trailing slash', () => {
+    expect(printableUrl('https://www.example.com/mobile')).toBe('example.com/mobile');
+    expect(printableUrl('http://example.com/mobile/?from=qr#top')).toBe('example.com/mobile');
   });
 });
 

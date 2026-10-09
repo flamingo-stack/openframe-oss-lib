@@ -5,4 +5,3 @@
 export const assets = {} as const;
 export * from './fae-avatar';
 export * from './sad-flamingo';
-export * from './mobile-app-qr';
