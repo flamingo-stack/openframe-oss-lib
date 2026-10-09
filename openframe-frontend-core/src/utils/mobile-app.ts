@@ -1,15 +1,14 @@
 /**
- * Where the OpenFrame apps are installed from. One owner for every surface that
- * offers them: the product's Settings page and the website's download page.
+ * The download page's own addresses: where it lives, the parameter that sends a
+ * phone on to its store, and the URL the install QR code encodes. The store
+ * listings and installer links are NOT here: they are the server's
+ * (`DownloadsPublic`, read through `useDownloads`).
  *
  * Pure and server-safe; also published as the granular subpath
  * `./utils/mobile-app`, for an Edge proxy and other server-only consumers.
  */
+import type { MobileAppLinks } from '../types/downloads';
 import { detectVisitorOs } from './visitor-os';
-
-/** Published listings for the OpenFrame Console mobile app. */
-export const APP_STORE_URL = 'https://apps.apple.com/us/app/openframe-console/id6801064262';
-export const GOOGLE_PLAY_URL = 'https://play.google.com/store/apps/details?id=ai.openframe.mobile';
 
 /** The website's download page: every installer and the mobile app. */
 export const DOWNLOAD_PAGE_PATH = '/download';
@@ -39,15 +38,20 @@ export const MOBILE_APP_INSTALL_HOST_PATH = MOBILE_APP_INSTALL_URL.replace(/^htt
 );
 
 /**
- * The store for a phone or tablet, or `null` for every other system.
+ * The store for a phone or tablet, or `null` for every other system and for a
+ * store the server names no listing for (`links` is the server's answer).
  *
  * The server passes the request's User-Agent; a browser also passes
  * `navigator.maxTouchPoints`, the only signal that tells an iPad asking for the
  * desktop site (it calls itself a Macintosh) from a real Mac.
  */
-export function resolveMobileStoreUrl(userAgent: string | null | undefined, maxTouchPoints?: number): string | null {
+export function resolveMobileStoreUrl(
+  links: MobileAppLinks,
+  userAgent: string | null | undefined,
+  maxTouchPoints?: number,
+): string | null {
   const os = detectVisitorOs(userAgent, { maxTouchPoints });
-  if (os === 'ios') return APP_STORE_URL;
-  if (os === 'android') return GOOGLE_PLAY_URL;
+  if (os === 'ios') return links.appStoreUrl;
+  if (os === 'android') return links.googlePlayUrl;
   return null;
 }

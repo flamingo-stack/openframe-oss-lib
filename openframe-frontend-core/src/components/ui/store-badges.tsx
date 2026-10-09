@@ -299,32 +299,40 @@ export function GooglePlayBadge({ className }: StoreBadgeProps) {
 }
 
 export interface StoreBadgeLinksProps {
-  appStoreUrl: string;
-  googlePlayUrl: string;
+  /** The App Store listing. Absent or null: that badge is not drawn. */
+  appStoreUrl?: string | null;
+  /** The Google Play listing. Absent or null: that badge is not drawn. */
+  googlePlayUrl?: string | null;
   /** Opens both listings in a new tab. */
   openInNewTab?: boolean;
   className?: string;
 }
 
 /**
- * The pair of store badges as links — the canonical "get our mobile app" row.
+ * The store badges as links — the canonical "get our mobile app" row. A store
+ * with no listing has no badge, and with neither the row is not rendered.
  *
  * Both are rendered at the same height because Apple and Google each require
  * their badge to be no smaller than any other store's badge beside it, which is
  * only satisfiable by drawing them equal.
  */
 export function StoreBadgeLinks({ appStoreUrl, googlePlayUrl, openInNewTab = true, className }: StoreBadgeLinksProps) {
+  if (!appStoreUrl && !googlePlayUrl) return null;
   return (
     <div className={cn('flex flex-wrap items-center gap-[var(--spacing-system-lf)]', className)}>
       {/* `rel` on both branches: `noopener` is inert without a target, but `noreferrer` is
           not — dropping it on the same-window branch sent the tenant's hostname to Apple
           and Google as a Referer. */}
-      <a href={appStoreUrl} target={openInNewTab ? '_blank' : undefined} rel="noopener noreferrer">
-        <AppStoreBadge className="h-12 w-auto" />
-      </a>
-      <a href={googlePlayUrl} target={openInNewTab ? '_blank' : undefined} rel="noopener noreferrer">
-        <GooglePlayBadge className="h-12 w-auto" />
-      </a>
+      {appStoreUrl && (
+        <a href={appStoreUrl} target={openInNewTab ? '_blank' : undefined} rel="noopener noreferrer">
+          <AppStoreBadge className="h-12 w-auto" />
+        </a>
+      )}
+      {googlePlayUrl && (
+        <a href={googlePlayUrl} target={openInNewTab ? '_blank' : undefined} rel="noopener noreferrer">
+          <GooglePlayBadge className="h-12 w-auto" />
+        </a>
+      )}
     </div>
   );
 }

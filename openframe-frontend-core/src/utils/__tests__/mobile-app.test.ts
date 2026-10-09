@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  APP_STORE_URL,
-  GOOGLE_PLAY_URL,
-  MOBILE_APP_INSTALL_HOST_PATH,
-  MOBILE_APP_INSTALL_URL,
-  resolveMobileStoreUrl,
-} from '../mobile-app';
+import { MOBILE_APP_INSTALL_HOST_PATH, MOBILE_APP_INSTALL_URL, resolveMobileStoreUrl } from '../mobile-app';
 
 /**
  * The install URL is committed twice: here, and as the QR path data in
@@ -22,6 +16,10 @@ describe('MOBILE_APP_INSTALL_URL', () => {
   });
 });
 
+const APP_STORE_URL = 'https://apps.test/app';
+const GOOGLE_PLAY_URL = 'https://play.test/app';
+const LINKS = { appStoreUrl: APP_STORE_URL, googlePlayUrl: GOOGLE_PLAY_URL };
+
 describe('resolveMobileStoreUrl', () => {
   const IPHONE =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile Safari';
@@ -30,18 +28,23 @@ describe('resolveMobileStoreUrl', () => {
   const WINDOWS = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36';
 
   it('sends iOS devices to the App Store and Android to Play', () => {
-    expect(resolveMobileStoreUrl(IPHONE, 5)).toBe(APP_STORE_URL);
-    expect(resolveMobileStoreUrl(ANDROID, 5)).toBe(GOOGLE_PLAY_URL);
+    expect(resolveMobileStoreUrl(LINKS, IPHONE, 5)).toBe(APP_STORE_URL);
+    expect(resolveMobileStoreUrl(LINKS, ANDROID, 5)).toBe(GOOGLE_PLAY_URL);
   });
 
   it('reads an iPad asking for the desktop site as iOS, by its touch points', () => {
-    expect(resolveMobileStoreUrl(MAC, 5)).toBe(APP_STORE_URL);
+    expect(resolveMobileStoreUrl(LINKS, MAC, 5)).toBe(APP_STORE_URL);
   });
 
   it('keeps desktops, and a server with no touch signal, on the page', () => {
-    expect(resolveMobileStoreUrl(MAC, 0)).toBeNull();
-    expect(resolveMobileStoreUrl(MAC)).toBeNull();
-    expect(resolveMobileStoreUrl(WINDOWS, 0)).toBeNull();
-    expect(resolveMobileStoreUrl(null)).toBeNull();
+    expect(resolveMobileStoreUrl(LINKS, MAC, 0)).toBeNull();
+    expect(resolveMobileStoreUrl(LINKS, MAC)).toBeNull();
+    expect(resolveMobileStoreUrl(LINKS, WINDOWS, 0)).toBeNull();
+    expect(resolveMobileStoreUrl(LINKS, null)).toBeNull();
+  });
+
+  it('sends nobody to a store the server names no listing for', () => {
+    expect(resolveMobileStoreUrl({ appStoreUrl: null, googlePlayUrl: GOOGLE_PLAY_URL }, IPHONE, 5)).toBeNull();
+    expect(resolveMobileStoreUrl({ appStoreUrl: APP_STORE_URL, googlePlayUrl: null }, ANDROID, 5)).toBeNull();
   });
 });

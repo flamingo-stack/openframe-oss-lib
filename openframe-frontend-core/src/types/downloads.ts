@@ -20,8 +20,12 @@ export const DOWNLOADS_MOBILE_TITLE = 'Get the OpenFrame app';
 export const DOWNLOADS_MOBILE_TAGLINE =
   'Alerts and tickets on your phone, signed in with the account you already have.';
 
-/** An installer file, or a one-line package manager install. */
-export type AppDownloadKind = 'binary' | 'command';
+/**
+ * What a row is: an installer file, or a one-line package manager install. THE
+ * one declaration: the type, the server's rows and every reader derive from it.
+ */
+export const APP_DOWNLOAD_KINDS = ['binary', 'command'] as const;
+export type AppDownloadKind = (typeof APP_DOWNLOAD_KINDS)[number];
 
 /** One way to install the desktop app on one system. */
 export interface AppDownload {
@@ -40,13 +44,24 @@ export interface AppDownload {
   label: string | null;
 }
 
-/** Everything the download page shows that is not a constant of the lib. */
+/** Where the mobile app is installed from. A store the server names no listing for is null, and is not offered. */
+export interface MobileAppLinks {
+  appStoreUrl: string | null;
+  googlePlayUrl: string | null;
+}
+
+/**
+ * Everything the download page shows. All of it is the server's: the lib holds
+ * no link of its own and falls back to none, so what is missing is not drawn.
+ */
 export interface DownloadsPublic {
   /** The desktop installers and install commands, in the order they are offered. Per system, the first installer is the default. */
   desktop: AppDownload[];
+  /** The mobile app's store listings. */
+  mobile: MobileAppLinks;
 }
 
-/** A system's name on a button and a tab. */
+/** A system's name on a button and a card. */
 export const DESKTOP_OS_LABELS: Record<DesktopOs, string> = { mac: 'Mac', windows: 'Windows', linux: 'Linux' };
 
 /** An architecture's name beside a button, when a system has more than one installer. */

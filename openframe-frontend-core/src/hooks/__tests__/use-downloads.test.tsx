@@ -4,6 +4,7 @@ import type { DownloadsPublic } from '../../types/downloads';
 import { resetDownloadsStore, useDownloads } from '../use-downloads';
 
 const DATA: DownloadsPublic = {
+  mobile: { appStoreUrl: null, googlePlayUrl: null },
   desktop: [
     {
       id: 'mac',
