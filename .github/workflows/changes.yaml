@@ -6,6 +6,9 @@ on:
       node_matrix:
         description: "Node packages matrix"
         value: ${{ jobs.collect.outputs.node_matrix }}
+      scan_matrix:
+        description: "Code scan targets"
+        value: ${{ jobs.collect.outputs.scan_matrix }}
       changes:
         description: "JSON object mapping each component key to true/false"
         value: ${{ jobs.collect.outputs.changes }}
@@ -16,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       node_matrix: ${{ steps.define.outputs.node_matrix }}
+      scan_matrix: ${{ steps.define.outputs.scan_matrix }}
       changes: ${{ steps.changes.outputs.changes }}
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +35,10 @@ jobs:
                 "path": "openframe-frontend-core"
               }
             ]')
+          scan_matrix=$(jq -c '
+            [ .[] | { name, path } ]
+              + [{ name: "backend", path: ".", paths: "**/{pom.xml,Cargo.toml,Cargo.lock,Dockerfile*}", skip_files: "**/package.json,**/package-lock.json,**/yarn.lock,**/pnpm-lock.yaml" }]
+          ' <<< "$node_matrix")
 
           filters=$(jq -nc '{
               "java": [
@@ -87,6 +95,7 @@ jobs:
 
           {
             echo "node_matrix=$node_matrix"
+            echo "scan_matrix=$scan_matrix"
             echo "filters=$filters"
             echo "keys=$keys"
           } >> "$GITHUB_OUTPUT"
