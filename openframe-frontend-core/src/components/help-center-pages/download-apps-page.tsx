@@ -88,6 +88,8 @@ export interface DownloadAppsPageProps {
 const SECTIONS_CLASS = 'flex flex-col gap-[var(--spacing-system-xlf)]';
 const SECTION_CLASS = 'flex flex-col gap-[var(--spacing-system-lf)]';
 const CARDS_GRID_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-2';
+/** One card takes the row; two or more share it. */
+const cardsGridClass = (cards: number) => (cards > 1 ? CARDS_GRID_CLASS : 'grid grid-cols-1');
 const CARD_CLASS =
   'flex flex-col gap-[var(--spacing-system-lf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)]';
 const CARD_HEADER_CLASS = 'flex items-center gap-[var(--spacing-system-sf)]';
@@ -124,13 +126,17 @@ interface SystemRows {
   commands: AppDownload[];
 }
 
-/** The rows per system, in the order they arrived. A system with no installer is not offered. */
+/**
+ * The rows per system, in the order they arrived. The page adapts to what the
+ * deployment names: a system is offered when it has an installer OR a package
+ * manager command, and a system with neither has no card at all.
+ */
 function rowsBySystem(downloads: readonly AppDownload[]): SystemRows[] {
   return DESKTOP_OSES.map(os => ({
     os,
     installers: downloads.filter(d => d.os === os && d.kind === 'binary' && d.url),
     commands: downloads.filter(d => d.os === os && d.kind === 'command' && d.command),
-  })).filter(system => system.installers.length > 0);
+  })).filter(system => system.installers.length > 0 || system.commands.length > 0);
 }
 
 function installerLabel(download: AppDownload, siblings: number): string {
@@ -163,20 +169,22 @@ function SystemCard({
         title={DESKTOP_OS_LABELS[system.os]}
         detail={requirements.length > 0 ? `Requires ${requirements.join(' or ')}` : undefined}
       />
-      <div className={BUTTONS_CLASS}>
-        {system.installers.map((download, index) => (
-          <Button
-            key={download.id}
-            variant={index === 0 ? 'accent' : 'outline'}
-            href={download.url ?? undefined}
-            download
-            leftIcon={<Download01Icon className="h-5 w-5" />}
-            onClick={() => report('installer', download)}
-          >
-            {installerLabel(download, system.installers.length)}
-          </Button>
-        ))}
-      </div>
+      {system.installers.length > 0 && (
+        <div className={BUTTONS_CLASS}>
+          {system.installers.map((download, index) => (
+            <Button
+              key={download.id}
+              variant={index === 0 ? 'accent' : 'outline'}
+              href={download.url ?? undefined}
+              download
+              leftIcon={<Download01Icon className="h-5 w-5" />}
+              onClick={() => report('installer', download)}
+            >
+              {installerLabel(download, system.installers.length)}
+            </Button>
+          ))}
+        </div>
+      )}
       {system.commands.length > 0 && (
         <div className={COMMANDS_CLASS}>
           {system.commands.map(row =>
@@ -242,7 +250,7 @@ function DesktopSection({
     return null;
   } else {
     body = (
-      <div className={CARDS_GRID_CLASS}>
+      <div className={cardsGridClass(systems.length)}>
         {systems.map(system => (
           <SystemCard key={system.os} system={system} onDownloadAction={onDownloadAction} />
         ))}

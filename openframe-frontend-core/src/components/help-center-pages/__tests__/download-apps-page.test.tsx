@@ -93,6 +93,23 @@ describe('DownloadAppsPage', () => {
     expect(screen.getByText('host footer')).toBeInTheDocument();
   });
 
+  it('gives a system a card only for what the deployment names', () => {
+    const homebrew = DATA.desktop.find(row => row.id === 'homebrew') as AppDownload;
+    // Windows has installers and no command; the Mac has a command and no installer.
+    render(
+      <DownloadAppsPage initialData={{ desktop: [homebrew, ...DATA.desktop.filter(row => row.os === 'windows')] }} />,
+    );
+    expect(screen.getByText('brew install --cask openframe')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Download for Mac' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Download for Windows (x64)' })).toBeInTheDocument();
+  });
+
+  it('leaves a system with neither an installer nor a command out', () => {
+    render(<DownloadAppsPage initialData={{ desktop: DATA.desktop.filter(row => row.os === 'windows') }} />);
+    expect(screen.queryByRole('heading', { name: 'Mac' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Windows' })).toBeInTheDocument();
+  });
+
   it('shows no desktop section when the deployment names no installer', () => {
     render(<DownloadAppsPage initialData={{ desktop: [] }} />);
     expect(screen.queryByText('Desktop app')).not.toBeInTheDocument();
