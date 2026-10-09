@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
+import { ICON_OPTIONS, resolveIcon } from '../components/chat/utils/icon-library';
 import { MonitorIcon, UserPlusIcon } from '../components/icons-v2-generated';
 import { SearchableSelect, type SearchableSelectProps } from '../components/ui/searchable-select';
 import { SquareAvatar } from '../components/ui/square-avatar';
@@ -12,6 +13,14 @@ const meta = {
       control: 'select',
       options: ['start', 'center', 'end'],
     },
+    layout: {
+      control: 'select',
+      options: ['list', 'grid'],
+    },
+    labelVariant: {
+      control: 'select',
+      options: ['default', 'large'],
+    },
     isLoading: { control: 'boolean' },
     disabled: { control: 'boolean' },
   },
@@ -21,8 +30,9 @@ const meta = {
         component:
           'Select-style dropdown whose first item is a search field filtering the option list - ' +
           'the ticket assignee "Search users..." pattern generalized for any entity. The default ' +
-          'trigger matches SelectTrigger; pass a custom trigger for icon-button use cases ' +
-          '(AssigneeDropdown compact is built on this component).',
+          'trigger matches SelectTrigger (with an optional FieldWrapper label); pass a custom trigger for ' +
+          'icon-button use cases (AssigneeDropdown compact is built on this component). The `grid` layout ' +
+          'tiles the options icon-above-caption - the icon-picker pattern.',
       },
     },
   },
@@ -133,6 +143,40 @@ export const Loading: Story = {
   },
   render: args => (
     <div className="w-[320px] bg-ods-bg p-[var(--spacing-system-mf)]">
+      <ControlledSelect {...args} />
+    </div>
+  ),
+};
+
+/** Library glyphs offered by an icon picker: the chat icon registry
+ *  (`ICON_OPTIONS` + `resolveIcon`) tiled in the `grid` layout, the stored key
+ *  searchable through `keywords`, and a `FieldWrapper` label over the trigger. */
+const ICONS = ICON_OPTIONS.map(option => {
+  const Glyph = resolveIcon(option.key);
+  return {
+    value: option.key,
+    label: option.label,
+    keywords: [option.key],
+    icon: <Glyph size={24} className="shrink-0 text-ods-flamingo-cyan" />,
+  };
+});
+
+export const IconGrid: Story = {
+  args: {
+    options: ICONS,
+    onValueChange: () => {},
+    value: 'rocket',
+    label: 'Icon',
+    labelVariant: 'large',
+    placeholder: 'Select icon',
+    searchPlaceholder: 'Search for Icon',
+    emptyText: 'No icons found',
+    layout: 'grid',
+    contentClassName: 'w-[360px]',
+  },
+  render: args => (
+    // 160px trigger (the Figma quick-action "Icon" field) + the stage padding.
+    <div className="w-[192px] bg-ods-bg p-[var(--spacing-system-mf)]">
       <ControlledSelect {...args} />
     </div>
   ),
