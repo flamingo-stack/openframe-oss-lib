@@ -7,18 +7,9 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Polls a Fleet read until a condition holds.
- *
- * <p>Fleet's triggers are asynchronous: a host refetch is only applied on the host's next check-in, and
- * policy pass/fail aggregates are recomputed by a cron. Tests therefore observe the effect by polling
- * rather than asserting inline.
- *
- * <p><b>A failed poll counts as "not yet" rather than ending the wait.</b> An isolated non-200 from the
- * Fleet proxy between two healthy polls has been observed on qa, and {@link RetryingHttpClientFactory}
- * does not cover it — it retries connection failures, not error statuses. Without this, a single blip
- * anywhere in the wait would fail an otherwise good run.
- */
+// Polls because Fleet's triggers are async (refetch on next check-in, policy aggregates via cron); a
+// failed poll is treated as "not yet" since an isolated non-200 from the Fleet proxy has been observed
+// on qa and isn't covered by RetryingHttpClientFactory's connection-failure-only retries.
 @Slf4j
 public class FleetWait {
 
@@ -29,12 +20,8 @@ public class FleetWait {
         return until(what, read, satisfied, DEFAULT_TIMEOUT_SECONDS);
     }
 
-    /**
-     * Polls {@code read} until {@code satisfied} holds or the deadline passes.
-     *
-     * @return the last value successfully read — whether or not it satisfied the condition, so the
-     * caller can assert on it and produce a domain-specific failure message.
-     */
+    // Returns the last value successfully read regardless of whether it satisfied the condition, so the
+    // caller can assert on it and produce a domain-specific failure message.
     public static <T> T until(String what, Supplier<T> read, Predicate<T> satisfied, int timeoutSeconds) {
         long deadline = System.nanoTime() + timeoutSeconds * 1_000_000_000L;
         T last = null;

@@ -14,12 +14,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Service for generating presigned URLs using GCS SDK with ADC.
- * Uses Application Default Credentials (same as Images).
- *
- * Requires IAM role: roles/iam.serviceAccountTokenCreator
- */
+// Requires IAM role: roles/iam.serviceAccountTokenCreator
 @Service
 @Slf4j
 @ConditionalOnProperty(name = "storage.s3.disabled", havingValue = "false")
