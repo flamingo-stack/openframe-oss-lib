@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetDownloadsStore } from '../../../hooks/use-downloads';
 import {
   DOWNLOADS_MOBILE_TITLE,
   DOWNLOADS_TITLE,
@@ -42,6 +43,7 @@ const DATA: DownloadsPublic = {
 const fetchMock = vi.fn<typeof fetch>();
 
 beforeEach(() => {
+  resetDownloadsStore();
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
 });

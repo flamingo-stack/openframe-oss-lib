@@ -11,9 +11,9 @@
  *   - The mobile app: the store badges, and the install QR code beside them.
  *   - `footer`: the host's own last word (the website's "start on the web" card).
  *
- * DATA: `useSelfFetch` against `endpoint` (default `DOWNLOADS_API_PATH`;
- * embedders pass their `/content` proxy path). `initialData` (hub SSR) skips the
- * first fetch. The store links and the QR code are the lib's own constants, so
+ * DATA: `useDownloads` against `endpoint` (default `DOWNLOADS_API_PATH`;
+ * embedders pass their `/content` proxy path), the one request every download
+ * button on the page shares. `initialData` (hub SSR) is the answer, with no fetch. The store links and the QR code are the lib's own constants, so
  * the mobile section renders without the request.
  *
  * A HOST DECIDES `showDesktop`: the website shows the desktop app only to a
@@ -26,12 +26,11 @@
 import { useEffect, type ComponentType, type ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
-import { useSelfFetch } from '../../hooks/use-self-fetch';
+import { useDownloads } from '../../hooks/use-downloads';
 import {
   DESKTOP_OS_LABELS,
   DOWNLOAD_ARCHITECTURE_LABELS,
   DOWNLOADS_API_PATH,
-  DOWNLOADS_CACHE_SECONDS,
   DOWNLOADS_MOBILE_TAGLINE,
   DOWNLOADS_MOBILE_TITLE,
   DOWNLOADS_TAGLINE,
@@ -279,10 +278,7 @@ export function DownloadAppsPage({
   onDownloadAction,
   footer,
 }: DownloadAppsPageProps) {
-  const { data, isLoading, error, reload } = useSelfFetch<DownloadsPublic>(showDesktop ? endpoint : null, {
-    initialData,
-    revalidateOnVisibleAfterMs: DOWNLOADS_CACHE_SECONDS * 1000,
-  });
+  const { data, isLoading, error, reload } = useDownloads({ endpoint, initialData, enabled: showDesktop });
   // The desktop app is "offered" until the data says the deployment names no installer.
   const offersDesktop = showDesktop && (!data || rowsBySystem(data.desktop).length > 0);
 
