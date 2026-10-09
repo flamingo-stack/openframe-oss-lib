@@ -5,7 +5,7 @@
  *
  * ONE page, not tabs (2026 trust-center practice: buyers skim and Ctrl-F, and a
  * questionnaire needs a deep link per section): hero with the monitoring status
- * and the two actions, then anchored sections in reading order
+ * and the actions (Download PDF, Request access), then anchored sections in reading order
  * (`TRUST_CENTER_SECTIONS`: AI & data use → compliance → controls → documents →
  * subprocessors → FAQ → questions) with a sticky section rail on desktop
  * (`StickySectionNav` + `useScrollSpy`, the vendor-page / DocViewer pattern).
@@ -34,11 +34,12 @@ import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
   TRUST_CENTER_API_PATH,
   TRUST_CENTER_CACHE_SECONDS,
-  TRUST_CENTER_SECTIONS,
   TRUST_CENTER_TAGLINE,
   TRUST_CENTER_TITLE,
-  isTrustCenterMonitored,
+  trustCenterMonitoringStatus,
   trustCenterDocumentUrl,
+  trustCenterPdfUrl,
+  visibleTrustCenterSections,
   type TrustCenterControlsPage,
   type TrustCenterPublic,
   type TrustCenterSectionId,
@@ -46,8 +47,9 @@ import {
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection, type FaqSectionProps } from '../faq/faq-section';
+import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
 import { PageShell } from '../layout/article-detail-layout';
-import { PageLayout } from '../layout/page-layout';
+import { PageLayout, type PageActionButton } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { DataAttribution } from '../ui/data-attribution';
 import { EntityImage } from '../ui/entity-image';
@@ -93,20 +95,6 @@ interface TrustSectionView {
   render: (data: TrustCenterPublic) => ReactNode;
 }
 
-/** Sections that have content, in page order. */
-function visibleSections(data: TrustCenterPublic): Array<(typeof TRUST_CENTER_SECTIONS)[number]> {
-  const hasContent: Record<TrustCenterSectionId, boolean> = {
-    ai: data.aiPractices.length > 0,
-    compliance: data.frameworks.length > 0,
-    controls: data.controlDomains.length > 0,
-    documents: data.documents.length > 0,
-    subprocessors: data.subprocessors.length > 0,
-    faq: data.faqs.length > 0,
-    contact: true,
-  };
-  return TRUST_CENTER_SECTIONS.filter(section => hasContent[section.id]);
-}
-
 /**
  * The Controls section's first answer, from the page's own server data: the
  * first category's controls with no query — exactly what the controls endpoint
@@ -136,12 +124,9 @@ function monitoringStatus(
   hydrated: boolean,
   nowMs: number,
 ): { status: 'success' | 'pending' | 'missing'; label: string } {
-  if (!data.connected) return { status: 'missing', label: 'Live control monitoring is not enabled yet' };
   // Before mount the clock is the server's, so the text claims nothing either way.
-  if (!hydrated) return { status: 'missing', label: 'Checking monitoring status' };
-  return isTrustCenterMonitored(data, nowMs)
-    ? { status: 'success', label: 'Controls continuously monitored' }
-    : { status: 'pending', label: 'Monitoring paused' };
+  if (data.connected && !hydrated) return { status: 'missing', label: 'Checking monitoring status' };
+  return trustCenterMonitoringStatus(data, nowMs);
 }
 
 export function TrustCenterPage({
@@ -180,7 +165,7 @@ export function TrustCenterPage({
     documentTitle: null,
   });
 
-  const sections = useMemo(() => (data ? visibleSections(data) : []), [data]);
+  const sections = useMemo(() => (data ? visibleTrustCenterSections(data) : []), [data]);
   // Anchors. The scroll spy lights the rail from whatever scrolls the sections
   // (the window, or a host shell's `<main overflow-y-auto>` — OpenFrame's
   // `AppLayout`) and keeps the URL's hash on the section in view (`syncHash`;
@@ -202,12 +187,27 @@ export function TrustCenterPage({
   const closeRequest = useCallback(() => setRequest(current => ({ ...current, open: false })), []);
 
   const hasGatedDocuments = data?.documents.some(document => document.access === 'request') ?? false;
-  const actions = hasGatedDocuments
-    ? [{ label: 'Request access', variant: 'accent' as const, onClick: () => openRequest(null) }]
+  // The PDF is the page's own content as a file (the hub's `pdf` route beside
+  // `endpoint`), so it is offered once there is content. A new tab: the answer
+  // is an attachment, which the browser saves without leaving the page.
+  const actions: PageActionButton[] | undefined = data
+    ? [
+        {
+          label: 'Download PDF',
+          variant: 'outline',
+          icon: <Download01Icon aria-hidden="true" />,
+          href: trustCenterPdfUrl(endpoint),
+          openInNewTab: true,
+          prefetch: false,
+        },
+        ...(hasGatedDocuments
+          ? [{ label: 'Request access', variant: 'accent' as const, onClick: () => openRequest(null) }]
+          : []),
+      ]
     : undefined;
 
   // Section id → its content. Titles come from `TRUST_CENTER_SECTIONS`; which
-  // sections show comes from `visibleSections` — this map only says what each renders.
+  // sections show comes from `visibleTrustCenterSections` — this map only says what each renders.
   const views: Record<TrustCenterSectionId, TrustSectionView> = {
     ai: {
       lead: TRUST_SECTION_LEADS.ai,
@@ -321,7 +321,7 @@ function TrustCenterChrome({
   actions,
   children,
 }: Required<Pick<TrustCenterPageProps, 'shell' | 'title' | 'subtitle' | 'backButton'>> & {
-  actions?: Array<{ label: string; variant: 'accent'; onClick: () => void }>;
+  actions?: PageActionButton[];
   children: ReactNode;
 }) {
   const router = useRouter();

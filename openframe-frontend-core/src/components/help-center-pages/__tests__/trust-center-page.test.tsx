@@ -208,6 +208,14 @@ describe('TrustCenterPage', () => {
     expect(screen.getByRole('link', { name: 'View Privacy policy' })).toHaveAttribute('target', '_blank');
   });
 
+  it("offers the page as a PDF: the hub's pdf route beside the endpoint, query string kept, in a new tab", () => {
+    render(<TrustCenterPage endpoint="/content/api/trust-center?tenant=a" initialData={makeData()} />);
+    // PageLayout renders its actions once per breakpoint (desktop + mobile bar).
+    const link = screen.getAllByRole('link', { name: 'Download PDF' })[0];
+    expect(link).toHaveAttribute('href', '/content/api/trust-center/pdf?tenant=a');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
   it('hides empty sections and the request CTA when nothing is gated', () => {
     render(
       <TrustCenterPage
