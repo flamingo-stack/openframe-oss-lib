@@ -1,7 +1,5 @@
 package com.openframe.delivery.dispatch;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
@@ -18,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -27,25 +26,37 @@ public class DeliveryRecorder {
     private final MachineDeliveryRepository repository;
     private final MachineDeliverySequenceRepository sequences;
     private final DeliveryProperties properties;
-    private final ObjectMapper objectMapper;
+    private final DeliveryPayloadJson payloadJson;
 
-    // false = a row for this very dispatch already exists: the hand-off was replayed, nothing to do
-    public boolean record(DeliveryRequest<?> request) {
+    public DeliveryRecordOutcome record(DeliveryRequest<?> request) {
         DeliveryType type = request.getType();
+        if (request.isForEveryMachine()) {
+            throw new IllegalArgumentException("A wildcard is not a machine, the type is not rolled out: " + type);
+        }
         String targetId = request.getTargetId();
         String machineId = request.getMachineId();
         String id = DeliveryId.of(type, targetId, machineId);
         DeliveryRef delivery = request.getPayload().getDelivery();
         String dispatchId = delivery.getDispatchId();
         if (repository.existsByIdAndDispatchId(id, dispatchId)) {
-            return false;
+            return DeliveryRecordOutcome.REPLAYED;
         }
-        int sequence = sequences.next();
+        int sequence = sequenceOf(delivery);
         delivery.setSequence(sequence);
         MachineDelivery row = pendingRow(request, id);
-        repository.upsertPending(row);
+        boolean taken = repository.upsertPending(row);
+        if (!taken) {
+            log.info("Delivery outranked, a newer dispatch holds the row: type={} targetId={} machineId={} sequence={}",
+                    type, targetId, machineId, sequence);
+            return DeliveryRecordOutcome.OUTRANKED;
+        }
         log.info("Delivery recorded: type={} targetId={} machineId={} sequence={}", type, targetId, machineId, sequence);
-        return true;
+        return DeliveryRecordOutcome.RECORDED;
+    }
+
+    // a rollout gives all its rows the sequence it started with; a single dispatch takes the next one
+    private int sequenceOf(DeliveryRef delivery) {
+        return Optional.ofNullable(delivery.getSequence()).orElseGet(sequences::next);
     }
 
     private MachineDelivery pendingRow(DeliveryRequest<?> request, String id) {
@@ -54,7 +65,7 @@ public class DeliveryRecorder {
         DeliveryPayload payload = request.getPayload();
         DeliveryRef delivery = payload.getDelivery();
         String dispatchId = delivery.getDispatchId();
-        String payloadJson = toJson(payload);
+        String json = payloadJson.write(payload);
         Policy policy = properties.resolve(type);
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
         long ttlSeconds = policy.getTtlSeconds();
@@ -64,22 +75,14 @@ public class DeliveryRecorder {
                 .targetId(request.getTargetId())
                 .machineId(request.getMachineId())
                 .dispatchId(dispatchId)
+                .sequence(delivery.getSequence())
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
                 .errors(0)
-                .payloadJson(payloadJson)
+                .payloadJson(json)
                 .dispatchedAt(now)
                 .dueAt(now.plusSeconds(ackThresholdSeconds))
                 .expiresAt(now.plusSeconds(ttlSeconds))
                 .build();
-    }
-
-    private String toJson(Object payload) {
-        try {
-            return objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
-            String payloadType = payload.getClass().getSimpleName();
-            throw new IllegalArgumentException("Delivery payload is not serializable: " + payloadType, e);
-        }
     }
 }

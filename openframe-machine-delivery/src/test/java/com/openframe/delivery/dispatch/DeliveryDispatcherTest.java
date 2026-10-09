@@ -79,4 +79,44 @@ class DeliveryDispatcherTest {
         assertThatThrownBy(() -> dispatcher.dispatch(seed)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(sinkProvider);
     }
+
+    @Test
+    void dispatch_wildcardOnATypeThatDeliversToOneMachineAtATime_throwsWithoutHandOff() {
+        // setup
+        TestSeed everyMachine = new TestSeed(DeliveryRequest.EVERY_MACHINE);
+        DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
+                .type(DeliveryType.TOOL_INSTALLATION)
+                .targetId(TARGET_ID)
+                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.request(everyMachine)).thenReturn(forEveryMachine);
+
+        // execution + verifications
+        assertThatThrownBy(() -> dispatcher.dispatch(everyMachine)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(sinkProvider);
+    }
+
+    @Test
+    void dispatch_wildcardOnATypeThatMayBeRolledOut_handedToSink() {
+        // setup
+        TestSeed everyMachine = new TestSeed(DeliveryRequest.EVERY_MACHINE);
+        DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
+                .type(DeliveryType.TOOL_INSTALLATION)
+                .targetId(TARGET_ID)
+                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.request(everyMachine)).thenReturn(forEveryMachine);
+        when(spec.canDeliverToEveryMachine()).thenReturn(true);
+        when(sinkProvider.getObject()).thenReturn(sink);
+
+        // execution
+        dispatcher.dispatch(everyMachine);
+
+        // verifications
+        verify(sink).accept(forEveryMachine);
+    }
 }

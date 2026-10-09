@@ -56,6 +56,33 @@ class DeliveryDispatchListenerTest {
     }
 
     @Test
+    void onDispatch_commandForEveryMachine_requestForEveryMachineHandedToSink() {
+        // setup
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        doReturn(ToolInstallationMessage.class).when(spec).getPayloadClass();
+
+        // execution
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryRequest.EVERY_MACHINE, command));
+
+        // verifications
+        verify(sink).accept(requestCaptor.capture());
+        DeliveryRequest<DeliveryPayload> request = requestCaptor.getValue();
+        assertThat(request.isForEveryMachine()).isTrue();
+        assertThat(request.getTargetId()).isEqualTo(TARGET_ID);
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void onDispatch_noMachineId_rejectedAsIncomplete() {
+        // execution
+        listener.onDispatch(new DeliveryDispatchMessage(null, command));
+
+        // verifications
+        verify(metrics).recordDispatchRejected(DeliveryDispatchListener.REJECTED_INCOMPLETE);
+        verifyNoInteractions(sink);
+    }
+
+    @Test
     void onDispatch_command_requestRebuiltFromDeliveryBlockAndHandedToSink() {
         // setup
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);

@@ -1,6 +1,7 @@
 package com.openframe.delivery.sweep;
 
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.rollout.DeliveryRolloutService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -16,9 +17,11 @@ public class DeliverySweepScheduler {
 
     private static final String PASS_RETRY = "retry";
     private static final String PASS_WATCHDOG = "watchdog";
+    private static final String PASS_ROLLOUT = "rollout";
 
     private final DeliverySweepService sweepService;
     private final DeliveryWatchdogService watchdogService;
+    private final DeliveryRolloutService rolloutService;
     private final DeliveryMetrics metrics;
 
     @Scheduled(fixedDelayString = "${openframe.delivery.sweep.interval}")
@@ -28,6 +31,7 @@ public class DeliverySweepScheduler {
     public void tick() {
         runPass(PASS_RETRY, sweepService::retryPending);
         runPass(PASS_WATCHDOG, watchdogService::reapAcked);
+        runPass(PASS_ROLLOUT, rolloutService::advance);
     }
 
     private void runPass(String pass, Runnable body) {

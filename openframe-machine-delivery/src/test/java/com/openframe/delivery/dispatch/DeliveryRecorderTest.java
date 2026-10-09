@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -57,7 +58,23 @@ class DeliveryRecorderTest {
                 .machineId(MACHINE_ID)
                 .payload(payload)
                 .build();
-        recorder = new DeliveryRecorder(repository, sequences, DeliveryTestPolicies.properties(), new ObjectMapper());
+        recorder = new DeliveryRecorder(repository, sequences, DeliveryTestPolicies.properties(), new DeliveryPayloadJson(new ObjectMapper()));
+    }
+
+    @Test
+    void record_sequenceAssignedByARollout_keptAndCounterUntouched() {
+        // setup
+        payload.getDelivery().setSequence(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        recorder.record(request);
+
+        // verifications
+        verifyNoInteractions(sequences);
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getPayloadJson()).contains("\"sequence\":7");
     }
 
     @Test
@@ -66,10 +83,10 @@ class DeliveryRecorderTest {
         when(repository.existsByIdAndDispatchId(any(), any())).thenReturn(true);
 
         // execution
-        boolean recorded = recorder.record(request);
+        DeliveryRecordOutcome outcome = recorder.record(request);
 
         // verifications
-        assertThat(recorded).isFalse();
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.REPLAYED);
         verify(repository, never()).upsertPending(any(MachineDelivery.class));
         verifyNoInteractions(sequences);
     }
@@ -78,14 +95,17 @@ class DeliveryRecorderTest {
     void record_request_pendingRowUpsertedDueAfterAckThreshold() {
         // setup
         when(sequences.next()).thenReturn(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
 
         // execution
-        recorder.record(request);
+        DeliveryRecordOutcome outcome = recorder.record(request);
 
         // verifications
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.RECORDED);
         verify(repository).upsertPending(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
         assertThat(saved.getId()).isEqualTo(ROW_ID);
+        assertThat(saved.getSequence()).isEqualTo(SEQUENCE);
         assertThat(saved.getType()).isEqualTo(DeliveryType.CLIENT_UNINSTALL);
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(saved.getAttempts()).isZero();
@@ -100,6 +120,7 @@ class DeliveryRecorderTest {
     void record_request_sequenceStampedIntoThePayloadBeforeItIsStored() {
         // setup
         when(sequences.next()).thenReturn(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
 
         // execution
         recorder.record(request);
@@ -109,5 +130,33 @@ class DeliveryRecorderTest {
         verify(repository).upsertPending(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
         assertThat(saved.getPayloadJson()).contains("\"sequence\":7");
+    }
+
+    @Test
+    void record_rowHeldByANewerDispatch_outrankedNothingElse() {
+        // setup
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(false);
+
+        // execution
+        DeliveryRecordOutcome outcome = recorder.record(request);
+
+        // verifications
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.OUTRANKED);
+    }
+
+    @Test
+    void record_wildcardMachine_rejectedNothingWritten() {
+        // setup
+        DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
+                .type(DeliveryType.CLIENT_UNINSTALL)
+                .targetId(MACHINE_ID)
+                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+
+        // execution + verifications
+        assertThatThrownBy(() -> recorder.record(forEveryMachine)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(repository, sequences);
     }
 }

@@ -3,8 +3,10 @@ package com.openframe.client.service.delivery;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.model.ToolInstallationMessage;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
+import com.openframe.delivery.dispatch.DeliveryRecordOutcome;
 import com.openframe.delivery.dispatch.DeliveryRecorder;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.rollout.DeliveryRolloutRecorder;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -18,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -35,6 +38,7 @@ class LocalDeliverySinkTest {
 
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliveryRecorder recorder;
+    @Mock private DeliveryRolloutRecorder rollouts;
     @Mock private DeliveryPublisher publisher;
     @Mock private DeliveryMetrics metrics;
     @Mock private DeliverySpec<DeliverySeed, DeliveryPayload> spec;
@@ -57,9 +61,48 @@ class LocalDeliverySinkTest {
     }
 
     @Test
+    void accept_requestForEveryMachine_rolloutRecordedNothingPublished() {
+        // setup
+        DeliveryRequest<ToolInstallationMessage> forEveryMachine = DeliveryRequest.<ToolInstallationMessage>builder()
+                .type(DeliveryType.TOOL_INSTALLATION)
+                .targetId(TARGET_ID)
+                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.canDeliverToEveryMachine()).thenReturn(true);
+
+        // execution
+        sink.accept(forEveryMachine);
+
+        // verifications
+        verify(rollouts).record(forEveryMachine);
+        verifyNoInteractions(recorder, publisher);
+    }
+
+    @Test
+    void accept_wildcardOnATypeThatDeliversToOneMachineAtATime_goesTheOrdinaryWay() {
+        // setup
+        DeliveryRequest<ToolInstallationMessage> forEveryMachine = DeliveryRequest.<ToolInstallationMessage>builder()
+                .type(DeliveryType.TOOL_INSTALLATION)
+                .targetId(TARGET_ID)
+                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.canDeliverToEveryMachine()).thenReturn(false);
+        when(recorder.record(forEveryMachine)).thenThrow(new IllegalArgumentException("A wildcard is not a machine"));
+
+        // execution + verifications
+        assertThatThrownBy(() -> sink.accept(forEveryMachine)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(rollouts, publisher);
+    }
+
+    @Test
     void accept_newDispatch_rowRecordedThenPublishedToSpecSubject() {
         // setup
-        when(recorder.record(request)).thenReturn(true);
+        when(recorder.record(request)).thenReturn(DeliveryRecordOutcome.RECORDED);
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         when(spec.subject(MACHINE_ID)).thenReturn(SUBJECT);
 
@@ -74,7 +117,7 @@ class LocalDeliverySinkTest {
     @Test
     void accept_natsDown_rowKeptAndNothingThrown() {
         // setup
-        when(recorder.record(request)).thenReturn(true);
+        when(recorder.record(request)).thenReturn(DeliveryRecordOutcome.RECORDED);
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         when(spec.subject(MACHINE_ID)).thenReturn(SUBJECT);
         doThrow(new IllegalStateException("nats down")).when(publisher).publish(SUBJECT, payload);
@@ -90,7 +133,7 @@ class LocalDeliverySinkTest {
     @Test
     void accept_replayedHandOff_nothingPublished() {
         // setup
-        when(recorder.record(request)).thenReturn(false);
+        when(recorder.record(request)).thenReturn(DeliveryRecordOutcome.REPLAYED);
 
         // execution
         sink.accept(request);
@@ -98,5 +141,18 @@ class LocalDeliverySinkTest {
         // verifications
         verifyNoInteractions(publisher, registry);
         verify(metrics).recordDispatchDuplicate(DeliveryType.TOOL_INSTALLATION);
+    }
+
+    @Test
+    void accept_outrankedByANewerDispatch_nothingPublished() {
+        // setup
+        when(recorder.record(request)).thenReturn(DeliveryRecordOutcome.OUTRANKED);
+
+        // execution
+        sink.accept(request);
+
+        // verifications
+        verifyNoInteractions(publisher, registry);
+        verify(metrics).recordDispatchRejected(LocalDeliverySink.REJECTED_OUTRANKED);
     }
 }
