@@ -18,6 +18,8 @@ pub mod updater_launcher;
 pub mod user_session;
 
 #[cfg(target_os = "windows")]
+pub mod apps_entry;
+#[cfg(target_os = "windows")]
 pub mod powershell;
 #[cfg(target_os = "macos")]
 pub mod preferences_writer;
