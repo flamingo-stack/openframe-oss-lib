@@ -8,7 +8,10 @@
  *     when a visitor looks for another system). In a card the installer is THE
  *     action (the other architecture is a quieter button) and each package
  *     manager is one line under it, with its copy button.
- *   - The mobile app: the store badges, and the install QR code beside them.
+ *   - The mobile app: the store badges, and the install QR code beside them. The
+ *     code encodes the website's install link (`MOBILE_APP_INSTALL_URL`), which
+ *     the server answers with a redirect to the phone's store; this page
+ *     redirects nobody.
  *   - `footer`: the host's own last word (the website's "start on the web" card).
  *
  * DATA: all of it is the server's answer (`DownloadsPublic`), read by
@@ -26,7 +29,7 @@
  * The chrome is the canonical `PageShell` + frozen `PageLayout`.
  */
 
-import { useEffect, type ComponentType, type ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloads } from '../../hooks/use-downloads';
@@ -44,7 +47,7 @@ import {
   type MobileAppLinks,
 } from '../../types/downloads';
 import { cn } from '../../utils/cn';
-import { DOWNLOAD_PAGE_STORE_PARAM, MOBILE_APP_INSTALL_HOST_PATH, resolveMobileStoreUrl } from '../../utils/mobile-app';
+import { MOBILE_APP_INSTALL_HOST_PATH } from '../../utils/mobile-app';
 import { DESKTOP_OSES, type DesktopOs } from '../../utils/visitor-os';
 import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
@@ -257,15 +260,6 @@ export function DownloadAppsPage({
   const hasMobile = !!mobile && (!!mobile.appStoreUrl || !!mobile.googlePlayUrl);
   // Until the answer lands, a host that offers the desktop app is titled for it.
   const offersDesktop = showDesktop && (!data || systems.length > 0);
-
-  useEffect(() => {
-    // The install QR code arrives with this parameter: a phone or a tablet goes
-    // straight on to its store. `replace`, so Back returns to whatever sent the
-    // visitor here. Anyone else who opens the page on a phone reads it.
-    if (!mobile || !new URLSearchParams(window.location.search).has(DOWNLOAD_PAGE_STORE_PARAM)) return;
-    const storeUrl = resolveMobileStoreUrl(mobile, navigator.userAgent, navigator.maxTouchPoints);
-    if (storeUrl) window.location.replace(storeUrl);
-  }, [mobile]);
 
   let body: ReactNode;
   if (error && !data) {
