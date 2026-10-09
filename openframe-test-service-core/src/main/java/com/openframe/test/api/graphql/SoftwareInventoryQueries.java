@@ -17,7 +17,6 @@ public class SoftwareInventoryQueries {
                             latestVersion
                             versionStatus
                             olderVersionsCount
-                            devicesCount
                             vulnerabilitySummary { highestSeverity cveCount }
                             cpeMatched
                         }
@@ -39,7 +38,6 @@ public class SoftwareInventoryQueries {
                     latestVersion
                     versionStatus
                     olderVersionsCount
-                    devicesCount
                     vulnerabilitySummary { highestSeverity cveCount }
                     cpeMatched
                 }
@@ -171,7 +169,6 @@ public class SoftwareInventoryQueries {
                             latestVersion
                             versionStatus
                             olderVersionsCount
-                            devicesCount
                             vulnerabilitySummary { highestSeverity cveCount }
                             cpeMatched
                         }
