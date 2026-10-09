@@ -22,7 +22,7 @@ export { ProductReleasesListPage, type ProductReleasesListPageProps } from './pr
 export { DeliveryPage, type DeliveryPageProps } from './delivery-page';
 export { OnboardingGuidesCatalogPage, type OnboardingGuidesCatalogPageProps } from './onboarding-guides-catalog-page';
 export { TrustCenterPage, TrustCenterPageSkeleton, type TrustCenterPageProps } from './trust-center-page';
-export { DownloadAppsPage, type DownloadAppsPageProps } from './download-apps-page';
+export { DownloadAppsPage, type DownloadAppsPageProps, type DownloadAppsWebOption } from './download-apps-page';
 
 // Existing full-pages re-exported for a single Help Center import site.
 export { FaqDocumentPage, type FaqDocumentPageProps } from '../faq';

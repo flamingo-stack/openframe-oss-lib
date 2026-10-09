@@ -1,5 +1,6 @@
 'use client';
 
+import { formatUrlForDisplay } from '../../../utils/format';
 import { ExternalLinkIcon, InfoCircleIcon } from '../../icons-v2-generated';
 import { Button } from '../../ui/button/button';
 import { RemoteSessionOrgLogo } from './remote-session-parts';
@@ -19,11 +20,6 @@ export interface RemoteAccessRequestCardProps {
    * the URL comes from the server, so no other scheme is ever handed out.
    */
   onOpenSite?: (url: string) => void;
-}
-
-/** `https://www.techflow.com/` -> `www.techflow.com`. */
-function displaySiteUrl(url: string): string {
-  return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 }
 
 /** The end user's consent dialog for a remote access request: who is asking, what they get, Decline / Allow Access. */
@@ -47,7 +43,11 @@ export function RemoteAccessRequestCard({
         <RemoteSessionOrgLogo name={organizationName} logoUrl={party.organizationLogoUrl} sizePx={64} />
         <div className="flex min-w-0 flex-1 flex-col">
           <p className="w-full truncate text-ods-text-primary text-h3">{organizationName}</p>
-          {siteUrl && <p className="w-full truncate text-ods-text-secondary text-h4">{displaySiteUrl(siteUrl)}</p>}
+          {siteUrl && (
+            <p className="w-full truncate text-ods-text-secondary text-h4">
+              {formatUrlForDisplay(siteUrl, { keepWww: true })}
+            </p>
+          )}
         </div>
         {openableSite && onOpenSite && (
           <Button variant="outline" size="icon" aria-label="Open website" onClick={() => onOpenSite(openableSite)}>
