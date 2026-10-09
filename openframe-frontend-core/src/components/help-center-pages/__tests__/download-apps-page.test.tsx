@@ -4,6 +4,7 @@ import {
   DOWNLOADS_MOBILE_TITLE,
   DOWNLOADS_TITLE,
   type AppDownload,
+  type DownloadActionEvent,
   type DownloadsPublic,
 } from '../../../types/downloads';
 import { APP_STORE_URL, GOOGLE_PLAY_URL } from '../../../utils/mobile-app';
@@ -73,7 +74,7 @@ describe('DownloadAppsPage', () => {
   });
 
   it('reports an installer download and a copied command to the host', () => {
-    const onDownloadAction = vi.fn();
+    const onDownloadAction = vi.fn<(event: DownloadActionEvent) => void>();
     render(<DownloadAppsPage initialData={DATA} onDownloadAction={onDownloadAction} />);
     fireEvent.click(screen.getByRole('link', { name: 'Download for Mac' }));
     fireEvent.click(screen.getByRole('button', { name: 'Copy the Homebrew command' }));
