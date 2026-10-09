@@ -21,6 +21,8 @@ pub struct LogBatchMessage {
     pub machine_id: Option<String>,
     pub hostname: String,
     pub tenant_domain: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub organization_id: Option<String>,
     pub logs: Vec<LogEntry>,
 }
 

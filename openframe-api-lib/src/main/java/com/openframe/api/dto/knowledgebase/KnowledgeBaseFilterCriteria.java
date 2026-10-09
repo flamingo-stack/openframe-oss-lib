@@ -18,4 +18,6 @@ public class KnowledgeBaseFilterCriteria {
     private KnowledgeBaseItemType type;
     private List<String> tagIds;
     private List<KnowledgeBaseArticleStatus> statuses;
+    /** Null lets the listing choose: one level, or the subtree under a search or a tag filter. */
+    private KnowledgeBaseScope scope;
 }

@@ -13,6 +13,10 @@ const AGENT_BASE = `${CONTENT}/chat/agent`
 export const EP = {
   // chat
   chatStream: `${CONTENT}/docs/chat`,
+  // The server-side conversation list behind the chat's "Current Chats" rail,
+  // archive and rename (GET list, PATCH `/<id>`). Never derived by the lib: a
+  // runtime that leaves it out gets the single-thread chat with no history.
+  chatConversations: `${CONTENT}/docs/chat/conversations`,
   // MCP server (streamable HTTP JSON-RPC) — the /mcp playground page's
   // official-SDK transport points here; the proxy injects Bearer + act-as.
   mcp: `${CONTENT}/mcp`,
@@ -25,6 +29,12 @@ export const EP = {
   // OpenFrame AI agents (Fae/Mingo) — public per-agent display config. Drives
   // EmbeddableChat "agent mode" via runtime.endpoints.aiAgentConfigUrl.
   aiAgent: (slug: string) => `${CONTENT}/ai-agents/${slug}`,
+  // The active agents' public identities (name, icon, audience): where the assistant's
+  // identity comes from on a platform that configured none of its own.
+  aiAgents: `${CONTENT}/ai-agents`,
+  // The questions an "ask" surface offers (the FAQ's card): `?count&section&exclude`.
+  // `section` is the surface's topic, any string the hub's chat config knows.
+  askPrompts: `${CONTENT}/quick-actions/questions`,
   docsSearch: `${CONTENT}/docs/search`,
   // doc sources (knowledge-base mounts <DocsHubPage> against these)
   docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,
