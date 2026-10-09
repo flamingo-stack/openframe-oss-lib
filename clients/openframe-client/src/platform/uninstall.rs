@@ -468,6 +468,10 @@ pub async fn uninstall_windows(
         Err(e) => warn!("Service uninstall warning: {} (may not be installed)", e),
     }
 
+    if let Err(e) = crate::platform::apps_entry::unregister() {
+        warn!("Failed to remove Apps & Features entry: {:#}", e);
+    }
+
     // After the service stop so a heartbeat can't resurrect the deleted machine record.
     if let Some(deregistration_service) = &deregistration_service {
         deregistration_service.deregister_best_effort().await;
