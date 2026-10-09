@@ -1,8 +1,9 @@
 package com.openframe.client.listener.delivery;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.client.service.delivery.LocalDeliverySink;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.model.ToolInstallationMessage;
@@ -41,7 +42,7 @@ class DeliveryDispatchListenerTest {
 
     @Captor private ArgumentCaptor<DeliveryRequest<DeliveryPayload>> requestCaptor;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new JsonMapper();
 
     private DeliveryDispatchListener listener;
     private ObjectNode command;

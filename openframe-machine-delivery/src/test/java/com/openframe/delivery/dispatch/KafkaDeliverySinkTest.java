@@ -1,6 +1,7 @@
 package com.openframe.delivery.dispatch;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryRef;
@@ -40,7 +41,7 @@ class KafkaDeliverySinkTest {
 
     @BeforeEach
     void setUp() {
-        sink = new KafkaDeliverySink(producer, new ObjectMapper(), metrics, TOPIC);
+        sink = new KafkaDeliverySink(producer, new JsonMapper(), metrics, TOPIC);
         TestPayload payload = new TestPayload();
         payload.setValue("issued");
         payload.setDelivery(new DeliveryRef(DeliveryType.TOOL_INSTALLATION, TARGET_ID, DISPATCH_ID));
@@ -61,8 +62,8 @@ class KafkaDeliverySinkTest {
         verify(producer).sendAndAwait(eq(TOPIC), eq(MACHINE_ID), messageCaptor.capture());
         DeliveryDispatchMessage message = messageCaptor.getValue();
         assertThat(message.getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(message.getPayload().get("delivery").get("dispatchId").asText()).isEqualTo(DISPATCH_ID);
-        assertThat(message.getPayload().get("value").asText()).isEqualTo("issued");
+        assertThat(message.getPayload().get("delivery").get("dispatchId").asString()).isEqualTo(DISPATCH_ID);
+        assertThat(message.getPayload().get("value").asString()).isEqualTo("issued");
         verify(metrics).recordDispatched(DeliveryType.TOOL_INSTALLATION, "kafka");
     }
 
