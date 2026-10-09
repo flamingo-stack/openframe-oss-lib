@@ -6,6 +6,7 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.spec.DeliveryPayload;
@@ -24,22 +25,32 @@ import java.time.Instant;
 public class DeliveryRecorder {
 
     private final MachineDeliveryRepository repository;
+    private final MachineDeliverySequenceRepository sequences;
     private final DeliveryProperties properties;
     private final ObjectMapper objectMapper;
 
-    public void record(DeliveryRequest<?> request) {
-        MachineDelivery delivery = pendingRow(request);
-        repository.upsertPending(delivery);
-        log.info("Delivery recorded: type={} targetId={} machineId={}",
-                request.getType(), request.getTargetId(), request.getMachineId());
-    }
-
-    private MachineDelivery pendingRow(DeliveryRequest<?> request) {
-        Instant now = Instant.now();
+    // false = a row for this very dispatch already exists: the hand-off was replayed, nothing to do
+    public boolean record(DeliveryRequest<?> request) {
         DeliveryType type = request.getType();
         String targetId = request.getTargetId();
         String machineId = request.getMachineId();
         String id = DeliveryId.of(type, targetId, machineId);
+        DeliveryRef delivery = request.getPayload().getDelivery();
+        String dispatchId = delivery.getDispatchId();
+        if (repository.existsByIdAndDispatchId(id, dispatchId)) {
+            return false;
+        }
+        int sequence = sequences.next();
+        delivery.setSequence(sequence);
+        MachineDelivery row = pendingRow(request, id);
+        repository.upsertPending(row);
+        log.info("Delivery recorded: type={} targetId={} machineId={} sequence={}", type, targetId, machineId, sequence);
+        return true;
+    }
+
+    private MachineDelivery pendingRow(DeliveryRequest<?> request, String id) {
+        Instant now = Instant.now();
+        DeliveryType type = request.getType();
         DeliveryPayload payload = request.getPayload();
         DeliveryRef delivery = payload.getDelivery();
         String dispatchId = delivery.getDispatchId();
@@ -50,8 +61,8 @@ public class DeliveryRecorder {
         return MachineDelivery.builder()
                 .id(id)
                 .type(type)
-                .targetId(targetId)
-                .machineId(machineId)
+                .targetId(request.getTargetId())
+                .machineId(request.getMachineId())
                 .dispatchId(dispatchId)
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
