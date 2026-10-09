@@ -21,6 +21,7 @@ const NAV = [
   { to: '/authors', label: 'Authors' },
   { to: '/faqs', label: 'FAQ' },
   { to: '/trust-center', label: 'Trust' },
+  { to: '/download', label: 'Download' },
   { to: '/legal/privacy', label: 'Legal' },
   { to: '/contact', label: 'Contact' },
   { to: '/schedule-a-call', label: 'Schedule' },

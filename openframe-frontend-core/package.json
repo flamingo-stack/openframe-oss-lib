@@ -255,6 +255,12 @@
       "require": "./dist/utils/form-rescue.cjs",
       "default": "./dist/utils/form-rescue.js"
     },
+    "./utils/mobile-app": {
+      "types": "./dist/utils/mobile-app.d.ts",
+      "import": "./dist/utils/mobile-app.js",
+      "require": "./dist/utils/mobile-app.cjs",
+      "default": "./dist/utils/mobile-app.js"
+    },
     "./utils/platform-identity": {
       "types": "./dist/utils/platform-identity.d.ts",
       "import": "./dist/utils/platform-identity.js",

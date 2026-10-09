@@ -118,6 +118,8 @@ export * from './video-bite-id';
 // OS type utilities
 export * from './os-utils';
 export * from './visitor-os';
+// Also exported via the granular subpath `./utils/mobile-app` (server and Edge consumers).
+export * from './mobile-app';
 // Phone utilities
 export * from './country-phone-utils';
 export * from './compliance-standards';
