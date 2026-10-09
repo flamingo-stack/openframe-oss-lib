@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mockReplaceState, setMockSearchParams, writtenUrl } from '../../../../vitest.setup';
+import { mockPush, mockReplace, mockReplaceState, setMockSearchParams, writtenUrl } from '../../../../vitest.setup';
 import { createSearchParams, useApiParams } from '../use-api-params';
 
 describe('useApiParams', () => {
@@ -1076,5 +1076,82 @@ describe('createSearchParams', () => {
     const params = createSearchParams({});
 
     expect(params.toString()).toBe('');
+  });
+});
+
+describe('useApiParams URL write path', () => {
+  const schema = {
+    search: { type: 'string' as const, default: '' },
+    page: { type: 'number' as const, default: 1 },
+  };
+
+  it('writes the URL in place through history.replaceState — never a router navigation', () => {
+    const { result } = renderHook(() => useApiParams(schema));
+
+    act(() => {
+      result.current.setParam('search', 'laptop');
+    });
+
+    // A relative query: the host route is never rewritten, and the state is
+    // `null` so Next keeps the entry's internal tree.
+    expect(mockReplaceState).toHaveBeenCalledTimes(1);
+    expect(mockReplaceState).toHaveBeenCalledWith(null, '', '?search=laptop');
+    // `router.replace` is a soft navigation in a Next host: an RSC round trip
+    // before the URL (and so the params) change — the lag this path removes.
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('the intent is readable at once; the params follow once the host commits the URL', () => {
+    // Next (14.1+) patches `history.replaceState` and feeds the URL into the
+    // router state `useSearchParams` reads — in a transition, so a render can
+    // sit between the write and the commit. Emulate exactly that link.
+    let written: string | undefined;
+    mockReplaceState.mockImplementationOnce((_state: unknown, _unused: string, url?: string | URL | null) => {
+      written = String(url);
+    });
+    const { result, rerender } = renderHook(() => useApiParams(schema));
+
+    act(() => {
+      result.current.setParams({ search: 'laptop', page: 3 });
+    });
+
+    // Between the write and the commit: the click is visible, the URL is not.
+    expect(result.current.pendingParams).toEqual({ search: 'laptop', page: 3 });
+    expect(result.current.params).toEqual({ search: '', page: 1 });
+
+    // The host's router state catches up with the address bar.
+    expect(written).toBe('?search=laptop&page=3');
+    setMockSearchParams(new URLSearchParams(written));
+    rerender();
+
+    expect(result.current.params).toEqual({ search: 'laptop', page: 3 });
+    // Committed: the queue drained, intent and URL are one object again.
+    expect(result.current.pendingParams).toBe(result.current.params);
+  });
+
+  it('unregistered host: the params follow the write through the shim fallback', async () => {
+    // A fresh module graph, so the hook imports a shim with nothing registered
+    // and its fallback `useSearchParams` (window.location + popstate) is in
+    // charge — the Vite/Tauri embedding case.
+    vi.resetModules();
+    const { useApiParams: useFallbackApiParams } = await import('../use-api-params');
+    mockReplaceState.mockImplementationOnce((_state: unknown, _unused: string, url?: string | URL | null) => {
+      window.location.search = String(url);
+    });
+    try {
+      const { result } = renderHook(() => useFallbackApiParams(schema));
+      expect(result.current.params.search).toBe('');
+
+      act(() => {
+        result.current.setParam('search', 'laptop');
+      });
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(result.current.params.search).toBe('laptop');
+      expect(result.current.pendingParams).toBe(result.current.params);
+    } finally {
+      window.location.search = '';
+    }
   });
 });

@@ -134,25 +134,30 @@ function softNavigate(href: string, mode: 'push' | 'replace'): void {
 
 /**
  * Rewrites the current URL in place — a query-string write that is NOT a
- * navigation. `useApiParams` uses this for its filter/search/page writes.
+ * navigation. `useApiParams` uses this for its filter/search/page writes; the
+ * path never changes, only the query.
  *
  * `router.replace` in a Next host is a soft navigation: the App Router fetches
  * the route's RSC payload (`?_rsc=…`) and only then commits the URL, so a
  * filter pick showed its label a server round trip later — and a full second or
  * more where that fetch fails. The native History API skips the fetch: Next
- * (14.1+) patches `history.replaceState` and syncs `useSearchParams` /
- * `usePathname` from it, and the page's own queries react to the new params.
- * The `null` state matters: Next copies its internal tree into the entry only
- * for a state it did not write itself.
+ * (14.1+) patches `history.replaceState` and syncs `useSearchParams` from it,
+ * and the page's own queries react to the new params. The `null` state
+ * matters: Next copies its internal tree into the entry only for a state it
+ * did not write itself. A registered host's `useSearchParams` must therefore
+ * observe `history.replaceState` — Next's does; that is the contract.
  *
- * Outside a Next host nothing patches the History API, so the synthetic
- * `popstate` is what re-renders this file's fallback subscribers — the same
- * signal {@link softNavigate} sends. Next ignores a `popstate` with no state.
+ * In a registered host the write is that ONE `replaceState`, the same history
+ * event `router.replace` ended in, so history listeners (analytics, a page's
+ * own `popstate` handler) see nothing new. Only while this file's fallback
+ * `useSearchParams` is in charge is a synthetic `popstate` dispatched: nothing
+ * else would re-render it, and it is the signal {@link softNavigate} sends.
+ * A Next App Router ignores a `popstate` with no state either way.
  */
 export function replaceUrlInPlace(href: string): void {
   if (typeof window === 'undefined') return;
   window.history.replaceState(null, '', href);
-  window.dispatchEvent(new PopStateEvent('popstate'));
+  if (!impl.useSearchParams) window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 // `useFallback*`, not `fallbackUse*`: two of these call hooks, and the
