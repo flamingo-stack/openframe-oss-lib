@@ -11,8 +11,8 @@ extend type Query {
         sort: LogSortInput
     ): LogConnection!
 
-    # Get full audit details from Cassandra when user clicks on a audit
-    # Requires complete composite key for efficient Cassandra lookup
+    # Get full audit details from Loki when user clicks on a audit
+    # Requires the complete key of the event for an exact Loki lookup
     logDetails(
         ingestDay: String!      # YYYY-MM-DD format
         toolType: String!       # Tool type (meshcentral, fleet-mdm, etc.)
@@ -87,7 +87,7 @@ type LogEvent implements Node {
     timestamp: Instant!
 }
 
-# Full audit details from Cassandra
+# Full audit details from Loki
 type LogDetails implements Node {
     id: ID!
     toolEventId: String!

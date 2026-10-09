@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 
 /**
- * Loki query connection settings.
+ * Loki connection settings, for queries and pushes.
  * <p>
  * Lives under {@code openframe.loki} rather than {@code loki}: OSS deployments already use
  * {@code loki.url} for the logback push appender.
@@ -38,7 +38,8 @@ public class LokiProperties {
     private Duration connectTimeout = Duration.ofSeconds(2);
 
     /**
-     * Upper bound for one query. These are user-facing reads, so it stays below Loki's own query timeout.
+     * Upper bound for one request, a query or a push. The default suits user-facing reads: it stays below Loki's own
+     * query timeout.
      */
     private Duration readTimeout = Duration.ofSeconds(30);
 }

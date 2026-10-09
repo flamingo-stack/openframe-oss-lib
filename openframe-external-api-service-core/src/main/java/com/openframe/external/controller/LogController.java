@@ -157,7 +157,7 @@ public class LogController {
         log.debug("Getting log details - ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {} - userId: {}, apiKeyId: {}", 
                 ingestDay, toolType, eventType, timestamp, toolEventId, caller.userId(), caller.apiKeyId());
         
-        var logDetails = logService.findLogDetails(ingestDay, toolType, eventType, timestamp, toolEventId)
+        var logDetails = logService.findLogDetails(toolType, eventType, timestamp, toolEventId)
                 .orElseThrow(() -> new LogNotFoundException(
                     String.format("Log not found for toolEventId: %s, ingestDay: %s, toolType: %s, eventType: %s, timestamp: %s",
                         toolEventId, ingestDay, toolType, eventType, timestamp)));

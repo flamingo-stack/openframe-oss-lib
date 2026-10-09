@@ -3,13 +3,16 @@ package com.openframe.api.service;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.audit.LogEvent;
 import com.openframe.api.dto.audit.LogFilterCriteria;
+import com.openframe.api.dto.audit.LogFilters;
+import com.openframe.api.dto.audit.OrganizationFilterOption;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
-import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
+import com.openframe.data.loki.toolevent.ToolEventLogRepository;
 import com.openframe.data.pinot.model.LogProjection;
+import com.openframe.data.pinot.model.OrganizationOption;
 import com.openframe.data.pinot.repository.PinotLogRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -47,10 +51,10 @@ class LogServiceTest {
     @BeforeEach
     void setUp() {
         pinotLogRepository = mock(PinotLogRepository.class);
-        UnifiedLogEventRepository unifiedLogEventRepository = mock(UnifiedLogEventRepository.class);
+        ToolEventLogRepository toolEventLogRepository = mock(ToolEventLogRepository.class);
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
 
-        service = new LogService(pinotLogRepository, unifiedLogEventRepository, tenantIdProvider);
+        service = new LogService(pinotLogRepository, toolEventLogRepository, tenantIdProvider);
 
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
         when(pinotLogRepository.isSortableField(any())).thenReturn(true);
@@ -157,6 +161,162 @@ class LogServiceTest {
                 .returns(false, PageInfo::isHasNextPage)
                 .returns(null, PageInfo::getStartCursor)
                 .returns(null, PageInfo::getEndCursor);
+    }
+
+    @Test
+    void queryLogs_everyFilterField_passesEachToPinotForTheCallersTenant() {
+        LogFilterCriteria filter = LogFilterCriteria.builder()
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 9, 30))
+                .timestampFrom(FROM)
+                .timestampTo(TO)
+                .toolTypes(List.of("FLEET"))
+                .eventTypes(List.of("LOGIN"))
+                .severities(List.of("WARNING"))
+                .organizationIds(List.of("org-7"))
+                .deviceId("device-7")
+                .build();
+
+        service.queryLogs(filter, CursorPaginationCriteria.builder().limit(5).cursor("9_e-9").build(), null, null);
+
+        verify(pinotLogRepository).findLogs("t1", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), FROM, TO,
+                List.of("FLEET"), List.of("LOGIN"), List.of("WARNING"), List.of("org-7"), "device-7", "9_e-9", 6,
+                "eventTimestamp", "DESC");
+    }
+
+    @Test
+    void queryLogs_blankSearchTerm_usesExactFiltering() {
+        service.queryLogs(LogFilterCriteria.builder().build(), page(), "  ", null);
+
+        verify(pinotLogRepository).findLogs("t1", null, null, null, null, null, null, null, null, null, null, 21,
+                "eventTimestamp", "DESC");
+    }
+
+    @Test
+    void queryLogs_sortFieldWithSpacesAround_sortsByTheTrimmedField() {
+        SortInput sort = SortInput.builder().field(" severity ").direction(SortDirection.ASC).build();
+
+        service.queryLogs(LogFilterCriteria.builder().build(), page(), null, sort);
+
+        verify(pinotLogRepository).findLogs("t1", null, null, null, null, null, null, null, null, null, null, 21,
+                "severity", "ASC");
+    }
+
+    @Test
+    void queryLogs_sortFieldNotSortable_sortsByTheDefaultField() {
+        when(pinotLogRepository.isSortableField("details")).thenReturn(false);
+        SortInput sort = SortInput.builder().field("details").direction(SortDirection.ASC).build();
+
+        service.queryLogs(LogFilterCriteria.builder().build(), page(), null, sort);
+
+        verify(pinotLogRepository).findLogs("t1", null, null, null, null, null, null, null, null, null, null, 21,
+                "eventTimestamp", "ASC");
+    }
+
+    @Test
+    void queryLogs_blankSortField_sortsByTheDefaultField() {
+        SortInput sort = SortInput.builder().field("  ").direction(SortDirection.ASC).build();
+
+        service.queryLogs(LogFilterCriteria.builder().build(), page(), null, sort);
+
+        verify(pinotLogRepository).findLogs("t1", null, null, null, null, null, null, null, null, null, null, 21,
+                "eventTimestamp", "ASC");
+    }
+
+    @Test
+    void queryLogs_sortWithoutDirection_sortsDescending() {
+        SortInput sort = SortInput.builder().field("severity").build();
+
+        service.queryLogs(LogFilterCriteria.builder().build(), page(), null, sort);
+
+        verify(pinotLogRepository).findLogs("t1", null, null, null, null, null, null, null, null, null, null, 21,
+                "severity", "DESC");
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"9_e-9, true", "null, false"}, nullValues = "null")
+    void queryLogs_cursorGivenOrNot_reportsAPreviousPageOnlyWithACursor(String cursor, boolean expectedHasPreviousPage) {
+        GenericQueryResult<LogEvent> result = service.queryLogs(LogFilterCriteria.builder().build(),
+                CursorPaginationCriteria.builder().limit(2).cursor(cursor).build(), null, null);
+
+        assertThat(result.getPageInfo().isHasPreviousPage()).isEqualTo(expectedHasPreviousPage);
+    }
+
+    @Test
+    void queryLogs_rowFromPinot_mapsEveryField() {
+        when(pinotLogRepository.findLogs("t1", null, null, null, null, null, null, null, null, null, null, 21,
+                "eventTimestamp", "DESC")).thenReturn(List.of(LogProjection.builder()
+                .toolEventId("evt-1")
+                .ingestDay("2026-10-01")
+                .toolType("FLEET")
+                .eventType("LOGIN")
+                .severity("WARNING")
+                .userId("user-7")
+                .deviceId("device-7")
+                .hostname("host-7")
+                .nickname("Reception iMac")
+                .executionSource("MANUAL")
+                .scriptCreationSource("AI_ASSISTANT")
+                .organizationId("org-7")
+                .organizationName("Acme")
+                .summary("User logged in")
+                .eventTimestamp(Instant.ofEpochMilli(1_790_848_800_123L))
+                .build()));
+
+        GenericQueryResult<LogEvent> result = service.queryLogs(LogFilterCriteria.builder().build(), page(), null, null);
+
+        assertThat(result.getItems()).containsExactly(LogEvent.builder()
+                .id("1790848800123_evt-1")
+                .toolEventId("evt-1")
+                .ingestDay("2026-10-01")
+                .toolType("FLEET")
+                .eventType("LOGIN")
+                .severity("WARNING")
+                .userId("user-7")
+                .deviceId("device-7")
+                .hostname("host-7")
+                .nickname("Reception iMac")
+                .executionSource("MANUAL")
+                .scriptCreationSource("AI_ASSISTANT")
+                .organizationId("org-7")
+                .organizationName("Acme")
+                .summary("User logged in")
+                .timestamp(Instant.ofEpochMilli(1_790_848_800_123L))
+                .build());
+    }
+
+    @Test
+    void getLogFilters_criteria_returnsTheOptionsOfTheCallersTenant() {
+        LocalDate start = LocalDate.of(2026, 9, 1);
+        LocalDate end = LocalDate.of(2026, 9, 30);
+        List<String> tools = List.of("FLEET");
+        List<String> events = List.of("LOGIN");
+        List<String> severities = List.of("WARNING");
+        List<String> organizations = List.of("org-7");
+        when(pinotLogRepository.getToolTypeOptions("t1", start, end, tools, events, severities, organizations))
+                .thenReturn(List.of("FLEET", "RMM"));
+        when(pinotLogRepository.getEventTypeOptions("t1", start, end, tools, events, severities, organizations))
+                .thenReturn(List.of("LOGIN", "LOGOUT"));
+        when(pinotLogRepository.getSeverityOptions("t1", start, end, tools, events, severities, organizations))
+                .thenReturn(List.of("INFO", "WARNING"));
+        when(pinotLogRepository.getOrganizationOptions("t1", start, end, tools, events, severities))
+                .thenReturn(List.of(new OrganizationOption("org-7", "Acme")));
+
+        LogFilters filters = service.getLogFilters(LogFilterCriteria.builder()
+                .startDate(start)
+                .endDate(end)
+                .toolTypes(tools)
+                .eventTypes(events)
+                .severities(severities)
+                .organizationIds(organizations)
+                .build());
+
+        assertThat(filters).isEqualTo(LogFilters.builder()
+                .toolTypes(List.of("FLEET", "RMM"))
+                .eventTypes(List.of("LOGIN", "LOGOUT"))
+                .severities(List.of("INFO", "WARNING"))
+                .organizations(List.of(new OrganizationFilterOption("org-7", "Acme")))
+                .build());
     }
 
     private static List<LogProjection> logs(int count) {

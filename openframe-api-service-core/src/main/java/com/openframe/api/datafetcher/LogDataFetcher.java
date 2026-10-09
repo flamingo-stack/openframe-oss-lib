@@ -24,7 +24,7 @@ import java.util.Optional;
 @Slf4j
 @Validated
 @AllArgsConstructor
-@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.loki.enabled", havingValue = "true")
 public class LogDataFetcher {
 
     private static final Relay RELAY = new Relay();
@@ -89,7 +89,7 @@ public class LogDataFetcher {
         log.debug("Fetching audit details for ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {}",
                 ingestDay, toolType, eventType, timestamp, toolEventId);
 
-        Optional<LogDetails> details = logService.findLogDetails(ingestDay, toolType, eventType, timestamp, toolEventId);
+        Optional<LogDetails> details = logService.findLogDetails(toolType, eventType, timestamp, toolEventId);
         if (details.isPresent()) {
             log.debug("Successfully fetched audit details for toolEventId: {}", toolEventId);
             return details.get();

@@ -6,8 +6,8 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
-import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
+import com.openframe.data.loki.toolevent.ToolEventLog;
+import com.openframe.data.loki.toolevent.ToolEventLogRepository;
 import com.openframe.data.pinot.model.LogProjection;
 import com.openframe.data.pinot.model.OrganizationOption;
 import com.openframe.data.pinot.repository.PinotLogRepository;
@@ -27,11 +27,11 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @AllArgsConstructor
-@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.loki.enabled", havingValue = "true")
 public class LogService {
 
     private final PinotLogRepository pinotLogRepository;
-    private final UnifiedLogEventRepository unifiedLogEventRepository;
+    private final ToolEventLogRepository toolEventLogRepository;
     private final TenantIdProvider tenantIdProvider;
 
 
@@ -90,29 +90,15 @@ public class LogService {
         return result;
     }
 
-    public Optional<LogDetails> findLogDetails(String ingestDay, String toolType, String eventType,
-                                               Instant timestamp, String toolEventId) {
-        log.debug("Finding log details for ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {}",
-                ingestDay, toolType, eventType, timestamp, toolEventId);
+    public Optional<LogDetails> findLogDetails(String toolType, String eventType, Instant timestamp, String toolEventId) {
+        log.debug("Finding log details for toolType: {}, eventType: {}, timestamp: {}, toolEventId: {}",
+                toolType, eventType, timestamp, toolEventId);
 
-        UnifiedLogEvent.UnifiedLogEventKey key = new UnifiedLogEvent.UnifiedLogEventKey();
-        key.setIngestDay(ingestDay);
-        key.setToolType(toolType);
-        key.setTenantId(tenantIdProvider.getTenantId());
-        key.setEventType(eventType);
-        key.setEventTimestamp(timestamp);
-        key.setToolEventId(toolEventId);
-
-        Optional<UnifiedLogEvent> logEvent = unifiedLogEventRepository.findById(key);
-
-        if (logEvent.isPresent()) {
-            LogDetails details = mapToLogDetails(logEvent.get());
-            log.debug("Successfully retrieved audit details");
-            return Optional.of(details);
-        } else {
-            log.debug("Log details not found");
-            return Optional.empty();
-        }
+        Optional<LogDetails> details = toolEventLogRepository
+                .find(tenantIdProvider.getTenantId(), toolType, eventType, timestamp, toolEventId)
+                .map(this::mapToLogDetails);
+        log.debug("Log details found: {}", details.isPresent());
+        return details;
     }
 
     public LogFilters getLogFilters(LogFilterCriteria filters) {
@@ -212,14 +198,14 @@ public class LogService {
                 .build();
     }
 
-    private LogDetails mapToLogDetails(UnifiedLogEvent logEvent) {
+    private LogDetails mapToLogDetails(ToolEventLog logEvent) {
         return LogDetails.builder()
-                .id(logEvent.getKey().getEventTimestamp().toEpochMilli() + "_" + logEvent.getKey().getToolEventId())
-                .toolEventId(logEvent.getKey().getToolEventId())
-                .timestamp(logEvent.getKey().getEventTimestamp())
-                .toolType(logEvent.getKey().getToolType())
-                .eventType(logEvent.getKey().getEventType())
-                .ingestDay(logEvent.getKey().getIngestDay())
+                .id(logEvent.getEventTimestamp() + "_" + logEvent.getToolEventId())
+                .toolEventId(logEvent.getToolEventId())
+                .timestamp(Instant.ofEpochMilli(logEvent.getEventTimestamp()))
+                .toolType(logEvent.getToolType())
+                .eventType(logEvent.getEventType())
+                .ingestDay(logEvent.getIngestDay())
                 .severity(logEvent.getSeverity())
                 .message(logEvent.getMessage())
                 .details(logEvent.getDetails())
@@ -234,7 +220,7 @@ public class LogService {
                 .summary(logEvent.getMessage())
                 .build();
     }
-    
+
     private String validateSortField(String field) {
         if (field == null || field.trim().isEmpty()) {
             return pinotLogRepository.getDefaultSortField();

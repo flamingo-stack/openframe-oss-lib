@@ -2,6 +2,7 @@ package com.openframe.external.exception;
 
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -31,6 +32,13 @@ public class GlobalExceptionHandler {
     public ErrorResponse handlePinotQueryException(PinotQueryException ex) {
         log.error("Pinot query error: ", ex);
         return ErrorResponse.of(ErrorCode.PINOT_QUERY_ERROR, "Query service temporarily unavailable. Please try again later.");
+    }
+
+    @ExceptionHandler(LokiQueryException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ErrorResponse handleLokiQueryException(LokiQueryException ex) {
+        log.error("Loki query error: ", ex);
+        return ErrorResponse.of(ErrorCode.LOKI_QUERY_ERROR, "Logs are temporarily unavailable. Please try again later.");
     }
 
     @ExceptionHandler(DataAccessException.class)

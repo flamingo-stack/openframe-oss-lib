@@ -1,6 +1,7 @@
 package com.openframe.data.loki.config;
 
 import com.openframe.data.loki.client.LokiClient;
+import com.openframe.data.loki.toolevent.ToolEventLogRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -33,5 +34,10 @@ public class LokiConfig {
                 .requestFactory(ClientHttpRequestFactories.get(settings))
                 .build();
         return new LokiClient(restClient, properties.getMaxQueryBytesRead());
+    }
+
+    @Bean
+    public ToolEventLogRepository toolEventLogRepository(LokiClient lokiClient) {
+        return new ToolEventLogRepository(lokiClient);
     }
 }
