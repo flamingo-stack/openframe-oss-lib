@@ -1,6 +1,8 @@
 package com.openframe.management.controller;
 
 import com.openframe.data.document.tool.IntegratedTool;
+import com.openframe.data.document.tool.ToolApiKey;
+import com.openframe.data.document.tool.ToolCredentials;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.management.hook.IntegratedToolPostSaveHook;
@@ -61,7 +63,10 @@ public class IntegratedToolController {
             // keeping it would make save() replace another tenant's doc by _id (last-writer-wins ownership
             // flip). Uniqueness is on (tenantId, key) via tenant_key_idx.
             toolService.getToolByKey(key).ifPresentOrElse(
-                    existing -> tool.setId(existing.getId()),
+                    existing -> {
+                        tool.setId(existing.getId());
+                        keepExistingApiKey(tool, existing);
+                    },
                     () -> tool.setId(null));
             tool.setKey(key);
             tool.setTenantId(tenantId);
@@ -84,6 +89,25 @@ public class IntegratedToolController {
             log.error("Failed to save tool: {}", key, e);
             return ResponseEntity.status(INTERNAL_SERVER_ERROR)
                     .body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * The tenant chart's PostSync register Job re-posts the tool on every Argo sync with username and
+     * password only. The API key is minted afterwards by FleetMdmSetupScheduler, so saving the payload
+     * as-is wiped it until the next scheduler tick and every reader of the key failed in that window.
+     * A key sent in the request still wins, so it can be rotated through this endpoint.
+     */
+    private static void keepExistingApiKey(IntegratedTool tool, IntegratedTool existing) {
+        ToolApiKey existingApiKey = existing.getCredentials() == null ? null : existing.getCredentials().getApiKey();
+        if (existingApiKey == null) {
+            return;
+        }
+        if (tool.getCredentials() == null) {
+            tool.setCredentials(new ToolCredentials());
+        }
+        if (tool.getCredentials().getApiKey() == null) {
+            tool.getCredentials().setApiKey(existingApiKey);
         }
     }
 }
