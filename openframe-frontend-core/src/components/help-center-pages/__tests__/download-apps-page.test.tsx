@@ -91,12 +91,23 @@ describe('DownloadAppsPage', () => {
   });
 
   it('offers the mobile app only when the host turns the desktop app off', () => {
-    render(<DownloadAppsPage initialData={DATA} showDesktop={false} footer={<p>host footer</p>} />);
+    render(
+      <DownloadAppsPage
+        initialData={DATA}
+        showDesktop={false}
+        web={{
+          title: 'No install',
+          description: 'Runs in the browser.',
+          action: <button type="button">host action</button>,
+        }}
+      />,
+    );
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(DOWNLOADS_MOBILE_TITLE);
     expect(screen.queryByText('Desktop app')).not.toBeInTheDocument();
     const hrefs = screen.getAllByRole('link').map(link => link.getAttribute('href'));
     expect(hrefs).toEqual(expect.arrayContaining([APP_STORE_URL, GOOGLE_PLAY_URL]));
-    expect(screen.getByText('host footer')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No install' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'host action' })).toBeInTheDocument();
   });
 
   it('draws a badge only for a store the server names a listing for', () => {

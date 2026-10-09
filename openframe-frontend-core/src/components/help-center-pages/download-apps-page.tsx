@@ -9,7 +9,9 @@
  *     action (the other architecture is a quieter button) and each package
  *     manager is one line under it, with its copy button.
  *   - The mobile app: the store badges, and the install QR code beside them.
- *   - `footer`: the host's own last word (the website's "start on the web" card).
+ *   - `web`: the way in for someone who installs nothing (the website's trial
+ *     signup). The host names the words and the button; the page draws the card,
+ *     in the frame of every other card on it.
  *
  * DATA: all of it is the server's answer (`DownloadsPublic`), read by
  * `useDownloads` against `endpoint` (default `DOWNLOADS_API_PATH`; embedders
@@ -78,8 +80,16 @@ export interface DownloadAppsPageProps {
   openStoresInNewTab?: boolean;
   /** Called when a visitor downloads an installer or copies an install command (the host's analytics). */
   onDownloadAction?: (event: DownloadActionEvent) => void;
-  /** The host's own closing block, under the mobile app. */
-  footer?: ReactNode;
+  /** The closing card, under the mobile app: using OpenFrame without installing anything. Default: none. */
+  web?: DownloadAppsWebOption;
+}
+
+/** The "no install" card: the host's words and its own button (the page holds no signup link). */
+export interface DownloadAppsWebOption {
+  title: string;
+  description: string;
+  /** The host's button (the website's trial signup). */
+  action: ReactNode;
 }
 
 const SECTIONS_CLASS = 'flex flex-col gap-[var(--spacing-system-xlf)]';
@@ -206,6 +216,24 @@ function SystemCard({
   );
 }
 
+/** The closing card: one line of what the web offers, and the host's button at the far end. */
+function WebCard({ web }: { web: DownloadAppsWebOption }) {
+  return (
+    <section
+      aria-labelledby="download-web"
+      className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-center content-md:justify-between')}
+    >
+      <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
+        <h2 id="download-web" className="m-0 text-ods-text-primary text-h3">
+          {web.title}
+        </h2>
+        <p className="m-0 text-ods-text-secondary text-h4">{web.description}</p>
+      </div>
+      <div className="shrink-0">{web.action}</div>
+    </section>
+  );
+}
+
 /** A section's cards while the server's answer loads: the same grid and card frame, a button's box in each. */
 function CardsSkeleton({ label }: { label: string }) {
   return (
@@ -248,7 +276,7 @@ export function DownloadAppsPage({
   showDesktop = true,
   openStoresInNewTab = true,
   onDownloadAction,
-  footer,
+  web,
 }: DownloadAppsPageProps) {
   const { data, isLoading, error, reload } = useDownloads({ endpoint, initialData });
   // The page adapts to the server's answer: a section exists only for what it names.
@@ -336,7 +364,7 @@ export function DownloadAppsPage({
     >
       <div className={SECTIONS_CLASS}>
         {body}
-        {footer}
+        {web && <WebCard web={web} />}
       </div>
     </DownloadAppsChrome>
   );
