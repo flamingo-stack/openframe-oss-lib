@@ -19,9 +19,16 @@ public class ToolConnectionService {
 
     private final ToolConnectionRepository toolConnectionRepository;
 
-    public Optional<ToolConnection> findById(String id) {
+    public boolean hasConnection(String id) {
         return toolConnectionRepository.findById(id)
-                .filter(this::isNotDisconnected);
+                .filter(this::isNotDisconnected)
+                .isPresent();
+    }
+
+    public ToolConnection getConnection(String id) {
+        return toolConnectionRepository.findById(id)
+                .filter(this::isNotDisconnected)
+                .orElseThrow(() -> new NoSuchElementException("Tool connection not found: " + id));
     }
 
     /**
