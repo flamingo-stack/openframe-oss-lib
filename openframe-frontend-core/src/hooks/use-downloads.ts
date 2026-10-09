@@ -81,9 +81,16 @@ export interface UseDownloadsOptions {
 export function useDownloads({ endpoint = DOWNLOADS_API_PATH, initialData, enabled = true }: UseDownloadsOptions = {}) {
   const entry = entryFor(endpoint);
   // A server copy is the answer: held from the first render (server and client alike), and never re-requested.
+  // Written during render so THIS caller's first paint has it; a render cannot notify other callers.
   if (initialData && entry.state.data !== initialData && !entry.request) {
     entry.state = { data: initialData, isLoading: false, error: false };
   }
+  // So the callers that rendered before this one (a header button above the page) are told after
+  // the commit: they re-read the shared answer instead of staying on the empty one they first saw.
+  useEffect(() => {
+    if (!initialData) return;
+    for (const listener of entry.listeners) listener();
+  }, [entry, initialData]);
   const subscribe = useCallback(
     (listener: () => void) => {
       entry.listeners.add(listener);

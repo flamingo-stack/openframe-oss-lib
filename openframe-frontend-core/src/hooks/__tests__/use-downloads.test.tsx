@@ -62,6 +62,17 @@ describe('useDownloads', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('gives the server copy to a caller that rendered before the one holding it', async () => {
+    render(
+      <>
+        <Probe id="button" />
+        <Probe id="page" initialData={DATA} />
+      </>,
+    );
+    await waitFor(() => expect(screen.getByTestId('button')).toHaveTextContent('https://gateway.test/mac'));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('reports a failed read', async () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
     render(<Probe id="a" />);
