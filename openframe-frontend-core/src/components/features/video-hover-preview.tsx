@@ -192,7 +192,29 @@ export function VideoHoverPreviewSurface({
           </div>
         </>
       ) : (
-        <div className="absolute inset-0 bg-ods-card" />
+        // Un-mounted skeleton: the player-mount gate has not fired yet, or the
+        // marquee carried this card far off-screen. Render real card chrome —
+        // the poster (or a shimmer when a bite has none) plus the play glyph —
+        // so an ungated card still reads as a card instead of a flat dark box.
+        // The poster is a lazy <Image>, so off-screen cards fetch nothing.
+        <>
+          {posterSrc ? (
+            <Image
+              src={posterSrc}
+              alt=""
+              fill
+              sizes={posterSizes}
+              unoptimized
+              onError={onPosterError}
+              className="object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 animate-pulse bg-ods-border" />
+          )}
+          {badge === 'play' && (
+            <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />
+          )}
+        </>
       )}
     </div>
   );
