@@ -45,6 +45,7 @@
         <libthrift.version>0.25.0</libthrift.version>
         <async-http-client.version>3.0.14</async-http-client.version>
         <lz4-java.version>1.8.1</lz4-java.version>
+        <kafka-lz4-java.version>1.12.0</kafka-lz4-java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
@@ -284,6 +285,12 @@
                 <groupId>org.lz4</groupId>
                 <artifactId>lz4-java</artifactId>
                 <version>${lz4-java.version}</version>
+            </dependency>
+            <!-- Transitive of kafka-clients, pinned past a HIGH CVE in the version it brings -->
+            <dependency>
+                <groupId>at.yawk.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>${kafka-lz4-java.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.nats</groupId>
