@@ -1,12 +1,13 @@
 package com.openframe.client.config;
 
+import com.openframe.core.async.TracedExecutorFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.support.TaskExecutorAdapter;
 import org.springframework.scheduling.annotation.EnableAsync;
 
-import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 
 @Configuration
 @EnableAsync
@@ -16,6 +17,7 @@ public class AsyncConfig {
 
     @Bean(TOOL_INSTALL_EXECUTOR)
     public AsyncTaskExecutor toolInstallExecutor() {
-        return new TaskExecutorAdapter(Executors.newVirtualThreadPerTaskExecutor());
+        ExecutorService executor = TracedExecutorFactory.newVirtualThreadPerTaskExecutor();
+        return new TaskExecutorAdapter(executor);
     }
 }
