@@ -21,7 +21,7 @@ import static java.util.UUID.randomUUID;
 @Component
 public class InvitationMapper {
 
-    @Value("${openframe.invitations.ttl-hours:24h}")
+    @Value("${openframe.invitations.ttl-hours}")
     private Duration ttl;
 
     public Invitation toEntity(CreateInvitationRequest request) {

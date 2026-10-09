@@ -16,10 +16,10 @@ public class SoftwareBundleOnlineDispatchScheduler {
 
     private final SoftwareBundleOnlineDispatchService dispatchService;
 
-    @Scheduled(fixedDelayString = "${openframe.rmm.software.bundle.online-dispatch.interval:60000}")
+    @Scheduled(fixedDelayString = "${openframe.rmm.software.bundle.online-dispatch.interval}")
     @SchedulerLock(name = "softwareBundleOnlineDispatch",
-            lockAtMostFor = "${openframe.rmm.software.bundle.online-dispatch.lock-at-most-for:2m}",
-            lockAtLeastFor = "${openframe.rmm.software.bundle.online-dispatch.lock-at-least-for:10s}"
+            lockAtMostFor = "${openframe.rmm.software.bundle.online-dispatch.lock-at-most-for}",
+            lockAtLeastFor = "${openframe.rmm.software.bundle.online-dispatch.lock-at-least-for}"
     )
     public void run() {
         try {

@@ -66,7 +66,7 @@ public class EnvironmentConfig {
             if (envVar != null && !envVar.trim().isEmpty()) {
                 envMode = envVar;
             } else {
-                envMode = DEV;
+                throw new RuntimeException("TEST_ENV_MODE environment variable is not set");
             }
             log.debug("TEST_ENV_MODE: {}", envMode);
         }

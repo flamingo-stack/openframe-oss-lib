@@ -22,7 +22,7 @@ public class DeviceHeartbeatOfflineDetectionService {
 
     private final MachineRepository machineRepository;
 
-    @Value("${openframe.device.heartbeat.offline-threshold-seconds:130}")
+    @Value("${openframe.device.heartbeat.offline-threshold-seconds}")
     private long offlineThresholdSeconds;
 
     // two reads: status ONLINE covers machines from before telemetryStatus existed; telemetry ONLINE covers machines
