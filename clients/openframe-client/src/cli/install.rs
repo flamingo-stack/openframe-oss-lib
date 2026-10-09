@@ -13,6 +13,11 @@ pub(super) fn run(args: InstallArgs, rt: &Runtime) {
     let params = args.to_params();
     let parameterless = params.is_parameterless();
 
+    if parameterless && Service::is_installed() && Service::get_install_location().exists() {
+        print_already_installed();
+        process::exit(0);
+    }
+
     let report = preflight(&params, parameterless, rt);
     super::init_file_logging();
 
@@ -67,6 +72,14 @@ fn install(params: InstallConfigParams, parameterless: bool, rt: &Runtime) -> ! 
             process::exit(1);
         }
     }
+}
+
+fn print_already_installed() {
+    println!("\nOpenFrame agent is already installed. Nothing was changed.");
+    println!(
+        "To connect it, run the auth command from your OpenFrame dashboard → Devices → Add device."
+    );
+    println!("To remove it, run 'openframe-client uninstall'.");
 }
 
 fn print_next_steps() {
