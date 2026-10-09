@@ -119,7 +119,7 @@ public class AppleNativeDiscoveryController {
         } catch (SsoAlreadyLinkedException e) {
             throw new ResponseStatusException(CONFLICT, "already_linked");
         }
-        if (userService.findActiveByEmail(email.toLowerCase(ROOT)).isPresent()) {
+        if (userService.existsActiveByEmail(email.toLowerCase(ROOT))) {
             throw new ResponseStatusException(CONFLICT, "account_exists");
         }
 

@@ -57,7 +57,7 @@ class PasswordResetServiceTest {
 
     @Test
     void shouldStoreRandomTokenWithTtlAndEmailIt() {
-        when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.of(activeUser("u", "t", "ada@acme.com")));
+        when(userService.existsActiveByEmail("ada@acme.com")).thenReturn(true);
 
         service.createResetToken("ada@acme.com");
 
@@ -71,7 +71,7 @@ class PasswordResetServiceTest {
 
     @Test
     void shouldDoNothingVisibleForUnknownEmail() {
-        when(userService.findActiveByEmail("ghost@acme.com")).thenReturn(Optional.empty());
+        when(userService.existsActiveByEmail("ghost@acme.com")).thenReturn(false);
 
         service.createResetToken("ghost@acme.com");
 

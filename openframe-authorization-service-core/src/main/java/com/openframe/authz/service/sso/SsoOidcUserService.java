@@ -2,6 +2,7 @@ package com.openframe.authz.service.sso;
 
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.util.AppleUserParam;
+import com.openframe.authz.util.SsoAuthentication;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.user.UserService;
@@ -9,6 +10,7 @@ import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
@@ -32,14 +34,15 @@ import static com.openframe.data.document.user.UserRole.ADMIN;
 import static java.util.Locale.ROOT;
 
 /**
- * Loads the OIDC user for SSO logins and auto-provisions them into the current tenant when the
- * tenant's SSO config (or the global domain policy) allows it. Extracted from {@code SecurityConfig}
- * so the logic is injectable, testable, and its failures loggable.
+ * Loads the OIDC user for SSO logins, and auto-provisions users into a tenant when the tenant's SSO
+ * config (or the global domain policy) allows it. Extracted from {@code SecurityConfig} so the logic
+ * is injectable, testable, and its failures loggable.
  * <p>
- * Provisioning failures never block the login itself — the user may already exist, and rejecting a
- * valid login because a side effect failed would be worse. They are logged at WARN, since the usual
- * symptom (user logs in, then hits 401s because they don't exist in the tenant) is otherwise
- * untraceable.
+ * Loading never provisions: the callback may belong to an invitation or registration flow, which
+ * creates its own user under its own rules. Plain tenant logins provision through
+ * {@link #autoProvisionForTenantLogin}, called once the flow dispatch knows no other flow owns the
+ * callback. A refused or failed create blocks that login; only the post-provision side effects
+ * (profile refresh, avatar) stay best-effort.
  */
 @Slf4j
 @Service
@@ -57,8 +60,6 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
     public OidcUser loadUser(OidcUserRequest userRequest) {
         OidcUser user = delegate.loadUser(userRequest);
 
-        autoProvisionIfNeeded(userRequest, user);
-
         Set<GrantedAuthority> authorities = new HashSet<>(user.getAuthorities());
         OidcUserInfo userInfo = user.getUserInfo() != null
                 ? user.getUserInfo()
@@ -67,45 +68,44 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
         return new DefaultOidcUser(authorities, userRequest.getIdToken(), userInfo, resolvePreferredPrincipalClaim(user));
     }
 
-    private void autoProvisionIfNeeded(OidcUserRequest userRequest, OidcUser user) {
+    /**
+     * Auto-provision for a plain SSO login into the current tenant (no invitation or registration
+     * flow in progress). No-op for non-OIDC logins.
+     */
+    public void autoProvisionForTenantLogin(Authentication authentication) {
         String tenantId = TenantContext.getTenantId();
-        String provider = userRequest.getClientRegistration().getRegistrationId();
-        try {
-            if (tenantId == null || provider == null) {
-                return;
-            }
-            String email = resolveEmail(user);
-            if (!hasText(email)) {
-                return;
-            }
-
-            String normalizedEmail = email.toLowerCase(ROOT);
-            String pictureUrl = resolvePictureUrl(user);
-
-            ssoConfigService
-                    .getSSOConfig(tenantId, provider)
-                    .filter(SSOPerTenantConfig::isEnabled)
-                    .ifPresentOrElse(cfg -> {
-                        if (!cfg.isAutoProvisionUsers()) {
-                            return;
-                        }
-                        if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
-                            provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, pictureUrl);
-                        }
-                    }, () -> {
-                        String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
-                        globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
-                                .ifPresent(mappedTenantId -> {
-                                    if (tenantId.equals(mappedTenantId)) {
-                                        provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, pictureUrl);
-                                    }
-                                });
-                    });
-        } catch (Exception e) {
-            // Deliberately non-blocking, but never silent: the downstream symptom is a user who can
-            // log in yet does not exist in the tenant.
-            log.warn("SSO auto-provisioning failed. tenantId={}, provider={}: {}", tenantId, provider, e.getMessage(), e);
+        String provider = SsoAuthentication.registrationId(authentication);
+        OidcUser user = SsoAuthentication.oidcUser(authentication).orElse(null);
+        if (tenantId == null || provider == null || user == null) {
+            return;
         }
+        String email = resolveEmail(user);
+        if (!hasText(email)) {
+            return;
+        }
+
+        String normalizedEmail = email.toLowerCase(ROOT);
+        String pictureUrl = resolvePictureUrl(user);
+
+        ssoConfigService
+                .getSSOConfig(tenantId, provider)
+                .filter(SSOPerTenantConfig::isEnabled)
+                .ifPresentOrElse(cfg -> {
+                    if (!cfg.isAutoProvisionUsers()) {
+                        return;
+                    }
+                    if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
+                        provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, pictureUrl);
+                    }
+                }, () -> {
+                    String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
+                    globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
+                            .ifPresent(mappedTenantId -> {
+                                if (tenantId.equals(mappedTenantId)) {
+                                    provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, pictureUrl);
+                                }
+                            });
+                });
     }
 
     private AuthUser provisionOrRefresh(String tenantId,
@@ -125,7 +125,12 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
                     }
                     return registerUser(tenantId, email, user, provider);
                 });
-        registrationProcessor.postProcessAutoProvision(authUser, pictureUrl);
+        try {
+            registrationProcessor.postProcessAutoProvision(authUser, pictureUrl);
+        } catch (Exception e) {
+            // Profile refresh only — the account itself is settled, so this must not fail the login.
+            log.warn("SSO auto-provision post-processing failed. userId={}: {}", authUser.getId(), e.getMessage(), e);
+        }
         return authUser;
     }
 
