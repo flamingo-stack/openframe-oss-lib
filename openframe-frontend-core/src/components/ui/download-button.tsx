@@ -7,22 +7,18 @@ export type DownloadButtonProps = Omit<ButtonProps, 'leftIcon' | 'children'> & {
 };
 
 /**
- * THE download button: a regular small ghost `Button` (`transparent`) with the download
- * glyph, wherever a surface hands the reader a file of what it shows (the Trust
- * Center's PDF, the margin report's PDF). One look and one size, so a download
- * reads the same on every page and never louder than the page's own action.
+ * THE download button: a regular small `Button` in the quiet `link` variant
+ * (no surface, secondary text like the facts it sits beside, the accent on
+ * hover) with the download glyph, wherever a surface hands the reader a file of
+ * what it shows (the Trust Center's PDF, the margin report's PDF). One look and
+ * one size, so a download reads the same on every page and never louder than
+ * the page's own action.
  *
  * With `href` it is a link that opens in a new tab (an attachment downloads
  * there without leaving the page). With `onClick` the host fetches the file
  * itself and passes `loading` while it does.
  */
-export function DownloadButton({
-  label,
-  variant = 'transparent',
-  size = 'small',
-  href,
-  ...props
-}: DownloadButtonProps) {
+export function DownloadButton({ label, variant = 'link', size = 'small', href, ...props }: DownloadButtonProps) {
   return (
     <Button
       variant={variant}

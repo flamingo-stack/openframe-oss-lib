@@ -17,7 +17,7 @@ describe('DownloadButton', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('is the regular small ghost button unless the host says otherwise', () => {
+  it('is the regular small quiet button unless the host says otherwise', () => {
     const { rerender } = render(<DownloadButton label="Download PDF" onClick={() => {}} />);
     const regular = screen.getByRole('button', { name: 'Download PDF' }).className;
     rerender(<DownloadButton label="Download PDF" variant="outline" onClick={() => {}} />);
