@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
 import { resolveIcon, ICON_OPTIONS } from '../icon-library';
 import { getIconComponent } from '../icon-registry';
@@ -64,5 +66,16 @@ describe('unified resolveIcon — design variant (default) resolves every picker
   it('null/unknown design → defined fallback, never throws', () => {
     expect(resolveIcon(null)).toBeDefined();
     expect(resolveIcon('definitely-not-an-icon')).toBeDefined();
+  });
+
+  // The picker and the chat chips tint every glyph with the agent accent
+  // through `currentColor`. A glyph that ships its own brand fill ignores that
+  // tint — the colored OpenAI / Anthropic marks sat black and orange in a cyan
+  // grid until their keys were pointed at the grey variants.
+  it('every ICON_OPTIONS glyph takes the slot colour — no hardcoded fill or stroke', () => {
+    for (const opt of ICON_OPTIONS) {
+      const markup = renderToStaticMarkup(createElement(resolveIcon(opt.key), { size: 24 }));
+      expect(markup, `design('${opt.key}') should not hardcode a colour`).not.toMatch(/(fill|stroke)="#/);
+    }
   });
 });

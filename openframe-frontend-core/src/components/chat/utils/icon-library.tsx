@@ -34,9 +34,11 @@ import { platformAccentVarName } from '../../../utils/platform-identity';
 import * as IconsV2 from '../../icons-v2-generated';
 import { HeadphoneIcon } from '../../icons-v2-generated/audio-and-visual/headphone-icon';
 import { VideoRecorderIcon } from '../../icons-v2-generated/audio-and-visual/video-recorder-icon';
+import { AnthropicLogoGreyIcon } from '../../icons-v2-generated/brand-logos/anthropic-logo-grey-icon';
 import { ClickupLogoGreyIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-grey-icon';
 import { GithubIcon } from '../../icons-v2-generated/brand-logos/github-icon';
 import { HubspotLogoGreyIcon } from '../../icons-v2-generated/brand-logos/hubspot-logo-grey-icon';
+import { OpenaiLogoGreyIcon } from '../../icons-v2-generated/brand-logos/openai-logo-grey-icon';
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
 import { BracketCurlyIcon } from '../../icons-v2-generated/coding/bracket-curly-icon';
 import { BugIcon } from '../../icons-v2-generated/coding/bug-icon';
@@ -157,6 +159,13 @@ export const ICON_ALIASES: Record<string, IconComponent> = {
   headphones: HeadphoneIcon,
   calendar: CalendarIcon,
   compass: CompassIcon,
+
+  // The two LLM brands offered by `ICON_OPTIONS`. Their brand-colored glyphs
+  // are the only picker entries that hardcode a fill (#000 / #D97757), so they
+  // ignored the chip accent and sat black and orange in a cyan grid; the grey
+  // variants fill with `currentColor` like every other brand logo here.
+  'openai-logo': OpenaiLogoGreyIcon,
+  'anthropic-logo': AnthropicLogoGreyIcon,
 
   // Figma-canonical aliases (node 7363:205938) — kept for Storybook
   // fixtures and any older feed entries still using the long names.
