@@ -47,11 +47,11 @@ import {
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection, type FaqSectionProps } from '../faq/faq-section';
-import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
-import { DataAttribution, DataAttributionLink } from '../ui/data-attribution';
+import { DataAttribution } from '../ui/data-attribution';
+import { DownloadButton } from '../ui/download-button';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
 import { StatusIndicator } from '../ui/status-indicator';
@@ -193,13 +193,9 @@ export function TrustCenterPage({
   // The page as a file (the hub's `pdf` route beside `endpoint`). An occasional
   // utility on a read-only page, so it is NOT a header action (a button there,
   // and a fixed bar on a phone, are for the page's task: Request access). It is
-  // one quiet link at the end of the status line under the title, in that
-  // line's own type, at every width.
-  const download = {
-    label: 'Download PDF',
-    href: trustCenterPdfUrl(endpoint),
-    icon: <Download01Icon className="size-4" aria-hidden="true" />,
-  };
+  // the shared small `DownloadButton` at the end of the status line under the
+  // title, at every width.
+  const download = <DownloadButton label="Download PDF" href={trustCenterPdfUrl(endpoint)} />;
 
   // Section id → its content. Titles come from `TRUST_CENTER_SECTIONS`; which
   // sections show comes from `visibleTrustCenterSections` — this map only says what each renders.
@@ -262,7 +258,7 @@ export function TrustCenterPage({
               action={download}
             />
           ) : (
-            <DataAttributionLink {...download} />
+            download
           )}
         </div>
 

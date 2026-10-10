@@ -1,13 +1,6 @@
 import type { ReactNode } from 'react';
 import { formatDate } from '../../utils/format';
 
-export interface DataAttributionAction {
-  label: string;
-  href: string;
-  /** A 16px glyph before the label (e.g. `<Download01Icon className="size-4" />`). */
-  icon?: ReactNode;
-}
-
 export interface DataAttributionProps {
   /** The source's mark, sized by the caller (e.g. `<CartaIcon className="h-4 w-4" />`). */
   icon?: ReactNode;
@@ -15,8 +8,8 @@ export interface DataAttributionProps {
   source: string;
   /** ISO instant of the last successful sync, or null when it never ran. */
   lastUpdated: string | null;
-  /** One quiet link at the end of the line: a way to take this data away (a file of it). */
-  action?: DataAttributionAction;
+  /** One control at the end of the line: a way to take this data away (a `DownloadButton` for a file of it). */
+  action?: ReactNode;
 }
 
 const LINE_CLASS =
@@ -28,26 +21,6 @@ function Separator() {
     <span className="hidden text-ods-text-secondary content-sm:inline" aria-hidden="true">
       &middot;
     </span>
-  );
-}
-
-/**
- * The line's link, in the line's own type: secondary text, underlined, never
- * louder than the facts beside it. Opens in a new tab (a file downloads there
- * without leaving the page). Exported for a surface that shows the link while
- * it has no source to attribute yet.
- */
-export function DataAttributionLink({ label, href, icon }: DataAttributionAction) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`${ITEM_CLASS} text-ods-text-secondary underline underline-offset-2 transition-colors text-h6 hover:text-ods-text-primary`}
-    >
-      {icon}
-      <span>{label}</span>
-    </a>
   );
 }
 
@@ -66,12 +39,7 @@ export function DataAttribution({ icon, source, lastUpdated, action }: DataAttri
       </div>
       <Separator />
       <span className="text-ods-text-secondary">Last updated: {lastUpdated ? formatDate(lastUpdated) : 'Never'}</span>
-      {action ? (
-        <>
-          <Separator />
-          <DataAttributionLink {...action} />
-        </>
-      ) : null}
+      {action ? <div className="flex content-sm:pl-[var(--spacing-system-xs)]">{action}</div> : null}
     </div>
   );
 }

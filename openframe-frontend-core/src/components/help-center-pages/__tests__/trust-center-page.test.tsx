@@ -208,13 +208,13 @@ describe('TrustCenterPage', () => {
     expect(screen.getByRole('link', { name: 'View Privacy policy' })).toHaveAttribute('target', '_blank');
   });
 
-  it("offers the page as a PDF: ONE quiet link in the status line, the hub's pdf route beside the endpoint, in a new tab", () => {
+  it("offers the page as a PDF: ONE small download button in the status line, the hub's pdf route beside the endpoint, in a new tab", () => {
     render(<TrustCenterPage endpoint="/content/api/trust-center?tenant=a" initialData={makeData()} />);
     const link = screen.getByRole('link', { name: 'Download PDF' });
     expect(link).toHaveAttribute('href', '/content/api/trust-center/pdf?tenant=a');
     expect(link).toHaveAttribute('target', '_blank');
-    // Never a header button (nor, on a phone, part of the fixed bottom bar): those are for Request access.
-    expect(screen.queryByRole('button', { name: 'Download PDF' })).toBeNull();
+    // One control only: never also a header action or part of the phone's fixed bottom bar (those are for Request access).
+    expect(screen.getAllByText('Download PDF')).toHaveLength(1);
   });
 
   it('still offers the PDF when monitoring is not connected (no source line to end)', () => {
