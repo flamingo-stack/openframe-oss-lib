@@ -336,7 +336,7 @@ export default defineConfig([
     // pipeline for zero lint benefit.
     name: 'openframe-frontend-core/imperative-external-systems',
     files: [
-      'src/components/features/video.tsx',
+      'src/components/features/video-file-player.tsx',
       'src/components/features/figma-prototype-viewer.tsx',
       'src/components/chat/hooks/use-nats-chat-adapter.ts',
     ],

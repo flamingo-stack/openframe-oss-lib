@@ -29,9 +29,8 @@
  */
 
 import { Megaphone, Bell, Info, Star, Package as PackageGlyph } from 'lucide-react';
-import type { ComponentType, CSSProperties } from 'react';
+import { lazy, Suspense, type ComponentType, type CSSProperties } from 'react';
 import { platformAccentVarName } from '../../../utils/platform-identity';
-import * as IconsV2 from '../../icons-v2-generated';
 import { HeadphoneIcon } from '../../icons-v2-generated/audio-and-visual/headphone-icon';
 import { VideoRecorderIcon } from '../../icons-v2-generated/audio-and-visual/video-recorder-icon';
 import { ClickupLogoGreyIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-grey-icon';
@@ -45,6 +44,7 @@ import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-ic
 import { LayersIcon } from '../../icons-v2-generated/design/layers-icon';
 import { FileIcon } from '../../icons-v2-generated/documents/file-icon';
 import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon';
+import { ICON_LOADERS } from '../../icons-v2-generated/icon-loaders';
 import { SearchIcon } from '../../icons-v2-generated/interface/search-icon';
 import { BriefcaseIcon } from '../../icons-v2-generated/map-and-travel/briefcase-icon';
 import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon';
@@ -202,6 +202,50 @@ export const ICON_ALIASES: Record<string, IconComponent> = {
   'bracket-curly': BracketCurlyIcon,
 };
 
+/** The size a generated icon draws at when it is given none; its loading box matches it. */
+const SET_ICON_DEFAULT_SIZE = 24;
+
+/** The set's icons already asked for, by export name: one component each, so a name always draws the same one. */
+const setIcons = new Map<string, IconComponent>();
+
+/**
+ * An icon of the generated set by its EXPORT name (`ChartPieIcon`), or
+ * `undefined` when the set has none by that name.
+ *
+ * The icon's module is loaded when the icon is first drawn, never before: the
+ * set is ~1,700 icons and a page draws a few dozen, so a page ships the ones it
+ * draws (`ICON_LOADERS`, one loader per icon). While its module is on the way
+ * the icon holds its place with an empty box of its own size, so nothing
+ * around it moves. On the server, and for an icon already loaded once, it
+ * draws at once.
+ */
+function iconFromSet(exportName: string): IconComponent | undefined {
+  const known = setIcons.get(exportName);
+  if (known) return known;
+  if (!Object.prototype.hasOwnProperty.call(ICON_LOADERS, exportName)) return undefined;
+  const Loaded = lazy(ICON_LOADERS[exportName]);
+  const SetIcon: IconComponent = ({ size, className, ...rest }) => (
+    <Suspense
+      fallback={
+        <span
+          aria-hidden="true"
+          className={className}
+          style={{
+            display: 'inline-block',
+            width: size ?? SET_ICON_DEFAULT_SIZE,
+            height: size ?? SET_ICON_DEFAULT_SIZE,
+          }}
+        />
+      }
+    >
+      <Loaded size={size} className={className} {...rest} />
+    </Suspense>
+  );
+  SetIcon.displayName = exportName;
+  setIcons.set(exportName, SetIcon);
+  return SetIcon;
+}
+
 /**
  * Generic resolution against the FULL `icons-v2-generated` set.
  *
@@ -218,8 +262,8 @@ export const ICON_ALIASES: Record<string, IconComponent> = {
  * export `…AIIcon` (`BrainAIIcon`, `CodeAIIcon`), while the Adobe
  * Illustrator brand glyph keeps `AdobeAiIcon`. We try the literal
  * capitalization first, then the `ai → AI` variant, and take whichever
- * actually exists in the namespace (the namespace is the source of
- * truth, so we never guess wrong).
+ * actually exists in the set (its loader table is the source of truth, so
+ * we never guess wrong).
  */
 function resolveFromLibrary(iconName: string): IconComponent | undefined {
   const tokens = iconName.trim().toLowerCase().replace(/_/g, '-').split('-');
@@ -229,9 +273,8 @@ function resolveFromLibrary(iconName: string): IconComponent | undefined {
     `${tokens.map(cap).join('')}Icon`,
     `${tokens.map(t => (t === 'ai' ? 'AI' : cap(t))).join('')}Icon`,
   ];
-  const registry = IconsV2 as unknown as Record<string, IconComponent | undefined>;
   for (const name of candidates) {
-    const Icon = registry[name];
+    const Icon = iconFromSet(name);
     if (Icon) return Icon;
   }
   return undefined;
@@ -250,16 +293,14 @@ function resolveFromLibrary(iconName: string): IconComponent | undefined {
 export function brandLogoForName(name: string | null | undefined): IconComponent | null {
   const words = (name ?? '').split(/[^A-Za-z0-9]+/).filter(Boolean);
   const pascal = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-  const registry = IconsV2 as unknown as Record<string, IconComponent | undefined>;
   for (let length = Math.min(3, words.length); length >= 1; length -= 1) {
     for (let start = 0; start + length <= words.length; start += 1) {
-      const Logo =
-        registry[
-          `${words
-            .slice(start, start + length)
-            .map(pascal)
-            .join('')}LogoIcon`
-        ];
+      const Logo = iconFromSet(
+        `${words
+          .slice(start, start + length)
+          .map(pascal)
+          .join('')}LogoIcon`,
+      );
       if (Logo) return Logo;
     }
   }

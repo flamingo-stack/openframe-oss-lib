@@ -75,6 +75,14 @@ import { Video, VIDEO_PLAYBACK_FAILED_EVENT } from '../video';
 const YT_ORIGIN = 'https://www.youtube-nocookie.com';
 const ERROR_TEXT = 'This video failed to play.';
 
+/** Draw a file video and wait for its player, which `<Video>` loads on demand. */
+async function renderFileVideo(ui: React.ReactElement): Promise<void> {
+  render(ui);
+  await act(async () => {
+    await import('../video-file-player');
+  });
+}
+
 function ytMessage(body: unknown): void {
   window.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(body), origin: YT_ORIGIN }));
 }
@@ -99,9 +107,9 @@ describe('Video — file playback failure handling', () => {
     vi.restoreAllMocks();
   });
 
-  it('a mid-playback stall surfaces a retry and reports the failure once', () => {
+  it('a mid-playback stall surfaces a retry and reports the failure once', async () => {
     const dispatched = vi.spyOn(window, 'dispatchEvent');
-    render(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
+    await renderFileVideo(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
 
     // Buffering while playback is expected — the watchdog arms.
     act(() => muxProps.onWaiting?.());
@@ -119,8 +127,8 @@ describe('Video — file playback failure handling', () => {
     expect(events[0].detail).toMatchObject({ kind: 'file', reason: 'stall' });
   });
 
-  it('Try again reloads and resumes the element, clearing the error', () => {
-    render(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
+  it('Try again reloads and resumes the element, clearing the error', async () => {
+    await renderFileVideo(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
     act(() => muxProps.onWaiting?.());
     act(() => {
       vi.advanceTimersByTime(15_000);
@@ -132,8 +140,8 @@ describe('Video — file playback failure handling', () => {
     expect(screen.queryByText(ERROR_TEXT)).toBeNull();
   });
 
-  it('Try again resumes from where the stall happened, not from the top', () => {
-    render(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
+  it('Try again resumes from where the stall happened, not from the top', async () => {
+    await renderFileVideo(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
     if (muxEl) muxEl.currentTime = 480;
     act(() => muxProps.onWaiting?.());
     act(() => {
@@ -148,14 +156,14 @@ describe('Video — file playback failure handling', () => {
     expect(muxEl?.listeners.loadedmetadata).toHaveLength(0);
   });
 
-  it('a hard media error surfaces the retry immediately', () => {
-    render(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
+  it('a hard media error surfaces the retry immediately', async () => {
+    await renderFileVideo(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
     act(() => muxProps.onError?.());
     expect(screen.getByText(ERROR_TEXT)).toBeInTheDocument();
   });
 
-  it('a stall that self-heals dismisses its own overlay', () => {
-    render(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
+  it('a stall that self-heals dismisses its own overlay', async () => {
+    await renderFileVideo(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
     act(() => muxProps.onWaiting?.());
     act(() => {
       vi.advanceTimersByTime(15_000);
@@ -166,8 +174,8 @@ describe('Video — file playback failure handling', () => {
     expect(screen.queryByText(ERROR_TEXT)).toBeNull();
   });
 
-  it('a paused player is never treated as a stall', () => {
-    render(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
+  it('a paused player is never treated as a stall', async () => {
+    await renderFileVideo(<Video kind="file" url="https://example.com/a.m3u8" layout="centered" />);
     if (muxEl) muxEl.paused = true;
     act(() => muxProps.onWaiting?.());
     act(() => {
@@ -176,8 +184,8 @@ describe('Video — file playback failure handling', () => {
     expect(screen.queryByText(ERROR_TEXT)).toBeNull();
   });
 
-  it('decorative first-frame previews stay silent on error', () => {
-    render(<Video kind="file" url="https://example.com/a.m3u8" firstFrameOnly />);
+  it('decorative first-frame previews stay silent on error', async () => {
+    await renderFileVideo(<Video kind="file" url="https://example.com/a.m3u8" firstFrameOnly />);
     act(() => muxProps.onError?.());
     expect(screen.queryByText(ERROR_TEXT)).toBeNull();
   });
