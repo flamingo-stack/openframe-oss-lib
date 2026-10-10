@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssistantRuntimeContext, type AssistantRuntime } from '../../../contexts/assistant-runtime-context';
 import type { Faq } from '../../../types/faq';
 import { AssistantAskPrompts } from '../../chat/assistant-ask-prompts';
-import { buildAskPromptsUrl, resetShownAskPrompts } from '../../chat/hooks/use-ask-prompts';
+import { buildAskPromptsUrl, resetAskSurfaces } from '../../chat/hooks/use-ask-prompts';
 import { ASK_AI_OPEN_EVENT, MingoAiButton } from '../../navigation/mingo-ai-button';
 import { FaqSection } from '../faq-section';
 
@@ -49,7 +49,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve({ prompts: PROMPTS }) });
   vi.stubGlobal('fetch', fetchMock);
-  resetShownAskPrompts();
+  resetAskSurfaces();
 });
 
 afterEach(() => {
@@ -272,6 +272,97 @@ describe('AssistantAskPrompts', () => {
       .find(url => url.searchParams.get('section') === 'faq');
     // One request for the card, made after the row's pick: it names the row's question.
     expect(card?.searchParams.get('exclude')).toBe('q1');
+  });
+});
+
+describe('ask surfaces of one page', () => {
+  /** Answers each request with one question its `exclude` does not name, and records the order. */
+  function pickingHost() {
+    const pool = ['q1', 'q2', 'q3'];
+    fetchMock.mockImplementation((input: unknown) => {
+      const url = new URL(String(input), 'https://host.test');
+      const left = (url.searchParams.get('exclude') ?? '').split(',');
+      const id = pool.find(candidate => !left.includes(candidate));
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ prompts: id ? [{ id, label: `Question ${id}` }] : [] }),
+      });
+    });
+  }
+  const requests = () => fetchMock.mock.calls.map(call => new URL(String(call[0]), 'https://host.test'));
+
+  it('two rows on ONE topic pick one after the other and never show the same question', async () => {
+    pickingHost();
+    renderFaq(
+      RUNTIME,
+      <>
+        <AssistantAskPrompts topic="pricing" count={1} />
+        <AssistantAskPrompts topic="pricing" count={1} />
+      </>,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(requests().map(url => url.searchParams.get('exclude'))).toEqual([null, 'q1']);
+    expect(await screen.findByText('Question q1')).toBeInTheDocument();
+    expect(await screen.findByText('Question q2')).toBeInTheDocument();
+    expect(screen.getAllByText(/^Question /)).toHaveLength(2);
+  });
+
+  it('rows on different topics leave out each other too, and the card leaves out both', async () => {
+    pickingHost();
+    renderFaq(
+      RUNTIME,
+      <>
+        <AssistantAskPrompts topic="agents" count={1} />
+        <AssistantAskPrompts topic="pricing" count={1} />
+        <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq', count: 1 }} />
+      </>,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(requests().map(url => [url.searchParams.get('section'), url.searchParams.get('exclude')])).toEqual([
+      ['agents', null],
+      ['pricing', 'q1'],
+      ['faq', 'q1,q2'],
+    ]);
+  });
+
+  it('a row keeps its questions when a later surface settles: one pick per mount', async () => {
+    pickingHost();
+    renderFaq(
+      RUNTIME,
+      <>
+        <AssistantAskPrompts topic="pricing" count={1} />
+        <AssistantAskPrompts topic="pricing" count={1} />
+      </>,
+    );
+    await screen.findByText('Question q2');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failed pick does not hold the surfaces after it', async () => {
+    fetchMock.mockImplementation((input: unknown) => {
+      const first = new URL(String(input), 'https://host.test').searchParams.get('section') === 'agents';
+      return Promise.resolve(
+        first ? { ok: false, status: 500 } : { ok: true, json: () => Promise.resolve({ prompts: [PROMPTS[1]] }) },
+      );
+    });
+    renderFaq(
+      RUNTIME,
+      <>
+        <AssistantAskPrompts topic="agents" count={1} />
+        <AssistantAskPrompts topic="pricing" count={1} />
+      </>,
+    );
+    expect(await screen.findByText('Is it open source?')).toBeInTheDocument();
+  });
+
+  it('the card is one of the surfaces: `AssistantAskPrompts` as a card', async () => {
+    renderFaq(RUNTIME, <AssistantAskPrompts variant="card" topic="docs" count={2} />);
+    expect(screen.getByText('Still deciding?')).toBeInTheDocument();
+    expect(await screen.findByText('How does pricing work?')).toBeInTheDocument();
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('docs');
   });
 });
 
