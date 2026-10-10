@@ -2,7 +2,7 @@
  * The sad flamingo illustration (Figma `etEsOUsmdzjqnIbSH4kULB` node `4975:36807`,
  * the "Don't set it up alone" modal). Figma holds it as an image fill, so its SVG
  * export wraps the raster (384px, 2x the 192px slot) rather than tracing vectors.
- * Packaged as a data URI, so every consumer renders
+ * Packaged as a data URI like `FAE_AVATAR_DATA_URI`, so every consumer renders
  * it with no host-asset serving.
  */
 export const SAD_FLAMINGO_SVG_DATA_URI =

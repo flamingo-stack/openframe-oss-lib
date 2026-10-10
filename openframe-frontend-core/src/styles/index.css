@@ -10,7 +10,6 @@
 @import './app-globals.css';
 @import './chat-animations.css';
 @import './ods-page-shell.css';
-@import './agent-marks.css';
 
 /* Vendor/library style overrides */
 @import './vendor-react-easy-crop.css';
