@@ -43,6 +43,7 @@ public class FeFeatureFlags implements TenantScoped {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
-    @Indexed
+    @Indexed(unique = true)
     private String tenantId;
 }
+
