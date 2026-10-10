@@ -5,7 +5,9 @@ import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 
 import java.util.Map;
@@ -28,7 +30,11 @@ public class ToolApiWebSocketProxyUrlFilter extends ToolWebSocketProxyUrlFilter 
 
     @Override
     protected String getRequestToolId(String path) {
-        return path.split("/")[3];
+        String[] segments = path.split("/");
+        if (segments.length < 4) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid WebSocket proxy path: " + path);
+        }
+        return segments[3];
     }
 
     @Override
@@ -48,3 +54,4 @@ public class ToolApiWebSocketProxyUrlFilter extends ToolWebSocketProxyUrlFilter 
                 .build();
     }
 }
+
