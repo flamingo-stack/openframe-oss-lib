@@ -78,6 +78,12 @@ describe('what a balance runs', () => {
     expect(formatTokenAmount(850)).toBe('850');
     expect(formatTokenAmount(750_019)).toBe('750K');
     expect(formatTokenAmount(1_250_000)).toBe('1.25M');
+    // The unit follows the rounded figure: just under a unit reads as the next one.
+    expect(formatTokenAmount(999.6)).toBe('1K');
+    expect(formatTokenAmount(999_600)).toBe('1M');
+    expect(formatTokenAmount(999_600_000)).toBe('1B');
+    expect(formatTokenAmount(999_400)).toBe('999K');
+    expect(formatTokenAmount(2_500_000_000)).toBe('2.5B');
     expect(formatTokenAmount(null)).toBe(TOKEN_RATE_EMPTY);
   });
 });

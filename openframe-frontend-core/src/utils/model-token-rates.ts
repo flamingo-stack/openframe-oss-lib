@@ -43,13 +43,30 @@ export function tokenCost(tokens: number, tokenPrice: TokenPrice | null | undefi
   return (tokens / tokenPrice.tokens) * tokenPrice.price;
 }
 
-/** A token count in short form: "850", "10K", "750K", "1.25M". */
+/** The units a token count is shortened to, largest first. */
+const TOKEN_AMOUNT_UNITS = [
+  { size: 1_000_000_000, suffix: 'B' },
+  { size: 1_000_000, suffix: 'M' },
+  { size: 1_000, suffix: 'K' },
+] as const;
+
+/**
+ * A token count in short form: "850", "10K", "750K", "1.25M". The unit is chosen
+ * from the ROUNDED figure, so a count just under a unit reads as the next one
+ * ("1M", never "1000K").
+ */
 export function formatTokenAmount(tokens: number | null | undefined): string {
   if (tokens == null || !Number.isFinite(tokens) || tokens < 0) return TOKEN_RATE_EMPTY;
-  const short = (value: number) => String(Number(value.toPrecision(3)));
-  if (tokens >= 1_000_000) return `${short(tokens / 1_000_000)}M`;
-  if (tokens >= 1_000) return `${short(tokens / 1_000)}K`;
-  return String(Math.round(tokens));
+  const whole = Math.round(tokens);
+  if (whole < 1_000) return String(whole);
+  for (const [index, unit] of TOKEN_AMOUNT_UNITS.entries()) {
+    if (whole < unit.size) continue;
+    const figure = Number((whole / unit.size).toPrecision(3));
+    // Rounded up to a thousand of this unit: it is one of the unit above.
+    const larger = TOKEN_AMOUNT_UNITS[index - 1];
+    return figure >= 1_000 && larger ? `1${larger.suffix}` : `${figure}${unit.suffix}`;
+  }
+  return String(whole);
 }
 
 /**
