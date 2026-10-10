@@ -31,6 +31,34 @@ export function formatTokenRate(value: number | null | undefined): string {
   return `${rounded}\u00d7`;
 }
 
+/** What OpenFrame tokens cost: `price` USD buys `tokens` of them. */
+export interface TokenPrice {
+  tokens: number;
+  price: number;
+}
+
+/** The size a model's price is quoted for, as every provider quotes it. */
+export const TOKEN_PRICE_UNIT = 1_000_000;
+
+/**
+ * What one million of a model's tokens cost in USD, from its rate and the price
+ * of OpenFrame tokens. Null when either is missing.
+ */
+export function tokenRatePrice(
+  rate: number | null | undefined,
+  tokenPrice: TokenPrice | null | undefined,
+): number | null {
+  if (rate == null || !Number.isFinite(rate) || rate <= 0) return null;
+  if (!tokenPrice || !(tokenPrice.tokens > 0) || !(tokenPrice.price > 0)) return null;
+  return rate * TOKEN_PRICE_UNIT * (tokenPrice.price / tokenPrice.tokens);
+}
+
+/** A price per million tokens: cents from ten cents up ("$13.33", "$0.33"), two significant digits under it ("$0.033"). */
+export function formatTokenPrice(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return TOKEN_RATE_EMPTY;
+  return `$${value >= 0.1 ? value.toFixed(2) : Number(value.toPrecision(2))}`;
+}
+
 const PROVIDER_LABELS: Record<string, string> = {
   ANTHROPIC: 'Anthropic',
   OPENAI: 'OpenAI',

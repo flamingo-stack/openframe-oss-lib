@@ -1,12 +1,15 @@
 'use client';
 
-import { type ComponentType, Fragment, type ReactNode } from 'react';
+import { type ComponentType, type ReactNode, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { formatDate } from '../../utils/format';
 import {
+  formatTokenPrice,
   formatTokenRate,
   groupTokenRatesByProvider,
   type ModelTokenRate,
+  type TokenPrice,
+  tokenRatePrice,
   tokenRateProviderLabel,
 } from '../../utils/model-token-rates';
 import { AnthropicLogoGreyIcon } from '../icons-v2-generated/brand-logos/anthropic-logo-grey-icon';
@@ -17,25 +20,31 @@ import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { FadePreview } from '../ui/fade-preview';
 import { Skeleton } from '../ui/skeleton';
+import { TabSelector } from '../ui/tab-selector';
 
 /**
  * The per-model AI token exchange rates, as every surface shows them: the
  * product's billing cards (a popover behind a question mark) and the website's
- * pricing page (the table in the page). ONE table, so a rate reads the same
- * wherever it is stated.
+ * pricing page (in the page). ONE table, so a rate reads the same wherever it
+ * is stated.
  *
  * The component never fetches. A host reads the rates its own way (the product
  * through its GraphQL API, the website through its server) and hands them in,
  * with `status` saying where that read stands.
  *
- * A rate is the number of OpenFrame tokens one token of the model costs, so it
- * is written as a multiplier ("1.33×"): the caption states the unit once and
- * every figure under it is that unit. Input and output are separate columns,
- * right-aligned in tabular figures so they compare down the column, and the
- * models are grouped under their provider. The rate's type and its formatting
- * are `utils/model-token-rates` (server-safe: a host's server states a rate with
- * the same function).
+ * It is SMALL by construction: one provider at a time (the lib's `TabSelector`),
+ * and on a page only the first rows, the rest behind "Show N more" (the lib's
+ * `FadePreview`), so thirty models take the room of five.
+ *
+ * A rate is the number of OpenFrame tokens one token of the model costs, written
+ * as a multiplier ("1.33×"); given `tokenPrice`, each figure is instead what a
+ * million of the model's tokens cost in USD, the unit every provider quotes.
+ * Either way the unit is stated once, under the figures, which sit right-aligned
+ * in tabular figures so they compare down the column. The rate's type and its
+ * formatting are `utils/model-token-rates` (server-safe: a host's server states
+ * a rate with the same function).
  */
 
 /** Where the host's read of the rates stands. */
@@ -44,12 +53,15 @@ export type ModelTokenRatesStatus = 'loading' | 'error' | 'ready';
 /** The wording of the table, stated once. */
 export const MODEL_TOKEN_RATES_COPY = {
   trigger: 'Per-model token rates',
-  caption: 'OpenFrame tokens used per model token',
+  unit: { rate: 'OpenFrame tokens used per model token', price: 'USD per 1M model tokens' },
+  providers: 'Provider',
   model: 'Model',
   input: 'Input',
   output: 'Output',
-  cached: 'Cached input',
-  effective: (date: string) => `Rates in effect since ${date}`,
+  cached: 'Cached',
+  more: (count: number) => `Show ${count} more ${count === 1 ? 'model' : 'models'}`,
+  less: 'Show fewer models',
+  effective: (date: string) => `In effect since ${date}`,
   autoTopUp: { on: 'Auto Top Up Enabled', off: 'Auto Top Up Disabled' },
   unavailable: {
     title: 'Rates unavailable',
@@ -58,21 +70,26 @@ export const MODEL_TOKEN_RATES_COPY = {
   empty: 'No token rates are in effect right now.',
 } as const;
 
-/** The provider's mark in its monochrome cut: it takes the row's text colour, so no brand colour competes with the figures. A provider with no mark is shown by name. */
+/** The provider's mark in its monochrome cut: it takes the text colour, so no brand colour competes with the figures. A provider with no mark is shown by name. */
 const PROVIDER_ICON: Record<string, ComponentType<{ className?: string }>> = {
   ANTHROPIC: AnthropicLogoGreyIcon,
   OPENAI: OpenaiLogoGreyIcon,
   GOOGLE_GEMINI: GeminiLogoGreyIcon,
 };
 
-/** `compact`: the popover (input and output, scrolls past its height). `comfortable`: a page section (adds cached input, as tall as its rows). */
+/** `compact`: the popover (input and output, scrolls past its height). `comfortable`: in a page (adds cached input, shows the first rows). */
 export type ModelTokenRatesDensity = 'compact' | 'comfortable';
+
+/** How many models a page shows before "Show N more". */
+export const MODEL_TOKEN_RATES_VISIBLE_ROWS = 5;
 
 export interface ModelTokenRatesProps {
   /** The rates, once read. */
   rates?: readonly ModelTokenRate[];
   /** Where the read stands. Default `ready`. */
   status?: ModelTokenRatesStatus;
+  /** What OpenFrame tokens cost. Given: every figure is USD per 1M of the model's tokens, not a multiplier. */
+  tokenPrice?: TokenPrice | null;
   /** When these rates took effect (ISO); stated under the table. */
   effectiveFrom?: string | null;
   /**
@@ -81,12 +98,17 @@ export interface ModelTokenRatesProps {
    */
   autoTopUpEnabled?: boolean;
   density?: ModelTokenRatesDensity;
+  /** `comfortable` only: the models shown before "Show N more". Default `MODEL_TOKEN_RATES_VISIBLE_ROWS`. */
+  visibleRows?: number;
   className?: string;
 }
 
-const CELL_X = 'px-[var(--spacing-system-s)]';
-const NUMBER_CELL =
-  'whitespace-nowrap py-[var(--spacing-system-xxs)] pl-[var(--spacing-system-s)] text-right tabular-nums';
+const PAD_X = 'px-[var(--spacing-system-s)]';
+const ROW = 'flex items-center gap-[var(--spacing-system-s)]';
+/** Fixed widths, so the figures of separate rows line up as columns. */
+const NUMBER_CELL = 'w-14 shrink-0 whitespace-nowrap text-right tabular-nums sm:w-16';
+/** From the `sm` width up: on a phone the model's name needs the room more than a third figure does. */
+const CACHED_CELL = 'hidden w-20 shrink-0 whitespace-nowrap text-right tabular-nums sm:block';
 
 /**
  * The table in its frame. The frame and the auto top-up line stay put while the
@@ -96,27 +118,34 @@ const NUMBER_CELL =
 export function ModelTokenRates({
   rates = [],
   status = 'ready',
+  tokenPrice,
   effectiveFrom,
   autoTopUpEnabled,
   density = 'compact',
+  visibleRows = MODEL_TOKEN_RATES_VISIBLE_ROWS,
   className,
 }: ModelTokenRatesProps) {
-  const compact = density === 'compact';
   return (
     <div
       className={cn(
         'flex flex-col overflow-hidden rounded-[6px] border border-ods-border bg-ods-card',
-        compact ? 'max-h-[min(60vh,420px)] min-w-[300px]' : 'w-full',
+        density === 'compact' ? 'max-h-[min(60vh,420px)] w-[340px] max-w-[calc(100vw-2rem)]' : 'w-full',
         className,
       )}
     >
       {autoTopUpEnabled != null && <AutoTopUpLine enabled={autoTopUpEnabled} />}
       {status === 'loading' ? (
-        <ModelTokenRatesSkeleton density={density} />
+        <ModelTokenRatesSkeleton density={density} rows={visibleRows} />
       ) : status === 'error' ? (
         <ModelTokenRatesUnavailable />
       ) : (
-        <ModelTokenRatesTable rates={rates} effectiveFrom={effectiveFrom} density={density} />
+        <ModelTokenRatesTable
+          rates={rates}
+          tokenPrice={tokenPrice}
+          effectiveFrom={effectiveFrom}
+          density={density}
+          visibleRows={visibleRows}
+        />
       )}
     </div>
   );
@@ -165,7 +194,7 @@ function AutoTopUpLine({ enabled }: { enabled: boolean }) {
     <div
       className={cn(
         'flex shrink-0 items-center gap-[var(--spacing-system-xs)] border-b border-ods-border py-[var(--spacing-system-xs)] text-h4',
-        CELL_X,
+        PAD_X,
         enabled ? 'bg-ods-success-secondary text-ods-success' : 'text-ods-text-secondary',
       )}
     >
@@ -179,109 +208,133 @@ function AutoTopUpLine({ enabled }: { enabled: boolean }) {
 
 function ModelTokenRatesTable({
   rates,
+  tokenPrice,
   effectiveFrom,
   density,
-}: Required<Pick<ModelTokenRatesProps, 'rates' | 'density'>> & Pick<ModelTokenRatesProps, 'effectiveFrom'>) {
-  if (rates.length === 0) {
+  visibleRows,
+}: Required<Pick<ModelTokenRatesProps, 'rates' | 'density' | 'visibleRows'>> &
+  Pick<ModelTokenRatesProps, 'effectiveFrom' | 'tokenPrice'>) {
+  const groups = groupTokenRatesByProvider(rates);
+  const [picked, setPicked] = useState<string | null>(null);
+  // The provider picked, while the rates still hold it; else the first one.
+  const group = groups.find(candidate => candidate.providerType === picked) ?? groups[0];
+
+  if (!group) {
     return (
-      <p className={cn('py-[var(--spacing-system-s)] text-ods-text-secondary text-h6', CELL_X)}>
+      <p className={cn('py-[var(--spacing-system-s)] text-ods-text-secondary text-h6', PAD_X)}>
         {MODEL_TOKEN_RATES_COPY.empty}
       </p>
     );
   }
 
-  const showCached = density === 'comfortable' && rates.some(rate => rate.cacheReadInputTokenRate != null);
-  const columns = showCached ? 4 : 3;
+  const compact = density === 'compact';
+  const showCached = !compact && rates.some(rate => rate.cacheReadInputTokenRate != null);
+  const priced = tokenRatePrice(1, tokenPrice) !== null;
+  const figure = (rate: number | null | undefined) =>
+    priced ? formatTokenPrice(tokenRatePrice(rate, tokenPrice)) : formatTokenRate(rate);
+  const unit = priced ? MODEL_TOKEN_RATES_COPY.unit.price : MODEL_TOKEN_RATES_COPY.unit.rate;
   const effectiveDate =
     effectiveFrom && !Number.isNaN(new Date(effectiveFrom).getTime()) ? formatDate(effectiveFrom) : null;
 
+  const rows = (
+    <div role="rowgroup">
+      {group.rates.map(rate => (
+        <div
+          key={rate.modelName}
+          role="row"
+          className={cn(ROW, PAD_X, 'py-[var(--spacing-system-xxs)] text-ods-text-primary text-h6')}
+        >
+          <span role="rowheader" className="min-w-0 flex-1 truncate">
+            {rate.displayName || rate.modelName}
+          </span>
+          <span role="cell" className={NUMBER_CELL}>
+            {figure(rate.inputTokenRate)}
+          </span>
+          <span role="cell" className={NUMBER_CELL}>
+            {figure(rate.outputTokenRate)}
+          </span>
+          {showCached && (
+            <span role="cell" className={cn(CACHED_CELL, 'text-ods-text-secondary')}>
+              {figure(rate.cacheReadInputTokenRate)}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <>
-      {/* The rows scroll under a pinned header when the list is taller than the panel. */}
-      <div className="overflow-y-auto">
-        <table className="w-full border-collapse">
-          <caption
-            className={cn(
-              'border-b border-ods-border py-[var(--spacing-system-xs)] text-left text-ods-text-secondary text-h6',
-              CELL_X,
-            )}
-          >
-            {MODEL_TOKEN_RATES_COPY.caption}
-          </caption>
-          <thead className="sticky top-0 bg-ods-card">
-            <tr className="uppercase tracking-[-0.02em] text-ods-text-secondary text-h5">
-              <th scope="col" className={cn('py-[var(--spacing-system-xs)] text-left font-[inherit]', CELL_X)}>
-                {MODEL_TOKEN_RATES_COPY.model}
-              </th>
-              <th scope="col" className={cn(NUMBER_CELL, 'font-[inherit]')}>
-                {MODEL_TOKEN_RATES_COPY.input}
-              </th>
-              <th
-                scope="col"
-                className={cn(NUMBER_CELL, 'font-[inherit]', !showCached && 'pr-[var(--spacing-system-s)]')}
-              >
-                {MODEL_TOKEN_RATES_COPY.output}
-              </th>
-              {showCached && (
-                <th scope="col" className={cn(NUMBER_CELL, 'pr-[var(--spacing-system-s)] font-[inherit]')}>
-                  {MODEL_TOKEN_RATES_COPY.cached}
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {groupTokenRatesByProvider(rates).map(group => {
-              const label = tokenRateProviderLabel(group.providerType);
-              const Icon = PROVIDER_ICON[group.providerType];
-              return (
-                <Fragment key={group.providerType}>
-                  <tr className="border-t border-ods-border">
-                    <th
-                      scope="colgroup"
-                      colSpan={columns}
-                      className={cn(
-                        'pb-[var(--spacing-system-xxs)] pt-[var(--spacing-system-xs)] text-left font-[inherit] text-ods-text-secondary text-h6',
-                        CELL_X,
-                      )}
-                    >
-                      <span className="flex items-center gap-[var(--spacing-system-xs)]">
-                        {Icon && <Icon className="size-5 shrink-0" />}
-                        {label}
-                      </span>
-                    </th>
-                  </tr>
-                  {group.rates.map(rate => (
-                    <tr key={rate.modelName} className="text-ods-text-primary text-h6">
-                      <th scope="row" className={cn('py-[var(--spacing-system-xxs)] text-left font-[inherit]', CELL_X)}>
-                        {rate.displayName || rate.modelName}
-                      </th>
-                      <td className={NUMBER_CELL}>{formatTokenRate(rate.inputTokenRate)}</td>
-                      <td className={cn(NUMBER_CELL, !showCached && 'pr-[var(--spacing-system-s)]')}>
-                        {formatTokenRate(rate.outputTokenRate)}
-                      </td>
-                      {showCached && (
-                        <td className={cn(NUMBER_CELL, 'pr-[var(--spacing-system-s)] text-ods-text-secondary')}>
-                          {formatTokenRate(rate.cacheReadInputTokenRate)}
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {effectiveDate && (
-        <p
+      {groups.length > 1 && (
+        <TabSelector
+          variant="secondary"
+          // Tabs keep their own width and the row scrolls, so a fourth provider never squeezes the names.
+          scrollable
+          value={group.providerType}
+          onValueChange={setPicked}
+          items={groups.map(candidate => {
+            const Icon = PROVIDER_ICON[candidate.providerType];
+            return {
+              id: candidate.providerType,
+              label: tokenRateProviderLabel(candidate.providerType),
+              icon: Icon ? <Icon className="size-full" /> : undefined,
+            };
+          })}
+          className={cn('shrink-0 border-b border-ods-border py-[var(--spacing-system-xs)]', PAD_X)}
+        />
+      )}
+      <div role="table" aria-label={unit} className="flex min-h-0 flex-col">
+        <div
+          role="row"
           className={cn(
-            'shrink-0 border-t border-ods-border py-[var(--spacing-system-xs)] text-ods-text-secondary text-h6',
-            CELL_X,
+            ROW,
+            PAD_X,
+            'shrink-0 py-[var(--spacing-system-xs)] uppercase tracking-[-0.02em] text-ods-text-secondary text-h5',
           )}
         >
-          {MODEL_TOKEN_RATES_COPY.effective(effectiveDate)}
-        </p>
-      )}
+          <span role="columnheader" className="min-w-0 flex-1 truncate">
+            {MODEL_TOKEN_RATES_COPY.model}
+          </span>
+          <span role="columnheader" className={NUMBER_CELL}>
+            {MODEL_TOKEN_RATES_COPY.input}
+          </span>
+          <span role="columnheader" className={NUMBER_CELL}>
+            {MODEL_TOKEN_RATES_COPY.output}
+          </span>
+          {showCached && (
+            <span role="columnheader" className={CACHED_CELL}>
+              {MODEL_TOKEN_RATES_COPY.cached}
+            </span>
+          )}
+        </div>
+        {compact ? (
+          // The popover: every model of the provider, scrolling under the pinned header.
+          <div className="min-h-0 overflow-y-auto pb-[var(--spacing-system-xxs)]">{rows}</div>
+        ) : (
+          // A page: the first models, the rest behind the toggle. Reset when the provider changes.
+          <FadePreview
+            visibleItems={visibleRows}
+            resetKey={group.providerType}
+            labels={{
+              more: MODEL_TOKEN_RATES_COPY.more(Math.max(0, group.rates.length - visibleRows)),
+              less: MODEL_TOKEN_RATES_COPY.less,
+            }}
+            toggleClassName={PAD_X}
+          >
+            {rows}
+          </FadePreview>
+        )}
+      </div>
+      {/* The unit, stated once, where it has room to wrap; then when the rates took effect. */}
+      <p
+        className={cn(
+          'shrink-0 border-t border-ods-border py-[var(--spacing-system-xs)] text-ods-text-secondary text-h6',
+          PAD_X,
+        )}
+      >
+        {unit}
+        {effectiveDate && `. ${MODEL_TOKEN_RATES_COPY.effective(effectiveDate)}.`}
+      </p>
     </>
   );
 }
@@ -302,32 +355,36 @@ export function ModelTokenRatesUnavailable() {
   );
 }
 
-const SKELETON_ROWS = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8'] as const;
-
-/** The table's loading footprint: the caption, the header and rows of the boxes the loaded rows use. */
-export function ModelTokenRatesSkeleton({ density = 'compact' }: { density?: ModelTokenRatesDensity }) {
+/** The table's loading footprint: the provider tabs, the header and as many rows as the loaded table shows. */
+export function ModelTokenRatesSkeleton({
+  density = 'compact',
+  rows = MODEL_TOKEN_RATES_VISIBLE_ROWS,
+}: {
+  density?: ModelTokenRatesDensity;
+  rows?: number;
+}) {
+  const cells = (
+    <>
+      <div className="flex-1" />
+      <Skeleton className="h-4 w-12" />
+      <Skeleton className="h-4 w-12" />
+      {density === 'comfortable' && <Skeleton className="hidden h-4 w-16 sm:block" />}
+    </>
+  );
   return (
     <div aria-busy="true">
-      <div className={cn('border-b border-ods-border py-[var(--spacing-system-xs)]', CELL_X)}>
-        <Skeleton className="h-4 w-56" />
+      <div className={cn('border-b border-ods-border py-[var(--spacing-system-xs)]', PAD_X)}>
+        <Skeleton className="h-11 w-full content-md:h-12" />
       </div>
-      <div className={cn('flex items-center gap-[var(--spacing-system-s)] py-[var(--spacing-system-xs)]', CELL_X)}>
-        <Skeleton className="h-4 w-12" />
-        <div className="flex-1" />
-        <Skeleton className="h-4 w-10" />
-        <Skeleton className="h-4 w-10" />
-        {density === 'comfortable' && <Skeleton className="h-4 w-16" />}
+      <div className={cn(ROW, PAD_X, 'py-[var(--spacing-system-xs)]')}>
+        <Skeleton className="h-4 w-48" />
+        {cells}
       </div>
-      {SKELETON_ROWS.map(key => (
-        <div
-          key={key}
-          className={cn('flex items-center gap-[var(--spacing-system-s)] py-[var(--spacing-system-xxs)]', CELL_X)}
-        >
-          <Skeleton className="h-4 w-40" />
-          <div className="flex-1" />
-          <Skeleton className="h-4 w-10" />
-          <Skeleton className="h-4 w-10" />
-          {density === 'comfortable' && <Skeleton className="h-4 w-16" />}
+      {Array.from({ length: rows }, (_, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholder rows
+        <div key={index} className={cn(ROW, PAD_X, 'py-[var(--spacing-system-xxs)]')}>
+          <Skeleton className="h-4 w-36" />
+          {cells}
         </div>
       ))}
     </div>
