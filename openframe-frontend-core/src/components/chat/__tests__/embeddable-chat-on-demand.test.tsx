@@ -33,6 +33,8 @@ import { EmbeddableChatOnDemand } from '../embeddable-chat-on-demand';
 const open = (type: string, detail: unknown) =>
   act(async () => {
     window.dispatchEvent(new CustomEvent(type, { detail }));
+    // Let the panel's module and the host's deferred props resolve inside this act.
+    await Promise.resolve();
   });
 
 describe('EmbeddableChatOnDemand', () => {
@@ -90,7 +92,7 @@ describe('EmbeddableChatOnDemand', () => {
   });
 
   it("loads a host's deferred props with the panel, once, and merges them over the direct ones", async () => {
-    const panelProps = vi.fn(async () => ({ baseRoute: '/docs' }));
+    const panelProps = vi.fn(() => Promise.resolve({ baseRoute: '/docs' }));
     render(<EmbeddableChatOnDemand baseRoute="/knowledge-base" panelProps={panelProps} />);
     expect(panelProps).not.toHaveBeenCalled();
     await open('ask-ai:open', { source: 'flamingo' });
