@@ -90,3 +90,35 @@ export function groupTokenRatesByProvider<T extends ModelTokenRate>(
   }
   return [...groups].map(([providerType, grouped]) => ({ providerType, rates: grouped }));
 }
+
+/** One page of a provider's rates: at most `pageSize` models, and where it sits among that provider's pages. */
+export interface TokenRatePage<T extends ModelTokenRate = ModelTokenRate> {
+  providerType: string;
+  /** 1-based, within the provider. */
+  page: number;
+  pages: number;
+  rates: T[];
+}
+
+/**
+ * The rates as pages of at most `pageSize` models, provider by provider. A
+ * provider's models are spread EVENLY over its pages (13 models at 7 a page are
+ * 7 and 6, never 7 and 6 and a page of none; 8 are 4 and 4, never 7 and 1), so
+ * no page is a stub.
+ */
+export function paginateTokenRates<T extends ModelTokenRate>(
+  rates: readonly T[],
+  pageSize: number,
+): TokenRatePage<T>[] {
+  const size = Math.max(1, Math.floor(pageSize));
+  return groupTokenRatesByProvider(rates).flatMap(group => {
+    const pages = Math.ceil(group.rates.length / size);
+    const perPage = Math.ceil(group.rates.length / pages);
+    return Array.from({ length: pages }, (_, index) => ({
+      providerType: group.providerType,
+      page: index + 1,
+      pages,
+      rates: group.rates.slice(index * perPage, (index + 1) * perPage),
+    }));
+  });
+}

@@ -5,11 +5,12 @@ import {
   formatTokenRate,
   groupTokenRatesByProvider,
   type ModelTokenRate,
+  paginateTokenRates,
   TOKEN_RATE_EMPTY,
   tokenRateExampleCost,
   tokenRateProviderLabel,
 } from '../../../utils/model-token-rates';
-import { MODEL_TOKEN_RATES_COPY, ModelTokenRateCards, ModelTokenRates } from '../model-token-rates';
+import { MODEL_TOKEN_RATES_COPY, ModelTokenRatePages, ModelTokenRates } from '../model-token-rates';
 
 const RATES: ModelTokenRate[] = [
   {
@@ -137,44 +138,73 @@ describe('ModelTokenRates (the popover table)', () => {
   });
 });
 
-describe('ModelTokenRateCards (a page)', () => {
-  // Slides off the first position are hidden from assistive tech, so cards are read with `hidden`.
-  const cards = () => screen.queryAllByRole('article', { hidden: true });
-  const card = (name: string) => screen.getByRole('article', { name, hidden: true });
+describe('paginateTokenRates', () => {
+  const many = (provider: string, count: number): ModelTokenRate[] =>
+    Array.from({ length: count }, (_, index) => ({
+      modelName: `${provider}-${index}`,
+      providerType: provider,
+      inputTokenRate: 1,
+      outputTokenRate: 1,
+    }));
 
-  it('is one card per model of the provider shown, each with its three rates and the example worked out', () => {
-    render(<ModelTokenRateCards rates={RATES} />);
-    expect(cards()).toHaveLength(2);
-    const opus = card('Claude Opus 5.5');
-    expect(within(opus).getByText('1.33×')).toBeTruthy();
-    expect(within(opus).getByText('6.67×')).toBeTruthy();
-    expect(within(opus).getByText('0.067×')).toBeTruthy();
-    expect(within(opus).getByText(MODEL_TOKEN_RATES_COPY.example('10K', '1K'))).toBeTruthy();
-    expect(within(opus).getByText(MODEL_TOKEN_RATES_COPY.exampleCost('20K'))).toBeTruthy();
-    // A model with no cached rate states none.
-    expect(within(card('claude-sonnet-4-6')).getByText(TOKEN_RATE_EMPTY)).toBeTruthy();
+  it('keeps a provider together and spreads its models evenly, so no page is a stub', () => {
+    const pages = paginateTokenRates([...many('A', 13), ...many('B', 8), ...many('C', 4)], 7);
+    expect(pages.map(page => [page.providerType, page.page, page.pages, page.rates.length])).toEqual([
+      ['A', 1, 2, 7],
+      ['A', 2, 2, 6],
+      ['B', 1, 2, 4],
+      ['B', 2, 2, 4],
+      ['C', 1, 1, 4],
+    ]);
   });
 
-  it('switches provider from its tabs and starts that provider at its first model', () => {
-    render(<ModelTokenRateCards rates={RATES} />);
-    fireEvent.click(screen.getByRole('button', { name: 'OpenAI' }));
-    expect(cards()).toHaveLength(1);
-    expect(within(card('GPT-6 Luna')).getByText(MODEL_TOKEN_RATES_COPY.exampleCost('500'))).toBeTruthy();
+  it('is no page for no rate', () => {
+    expect(paginateTokenRates([], 7)).toEqual([]);
+  });
+});
+
+describe('ModelTokenRatePages (a page)', () => {
+  // Pages off the first position are hidden from assistive tech, so they are read with `hidden`.
+  const tables = () => screen.queryAllByRole('table', { hidden: true });
+
+  it('is one table per provider page, each row a model with its rates and the example worked out', () => {
+    render(<ModelTokenRatePages rates={RATES} />);
+    expect(tables()).toHaveLength(2);
+    const anthropic = screen.getByRole('table', { name: `Anthropic: ${MODEL_TOKEN_RATES_COPY.unit}` });
+    const opus = within(anthropic).getByRole('row', { name: /Claude Opus 5\.5/ });
+    expect(
+      within(opus)
+        .getAllByRole('cell')
+        .map(cell => cell.textContent),
+    ).toEqual(['1.33×', '6.67×', '0.067×', '20K']);
+    // No cached rate: none is stated.
+    const sonnet = within(anthropic).getByRole('row', { name: /claude-sonnet-4-6/ });
+    expect(
+      within(sonnet)
+        .getAllByRole('cell')
+        .map(cell => cell.textContent),
+    ).toEqual(['1×', '5×', TOKEN_RATE_EMPTY, '15K']);
+    expect(
+      within(anthropic).getByRole('columnheader', { name: MODEL_TOKEN_RATES_COPY.example('10K', '1K') }),
+    ).toBeTruthy();
   });
 
-  it('never advances by itself: it has no play or pause control', () => {
-    render(<ModelTokenRateCards rates={RATES} />);
+  it("moves by itself on the carousel's timer, with a control to stop it, unless told not to", () => {
+    const { unmount } = render(<ModelTokenRatePages rates={RATES} />);
+    expect(screen.getByRole('button', { name: /pause|play/i })).toBeTruthy();
+    unmount();
+    render(<ModelTokenRatePages rates={RATES} autoAdvanceMs={0} />);
     expect(screen.queryByRole('button', { name: /pause|play/i })).toBeNull();
     expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy();
   });
 
   it('holds its place while loading, and says why when the rates fail or none is in effect', () => {
-    const { rerender } = render(<ModelTokenRateCards status="loading" />);
-    expect(cards()).toHaveLength(0);
+    const { rerender } = render(<ModelTokenRatePages status="loading" />);
+    expect(tables()).toHaveLength(0);
     expect(screen.queryByRole('alert')).toBeNull();
-    rerender(<ModelTokenRateCards status="error" />);
+    rerender(<ModelTokenRatePages status="error" />);
     expect(screen.getByRole('alert').textContent).toContain(MODEL_TOKEN_RATES_COPY.unavailable.title);
-    rerender(<ModelTokenRateCards rates={[]} />);
+    rerender(<ModelTokenRatePages rates={[]} />);
     expect(screen.getByText(MODEL_TOKEN_RATES_COPY.empty)).toBeTruthy();
   });
 });

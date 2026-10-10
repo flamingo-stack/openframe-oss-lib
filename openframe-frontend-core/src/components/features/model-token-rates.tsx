@@ -8,6 +8,8 @@ import {
   groupTokenRatesByProvider,
   type ModelTokenRate,
   TOKEN_RATE_EXAMPLE,
+  paginateTokenRates,
+  type TokenRatePage,
   tokenRateExampleCost,
   tokenRateProviderLabel,
 } from '../../utils/model-token-rates';
@@ -28,18 +30,19 @@ import { TabSelector } from '../ui/tab-selector';
  *
  * - `ModelTokenRates` (+ `ModelTokenRatesPopover`): a small table behind a
  *   question mark, for the product's cards that count in tokens.
- * - `ModelTokenRateCards`: one card per model, browsed left and right on the
- *   lib's `SnapCarousel`, for a page (the website's pricing page).
+ * - `ModelTokenRatePages`: the full table a page at a time, on the lib's
+ *   `SnapCarousel`, for a page (the website's pricing page).
  *
- * Both show one provider at a time (the lib's `TabSelector`) and both state a
- * rate with the same functions (`utils/model-token-rates`, server-safe), so a
- * rate reads the same wherever it is stated. Neither fetches: a host reads the
- * rates its own way and hands them in, with `status` saying where that read
- * stands. Each holds ONE height loading, loaded, failed or empty.
+ * Both are TABLES: the data is models by rates, and a table is what lets two
+ * models be compared down a column. Both state a rate with the same functions
+ * (`utils/model-token-rates`, server-safe), so a rate reads the same wherever
+ * it is stated. Neither fetches: a host reads the rates its own way and hands
+ * them in, with `status` saying where that read stands. Each holds ONE height
+ * loading, loaded, failed or empty.
  *
- * A rate is the number of OpenFrame tokens ONE token of the model uses. A card
- * also works one example request out (`TOKEN_RATE_EXAMPLE`), because a total is
- * easier to compare than three rates.
+ * A rate is the number of OpenFrame tokens ONE token of the model uses. The
+ * paged table also works one example request out per model
+ * (`TOKEN_RATE_EXAMPLE`), because a total is easier to compare than three rates.
  */
 
 /** Where the host's read of the rates stands. */
@@ -54,12 +57,12 @@ export const MODEL_TOKEN_RATES_COPY = {
   input: 'Input',
   output: 'Output',
   cached: 'Cached input',
-  /** Over a card's rates: what the three figures are. */
-  perToken: 'OpenFrame tokens per token',
-  /** "Reads 10K, writes 1K" */
-  example: (input: string, output: string) => `Reads ${input}, writes ${output}`,
-  /** "20K OpenFrame tokens" */
-  exampleCost: (tokens: string) => `${tokens} OpenFrame tokens`,
+  /** "1 of 2", after a provider whose models take more than one page. */
+  pageOf: (page: number, pages: number) => `${page} of ${pages}`,
+  /** The example column's name: the request it works out, in OpenFrame tokens. "10K in + 1K out" */
+  example: (input: string, output: string) => `${input} in + ${output} out`,
+  /** The same column's name where there is no room for the request. */
+  exampleShort: 'Example',
   autoTopUp: { on: 'Auto Top Up Enabled', off: 'Auto Top Up Disabled' },
   unavailable: {
     title: 'Rates unavailable',
@@ -341,43 +344,62 @@ export function ModelTokenRatesSkeleton() {
   );
 }
 
-// ─── The cards (a page) ──────────────────────────────────────────────────────
+// ─── The paged table (a page) ────────────────────────────────────────────────
 
-export interface ModelTokenRateCardsProps {
+export interface ModelTokenRatePagesProps {
   /** The rates, once read. */
   rates?: readonly ModelTokenRate[];
   /** Where the read stands. Default `ready`. */
   status?: ModelTokenRatesStatus;
+  /** Move to the next page after this long; `0` never moves by itself. Default: the carousel's own interval. */
+  autoAdvanceMs?: number;
   className?: string;
 }
 
-/** One card's box: the loaded card and its skeleton are this same frame, so the block never moves. */
-const RATE_CARD_CLASS =
-  'flex h-52 w-full flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]';
-/** One slide's width: about four cards across a desktop container, one and a bit on a phone. */
-const RATE_SLIDE_CLASS = 'min-w-0 basis-[272px]';
-/** The track's height (a card), for the states that have no cards. */
-const RATE_TRACK_CLASS = 'h-52';
-/** How many skeleton cards fill the track. */
-const RATE_SKELETON_CARDS = 6;
+/** Models on one page. Every page draws this many row slots, so every page (and the skeleton) is one height. */
+export const MODEL_TOKEN_RATES_PAGE_SIZE = 7;
+
+const PAGE_FRAME_CLASS = 'relative w-full overflow-hidden rounded-md border border-ods-border bg-ods-card';
+/** Tighter on a phone, where the model's name needs every pixel. */
+const PAGE_PAD_X = 'px-[var(--spacing-system-s)] sm:px-[var(--spacing-system-mf)]';
+/** One line of a page: the title bar, the column names and each model are this box, loaded or loading. */
+const PAGE_LINE_CLASS = cn(
+  'flex h-10 items-center gap-[var(--spacing-system-xs)] sm:gap-[var(--spacing-system-mf)]',
+  PAGE_PAD_X,
+);
+const PAGE_NUMBER_CELL = 'w-11 shrink-0 whitespace-nowrap text-right tabular-nums sm:w-24';
+/** From the `sm` width up: on a phone the model's name needs the room more than a third rate does. */
+const PAGE_CACHED_CELL = 'hidden w-24 shrink-0 whitespace-nowrap text-right tabular-nums sm:block';
+const PAGE_EXAMPLE_CELL = 'w-14 shrink-0 whitespace-nowrap text-right tabular-nums sm:w-40';
+/** The slots of one page, as keys. */
+const PAGE_SLOTS = Array.from({ length: MODEL_TOKEN_RATES_PAGE_SIZE }, (_, index) => index);
 
 /**
- * The rates as cards, one model each, browsed left and right: provider tabs
- * over a `SnapCarousel` (arrows, dots, a counter, swipe). It never advances by
- * itself: a price is read, not watched. The block is the same height loading,
- * loaded, failed and empty: tabs, one card's height, the carousel's controls row.
+ * The rates as a TABLE, a page at a time: rows are models and columns are what
+ * a token of each uses, so two models compare by reading down a column. The
+ * pages sit on the lib's `SnapCarousel` (the control under the customer
+ * stories): it moves to the next page by itself on the carousel's timer, with
+ * its pause control, dots, counter, arrows and swipe. A provider's models keep
+ * together and each page names its provider.
+ *
+ * ONE height in every state: a page always draws `MODEL_TOKEN_RATES_PAGE_SIZE`
+ * row slots, and loading, failed and empty draw the same frame.
  */
-export function ModelTokenRateCards({ rates = [], status = 'ready', className }: ModelTokenRateCardsProps) {
-  const { groups, group, setPicked } = useProviderGroup(rates);
+export function ModelTokenRatePages({
+  rates = [],
+  status = 'ready',
+  autoAdvanceMs,
+  className,
+}: ModelTokenRatePagesProps) {
+  if (status === 'loading') return <ModelTokenRatePagesSkeleton className={className} />;
 
-  if (status === 'loading') return <ModelTokenRateCardsSkeleton className={className} />;
-
-  if (status === 'error' || !group) {
+  const pages = paginateTokenRates(rates, MODEL_TOKEN_RATES_PAGE_SIZE);
+  if (status === 'error' || pages.length === 0) {
     return (
-      <div className={cn('flex flex-col gap-[var(--spacing-system-mf)]', className)}>
-        <div aria-hidden className={TABS_SKELETON_CLASS} />
-        <div>
-          <div className={cn(RATE_TRACK_CLASS, 'flex rounded-md border border-ods-border bg-ods-card')}>
+      <div className={className}>
+        <div className={PAGE_FRAME_CLASS}>
+          <PageSlots />
+          <div className="absolute inset-0 flex">
             {status === 'error' ? (
               <ModelTokenRatesUnavailable className="flex-1" />
             ) : (
@@ -386,105 +408,143 @@ export function ModelTokenRateCards({ rates = [], status = 'ready', className }:
               </p>
             )}
           </div>
-          <SnapCarouselControlsSkeleton />
         </div>
+        <SnapCarouselControlsSkeleton />
       </div>
     );
   }
 
   return (
-    <div className={cn('flex flex-col gap-[var(--spacing-system-mf)]', className)}>
-      <ProviderTabs
-        groups={groups}
-        value={group.providerType}
-        onValueChange={setPicked}
-        className="max-w-full self-start"
-      />
-      <SnapCarousel
-        // Re-keyed per provider: its track starts again at the first model.
-        key={group.providerType}
-        items={group.rates}
-        getKey={rate => rate.modelName}
-        label={MODEL_TOKEN_RATES_COPY.carousel}
-        autoAdvanceMs={0}
-        slideClassName={RATE_SLIDE_CLASS}
-        renderItem={rate => <ModelTokenRateCard rate={rate} />}
-      />
+    <SnapCarousel
+      className={className}
+      items={pages}
+      getKey={page => `${page.providerType}-${page.page}`}
+      label={MODEL_TOKEN_RATES_COPY.carousel}
+      autoAdvanceMs={autoAdvanceMs}
+      slideClassName="min-w-0 basis-full"
+      renderItem={page => <ModelTokenRatePage page={page} />}
+    />
+  );
+}
+
+/** The frame's lines with nothing in them: what holds a page's height when it has no rows to draw. */
+function PageSlots() {
+  return (
+    <div aria-hidden className="invisible">
+      <div className={PAGE_LINE_CLASS} />
+      <div className={PAGE_LINE_CLASS} />
+      {PAGE_SLOTS.map(slot => (
+        <div key={slot} className={PAGE_LINE_CLASS} />
+      ))}
     </div>
   );
 }
 
-/** One model: its name, what a token of it uses, and the example request worked out. */
-function ModelTokenRateCard({ rate }: { rate: ModelTokenRate }) {
-  const Icon = PROVIDER_ICON[rate.providerType];
-  const figures: [string, number | null | undefined][] = [
-    [MODEL_TOKEN_RATES_COPY.input, rate.inputTokenRate],
-    [MODEL_TOKEN_RATES_COPY.output, rate.outputTokenRate],
-    [MODEL_TOKEN_RATES_COPY.cached, rate.cacheReadInputTokenRate],
-  ];
-  const name = rate.displayName || rate.modelName;
+/** One page: its provider, the column names (the unit stated once, over the rates), then a row per model. */
+function ModelTokenRatePage({ page }: { page: TokenRatePage }) {
+  const Icon = PROVIDER_ICON[page.providerType];
+  const provider = tokenRateProviderLabel(page.providerType);
+  const example = MODEL_TOKEN_RATES_COPY.example(
+    formatTokenAmount(TOKEN_RATE_EXAMPLE.inputTokens),
+    formatTokenAmount(TOKEN_RATE_EXAMPLE.outputTokens),
+  );
   return (
-    <article aria-label={name} className={RATE_CARD_CLASS}>
-      <header className="flex min-w-0 items-center gap-[var(--spacing-system-xs)]">
+    <div role="table" aria-label={`${provider}: ${MODEL_TOKEN_RATES_COPY.unit}`} className={PAGE_FRAME_CLASS}>
+      <div className={cn(PAGE_LINE_CLASS, 'border-b border-ods-border')}>
         {Icon && <Icon className="size-6 shrink-0 text-ods-text-secondary" />}
-        <h3 className="min-w-0 truncate text-ods-text-primary text-h4">{name}</h3>
-      </header>
-      <dl className="flex flex-col gap-[var(--spacing-system-xxs)]">
-        <dt className="text-ods-text-secondary text-h6">{MODEL_TOKEN_RATES_COPY.perToken}</dt>
-        <dd className="flex gap-[var(--spacing-system-mf)]">
-          {figures.map(([label, value]) => (
-            <span key={label} className="flex min-w-0 flex-col">
-              <span className="whitespace-nowrap tabular-nums text-ods-text-primary text-h4">
-                {formatTokenRate(value)}
+        <span className="shrink-0 text-ods-text-primary text-h4">{provider}</span>
+        {page.pages > 1 && (
+          <span className="shrink-0 text-ods-text-secondary text-h6">
+            {MODEL_TOKEN_RATES_COPY.pageOf(page.page, page.pages)}
+          </span>
+        )}
+        <span className="ml-auto hidden min-w-0 truncate text-ods-text-secondary text-h6 sm:block">
+          {MODEL_TOKEN_RATES_COPY.unit}
+        </span>
+      </div>
+      <div role="row" className={cn(PAGE_LINE_CLASS, 'uppercase tracking-[-0.02em] text-ods-text-secondary text-h5')}>
+        <span role="columnheader" className="min-w-0 flex-1 truncate">
+          {MODEL_TOKEN_RATES_COPY.model}
+        </span>
+        <span role="columnheader" className={PAGE_NUMBER_CELL}>
+          {MODEL_TOKEN_RATES_COPY.input}
+        </span>
+        <span role="columnheader" className={PAGE_NUMBER_CELL}>
+          {MODEL_TOKEN_RATES_COPY.output}
+        </span>
+        <span role="columnheader" className={PAGE_CACHED_CELL}>
+          {MODEL_TOKEN_RATES_COPY.cached}
+        </span>
+        <span role="columnheader" aria-label={example} className={PAGE_EXAMPLE_CELL}>
+          <span className="sm:hidden">{MODEL_TOKEN_RATES_COPY.exampleShort}</span>
+          <span className="hidden sm:inline">{example}</span>
+        </span>
+      </div>
+      <div role="rowgroup">
+        {PAGE_SLOTS.map(slot => {
+          const rate = page.rates[slot];
+          // A page with fewer models keeps its empty slots, so every page is one height.
+          if (!rate) return <div key={`slot-${slot}`} aria-hidden className={PAGE_LINE_CLASS} />;
+          return (
+            <div
+              key={rate.modelName}
+              role="row"
+              className={cn(PAGE_LINE_CLASS, 'border-t border-ods-border text-ods-text-primary text-h6')}
+            >
+              <span role="rowheader" className="min-w-0 flex-1 truncate">
+                {rate.displayName || rate.modelName}
               </span>
-              <span className="whitespace-nowrap text-ods-text-secondary text-h6">{label}</span>
-            </span>
-          ))}
-        </dd>
-      </dl>
-      <p className="mt-auto flex flex-col border-t border-ods-border pt-[var(--spacing-system-sf)]">
-        <span className="text-ods-text-secondary text-h6">
-          {MODEL_TOKEN_RATES_COPY.example(
-            formatTokenAmount(TOKEN_RATE_EXAMPLE.inputTokens),
-            formatTokenAmount(TOKEN_RATE_EXAMPLE.outputTokens),
-          )}
-        </span>
-        <span className="tabular-nums text-ods-text-primary text-h4">
-          {MODEL_TOKEN_RATES_COPY.exampleCost(formatTokenAmount(tokenRateExampleCost(rate)))}
-        </span>
-      </p>
-    </article>
+              <span role="cell" className={PAGE_NUMBER_CELL}>
+                {formatTokenRate(rate.inputTokenRate)}
+              </span>
+              <span role="cell" className={PAGE_NUMBER_CELL}>
+                {formatTokenRate(rate.outputTokenRate)}
+              </span>
+              <span role="cell" className={cn(PAGE_CACHED_CELL, 'text-ods-text-secondary')}>
+                {formatTokenRate(rate.cacheReadInputTokenRate)}
+              </span>
+              <span role="cell" className={PAGE_EXAMPLE_CELL}>
+                {formatTokenAmount(tokenRateExampleCost(rate))}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
-/** The cards' loading footprint: the tabs, a row of the cards' own frames, the carousel's controls row. */
-export function ModelTokenRateCardsSkeleton({ className }: { className?: string }) {
+/** The paged table's loading footprint: one page's frame with its own lines, and the carousel's controls row. */
+export function ModelTokenRatePagesSkeleton({ className }: { className?: string }) {
+  const cells = (
+    <>
+      <Skeleton className="h-4 w-10 shrink-0 sm:ml-14" />
+      <Skeleton className="h-4 w-10 shrink-0 sm:ml-14" />
+      <Skeleton className="hidden h-4 w-10 shrink-0 sm:ml-14 sm:block" />
+      <Skeleton className="h-4 w-12 shrink-0 sm:ml-20 sm:w-20" />
+    </>
+  );
   return (
-    <div aria-busy="true" className={cn('flex flex-col gap-[var(--spacing-system-mf)]', className)}>
-      <Skeleton className={TABS_SKELETON_CLASS} />
-      <div>
-        <div className="flex gap-3 overflow-hidden">
-          {Array.from({ length: RATE_SKELETON_CARDS }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholder cards
-            <div key={index} className={cn('flex shrink-0 grow-0', RATE_SLIDE_CLASS)}>
-              <div className={RATE_CARD_CLASS}>
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-4 w-44" />
-                <div className="flex gap-[var(--spacing-system-mf)]">
-                  <Skeleton className="h-10 w-12" />
-                  <Skeleton className="h-10 w-12" />
-                  <Skeleton className="h-10 w-16" />
-                </div>
-                <div className="mt-auto flex flex-col gap-[var(--spacing-system-xxs)] border-t border-ods-border pt-[var(--spacing-system-sf)]">
-                  <Skeleton className="h-4 w-36" />
-                  <Skeleton className="h-6 w-44" />
-                </div>
-              </div>
-            </div>
-          ))}
+    <div aria-busy="true" className={className}>
+      <div className={PAGE_FRAME_CLASS}>
+        <div className={cn(PAGE_LINE_CLASS, 'border-b border-ods-border')}>
+          <Skeleton className="size-6 shrink-0 rounded-full" />
+          <Skeleton className="h-5 w-28" />
         </div>
-        <SnapCarouselControlsSkeleton />
+        <div className={PAGE_LINE_CLASS}>
+          <Skeleton className="h-4 w-14" />
+          <div className="flex-1" />
+          {cells}
+        </div>
+        {PAGE_SLOTS.map(slot => (
+          <div key={slot} className={cn(PAGE_LINE_CLASS, 'border-t border-ods-border')}>
+            <Skeleton className="h-4 w-36" />
+            <div className="flex-1" />
+            {cells}
+          </div>
+        ))}
       </div>
+      <SnapCarouselControlsSkeleton />
     </div>
   );
 }
