@@ -30,8 +30,16 @@
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
 import type React from 'react';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import dynamic from '../../embed-shims/next-dynamic';
+import {
+  createElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+} from 'react';
 import { useNearViewport } from '../../hooks/use-near-viewport';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 import { VideoPlayBadge } from './video-center-badge';
@@ -61,9 +69,41 @@ export {
  * The Mux player, fetched when a file video is drawn and not before: the
  * player and hls.js are the largest script a page can load, and most pages
  * draw no file video.
+ *
+ * It is never awaited through `<Suspense>`: a boundary waiting for a script
+ * holds back the hydration of the page around it. The server and the first
+ * draw in the browser show the poster; the player takes its place when its
+ * module has arrived.
  */
-const loadFilePlayer = () => import('./video-file-player');
-const LazyFilePlayer = dynamic<FilePlayerProps>(loadFilePlayer);
+let filePlayer: ComponentType<FilePlayerProps> | null = null;
+let filePlayerLoad: Promise<void> | null = null;
+const filePlayerListeners = new Set<() => void>();
+
+function loadFilePlayer(): void {
+  if (filePlayer || filePlayerLoad) return;
+  filePlayerLoad = import('./video-file-player')
+    .then(module => {
+      filePlayer = module.default;
+      for (const listener of filePlayerListeners) listener();
+    })
+    // A failed load is forgotten, so the next video asks again.
+    .catch(() => undefined)
+    .finally(() => {
+      filePlayerLoad = null;
+    });
+}
+
+/** Subscribing is what asks for the player: it happens in the browser, once a file video is on the page. */
+function subscribeToFilePlayer(listener: () => void): () => void {
+  filePlayerListeners.add(listener);
+  loadFilePlayer();
+  return () => {
+    filePlayerListeners.delete(listener);
+  };
+}
+
+const loadedFilePlayer = () => filePlayer;
+const noFilePlayer = () => null;
 
 /** The player's box while its module loads: the poster at the player's own size, so nothing moves. */
 function FilePlayerFallback({ poster, className }: { poster?: string | null; className?: string }) {
@@ -81,11 +121,10 @@ function FilePlayerFallback({ poster, className }: { poster?: string | null; cla
 }
 
 function FilePlayer(props: FilePlayerProps): React.ReactElement {
-  return (
-    <Suspense fallback={<FilePlayerFallback poster={props.poster} className={props.className} />}>
-      <LazyFilePlayer {...props} />
-    </Suspense>
-  );
+  // The player's component when its module has arrived (a loaded module, drawn through `createElement`).
+  const arrived = useSyncExternalStore(subscribeToFilePlayer, loadedFilePlayer, noFilePlayer);
+  if (arrived) return createElement(arrived, props);
+  return <FilePlayerFallback poster={props.poster} className={props.className} />;
 }
 
 // =============================================================================

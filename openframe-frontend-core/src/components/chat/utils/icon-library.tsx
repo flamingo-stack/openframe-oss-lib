@@ -29,7 +29,16 @@
  */
 
 import { Megaphone, Bell, Info, Star, Package as PackageGlyph } from 'lucide-react';
-import { lazy, Suspense, type ComponentType, type CSSProperties } from 'react';
+import {
+  createElement,
+  lazy,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type ComponentType,
+  type CSSProperties,
+  type SVGProps,
+} from 'react';
 import { platformAccentVarName } from '../../../utils/platform-identity';
 import { HeadphoneIcon } from '../../icons-v2-generated/audio-and-visual/headphone-icon';
 import { VideoRecorderIcon } from '../../icons-v2-generated/audio-and-visual/video-recorder-icon';
@@ -208,42 +217,112 @@ const SET_ICON_DEFAULT_SIZE = 24;
 /** The set's icons already asked for, by export name: one component each, so a name always draws the same one. */
 const setIcons = new Map<string, IconComponent>();
 
+/** What a generated icon takes: the icon props plus whatever its `<svg>` accepts. */
+type SetIconProps = { size?: number; className?: string; color?: string } & Omit<
+  SVGProps<SVGSVGElement>,
+  'ref' | 'width' | 'height' | 'color' | 'children' | 'dangerouslySetInnerHTML'
+>;
+
+/** The set's icon modules that have arrived, by export name. */
+const loadedSetIcons = new Map<string, ComponentType<SetIconProps>>();
+/** The loads on their way, so a name is asked for once. */
+const setIconLoads = new Map<string, Promise<void>>();
+/** Who redraws when a name's module arrives. */
+const setIconListeners = new Map<string, Set<() => void>>();
+
+function loadSetIcon(exportName: string): void {
+  if (loadedSetIcons.has(exportName) || setIconLoads.has(exportName)) return;
+  setIconLoads.set(
+    exportName,
+    ICON_LOADERS[exportName]()
+      .then(module => {
+        loadedSetIcons.set(exportName, module.default as ComponentType<SetIconProps>);
+        for (const listener of setIconListeners.get(exportName) ?? []) listener();
+      })
+      // A failed load is forgotten, so the next icon by that name asks again.
+      .catch(() => undefined)
+      .finally(() => {
+        setIconLoads.delete(exportName);
+      }),
+  );
+}
+
+function subscribeToSetIcon(exportName: string) {
+  return (listener: () => void) => {
+    const listeners = setIconListeners.get(exportName) ?? new Set();
+    listeners.add(listener);
+    setIconListeners.set(exportName, listeners);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+}
+
+/** Leaves an `<svg>`'s markup as it is: what the server drew stays drawn. */
+const KEEP_MARKUP = { __html: '' };
+
+function sameProps(a: SetIconProps, b: SetIconProps): boolean {
+  const keys = Object.keys(a) as (keyof SetIconProps)[];
+  return keys.length === Object.keys(b).length && keys.every(key => Object.is(a[key], b[key]));
+}
+
 /**
  * An icon of the generated set by its EXPORT name (`ChartPieIcon`), or
  * `undefined` when the set has none by that name.
  *
- * The icon's module is loaded when the icon is first drawn, never before: the
- * set is ~1,700 icons and a page draws a few dozen, so a page ships the ones it
- * draws (`ICON_LOADERS`, one loader per icon). While its module is on the way
- * the icon holds its place with an empty box of its own size, so nothing
- * around it moves. On the server, and for an icon already loaded once, it
- * draws at once.
+ * The icon's module is loaded on demand, never with the page: the set is
+ * ~1,700 icons and a page draws a few dozen (`ICON_LOADERS`, one loader each).
+ *
+ * It NEVER suspends in the browser. An icon inside a `<Suspense>` whose module
+ * is on its way holds back the hydration of everything around it, and React
+ * then throws the server's markup away and draws the page again (measured: the
+ * home page's heading was drawn a second time seconds after it was first
+ * shown). So:
+ *   - on the server the icon is drawn in full (it waits for its module there);
+ *   - in the browser, an icon the server drew keeps that `<svg>` as it is and
+ *     loads nothing, until its props change;
+ *   - an icon first drawn in the browser is an empty `<svg>` of its own size
+ *     until its module arrives, so nothing around it moves.
  */
 function iconFromSet(exportName: string): IconComponent | undefined {
   const known = setIcons.get(exportName);
   if (known) return known;
   if (!Object.prototype.hasOwnProperty.call(ICON_LOADERS, exportName)) return undefined;
-  const Loaded = lazy(ICON_LOADERS[exportName]);
-  const SetIcon: IconComponent = ({ size, className, ...rest }) => (
-    <Suspense
-      fallback={
-        <span
-          aria-hidden="true"
-          className={className}
-          style={{
-            display: 'inline-block',
-            width: size ?? SET_ICON_DEFAULT_SIZE,
-            height: size ?? SET_ICON_DEFAULT_SIZE,
-          }}
-        />
-      }
-    >
-      <Loaded size={size} className={className} {...rest} />
-    </Suspense>
-  );
+  const ServerDrawn = lazy(ICON_LOADERS[exportName]) as ComponentType<SetIconProps>;
+  const subscribe = subscribeToSetIcon(exportName);
+  const loaded = () => loadedSetIcons.get(exportName);
+
+  const SetIcon = (props: SetIconProps) => {
+    // The module's component when it has arrived (drawn through `createElement`: it is a loaded module, not a component made here).
+    const arrived = useSyncExternalStore(subscribe, loaded, loaded);
+    const svg = useRef<SVGSVGElement>(null);
+    const drawnWith = useRef<SetIconProps | null>(null);
+    useEffect(() => {
+      if (arrived) return;
+      const first = drawnWith.current === null;
+      if (first) drawnWith.current = props;
+      // The server's `<svg>` has its paths; one made here is empty and needs its module.
+      const drawn = svg.current?.hasChildNodes() ?? false;
+      if (!drawn || (!first && drawnWith.current !== null && !sameProps(drawnWith.current, props)))
+        loadSetIcon(exportName);
+    });
+    if (typeof window === 'undefined') return <ServerDrawn {...props} />;
+    if (arrived) return createElement(arrived, props);
+    const { size, color: _color, ...rest } = props;
+    return (
+      <svg
+        {...rest}
+        ref={svg}
+        width={size ?? SET_ICON_DEFAULT_SIZE}
+        height={size ?? SET_ICON_DEFAULT_SIZE}
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={KEEP_MARKUP}
+      />
+    );
+  };
   SetIcon.displayName = exportName;
-  setIcons.set(exportName, SetIcon);
-  return SetIcon;
+  setIcons.set(exportName, SetIcon as IconComponent);
+  return SetIcon as IconComponent;
 }
 
 /**
