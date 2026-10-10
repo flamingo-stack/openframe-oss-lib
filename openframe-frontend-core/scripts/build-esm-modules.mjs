@@ -17,10 +17,12 @@
  *
  *   - a module the SERVER entries reach (tsup.config.ts, first block: types,
  *     pure utils, schemas, the wire protocol) is server-safe and gets none;
+ *   - a BARREL (a module that only re-exports) gets none either: see `isBarrel`;
  *   - every other module gets `"use client"`, as the banner gave it before.
  *
- * So nothing changes about which imports are client references; only the size
- * of what an import drags in.
+ * So a name imported from the lib is a client reference exactly when the module
+ * that DEFINES it is a client module; only the size of what an import drags in
+ * changes.
  *
  * SPECIFIERS. Source imports are extensionless (`./button`). Each relative (and
  * `@/`) specifier is rewritten to the file it names (`./button.js`,
@@ -53,6 +55,27 @@ const USE_CLIENT = '"use client";';
 const TARGET = 'es2020';
 
 const toPosix = path => path.split(sep).join(posix.sep);
+
+// The three statements a barrel is made of: `export … from`, `import … from`, and `export { … }` of what it imported.
+const RE_EXPORT_FROM = /export\s*(?:\*(?:\s*as\s+[\w$]+)?|\{[^}]*\})\s*from\s*["'][^"']+["'];?/g;
+const RE_IMPORT = /import\s+(?:[\w$\s,*]*(?:\{[^}]*\})?[\w$\s,*]*\s+from\s+)?["'][^"']+["'];?/g;
+const RE_EXPORT_LIST = /export\s*\{[^}]*\};?/g;
+
+/**
+ * A barrel: a module that only re-exports other modules (`export … from`, or
+ * an import followed by `export { … }`). It gets NO directive, whatever it
+ * re-exports. With `"use client"` on it, a server component that imports one
+ * name from the barrel makes the WHOLE barrel a client entry, and every module
+ * it re-exports ships to the browser (the chat panel behind one icon helper).
+ * Without it, the import resolves through to the module that defines the name,
+ * and that module's own directive decides.
+ */
+function isBarrel(code) {
+  const body = code.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '').replace(/^\s*["']use client["'];?/, '');
+  const exports = (body.match(RE_EXPORT_FROM) ?? []).length + (body.match(RE_EXPORT_LIST) ?? []).length;
+  const rest = body.replace(RE_EXPORT_FROM, '').replace(RE_IMPORT, '').replace(RE_EXPORT_LIST, '');
+  return exports > 0 && rest.trim() === '';
+}
 
 /** The tsup config's own entry lists: one owner for what is a server entry. */
 async function loadTsupConfig() {
@@ -155,6 +178,7 @@ async function main() {
   const known = new Set(modules);
   const unresolved = [];
   let clientModules = 0;
+  let barrels = 0;
 
   await Promise.all(
     modules.map(async rel => {
@@ -167,7 +191,11 @@ async function main() {
         sourcefile: rel,
       });
       let output = rewriteSpecifiers(code, rel, known, unresolved);
-      if (!serverSafe.has(rel)) {
+      if (isBarrel(output)) {
+        barrels += 1;
+        // A barrel written with its own directive in the source loses it here, for the same reason.
+        output = output.replace(/^\s*["']use client["'];?\s*/, '');
+      } else if (!serverSafe.has(rel)) {
         clientModules += 1;
         if (!/^\s*["']use client["']/.test(output)) output = `${USE_CLIENT}\n${output}`;
       }
@@ -202,7 +230,7 @@ async function main() {
 
   if (!existsSync(join(DIST, 'index.js'))) throw new Error('build-esm-modules: dist/index.js was not written');
   console.log(
-    `ESM modules: ${modules.length} written (${clientModules} client, ${modules.length - clientModules} server-safe) in ${Date.now() - started}ms`,
+    `ESM modules: ${modules.length} written (${clientModules} client, ${barrels} barrels, ${modules.length - clientModules - barrels} server-safe) in ${Date.now() - started}ms`,
   );
 }
 
