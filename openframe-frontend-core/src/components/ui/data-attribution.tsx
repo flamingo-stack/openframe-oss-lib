@@ -13,7 +13,7 @@ export interface DataAttributionProps {
 }
 
 const LINE_CLASS =
-  'flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] text-ods-text-primary text-h6 content-sm:flex-row content-sm:items-center content-sm:gap-[var(--spacing-system-sf)]';
+  'flex shrink-0 flex-col gap-[var(--spacing-system-xsf)] text-ods-text-primary text-h6 content-sm:flex-row content-sm:items-center content-sm:gap-[var(--spacing-system-sf)]';
 const ITEM_CLASS = 'flex items-center gap-[var(--spacing-system-xsf)]';
 
 function Separator() {

@@ -7,7 +7,7 @@ export type DownloadButtonProps = Omit<ButtonProps, 'leftIcon' | 'children'> & {
 };
 
 /**
- * THE download button: a regular small outline `Button` with the download
+ * THE download button: a regular small ghost `Button` (`transparent`) with the download
  * glyph, wherever a surface hands the reader a file of what it shows (the Trust
  * Center's PDF, the margin report's PDF). One look and one size, so a download
  * reads the same on every page and never louder than the page's own action.
@@ -16,7 +16,13 @@ export type DownloadButtonProps = Omit<ButtonProps, 'leftIcon' | 'children'> & {
  * there without leaving the page). With `onClick` the host fetches the file
  * itself and passes `loading` while it does.
  */
-export function DownloadButton({ label, variant = 'outline', size = 'small', href, ...props }: DownloadButtonProps) {
+export function DownloadButton({
+  label,
+  variant = 'transparent',
+  size = 'small',
+  href,
+  ...props
+}: DownloadButtonProps) {
   return (
     <Button
       variant={variant}
