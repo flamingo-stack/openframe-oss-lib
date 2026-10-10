@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AgentIdentityProvider } from '../agent-identity';
+import { AGENT_IDENTITIES_API_PATH, AgentIdentityProvider, resetAgentIdentitiesStore } from '../agent-identity';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
 
@@ -55,5 +55,68 @@ describe("an agent's mark is its identity's icon", () => {
     );
     expect(html).toContain('own.webp');
     expect(html).not.toContain('fae.webp');
+  });
+});
+
+describe('with no copy from the host, the identities are read from the server', () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  beforeEach(() => {
+    resetAgentIdentitiesStore();
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('asks once for every provider on the page, and draws the picture the answer holds', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL, props: null } }] })),
+    );
+    render(
+      <div data-testid="marks">
+        <AgentIdentityProvider>
+          <AgentMark agent="fae" />
+        </AgentIdentityProvider>
+        <AgentIdentityProvider>
+          <EntityIcon icon={{ name: 'fae' }} size={24} />
+        </AgentIdentityProvider>
+      </div>,
+    );
+    await waitFor(() => expect(screen.getByTestId('marks').innerHTML.match(/fae\.webp/g)).toHaveLength(2));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(AGENT_IDENTITIES_API_PATH);
+  });
+
+  it("reads from the embedder's own path", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ agents: [] })));
+    render(
+      <AgentIdentityProvider endpoint="/content/api/ai-agents">
+        <AgentMark agent="fae" />
+      </AgentIdentityProvider>,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/content/api/ai-agents', undefined));
+  });
+
+  it('keeps the packaged mark when the identities cannot be read', async () => {
+    fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
+    render(
+      <div data-testid="marks">
+        <AgentIdentityProvider>
+          <AgentMark agent="fae" />
+        </AgentIdentityProvider>
+      </div>,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('marks').innerHTML).toContain('data:image');
+  });
+
+  it('asks for nothing when the host gave its copy', () => {
+    render(
+      <AgentIdentityProvider icons={{ fae: { url: FAE_URL } }}>
+        <AgentMark agent="fae" />
+      </AgentIdentityProvider>,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
