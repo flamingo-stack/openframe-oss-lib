@@ -3,7 +3,7 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
-import { mobilePageActions, PageActions, type PageActionButton } from '../ui/page-actions';
+import { PageActions, type PageActionButton } from '../ui/page-actions';
 import { BackButton } from './back-button';
 import { accentSentenceMarks } from './page-heading';
 
@@ -208,8 +208,7 @@ function renderAdvancedPageContainer({
   };
 
   // Check if we need bottom padding for mobile fixed actions
-  const needsBottomPadding =
-    !!actions && mobilePageActions(actions).length > 0 && getActionsVariant() === 'primary-buttons';
+  const needsBottomPadding = actions && actions.length > 0 && getActionsVariant() === 'primary-buttons';
 
   const paddingClasses = {
     none: '',

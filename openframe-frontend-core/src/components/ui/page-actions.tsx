@@ -30,13 +30,6 @@ export type PageActionButton = {
   /** Show action only on mobile (below md). Default: visible on all screens. */
   showOnlyMobile?: boolean;
   /**
-   * Keep the action out of the MOBILE surface (the fixed bottom bar, the "…"
-   * menu). For an occasional utility on a read-only page (a download, an
-   * export): the bar is for the page's main task, so the page offers the
-   * action inline instead. Default: visible on all screens.
-   */
-  showOnlyDesktop?: boolean;
-  /**
    * Render the desktop button as icon-only (label hidden, icon centered). The full
    * label still appears in the mobile "..." dropdown. The desktop icon is forced to
    * `text-ods-text-primary`; the mobile row keeps the caller-provided icon color.
@@ -63,11 +56,6 @@ export type PageActionButton = {
   /** When set, the rendered desktop button is wrapped in a hover tooltip. */
   tooltip?: React.ReactNode;
 };
-
-/** The actions the mobile surface shows: everything but `showOnlyDesktop` ones. */
-export function mobilePageActions(actions: PageActionButton[]): PageActionButton[] {
-  return actions.filter(action => !action.showOnlyDesktop);
-}
 
 function actionKey(action: PageActionButton, idx: number) {
   return `${action.label ?? action.ariaLabel ?? 'action'}-${idx}`;
@@ -357,12 +345,11 @@ function IconButtonsVariant({
   const desktopActions = actions.filter(a => !a.showOnlyMobile);
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0);
 
-  const mobileActions = mobilePageActions(actions);
-  const isSingleAction = mobileActions.length === 1 && !mobileActions[0].submenu?.length;
-  const singleAction = isSingleAction ? mobileActions[0] : null;
+  const isSingleAction = actions.length === 1 && !actions[0].submenu?.length;
+  const singleAction = isSingleAction ? actions[0] : null;
   const useSingleActionMobile = isSingleAction && !hasMenuActions;
 
-  const mobileMenuGroups = [{ items: mobileActions.flatMap(actionToMenuItems) }, ...(menuActions ?? [])];
+  const mobileMenuGroups = [{ items: actions.flatMap(actionToMenuItems) }, ...(menuActions ?? [])];
   const hasMobileMenuItems = mobileMenuGroups.some(g => g.items.length > 0);
 
   return (
@@ -442,9 +429,7 @@ function PrimaryButtonsVariant({
         {loading ? <MobileTriggerSkeleton /> : <CompactPrimaryActions actions={desktopActions} />}
       </div>
 
-      {mobilePageActions(sortedActions).length > 0 ? (
-        <MobileBottomActions actions={mobilePageActions(sortedActions)} loading={loading} />
-      ) : null}
+      <MobileBottomActions actions={sortedActions} loading={loading} />
     </>
   );
 }
@@ -469,7 +454,7 @@ function MenuPrimaryVariant({
   const desktopActions = actions.filter(a => !a.showOnlyMobile);
   const hasMenuActions = menuActions.some(g => g.items.length > 0);
 
-  const mobileMenuGroups = [{ items: mobilePageActions(actions).flatMap(actionToMenuItems) }, ...menuActions];
+  const mobileMenuGroups = [{ items: actions.flatMap(actionToMenuItems) }, ...menuActions];
   const hasMobileMenuItems = mobileMenuGroups.some(g => g.items.length > 0);
 
   return (

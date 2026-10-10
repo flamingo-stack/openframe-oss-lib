@@ -5,7 +5,7 @@
  *
  * ONE page, not tabs (2026 trust-center practice: buyers skim and Ctrl-F, and a
  * questionnaire needs a deep link per section): hero with the monitoring status
- * and the actions (Download PDF, Request access), then anchored sections in reading order
+ * (with the page's PDF as a quiet link at its end) and the Request access action, then anchored sections in reading order
  * (`TRUST_CENTER_SECTIONS`: AI & data use → compliance → controls → documents →
  * subprocessors → FAQ → questions) with a sticky section rail on desktop
  * (`StickySectionNav` + `useScrollSpy`, the vendor-page / DocViewer pattern).
@@ -49,10 +49,9 @@ import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection, type FaqSectionProps } from '../faq/faq-section';
 import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
 import { PageShell } from '../layout/article-detail-layout';
-import { PageLayout, type PageActionButton } from '../layout/page-layout';
+import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
-import { Button } from '../ui/button/button';
-import { DataAttribution } from '../ui/data-attribution';
+import { DataAttribution, DataAttributionLink } from '../ui/data-attribution';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
 import { StatusIndicator } from '../ui/status-indicator';
@@ -111,9 +110,6 @@ function controlsSeed(data: TrustCenterPublic): TrustCenterControlsPage {
     total: data.controlDomains.reduce((sum, domain) => sum + domain.controls.length, 0),
   };
 }
-
-/** The download's wording, in the header action and the phone's inline link. */
-const DOWNLOAD_PDF_LABEL = 'Download PDF';
 
 /** How often an open page re-judges "monitored" against the clock. */
 const MONITORING_CLOCK_TICK_MS = 60_000;
@@ -191,33 +187,19 @@ export function TrustCenterPage({
   const closeRequest = useCallback(() => setRequest(current => ({ ...current, open: false })), []);
 
   const hasGatedDocuments = data?.documents.some(document => document.access === 'request') ?? false;
-  // The PDF is the page's own content as a file (the hub's `pdf` route beside
-  // `endpoint`), so it is offered once there is content. A new tab: the answer
-  // is an attachment, which the browser saves without leaving the page.
-  //
-  // WHERE: with the page's actions at the top of the page, like every trust
-  // center's hero actions. On a wide window that is the header's action slot.
-  // On a phone the header's actions become a bar fixed to the bottom of the
-  // screen, which is for the page's main task (Request access): an occasional
-  // download on a read-only page does not belong there (`showOnlyDesktop`), so
-  // it is a quiet link in the status row under the title instead.
-  const pdfUrl = trustCenterPdfUrl(endpoint);
-  const actions: PageActionButton[] | undefined = data
-    ? [
-        {
-          label: DOWNLOAD_PDF_LABEL,
-          variant: 'outline',
-          icon: <Download01Icon aria-hidden="true" />,
-          href: pdfUrl,
-          openInNewTab: true,
-          prefetch: false,
-          showOnlyDesktop: true,
-        },
-        ...(hasGatedDocuments
-          ? [{ label: 'Request access', variant: 'accent' as const, onClick: () => openRequest(null) }]
-          : []),
-      ]
+  const actions = hasGatedDocuments
+    ? [{ label: 'Request access', variant: 'accent' as const, onClick: () => openRequest(null) }]
     : undefined;
+  // The page as a file (the hub's `pdf` route beside `endpoint`). An occasional
+  // utility on a read-only page, so it is NOT a header action (a button there,
+  // and a fixed bar on a phone, are for the page's task: Request access). It is
+  // one quiet link at the end of the status line under the title, in that
+  // line's own type, at every width.
+  const download = {
+    label: 'Download PDF',
+    href: trustCenterPdfUrl(endpoint),
+    icon: <Download01Icon className="size-4" aria-hidden="true" />,
+  };
 
   // Section id → its content. Titles come from `TRUST_CENTER_SECTIONS`; which
   // sections show comes from `visibleTrustCenterSections` — this map only says what each renders.
@@ -277,20 +259,11 @@ export function TrustCenterPage({
               }
               source={data.dataSource.name}
               lastUpdated={data.syncedAt}
+              action={download}
             />
-          ) : null}
-          {/* The phone's Download PDF (see `actions`): the same breakpoint the bottom bar uses. */}
-          <Button
-            variant="link"
-            size="wrap"
-            href={pdfUrl}
-            openInNewTab
-            prefetch={false}
-            leftIcon={<Download01Icon aria-hidden="true" />}
-            className="self-start md:hidden"
-          >
-            {DOWNLOAD_PDF_LABEL}
-          </Button>
+          ) : (
+            <DataAttributionLink {...download} />
+          )}
         </div>
 
         <div className={TRUST_BODY_GRID_CLASS}>
@@ -346,7 +319,7 @@ function TrustCenterChrome({
   actions,
   children,
 }: Required<Pick<TrustCenterPageProps, 'shell' | 'title' | 'subtitle' | 'backButton'>> & {
-  actions?: PageActionButton[];
+  actions?: Array<{ label: string; variant: 'accent'; onClick: () => void }>;
   children: ReactNode;
 }) {
   const router = useRouter();
