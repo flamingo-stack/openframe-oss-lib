@@ -210,10 +210,30 @@ describe('TrustCenterPage', () => {
 
   it("offers the page as a PDF: the hub's pdf route beside the endpoint, query string kept, in a new tab", () => {
     render(<TrustCenterPage endpoint="/content/api/trust-center?tenant=a" initialData={makeData()} />);
-    // PageLayout renders its actions once per breakpoint (desktop + mobile bar).
-    const link = screen.getAllByRole('link', { name: 'Download PDF' })[0];
-    expect(link).toHaveAttribute('href', '/content/api/trust-center/pdf?tenant=a');
-    expect(link).toHaveAttribute('target', '_blank');
+    const links = screen.getAllByRole('link', { name: 'Download PDF' });
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', '/content/api/trust-center/pdf?tenant=a');
+      expect(link).toHaveAttribute('target', '_blank');
+    }
+  });
+
+  it('keeps the download out of the phone bottom bar: the bar holds Request access only, the download is an inline link', () => {
+    render(<TrustCenterPage initialData={makeData()} />);
+    // The bottom bar draws its actions full width (`flex-1`): Request access is there, the download is not.
+    const inBar = (element: HTMLElement) => element.className.split(' ').includes('flex-1');
+    expect(screen.getAllByRole('button', { name: 'Request access' }).filter(inBar)).toHaveLength(1);
+    const downloads = screen.getAllByRole('link', { name: 'Download PDF' });
+    expect(downloads.filter(inBar)).toHaveLength(0);
+    // The phone's link: shown below the `md` step only, in the page body.
+    expect(downloads.filter(link => link.className.split(' ').includes('md:hidden'))).toHaveLength(1);
+  });
+
+  it('draws nothing in the bottom bar when the download is the only action', () => {
+    render(<TrustCenterPage initialData={makeData({ documents: [] })} />);
+    expect(screen.queryByRole('button', { name: 'Request access' })).toBeNull();
+    const downloads = screen.getAllByRole('link', { name: 'Download PDF' });
+    expect(downloads.length).toBeGreaterThan(0);
+    expect(downloads.filter(link => link.className.split(' ').includes('flex-1'))).toHaveLength(0);
   });
 
   it('hides empty sections and the request CTA when nothing is gated', () => {

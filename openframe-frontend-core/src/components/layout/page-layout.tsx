@@ -47,7 +47,7 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
-import type { PageActionButton } from '../ui/page-actions';
+import { mobilePageActions, type PageActionButton } from '../ui/page-actions';
 import { TitleBlock } from './title-block';
 
 export interface PageLayoutProps {
@@ -113,7 +113,8 @@ export function PageLayout({
   titleWrap,
 }: PageLayoutProps) {
   const hasActions = actions && actions.length > 0;
-  const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons';
+  // Room for the mobile bottom bar, which holds only the actions the mobile surface shows.
+  const needsBottomPadding = !!actions && mobilePageActions(actions).length > 0 && actionsVariant === 'primary-buttons';
   const hasHeader = showHeader && (title || subtitle || image || backButton || hasActions || selector || loading);
 
   return (
