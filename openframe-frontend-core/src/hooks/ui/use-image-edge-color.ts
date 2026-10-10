@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { resizedImageUrl } from '../../embed-shims/next-image';
+
+/** The sample is drawn 100px at most, so that is all of the picture that is downloaded. */
+const EDGE_SAMPLE_WIDTH_PX = 100;
 
 /**
  * Extract the dominant edge color from an image using color bucketing.
@@ -13,7 +17,7 @@ function extractEdgeColor(img: HTMLImageElement): string {
   const ctx = canvas.getContext('2d');
   if (!ctx) return '#000000';
 
-  const maxSize = 100;
+  const maxSize = EDGE_SAMPLE_WIDTH_PX;
   const scale = Math.min(maxSize / img.naturalWidth, maxSize / img.naturalHeight);
   const w = Math.round(img.naturalWidth * scale);
   const h = Math.round(img.naturalHeight * scale);
@@ -125,12 +129,22 @@ export function useImageEdgeColor(imageUrl: string | undefined | null, fallback 
       }
     };
 
+    // The picture is asked for at the sample's size (a card's cover is often a
+    // multi-hundred-KB original, and this is a second request for it). When the
+    // host cannot serve that size, the original is tried once.
+    const sampleUrl = resizedImageUrl(imageUrl, EDGE_SAMPLE_WIDTH_PX);
+    let triedOriginal = sampleUrl === imageUrl;
     img.onerror = () => {
       if (cancelled) return;
+      if (!triedOriginal) {
+        triedOriginal = true;
+        img.src = imageUrl;
+        return;
+      }
       setColor(fallback);
     };
 
-    img.src = imageUrl;
+    img.src = sampleUrl;
 
     return () => {
       cancelled = true;

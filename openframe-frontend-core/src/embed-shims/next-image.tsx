@@ -58,6 +58,26 @@ export function registerImage<P>(component: ComponentType<P>): void {
   impl = component as RegisteredImage;
 }
 
+/** A host's way to ask for a picture at a smaller width: the same picture, about `widthPx` wide, uncropped. */
+type ImageResizer = (src: string, widthPx: number) => string;
+
+let resizer: ImageResizer | null = null;
+
+/**
+ * Register how this host serves a picture at a given width (its image
+ * transform or optimizer). Code that only needs a few pixels of a picture (a
+ * colour sample) asks through {@link resizedImageUrl} and never downloads the
+ * original. Without a registration the original URL is used.
+ */
+export function registerImageResizer(fn: ImageResizer): void {
+  resizer = fn;
+}
+
+/** The URL of `src` about `widthPx` wide, as the host serves it; `src` itself when the host registered no way. */
+export function resizedImageUrl(src: string, widthPx: number): string {
+  return resizer ? resizer(src, widthPx) : src;
+}
+
 const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim(props, ref) {
   // Real impl path — registered by the host. Hand off untouched so
   // every Next-specific prop (priority, placeholder, sizes, loader…)
