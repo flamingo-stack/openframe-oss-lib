@@ -188,6 +188,21 @@ export function isTrustCenterMonitored(
   return Number.isFinite(synced) && nowMs - synced <= data.monitoredWindowMs;
 }
 
+/**
+ * THE monitoring claim and its wording, judged against a clock: monitored,
+ * paused, or not enabled. The page reads it after mount (its own clock) and the
+ * PDF when it is generated, so both say the same thing in the same words.
+ */
+export function trustCenterMonitoringStatus(
+  data: Pick<TrustCenterPublic, 'connected' | 'syncedAt' | 'monitoredWindowMs'>,
+  nowMs: number,
+): { status: 'success' | 'pending' | 'missing'; label: string } {
+  if (!data.connected) return { status: 'missing', label: 'Live control monitoring is not enabled yet' };
+  return isTrustCenterMonitored(data, nowMs)
+    ? { status: 'success', label: 'Controls continuously monitored' }
+    : { status: 'pending', label: 'Monitoring paused' };
+}
+
 /** "SOC 2 Type II: In progress · ISO 27001: Planned" — the ONE framework summary line (chat card, RAG mapper). */
 export function trustFrameworksSummary(
   frameworks: ReadonlyArray<Pick<TrustCenterFramework, 'label' | 'monitoring' | 'percent'>>,
@@ -195,10 +210,16 @@ export function trustFrameworksSummary(
   return frameworks.map(f => `${f.label}: ${trustFrameworkBadge(f)}`).join(' · ');
 }
 
+/** A path BESIDE the page's `endpoint`, which may carry a query string (an embed proxy): `endpoint/segment?query`. */
+function besideTrustCenterEndpoint(endpoint: string, segment: string): string {
+  const [path, query] = endpoint.split('?', 2);
+  return `${path}/${segment}${query ? `?${query}` : ''}`;
+}
+
 /**
  * Where a public document opens: its own link, or — for a file — the hub's
- * documents route beside the page's `endpoint` (which may carry a query string,
- * e.g. an embed proxy). `null` for a document that is only available on request.
+ * documents route beside the page's `endpoint`. `null` for a document that is
+ * only available on request.
  */
 export function trustCenterDocumentUrl(
   endpoint: string,
@@ -206,8 +227,35 @@ export function trustCenterDocumentUrl(
 ): string | null {
   if (document.access !== 'public') return null;
   if (document.externalUrl) return document.externalUrl;
-  const [path, query] = endpoint.split('?', 2);
-  return `${path}/documents/${encodeURIComponent(document.id)}${query ? `?${query}` : ''}`;
+  return besideTrustCenterEndpoint(endpoint, `documents/${encodeURIComponent(document.id)}`);
+}
+
+/** Where the page downloads as a PDF: the hub's `pdf` route beside the page's `endpoint`. */
+export function trustCenterPdfUrl(endpoint: string): string {
+  return besideTrustCenterEndpoint(endpoint, 'pdf');
+}
+
+/**
+ * THE rule for which sections a trust center shows, in reading order: a section
+ * with nothing to list is left out; Contact always shows. The page and its PDF
+ * both read it, so the two can never disagree about what is published.
+ */
+export function visibleTrustCenterSections(
+  data: Pick<
+    TrustCenterPublic,
+    'aiPractices' | 'frameworks' | 'controlDomains' | 'documents' | 'subprocessors' | 'faqs'
+  >,
+): Array<(typeof TRUST_CENTER_SECTIONS)[number]> {
+  const hasContent: Record<TrustCenterSectionId, boolean> = {
+    ai: data.aiPractices.length > 0,
+    compliance: data.frameworks.length > 0,
+    controls: data.controlDomains.length > 0,
+    documents: data.documents.length > 0,
+    subprocessors: data.subprocessors.length > 0,
+    faq: data.faqs.length > 0,
+    contact: true,
+  };
+  return TRUST_CENTER_SECTIONS.filter(section => hasContent[section.id]);
 }
 
 // ---------------------------------------------------------------------------

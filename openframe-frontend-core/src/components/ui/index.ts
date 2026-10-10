@@ -108,6 +108,7 @@ export * from './device-card';
 export * from './device-card-compact';
 export * from './entity-image';
 export * from './data-attribution';
+export * from './download-button';
 export * from './compliance-badge';
 export * from './feature-card';
 export * from './feature-list';
