@@ -24,9 +24,9 @@
 
 import type { Element, Root } from 'hast';
 import type React from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useSyncExternalStore } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
-import rehypeHighlight from 'rehype-highlight';
+import type RehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import remarkBreaks from 'remark-breaks';
@@ -67,6 +67,51 @@ export type { ResolveLinkResult };
 export const NO_BROKEN_LINKS: readonly string[] = [];
 
 const BARE_FENCE_LANGUAGE = 'code';
+
+// The code highlighter (rehype-highlight and its grammars) is the heaviest part
+// of the renderer, and most text has no code in it. It is fetched the first time
+// a text with a code block is drawn, once per page; until it lands that block is
+// drawn unhighlighted, the way the streaming tail already is.
+type HighlightPlugin = typeof RehypeHighlight;
+let highlightPlugin: HighlightPlugin | null = null;
+let highlightRequest: Promise<void> | null = null;
+const highlightListeners = new Set<() => void>();
+
+function loadHighlightPlugin(): void {
+  highlightRequest ??= import('rehype-highlight')
+    .then(module => {
+      highlightPlugin = module.default;
+      for (const listener of highlightListeners) listener();
+    })
+    .catch(() => {
+      // A failed fetch leaves code unhighlighted; the next text with code asks again.
+      highlightRequest = null;
+    });
+}
+
+function subscribeToHighlightPlugin(listener: () => void): () => void {
+  highlightListeners.add(listener);
+  return () => {
+    highlightListeners.delete(listener);
+  };
+}
+
+/** A fenced block or inline HTML code: the only things the highlighter colours. */
+const HAS_CODE_BLOCK = /```|~~~|<pre[\s>]|<code[\s>]/;
+
+/** The highlighter once it has loaded, asked for only when `content` has code to colour. */
+function useHighlightPlugin(content: string): HighlightPlugin | null {
+  const wanted = HAS_CODE_BLOCK.test(content);
+  const plugin = useSyncExternalStore(
+    subscribeToHighlightPlugin,
+    () => highlightPlugin,
+    () => null,
+  );
+  useEffect(() => {
+    if (wanted) loadHighlightPlugin();
+  }, [wanted]);
+  return wanted ? plugin : null;
+}
 
 /**
  * Gives a fenced code block written without a language the `language-code`
@@ -227,6 +272,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     [additionalRemarkPlugins],
   );
 
+  const rehypeHighlight = useHighlightPlugin(processedContent);
   const { rehypePlugins, liveRehypePlugins } = useMemo(() => {
     const schema = buildSanitizeSchema({
       extraAllowedHtmlTags: extraTagsKey ? extraTagsKey.split('|') : undefined,
@@ -236,13 +282,12 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     // defense-in-depth (srcset scanning, iframe[srcdoc]); the fence label
     // goes on after sanitizing and before highlight, which runs last.
     const safe: PluggableList = [rehypeRaw, [rehypeSanitize, schema], rehypeStripUnsafe, rehypeLabelBareFences];
-    const highlighted: PluggableList = [
-      ...safe,
-      // No language detection: it ran highlightAuto over every registered
-      // grammar for each unlabelled fence (~2.5x the cost of opening a
-      // thread) and often guessed wrong (PowerShell shown as "VBNET").
-      [rehypeHighlight, { plainText: [BARE_FENCE_LANGUAGE] }],
-    ];
+    // No language detection: it ran highlightAuto over every registered
+    // grammar for each unlabelled fence (~2.5x the cost of opening a
+    // thread) and often guessed wrong (PowerShell shown as "VBNET").
+    const highlighted: PluggableList = rehypeHighlight
+      ? [...safe, [rehypeHighlight, { plainText: [BARE_FENCE_LANGUAGE] }]]
+      : safe;
     return {
       rehypePlugins: highlighted,
       // The streaming tail re-parses on every chunk, and a code fence being
@@ -252,7 +297,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
       // `rehypePlugins`.
       liveRehypePlugins: safe,
     };
-  }, [extraTagsKey]);
+  }, [extraTagsKey, rehypeHighlight]);
 
   const components: Components = useMemo(
     () => ({
