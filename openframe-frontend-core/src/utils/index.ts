@@ -17,6 +17,7 @@ export {
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
 export { formatDate, formatNumber, formatPrice, formatBytes, formatUrlForDisplay } from './format';
+export * from './ai-providers';
 export * from './model-token-rates';
 export { TRIAL_DAYS, TRIAL_LABELS } from './trial';
 export {

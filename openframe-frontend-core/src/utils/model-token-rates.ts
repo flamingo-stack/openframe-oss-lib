@@ -4,6 +4,8 @@
  * metadata) states a rate exactly as the shared table (`ModelTokenRates`) does.
  */
 
+import { aiProvider } from './ai-providers';
+
 /** One model's rates: OpenFrame tokens charged per ONE token of the model. */
 export interface ModelTokenRate {
   modelName: string;
@@ -11,6 +13,10 @@ export interface ModelTokenRate {
   displayName?: string | null;
   /** The provider's key (`ANTHROPIC`, `OPENAI`, `GOOGLE_GEMINI`); an unknown one is shown by name, without a mark. */
   providerType: string;
+  /** The provider's name, when the host's server states one; else the shared provider list names it. */
+  providerLabel?: string | null;
+  /** The icon set's name of the provider's mark, when the host's server states one; else the shared provider list's. */
+  providerIcon?: string | null;
   inputTokenRate: number;
   outputTokenRate: number;
   /** Charged for an input token read back from the prompt cache. Shown only where the table has room for it. */
@@ -78,23 +84,9 @@ export function tokensForBalance(balance: number, rate: number | null | undefine
   return balance / rate;
 }
 
-const PROVIDER_LABELS: Record<string, string> = {
-  ANTHROPIC: 'Anthropic',
-  OPENAI: 'OpenAI',
-  GOOGLE_GEMINI: 'Google Gemini',
-};
-
-/** A provider's name; a provider this list has not met is named from its key. */
-export function tokenRateProviderLabel(providerType: string): string {
-  return (
-    PROVIDER_LABELS[providerType] ??
-    providerType
-      .toLowerCase()
-      .split('_')
-      .filter(Boolean)
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-  );
+/** A provider's name: what the host stated for it, else the shared provider list's (`aiProvider`). */
+export function tokenRateProviderLabel(providerType: string, stated?: string | null): string {
+  return aiProvider(providerType, { label: stated }).label;
 }
 
 /** The rates under their providers, in the order the host gave them (providers by first appearance). */

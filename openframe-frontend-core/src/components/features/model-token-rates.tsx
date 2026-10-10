@@ -1,6 +1,7 @@
 'use client';
 
-import { type ComponentType, type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
+import { aiProvider } from '../../utils/ai-providers';
 import { cn } from '../../utils/cn';
 import { formatPrice } from '../../utils/format';
 import {
@@ -13,9 +14,7 @@ import {
   tokenRateProviderLabel,
   tokensForBalance,
 } from '../../utils/model-token-rates';
-import { AnthropicLogoGreyIcon } from '../icons-v2-generated/brand-logos/anthropic-logo-grey-icon';
-import { GeminiLogoGreyIcon } from '../icons-v2-generated/brand-logos/gemini-logo-grey-icon';
-import { OpenaiLogoGreyIcon } from '../icons-v2-generated/brand-logos/openai-logo-grey-icon';
+import { findIcon } from '../chat/utils/icon-library';
 import { AlertTriangleIcon } from '../icons-v2-generated/interface/alert-triangle-icon';
 import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02-vr-icon';
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
@@ -102,12 +101,16 @@ export const MODEL_TOKEN_RATES_COPY = {
   empty: 'No token rates are in effect right now.',
 } as const;
 
-/** The provider's mark in its monochrome cut: it takes the text colour, so no brand colour competes with the figures. A provider with no mark is shown by name. */
-const PROVIDER_ICON: Record<string, ComponentType<{ className?: string }>> = {
-  ANTHROPIC: AnthropicLogoGreyIcon,
-  OPENAI: OpenaiLogoGreyIcon,
-  GOOGLE_GEMINI: GeminiLogoGreyIcon,
-};
+/**
+ * A provider's mark, found in the icon set BY NAME (the name the host's server
+ * stated, else the shared provider list's): nothing here imports a provider's
+ * icon. The monochrome cut takes the text colour, so no brand colour competes
+ * with the figures. A provider the set holds no mark for is shown by name.
+ */
+function providerMark(providerType: string, stated: string | null | undefined, className: string): ReactNode {
+  const Mark = findIcon(aiProvider(providerType, { icon: stated }).icon);
+  return Mark ? <Mark className={className} /> : undefined;
+}
 
 const PAD_X = 'px-[var(--spacing-system-s)]';
 const ROW = 'flex items-center gap-[var(--spacing-system-s)]';
@@ -128,7 +131,7 @@ function ProviderTabs({
   onValueChange,
   className,
 }: {
-  groups: { providerType: string }[];
+  groups: { providerType: string; rates: readonly ModelTokenRate[] }[];
   value: string;
   onValueChange: (providerType: string) => void;
   className?: string;
@@ -139,14 +142,11 @@ function ProviderTabs({
       scrollable
       value={value}
       onValueChange={onValueChange}
-      items={groups.map(candidate => {
-        const Icon = PROVIDER_ICON[candidate.providerType];
-        return {
-          id: candidate.providerType,
-          label: tokenRateProviderLabel(candidate.providerType),
-          icon: Icon ? <Icon className="size-full" /> : undefined,
-        };
-      })}
+      items={groups.map(candidate => ({
+        id: candidate.providerType,
+        label: tokenRateProviderLabel(candidate.providerType, candidate.rates[0]?.providerLabel),
+        icon: providerMark(candidate.providerType, candidate.rates[0]?.providerIcon, 'size-full'),
+      }))}
       className={className}
     />
   );
@@ -430,12 +430,11 @@ function Bar({ className }: { className: string }) {
 
 /** A model as a picker option: its name, its provider under it, the provider's mark beside it. */
 function modelOption(rate: ModelTokenRate): AutocompleteOption<string> {
-  const Icon = PROVIDER_ICON[rate.providerType];
   return {
     label: rate.displayName || rate.modelName,
     value: rate.modelName,
-    description: tokenRateProviderLabel(rate.providerType),
-    icon: Icon ? <Icon className="size-full text-ods-text-secondary" /> : undefined,
+    description: tokenRateProviderLabel(rate.providerType, rate.providerLabel),
+    icon: providerMark(rate.providerType, rate.providerIcon, 'size-full text-ods-text-secondary'),
   };
 }
 
@@ -598,11 +597,14 @@ export function ModelTokenExchange({
                   disabled: true,
                 }))
               : providers.map(providerType => {
-                  const Icon = PROVIDER_ICON[providerType];
+                  // What the server stated for the provider rides its models' rows.
+                  const stated =
+                    models.find(option => option.providerType === providerType) ??
+                    (rate?.providerType === providerType ? rate : null);
                   return {
                     id: providerType,
-                    name: tokenRateProviderLabel(providerType),
-                    icon: Icon ? <Icon className="size-8 text-ods-text-secondary" /> : undefined,
+                    name: tokenRateProviderLabel(providerType, stated?.providerLabel),
+                    icon: providerMark(providerType, stated?.providerIcon, 'size-8 text-ods-text-secondary'),
                   };
                 })
           }
