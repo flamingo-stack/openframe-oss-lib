@@ -13,7 +13,11 @@ import {
   type TrustCenterControlsPage,
   type TrustCenterPublic,
 } from '../../../types/trust-center';
-import { TRUST_CENTER_FIXTURE_WINDOW_MS, makeTrustCenterData } from '../__fixtures__/trust-center';
+import {
+  TRUST_CENTER_FIXTURE_FAQ,
+  TRUST_CENTER_FIXTURE_WINDOW_MS,
+  makeTrustCenterData,
+} from '../__fixtures__/trust-center';
 import { TrustCenterPage, TrustCenterPageSkeleton } from '../trust-center-page';
 import { TRUST_SECTION_LEADS } from '../trust-center-sections';
 
@@ -221,6 +225,25 @@ describe('TrustCenterPage', () => {
     render(<TrustCenterPage initialData={makeData({ connected: false, syncedAt: null })} />);
     expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/api/trust-center/pdf');
     expect(screen.queryByText(/Data synced from/)).toBeNull();
+  });
+
+  it('with host content before it, the FAQ is the last thing on the page, after that content', () => {
+    render(
+      <TrustCenterPage
+        initialData={makeData({ faqs: [TRUST_CENTER_FIXTURE_FAQ] })}
+        beforeFaq={<h2>Why we build in the open</h2>}
+      />,
+    );
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+    expect(headings.indexOf('Why we build in the open')).toBeGreaterThan(headings.indexOf('Contact'));
+    expect(headings.indexOf('FAQ')).toBeGreaterThan(headings.indexOf('Why we build in the open'));
+    expect(headings.filter(h => h === 'FAQ')).toHaveLength(1);
+  });
+
+  it('without host content the FAQ closes the sections column, as before', () => {
+    render(<TrustCenterPage initialData={makeData({ faqs: [TRUST_CENTER_FIXTURE_FAQ] })} />);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+    expect(headings.indexOf('FAQ')).toBeGreaterThan(headings.indexOf('Contact'));
   });
 
   it('hides empty sections and the request CTA when nothing is gated', () => {

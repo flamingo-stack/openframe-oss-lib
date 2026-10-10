@@ -87,6 +87,13 @@ export interface TrustCenterPageProps {
   subtitle?: string;
   /** The FAQ section's "ask the assistant" card (`FaqSection`'s `ask`): the host states its topic. Absent: no card. */
   ask?: FaqSectionProps['ask'];
+  /**
+   * Host content shown after the trust sections and BEFORE the FAQ (the hub's
+   * own "why we build in the open" sections). The FAQ is the last thing on a
+   * page, so with this the page draws: trust sections, this content at the
+   * page's full width, then the FAQ. Absent: the FAQ closes the sections column.
+   */
+  beforeFaq?: ReactNode;
 }
 
 /** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
@@ -137,6 +144,7 @@ export function TrustCenterPage({
   title = TRUST_CENTER_TITLE,
   subtitle = TRUST_CENTER_TAGLINE,
   ask,
+  beforeFaq,
 }: TrustCenterPageProps) {
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
     initialData,
@@ -230,6 +238,11 @@ export function TrustCenterPage({
     contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };
 
+  // With host content before it, the FAQ leaves the sections column and closes the page (below).
+  const faqSection = sections.find(section => section.id === 'faq');
+  const faqLast = Boolean(beforeFaq) && Boolean(faqSection);
+  const columnSections = faqLast ? sections.filter(section => section.id !== 'faq') : sections;
+
   let body: ReactNode;
   if (error && !data) {
     body = <LoadError message="Could not load the trust center" onRetry={reload} />;
@@ -264,7 +277,7 @@ export function TrustCenterPage({
 
         <div className={TRUST_BODY_GRID_CLASS}>
           <div className={TRUST_SECTIONS_COLUMN_CLASS}>
-            {sections.map(section => {
+            {columnSections.map(section => {
               const view = views[section.id];
               return (
                 <TrustSection key={section.id} id={section.id} title={section.label} lead={view.lead}>
@@ -296,9 +309,24 @@ export function TrustCenterPage({
   }
 
   return (
-    <TrustCenterChrome shell={shell} title={title} subtitle={subtitle} backButton={backButton} actions={actions}>
-      {body}
-    </TrustCenterChrome>
+    <>
+      <TrustCenterChrome shell={shell} title={title} subtitle={subtitle} backButton={backButton} actions={actions}>
+        {body}
+      </TrustCenterChrome>
+      {beforeFaq}
+      {faqLast && faqSection && data ? (
+        // The page's own content box and the sections' column, so the FAQ lines up with what is above the host content.
+        <div className={shell ? 'bg-ods-bg' : undefined}>
+          <div className={shell ? 'page-shell-content mx-auto max-w-[1920px]' : 'page-shell-content'}>
+            <div className={TRUST_BODY_GRID_CLASS}>
+              <TrustSection id={faqSection.id} title={faqSection.label} lead={views.faq.lead}>
+                {views.faq.render(data)}
+              </TrustSection>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
