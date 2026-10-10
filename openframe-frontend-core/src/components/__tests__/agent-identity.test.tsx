@@ -1,8 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AGENT_IDENTITIES_API_PATH, AgentIdentityProvider, resetAgentIdentitiesStore } from '../agent-identity';
+import { AGENT_IDENTITIES_API_PATH, AgentIdentityProvider } from '../agent-identity';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
 
@@ -60,8 +61,9 @@ describe("an agent's mark is its identity's icon", () => {
 
 describe('with no copy from the host, the identities are read from the server', () => {
   const fetchMock = vi.fn<typeof fetch>();
+  /** A page: one react-query client above everything it draws. */
+  const page = (ui: ReactNode) => render(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
   beforeEach(() => {
-    resetAgentIdentitiesStore();
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
   });
@@ -73,7 +75,7 @@ describe('with no copy from the host, the identities are read from the server', 
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL, props: null } }] })),
     );
-    render(
+    page(
       <div data-testid="marks">
         <AgentIdentityProvider>
           <AgentMark agent="fae" />
@@ -90,17 +92,17 @@ describe('with no copy from the host, the identities are read from the server', 
 
   it("reads from the embedder's own path", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ agents: [] })));
-    render(
+    page(
       <AgentIdentityProvider endpoint="/content/api/ai-agents">
         <AgentMark agent="fae" />
       </AgentIdentityProvider>,
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/content/api/ai-agents', undefined));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/content/api/ai-agents', expect.anything()));
   });
 
   it('keeps the packaged mark when the identities cannot be read', async () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
-    render(
+    page(
       <div data-testid="marks">
         <AgentIdentityProvider>
           <AgentMark agent="fae" />
@@ -111,7 +113,7 @@ describe('with no copy from the host, the identities are read from the server', 
     expect(screen.getByTestId('marks').innerHTML).toContain('data:image');
   });
 
-  it('asks for nothing when the host gave its copy', () => {
+  it('asks for nothing, and needs no query client, when the host gave its copy', () => {
     render(
       <AgentIdentityProvider icons={{ fae: { url: FAE_URL } }}>
         <AgentMark agent="fae" />

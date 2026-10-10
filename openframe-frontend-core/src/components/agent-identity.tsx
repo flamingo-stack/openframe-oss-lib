@@ -1,40 +1,29 @@
 'use client';
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { createSharedRequest } from '../hooks/shared-request';
+import {
+  AGENT_IDENTITIES_API_PATH,
+  useAgentIdentities,
+  type AgentIdentityIcon,
+  type AgentIdentityIcons,
+} from '../hooks/use-agent-identities';
 
-/** An icon as an agent's identity holds it: a library glyph name, an uploaded picture, or both unset. */
-export interface AgentIdentityIcon {
-  name?: string | null;
-  url?: string | null;
-  props?: Record<string, unknown> | null;
+export { AGENT_IDENTITIES_API_PATH, type AgentIdentityIcon, type AgentIdentityIcons };
+
+const AgentIdentityContext = createContext<ReadonlyMap<string, AgentIdentityIcon>>(new Map());
+
+function Provide({ icons, children }: { icons: AgentIdentityIcons | undefined; children: ReactNode }) {
+  const bySlug = useMemo(() => {
+    const map = new Map<string, AgentIdentityIcon>();
+    for (const [slug, icon] of Object.entries(icons ?? {})) if (icon) map.set(slug, icon);
+    return map;
+  }, [icons]);
+  return <AgentIdentityContext.Provider value={bySlug}>{children}</AgentIdentityContext.Provider>;
 }
 
-/** Each agent's identity icon, keyed by the agent's slug. */
-export type AgentIdentityIcons = Readonly<Record<string, AgentIdentityIcon | null | undefined>>;
-
-/**
- * GET endpoint for the agents' public identities (the hub's path; embedders
- * prefix their proxy). It answers `{ agents: [{ slug, icon }] }`.
- */
-export const AGENT_IDENTITIES_API_PATH = '/api/ai-agents';
-
-/** The list answer, read down to what a mark needs: each agent's icon by slug. A body of another shape names none. */
-function readIdentityIcons(body: unknown): AgentIdentityIcons {
-  const agents = (body as { agents?: unknown } | null)?.agents;
-  const icons: Record<string, AgentIdentityIcon> = {};
-  if (!Array.isArray(agents)) return icons;
-  for (const agent of agents as Array<{ slug?: unknown; icon?: AgentIdentityIcon | null }>) {
-    if (typeof agent?.slug === 'string' && agent.icon) icons[agent.slug] = agent.icon;
-  }
-  return icons;
-}
-
-const identities = createSharedRequest<AgentIdentityIcons>(readIdentityIcons);
-
-/** Test seam: forget every answer. */
-export function resetAgentIdentitiesStore(): void {
-  identities.reset();
+/** The identities read from the server (`useAgentIdentities`); it needs the host's react-query client. */
+function ProvideFromServer({ endpoint, children }: { endpoint: string; children: ReactNode }) {
+  return <Provide icons={useAgentIdentities(endpoint)}>{children}</Provide>;
 }
 
 /**
@@ -48,15 +37,12 @@ export function resetAgentIdentitiesStore(): void {
  *
  * Where the identities come from:
  *   - `icons`: the host's own copy (one it read on the server). No request.
- *   - no `icons`: the provider reads them FROM THE SERVER (`endpoint`, default
- *     `AGENT_IDENTITIES_API_PATH`), one request shared by every provider on the
- *     page. An embedder passes its proxy path.
+ *   - no `icons`: read FROM THE SERVER by `useAgentIdentities` (`endpoint`,
+ *     default `AGENT_IDENTITIES_API_PATH`; an embedder passes its proxy path).
  *
  * Until the answer lands, when it cannot be read, and with no provider at all
  * (a story, a test) each agent keeps the mark packaged with the library.
  */
-const AgentIdentityContext = createContext<ReadonlyMap<string, AgentIdentityIcon>>(new Map());
-
 export function AgentIdentityProvider({
   icons,
   endpoint = AGENT_IDENTITIES_API_PATH,
@@ -68,14 +54,8 @@ export function AgentIdentityProvider({
   endpoint?: string;
   children: ReactNode;
 }) {
-  const { data } = identities.useSharedRequest({ endpoint, enabled: !icons });
-  const held = icons ?? data;
-  const bySlug = useMemo(() => {
-    const map = new Map<string, AgentIdentityIcon>();
-    for (const [slug, icon] of Object.entries(held ?? {})) if (icon) map.set(slug, icon);
-    return map;
-  }, [held]);
-  return <AgentIdentityContext.Provider value={bySlug}>{children}</AgentIdentityContext.Provider>;
+  if (icons) return <Provide icons={icons}>{children}</Provide>;
+  return <ProvideFromServer endpoint={endpoint}>{children}</ProvideFromServer>;
 }
 
 /** The icon the identity of the agent with this slug holds; undefined when none is known. */
