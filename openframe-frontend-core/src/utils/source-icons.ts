@@ -64,11 +64,11 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
 
   // Financials
   'investor-updates': 'mail',
-  'financial-kpis': 'activity',
-  'financial-cap-table': 'table',
-  'financial-pnl': 'trending-up',
-  'financial-balance-sheet': 'dollar-sign',
-  'financial-cash-flow': 'banknote',
+  'financial-kpis': 'chart-bar-01-ver',
+  'financial-cap-table': 'chart-pie',
+  'financial-pnl': 'money-bill-dollar',
+  'financial-balance-sheet': 'bank',
+  'financial-cash-flow': 'coins-exchange-currency',
 
   // ClickUp
   'clickup-roadmap': 'clickup',
@@ -92,24 +92,24 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'slack-messages': 'slack',
 
   // People-hub employee content
-  'what-i-shipped': 'package',
-  'how-i-work': 'book-open',
-  'ai-prompts': 'message-square',
+  'what-i-shipped': 'rocket-02',
+  'how-i-work': 'clipboard-list',
+  'ai-prompts': 'chat-quote',
 
   // Product-hub internal
   'design-docs': 'file-text',
   'openframe-tenants': 'openframe',
-  'prospect-calls': 'phone',
+  'prospect-calls': 'call',
 
   // Code intelligence
-  'code-rules': 'check-square',
-  'code-graph-repos': 'github',
+  'code-rules': 'bracket-curly-check',
+  'code-graph-repos': 'coding-branch',
   'code-graph-deployments': 'package',
-  'code-graph-files': 'file-text',
-  'code-symbols': 'box',
-  'code-duplicates': 'search',
-  'code-impact': 'activity',
-  'change-sets': 'coding-branch',
+  'code-graph-files': 'file-code',
+  'code-symbols': 'code-square',
+  'code-duplicates': 'copy-01',
+  'code-impact': 'coding-pull-request',
+  'change-sets': 'coding-merge',
 };
 
 /** Lookup an icon name by RagTableConfig.id. Returns undefined when

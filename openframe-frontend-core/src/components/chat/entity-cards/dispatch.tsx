@@ -61,29 +61,14 @@ import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
-import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon';
-import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon';
 import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentation-bar-icon';
 import { PresentationLineIcon } from '../../icons-v2-generated/charts/presentation-line-icon';
-import { BracketCurlyCheckIcon } from '../../icons-v2-generated/coding/bracket-curly-check-icon';
 import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
-import { CodeSquareIcon } from '../../icons-v2-generated/coding/code-square-icon';
-import { CodingBranchIcon } from '../../icons-v2-generated/coding/coding-branch-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
-import { CodingMergeIcon } from '../../icons-v2-generated/coding/coding-merge-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
-import { PackageIcon } from '../../icons-v2-generated/coding/package-icon';
-import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
-import { ChatQuoteIcon } from '../../icons-v2-generated/communication/chat-quote-icon';
 import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
-import { ClipboardListIcon } from '../../icons-v2-generated/documents/clipboard-list-icon';
-import { Copy01Icon } from '../../icons-v2-generated/documents/copy-01-icon';
-import { FileCodeIcon } from '../../icons-v2-generated/documents/file-code-icon';
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon';
 import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon';
-import { BankIcon } from '../../icons-v2-generated/finance/bank-icon';
-import { CoinsExchangeCurrencyIcon } from '../../icons-v2-generated/finance/coins-exchange-currency-icon';
-import { MoneyBillDollarIcon } from '../../icons-v2-generated/finance/money-bill-dollar-icon';
 import { MicrophoneIcon } from '../../icons-v2-generated/household/microphone-icon';
 import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-triangle-icon';
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon';
@@ -113,10 +98,9 @@ import { resolveCardDestination } from '../utils/card-destination';
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution';
 import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
-import { resolveIcon } from '../utils/icon-library';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
-import { getSourceLabel, SOURCE_ICON_NAMES } from '../utils/source-icons';
+import { defaultTableIdForDocumentType, getSourceLabel, SOURCE_ICON_NAMES } from '../utils/source-icons';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
 import { BlogCardSkeleton } from './blog-card';
@@ -1393,18 +1377,16 @@ function refHydratedEntry(
   };
 }
 
+/** The leading glyph carries the type signal (the badge pill is dropped); it is the SOURCE's icon (`sourceGlyph`). */
 interface FinancialCardConfig {
   label: string;
-  /** Per-type leading glyph — carries the type signal now that the
-   *  badge pill is dropped. */
-  icon: () => React.ReactNode;
 }
 const FINANCIAL_CARD_CONFIGS: Record<string, FinancialCardConfig> = {
-  financial_kpi: { label: 'Financial KPI', icon: () => <ChartBar01VerIcon size={24} /> },
-  cap_table: { label: 'Cap table entry', icon: () => <ChartPieIcon size={24} /> },
-  profit_loss: { label: 'P&L period', icon: () => <MoneyBillDollarIcon size={24} /> },
-  balance_sheet: { label: 'Balance sheet', icon: () => <BankIcon size={24} /> },
-  cash_flow: { label: 'Cash flow', icon: () => <CoinsExchangeCurrencyIcon size={24} /> },
+  financial_kpi: { label: 'Financial KPI' },
+  cap_table: { label: 'Cap table entry' },
+  profit_loss: { label: 'P&L period' },
+  balance_sheet: { label: 'Balance sheet' },
+  cash_flow: { label: 'Cash flow' },
 };
 /** Expand a per-family config map into registry entries — ONE loop shell
  *  for every card family (financial, github, program, roadmap); adding a
@@ -1423,7 +1405,7 @@ function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
       <GenericFinancialChatCard
         chatRef={displayRef}
-        icon={cfg.icon()}
+        icon={sourceGlyph(docType)}
         isNewTab={opts.isNewTab}
         discuss={opts.discuss}
       />
@@ -1463,11 +1445,13 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
 interface GlyphCardConfig {
   label: string;
   /**
-   * The card's leading glyph. It is handed the hydrated ref, so a type whose
-   * records carry their own mark (a vendor's logo, a page's menu icon) draws
-   * that and keeps a generic glyph for a record without one.
+   * ONLY for a type whose records carry their own mark (a vendor's logo, a
+   * page's menu icon): it is handed the hydrated ref and draws that mark.
+   * Every other type leaves it out and gets its SOURCE's icon
+   * (`sourceGlyph`): the one `SOURCE_ICON_NAMES` entry its chip draws too, so
+   * a card and its chip can never show different icons.
    */
-  icon: (ref?: ChatRef) => React.ReactNode;
+  icon?: (ref?: ChatRef) => React.ReactNode;
   /**
    * Video-bearing ref types: render the media card (cover from the ref's
    * `metadata.videoPoster`, else the host's OG placeholder; the type label as the
@@ -1481,41 +1465,51 @@ interface GlyphCardConfig {
  *  (`/api/design-docs`, `/api/openframe-tenants`, `/api/prospect-calls` — ChatRef-shaped items,
  *  same preset as github / slack). Adding one = one line here + the
  *  `list-url.ts` builder + the `source-icons.ts` label / icon / type entries. */
-/** The OpenFrame logo every OpenFrame surface uses (the `openframe` icon name). */
-const OpenFrameGlyph = resolveIcon('openframe');
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
-  openframe_tenant: { label: 'OpenFrame tenant', icon: () => <OpenFrameGlyph size={24} /> },
-  prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
+  openframe_tenant: { label: 'OpenFrame tenant' },
+  prospect_call: { label: 'Prospect call', media: true },
   // Code intelligence (product-hub internal): the review rules a repository is
   // held to, the repositories themselves, and one row per deployment
   // environment. Glyph cards like their siblings — none of the three has a
   // cover image, and a rule is read in the admin screen it links to.
-  code_rule: { label: 'Code rule', icon: () => <BracketCurlyCheckIcon size={24} /> },
-  code_repo: { label: 'Repository', icon: () => <CodingBranchIcon size={24} /> },
-  code_deployment: { label: 'Deployment', icon: () => <PackageIcon size={24} /> },
+  code_rule: { label: 'Code rule' },
+  code_repo: { label: 'Repository' },
+  code_deployment: { label: 'Deployment' },
   // The graph's own objects: one source file's public surface, one public
   // symbol, a near-duplicate cluster, and a pull request's blast radius.
   // Glyph cards for the same reason as their three siblings — none carries a
   // cover image, and each links to the admin screen that renders it in full.
-  code_file: { label: 'Code file', icon: () => <FileCodeIcon size={24} /> },
-  code_symbol: { label: 'Code symbol', icon: () => <CodeSquareIcon size={24} /> },
-  code_duplicate: { label: 'Duplicate code', icon: () => <Copy01Icon size={24} /> },
-  code_impact: { label: 'Change impact', icon: () => <CodingPullRequestIcon size={24} /> },
+  code_file: { label: 'Code file' },
+  code_symbol: { label: 'Code symbol' },
+  code_duplicate: { label: 'Duplicate code' },
+  code_impact: { label: 'Change impact' },
   // A change set: pull requests across repositories declared as one change, with the ClickUp tasks and design
   // docs its pull requests are attached to. ONE card for it wherever a set is shown (chat, a design doc's page).
-  change_set: { label: 'Change set', icon: () => <CodingMergeIcon size={24} /> },
+  change_set: { label: 'Change set' },
   // A page of the public website (pricing, product, legal, and every page the navigation lists), read live
   // from the data the page shows. A glyph card: a page has no cover of its own, and the card opens the page.
   site_page: { label: 'Website page', icon: ref => <SitePageGlyph iconName={refText(ref, 'icon_name')} /> },
   // What OpenFrame charges, read live from its billing: the plan in force, or one AI model's token exchange
   // rate. A glyph card; it opens the pricing page.
-  openframe_price: { label: 'OpenFrame price', icon: () => <OpenFrameGlyph size={24} /> },
+  openframe_price: { label: 'OpenFrame price' },
   // A vendor (product) of the OpenMSP directory. A glyph card; it opens the vendor's page there.
   vendor: { label: 'Vendor', icon: ref => <VendorGlyph title={ref?.title ?? ''} logoUrl={refText(ref, 'logo_url')} /> },
 };
+/**
+ * A card type's icon: its SOURCE's, resolved exactly as the source's chip
+ * resolves it (`resolveSourceIcon` over `SOURCE_ICON_NAMES`). One name per
+ * source, one resolver, so a card and its chip always match.
+ */
+function sourceGlyph(docType: string): React.ReactNode {
+  const { Icon } = resolveSourceIcon({ sourceRepo: defaultTableIdForDocumentType(docType), documentType: docType });
+  return <Icon className="size-6" />;
+}
+
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
-    refHydratedEntry(docType, cfg.label, (displayRef, opts) =>
+  return registryEntries(REF_GLYPH_CARD_CONFIGS, (config, docType) => {
+    const glyph = config.icon ?? (() => sourceGlyph(docType));
+    const cfg = config;
+    return refHydratedEntry(docType, cfg.label, (displayRef, opts) =>
       cfg.media ? (
         <EntityMingoCard
           title={displayRef.title}
@@ -1524,7 +1518,7 @@ function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
             displayRef.metadata?.videoPoster,
             opts.extras?.buildOgPlaceholderUrl?.(displayRef.title ?? '') ?? null,
           )}
-          fallbackIcon={cfg.icon(displayRef)}
+          fallbackIcon={glyph(displayRef)}
           status={{ label: cfg.label, variant: 'grey' }}
           chatRef={displayRef}
           isNewTab={opts.isNewTab}
@@ -1532,15 +1526,10 @@ function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
           menuAriaLabel={`${cfg.label} actions`}
         />
       ) : (
-        <GlyphChatCard
-          chatRef={displayRef}
-          icon={cfg.icon(displayRef)}
-          isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
-        />
+        <GlyphChatCard chatRef={displayRef} icon={glyph(displayRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
       ),
-    ),
-  );
+    );
+  });
 }
 
 /** People-hub employee feeds hydrate from their EXISTING list APIs
@@ -1558,9 +1547,9 @@ function fetchedEmployeeEntryDisplayRef(item: unknown, chatRef: ChatRef): ChatRe
   return { ...chatRef, title, preview: preview.length > 0 ? preview : chatRef.preview };
 }
 const EMPLOYEE_ENTRY_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
-  what_i_shipped: { label: 'What I Shipped', icon: () => <Rocket02Icon size={24} /> },
-  how_i_work: { label: 'How I Work', icon: () => <ClipboardListIcon size={24} /> },
-  ai_prompt: { label: 'Squawkbox', icon: () => <ChatQuoteIcon size={24} /> },
+  what_i_shipped: { label: 'What I Shipped' },
+  how_i_work: { label: 'How I Work' },
+  ai_prompt: { label: 'Squawkbox' },
 };
 function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(EMPLOYEE_ENTRY_CARD_CONFIGS, (cfg, docType) => ({
@@ -1571,7 +1560,7 @@ function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     render: (item, chatRef, opts) => (
       <GlyphChatCard
         chatRef={fetchedEmployeeEntryDisplayRef(item, chatRef)}
-        icon={cfg.icon()}
+        icon={sourceGlyph(docType)}
         isNewTab={opts.isNewTab}
         discuss={opts.discuss}
       />

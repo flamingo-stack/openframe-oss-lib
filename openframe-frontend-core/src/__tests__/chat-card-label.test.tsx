@@ -24,7 +24,7 @@ describe('prospect_call source wiring', () => {
   it('maps the document type to its table id, label, icon and card route', () => {
     expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.prospect_call).toBe('prospect-calls');
     expect(getSourceLabel('prospect-calls')).toBe('Prospect calls');
-    expect(SOURCE_ICON_NAMES['prospect-calls']).toBe('phone');
+    expect(SOURCE_ICON_NAMES['prospect-calls']).toBe('call');
     expect(buildListUrl('prospect_call', ['1', '2'])).toBe('/api/prospect-calls?ids=1,2');
   });
 });
