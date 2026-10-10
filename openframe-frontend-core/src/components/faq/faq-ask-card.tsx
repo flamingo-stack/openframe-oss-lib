@@ -1,21 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import {
-  AssistantRuntimeContext,
-  useAssistantRuntime,
-  type AssistantOpenRequest,
-  type AssistantRuntime,
-} from '../../contexts/assistant-runtime-context';
+import { useState } from 'react';
+import type { AssistantOpenRequest, AssistantRuntime } from '../../contexts/assistant-runtime-context';
 import { useInView } from '../../hooks/ui/use-in-view';
-import { AskCard } from '../chat/ask-prompts';
-import {
-  assistantAvailable,
-  ASK_PROMPTS_DEFAULT_COUNT,
-  useAskPrompts,
-  useAssistantOpen,
-  useShownAskPromptIds,
-} from '../chat/hooks/use-ask-prompts';
+import { AssistantAskPrompts } from '../chat/assistant-ask-prompts';
+import { assistantAvailable } from '../chat/hooks/use-ask-prompts';
 
 /** The card beside a FAQ, as a host may shape it. Every field is optional. */
 export interface FaqAskOptions {
@@ -29,8 +18,7 @@ export interface FaqAskOptions {
   topic?: string;
   /**
    * Ids of questions never to offer. Absent: the ones the page's other "ask"
-   * surfaces show (`AssistantAskPrompts` rows say so themselves), which the
-   * card waits for. `null`: wait.
+   * surfaces show, which the card waits for. `null`: wait.
    */
   exclude?: readonly string[] | null;
   /** How many questions the card offers. Absent: the runtime's, else three. */
@@ -46,16 +34,8 @@ export interface FaqAskOptions {
   onOpen?: (request: AssistantOpenRequest) => void;
 }
 
-/** The lib's own wording, when neither the host nor the runtime states it. */
-const DEFAULT_ASK_CARD = {
-  title: 'Still deciding?',
-  description: '{assistant} answers from our docs and customer stories.',
-} as const;
-
 /** How far below the viewport the card is when it picks its questions. */
 const PICK_ROOT_MARGIN = '600px';
-
-const fillAssistant = (text: string, name: string) => text.split('{assistant}').join(name);
 
 /** True when a FAQ under this runtime shows the card: a chat to open, and a name for the card's words. */
 export function faqAskCardShown(assistant: AssistantRuntime | null): assistant is AssistantRuntime {
@@ -63,53 +43,28 @@ export function faqAskCardShown(assistant: AssistantRuntime | null): assistant i
 }
 
 /**
- * The "ask the assistant" card of a FAQ: the assistant's identity and the
- * chat's opener from the nearest assistant runtime, its questions from the
- * host's endpoint. It picks ONCE, when the card first comes near the viewport:
- * by then the page above has said which questions it shows itself, and a
- * visitor who never reaches the FAQ costs no request. The card is the same
- * height before and after the questions arrive. A host with no questions
- * endpoint gets the launcher with no questions.
+ * The "ask the assistant" card of a FAQ: THE ask surface (`AssistantAskPrompts`)
+ * as a card, told when to pick. It picks ONCE, when the card first comes near
+ * the viewport: a visitor who never reaches the FAQ costs no request, and the
+ * card then leaves out every question the page above already shows. The card
+ * is the same height before and after the questions arrive.
  */
 export function FaqAskCard({ topic, exclude, count, title, description, onOpen }: FaqAskOptions & { topic: string }) {
-  const assistant = useAssistantRuntime();
   const { ref, inView } = useInView<HTMLDivElement>({ rootMargin: PICK_ROOT_MARGIN });
   const [reached, setReached] = useState(false);
   if (inView && !reached) setReached(true);
-
-  const shownElsewhere = useShownAskPromptIds();
-  const excluded = exclude === undefined ? shownElsewhere : exclude;
-  const slots = count ?? assistant?.askCard?.count ?? ASK_PROMPTS_DEFAULT_COUNT;
-  const { prompts, isLoading, supported } = useAskPrompts({
-    topic,
-    count: slots,
-    exclude: excluded ?? undefined,
-    enabled: reached && excluded !== null,
-  });
-  const open = useAssistantOpen(topic, onOpen);
-  // The card's launcher opens the same chat as its questions, with the card's topic: it reads the runtime.
-  const scoped = useMemo(() => (assistant ? { ...assistant, open } : null), [assistant, open]);
-
-  if (!faqAskCardShown(assistant) || !assistant.name) return null;
-  const name = assistant.name;
-  const cardDescription = description ?? assistant.askCard?.description ?? DEFAULT_ASK_CARD.description;
   return (
-    <AssistantRuntimeContext.Provider value={scoped}>
-      <div ref={ref}>
-        <AskCard
-          title={fillAssistant(title ?? assistant.askCard?.title ?? DEFAULT_ASK_CARD.title, name)}
-          description={cardDescription ? fillAssistant(cardDescription, name) : undefined}
-          prompts={prompts}
-          // Fixed slots, one question per row: chip skeletons until the pick lands, the same box after.
-          count={supported ? slots : 0}
-          loading={isLoading}
-          source={assistant.source}
-          label={name}
-          icon={assistant.icon}
-          onOpen={open}
-          onAsk={prompt => assistant.onAsk?.({ promptId: prompt.id, topic })}
-        />
-      </div>
-    </AssistantRuntimeContext.Provider>
+    <div ref={ref}>
+      <AssistantAskPrompts
+        variant="card"
+        topic={topic}
+        count={count}
+        exclude={exclude}
+        enabled={reached}
+        title={title}
+        description={description}
+        onOpen={onOpen}
+      />
+    </div>
   );
 }
