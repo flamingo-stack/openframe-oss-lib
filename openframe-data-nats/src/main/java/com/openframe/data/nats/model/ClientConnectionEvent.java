@@ -1,17 +1,23 @@
 package com.openframe.data.nats.model;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Getter
-@Setter
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ClientConnectionEvent {
 
     private String timestamp;
     private Client client;
 
-    @Getter
-    @Setter
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Client {
 
         private String name;
