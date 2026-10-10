@@ -255,6 +255,7 @@ export default defineConfig([
       'src/embed-shims/next-image.tsx',
       'src/components/chat/chat-attachment-bar.tsx',
       'src/components/agent-mark.tsx',
+      'src/components/agent-mark-packaged-fae.tsx',
     ],
     rules: { '@next/next/no-img-element': 'off' },
   },

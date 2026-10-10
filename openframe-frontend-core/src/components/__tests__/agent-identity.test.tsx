@@ -27,15 +27,16 @@ describe("an agent's mark is its identity's icon", () => {
     expect(html).not.toContain('data:image');
   });
 
-  it('keeps the packaged marks when the host names no identity icon', () => {
+  it('keeps the packaged marks when the host names no identity icon', async () => {
     const html = markup(
       <>
         <AgentMark agent="fae" />
         <AgentMark agent="mingo" />
       </>,
     );
-    expect(html).toContain('data:image');
     expect(html).toContain('<svg');
+    // Fae's packaged picture is fetched when it is drawn.
+    await waitFor(() => expect(screen.getByTestId('marks').innerHTML).toContain('data:image'));
   });
 
   it("keeps the packaged mark for an identity that names the agent's own mark", () => {
@@ -110,7 +111,7 @@ describe('with no copy from the host, the identities are read from the server', 
       </div>,
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId('marks').innerHTML).toContain('data:image');
+    await waitFor(() => expect(screen.getByTestId('marks').innerHTML).toContain('data:image'));
   });
 
   it('asks for nothing, and needs no query client, when the host gave its copy', () => {

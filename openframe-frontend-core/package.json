@@ -24,6 +24,8 @@
     "!src/components/icons-v2/**/*.svg"
   ],
   "exports": {
+    "./optimize-imports-loader": "./dist/build/optimize-imports-loader.cjs",
+    "./dist/*": "./dist/*",
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
@@ -363,8 +365,8 @@
   "scripts": {
     "type-check": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/type-check.tsbuildinfo",
     "dev": "NODE_OPTIONS='--max-old-space-size=8192' tsup --watch",
-    "build": "rm -rf dist && NODE_OPTIONS='--max-old-space-size=8192' tsup && node scripts/build-esm-modules.mjs && tsc -p tsconfig.declarations.json",
-    "build:fast": "NODE_OPTIONS='--max-old-space-size=8192' tsup --no-dts && node scripts/build-esm-modules.mjs",
+    "build": "rm -rf dist && NODE_OPTIONS='--max-old-space-size=8192' tsup && node scripts/build-esm-modules.mjs && node scripts/build-export-map.mjs && tsc -p tsconfig.declarations.json",
+    "build:fast": "NODE_OPTIONS='--max-old-space-size=8192' tsup --no-dts && node scripts/build-esm-modules.mjs && node scripts/build-export-map.mjs",
     "clean": "rm -rf dist node_modules/.cache",
     "prepack": "NODE_OPTIONS='--max-old-space-size=8192' npm run build",
     "prepublishOnly": "node scripts/check-publish-manifest.mjs",
@@ -372,7 +374,7 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "yalc:watch": "NODE_OPTIONS='--max-old-space-size=4096' nodemon --watch src --watch tsconfig.json --watch tsup.config.ts --watch tailwind.config.ts --watch package.json -e ts,tsx,json,css --ignore dist --ignore node_modules --ignore '*.lock' --ignore .yalc --ignore yalc.lock --exec 'rm -rf dist && tsup && node scripts/build-esm-modules.mjs && tsc -p tsconfig.declarations.json && yalc push --changed ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}'",
+    "yalc:watch": "NODE_OPTIONS='--max-old-space-size=4096' nodemon --watch src --watch tsconfig.json --watch tsup.config.ts --watch tailwind.config.ts --watch package.json -e ts,tsx,json,css --ignore dist --ignore node_modules --ignore '*.lock' --ignore .yalc --ignore yalc.lock --exec 'rm -rf dist && tsup && node scripts/build-esm-modules.mjs && node scripts/build-export-map.mjs && tsc -p tsconfig.declarations.json && yalc push --changed ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}'",
     "yalc:push": "yalc push ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "yalc:publish": "yalc publish ${YALC_STORE_FOLDER:+--store-folder \"$YALC_STORE_FOLDER\"}",
     "generate:icons": "node scripts/generate-icons.mjs",

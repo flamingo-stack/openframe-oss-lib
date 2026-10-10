@@ -1,11 +1,13 @@
 'use client';
 
-import { createElement } from 'react';
+import { createElement, lazy, Suspense } from 'react';
 
-import { FAE_AVATAR_DATA_URI } from '../assets/fae-avatar';
 import { useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
 import { MingoIcon, type MingoIconProps } from './icons/mingo-icon';
+
+/** Fae's packaged avatar, fetched when it is drawn: a host that provides the identities never needs it. */
+const PackagedFaeAvatar = lazy(() => import('./agent-mark-packaged-fae'));
 
 export type AgentName = 'fae' | 'mingo';
 
@@ -27,12 +29,7 @@ export interface AgentMarkProps extends Pick<MingoIconProps, 'color' | 'eyesColo
  * Mingo's vector (tinted by the colour props), Fae's avatar. Just the glyph —
  * the caller sizes/boxes it. Decorative in every form.
  */
-export function AgentMark({
-  agent,
-  className = '',
-  faeAvatarSrc = FAE_AVATAR_DATA_URI,
-  ...mingoColors
-}: AgentMarkProps) {
+export function AgentMark({ agent, className = '', faeAvatarSrc, ...mingoColors }: AgentMarkProps) {
   const identity = useAgentIdentityIcon(agent);
   if (identity?.url) {
     return <img src={identity.url} alt="" className={className} loading="lazy" decoding="async" />;
@@ -44,7 +41,12 @@ export function AgentMark({
   }
   return agent === 'mingo' ? (
     <MingoIcon className={className} aria-hidden="true" focusable="false" {...mingoColors} />
-  ) : (
+  ) : faeAvatarSrc ? (
     <img src={faeAvatarSrc} alt="" className={className} />
+  ) : (
+    // The mark's own box holds the place while the packaged picture loads.
+    <Suspense fallback={<span aria-hidden="true" className={className} />}>
+      <PackagedFaeAvatar className={className} />
+    </Suspense>
   );
 }
