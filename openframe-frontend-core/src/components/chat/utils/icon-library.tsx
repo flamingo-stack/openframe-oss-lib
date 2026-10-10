@@ -295,6 +295,12 @@ export function resolveIcon(
   return ICON_ALIASES[iconName] ?? resolveFromLibrary(iconName) ?? FileIcon;
 }
 
+/** The icon a name resolves to, or `null` when the set holds none: for a caller that draws nothing in that case (`resolveIcon` draws a fallback glyph). */
+export function findIcon(iconName: string | null | undefined): IconComponent | null {
+  if (!iconName) return null;
+  return ICON_ALIASES[iconName] ?? resolveFromLibrary(iconName) ?? null;
+}
+
 /** One selectable icon in the admin slash-command picker. */
 export interface IconOption {
   /** Stored `icon_name` value — a kebab-case `icons-v2-generated` key (or a

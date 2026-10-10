@@ -58,6 +58,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'trust-center': 'shield-check',
   // The public website's own pages (live source): the site's own mark, as a glyph in the slot's colour
   'website-pages': 'flamingo-logo-grey',
+  'openframe-pricing': 'money-bill-dollar',
   // The OpenMSP vendor directory: the icon the site menu's "Tool directory" entry draws (it reads this one)
   vendors: 'package-search',
 
@@ -150,6 +151,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   // Trust
   'trust-center': 'Trust Center',
   'website-pages': 'Website',
+  'openframe-pricing': 'OpenFrame pricing',
   vendors: 'Vendor Directory',
 
   // Financials
@@ -255,6 +257,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   // Trust
   trust_center: 'trust-center',
   site_page: 'website-pages',
+  openframe_price: 'openframe-pricing',
   vendor: 'vendors',
 
   // Financials

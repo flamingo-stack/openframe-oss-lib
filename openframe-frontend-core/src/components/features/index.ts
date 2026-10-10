@@ -32,6 +32,7 @@ export * from './github-releases-manager';
 export * from './knowledge-base-links-manager';
 export * from './loading-provider';
 export * from './media-gallery-manager';
+export * from './model-token-rates';
 export * from './more-about-button';
 export * from './os-type-badge';
 export * from './os-type-badge-group';

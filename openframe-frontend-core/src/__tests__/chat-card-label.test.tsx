@@ -72,3 +72,15 @@ describe('trust_center source wiring', () => {
     expect(extractCardItems('faq', payload)).toEqual([TRUST_CENTER_FIXTURE_FAQ]);
   });
 });
+
+describe('openframe_price source wiring', () => {
+  it('has a card label, a table, a chip label, an icon and a hydration URL', () => {
+    expect(chatCardLabel('openframe_price')).toBe('OpenFrame price');
+    expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.openframe_price).toBe('openframe-pricing');
+    expect(getSourceLabel('openframe-pricing')).toBe('OpenFrame pricing');
+    expect(SOURCE_ICON_NAMES['openframe-pricing']).toBe('money-bill-dollar');
+    expect(buildListUrl('openframe_price', ['plan', 'model-claude-opus-5-5'])).toBe(
+      '/api/openframe-pricing?ids=plan,model-claude-opus-5-5',
+    );
+  });
+});
