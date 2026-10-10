@@ -315,14 +315,13 @@ export function TrustCenterPage({
       </TrustCenterChrome>
       {beforeFaq}
       {faqLast && faqSection && data ? (
-        // The page's own content box and the sections' column, so the FAQ lines up with what is above the host content.
+        // The page's own content box at its FULL width (no section-rail column): a closing FAQ takes the
+        // same space the FAQ block takes at the foot of every other page.
         <div className={shell ? 'bg-ods-bg' : undefined}>
           <div className={shell ? 'page-shell-content mx-auto max-w-[1920px]' : 'page-shell-content'}>
-            <div className={TRUST_BODY_GRID_CLASS}>
-              <TrustSection id={faqSection.id} title={faqSection.label} lead={views.faq.lead}>
-                {views.faq.render(data)}
-              </TrustSection>
-            </div>
+            <TrustSection id={faqSection.id} title={faqSection.label} lead={views.faq.lead}>
+              {views.faq.render(data)}
+            </TrustSection>
           </div>
         </div>
       ) : null}
