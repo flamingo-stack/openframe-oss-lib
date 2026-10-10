@@ -3,14 +3,14 @@
 import { type ComponentType, type ReactNode, useState } from 'react';
 import { cn } from '../../utils/cn';
 import {
-  formatTokenAmount,
+  formatTokenPrice,
   formatTokenRate,
   groupTokenRatesByProvider,
   type ModelTokenRate,
-  TOKEN_RATE_EXAMPLE,
   paginateTokenRates,
   type TokenRatePage,
-  tokenRateExampleCost,
+  type TokenPrice,
+  tokenRatePrice,
   tokenRateProviderLabel,
 } from '../../utils/model-token-rates';
 import { AnthropicLogoGreyIcon } from '../icons-v2-generated/brand-logos/anthropic-logo-grey-icon';
@@ -40,9 +40,10 @@ import { TabSelector } from '../ui/tab-selector';
  * them in, with `status` saying where that read stands. Each holds ONE height
  * loading, loaded, failed or empty.
  *
- * A rate is the number of OpenFrame tokens ONE token of the model uses. The
- * paged table also works one example request out per model
- * (`TOKEN_RATE_EXAMPLE`), because a total is easier to compare than three rates.
+ * A rate is the number of OpenFrame tokens ONE token of the model uses. Given
+ * what OpenFrame tokens cost (`tokenPrice`), the paged table states each model
+ * the way every provider's price list does: USD per million tokens, for input,
+ * cached input and output, with the rate beside it.
  */
 
 /** Where the host's read of the rates stands. */
@@ -57,12 +58,15 @@ export const MODEL_TOKEN_RATES_COPY = {
   input: 'Input',
   output: 'Output',
   cached: 'Cached input',
+  /** The same column where there is no room for two words. */
+  cachedShort: 'Cached',
   /** "1 of 2", after a provider whose models take more than one page. */
   pageOf: (page: number, pages: number) => `${page} of ${pages}`,
-  /** The example column's name: the request it works out, in OpenFrame tokens. "10K in + 1K out" */
-  example: (input: string, output: string) => `${input} in + ${output} out`,
-  /** The same column's name where there is no room for the request. */
-  exampleShort: 'Example',
+  /** The paged table's unit, in its title bar. */
+  priceUnit: 'USD per 1M tokens',
+  /** The column that ties a price back to what the balance is counted in: "1.33× in · 6.67× out". */
+  rate: 'Token rate',
+  rateOf: (input: string, output: string) => `${input} in \u00b7 ${output} out`,
   autoTopUp: { on: 'Auto Top Up Enabled', off: 'Auto Top Up Disabled' },
   unavailable: {
     title: 'Rates unavailable',
@@ -351,6 +355,12 @@ export interface ModelTokenRatePagesProps {
   rates?: readonly ModelTokenRate[];
   /** Where the read stands. Default `ready`. */
   status?: ModelTokenRatesStatus;
+  /**
+   * What OpenFrame tokens cost. Given: every figure is USD per 1M of the model's
+   * tokens and the rate is a column of its own. Not given (the host could not
+   * read the price): the figures are the rates themselves.
+   */
+  tokenPrice?: TokenPrice | null;
   /** Move to the next page after this long; `0` never moves by itself. Default: the carousel's own interval. */
   autoAdvanceMs?: number;
   className?: string;
@@ -367,20 +377,20 @@ const PAGE_LINE_CLASS = cn(
   'flex h-10 items-center gap-[var(--spacing-system-xs)] sm:gap-[var(--spacing-system-mf)]',
   PAGE_PAD_X,
 );
-const PAGE_NUMBER_CELL = 'w-11 shrink-0 whitespace-nowrap text-right tabular-nums sm:w-24';
-/** From the `sm` width up: on a phone the model's name needs the room more than a third rate does. */
-const PAGE_CACHED_CELL = 'hidden w-24 shrink-0 whitespace-nowrap text-right tabular-nums sm:block';
-const PAGE_EXAMPLE_CELL = 'w-14 shrink-0 whitespace-nowrap text-right tabular-nums sm:w-40';
+const PAGE_NUMBER_CELL = 'w-14 shrink-0 whitespace-nowrap text-right tabular-nums sm:w-28';
+/** From the `md` width up: the rate is the detail behind the price, and a phone has no room for it. */
+const PAGE_RATE_CELL =
+  'hidden w-44 shrink-0 whitespace-nowrap text-right tabular-nums text-ods-text-secondary md:block';
 /** The slots of one page, as keys. */
 const PAGE_SLOTS = Array.from({ length: MODEL_TOKEN_RATES_PAGE_SIZE }, (_, index) => index);
 
 /**
- * The rates as a TABLE, a page at a time: rows are models and columns are what
- * a token of each uses, so two models compare by reading down a column. The
- * pages sit on the lib's `SnapCarousel` (the control under the customer
- * stories): it moves to the next page by itself on the carousel's timer, with
- * its pause control, dots, counter, arrows and swipe. A provider's models keep
- * together and each page names its provider.
+ * The rates as a price list, a page at a time: rows are models and the columns
+ * are input, cached input and output, so two models compare by reading down a
+ * column. The pages sit on the lib's `SnapCarousel` (the control under the
+ * customer stories): it moves to the next page by itself on the carousel's
+ * timer, with its pause control, dots, counter, arrows and swipe. A provider's
+ * models keep together and each page names its provider.
  *
  * ONE height in every state: a page always draws `MODEL_TOKEN_RATES_PAGE_SIZE`
  * row slots, and loading, failed and empty draw the same frame.
@@ -388,6 +398,7 @@ const PAGE_SLOTS = Array.from({ length: MODEL_TOKEN_RATES_PAGE_SIZE }, (_, index
 export function ModelTokenRatePages({
   rates = [],
   status = 'ready',
+  tokenPrice,
   autoAdvanceMs,
   className,
 }: ModelTokenRatePagesProps) {
@@ -422,7 +433,7 @@ export function ModelTokenRatePages({
       label={MODEL_TOKEN_RATES_COPY.carousel}
       autoAdvanceMs={autoAdvanceMs}
       slideClassName="min-w-0 basis-full"
-      renderItem={page => <ModelTokenRatePage page={page} />}
+      renderItem={page => <ModelTokenRatePage page={page} tokenPrice={tokenPrice} />}
     />
   );
 }
@@ -440,16 +451,17 @@ function PageSlots() {
   );
 }
 
-/** One page: its provider, the column names (the unit stated once, over the rates), then a row per model. */
-function ModelTokenRatePage({ page }: { page: TokenRatePage }) {
+/** One page: its provider and the unit (stated once, over the figures), the column names, then a row per model. */
+function ModelTokenRatePage({ page, tokenPrice }: { page: TokenRatePage; tokenPrice?: TokenPrice | null }) {
   const Icon = PROVIDER_ICON[page.providerType];
   const provider = tokenRateProviderLabel(page.providerType);
-  const example = MODEL_TOKEN_RATES_COPY.example(
-    formatTokenAmount(TOKEN_RATE_EXAMPLE.inputTokens),
-    formatTokenAmount(TOKEN_RATE_EXAMPLE.outputTokens),
-  );
+  // Priced: USD per 1M tokens, the rate in its own column. Not priced: the rates are the figures.
+  const priced = tokenRatePrice(1, tokenPrice) !== null;
+  const unit = priced ? MODEL_TOKEN_RATES_COPY.priceUnit : MODEL_TOKEN_RATES_COPY.unit;
+  const figure = (rate: number | null | undefined) =>
+    priced ? formatTokenPrice(tokenRatePrice(rate, tokenPrice)) : formatTokenRate(rate);
   return (
-    <div role="table" aria-label={`${provider}: ${MODEL_TOKEN_RATES_COPY.unit}`} className={PAGE_FRAME_CLASS}>
+    <div role="table" aria-label={`${provider}: ${unit}`} className={PAGE_FRAME_CLASS}>
       <div className={cn(PAGE_LINE_CLASS, 'border-b border-ods-border')}>
         {Icon && <Icon className="size-6 shrink-0 text-ods-text-secondary" />}
         <span className="shrink-0 text-ods-text-primary text-h4">{provider}</span>
@@ -458,9 +470,7 @@ function ModelTokenRatePage({ page }: { page: TokenRatePage }) {
             {MODEL_TOKEN_RATES_COPY.pageOf(page.page, page.pages)}
           </span>
         )}
-        <span className="ml-auto hidden min-w-0 truncate text-ods-text-secondary text-h6 sm:block">
-          {MODEL_TOKEN_RATES_COPY.unit}
-        </span>
+        <span className="ml-auto min-w-0 truncate text-ods-text-secondary text-h6">{unit}</span>
       </div>
       <div role="row" className={cn(PAGE_LINE_CLASS, 'uppercase tracking-[-0.02em] text-ods-text-secondary text-h5')}>
         <span role="columnheader" className="min-w-0 flex-1 truncate">
@@ -469,16 +479,18 @@ function ModelTokenRatePage({ page }: { page: TokenRatePage }) {
         <span role="columnheader" className={PAGE_NUMBER_CELL}>
           {MODEL_TOKEN_RATES_COPY.input}
         </span>
+        <span role="columnheader" aria-label={MODEL_TOKEN_RATES_COPY.cached} className={PAGE_NUMBER_CELL}>
+          <span className="sm:hidden">{MODEL_TOKEN_RATES_COPY.cachedShort}</span>
+          <span className="hidden sm:inline">{MODEL_TOKEN_RATES_COPY.cached}</span>
+        </span>
         <span role="columnheader" className={PAGE_NUMBER_CELL}>
           {MODEL_TOKEN_RATES_COPY.output}
         </span>
-        <span role="columnheader" className={PAGE_CACHED_CELL}>
-          {MODEL_TOKEN_RATES_COPY.cached}
-        </span>
-        <span role="columnheader" aria-label={example} className={PAGE_EXAMPLE_CELL}>
-          <span className="sm:hidden">{MODEL_TOKEN_RATES_COPY.exampleShort}</span>
-          <span className="hidden sm:inline">{example}</span>
-        </span>
+        {priced && (
+          <span role="columnheader" className={PAGE_RATE_CELL}>
+            {MODEL_TOKEN_RATES_COPY.rate}
+          </span>
+        )}
       </div>
       <div role="rowgroup">
         {PAGE_SLOTS.map(slot => {
@@ -495,17 +507,22 @@ function ModelTokenRatePage({ page }: { page: TokenRatePage }) {
                 {rate.displayName || rate.modelName}
               </span>
               <span role="cell" className={PAGE_NUMBER_CELL}>
-                {formatTokenRate(rate.inputTokenRate)}
+                {figure(rate.inputTokenRate)}
               </span>
               <span role="cell" className={PAGE_NUMBER_CELL}>
-                {formatTokenRate(rate.outputTokenRate)}
+                {figure(rate.cacheReadInputTokenRate)}
               </span>
-              <span role="cell" className={cn(PAGE_CACHED_CELL, 'text-ods-text-secondary')}>
-                {formatTokenRate(rate.cacheReadInputTokenRate)}
+              <span role="cell" className={PAGE_NUMBER_CELL}>
+                {figure(rate.outputTokenRate)}
               </span>
-              <span role="cell" className={PAGE_EXAMPLE_CELL}>
-                {formatTokenAmount(tokenRateExampleCost(rate))}
-              </span>
+              {priced && (
+                <span role="cell" className={PAGE_RATE_CELL}>
+                  {MODEL_TOKEN_RATES_COPY.rateOf(
+                    formatTokenRate(rate.inputTokenRate),
+                    formatTokenRate(rate.outputTokenRate),
+                  )}
+                </span>
+              )}
             </div>
           );
         })}
@@ -518,10 +535,10 @@ function ModelTokenRatePage({ page }: { page: TokenRatePage }) {
 export function ModelTokenRatePagesSkeleton({ className }: { className?: string }) {
   const cells = (
     <>
-      <Skeleton className="h-4 w-10 shrink-0 sm:ml-14" />
-      <Skeleton className="h-4 w-10 shrink-0 sm:ml-14" />
-      <Skeleton className="hidden h-4 w-10 shrink-0 sm:ml-14 sm:block" />
-      <Skeleton className="h-4 w-12 shrink-0 sm:ml-20 sm:w-20" />
+      <Skeleton className="h-4 w-10 shrink-0 sm:ml-16 sm:w-12" />
+      <Skeleton className="h-4 w-10 shrink-0 sm:ml-16 sm:w-12" />
+      <Skeleton className="h-4 w-10 shrink-0 sm:ml-16 sm:w-12" />
+      <Skeleton className="hidden h-4 w-28 shrink-0 md:ml-16 md:block" />
     </>
   );
   return (

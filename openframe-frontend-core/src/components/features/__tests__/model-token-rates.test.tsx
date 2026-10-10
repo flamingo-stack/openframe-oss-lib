@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
-  formatTokenAmount,
+  formatTokenPrice,
   formatTokenRate,
   groupTokenRatesByProvider,
   type ModelTokenRate,
   paginateTokenRates,
   TOKEN_RATE_EMPTY,
-  tokenRateExampleCost,
+  tokenRatePrice,
   tokenRateProviderLabel,
 } from '../../../utils/model-token-rates';
 import { MODEL_TOKEN_RATES_COPY, ModelTokenRatePages, ModelTokenRates } from '../model-token-rates';
@@ -63,26 +63,26 @@ describe('formatTokenRate', () => {
   });
 });
 
-describe('the example request', () => {
-  it('uses what it reads at the input rate plus what it writes at the output rate', () => {
-    expect(tokenRateExampleCost({ inputTokenRate: 1, outputTokenRate: 5 })).toBe(15_000);
-    expect(tokenRateExampleCost({ inputTokenRate: 1.3333, outputTokenRate: 6.6667 })).toBeCloseTo(20_000, 0);
-    expect(
-      tokenRateExampleCost({ inputTokenRate: 2, outputTokenRate: 4 }, { inputTokens: 100, outputTokens: 10 }),
-    ).toBe(240);
+describe('a price per million tokens', () => {
+  const TEN_PER_MILLION = { tokens: 1_000_000, price: 10 };
+
+  it('is the rate times what a million OpenFrame tokens cost', () => {
+    expect(tokenRatePrice(1.3333, TEN_PER_MILLION)).toBeCloseTo(13.333);
+    expect(tokenRatePrice(1, { tokens: 500_000, price: 10 })).toBe(20);
   });
 
-  it('is not worked out without both rates', () => {
-    expect(tokenRateExampleCost({ inputTokenRate: 0, outputTokenRate: 5 })).toBeNull();
-    expect(tokenRateExampleCost({ inputTokenRate: 1, outputTokenRate: Number.NaN })).toBeNull();
+  it('is never guessed: no rate, or no price, is no figure', () => {
+    expect(tokenRatePrice(null, TEN_PER_MILLION)).toBeNull();
+    expect(tokenRatePrice(1, null)).toBeNull();
+    expect(tokenRatePrice(1, { tokens: 0, price: 10 })).toBeNull();
   });
 
-  it('writes a token count in short form', () => {
-    expect(formatTokenAmount(850)).toBe('850');
-    expect(formatTokenAmount(10_000)).toBe('10K');
-    expect(formatTokenAmount(16_667)).toBe('16.7K');
-    expect(formatTokenAmount(1_250_000)).toBe('1.25M');
-    expect(formatTokenAmount(null)).toBe(TOKEN_RATE_EMPTY);
+  it('is written to the cent, and a price under ten cents keeps two significant digits', () => {
+    expect(formatTokenPrice(13.333)).toBe('$13.33');
+    expect(formatTokenPrice(5)).toBe('$5.00');
+    expect(formatTokenPrice(0.333)).toBe('$0.33');
+    expect(formatTokenPrice(0.0333)).toBe('$0.033');
+    expect(formatTokenPrice(null)).toBe(TOKEN_RATE_EMPTY);
   });
 });
 
@@ -167,26 +167,36 @@ describe('ModelTokenRatePages (a page)', () => {
   // Pages off the first position are hidden from assistive tech, so they are read with `hidden`.
   const tables = () => screen.queryAllByRole('table', { hidden: true });
 
-  it('is one table per provider page, each row a model with its rates and the example worked out', () => {
-    render(<ModelTokenRatePages rates={RATES} />);
+  const TEN_PER_MILLION = { tokens: 1_000_000, price: 10 };
+  const cellsIn = (table: HTMLElement, name: RegExp) =>
+    within(within(table).getByRole('row', { name }))
+      .getAllByRole('cell')
+      .map(cell => cell.textContent);
+
+  it('given what OpenFrame tokens cost, is a price list: USD per 1M tokens for input, cached input and output, with the rate beside it', () => {
+    render(<ModelTokenRatePages rates={RATES} tokenPrice={TEN_PER_MILLION} />);
     expect(tables()).toHaveLength(2);
+    const anthropic = screen.getByRole('table', { name: `Anthropic: ${MODEL_TOKEN_RATES_COPY.priceUnit}` });
+    expect(cellsIn(anthropic, /Claude Opus 5\.5/)).toEqual([
+      '$13.33',
+      '$0.67',
+      '$66.67',
+      MODEL_TOKEN_RATES_COPY.rateOf('1.33×', '6.67×'),
+    ]);
+    // No cached rate: no price is stated for it.
+    expect(cellsIn(anthropic, /claude-sonnet-4-6/)).toEqual([
+      '$10.00',
+      TOKEN_RATE_EMPTY,
+      '$50.00',
+      MODEL_TOKEN_RATES_COPY.rateOf('1×', '5×'),
+    ]);
+  });
+
+  it('without a price, states the rates themselves and no rate column', () => {
+    render(<ModelTokenRatePages rates={RATES} />);
     const anthropic = screen.getByRole('table', { name: `Anthropic: ${MODEL_TOKEN_RATES_COPY.unit}` });
-    const opus = within(anthropic).getByRole('row', { name: /Claude Opus 5\.5/ });
-    expect(
-      within(opus)
-        .getAllByRole('cell')
-        .map(cell => cell.textContent),
-    ).toEqual(['1.33×', '6.67×', '0.067×', '20K']);
-    // No cached rate: none is stated.
-    const sonnet = within(anthropic).getByRole('row', { name: /claude-sonnet-4-6/ });
-    expect(
-      within(sonnet)
-        .getAllByRole('cell')
-        .map(cell => cell.textContent),
-    ).toEqual(['1×', '5×', TOKEN_RATE_EMPTY, '15K']);
-    expect(
-      within(anthropic).getByRole('columnheader', { name: MODEL_TOKEN_RATES_COPY.example('10K', '1K') }),
-    ).toBeTruthy();
+    expect(cellsIn(anthropic, /Claude Opus 5\.5/)).toEqual(['1.33×', '0.067×', '6.67×']);
+    expect(within(anthropic).queryByRole('columnheader', { name: MODEL_TOKEN_RATES_COPY.rate })).toBeNull();
   });
 
   it("moves by itself on the carousel's timer, with a control to stop it, unless told not to", () => {
