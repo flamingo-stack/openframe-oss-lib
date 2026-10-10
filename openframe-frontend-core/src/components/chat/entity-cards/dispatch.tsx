@@ -1507,6 +1507,9 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   // A page of the public website (pricing, product, legal, and every page the navigation lists), read live
   // from the data the page shows. A glyph card: a page has no cover of its own, and the card opens the page.
   site_page: { label: 'Website page', icon: ref => <SitePageGlyph iconName={refText(ref, 'icon_name')} /> },
+  // What OpenFrame charges, read live from its billing: the plan in force, or one AI model's token exchange
+  // rate. A glyph card; it opens the pricing page.
+  openframe_price: { label: 'OpenFrame price', icon: () => <OpenFrameGlyph size={24} /> },
   // A vendor (product) of the OpenMSP directory. A glyph card; it opens the vendor's page there.
   vendor: { label: 'Vendor', icon: ref => <VendorGlyph title={ref?.title ?? ''} logoUrl={refText(ref, 'logo_url')} /> },
 };
