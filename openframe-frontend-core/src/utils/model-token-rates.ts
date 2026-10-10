@@ -31,33 +31,28 @@ export function formatTokenRate(value: number | null | undefined): string {
   return `${rounded}\u00d7`;
 }
 
-/** What OpenFrame tokens cost: `price` USD buys `tokens` of them. */
-export interface TokenPrice {
-  tokens: number;
-  price: number;
+/** A token count in short form: "850", "10K", "750K", "1.25M". */
+export function formatTokenAmount(tokens: number | null | undefined): string {
+  if (tokens == null || !Number.isFinite(tokens) || tokens < 0) return TOKEN_RATE_EMPTY;
+  const short = (value: number) => String(Number(value.toPrecision(3)));
+  if (tokens >= 1_000_000) return `${short(tokens / 1_000_000)}M`;
+  if (tokens >= 1_000) return `${short(tokens / 1_000)}K`;
+  return String(Math.round(tokens));
 }
 
-/** The size every provider quotes a model's price for. */
-export const TOKEN_PRICE_UNIT = 1_000_000;
+/** A rate as a plain number, for a sentence that names its own unit: "1.33", "0.067". */
+export function formatTokenRateNumber(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return TOKEN_RATE_EMPTY;
+  return String(value >= 0.1 ? Number(value.toFixed(2)) : Number(value.toPrecision(2)));
+}
 
 /**
- * What one million of a model's tokens cost in USD: its rate (OpenFrame tokens
- * per token) times what a million OpenFrame tokens cost. Null when either is
- * missing: a price is never guessed.
+ * How many of a model's tokens a balance of OpenFrame tokens runs at a rate:
+ * the balance divided by the rate. Null without a rate.
  */
-export function tokenRatePrice(
-  rate: number | null | undefined,
-  tokenPrice: TokenPrice | null | undefined,
-): number | null {
-  if (rate == null || !Number.isFinite(rate) || rate <= 0) return null;
-  if (!tokenPrice || !(tokenPrice.tokens > 0) || !(tokenPrice.price > 0)) return null;
-  return rate * TOKEN_PRICE_UNIT * (tokenPrice.price / tokenPrice.tokens);
-}
-
-/** A price per million tokens: to the cent from ten cents up ("$13.33", "$0.33"), two significant digits under it ("$0.033"). */
-export function formatTokenPrice(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value) || value <= 0) return TOKEN_RATE_EMPTY;
-  return `$${value >= 0.1 ? value.toFixed(2) : Number(value.toPrecision(2))}`;
+export function tokensForBalance(balance: number, rate: number | null | undefined): number | null {
+  if (rate == null || !Number.isFinite(rate) || rate <= 0 || !(balance > 0)) return null;
+  return balance / rate;
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -90,36 +85,4 @@ export function groupTokenRatesByProvider<T extends ModelTokenRate>(
     else groups.set(rate.providerType, [rate]);
   }
   return [...groups].map(([providerType, grouped]) => ({ providerType, rates: grouped }));
-}
-
-/** One page of a provider's rates: at most `pageSize` models, and where it sits among that provider's pages. */
-export interface TokenRatePage<T extends ModelTokenRate = ModelTokenRate> {
-  providerType: string;
-  /** 1-based, within the provider. */
-  page: number;
-  pages: number;
-  rates: T[];
-}
-
-/**
- * The rates as pages of at most `pageSize` models, provider by provider. A
- * provider's models are spread EVENLY over its pages (13 models at 7 a page are
- * 7 and 6, never 7 and 6 and a page of none; 8 are 4 and 4, never 7 and 1), so
- * no page is a stub.
- */
-export function paginateTokenRates<T extends ModelTokenRate>(
-  rates: readonly T[],
-  pageSize: number,
-): TokenRatePage<T>[] {
-  const size = Math.max(1, Math.floor(pageSize));
-  return groupTokenRatesByProvider(rates).flatMap(group => {
-    const pages = Math.ceil(group.rates.length / size);
-    const perPage = Math.ceil(group.rates.length / pages);
-    return Array.from({ length: pages }, (_, index) => ({
-      providerType: group.providerType,
-      page: index + 1,
-      pages,
-      rates: group.rates.slice(index * perPage, (index + 1) * perPage),
-    }));
-  });
 }
