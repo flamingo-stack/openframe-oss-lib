@@ -40,12 +40,6 @@ export function formatTokenAmount(tokens: number | null | undefined): string {
   return String(Math.round(tokens));
 }
 
-/** A rate as a plain number, for a sentence that names its own unit: "1.33", "0.067". */
-export function formatTokenRateNumber(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value) || value <= 0) return TOKEN_RATE_EMPTY;
-  return String(value >= 0.1 ? Number(value.toFixed(2)) : Number(value.toPrecision(2)));
-}
-
 /**
  * How many of a model's tokens a balance of OpenFrame tokens runs at a rate:
  * the balance divided by the rate. Null without a rate.

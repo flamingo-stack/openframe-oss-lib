@@ -1,9 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   formatTokenAmount,
   formatTokenRate,
-  formatTokenRateNumber,
   groupTokenRatesByProvider,
   type ModelTokenRate,
   TOKEN_RATE_EMPTY,
@@ -75,14 +74,11 @@ describe('what a balance runs', () => {
     expect(tokensForBalance(0, 1)).toBeNull();
   });
 
-  it('writes a token count in short form and a rate as a plain number', () => {
+  it('writes a token count in short form', () => {
     expect(formatTokenAmount(850)).toBe('850');
     expect(formatTokenAmount(750_019)).toBe('750K');
     expect(formatTokenAmount(1_250_000)).toBe('1.25M');
     expect(formatTokenAmount(null)).toBe(TOKEN_RATE_EMPTY);
-    expect(formatTokenRateNumber(1.3333)).toBe('1.33');
-    expect(formatTokenRateNumber(0.0667)).toBe('0.067');
-    expect(formatTokenRateNumber(undefined)).toBe(TOKEN_RATE_EMPTY);
   });
 });
 
@@ -140,44 +136,44 @@ describe('ModelTokenRates (the popover table)', () => {
 
 describe('ModelTokenExchange (a page)', () => {
   const copy = MODEL_TOKEN_RATES_COPY.exchange;
+  const [OPUS, LUNA] = RATES;
 
-  it('shows the first model: what a token of it charges, and what a million OpenFrame tokens run on it', () => {
-    render(<ModelTokenExchange rates={RATES} />);
-    expect(screen.getByRole('combobox', { name: copy.pick }).textContent).toContain('Claude Opus 5.5');
-    // 1 input token = 1.33, 1 output token = 6.67, 1 cached input token = 0.067 OpenFrame tokens.
+  it('states in big figures what one token of the picked model charges, and what a balance buys', () => {
+    render(<ModelTokenExchange rate={OPUS} models={RATES} balancePrice="$10.00" />);
+    expect(screen.getByText('1.33×')).toBeTruthy();
     expect(screen.getByText(copy.input)).toBeTruthy();
-    expect(screen.getByText('1.33')).toBeTruthy();
-    expect(screen.getByText('6.67')).toBeTruthy();
-    expect(screen.getByText('0.067')).toBeTruthy();
-    // 1M OpenFrame tokens run 750K input tokens, or 150K output tokens.
-    expect(screen.getByText('1M')).toBeTruthy();
-    expect(screen.getByText(copy.buys)).toBeTruthy();
-    expect(screen.getByText('750K')).toBeTruthy();
-    expect(screen.getByText(copy.orOutput('150K'))).toBeTruthy();
+    expect(screen.getByText('6.67×')).toBeTruthy();
+    expect(screen.getByText(copy.output)).toBeTruthy();
+    expect(screen.getByText(copy.buys('1M ($10.00)', '750K', '150K'))).toBeTruthy();
   });
 
-  it('works the exchange out for the balance and caption the host names', () => {
-    render(<ModelTokenExchange rates={RATES} balance={10_000_000} balanceCaption="included every month" />);
-    expect(screen.getByText('10M')).toBeTruthy();
-    expect(screen.getByText('included every month')).toBeTruthy();
-    expect(screen.getByText('7.5M')).toBeTruthy();
-    expect(screen.getByText(copy.orOutput('1.5M'))).toBeTruthy();
+  it('works the last line out for the balance the host names', () => {
+    render(<ModelTokenExchange rate={OPUS} models={RATES} balance={10_000_000} />);
+    expect(screen.getByText(copy.buys('10M', '7.5M', '1.5M'))).toBeTruthy();
   });
 
-  it('states no figure for a rate the model does not have', () => {
-    render(<ModelTokenExchange rates={[RATES[2]]} />);
-    expect(screen.getByText(copy.cached)).toBeTruthy();
-    expect(screen.getByText(TOKEN_RATE_EMPTY)).toBeTruthy();
+  it("searches on the host: what is typed is handed over, and the options are exactly the host's answer", () => {
+    const onQueryChange = vi.fn();
+    const onPick = vi.fn();
+    render(<ModelTokenExchange rate={OPUS} models={[LUNA]} query="" onQueryChange={onQueryChange} onPick={onPick} />);
+    const input = screen.getByPlaceholderText(copy.search);
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'luna' } });
+    expect(onQueryChange).toHaveBeenLastCalledWith('luna');
+    // "claude-sonnet-4-6" is not in the host's answer, so it is not offered: the picker filters nothing itself.
+    expect(screen.queryByRole('option', { name: /claude-sonnet-4-6/ })).toBeNull();
+    fireEvent.click(screen.getByRole('option', { name: /GPT-6 Luna/ }));
+    expect(onPick).toHaveBeenCalledWith('gpt-6-luna');
   });
 
-  it('keeps its frame while loading, and says why when the rates fail or none is in effect', () => {
+  it('keeps its frame while loading, and says why when the rate fails or none is in effect', () => {
     const { rerender } = render(<ModelTokenExchange status="loading" />);
-    expect(screen.getByText(copy.title)).toBeTruthy();
-    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.getByText(copy.input)).toBeTruthy();
+    expect(screen.queryByText(/×/)).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     rerender(<ModelTokenExchange status="error" />);
     expect(screen.getByRole('alert').textContent).toContain(MODEL_TOKEN_RATES_COPY.unavailable.title);
-    rerender(<ModelTokenExchange rates={[]} />);
+    rerender(<ModelTokenExchange rate={null} />);
     expect(screen.getByText(MODEL_TOKEN_RATES_COPY.empty)).toBeTruthy();
   });
 });

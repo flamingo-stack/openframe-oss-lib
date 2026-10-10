@@ -5,13 +5,11 @@ import { cn } from '../../utils/cn';
 import {
   formatTokenAmount,
   formatTokenRate,
-  formatTokenRateNumber,
   groupTokenRatesByProvider,
   type ModelTokenRate,
   tokenRateProviderLabel,
   tokensForBalance,
 } from '../../utils/model-token-rates';
-import { TransferHrIcon } from '../icons-v2-generated/arrows/transfer-hr-icon';
 import { AnthropicLogoGreyIcon } from '../icons-v2-generated/brand-logos/anthropic-logo-grey-icon';
 import { GeminiLogoGreyIcon } from '../icons-v2-generated/brand-logos/gemini-logo-grey-icon';
 import { OpenaiLogoGreyIcon } from '../icons-v2-generated/brand-logos/openai-logo-grey-icon';
@@ -19,9 +17,8 @@ import { AlertTriangleIcon } from '../icons-v2-generated/interface/alert-triangl
 import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02-vr-icon';
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
-import { DashboardInfoCard } from '../ui/dashboard-info-card';
+import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../ui/select';
 import { Skeleton } from '../ui/skeleton';
 import { TabSelector } from '../ui/tab-selector';
 
@@ -30,9 +27,9 @@ import { TabSelector } from '../ui/tab-selector';
  *
  * - `ModelTokenRates` (+ `ModelTokenRatesPopover`): a small table behind a
  *   question mark, for the product's cards that count in tokens.
- * - `ModelTokenExchange`: one model's rate at a time, picked from a list, the
- *   way a currency exchange shows one pair. For a page (the website's pricing
- *   page), where the point is the idea, not every row.
+ * - `ModelTokenExchange`: one model's rate at a time, found by searching, in
+ *   big figures: the way a currency exchange shows one pair. For a page (the
+ *   website's pricing page), where the point is the idea, not every row.
  *
  * Both state a rate with the same functions (`utils/model-token-rates`,
  * server-safe), so a rate reads the same wherever it is stated. Neither
@@ -56,19 +53,15 @@ export const MODEL_TOKEN_RATES_COPY = {
   output: 'Output',
   /** The exchange card: one model's rate, as a currency exchange shows one pair. */
   exchange: {
-    title: 'Exchange rate',
-    pick: 'Choose a model',
-    input: '1 input token',
-    output: '1 output token',
-    cached: '1 cached token',
-    /** Under each rate: what the figure is. */
-    charged: 'OpenFrame tokens charged',
-    balance: 'Your balance',
-    balanceUnit: 'OpenFrame tokens',
-    /** Over what the balance runs on the model picked. */
-    buys: 'Buys',
-    /** "input tokens, or 150K output tokens" */
-    orOutput: (output: string) => `input tokens, or ${output} output tokens`,
+    pick: 'Model',
+    search: 'Search models',
+    noMatch: 'No model matches',
+    /** Under each big figure: what one token of the model charges, in OpenFrame tokens. */
+    input: 'OpenFrame tokens per input token',
+    output: 'OpenFrame tokens per output token',
+    /** "1M ($10.00) OpenFrame tokens buy 750K input tokens or 150K output tokens." */
+    buys: (balance: string, input: string, output: string) =>
+      `${balance} OpenFrame tokens buy ${input} input tokens or ${output} output tokens.`,
   },
   autoTopUp: { on: 'Auto Top Up Enabled', off: 'Auto Top Up Disabled' },
   unavailable: {
@@ -354,51 +347,90 @@ export function ModelTokenRatesSkeleton() {
 // ─── The exchange (a page) ───────────────────────────────────────────────────
 
 export interface ModelTokenExchangeProps {
-  /** The rates, once read. */
-  rates?: readonly ModelTokenRate[];
-  /** Where the read stands. Default `ready`. */
+  /** The model whose rate is shown: the one picked, once the host has read it. */
+  rate?: ModelTokenRate | null;
+  /** Where the host's read of that model stands. Default `ready`. */
   status?: ModelTokenRatesStatus;
-  /** The balance the exchange is worked out for, in OpenFrame tokens. Default one million. */
+  /**
+   * The picker's options: what the HOST's search answered for `query`. The
+   * picker never filters them itself: searching is the host's server's job.
+   */
+  models?: readonly ModelTokenRate[];
+  /** What is typed in the picker, and the host's handler for it (it searches). */
+  query?: string;
+  onQueryChange?: (query: string) => void;
+  /** The host's search is in flight. */
+  searching?: boolean;
+  /** A model was picked: its `modelName`. */
+  onPick?: (modelName: string) => void;
+  /** The balance the last line is worked out for, in OpenFrame tokens. Default one million. */
   balance?: number;
-  /** What sits under that balance's figure (what it costs, or where it comes from). */
-  balanceCaption?: ReactNode;
+  /** What that balance costs, when the host knows it ("$10.00"). */
+  balancePrice?: string | null;
   className?: string;
 }
 
 /** The balance the exchange is worked out for when the host names none. */
 export const MODEL_TOKEN_EXCHANGE_BALANCE = 1_000_000;
 
-/** A rate tile is one height at every width, with or without a wrapped caption. */
-const EXCHANGE_TILE_CLASS = 'h-full md:h-auto';
+/** A line of the card's own text height, as a bar: what a figure is while it loads. */
+function Bar({ className }: { className: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn('inline-block h-[0.8lh] animate-pulse rounded bg-ods-border align-middle', className)}
+    />
+  );
+}
+
+/** A model as a picker option: its name, its provider under it, the provider's mark beside it. */
+function modelOption(rate: ModelTokenRate): AutocompleteOption<string> {
+  const Icon = PROVIDER_ICON[rate.providerType];
+  return {
+    label: rate.displayName || rate.modelName,
+    value: rate.modelName,
+    description: tokenRateProviderLabel(rate.providerType),
+    icon: Icon ? <Icon className="size-full text-ods-text-secondary" /> : undefined,
+  };
+}
 
 /**
  * The exchange rate of ONE model, the way a currency exchange shows one pair:
- * pick the model, read what a token of it charges to the balance, and see what
- * a balance of OpenFrame tokens runs on it. A picker, not a list: one model is
- * one answer, and the block is the same size whichever model is picked.
+ * search for the model, and read in big figures what one token of it charges to
+ * the balance: "1.33×" for what it reads, "6.67×" for what it writes. One line
+ * under them says what a balance buys at that rate.
  *
- * Built from the lib's `Select` and stat tiles (`DashboardInfoCard`), whose own
- * `loading` state is the skeleton: the same cards, their figures as bars, so
- * nothing moves when the rates land. A failed read keeps the frame and says why.
+ * The picker is the lib's `Autocomplete` with the provider's mark on every
+ * option. It SEARCHES ON THE SERVER: the host hands in `models` (what its
+ * search answered for `query`) and the picker shows exactly those, never a
+ * filter of its own.
+ *
+ * One size in every state: the figures and the line are the same boxes loading
+ * (bars of their own line height), loaded, failed and empty.
  */
 export function ModelTokenExchange({
-  rates = [],
+  rate,
   status = 'ready',
+  models = [],
+  query,
+  onQueryChange,
+  searching = false,
+  onPick,
   balance = MODEL_TOKEN_EXCHANGE_BALANCE,
-  balanceCaption,
+  balancePrice,
   className,
 }: ModelTokenExchangeProps) {
-  const groups = groupTokenRatesByProvider(rates);
-  const [picked, setPicked] = useState<string | null>(null);
-  // The model picked, while the rates still hold it; else the first one.
-  const rate = rates.find(candidate => candidate.modelName === picked) ?? rates[0];
-  const loading = status === 'loading';
   const copy = MODEL_TOKEN_RATES_COPY.exchange;
+  const loading = status === 'loading';
+  const failed = status === 'error' || (status === 'ready' && !rate);
 
-  const charges: [string, number | null | undefined][] = [
+  // The picked model stays addressable when the search's answer does not hold it.
+  const options = models.map(modelOption);
+  if (rate && !models.some(candidate => candidate.modelName === rate.modelName)) options.unshift(modelOption(rate));
+
+  const figures: [string, number | null | undefined][] = [
     [copy.input, rate?.inputTokenRate],
     [copy.output, rate?.outputTokenRate],
-    [copy.cached, rate?.cacheReadInputTokenRate],
   ];
 
   return (
@@ -408,65 +440,50 @@ export function ModelTokenExchange({
         className,
       )}
     >
-      <div className="flex flex-col gap-[var(--spacing-system-sf)] sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-ods-text-secondary text-h5">{copy.title}</span>
-        {loading || !rate ? (
-          <Skeleton className={cn('h-11 w-full sm:w-72 md:h-12', !loading && 'invisible')} />
-        ) : (
-          <Select value={rate.modelName} onValueChange={setPicked}>
-            <SelectTrigger aria-label={copy.pick} className="w-full bg-ods-bg sm:w-72">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {groups.map(group => (
-                <SelectGroup key={group.providerType}>
-                  <SelectLabel>{tokenRateProviderLabel(group.providerType)}</SelectLabel>
-                  {group.rates.map(candidate => (
-                    <SelectItem key={candidate.modelName} value={candidate.modelName}>
-                      {candidate.displayName || candidate.modelName}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
+      <Autocomplete<string>
+        label={copy.pick}
+        value={rate?.modelName ?? null}
+        onChange={modelName => {
+          if (modelName) onPick?.(modelName);
+        }}
+        options={options}
+        inputValue={query}
+        onInputChange={value => onQueryChange?.(value)}
+        disableClientFilter
+        loading={searching}
+        disabled={loading && !rate}
+        placeholder={copy.search}
+        noOptionsText={copy.noMatch}
+      />
 
-      {/* What one token of the model charges to the balance. */}
-      <div className="grid grid-cols-1 gap-[var(--spacing-system-sf)] sm:grid-cols-3">
-        {charges.map(([title, value]) => (
-          <DashboardInfoCard
-            key={title}
-            title={title}
-            value={formatTokenRateNumber(value)}
-            caption={copy.charged}
-            loading={loading}
-            className={EXCHANGE_TILE_CLASS}
-          />
+      {/* What one token of the model charges to the balance: the whole point, in the biggest type. */}
+      <div className="grid grid-cols-2 gap-[var(--spacing-system-mf)]">
+        {figures.map(([label, value]) => (
+          // The label keeps two lines too: it wraps in a narrow column.
+          <div key={label} className="flex min-w-0 flex-col">
+            <span className="whitespace-nowrap tabular-nums text-ods-text-primary text-h1">
+              {loading ? <Bar className="w-32" /> : formatTokenRate(value)}
+            </span>
+            <span className="min-h-[2lh] text-ods-text-secondary text-h5">{label}</span>
+          </div>
         ))}
       </div>
 
-      {/* What a balance runs on the model: the same rate, read the other way. */}
-      <div className="grid grid-cols-1 items-center gap-[var(--spacing-system-mf)] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        <DashboardInfoCard
-          title={copy.balance}
-          value={formatTokenAmount(balance)}
-          caption={balanceCaption ?? copy.balanceUnit}
-          className={EXCHANGE_TILE_CLASS}
-        />
-        <TransferHrIcon aria-hidden className="mx-auto size-5 text-ods-text-secondary max-sm:rotate-90" />
-        <DashboardInfoCard
-          title={copy.buys}
-          value={formatTokenAmount(tokensForBalance(balance, rate?.inputTokenRate))}
-          caption={copy.orOutput(formatTokenAmount(tokensForBalance(balance, rate?.outputTokenRate)))}
-          loading={loading}
-          className={EXCHANGE_TILE_CLASS}
-        />
-      </div>
+      {/* Two lines are kept for it, loading or loaded, so the card is one height when the sentence wraps. */}
+      <p className="min-h-[2lh] border-t border-ods-border pt-[var(--spacing-system-mf)] text-ods-text-secondary text-h4 [box-sizing:content-box]">
+        {loading || !rate ? (
+          <Bar className="w-full max-w-md" />
+        ) : (
+          copy.buys(
+            balancePrice ? `${formatTokenAmount(balance)} (${balancePrice})` : formatTokenAmount(balance),
+            formatTokenAmount(tokensForBalance(balance, rate.inputTokenRate)),
+            formatTokenAmount(tokensForBalance(balance, rate.outputTokenRate)),
+          )
+        )}
+      </p>
 
-      {(status === 'error' || (status === 'ready' && !rate)) && (
-        // The frame keeps its size; the tiles under it state no figure.
+      {failed && (
+        // The frame keeps its size; what is under it states no figure.
         <div className="absolute inset-0 flex rounded-md bg-ods-card">
           {status === 'error' ? (
             <ModelTokenRatesUnavailable className="flex-1" />
