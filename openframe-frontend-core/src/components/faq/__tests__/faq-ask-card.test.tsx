@@ -358,6 +358,27 @@ describe('ask surfaces of one page', () => {
     expect(await screen.findByText('Is it open source?')).toBeInTheDocument();
   });
 
+  it('a surface told what to leave out picks at once, without waiting for the one ahead of it', async () => {
+    // The row's request never answers: a surface that waited for its turn would never pick.
+    fetchMock.mockImplementation((input: unknown) => {
+      const row = new URL(String(input), 'https://host.test').searchParams.get('section') === 'pricing';
+      return row
+        ? new Promise(() => undefined)
+        : Promise.resolve({ ok: true, json: () => Promise.resolve({ prompts: [PROMPTS[1]] }) });
+    });
+    renderFaq(
+      RUNTIME,
+      <>
+        <AssistantAskPrompts topic="pricing" count={1} />
+        <FaqSection initialFaqs={FAQS} ask={{ topic: 'faq', exclude: ['q5'] }} />
+      </>,
+    );
+
+    expect(await screen.findByText('Is it open source?')).toBeInTheDocument();
+    const card = requests().find(url => url.searchParams.get('section') === 'faq');
+    expect(card?.searchParams.get('exclude')).toBe('q5');
+  });
+
   it('the card is one of the surfaces: `AssistantAskPrompts` as a card', async () => {
     renderFaq(RUNTIME, <AssistantAskPrompts variant="card" topic="docs" count={2} />);
     expect(screen.getByText('Still deciding?')).toBeInTheDocument();

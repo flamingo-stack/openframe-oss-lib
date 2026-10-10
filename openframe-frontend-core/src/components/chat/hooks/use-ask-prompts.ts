@@ -189,8 +189,9 @@ export interface UseAskSurfaceOptions {
   count?: number;
   /**
    * Ids of questions never to offer. Absent: the ones the page's other
-   * surfaces show, which this one waits for. A list: exactly those. `null`:
-   * the surface waits and never picks.
+   * surfaces show, which this one waits for. A list: exactly those, picked at
+   * once with no wait (the surfaces after it still leave its questions out).
+   * `null`: the surface waits and never picks.
    */
   exclude?: readonly string[] | null;
   /** False: the surface is not ready to pick yet (it takes its turn when it is). Default true. */
@@ -249,7 +250,8 @@ export function useAskSurface({
     topic,
     count,
     exclude: leftOut,
-    enabled: picks && shownAtTurn !== null,
+    // Told exactly what to leave out, a surface needs nobody's pick: it never waits for a turn.
+    enabled: picks && (exclude !== undefined || shownAtTurn !== null),
   });
   const settled = picks && !isLoading ? prompts.map(prompt => prompt.id).join(',') : null;
   useLayoutEffect(() => {
