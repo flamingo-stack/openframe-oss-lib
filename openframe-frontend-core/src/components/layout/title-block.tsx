@@ -89,6 +89,7 @@ import { EntityImage } from '../ui/entity-image';
 import { FloatingTooltip } from '../ui/floating-tooltip';
 import { PageActions, type PageActionButton } from '../ui/page-actions';
 import { BackButton } from './back-button';
+import { PageTitle } from './page-picture';
 
 /**
  * Minimum height of the title block's content column, matched to the action
@@ -278,20 +279,20 @@ export function TitleBlock({
                       disabled={!titleTruncated}
                       triggerClassName="min-w-0"
                     >
-                      <h1
+                      <PageTitle
                         ref={titleRef}
                         className={cn(titleClass, 'min-w-0 text-ods-text-primary', titleOverflowClass)}
                       >
                         {titleNode}
-                      </h1>
+                      </PageTitle>
                     </FloatingTooltip>
                     <span className="shrink-0">{titleAdornment}</span>
                   </div>
                 ) : (
                   <FloatingTooltip content={title} side="bottom" disabled={!titleTruncated}>
-                    <h1 ref={titleRef} className={cn(titleClass, 'text-ods-text-primary', titleOverflowClass)}>
+                    <PageTitle ref={titleRef} className={cn(titleClass, 'text-ods-text-primary', titleOverflowClass)}>
                       {titleNode}
-                    </h1>
+                    </PageTitle>
                   </FloatingTooltip>
                 ))}
               {hasSubtitleRow && (
@@ -320,9 +321,12 @@ export function TitleBlock({
           (titleAdornment ? (
             <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
               <FloatingTooltip content={title} side="bottom" disabled={!titleTruncated} triggerClassName="min-w-0">
-                <h1 ref={titleRef} className={cn(titleClass, 'min-w-0 text-ods-text-primary', titleOverflowClass)}>
+                <PageTitle
+                  ref={titleRef}
+                  className={cn(titleClass, 'min-w-0 text-ods-text-primary', titleOverflowClass)}
+                >
                   {title}
-                </h1>
+                </PageTitle>
               </FloatingTooltip>
               <span className="shrink-0">{titleAdornment}</span>
             </div>
@@ -331,7 +335,9 @@ export function TitleBlock({
                  wraps; `titleWrap` only adds break-words for pathological
                  unbroken tokens. No class change when the prop is unset —
                  the frozen baseline stays byte-identical. */
-            <h1 className={cn(titleClass, 'text-ods-text-primary', titleWrap && 'break-words')}>{title}</h1>
+            <PageTitle className={cn(titleClass, 'text-ods-text-primary', titleWrap && 'break-words')}>
+              {title}
+            </PageTitle>
           ))
         )}
       </div>
