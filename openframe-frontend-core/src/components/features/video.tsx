@@ -675,6 +675,9 @@ function YouTubeFacadeInner({
           <img
             src={posterJpg}
             alt={title}
+            // A YouTube poster is 16:9; the attributes state the ratio before it arrives (the box sizes it).
+            width={1280}
+            height={720}
             loading="lazy"
             onError={handlePosterError}
             // React 18 wants lowercase (`fetchpriority` DOM attribute);
