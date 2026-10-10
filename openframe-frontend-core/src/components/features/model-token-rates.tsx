@@ -70,7 +70,7 @@ export const MODEL_TOKEN_RATES_COPY = {
       /** The slider's label. */
       amount: 'How many tokens',
       /** Over the one-tap amounts. */
-      presets: 'Already in your plan',
+      presets: 'Included in your plan',
       /** A one-tap amount: "10M every month" */
       preset: (tokens: string, label: string) => `${tokens} ${label}`,
     },
