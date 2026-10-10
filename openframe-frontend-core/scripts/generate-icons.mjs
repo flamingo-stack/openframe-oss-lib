@@ -5,6 +5,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync,
 import { basename, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
+import { writeIconLoaders } from './generate-icon-loaders.mjs';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
@@ -237,5 +239,8 @@ presentCategories.sort();
 const categoryExports = presentCategories.map(cat => `export * from './${cat}';`).join('\n');
 
 writeFileSync(join(OUTPUT_DIR, 'index.ts'), categoryExports + '\n');
+
+// The per-icon loader table follows the set (see generate-icon-loaders.mjs).
+console.log(`Wrote loaders for ${writeIconLoaders()} icons.`);
 
 console.log(`\nDone! Generated ${totalIcons} icon components.`);

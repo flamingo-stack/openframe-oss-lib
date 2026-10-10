@@ -10,7 +10,7 @@ export type { NavPanelProps } from './nav-panel';
 export { NavItemRow } from './nav-item-row';
 export type { NavItemRowProps, NavItemRowVariant } from './nav-item-row';
 export type { AskAiOpenDetail } from './mingo-ai-button';
-export { ASK_AI_OPEN_EVENT, MingoAiButton, openAskAi } from './mingo-ai-button';
+export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, MingoAiButton, openAskAi } from './mingo-ai-button';
 export type { MingoAiButtonProps } from './mingo-ai-button';
 export { MobileNavSheet, MOBILE_NAV_SHEET_ID, siteNavHasMobileMenus } from './mobile-nav-sheet';
 export type { MobileNavSheetProps } from './mobile-nav-sheet';

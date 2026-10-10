@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
-import { MingoIcon } from '../icons';
+import { AgentMark } from '../agent-mark';
 import { XmarkIcon } from '../icons-v2-generated';
 
 export interface HeaderMingoButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -65,7 +65,8 @@ export function HeaderMingoButton({
       ) : (
         // Outer frame follows the button's text color (currentColor); the eyes
         // and corner block are ODS cyan.
-        <MingoIcon
+        <AgentMark
+          agent="mingo"
           color="currentColor"
           eyesColor="var(--ods-flamingo-cyan-base)"
           cornerColor="var(--ods-flamingo-cyan-base)"

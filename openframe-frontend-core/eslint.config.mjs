@@ -255,6 +255,7 @@ export default defineConfig([
       'src/embed-shims/next-image.tsx',
       'src/components/chat/chat-attachment-bar.tsx',
       'src/components/agent-mark.tsx',
+      'src/components/agent-mark-packaged-fae.tsx',
     ],
     rules: { '@next/next/no-img-element': 'off' },
   },
@@ -336,7 +337,7 @@ export default defineConfig([
     // pipeline for zero lint benefit.
     name: 'openframe-frontend-core/imperative-external-systems',
     files: [
-      'src/components/features/video.tsx',
+      'src/components/features/video-file-player.tsx',
       'src/components/features/figma-prototype-viewer.tsx',
       'src/components/chat/hooks/use-nats-chat-adapter.ts',
     ],

@@ -6,7 +6,8 @@ import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
-import { MingoIcon } from '../icons';
+import { AgentMark } from '../agent-mark';
+import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT } from '../chat/utils/ask-ai-events';
 import { Button } from '../ui/button';
 
 export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -35,8 +36,7 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
 
 const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
 
-/** The event the mounted chat panel (`EmbeddableChat`) opens on. */
-export const ASK_AI_OPEN_EVENT = 'ask-ai:open';
+export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT };
 
 /** What an `ask-ai:open` event carries. */
 export interface AskAiOpenDetail {
@@ -189,7 +189,8 @@ export function MingoAiButton({
           {icon}
         </span>
       ) : (
-        <MingoIcon
+        <AgentMark
+          agent="mingo"
           color="currentColor"
           eyesColor={MINGO_ACCENT}
           cornerColor={MINGO_ACCENT}

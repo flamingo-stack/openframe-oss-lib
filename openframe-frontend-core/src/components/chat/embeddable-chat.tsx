@@ -43,8 +43,8 @@ import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
 import { formatCitationIndices } from '../../utils/source-grouping';
+import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
-import { MingoIcon } from '../icons';
 import {
   Arrow02RightIcon,
   Arrow02LeftIcon,
@@ -106,6 +106,7 @@ import type {
   UnifiedChatState,
   UnifiedSendMessageOptions,
 } from './types/unified-chat-state.types';
+import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT } from './utils/ask-ai-events';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
@@ -1646,7 +1647,7 @@ function EmbeddableChatInner({
       effectiveAssistantIcon ? (
         <EntityIcon icon={effectiveAssistantIcon} size={24} />
       ) : (
-        <MingoIcon className="h-6 w-6" cornerColor="var(--ods-flamingo-cyan-base)" />
+        <AgentMark agent="mingo" className="h-6 w-6" cornerColor="var(--ods-flamingo-cyan-base)" />
       ),
     [effectiveAssistantIcon],
   );
@@ -1852,8 +1853,8 @@ function EmbeddableChatInner({
       setIsOpen(true);
       setTimeout(() => askAbout(detail.ref as ChatRef), 0);
     };
-    window.addEventListener('ask-ai:open-with-ref', handler);
-    return () => window.removeEventListener('ask-ai:open-with-ref', handler);
+    window.addEventListener(ASK_AI_OPEN_WITH_REF_EVENT, handler);
+    return () => window.removeEventListener(ASK_AI_OPEN_WITH_REF_EVENT, handler);
   }, [source, askAbout, setIsOpen]);
 
   // Listen for plain "open chat" events (no row context). Fired by the
@@ -1899,8 +1900,8 @@ function EmbeddableChatInner({
       const prompt = typeof detail.prompt === 'string' ? detail.prompt.trim() : '';
       if (prompt) setTimeout(() => sendAskPrompt(prompt), 0);
     };
-    window.addEventListener('ask-ai:open', handler);
-    return () => window.removeEventListener('ask-ai:open', handler);
+    window.addEventListener(ASK_AI_OPEN_EVENT, handler);
+    return () => window.removeEventListener(ASK_AI_OPEN_EVENT, handler);
   }, [source, setIsOpen, sendAskPrompt]);
 
   const hasMessages = messages.length > 0;
@@ -3124,7 +3125,7 @@ function EmbeddableChatInner({
           <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6">
             <Button
               onClick={handleOpen}
-              leftIcon={<MingoIcon className="h-5 w-5" color="currentColor" />}
+              leftIcon={<AgentMark agent="mingo" className="h-5 w-5" color="currentColor" />}
               tabIndex={isOpen ? -1 : 0}
               className={`pointer-events-auto !w-auto shadow-lg ${isOpen ? '!pointer-events-none' : ''}`}
             >
