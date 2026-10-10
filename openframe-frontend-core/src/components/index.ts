@@ -51,6 +51,7 @@ export * from './pagination';
 export * from './persistent-filter-controls';
 export * from './persistent-pagination';
 export * from './pricing-display';
+export * from './agent-identity';
 export * from './agent-mark';
 export * from './results-count';
 export * from './selection-source-badge';

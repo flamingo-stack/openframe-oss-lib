@@ -2,6 +2,7 @@
 
 import type { ReactElement } from 'react';
 import Image from '../embed-shims/next-image';
+import { useAgentIdentityIcon } from './agent-identity';
 import { AgentMark, type AgentName } from './agent-mark';
 import { resolveIcon } from './chat/utils/icon-library';
 
@@ -21,7 +22,8 @@ const BRAND_MARK_NAMES = new Set<string>(['fae', 'mingo']);
 /**
  * THE single icon-display path for the whole app. Resolution order:
  *   1. `url` → uploaded image
- *   2. `name` ∈ {fae,mingo} → packaged `AgentMark`
+ *   2. `name` = an agent's slug → that agent's identity icon when the host provides
+ *      it (`AgentIdentityProvider`), else its packaged `AgentMark` (fae, mingo)
  *   3. `name` → library glyph via `resolveIcon` (+ `props`)
  *
  * Replaces the old per-surface logic (the announcement bar's `renderSvgIcon`
@@ -37,10 +39,14 @@ export function EntityIcon({
   size?: number;
   className?: string;
 }): ReactElement {
-  if (icon?.url) {
+  // An agent named by its slug is drawn from its identity, when the host provides it
+  // (`AgentIdentityProvider`): its uploaded picture wins over the packaged mark.
+  const identity = useAgentIdentityIcon(icon?.url ? null : icon?.name);
+  const url = icon?.url ?? identity?.url;
+  if (url) {
     return (
       <Image
-        src={icon.url}
+        src={url}
         alt=""
         width={size}
         height={size}

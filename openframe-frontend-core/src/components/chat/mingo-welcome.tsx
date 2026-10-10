@@ -3,7 +3,7 @@
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
-import { MingoIcon } from '../icons';
+import { AgentMark } from '../agent-mark';
 import { CompassIcon, Arrow01DownIcon, AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
@@ -253,7 +253,8 @@ export function MingoWelcome({
             content, so the region scrolls instead of the greeting overlapping
             the grid. Padding is modest so it never dominates the narrow panel. */}
                 <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-l)] px-[var(--spacing-system-l)] py-[var(--spacing-system-xxl)] text-center">
-                  <MingoIcon
+                  <AgentMark
+                    agent="mingo"
                     className="h-12 w-12"
                     color="white"
                     eyesColor="var(--ods-flamingo-cyan-base)"

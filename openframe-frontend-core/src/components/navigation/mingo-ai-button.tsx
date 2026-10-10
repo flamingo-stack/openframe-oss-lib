@@ -6,7 +6,7 @@ import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
-import { MingoIcon } from '../icons';
+import { AgentMark } from '../agent-mark';
 import { Button } from '../ui/button';
 
 export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -189,7 +189,8 @@ export function MingoAiButton({
           {icon}
         </span>
       ) : (
-        <MingoIcon
+        <AgentMark
+          agent="mingo"
           color="currentColor"
           eyesColor={MINGO_ACCENT}
           cornerColor={MINGO_ACCENT}

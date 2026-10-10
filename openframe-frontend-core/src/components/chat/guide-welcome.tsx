@@ -2,8 +2,8 @@
 
 import { type ReactNode, useMemo } from 'react';
 import { cn } from '../../utils/cn';
+import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
-import { MingoIcon } from '../icons';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { Skeleton } from '../ui/skeleton';
 import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip';
@@ -163,7 +163,8 @@ export function GuideWelcome({
               // match the default Mingo mark (48px).
               <EntityIcon icon={{ name: icon.name, url: icon.url, props: icon.props }} size={48} />
             ) : (
-              <MingoIcon
+              <AgentMark
+                agent="mingo"
                 className="h-12 w-12"
                 color="white"
                 eyesColor="var(--ods-flamingo-cyan-base)"
