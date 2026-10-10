@@ -137,26 +137,77 @@ describe('ModelTokenRates (the popover table)', () => {
 describe('ModelTokenExchange (a page)', () => {
   const copy = MODEL_TOKEN_RATES_COPY.exchange;
   const [OPUS, LUNA] = RATES;
+  const PROVIDERS = ['ANTHROPIC', 'OPENAI'];
 
-  it('states in big figures what one token of the picked model charges, and what a balance buys', () => {
-    render(<ModelTokenExchange rate={OPUS} models={RATES} balancePrice="$10.00" />);
+  it('says the whole idea in three steps: buy OpenFrame tokens, use a model, pay its exchange rate', () => {
+    render(
+      <ModelTokenExchange
+        rate={OPUS}
+        models={RATES}
+        providers={PROVIDERS}
+        provider="ANTHROPIC"
+        balancePrice="$10.00"
+        included="10M included"
+      />,
+    );
+    // 1. What is bought, and for how much.
+    expect(screen.getByRole('heading', { name: copy.buy.title })).toBeTruthy();
+    expect(screen.getByText('$10.00')).toBeTruthy();
+    expect(screen.getByText(copy.buy.words('1M'))).toBeTruthy();
+    expect(screen.getByText('10M included')).toBeTruthy();
+    // 2. The model it is spent on.
+    expect(screen.getByRole('heading', { name: copy.use.title })).toBeTruthy();
+    // 3. The rate, and what the money buys at it.
+    expect(screen.getByRole('heading', { name: copy.charge.title })).toBeTruthy();
     expect(screen.getByText('1.33×')).toBeTruthy();
-    expect(screen.getByText(copy.input)).toBeTruthy();
+    expect(screen.getByText(copy.charge.input)).toBeTruthy();
     expect(screen.getByText('6.67×')).toBeTruthy();
-    expect(screen.getByText(copy.output)).toBeTruthy();
-    expect(screen.getByText(copy.buys('1M ($10.00)', '750K', '150K'))).toBeTruthy();
+    expect(screen.getByText(copy.charge.output)).toBeTruthy();
+    expect(screen.getByText(copy.charge.buys('$10.00', 'Claude Opus 5.5', '750K', '150K'))).toBeTruthy();
   });
 
-  it('works the last line out for the balance the host names', () => {
-    render(<ModelTokenExchange rate={OPUS} models={RATES} balance={10_000_000} />);
-    expect(screen.getByText(copy.buys('10M', '7.5M', '1.5M'))).toBeTruthy();
+  it('states the tokens alone when it is not told what they cost', () => {
+    render(
+      <ModelTokenExchange rate={OPUS} models={RATES} providers={PROVIDERS} provider="ANTHROPIC" balance={10_000_000} />,
+    );
+    expect(screen.getByText('10M')).toBeTruthy();
+    expect(screen.getByText(copy.buy.unit)).toBeTruthy();
+    expect(screen.getByText(copy.charge.buys('10M', 'Claude Opus 5.5', '7.5M', '1.5M'))).toBeTruthy();
+  });
+
+  it('chooses the provider with push buttons, and never clears the choice', () => {
+    const onProviderChange = vi.fn();
+    render(
+      <ModelTokenExchange
+        rate={OPUS}
+        models={RATES}
+        providers={PROVIDERS}
+        provider="ANTHROPIC"
+        onProviderChange={onProviderChange}
+      />,
+    );
+    fireEvent.click(screen.getByText('OpenAI'));
+    expect(onProviderChange).toHaveBeenCalledWith('OPENAI');
+    onProviderChange.mockClear();
+    fireEvent.click(screen.getByText('Anthropic'));
+    expect(onProviderChange).not.toHaveBeenCalledWith(undefined);
   });
 
   it("searches on the host: what is typed is handed over, and the options are exactly the host's answer", () => {
     const onQueryChange = vi.fn();
     const onPick = vi.fn();
-    render(<ModelTokenExchange rate={OPUS} models={[LUNA]} query="" onQueryChange={onQueryChange} onPick={onPick} />);
-    const input = screen.getByPlaceholderText(copy.search);
+    render(
+      <ModelTokenExchange
+        rate={OPUS}
+        models={[LUNA]}
+        providers={PROVIDERS}
+        provider="OPENAI"
+        query=""
+        onQueryChange={onQueryChange}
+        onPick={onPick}
+      />,
+    );
+    const input = screen.getByPlaceholderText(copy.use.search);
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'luna' } });
     expect(onQueryChange).toHaveBeenLastCalledWith('luna');
@@ -166,9 +217,9 @@ describe('ModelTokenExchange (a page)', () => {
     expect(onPick).toHaveBeenCalledWith('gpt-6-luna');
   });
 
-  it('keeps its frame while loading, and says why when the rate fails or none is in effect', () => {
+  it('keeps its three steps while loading, and says why when the rate fails or none is in effect', () => {
     const { rerender } = render(<ModelTokenExchange status="loading" />);
-    expect(screen.getByText(copy.input)).toBeTruthy();
+    expect(screen.getAllByRole('heading')).toHaveLength(3);
     expect(screen.queryByText(/×/)).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     rerender(<ModelTokenExchange status="error" />);

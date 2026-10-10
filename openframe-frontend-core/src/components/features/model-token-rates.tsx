@@ -21,15 +21,16 @@ import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Skeleton } from '../ui/skeleton';
 import { TabSelector } from '../ui/tab-selector';
+import { PushButtonSelector } from './push-button-selector';
 
 /**
  * The per-model AI token exchange rates, in the two places they are shown:
  *
  * - `ModelTokenRates` (+ `ModelTokenRatesPopover`): a small table behind a
  *   question mark, for the product's cards that count in tokens.
- * - `ModelTokenExchange`: one model's rate at a time, found by searching, in
- *   big figures: the way a currency exchange shows one pair. For a page (the
- *   website's pricing page), where the point is the idea, not every row.
+ * - `ModelTokenExchange`: the whole idea as three steps with a figure each
+ *   (buy OpenFrame tokens, use a frontier model, its tokens are charged at an
+ *   exchange rate). For a page (the website's pricing page).
  *
  * Both state a rate with the same functions (`utils/model-token-rates`,
  * server-safe), so a rate reads the same wherever it is stated. Neither
@@ -51,17 +52,29 @@ export const MODEL_TOKEN_RATES_COPY = {
   model: 'Model',
   input: 'Input',
   output: 'Output',
-  /** The exchange card: one model's rate, as a currency exchange shows one pair. */
+  /** The exchange: three steps, each with its own figure. */
   exchange: {
-    pick: 'Model',
-    search: 'Search models',
-    noMatch: 'No model matches',
-    /** Under each big figure: what one token of the model charges, in OpenFrame tokens. */
-    input: 'OpenFrame tokens per input token',
-    output: 'OpenFrame tokens per output token',
-    /** "1M ($10.00) OpenFrame tokens buy 750K input tokens or 150K output tokens." */
-    buys: (balance: string, input: string, output: string) =>
-      `${balance} OpenFrame tokens buy ${input} input tokens or ${output} output tokens.`,
+    buy: {
+      title: 'You buy OpenFrame tokens',
+      /** Under the price: "buys 1M OpenFrame tokens" */
+      words: (tokens: string) => `buys ${tokens} OpenFrame tokens`,
+      /** Under the tokens, where no price is known. */
+      unit: 'OpenFrame tokens',
+    },
+    use: {
+      title: 'You use a frontier AI model',
+      model: 'Model',
+      search: 'Search models',
+      noMatch: 'No model matches',
+    },
+    charge: {
+      title: 'Its tokens are charged at an exchange rate',
+      input: 'OpenFrame tokens for every token the model reads',
+      output: 'OpenFrame tokens for every token the model writes',
+      /** "So $10.00 on Claude Opus 5.5 buys 750K tokens read, or 150K tokens written." */
+      buys: (balance: string, model: string, input: string, output: string) =>
+        `So ${balance} on ${model} buys ${input} tokens read, or ${output} tokens written.`,
+    },
   },
   autoTopUp: { on: 'Auto Top Up Enabled', off: 'Auto Top Up Disabled' },
   unavailable: {
@@ -351,9 +364,15 @@ export interface ModelTokenExchangeProps {
   rate?: ModelTokenRate | null;
   /** Where the host's read of that model stands. Default `ready`. */
   status?: ModelTokenRatesStatus;
+  /** The providers to choose between (their keys), in the host's order. */
+  providers?: readonly string[];
+  /** The provider chosen, and the host's handler for a change (it searches that provider's models). */
+  provider?: string | null;
+  onProviderChange?: (providerType: string) => void;
   /**
-   * The picker's options: what the HOST's search answered for `query`. The
-   * picker never filters them itself: searching is the host's server's job.
+   * The picker's options: what the HOST's search answered for `query` within
+   * `provider`. The picker never filters them itself: searching is the host's
+   * server's job.
    */
   models?: readonly ModelTokenRate[];
   /** What is typed in the picker, and the host's handler for it (it searches). */
@@ -363,17 +382,19 @@ export interface ModelTokenExchangeProps {
   searching?: boolean;
   /** A model was picked: its `modelName`. */
   onPick?: (modelName: string) => void;
-  /** The balance the last line is worked out for, in OpenFrame tokens. Default one million. */
+  /** The OpenFrame tokens bought in step 1. Default one million. */
   balance?: number;
-  /** What that balance costs, when the host knows it ("$10.00"). */
+  /** What that many OpenFrame tokens cost ("$10.00"). Not given: step 1 states the tokens alone. */
   balancePrice?: string | null;
+  /** A line under step 1 (what the plan already includes). */
+  included?: ReactNode;
   className?: string;
 }
 
 /** The balance the exchange is worked out for when the host names none. */
 export const MODEL_TOKEN_EXCHANGE_BALANCE = 1_000_000;
 
-/** A line of the card's own text height, as a bar: what a figure is while it loads. */
+/** A line of the surrounding text's own height, as a bar: what a figure is while it loads. */
 function Bar({ className }: { className: string }) {
   return (
     <span
@@ -394,23 +415,60 @@ function modelOption(rate: ModelTokenRate): AutocompleteOption<string> {
   };
 }
 
+/** One step of the flow: its number and what happens in it, over its content. */
+function ExchangeStep({ step, title, children }: { step: number; title: string; children: ReactNode }) {
+  return (
+    <section className="flex min-w-0 flex-col gap-[var(--spacing-system-mf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)]">
+      <header className="flex items-center gap-[var(--spacing-system-sf)]">
+        <span className="grid size-8 shrink-0 place-items-center rounded-full border border-ods-border tabular-nums text-ods-text-primary text-h5">
+          {step}
+        </span>
+        <h3 className="min-w-0 text-ods-text-primary text-h3">{title}</h3>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/** A big figure over the plain words that say what it is. The words keep two lines, so a step is one height when they wrap. */
+function ExchangeFigure({ figure, words, loading }: { figure: ReactNode; words: ReactNode; loading?: boolean }) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <span className="whitespace-nowrap tabular-nums text-ods-text-primary text-h1">
+        {loading ? <Bar className="w-32" /> : figure}
+      </span>
+      <span className="min-h-[2lh] text-ods-text-secondary text-h4">
+        {loading ? <Bar className="w-full max-w-xs" /> : words}
+      </span>
+    </div>
+  );
+}
+
 /**
- * The exchange rate of ONE model, the way a currency exchange shows one pair:
- * search for the model, and read in big figures what one token of it charges to
- * the balance: "1.33×" for what it reads, "6.67×" for what it writes. One line
- * under them says what a balance buys at that rate.
+ * How AI tokens are paid for, as three steps read left to right, each with its
+ * own figure, so the whole idea is on screen at once:
  *
- * The picker is the lib's `Autocomplete` with the provider's mark on every
- * option. It SEARCHES ON THE SERVER: the host hands in `models` (what its
- * search answered for `query`) and the picker shows exactly those, never a
- * filter of its own.
+ *   1. You buy OpenFrame tokens      "$10.00 buys 1M OpenFrame tokens"
+ *   2. You use a frontier AI model   provider buttons, then the model
+ *   3. Its tokens are charged at an exchange rate
+ *                                    "1.33× per token it reads, 6.67× per token it
+ *                                     writes", then what the step 1 balance buys
  *
- * One size in every state: the figures and the line are the same boxes loading
+ * Step 2 is where the visitor acts: the lib's `PushButtonSelector` picks the
+ * provider and the lib's `Autocomplete` (the provider's mark on every option)
+ * finds a model of it. The picker SEARCHES ON THE SERVER: the host hands in
+ * `models` (what its search answered for `query` within `provider`) and the
+ * picker shows exactly those, never a filter of its own.
+ *
+ * One size in every state: each figure and its words are the same boxes loading
  * (bars of their own line height), loaded, failed and empty.
  */
 export function ModelTokenExchange({
   rate,
   status = 'ready',
+  providers = [],
+  provider,
+  onProviderChange,
   models = [],
   query,
   onQueryChange,
@@ -418,73 +476,86 @@ export function ModelTokenExchange({
   onPick,
   balance = MODEL_TOKEN_EXCHANGE_BALANCE,
   balancePrice,
+  included,
   className,
 }: ModelTokenExchangeProps) {
   const copy = MODEL_TOKEN_RATES_COPY.exchange;
   const loading = status === 'loading';
   const failed = status === 'error' || (status === 'ready' && !rate);
+  const tokens = formatTokenAmount(balance);
+  const model = rate ? rate.displayName || rate.modelName : '';
 
   // The picked model stays addressable when the search's answer does not hold it.
   const options = models.map(modelOption);
   if (rate && !models.some(candidate => candidate.modelName === rate.modelName)) options.unshift(modelOption(rate));
 
-  const figures: [string, number | null | undefined][] = [
-    [copy.input, rate?.inputTokenRate],
-    [copy.output, rate?.outputTokenRate],
-  ];
-
   return (
-    <div
-      className={cn(
-        'relative flex flex-col gap-[var(--spacing-system-lf)] rounded-md border border-ods-border p-[var(--spacing-system-lf)] md:p-[var(--spacing-system-xlf)]',
-        className,
-      )}
-    >
-      <Autocomplete<string>
-        label={copy.pick}
-        value={rate?.modelName ?? null}
-        onChange={modelName => {
-          if (modelName) onPick?.(modelName);
-        }}
-        options={options}
-        inputValue={query}
-        onInputChange={value => onQueryChange?.(value)}
-        disableClientFilter
-        loading={searching}
-        disabled={loading && !rate}
-        placeholder={copy.search}
-        noOptionsText={copy.noMatch}
-      />
-
-      {/* What one token of the model charges to the balance: the whole point, in the biggest type. */}
-      <div className="grid grid-cols-2 gap-[var(--spacing-system-mf)]">
-        {figures.map(([label, value]) => (
-          // The label keeps two lines too: it wraps in a narrow column.
-          <div key={label} className="flex min-w-0 flex-col">
-            <span className="whitespace-nowrap tabular-nums text-ods-text-primary text-h1">
-              {loading ? <Bar className="w-32" /> : formatTokenRate(value)}
-            </span>
-            <span className="min-h-[2lh] text-ods-text-secondary text-h5">{label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Two lines are kept for it, loading or loaded, so the card is one height when the sentence wraps. */}
-      <p className="min-h-[2lh] border-t border-ods-border pt-[var(--spacing-system-mf)] text-ods-text-secondary text-h4 [box-sizing:content-box]">
-        {loading || !rate ? (
-          <Bar className="w-full max-w-md" />
-        ) : (
-          copy.buys(
-            balancePrice ? `${formatTokenAmount(balance)} (${balancePrice})` : formatTokenAmount(balance),
-            formatTokenAmount(tokensForBalance(balance, rate.inputTokenRate)),
-            formatTokenAmount(tokensForBalance(balance, rate.outputTokenRate)),
-          )
+    <div className={cn('relative grid grid-cols-1 gap-[var(--spacing-system-mf)] lg:grid-cols-3', className)}>
+      <ExchangeStep step={1} title={copy.buy.title}>
+        <ExchangeFigure figure={balancePrice ?? tokens} words={balancePrice ? copy.buy.words(tokens) : copy.buy.unit} />
+        {included && (
+          <p className="mt-auto border-t border-ods-border pt-[var(--spacing-system-mf)] text-ods-text-secondary text-h4">
+            {included}
+          </p>
         )}
-      </p>
+      </ExchangeStep>
+
+      <ExchangeStep step={2} title={copy.use.title}>
+        <PushButtonSelector<string>
+          options={providers.map(providerType => {
+            const Icon = PROVIDER_ICON[providerType];
+            return {
+              id: providerType,
+              name: tokenRateProviderLabel(providerType),
+              icon: Icon ? <Icon className="size-8 text-ods-text-secondary" /> : undefined,
+            };
+          })}
+          selectedIds={provider ? [provider] : []}
+          onSelectionChange={ids => {
+            // A single choice that cannot be cleared: choosing the chosen provider changes nothing.
+            if (ids[0]) onProviderChange?.(ids[0]);
+          }}
+          multiSelect={false}
+          isLoading={providers.length === 0 && !failed}
+        />
+        <Autocomplete<string>
+          label={copy.use.model}
+          value={rate?.modelName ?? null}
+          onChange={modelName => {
+            if (modelName) onPick?.(modelName);
+          }}
+          options={options}
+          inputValue={query}
+          onInputChange={value => onQueryChange?.(value)}
+          disableClientFilter
+          loading={searching}
+          disabled={providers.length === 0}
+          placeholder={copy.use.search}
+          noOptionsText={copy.use.noMatch}
+        />
+      </ExchangeStep>
+
+      <ExchangeStep step={3} title={copy.charge.title}>
+        <ExchangeFigure loading={loading} figure={formatTokenRate(rate?.inputTokenRate)} words={copy.charge.input} />
+        <ExchangeFigure loading={loading} figure={formatTokenRate(rate?.outputTokenRate)} words={copy.charge.output} />
+        {/* The step 1 balance, read through this rate: what the money buys on the model picked. */}
+        <p className="mt-auto min-h-[3lh] border-t border-ods-border pt-[var(--spacing-system-mf)] text-ods-text-primary text-h4 [box-sizing:content-box]">
+          {loading || !rate ? (
+            <Bar className="w-full max-w-xs" />
+          ) : (
+            copy.charge.buys(
+              balancePrice ?? tokens,
+              model,
+              formatTokenAmount(tokensForBalance(balance, rate.inputTokenRate)),
+              formatTokenAmount(tokensForBalance(balance, rate.outputTokenRate)),
+            )
+          )}
+        </p>
+      </ExchangeStep>
 
       {failed && (
         // The frame keeps its size; what is under it states no figure.
-        <div className="absolute inset-0 flex rounded-md bg-ods-card">
+        <div className="absolute inset-0 flex rounded-md border border-ods-border bg-ods-card">
           {status === 'error' ? (
             <ModelTokenRatesUnavailable className="flex-1" />
           ) : (
