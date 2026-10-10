@@ -1,12 +1,15 @@
 'use client';
 
-import { type ComponentType, type ReactNode, useState } from 'react';
+import { type ComponentType, type ReactNode, useId, useState } from 'react';
 import { cn } from '../../utils/cn';
+import { formatPrice } from '../../utils/format';
 import {
   formatTokenAmount,
   formatTokenRate,
   groupTokenRatesByProvider,
   type ModelTokenRate,
+  type TokenPrice,
+  tokenCost,
   tokenRateProviderLabel,
   tokensForBalance,
 } from '../../utils/model-token-rates';
@@ -18,8 +21,10 @@ import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
+import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Skeleton } from '../ui/skeleton';
+import { Slider } from '../ui/slider';
 import { TabSelector } from '../ui/tab-selector';
 import { PushButtonSelector } from './push-button-selector';
 
@@ -60,6 +65,14 @@ export const MODEL_TOKEN_RATES_COPY = {
       words: (tokens: string) => `buys ${tokens} OpenFrame tokens`,
       /** Under the tokens, where no price is known. */
       unit: 'OpenFrame tokens',
+      /** The amount, where no price is known: "1M OpenFrame tokens" */
+      tokens: (tokens: string) => `${tokens} OpenFrame tokens`,
+      /** The slider's label. */
+      amount: 'How many tokens',
+      /** Over the one-tap amounts. */
+      presets: 'Already in your plan',
+      /** A one-tap amount: "10M every month" */
+      preset: (tokens: string, label: string) => `${tokens} ${label}`,
     },
     use: {
       title: 'You use a frontier AI model',
@@ -69,11 +82,16 @@ export const MODEL_TOKEN_RATES_COPY = {
     },
     charge: {
       title: 'Its tokens are charged at an exchange rate',
-      input: 'OpenFrame tokens for every token the model reads',
-      output: 'OpenFrame tokens for every token the model writes',
-      /** "So $10.00 on Claude Opus 5.5 buys 750K tokens read, or 150K tokens written." */
-      buys: (balance: string, model: string, input: string, output: string) =>
-        `So ${balance} on ${model} buys ${input} tokens read, or ${output} tokens written.`,
+      /** Over the two rates: the unit, said once. */
+      unit: 'OpenFrame tokens charged',
+      input: 'per token read',
+      output: 'per token written',
+      /** Over the answer: "So $10.00 on Claude Opus 5.5 buys" */
+      so: (balance: string, model: string) => `So ${balance} on ${model} buys`,
+      /** Beside the answer's number: "750K tokens read" */
+      read: 'tokens read',
+      /** Under it: "or 150K tokens written" */
+      orWritten: (output: string) => `or ${output} tokens written`,
     },
   },
   autoTopUp: { on: 'Auto Top Up Enabled', off: 'Auto Top Up Disabled' },
@@ -382,17 +400,23 @@ export interface ModelTokenExchangeProps {
   searching?: boolean;
   /** A model was picked: its `modelName`. */
   onPick?: (modelName: string) => void;
-  /** The OpenFrame tokens bought in step 1. Default one million. */
-  balance?: number;
-  /** What that many OpenFrame tokens cost ("$10.00"). Not given: step 1 states the tokens alone. */
-  balancePrice?: string | null;
-  /** A line under step 1 (what the plan already includes). */
-  included?: ReactNode;
+  /** What OpenFrame tokens cost. Given: step 1 states the price of the amount chosen. Not given: the tokens alone. */
+  tokenPrice?: TokenPrice | null;
+  /** The amount step 1 opens on, in OpenFrame tokens. Default: the amount `tokenPrice` is quoted for, else one million. */
+  defaultAmount?: number;
+  /** The slider's bounds and step, in OpenFrame tokens. Default one to fifty million, a million at a time. */
+  amountRange?: { min: number; max: number; step: number };
+  /** Amounts offered as one-tap choices under the slider (what a plan includes): the tokens and what to call them. */
+  presets?: readonly { tokens: number; label: string }[];
   className?: string;
 }
 
-/** The balance the exchange is worked out for when the host names none. */
+/** The amount step 1 opens on when the host names none, and the slider's default bounds. */
 export const MODEL_TOKEN_EXCHANGE_BALANCE = 1_000_000;
+export const MODEL_TOKEN_EXCHANGE_RANGE = { min: 1_000_000, max: 50_000_000, step: 1_000_000 } as const;
+
+/** The provider rows drawn while the providers load: as many as OpenFrame has had. */
+const PROVIDER_PLACEHOLDERS = ['loading-1', 'loading-2', 'loading-3'] as const;
 
 /** A line of the surrounding text's own height, as a bar: what a figure is while it loads. */
 function Bar({ className }: { className: string }) {
@@ -430,12 +454,29 @@ function ExchangeStep({ step, title, children }: { step: number; title: string; 
   );
 }
 
-/** A big figure over the plain words that say what it is. The words keep two lines, so a step is one height when they wrap. */
-function ExchangeFigure({ figure, words, loading }: { figure: ReactNode; words: ReactNode; loading?: boolean }) {
+/**
+ * A figure over the plain words that say what it is. `hero` is the step's one
+ * headline figure; `plain` is a supporting one, a size down so two sit side by
+ * side in a narrow step. The words keep two lines, so a step is one height when
+ * they wrap.
+ */
+function ExchangeFigure({
+  figure,
+  words,
+  loading,
+  size = 'hero',
+}: {
+  figure: ReactNode;
+  words: ReactNode;
+  loading?: boolean;
+  size?: 'hero' | 'plain';
+}) {
   return (
     <div className="flex min-w-0 flex-col">
-      <span className="whitespace-nowrap tabular-nums text-ods-text-primary text-h1">
-        {loading ? <Bar className="w-32" /> : figure}
+      <span
+        className={cn('whitespace-nowrap tabular-nums text-ods-text-primary', size === 'hero' ? 'text-h1' : 'text-h2')}
+      >
+        {loading ? <Bar className="w-20" /> : figure}
       </span>
       <span className="min-h-[2lh] text-ods-text-secondary text-h4">
         {loading ? <Bar className="w-full max-w-xs" /> : words}
@@ -474,15 +515,23 @@ export function ModelTokenExchange({
   onQueryChange,
   searching = false,
   onPick,
-  balance = MODEL_TOKEN_EXCHANGE_BALANCE,
-  balancePrice,
-  included,
+  tokenPrice,
+  defaultAmount,
+  amountRange = MODEL_TOKEN_EXCHANGE_RANGE,
+  presets = [],
   className,
 }: ModelTokenExchangeProps) {
   const copy = MODEL_TOKEN_RATES_COPY.exchange;
   const loading = status === 'loading';
   const failed = status === 'error' || (status === 'ready' && !rate);
+  const sliderId = useId();
+  // The amount bought: what the visitor set, else what the host opens on. The slider reaches every preset.
+  const [chosen, setChosen] = useState<number | null>(null);
+  const balance = chosen ?? defaultAmount ?? tokenPrice?.tokens ?? MODEL_TOKEN_EXCHANGE_BALANCE;
+  const max = Math.max(amountRange.max, balance, ...presets.map(preset => preset.tokens));
   const tokens = formatTokenAmount(balance);
+  const cost = tokenCost(balance, tokenPrice);
+  const balancePrice = cost === null ? null : formatPrice(cost);
   const model = rate ? rate.displayName || rate.modelName : '';
 
   // The picked model stays addressable when the search's answer does not hold it.
@@ -493,30 +542,76 @@ export function ModelTokenExchange({
     <div className={cn('relative grid grid-cols-1 gap-[var(--spacing-system-mf)] lg:grid-cols-3', className)}>
       <ExchangeStep step={1} title={copy.buy.title}>
         <ExchangeFigure figure={balancePrice ?? tokens} words={balancePrice ? copy.buy.words(tokens) : copy.buy.unit} />
-        {included && (
-          <p className="mt-auto border-t border-ods-border pt-[var(--spacing-system-mf)] text-ods-text-secondary text-h4">
-            {included}
-          </p>
+        {/* The calculator: move the amount and every figure in step 3 follows. */}
+        <div className="flex flex-col gap-[var(--spacing-system-sf)]">
+          <label
+            htmlFor={sliderId}
+            className="flex items-baseline justify-between gap-[var(--spacing-system-sf)] text-ods-text-secondary text-h4"
+          >
+            <span>{copy.buy.amount}</span>
+            <output htmlFor={sliderId} className="tabular-nums text-ods-text-primary text-h3">
+              {tokens}
+            </output>
+          </label>
+          <Slider
+            id={sliderId}
+            min={amountRange.min}
+            max={max}
+            step={amountRange.step}
+            value={[balance]}
+            onValueChange={([value]) => setChosen(value)}
+            aria-valuetext={copy.buy.words(tokens)}
+          />
+        </div>
+        {presets.length > 0 && (
+          <div className="mt-auto flex flex-col gap-[var(--spacing-system-xs)] border-t border-ods-border pt-[var(--spacing-system-mf)]">
+            <span className="text-ods-text-secondary text-h5">{copy.buy.presets}</span>
+            <div className="flex flex-wrap gap-[var(--spacing-system-xs)]">
+              {presets.map(preset => (
+                <Button
+                  key={preset.label}
+                  type="button"
+                  variant={preset.tokens === balance ? 'accent' : 'outline'}
+                  size="small"
+                  onClick={() => setChosen(preset.tokens)}
+                >
+                  {copy.buy.preset(formatTokenAmount(preset.tokens), preset.label)}
+                </Button>
+              ))}
+            </div>
+          </div>
         )}
       </ExchangeStep>
 
       <ExchangeStep step={2} title={copy.use.title}>
+        {/*
+          While the providers load, the SAME selector draws placeholder rows (not its own skeleton,
+          whose rows are a different height), so the step is one height loading and loaded.
+        */}
         <PushButtonSelector<string>
-          options={providers.map(providerType => {
-            const Icon = PROVIDER_ICON[providerType];
-            return {
-              id: providerType,
-              name: tokenRateProviderLabel(providerType),
-              icon: Icon ? <Icon className="size-8 text-ods-text-secondary" /> : undefined,
-            };
-          })}
+          options={
+            providers.length === 0 && !failed
+              ? PROVIDER_PLACEHOLDERS.map(id => ({
+                  id,
+                  name: '\u00a0',
+                  icon: <Skeleton className="size-8 rounded" />,
+                  disabled: true,
+                }))
+              : providers.map(providerType => {
+                  const Icon = PROVIDER_ICON[providerType];
+                  return {
+                    id: providerType,
+                    name: tokenRateProviderLabel(providerType),
+                    icon: Icon ? <Icon className="size-8 text-ods-text-secondary" /> : undefined,
+                  };
+                })
+          }
           selectedIds={provider ? [provider] : []}
           onSelectionChange={ids => {
             // A single choice that cannot be cleared: choosing the chosen provider changes nothing.
             if (ids[0]) onProviderChange?.(ids[0]);
           }}
           multiSelect={false}
-          isLoading={providers.length === 0 && !failed}
         />
         <Autocomplete<string>
           label={copy.use.model}
@@ -536,21 +631,50 @@ export function ModelTokenExchange({
       </ExchangeStep>
 
       <ExchangeStep step={3} title={copy.charge.title}>
-        <ExchangeFigure loading={loading} figure={formatTokenRate(rate?.inputTokenRate)} words={copy.charge.input} />
-        <ExchangeFigure loading={loading} figure={formatTokenRate(rate?.outputTokenRate)} words={copy.charge.output} />
-        {/* The step 1 balance, read through this rate: what the money buys on the model picked. */}
-        <p className="mt-auto min-h-[3lh] border-t border-ods-border pt-[var(--spacing-system-mf)] text-ods-text-primary text-h4 [box-sizing:content-box]">
-          {loading || !rate ? (
-            <Bar className="w-full max-w-xs" />
-          ) : (
-            copy.charge.buys(
-              balancePrice ?? tokens,
-              model,
-              formatTokenAmount(tokensForBalance(balance, rate.inputTokenRate)),
-              formatTokenAmount(tokensForBalance(balance, rate.outputTokenRate)),
-            )
-          )}
-        </p>
+        <div className="grid grid-cols-2 gap-x-[var(--spacing-system-mf)]">
+          <span className="col-span-2 text-ods-text-secondary text-h5">{copy.charge.unit}</span>
+          <ExchangeFigure
+            size="plain"
+            loading={loading}
+            figure={formatTokenRate(rate?.inputTokenRate)}
+            words={copy.charge.input}
+          />
+          <ExchangeFigure
+            size="plain"
+            loading={loading}
+            figure={formatTokenRate(rate?.outputTokenRate)}
+            words={copy.charge.output}
+          />
+        </div>
+        {/* THE ANSWER: the step 1 amount, read through this rate. The most prominent thing in the step. */}
+        <div
+          aria-live="polite"
+          className="mt-auto flex flex-col rounded-md border border-ods-accent bg-ods-bg p-[var(--spacing-system-mf)]"
+        >
+          <span className="min-h-[2lh] text-ods-text-secondary text-h4">
+            {loading || !rate ? (
+              <Bar className="w-full max-w-xs" />
+            ) : (
+              copy.charge.so(balancePrice ?? copy.buy.tokens(tokens), model)
+            )}
+          </span>
+          {/* The number is the headline, alone on its line: a longer number never pushes its unit to a new line and the box taller. */}
+          <span className="min-h-[1lh] whitespace-nowrap tabular-nums text-ods-text-primary text-h1">
+            {loading || !rate ? (
+              <Bar className="w-40" />
+            ) : (
+              formatTokenAmount(tokensForBalance(balance, rate.inputTokenRate))
+            )}
+          </span>
+          <span className="min-h-[1lh] text-ods-text-primary text-h3">{copy.charge.read}</span>
+          <span className="min-h-[1lh] text-ods-text-secondary text-h4">
+            {loading || !rate ? (
+              <Bar className="w-48" />
+            ) : (
+              copy.charge.orWritten(formatTokenAmount(tokensForBalance(balance, rate.outputTokenRate)))
+            )}
+          </span>
+        </div>
       </ExchangeStep>
 
       {failed && (

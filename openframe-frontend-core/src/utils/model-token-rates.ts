@@ -31,6 +31,18 @@ export function formatTokenRate(value: number | null | undefined): string {
   return `${rounded}\u00d7`;
 }
 
+/** What OpenFrame tokens cost: `price` USD buys `tokens` of them. */
+export interface TokenPrice {
+  tokens: number;
+  price: number;
+}
+
+/** What a number of OpenFrame tokens costs in USD at a price. Null without a price. */
+export function tokenCost(tokens: number, tokenPrice: TokenPrice | null | undefined): number | null {
+  if (!tokenPrice || !(tokenPrice.tokens > 0) || !(tokenPrice.price > 0) || !(tokens >= 0)) return null;
+  return (tokens / tokenPrice.tokens) * tokenPrice.price;
+}
+
 /** A token count in short form: "850", "10K", "750K", "1.25M". */
 export function formatTokenAmount(tokens: number | null | undefined): string {
   if (tokens == null || !Number.isFinite(tokens) || tokens < 0) return TOKEN_RATE_EMPTY;

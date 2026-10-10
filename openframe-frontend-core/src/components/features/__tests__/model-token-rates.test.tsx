@@ -139,6 +139,8 @@ describe('ModelTokenExchange (a page)', () => {
   const [OPUS, LUNA] = RATES;
   const PROVIDERS = ['ANTHROPIC', 'OPENAI'];
 
+  const TEN_PER_MILLION = { tokens: 1_000_000, price: 10 };
+
   it('says the whole idea in three steps: buy OpenFrame tokens, use a model, pay its exchange rate', () => {
     render(
       <ModelTokenExchange
@@ -146,33 +148,77 @@ describe('ModelTokenExchange (a page)', () => {
         models={RATES}
         providers={PROVIDERS}
         provider="ANTHROPIC"
-        balancePrice="$10.00"
-        included="10M included"
+        tokenPrice={TEN_PER_MILLION}
       />,
     );
     // 1. What is bought, and for how much.
     expect(screen.getByRole('heading', { name: copy.buy.title })).toBeTruthy();
     expect(screen.getByText('$10.00')).toBeTruthy();
     expect(screen.getByText(copy.buy.words('1M'))).toBeTruthy();
-    expect(screen.getByText('10M included')).toBeTruthy();
     // 2. The model it is spent on.
     expect(screen.getByRole('heading', { name: copy.use.title })).toBeTruthy();
-    // 3. The rate, and what the money buys at it.
+    // 3. The rate, and (most prominent) what the money buys at it.
     expect(screen.getByRole('heading', { name: copy.charge.title })).toBeTruthy();
     expect(screen.getByText('1.33×')).toBeTruthy();
+    expect(screen.getByText(copy.charge.unit)).toBeTruthy();
     expect(screen.getByText(copy.charge.input)).toBeTruthy();
     expect(screen.getByText('6.67×')).toBeTruthy();
-    expect(screen.getByText(copy.charge.output)).toBeTruthy();
-    expect(screen.getByText(copy.charge.buys('$10.00', 'Claude Opus 5.5', '750K', '150K'))).toBeTruthy();
+    expect(screen.getByText(copy.charge.so('$10.00', 'Claude Opus 5.5'))).toBeTruthy();
+    expect(screen.getByText('750K')).toBeTruthy();
+    expect(screen.getByText(copy.charge.read)).toBeTruthy();
+    expect(screen.getByText(copy.charge.orWritten('150K'))).toBeTruthy();
+  });
+
+  it('is a calculator: moving the amount reprices step 1 and reworks the answer in step 3', () => {
+    render(
+      <ModelTokenExchange
+        rate={OPUS}
+        models={RATES}
+        providers={PROVIDERS}
+        provider="ANTHROPIC"
+        tokenPrice={TEN_PER_MILLION}
+      />,
+    );
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '5000000' } });
+    expect(screen.getByText('$50.00')).toBeTruthy();
+    expect(screen.getByText(copy.buy.words('5M'))).toBeTruthy();
+    expect(screen.getByText(copy.charge.so('$50.00', 'Claude Opus 5.5'))).toBeTruthy();
+    expect(screen.getByText('3.75M')).toBeTruthy();
+    expect(screen.getByText(copy.charge.read)).toBeTruthy();
+    expect(screen.getByText(copy.charge.orWritten('750K'))).toBeTruthy();
+  });
+
+  it('offers what the plan includes as one-tap amounts', () => {
+    render(
+      <ModelTokenExchange
+        rate={OPUS}
+        models={RATES}
+        providers={PROVIDERS}
+        provider="ANTHROPIC"
+        tokenPrice={TEN_PER_MILLION}
+        presets={[{ tokens: 10_000_000, label: 'every month' }]}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: copy.buy.preset('10M', 'every month') }));
+    expect(screen.getByText('$100.00')).toBeTruthy();
+    expect(screen.getByText('7.5M')).toBeTruthy();
+    expect(screen.getByText(copy.charge.read)).toBeTruthy();
   });
 
   it('states the tokens alone when it is not told what they cost', () => {
     render(
-      <ModelTokenExchange rate={OPUS} models={RATES} providers={PROVIDERS} provider="ANTHROPIC" balance={10_000_000} />,
+      <ModelTokenExchange
+        rate={OPUS}
+        models={RATES}
+        providers={PROVIDERS}
+        provider="ANTHROPIC"
+        defaultAmount={10_000_000}
+      />,
     );
-    expect(screen.getByText('10M')).toBeTruthy();
     expect(screen.getByText(copy.buy.unit)).toBeTruthy();
-    expect(screen.getByText(copy.charge.buys('10M', 'Claude Opus 5.5', '7.5M', '1.5M'))).toBeTruthy();
+    expect(screen.getByText(copy.charge.so(copy.buy.tokens('10M'), 'Claude Opus 5.5'))).toBeTruthy();
+    expect(screen.getByText('7.5M')).toBeTruthy();
+    expect(screen.getByText(copy.charge.read)).toBeTruthy();
   });
 
   it('chooses the provider with push buttons, and never clears the choice', () => {
