@@ -57,7 +57,7 @@ import { MiamiCyberGangLogoFaceOnly } from '../../icons/miami-cyber-gang-logo-fa
 import { MlgLogo } from '../../icons/mlg-logo';
 import { OpenFrameLogo } from '../../icons/openframe-logo';
 import { OpenmspLogo } from '../../icons/openmsp-logo';
-import { getIconComponent } from './icon-registry';
+import { ICON_REGISTRY, getIconComponent, normalizeIconKey } from './icon-registry';
 
 /** Shape used by every icon registered here (matches `icons-v2-generated`). */
 export type IconComponent = ComponentType<{
@@ -288,8 +288,13 @@ export function resolveIcon(
   opts?: { variant?: 'design' | 'brand' },
 ): IconComponent {
   if (opts?.variant === 'brand') {
-    // Brand variant — delegate to the registry resolver (same glyph as before).
-    return getIconComponent(iconName) as IconComponent;
+    // The brand set first. A name it does not hold is drawn from the design
+    // set, so a source whose icon lives only there is never shown as the file
+    // glyph; a name neither holds keeps the registry's own fallback.
+    const brand = iconName ? ICON_REGISTRY[normalizeIconKey(iconName)] : undefined;
+    if (brand) return brand as IconComponent;
+    const design = iconName ? (ICON_ALIASES[iconName] ?? resolveFromLibrary(iconName)) : undefined;
+    return design ?? (getIconComponent(iconName) as IconComponent);
   }
   if (!iconName) return FileIcon;
   return ICON_ALIASES[iconName] ?? resolveFromLibrary(iconName) ?? FileIcon;
