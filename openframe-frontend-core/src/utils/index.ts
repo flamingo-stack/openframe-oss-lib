@@ -19,7 +19,7 @@ export {
 export { formatDate, formatNumber, formatPrice, formatBytes, formatUrlForDisplay } from './format';
 export * from './ai-providers';
 export * from './model-token-rates';
-export { TRIAL_DAYS, TRIAL_LABELS } from './trial';
+export { TRIAL_TERMS, trialLabels, trialLengthLabel } from './trial';
 export {
   VENDOR_CLASSIFICATIONS,
   OPENFRAME_CLASSIFICATIONS,
