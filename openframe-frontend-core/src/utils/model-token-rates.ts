@@ -31,32 +31,32 @@ export function formatTokenRate(value: number | null | undefined): string {
   return `${rounded}\u00d7`;
 }
 
-/** What OpenFrame tokens cost: `price` USD buys `tokens` of them. */
-export interface TokenPrice {
-  tokens: number;
-  price: number;
+/** A request used to make a rate concrete: how many of the model's tokens it reads and writes. */
+export interface TokenRateExample {
+  inputTokens: number;
+  outputTokens: number;
 }
 
-/** The size a model's price is quoted for, as every provider quotes it. */
-export const TOKEN_PRICE_UNIT = 1_000_000;
+/** THE example request every rate card works out: it reads ten thousand tokens and writes one thousand. */
+export const TOKEN_RATE_EXAMPLE: TokenRateExample = { inputTokens: 10_000, outputTokens: 1_000 };
 
-/**
- * What one million of a model's tokens cost in USD, from its rate and the price
- * of OpenFrame tokens. Null when either is missing.
- */
-export function tokenRatePrice(
-  rate: number | null | undefined,
-  tokenPrice: TokenPrice | null | undefined,
+/** The OpenFrame tokens a request uses on a model: what it reads at the input rate plus what it writes at the output rate. Null without both rates. */
+export function tokenRateExampleCost(
+  rate: Pick<ModelTokenRate, 'inputTokenRate' | 'outputTokenRate'>,
+  example: TokenRateExample = TOKEN_RATE_EXAMPLE,
 ): number | null {
-  if (rate == null || !Number.isFinite(rate) || rate <= 0) return null;
-  if (!tokenPrice || !(tokenPrice.tokens > 0) || !(tokenPrice.price > 0)) return null;
-  return rate * TOKEN_PRICE_UNIT * (tokenPrice.price / tokenPrice.tokens);
+  const { inputTokenRate, outputTokenRate } = rate;
+  if (!(inputTokenRate > 0) || !(outputTokenRate > 0)) return null;
+  return example.inputTokens * inputTokenRate + example.outputTokens * outputTokenRate;
 }
 
-/** A price per million tokens: cents from ten cents up ("$13.33", "$0.33"), two significant digits under it ("$0.033"). */
-export function formatTokenPrice(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value) || value <= 0) return TOKEN_RATE_EMPTY;
-  return `$${value >= 0.1 ? value.toFixed(2) : Number(value.toPrecision(2))}`;
+/** A token count in short form: "850", "10K", "16.7K", "1.2M". */
+export function formatTokenAmount(tokens: number | null | undefined): string {
+  if (tokens == null || !Number.isFinite(tokens) || tokens < 0) return TOKEN_RATE_EMPTY;
+  const short = (value: number) => String(Number(value.toPrecision(3)));
+  if (tokens >= 1_000_000) return `${short(tokens / 1_000_000)}M`;
+  if (tokens >= 1_000) return `${short(tokens / 1_000)}K`;
+  return String(Math.round(tokens));
 }
 
 const PROVIDER_LABELS: Record<string, string> = {

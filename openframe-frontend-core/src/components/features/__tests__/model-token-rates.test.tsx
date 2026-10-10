@@ -1,15 +1,15 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
-  formatTokenPrice,
+  formatTokenAmount,
   formatTokenRate,
   groupTokenRatesByProvider,
   type ModelTokenRate,
   TOKEN_RATE_EMPTY,
-  tokenRatePrice,
+  tokenRateExampleCost,
   tokenRateProviderLabel,
 } from '../../../utils/model-token-rates';
-import { MODEL_TOKEN_RATES_COPY, ModelTokenRates } from '../model-token-rates';
+import { MODEL_TOKEN_RATES_COPY, ModelTokenRateCards, ModelTokenRates } from '../model-token-rates';
 
 const RATES: ModelTokenRate[] = [
   {
@@ -62,26 +62,26 @@ describe('formatTokenRate', () => {
   });
 });
 
-describe('a price per million tokens', () => {
-  const TEN_PER_MILLION = { tokens: 1_000_000, price: 10 };
-
-  it('is the rate times what a million OpenFrame tokens cost', () => {
-    expect(tokenRatePrice(1.3333, TEN_PER_MILLION)).toBeCloseTo(13.333);
-    expect(tokenRatePrice(1, { tokens: 500_000, price: 10 })).toBe(20);
+describe('the example request', () => {
+  it('uses what it reads at the input rate plus what it writes at the output rate', () => {
+    expect(tokenRateExampleCost({ inputTokenRate: 1, outputTokenRate: 5 })).toBe(15_000);
+    expect(tokenRateExampleCost({ inputTokenRate: 1.3333, outputTokenRate: 6.6667 })).toBeCloseTo(20_000, 0);
+    expect(
+      tokenRateExampleCost({ inputTokenRate: 2, outputTokenRate: 4 }, { inputTokens: 100, outputTokens: 10 }),
+    ).toBe(240);
   });
 
-  it('is not stated without a rate or without a price', () => {
-    expect(tokenRatePrice(null, TEN_PER_MILLION)).toBeNull();
-    expect(tokenRatePrice(1, null)).toBeNull();
-    expect(tokenRatePrice(1, { tokens: 0, price: 10 })).toBeNull();
+  it('is not worked out without both rates', () => {
+    expect(tokenRateExampleCost({ inputTokenRate: 0, outputTokenRate: 5 })).toBeNull();
+    expect(tokenRateExampleCost({ inputTokenRate: 1, outputTokenRate: Number.NaN })).toBeNull();
   });
 
-  it('is written to the cent, and a price under ten cents keeps two significant digits', () => {
-    expect(formatTokenPrice(13.333)).toBe('$13.33');
-    expect(formatTokenPrice(5)).toBe('$5.00');
-    expect(formatTokenPrice(0.333)).toBe('$0.33');
-    expect(formatTokenPrice(0.0333)).toBe('$0.033');
-    expect(formatTokenPrice(null)).toBe(TOKEN_RATE_EMPTY);
+  it('writes a token count in short form', () => {
+    expect(formatTokenAmount(850)).toBe('850');
+    expect(formatTokenAmount(10_000)).toBe('10K');
+    expect(formatTokenAmount(16_667)).toBe('16.7K');
+    expect(formatTokenAmount(1_250_000)).toBe('1.25M');
+    expect(formatTokenAmount(null)).toBe(TOKEN_RATE_EMPTY);
   });
 });
 
@@ -98,10 +98,11 @@ describe('providers', () => {
   });
 });
 
-describe('ModelTokenRates', () => {
+describe('ModelTokenRates (the popover table)', () => {
   it('shows one provider at a time, the first one first, and states the unit once', () => {
     render(<ModelTokenRates rates={RATES} />);
-    expect(screen.getByRole('table', { name: MODEL_TOKEN_RATES_COPY.unit.rate })).toBeTruthy();
+    expect(screen.getByRole('table', { name: MODEL_TOKEN_RATES_COPY.unit })).toBeTruthy();
+    expect(screen.getByText(MODEL_TOKEN_RATES_COPY.unit)).toBeTruthy();
     expect(cellsOf(/Claude Opus 5\.5/)).toEqual(['1.33×', '6.67×']);
     // No display name: the model's id stands in.
     expect(screen.getByRole('rowheader', { name: 'claude-sonnet-4-6' })).toBeTruthy();
@@ -121,32 +122,6 @@ describe('ModelTokenRates', () => {
     expect(screen.getByText('GPT-6 Luna')).toBeTruthy();
   });
 
-  it('adds the cached input column only where there is room for it', () => {
-    const { unmount } = render(<ModelTokenRates rates={RATES} />);
-    expect(screen.queryByText(MODEL_TOKEN_RATES_COPY.cached)).toBeNull();
-    unmount();
-    render(<ModelTokenRates rates={RATES} density="comfortable" />);
-    expect(screen.getByText(MODEL_TOKEN_RATES_COPY.cached)).toBeTruthy();
-    expect(cellsOf(/claude-sonnet-4-6/)).toEqual(['1×', '5×', TOKEN_RATE_EMPTY]);
-  });
-
-  it('given what OpenFrame tokens cost, states every figure in USD per million model tokens', () => {
-    render(<ModelTokenRates rates={RATES} density="comfortable" tokenPrice={{ tokens: 1_000_000, price: 10 }} />);
-    expect(screen.getByRole('table', { name: MODEL_TOKEN_RATES_COPY.unit.price })).toBeTruthy();
-    expect(cellsOf(/Claude Opus 5\.5/)).toEqual(['$13.33', '$66.67', '$0.67']);
-  });
-
-  it('says when the rates took effect, and nothing for a date it cannot read', () => {
-    const { unmount } = render(<ModelTokenRates rates={RATES} effectiveFrom="2026-10-01T21:20:26.143Z" />);
-    expect(
-      screen.getByText(`${MODEL_TOKEN_RATES_COPY.unit.rate}. ${MODEL_TOKEN_RATES_COPY.effective('October 1, 2026')}.`),
-    ).toBeTruthy();
-    unmount();
-    render(<ModelTokenRates rates={RATES} effectiveFrom="soon" />);
-    expect(screen.queryByText(/In effect since/)).toBeNull();
-    expect(screen.getByText(MODEL_TOKEN_RATES_COPY.unit.rate)).toBeTruthy();
-  });
-
   it('keeps its frame and the auto top-up line while the rates load or fail', () => {
     const { rerender } = render(<ModelTokenRates status="loading" autoTopUpEnabled />);
     expect(screen.getByText(MODEL_TOKEN_RATES_COPY.autoTopUp.on)).toBeTruthy();
@@ -158,6 +133,48 @@ describe('ModelTokenRates', () => {
 
   it('says so when no rate is in effect', () => {
     render(<ModelTokenRates rates={[]} />);
+    expect(screen.getByText(MODEL_TOKEN_RATES_COPY.empty)).toBeTruthy();
+  });
+});
+
+describe('ModelTokenRateCards (a page)', () => {
+  // Slides off the first position are hidden from assistive tech, so cards are read with `hidden`.
+  const cards = () => screen.queryAllByRole('article', { hidden: true });
+  const card = (name: string) => screen.getByRole('article', { name, hidden: true });
+
+  it('is one card per model of the provider shown, each with its three rates and the example worked out', () => {
+    render(<ModelTokenRateCards rates={RATES} />);
+    expect(cards()).toHaveLength(2);
+    const opus = card('Claude Opus 5.5');
+    expect(within(opus).getByText('1.33×')).toBeTruthy();
+    expect(within(opus).getByText('6.67×')).toBeTruthy();
+    expect(within(opus).getByText('0.067×')).toBeTruthy();
+    expect(within(opus).getByText(MODEL_TOKEN_RATES_COPY.example('10K', '1K'))).toBeTruthy();
+    expect(within(opus).getByText(MODEL_TOKEN_RATES_COPY.exampleCost('20K'))).toBeTruthy();
+    // A model with no cached rate states none.
+    expect(within(card('claude-sonnet-4-6')).getByText(TOKEN_RATE_EMPTY)).toBeTruthy();
+  });
+
+  it('switches provider from its tabs and starts that provider at its first model', () => {
+    render(<ModelTokenRateCards rates={RATES} />);
+    fireEvent.click(screen.getByRole('button', { name: 'OpenAI' }));
+    expect(cards()).toHaveLength(1);
+    expect(within(card('GPT-6 Luna')).getByText(MODEL_TOKEN_RATES_COPY.exampleCost('500'))).toBeTruthy();
+  });
+
+  it('never advances by itself: it has no play or pause control', () => {
+    render(<ModelTokenRateCards rates={RATES} />);
+    expect(screen.queryByRole('button', { name: /pause|play/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy();
+  });
+
+  it('holds its place while loading, and says why when the rates fail or none is in effect', () => {
+    const { rerender } = render(<ModelTokenRateCards status="loading" />);
+    expect(cards()).toHaveLength(0);
+    expect(screen.queryByRole('alert')).toBeNull();
+    rerender(<ModelTokenRateCards status="error" />);
+    expect(screen.getByRole('alert').textContent).toContain(MODEL_TOKEN_RATES_COPY.unavailable.title);
+    rerender(<ModelTokenRateCards rates={[]} />);
     expect(screen.getByText(MODEL_TOKEN_RATES_COPY.empty)).toBeTruthy();
   });
 });
