@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
-import { TRIAL_LABELS } from '../../../utils/trial';
+import { trialLabels } from '../../../utils/trial';
 import { OpenFrameLogo } from '../../icons';
 import { FileOffIcon } from '../../icons-v2-generated/documents/file-off-icon';
 import { CreditCardXmarkIcon } from '../../icons-v2-generated/finance/credit-card-xmark-icon';
@@ -19,6 +19,8 @@ export interface AuthBenefitsPanelProps {
   title?: string;
   description?: string;
   benefits?: AuthBenefit[];
+  /** The free trial's length in days, as the host read it from the billing plan. Without it the length is not stated. */
+  trialDays?: number | null;
   learnMoreLabel?: string;
   learnMoreUrl?: string;
   className?: string;
@@ -29,12 +31,16 @@ const DEFAULT_TITLE = 'The All-in-One Open Platform for MSPs';
 const DEFAULT_DESCRIPTION =
   'All your core ops in one place - built for MSPs who are done duct-taping tools together. Unified stack, AI-ready, no vendor tax. Just solid software that lets you run lean and fast.';
 
-const DEFAULT_BENEFITS: AuthBenefit[] = [
-  { icon: <CreditCardXmarkIcon />, label: TRIAL_LABELS.noCard },
-  { icon: <XmarkAltIcon />, label: TRIAL_LABELS.cancel },
-  { icon: <FlaskVialIcon />, label: TRIAL_LABELS.length },
-  { icon: <FileOffIcon />, label: TRIAL_LABELS.noContract },
-];
+/** The default chips: the trial's terms, and its length when the host knows it. */
+function defaultBenefits(trialDays: number | null | undefined): AuthBenefit[] {
+  const labels = trialLabels(trialDays);
+  return [
+    { icon: <CreditCardXmarkIcon />, label: labels.noCard },
+    { icon: <XmarkAltIcon />, label: labels.cancel },
+    ...(labels.length ? [{ icon: <FlaskVialIcon />, label: labels.length }] : []),
+    { icon: <FileOffIcon />, label: labels.noContract },
+  ];
+}
 
 /**
  * Marketing panel shown alongside the auth forms — title, blurb, benefit chips
@@ -43,7 +49,8 @@ const DEFAULT_BENEFITS: AuthBenefit[] = [
 export function AuthBenefitsPanel({
   title = DEFAULT_TITLE,
   description = DEFAULT_DESCRIPTION,
-  benefits = DEFAULT_BENEFITS,
+  trialDays,
+  benefits = defaultBenefits(trialDays),
   learnMoreLabel = 'Learn More About OpenFrame',
   learnMoreUrl = 'https://www.flamingo.run/',
   className,

@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { TRIAL_DAYS, TRIAL_LABELS } from '../trial';
+import { TRIAL_TERMS, trialLabels, trialLengthLabel } from '../trial';
 
-describe('trial facts', () => {
-  it('states the trial length from the one constant', () => {
-    expect(TRIAL_LABELS.length).toBe(`${TRIAL_DAYS} day free trial`);
+describe('trial wording', () => {
+  it('states the length from the number it is given', () => {
+    expect(trialLengthLabel(30)).toBe('30 day free trial');
+    expect(trialLabels(30).length).toBe('30 day free trial');
+  });
+
+  it("leaves the length out when the plan's length is not known", () => {
+    expect(trialLabels(null).length).toBeNull();
+    expect(trialLabels(undefined).length).toBeNull();
+    expect(trialLabels(null).noCard).toBe(TRIAL_TERMS.noCard);
   });
 });
