@@ -36,6 +36,7 @@ import { formatFileSize } from '../../utils/format';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
+import { Image } from '@flamingo-stack/openframe-frontend-core';
 import { ANTHROPIC_SUPPORTED_IMAGE_MIME } from './utils/chat-attachment-markdown';
 
 /** Chip strip / chip density. `compact` shrinks the thumbnail, padding, text
@@ -260,7 +261,7 @@ function AttachmentChip({ attachment, onRemove, disabled, size = 'default' }: At
         {isImage && blobUrl ? (
           //  cannot go through next/image; this is a transient pre-upload
           //  preview, NOT the chat-history render path.
-          <img src={blobUrl} alt={file.name} className="h-full w-full object-cover" />
+          <Image src={blobUrl} alt={file.name} className="h-full w-full object-cover" />
         ) : (
           <div
             className={cn(
@@ -370,3 +371,4 @@ function useObjectUrl(file: File | null): string | null {
 
   return url;
 }
+
