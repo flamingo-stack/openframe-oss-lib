@@ -5,7 +5,6 @@ export type PlatformName =
   | 'openmsp'
   | 'tmcg'
   | 'flamingo'
-  | 'flamingo-teaser'
   | 'universal'
   | 'marketing-hub'
   | 'product-hub'

@@ -50,6 +50,18 @@ export function PageShell({ children, schemas, contentClassName }: LayoutProps) 
 }
 
 /**
+ * The page's ONE main landmark, for a page made of full-width sections (a
+ * marketing page: each section is its own band and brings its own padding).
+ * `PageShell` is the same landmark with the shell's padding around its content.
+ *
+ * No `min-h-screen`, for the reason `PageShell` gives: the site chrome already
+ * grows the content area to the viewport.
+ */
+export function PageMain({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <main className={cn('bg-ods-bg', className)}>{children}</main>;
+}
+
+/**
  * Constrained layout for article/detail pages (max-w-[1280px]) — readable
  * content width for blog posts, release notes, case studies, investor updates.
  * Fixed hub padding (`px-6 content-md:px-20 py-6 content-md:py-10`); pass `contentClassName` to

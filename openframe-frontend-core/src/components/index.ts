@@ -121,3 +121,6 @@ export { AuthorDetailView, type AuthorDetailViewProps } from './authors/author-d
 // Note: These are re-exported from ./ui already, no need to duplicate
 
 export { EntityIcon, type EntityIconValue } from './icon-display';
+// An icon stated as DATA (its name, and a mark's own colours) and loaded when it is drawn: what a table keyed by a
+// string (a platform, a provider, a job) holds in place of imported icon components.
+export { NamedIcon, type IconRef } from './chat/utils/icon-loading';

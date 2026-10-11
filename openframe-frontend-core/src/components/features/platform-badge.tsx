@@ -44,7 +44,6 @@ const PLATFORM_MARKS: Readonly<Record<string, IconRef>> = {
     tertiaryColor: 'currentColor',
   },
   flamingo: FLAMINGO_MARK,
-  'flamingo-teaser': FLAMINGO_MARK,
   openframe: {
     set: 'OpenframeLogoIcon',
     color: 'var(--color-text-on-accent)',

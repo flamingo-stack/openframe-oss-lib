@@ -25,6 +25,7 @@
  */
 
 import { createElement, type ReactNode } from 'react';
+import { cn } from '../../../utils/cn';
 import { iconOf, lucideIcon, NamedIcon, type IconComponent, type IconRef } from './icon-loading';
 
 const lucide = (name: string): IconRef => ({ lucide: name });
@@ -213,6 +214,7 @@ const ICON_COLORS: Record<string, { color?: string; fill?: string }> = {
   linkedin: { color: 'var(--social-linkedin)' },
   facebook: { color: 'var(--social-facebook)' },
   youtube: { color: 'var(--social-youtube)' },
+  instagram: { color: 'var(--social-instagram-pink)' },
 };
 
 /**
@@ -231,7 +233,8 @@ export function getDynamicIcon(
   }
 
   const sizeClass = SIZE_CLASSES[size];
-  const finalClassName = className ? `${sizeClass} ${className}` : sizeClass;
+  // The caller's class wins over the preset's, so a size the presets do not have is one class away.
+  const finalClassName = cn(sizeClass, className);
 
   const canonicalKey = normalizeIconKey(iconName);
   if (Object.prototype.hasOwnProperty.call(ICON_REGISTRY, canonicalKey)) {

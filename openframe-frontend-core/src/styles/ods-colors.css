@@ -477,22 +477,6 @@
   --ods-accent: var(--ods-open-yellow-base);
 }
 
-[data-app-type='flamingo-teaser'] {
-  --color-accent-primary: var(--ods-flamingo-pink-base);
-  --color-accent-hover: var(--ods-flamingo-pink-hover);
-  --color-accent-active: var(--ods-flamingo-pink-action);
-  --color-accent-secondary: var(--ods-flamingo-pink-secondary);
-  --color-accent-secondary-hover: var(--ods-flamingo-pink-secondary-hover);
-  --color-accent-secondary-active: var(--ods-flamingo-pink-secondary-action);
-  --color-accent-focus: var(--ods-flamingo-pink-base);
-  --color-focus-ring: var(--ods-flamingo-pink-base);
-  --color-focus-visible: var(--ods-flamingo-pink-base);
-  --color-link: var(--ods-flamingo-pink-base);
-  --color-link-hover: var(--ods-flamingo-pink-hover);
-  --ods-current: var(--ods-flamingo-pink-base);
-  --ods-accent: var(--ods-flamingo-pink-base);
-}
-
 [data-app-type='flamingo'] {
   --color-accent-primary: var(--ods-flamingo-pink-base);
   --color-accent-hover: var(--ods-flamingo-pink-hover);

@@ -64,7 +64,6 @@ export const platformIcons: Record<PlatformName, React.ReactNode> = {
   openframe: renderPlatformIcon('openframe', 'h-5 w-5'),
   openmsp: renderPlatformIcon('openmsp', 'h-5 w-5'),
   flamingo: renderPlatformIcon('flamingo', 'h-5 w-5'),
-  'flamingo-teaser': renderPlatformIcon('flamingo-teaser', 'h-5 w-5'),
   'marketing-hub': renderPlatformIcon('marketing-hub', 'h-5 w-5'),
   'product-hub': renderPlatformIcon('product-hub', 'h-5 w-5'),
   'revenue-hub': renderPlatformIcon('revenue-hub', 'h-5 w-5'),

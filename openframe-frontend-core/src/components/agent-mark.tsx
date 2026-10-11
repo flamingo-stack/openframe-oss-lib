@@ -51,3 +51,29 @@ export function AgentMark({ agent, className = '' }: AgentMarkProps) {
   }
   return <span aria-hidden="true" className={className} />;
 }
+
+export interface AgentAvatarProps {
+  /** The slug of the AI agent to picture. */
+  agent: AgentName | (string & {});
+  /** The avatar's width and height, in pixels. */
+  size: number;
+  className?: string;
+}
+
+/**
+ * THE picture of an AI agent wherever a page shows one speaking, acting or
+ * named: the agent's mark (`AgentMark`, its identity's icon) in a round frame of
+ * a given size. The twin of a person's avatar. A caller names the agent by its
+ * slug and never a picture, so an agent looks the same in a card, a log row, a
+ * command bar and an example, and a new icon in its identity reaches all of them.
+ */
+export function AgentAvatar({ agent, size, className }: AgentAvatarProps) {
+  return (
+    <span
+      className={cn('inline-flex shrink-0 overflow-hidden rounded-full', className)}
+      style={{ width: size, height: size }}
+    >
+      <AgentMark agent={agent} className="h-full w-full" />
+    </span>
+  );
+}
