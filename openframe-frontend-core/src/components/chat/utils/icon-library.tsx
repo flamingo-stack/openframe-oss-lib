@@ -29,7 +29,7 @@
  */
 
 import { platformAccentVarName } from '../../../utils/platform-identity';
-import { iconFromSet, iconOf, setIcon, type IconComponent, type IconRef } from './icon-loading';
+import { iconFromSet, iconOf, lucideIcon, setIcon, type IconComponent, type IconRef } from './icon-loading';
 import { getIconComponent, normalizeIconKey, registryIcon } from './icon-registry';
 
 export type { IconComponent } from './icon-loading';
@@ -238,7 +238,14 @@ export function resolveIcon(
     return design ?? getIconComponent(iconName);
   }
   if (!iconName) return setIcon('FileIcon');
-  return aliasIcon(iconName) ?? resolveFromLibrary(iconName) ?? setIcon('FileIcon');
+  // A stored name the set does not hold is still drawn when lucide has an icon by that name
+  // (`git-pull-request`), before the file glyph that says "no such icon".
+  return (
+    aliasIcon(iconName) ??
+    resolveFromLibrary(iconName) ??
+    lucideIcon(iconName.trim().toLowerCase()) ??
+    setIcon('FileIcon')
+  );
 }
 
 /** The icon a name resolves to, or `null` when the set holds none: for a caller that draws nothing in that case (`resolveIcon` draws a fallback glyph). */

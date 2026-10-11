@@ -162,6 +162,9 @@ const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
   ClickUpIcon: 'clickup',
   HubspotIcon: 'hubspot',
   LinkedInIcon: 'linkedin',
+  // `social_platforms.icon_name` stores the names these marks were first exported under.
+  FacebookIcon: 'facebook',
+  InstagramIcon: 'instagram',
   FacebookClassicIcon: 'facebook',
   InstagramClassicIcon: 'instagram',
   YouTubeIcon: 'youtube',

@@ -4,7 +4,9 @@ import { render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { listGeneratedIcons, renderIconLoaders } from '../../../scripts/generate-icon-loaders.mjs';
+import { AVAILABLE_SVG_ICONS } from '../../types/announcement';
 import { findIcon, ICON_OPTIONS, resolveIcon } from '../chat/utils/icon-library';
+import { normalizeIconKey, registryIcon } from '../chat/utils/icon-registry';
 import { ICON_LOADERS } from '../icons-v2-generated/icon-loaders';
 
 /**
@@ -52,6 +54,35 @@ describe('an icon resolved by name from the set', () => {
 
   it('is found for every name the admin picker offers', () => {
     for (const option of ICON_OPTIONS) expect(findIcon(option.key), option.key).not.toBeNull();
+  });
+
+  it('is found for every name the announcement picker offers', () => {
+    for (const option of AVAILABLE_SVG_ICONS) expect(findIcon(option.name), option.name).not.toBeNull();
+  });
+
+  it('draws a lucide icon for a stored name the set does not hold, never the file glyph', () => {
+    expect(findIcon('git-pull-request')).toBeNull();
+    expect(resolveIcon('git-pull-request')).not.toBe(resolveIcon('definitely-not-an-icon'));
+  });
+
+  it('resolves the names `social_platforms.icon_name` stores', () => {
+    const stored = [
+      'FacebookIcon',
+      'FileText',
+      'Github',
+      'Globe',
+      'InstagramIcon',
+      'LinkedInIcon',
+      'Mail',
+      'MessageCircle',
+      'Send',
+      'SlackIcon',
+      'Video',
+      'WhatsAppIcon',
+      'XLogo',
+      'YouTubeIcon',
+    ];
+    for (const name of stored) expect(registryIcon(normalizeIconKey(name)), name).toBeDefined();
   });
 
   it('is not found for a name the set does not hold', () => {
