@@ -1,11 +1,7 @@
-import { Globe } from 'lucide-react';
+import { createElement } from 'react';
 import type React from 'react';
+import { NamedIcon, type IconRef } from '../components/chat/utils/icon-loading';
 import type { SelectableOption } from '../components/features';
-import { FlamingoMarkIcon } from '../components/icons-v2-generated/logos/flamingo-mark-icon';
-import { MiamiCyberGangLogoFaceOnlyIcon } from '../components/icons-v2-generated/logos/miami-cyber-gang-logo-face-only-icon';
-import { MlgLogoIcon } from '../components/icons-v2-generated/logos/mlg-logo-icon';
-import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
-import { OpenmspLogoIcon } from '../components/icons-v2-generated/logos/openmsp-logo-icon';
 import type { PlatformConfig, PlatformName } from '../types/platform';
 import { cn } from './cn';
 import { getPlatformBrandClasses } from './platform-identity';
@@ -18,39 +14,49 @@ import { getPlatformBrandClasses } from './platform-identity';
  * (`getPlatformIcon`, `getSmallPlatformIcon`, `getPlatformIconComponent`) are
  * thin wrappers that only pick a size.
  *
- * Two marks cannot take an accent fill and are named exceptions:
- *   - `universal` is a lucide `Globe`; lucide spreads `...rest` AFTER `fill: 'none'`,
- *     so a `fill` prop would paint a solid disc. It takes the class only.
- *   - `tmcg` is a two-colour mark (`MiamiCyberGangLogoFaceOnly`) with no fill prop.
+ * Two marks take no accent colour prop and are named exceptions:
+ *   - `universal` is lucide's globe, an outline: it takes the class only.
+ *   - `tmcg` is a two-colour mark with colours of its own.
  */
+const FLAMINGO_MARK: IconRef = { set: 'FlamingoMarkIcon', color: 'currentColor' };
+
+/**
+ * Each platform's mark, by the platform's name. Data: a mark is loaded when it
+ * is drawn. `tinted` marks take the platform's accent class and paint their
+ * accent part with `currentColor`.
+ */
+const PLATFORM_MARKS: Readonly<Record<string, { mark: IconRef; tinted: boolean }>> = {
+  // The squares are the accent; the frame is the neutral greys white.
+  openframe: {
+    mark: { set: 'OpenframeLogoIcon', color: 'var(--ods-system-greys-white)', secondaryColor: 'currentColor' },
+    tinted: true,
+  },
+  // The accent is the BACK bubble. The other two are the neutral greys.
+  openmsp: {
+    mark: {
+      set: 'OpenmspLogoIcon',
+      color: 'var(--ods-system-greys-white)',
+      secondaryColor: 'var(--ods-system-greys-black)',
+      tertiaryColor: 'currentColor',
+    },
+    tinted: true,
+  },
+  tmcg: { mark: { set: 'MiamiCyberGangLogoFaceOnlyIcon' }, tinted: false },
+  mlg: { mark: { set: 'MlgLogoIcon', size: 20 }, tinted: true },
+  universal: { mark: { lucide: 'globe' }, tinted: true },
+};
+
+/** Every other platform is drawn with the Flamingo mark in its own accent. */
+const DEFAULT_MARK = { mark: FLAMINGO_MARK, tinted: true };
+
 function renderPlatformIcon(platformName: string, className: string): React.ReactNode {
-  const tinted = cn(className, getPlatformBrandClasses(platformName).accentText);
-  switch (platformName) {
-    case 'openframe':
-      // `lowerPathColor` is the accent; the upper path is the neutral greys white.
-      return (
-        <OpenframeLogoIcon secondaryColor="currentColor" className={tinted} color="var(--ods-system-greys-white)" />
-      );
-    case 'openmsp':
-      // `OpenmspLogo`'s paths set their own fills, so a root `fill` is a no-op:
-      // the accent is the BACK bubble. The other two are the neutral greys.
-      return (
-        <OpenmspLogoIcon
-          secondaryColor="var(--ods-system-greys-black)"
-          tertiaryColor="currentColor"
-          className={tinted}
-          color="var(--ods-system-greys-white)"
-        />
-      );
-    case 'tmcg':
-      return <MiamiCyberGangLogoFaceOnlyIcon className={className} />;
-    case 'mlg':
-      return <MlgLogoIcon className={tinted} size={20} />;
-    case 'universal':
-      return <Globe className={tinted} />;
-    default:
-      return <FlamingoMarkIcon className={tinted} color="currentColor" />;
-  }
+  const { mark, tinted } = Object.prototype.hasOwnProperty.call(PLATFORM_MARKS, platformName)
+    ? PLATFORM_MARKS[platformName]
+    : DEFAULT_MARK;
+  return createElement(NamedIcon, {
+    icon: mark,
+    className: tinted ? cn(className, getPlatformBrandClasses(platformName).accentText) : className,
+  });
 }
 
 /** Platform icons mapping (5x5), tinted by each platform's accent class. */

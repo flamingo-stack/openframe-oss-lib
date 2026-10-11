@@ -48,7 +48,7 @@ vi.mock('../hooks/use-slash-commands', async importOriginal => {
 });
 
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
-import { EmbeddableChatPanel as EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat-panel';
+import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {

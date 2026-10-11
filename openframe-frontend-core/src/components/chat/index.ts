@@ -1,6 +1,9 @@
 'use client';
 
 // Chat components exports
+import { createElement, forwardRef, lazy, Suspense, useEffect } from 'react';
+import type { EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
+import { holdAskAiOpens } from './utils/ask-ai-events';
 export * from './approval-request-message';
 export * from './approval-batch-message';
 export * from './escalation-offer-message';
@@ -99,14 +102,18 @@ export * from './stream';
 export * from './utils';
 
 // EmbeddableChat — THE chat. Hosts mount it once at the root after providing a
-// <ChatRuntimeContext.Provider>; it loads the panel (`EmbeddableChatPanel`, its
-// own module) when the chat is first needed.
-export {
-  type ChatPrefillDraft,
-  EmbeddableChat,
-  type EmbeddableChatHandle,
-  type EmbeddableChatProps,
-} from './embeddable-chat';
-export { MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from './embeddable-chat-panel';
+// <ChatRuntimeContext.Provider>. Its module is loaded on its own, after the
+// page's code (`lazy`), so a page never ships the chat with its first script;
+// an open sent before it has loaded is held and delivered (`ask-ai-events`).
+export type { ChatPrefillDraft, EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
+const LoadedEmbeddableChat = lazy(() =>
+  import('./embeddable-chat').then(module => ({ default: module.EmbeddableChat })),
+);
+export const EmbeddableChat = forwardRef<EmbeddableChatHandle, EmbeddableChatProps>((props, ref) => {
+  useEffect(() => holdAskAiOpens(), []);
+  return createElement(Suspense, { fallback: null }, createElement(LoadedEmbeddableChat, { ...props, ref }));
+});
+EmbeddableChat.displayName = 'EmbeddableChat';
+export { MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from './chat-dimensions';
 export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_EVENTS, ASK_AI_OPEN_WITH_REF_EVENT } from './utils/ask-ai-events';
 export * from './proxy-credentials-panel';

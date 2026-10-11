@@ -1,12 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { createElement, useState } from 'react';
 import type { MouseEvent } from 'react';
-import { AppleClassicIcon } from '../icons-v2-generated/brand-logos/apple-classic-icon';
-import { GithubClassicIcon } from '../icons-v2-generated/brand-logos/github-classic-icon';
-import { GoogleLogoClassicIcon } from '../icons-v2-generated/brand-logos/google-logo-classic-icon';
-import { MicrosoftIcon } from '../icons-v2-generated/brand-logos/microsoft-icon';
-import { SlackIcon } from '../icons-v2-generated/brand-logos/slack-icon';
+import { requireIcon, type IconRef } from '../chat/utils/icon-loading';
 import { Button } from '../ui/button';
 
 interface ProviderButtonProps {
@@ -16,33 +12,33 @@ interface ProviderButtonProps {
   loading?: boolean;
 }
 
-const PROVIDER_CONFIG = {
+/** Each provider's label and the NAME of its mark: the mark is loaded when the button is drawn. */
+const PROVIDER_CONFIG: Record<ProviderButtonProps['provider'], { displayName: string; icon: IconRef }> = {
   microsoft: {
     displayName: 'Continue with Microsoft',
-    icon: MicrosoftIcon,
+    icon: { set: 'MicrosoftIcon' },
   },
   google: {
     displayName: 'Continue with Google',
-    icon: GoogleLogoClassicIcon,
+    icon: { set: 'GoogleLogoClassicIcon' },
   },
   slack: {
     displayName: 'Continue with Slack',
-    icon: SlackIcon,
+    icon: { set: 'SlackIcon' },
   },
   github: {
     displayName: 'Continue with GitHub',
-    icon: GithubClassicIcon,
+    icon: { set: 'GithubClassicIcon' },
   },
   apple: {
     displayName: 'Continue with Apple',
-    icon: AppleClassicIcon,
+    icon: { set: 'AppleClassicIcon' },
   },
 };
 
 export function ProviderButton({ provider, onClick, disabled = false, loading = false }: ProviderButtonProps) {
   const [internalLoading, setInternalLoading] = useState(false);
   const config = PROVIDER_CONFIG[provider];
-  const IconComponent = config.icon;
 
   // Use external loading state if provided, otherwise use internal state
   const isLoading = loading || internalLoading;
@@ -78,7 +74,7 @@ export function ProviderButton({ provider, onClick, disabled = false, loading = 
       disabled={disabled || isLoading}
       variant="outline"
       size="default"
-      leftIcon={isLoading ? null : <IconComponent className="h-5 w-5" />}
+      leftIcon={isLoading ? null : createElement(requireIcon(config.icon), { className: 'h-5 w-5' })}
       className={`h-[56px] w-full !font-bold !text-h6 hover:bg-ods-bg-hover content-md:!w-full ${isLoading ? 'cursor-wait' : 'cursor-pointer'} `}
       aria-label={config.displayName}
     >

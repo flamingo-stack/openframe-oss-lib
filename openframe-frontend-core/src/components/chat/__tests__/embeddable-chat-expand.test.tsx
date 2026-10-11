@@ -14,7 +14,7 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
 }));
 
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
-import { EmbeddableChatPanel as EmbeddableChat } from '../embeddable-chat-panel';
+import { EmbeddableChat } from '../embeddable-chat';
 import type { DialogItem } from '../types/component.types';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 

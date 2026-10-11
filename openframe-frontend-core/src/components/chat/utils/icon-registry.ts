@@ -15,8 +15,8 @@
  * The PascalCase variants come in via `normalizeIconKey()`, which maps
  * known PascalCase aliases → kebab-case before the lookup runs.
  *
- * Adding a new icon: import the component below, add a `'name': Component`
- * entry in `ICON_REGISTRY`, and (if the same icon also flows in from a DB
+ * Adding a new icon: add a `'name': { set | lucide }` entry in `ICON_REGISTRY`
+ * (data: the icon is loaded when it is drawn), and (if the same icon also flows in from a DB
  * column that uses PascalCase) add a `PascalName → 'name'` row to
  * `PASCAL_TO_KEBAB_ALIASES`.
  *
@@ -24,145 +24,91 @@
  * never renders without an icon.
  */
 
-import {
-  Activity,
-  Banknote,
-  Bell,
-  BookOpen,
-  Box,
-  Briefcase,
-  Calendar,
-  CheckSquare,
-  DollarSign,
-  Facebook,
-  FileText,
-  Github,
-  Globe,
-  GraduationCap,
-  Headphones,
-  Info,
-  Instagram,
-  Mail,
-  Megaphone,
-  MessageCircle,
-  MessageSquare,
-  Newspaper,
-  Package,
-  PenSquare,
-  Phone,
-  Rocket,
-  Search,
-  Send,
-  Shield,
-  Star,
-  TableProperties,
-  TrendingUp,
-  Twitter,
-  Users,
-  Video,
-  Youtube,
-} from 'lucide-react';
-import { createElement, type ComponentType, type ReactNode } from 'react';
-import { ClickupIcon } from '../../icons-v2-generated/brand-logos/clickup-icon';
-import { FacebookClassicIcon } from '../../icons-v2-generated/brand-logos/facebook-classic-icon';
-import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
-import { HubspotIcon } from '../../icons-v2-generated/brand-logos/hubspot-icon';
-import { InstagramClassicIcon } from '../../icons-v2-generated/brand-logos/instagram-classic-icon';
-import { LinkedinClassicIcon } from '../../icons-v2-generated/brand-logos/linkedin-classic-icon';
-import { SlackIcon } from '../../icons-v2-generated/brand-logos/slack-icon';
-import { WhatsappIcon } from '../../icons-v2-generated/brand-logos/whatsapp-icon';
-import { XLogoIcon } from '../../icons-v2-generated/brand-logos/x-logo-icon';
-import { YoutubeClassicIcon } from '../../icons-v2-generated/brand-logos/youtube-classic-icon';
-import { OpenframeLogoIcon as RawOpenFrameLogo } from '../../icons-v2-generated/logos/openframe-logo-icon';
-// Brand icons — lib-local exports.
+import { createElement, type ReactNode } from 'react';
+import { iconOf, lucideIcon, NamedIcon, type IconComponent, type IconRef } from './icon-loading';
 
-// Wrapper so the OpenFrame logo's outer frame inherits the parent's text
-// color instead of its hardcoded default — that default is invisible on
-// dark chat surfaces. The white squares stay white (visible on dark).
-// With this, the parent's `text-ods-text-primary` propagates via
-// `currentColor` and the frame renders in the same primary text color
-// as the lucide icons next to it. Uses `createElement` (not JSX) so this
-// stays a `.ts` file. Accepts `color` for shape-compat with the registry's
-// IconComponent type, but ignores it — the logo's outer frame is wired
-// to `currentColor` via the upperPathColor pass-through.
-const OpenFrameLogoIcon: ComponentType<{ className?: string; color?: string }> = ({ className }) =>
-  createElement(RawOpenFrameLogo, {
-    className,
-    color: 'currentColor',
-    secondaryColor: 'var(--ods-system-greys-white)',
-  });
+const lucide = (name: string): IconRef => ({ lucide: name });
+const fromSet = (exportName: string): IconRef => ({ set: exportName });
 
 /**
- * Loose icon-component shape: every entry accepts `className`; `color` is
- * optional (lucide + most brand icons accept it; OpenFrameLogo doesn't,
- * but `color` is optional so passing `undefined` is a no-op). Loose enough
- * to accept both lucide's `LucideIcon` and our brand SVG components.
+ * The kebab-case registry, as DATA: each name states where its icon lives
+ * (lucide, or the generated set) and nothing is loaded until it is drawn. ALL
+ * lookups go through here; PascalCase aliases route through
+ * `normalizeIconKey()` first.
  */
-type IconComponent = ComponentType<{ className?: string; color?: string }>;
-
-/**
- * The kebab-case registry. ALL lookups go through here; PascalCase
- * aliases route through `normalizeIconKey()` first.
- */
-export const ICON_REGISTRY: Record<string, IconComponent> = {
-  // lucide-react (kebab-case)
-  activity: Activity,
-  banknote: Banknote,
-  bell: Bell,
-  'book-open': BookOpen,
-  box: Box,
-  briefcase: Briefcase,
-  calendar: Calendar,
-  'check-square': CheckSquare,
-  'dollar-sign': DollarSign,
+export const ICON_REGISTRY: Readonly<Record<string, IconRef>> = {
+  activity: lucide('activity'),
+  banknote: lucide('banknote'),
+  bell: lucide('bell'),
+  'book-open': lucide('book-open'),
+  box: lucide('box'),
+  briefcase: lucide('briefcase'),
+  calendar: lucide('calendar'),
+  'check-square': lucide('square-check-big'),
+  'dollar-sign': lucide('dollar-sign'),
   // For brand-vs-lucide variants the kebab key is the BRAND (most-common
   // social-platform intent); `'<name>-lucide'` carries the lucide outline.
-  facebook: FacebookClassicIcon,
-  'facebook-lucide': Facebook,
-  'file-text': FileText,
+  facebook: fromSet('FacebookClassicIcon'),
+  'facebook-lucide': lucide('facebook'),
+  'file-text': lucide('file-text'),
   // `'github-lucide'` is the lucide outline glyph (used by
   // `social_platforms.icon_name='Github'`); `'github'` is the brand icon
-  // (used by `chat_admin_slash_commands.icon_name='github'`). The PascalCase
-  // alias `'Github' → 'github-lucide'` routes the lucide glyph for
-  // social-platform DB rows; `'GitHubIcon' → 'github'` keeps brand routing
-  // consistent for callers that store the PascalCase component name.
-  github: GithubClassicIcon,
-  'github-lucide': Github,
-  globe: Globe,
-  'graduation-cap': GraduationCap,
-  headphones: Headphones,
-  info: Info,
-  instagram: InstagramClassicIcon,
-  'instagram-lucide': Instagram,
-  mail: Mail,
-  megaphone: Megaphone,
-  'message-circle': MessageCircle,
-  'message-square': MessageSquare,
-  newspaper: Newspaper,
-  package: Package,
-  'pen-square': PenSquare,
-  phone: Phone,
-  rocket: Rocket,
-  search: Search,
-  send: Send,
-  shield: Shield,
-  star: Star,
-  table: TableProperties,
-  'trending-up': TrendingUp,
-  twitter: Twitter,
-  users: Users,
-  video: Video,
-  whatsapp: WhatsappIcon,
-  youtube: YoutubeClassicIcon,
-  'youtube-lucide': Youtube,
+  // (used by `chat_admin_slash_commands.icon_name='github'`).
+  github: fromSet('GithubClassicIcon'),
+  'github-lucide': lucide('github'),
+  globe: lucide('globe'),
+  'graduation-cap': lucide('graduation-cap'),
+  headphones: lucide('headphones'),
+  info: lucide('info'),
+  instagram: fromSet('InstagramClassicIcon'),
+  'instagram-lucide': lucide('instagram'),
+  mail: lucide('mail'),
+  megaphone: lucide('megaphone'),
+  'message-circle': lucide('message-circle'),
+  'message-square': lucide('message-square'),
+  newspaper: lucide('newspaper'),
+  package: lucide('package'),
+  'pen-square': lucide('square-pen'),
+  phone: lucide('phone'),
+  rocket: lucide('rocket'),
+  search: lucide('search'),
+  send: lucide('send'),
+  shield: lucide('shield'),
+  star: lucide('star'),
+  table: lucide('table-properties'),
+  'trending-up': lucide('trending-up'),
+  twitter: lucide('twitter'),
+  users: lucide('users'),
+  video: lucide('video'),
+  whatsapp: fromSet('WhatsappIcon'),
+  youtube: fromSet('YoutubeClassicIcon'),
+  'youtube-lucide': lucide('youtube'),
   // brand-only icons (no lucide variant in current use)
-  slack: SlackIcon,
-  clickup: ClickupIcon,
-  hubspot: HubspotIcon,
-  linkedin: LinkedinClassicIcon,
-  x: XLogoIcon,
-  openframe: OpenFrameLogoIcon,
+  slack: fromSet('SlackIcon'),
+  clickup: fromSet('ClickupIcon'),
+  hubspot: fromSet('HubspotIcon'),
+  linkedin: fromSet('LinkedinClassicIcon'),
+  x: fromSet('XLogoIcon'),
+  // The OpenFrame logo's frame takes the text colour of where it sits (its own
+  // default is invisible on dark chat surfaces); the squares stay white.
+  openframe: {
+    set: 'OpenframeLogoIcon',
+    color: 'currentColor',
+    secondaryColor: 'var(--ods-system-greys-white)',
+    ownColor: true,
+  },
 };
+
+/** The icon a registry key names, or `undefined` for a key the registry does not hold. */
+export function registryIcon(key: string): IconComponent | undefined {
+  if (!Object.prototype.hasOwnProperty.call(ICON_REGISTRY, key)) return undefined;
+  return iconOf(ICON_REGISTRY[key]) ?? undefined;
+}
+
+const GLOBE: IconRef = lucide('globe');
+
+/** The glyph a name with no icon draws. */
+const fallbackIcon = (name: string): IconComponent => lucideIcon(name) as IconComponent;
 
 /**
  * PascalCase → kebab-case alias table for DB columns that store icon
@@ -239,11 +185,9 @@ export function normalizeIconKey(key: string): string {
  * SOMETHING rather than a missing glyph. The fallback is intentional:
  * a typo in a new admin-authored row shouldn't crash render.
  */
-export function getIconComponent(
-  iconName: string | null | undefined,
-): ComponentType<{ className?: string; color?: string }> {
-  if (!iconName) return FileText;
-  return ICON_REGISTRY[normalizeIconKey(iconName)] ?? FileText;
+export function getIconComponent(iconName: string | null | undefined): IconComponent {
+  if (!iconName) return fallbackIcon('file-text');
+  return registryIcon(normalizeIconKey(iconName)) ?? fallbackIcon('file-text');
 }
 
 // ---------------------------------------------------------------------------
@@ -266,9 +210,9 @@ const SIZE_CLASSES: Record<DynamicIconSize, string> = {
  * before lookup.
  */
 const ICON_COLORS: Record<string, { color?: string; fill?: string }> = {
-  linkedin: { color: '#0A66C2' },
-  facebook: { color: '#1877F2' },
-  youtube: { color: '#FF0000' },
+  linkedin: { color: 'var(--social-linkedin)' },
+  facebook: { color: 'var(--social-facebook)' },
+  youtube: { color: 'var(--social-youtube)' },
 };
 
 /**
@@ -283,23 +227,21 @@ export function getDynamicIcon(
 ): ReactNode {
   if (!iconName) {
     console.warn('[getDynamicIcon] No iconName provided, using Globe fallback');
-    return createElement(Globe, { className: SIZE_CLASSES[size] });
+    return createElement(NamedIcon, { icon: GLOBE, className: SIZE_CLASSES[size] });
   }
 
   const sizeClass = SIZE_CLASSES[size];
   const finalClassName = className ? `${sizeClass} ${className}` : sizeClass;
 
   const canonicalKey = normalizeIconKey(iconName);
-  const IconComponent = ICON_REGISTRY[canonicalKey];
-
-  if (IconComponent) {
+  if (Object.prototype.hasOwnProperty.call(ICON_REGISTRY, canonicalKey)) {
     const colorConfig = ICON_COLORS[canonicalKey] || {};
-    return createElement(IconComponent, { className: finalClassName, ...colorConfig });
+    return createElement(NamedIcon, { icon: ICON_REGISTRY[canonicalKey], className: finalClassName, ...colorConfig });
   }
 
   console.error(
     `[getDynamicIcon] Icon NOT found in registry: "${iconName}" (normalized to "${canonicalKey}"). Available icons:`,
     Object.keys(ICON_REGISTRY),
   );
-  return createElement(Globe, { className: finalClassName });
+  return createElement(NamedIcon, { icon: GLOBE, className: finalClassName });
 }

@@ -3,11 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useContext, useState } from 'react';
 import { fn } from 'storybook/test';
 
-import {
-  EmbeddableChatPanel as EmbeddableChat,
-  MINGO_V2_RAIL_WIDTH,
-  MINGO_V2_SPLIT_WIDTH,
-} from '../components/chat/embeddable-chat-panel';
+import { EmbeddableChat, MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from '../components/chat/embeddable-chat';
 import type { UnifiedChatMessage, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import {
   BracketCurlyIcon,

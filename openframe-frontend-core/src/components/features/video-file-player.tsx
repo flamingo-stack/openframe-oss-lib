@@ -18,6 +18,7 @@ import MuxPlayer from '@mux/mux-player-react';
 import type React from 'react';
 import { useRef } from 'react';
 import { useAuthedAssetSrc } from '../../hooks/use-authed-asset-src';
+import { Button } from '../ui/button';
 import { muxViewerId } from './mux-player-environment';
 import { useHoverPlayback, usePlaybackHealth, usePlaybackSound, type MediaElement } from './use-file-playback';
 import { useIosNativeVideoFullscreen } from './use-ios-native-video-fullscreen';
@@ -127,19 +128,21 @@ export default function FilePlayer({
 
   // What sits over the player: the unmute control while playback runs muted
   // because the browser refused sound (muted autoplay with an explicit unmute,
-  // never forced sound), and the retry when playback failed. The unmute is a
-  // plain glyph in the centre slot, like the player's own centre controls.
+  // never forced sound), and the retry when playback failed.
   const unmute =
     sound.mutedFallback && !hideMutedBadge ? (
-      <button
+      // The common Button's bare media glyph: white at rest, the accent while hovered.
+      <Button
         type="button"
+        variant="glyph"
+        size="icon-glyph"
         aria-label="Unmute"
         title="Unmute"
         onClick={sound.unmute}
-        className="absolute inset-0 z-10 m-auto flex h-14 w-14 items-center justify-center text-ods-text-primary transition-colors hover:text-ods-accent"
+        className="absolute inset-0 z-10 m-auto"
       >
         <VideoUnmuteGlyph />
-      </button>
+      </Button>
     ) : null;
   const failure = health.failed ? <VideoErrorOverlay onRetry={health.retry} /> : null;
 

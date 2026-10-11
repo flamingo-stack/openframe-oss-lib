@@ -1,12 +1,8 @@
 'use client';
 
-import { Globe } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { getPlatformBrandClasses } from '../../utils/platform-identity';
-import { FlamingoMarkIcon } from '../icons-v2-generated/logos/flamingo-mark-icon';
-import { MiamiCyberGangLogoFaceOnlyIcon } from '../icons-v2-generated/logos/miami-cyber-gang-logo-face-only-icon';
-import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
-import { OpenmspLogoIcon } from '../icons-v2-generated/logos/openmsp-logo-icon';
+import { NamedIcon, type IconRef } from '../chat/utils/icon-loading';
 
 interface PlatformBadgeProps {
   platform?: {
@@ -37,43 +33,37 @@ const sizeClasses = {
   },
 };
 
-const PlatformIcon = ({ platform, className }: { platform: string; className: string }) => {
-  // Extract size from className (h-4 w-4 -> 16, h-5 w-5 -> 20, etc.)
-  const sizeMatch = className.match(/h-(\d+)/);
-  const size = sizeMatch ? parseInt(sizeMatch[1]) * 4 : 16; // Convert Tailwind size to pixels
+const FLAMINGO_MARK: IconRef = { set: 'FlamingoMarkIcon', color: 'var(--ods-flamingo-pink-base)' };
 
-  switch (platform) {
-    case 'openmsp':
-      return (
-        <OpenmspLogoIcon
-          secondaryColor="var(--ods-system-greys-black)"
-          tertiaryColor="currentColor"
-          className={className}
-          color="currentColor"
-        />
-      );
-    case 'flamingo':
-    case 'flamingo-teaser':
-      return <FlamingoMarkIcon color="var(--ods-flamingo-pink-base)" className={className} />;
-    case 'openframe':
-      return (
-        <OpenframeLogoIcon
-          color="var(--color-text-on-accent)"
-          secondaryColor="var(--color-text-primary)"
-          className={className}
-        />
-      );
-    case 'tmcg':
-      return <MiamiCyberGangLogoFaceOnlyIcon size={size} className={className} />;
-    case 'company-hub':
-    case 'marketing-hub':
-    case 'product-hub':
-    case 'revenue-hub':
-    case 'people-hub':
-      return <FlamingoMarkIcon className={className} color="var(--ods-flamingo-pink-base)" />;
-    default:
-      return <Globe className={className} />;
-  }
+/** Each platform's mark and its colours, by the platform's name. Data: the mark is loaded when a badge draws it. */
+const PLATFORM_MARKS: Readonly<Record<string, IconRef>> = {
+  openmsp: {
+    set: 'OpenmspLogoIcon',
+    color: 'currentColor',
+    secondaryColor: 'var(--ods-system-greys-black)',
+    tertiaryColor: 'currentColor',
+  },
+  flamingo: FLAMINGO_MARK,
+  'flamingo-teaser': FLAMINGO_MARK,
+  openframe: {
+    set: 'OpenframeLogoIcon',
+    color: 'var(--color-text-on-accent)',
+    secondaryColor: 'var(--color-text-primary)',
+  },
+  tmcg: { set: 'MiamiCyberGangLogoFaceOnlyIcon' },
+  'company-hub': FLAMINGO_MARK,
+  'marketing-hub': FLAMINGO_MARK,
+  'product-hub': FLAMINGO_MARK,
+  'revenue-hub': FLAMINGO_MARK,
+  'people-hub': FLAMINGO_MARK,
+};
+
+/** A platform with no mark of its own is drawn as the globe. */
+const NO_MARK: IconRef = { lucide: 'globe' };
+
+const PlatformIcon = ({ platform, className }: { platform: string; className: string }) => {
+  const mark = Object.prototype.hasOwnProperty.call(PLATFORM_MARKS, platform) ? PLATFORM_MARKS[platform] : NO_MARK;
+  return <NamedIcon icon={mark} className={className} />;
 };
 
 export function PlatformBadge({ platform, size = 'sm', showLabel = true, className }: PlatformBadgeProps) {
