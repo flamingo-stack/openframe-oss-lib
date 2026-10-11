@@ -2,11 +2,12 @@
 
 import { Globe } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { iconColors } from '../../utils/icon-colors';
 import { getPlatformBrandClasses } from '../../utils/platform-identity';
-import { FlamingoLogo } from '../flamingo-logo';
-import { MiamiCyberGangLogoFaceOnly } from '../icons/miami-cyber-gang-logo-face-only';
-import { OpenFrameLogo } from '../icons/openframe-logo';
-import { OpenmspLogo } from '../openmsp-logo';
+import { FlamingoMarkIcon } from '../icons-v2-generated/logos/flamingo-mark-icon';
+import { MiamiCyberGangLogoFaceOnlyIcon } from '../icons-v2-generated/logos/miami-cyber-gang-logo-face-only-icon';
+import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
+import { OpenmspLogoIcon } from '../icons-v2-generated/logos/openmsp-logo-icon';
 
 interface PlatformBadgeProps {
   platform?: {
@@ -45,26 +46,25 @@ const PlatformIcon = ({ platform, className }: { platform: string; className: st
   switch (platform) {
     case 'openmsp':
       return (
-        <OpenmspLogo
+        <OpenmspLogoIcon
+          style={iconColors({ secondary: 'var(--ods-system-greys-black)', tertiary: 'currentColor' })}
           className={className}
-          frontBubbleColor="currentColor"
-          innerFrontBubbleColor="var(--ods-system-greys-black)"
-          backBubbleColor="currentColor"
+          color="currentColor"
         />
       );
     case 'flamingo':
     case 'flamingo-teaser':
-      return <FlamingoLogo className={className} />;
+      return <FlamingoMarkIcon color="var(--ods-flamingo-pink-base)" className={className} />;
     case 'openframe':
-      return <OpenFrameLogo className={className} />;
+      return <OpenframeLogoIcon color="#1A1A1A" style={iconColors({ secondary: '#ffffff' })} className={className} />;
     case 'tmcg':
-      return <MiamiCyberGangLogoFaceOnly size={size} className={className} />;
+      return <MiamiCyberGangLogoFaceOnlyIcon size={size} className={className} />;
     case 'company-hub':
     case 'marketing-hub':
     case 'product-hub':
     case 'revenue-hub':
     case 'people-hub':
-      return <FlamingoLogo className={className} fill="currentColor" />;
+      return <FlamingoMarkIcon className={className} color="currentColor" />;
     default:
       return <Globe className={className} />;
   }

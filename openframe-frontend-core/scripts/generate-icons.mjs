@@ -14,6 +14,12 @@ const rootDir = join(__dirname, '..');
 const ICONS_V2_DIR = join(rootDir, 'src/components/icons-v2');
 const OUTPUT_DIR = join(rootDir, 'src/components/icons-v2-generated');
 
+// An icon whose own colour is not the text colour of its slot (a mark that is
+// white wherever it sits, a brand's orange) states it here, by
+// `<category>/<file name>`: the generated component takes it as the default of
+// its `color` prop instead of `currentColor`.
+const DEFAULT_COLORS = JSON.parse(readFileSync(join(ICONS_V2_DIR, 'default-colors.json'), 'utf8'));
+
 // Convert kebab-case or space-separated to PascalCase
 function toPascalCase(str) {
   return str
@@ -126,6 +132,11 @@ function processGeneratedCategory(categoryPath, originalNames) {
       .replace(new RegExp(`function ${svgrFuncName}\\(`, 'g'), `function ${componentName}(`);
 
     content = fixSmilReferences(content);
+
+    const defaultColor = DEFAULT_COLORS[`${basename(categoryPath)}/${normalizedKebabName}`];
+    if (defaultColor) {
+      content = content.replace(/color = (['"])currentColor\1/, `color = ${JSON.stringify(defaultColor)}`);
+    }
 
     writeFileSync(newFilePath, content);
 

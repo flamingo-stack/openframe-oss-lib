@@ -63,20 +63,19 @@ import {
   Youtube,
 } from 'lucide-react';
 import { createElement, type ComponentType, type ReactNode } from 'react';
+import { iconColors } from '../../../utils/icon-colors';
+import { ClickupIcon } from '../../icons-v2-generated/brand-logos/clickup-icon';
+import { FacebookClassicIcon } from '../../icons-v2-generated/brand-logos/facebook-classic-icon';
+import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
+import { HubspotIcon } from '../../icons-v2-generated/brand-logos/hubspot-icon';
+import { InstagramClassicIcon } from '../../icons-v2-generated/brand-logos/instagram-classic-icon';
+import { LinkedinClassicIcon } from '../../icons-v2-generated/brand-logos/linkedin-classic-icon';
+import { SlackIcon } from '../../icons-v2-generated/brand-logos/slack-icon';
+import { WhatsappIcon } from '../../icons-v2-generated/brand-logos/whatsapp-icon';
+import { XLogoIcon } from '../../icons-v2-generated/brand-logos/x-logo-icon';
+import { YoutubeClassicIcon } from '../../icons-v2-generated/brand-logos/youtube-classic-icon';
+import { OpenframeLogoIcon as RawOpenFrameLogo } from '../../icons-v2-generated/logos/openframe-logo-icon';
 // Brand icons — lib-local exports.
-import {
-  SlackIcon,
-  GitHubIcon,
-  ClickUpIcon,
-  HubspotIcon,
-  LinkedInIcon,
-  FacebookIcon,
-  InstagramIcon,
-  YouTubeIcon,
-  WhatsAppIcon,
-  XLogo,
-  OpenFrameLogo as RawOpenFrameLogo,
-} from '../../icons';
 
 // Wrapper so the OpenFrame logo's outer frame inherits the parent's text
 // color instead of its hardcoded default — that default is invisible on
@@ -88,7 +87,15 @@ import {
 // IconComponent type, but ignores it — the logo's outer frame is wired
 // to `currentColor` via the upperPathColor pass-through.
 const OpenFrameLogoIcon: ComponentType<{ className?: string; color?: string }> = ({ className }) =>
-  createElement(RawOpenFrameLogo, { className, upperPathColor: 'currentColor' });
+  createElement(RawOpenFrameLogo, {
+    className,
+    color: 'currentColor',
+    style: iconColors({ secondary: 'var(--ods-system-greys-white)' }),
+  });
+
+/** HubSpot's mark in its own orange unless the caller names a colour. */
+const HubspotBrandIcon: ComponentType<{ className?: string; color?: string }> = ({ className, color }) =>
+  createElement(HubspotIcon, { className, color: color ?? '#FF7A59' });
 
 /**
  * Loose icon-component shape: every entry accepts `className`; `color` is
@@ -115,7 +122,7 @@ export const ICON_REGISTRY: Record<string, IconComponent> = {
   'dollar-sign': DollarSign,
   // For brand-vs-lucide variants the kebab key is the BRAND (most-common
   // social-platform intent); `'<name>-lucide'` carries the lucide outline.
-  facebook: FacebookIcon,
+  facebook: FacebookClassicIcon,
   'facebook-lucide': Facebook,
   'file-text': FileText,
   // `'github-lucide'` is the lucide outline glyph (used by
@@ -124,13 +131,13 @@ export const ICON_REGISTRY: Record<string, IconComponent> = {
   // alias `'Github' → 'github-lucide'` routes the lucide glyph for
   // social-platform DB rows; `'GitHubIcon' → 'github'` keeps brand routing
   // consistent for callers that store the PascalCase component name.
-  github: GitHubIcon,
+  github: GithubClassicIcon,
   'github-lucide': Github,
   globe: Globe,
   'graduation-cap': GraduationCap,
   headphones: Headphones,
   info: Info,
-  instagram: InstagramIcon,
+  instagram: InstagramClassicIcon,
   'instagram-lucide': Instagram,
   mail: Mail,
   megaphone: Megaphone,
@@ -150,15 +157,15 @@ export const ICON_REGISTRY: Record<string, IconComponent> = {
   twitter: Twitter,
   users: Users,
   video: Video,
-  whatsapp: WhatsAppIcon,
-  youtube: YouTubeIcon,
+  whatsapp: WhatsappIcon,
+  youtube: YoutubeClassicIcon,
   'youtube-lucide': Youtube,
   // brand-only icons (no lucide variant in current use)
   slack: SlackIcon,
-  clickup: ClickUpIcon,
-  hubspot: HubspotIcon,
-  linkedin: LinkedInIcon,
-  x: XLogo,
+  clickup: ClickupIcon,
+  hubspot: HubspotBrandIcon,
+  linkedin: LinkedinClassicIcon,
+  x: XLogoIcon,
   openframe: OpenFrameLogoIcon,
 };
 
@@ -213,8 +220,8 @@ const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
   ClickUpIcon: 'clickup',
   HubspotIcon: 'hubspot',
   LinkedInIcon: 'linkedin',
-  FacebookIcon: 'facebook',
-  InstagramIcon: 'instagram',
+  FacebookClassicIcon: 'facebook',
+  InstagramClassicIcon: 'instagram',
   YouTubeIcon: 'youtube',
   WhatsAppIcon: 'whatsapp',
   XLogo: 'x',

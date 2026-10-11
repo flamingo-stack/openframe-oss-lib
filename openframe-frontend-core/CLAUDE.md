@@ -121,7 +121,7 @@ security boundary — and also why bypassing buys you nothing.
 Before writing any new component, **search the codebase first** to avoid duplicates:
 
 - Grep for similar names (`ProviderButton`, `*-button`, `*-card`, etc.)
-- Check `src/components/ui/`, `src/components/features/`, `src/components/navigation/`, `src/components/icons/`, `src/components/layout/`
+- Check `src/components/ui/`, `src/components/features/`, `src/components/navigation/`, `src/components/icons-v2-generated/`, `src/components/layout/`
 - Check the main consuming apps too — a component may already exist there and be ready to migrate into the core library
 - If something close exists: extend it (new variant, new prop) instead of cloning
 
@@ -216,7 +216,7 @@ import '@flamingo-stack/openframe-frontend-core/styles'
 - `src/components/navigation/` — Header, AppLayout, NavigationSidebar, SlidingSidebar, StickySectionNav
 - `src/components/chat/` — embeddable Mingo/Fae chat + the chat stream engine (chunk processor, history merge)
 - `src/components/tickets/`, `docs/`, `embeds/`, `help-center-pages/`, `onboarding-guides/`, `faq/`, `contact/`, `case-studies/`, `related-content/` — content/page verticals
-- `src/components/icons/` — 133 legacy hand-written icons (exported via `icons/index.ts`)
+- There is ONE icon set, `icons-v2`: every icon, logo and platform mark is a generated component with `size`, `className` and one `color`. A mark drawn in more than one colour takes its other parts from `iconColors({ secondary, tertiary })` (`src/utils/icon-colors.ts`). A new icon is an SVG in `src/components/icons-v2/<category>/`; never a hand-written icon component.
 - `src/components/icons-v2/` (raw SVGs) → `src/components/icons-v2-generated/` (SVGR output, the `components/icons-v2` export) — regenerate via `npm run generate:icons`
 - `src/hooks/ui/` `hooks/state/` (URL-state: useApiParams, useQueryParams, introspector) `hooks/platform/` `hooks/nats/`; `hooks/api/` is intentionally empty
 - `src/nats/` — nats.ws client, NatsProvider, `buildNatsWsUrl`

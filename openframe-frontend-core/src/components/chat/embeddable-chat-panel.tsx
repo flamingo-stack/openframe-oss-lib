@@ -1644,7 +1644,7 @@ function EmbeddableChatInner({
   // bubbles — and re-mounting their inline cards — on every realtime chunk).
   // The Mingo avatar comes from the resolved agent CONFIG icon when one is
   // available (same server-driven path as every other identity glyph, via
-  // `<EntityIcon>`) — falling back to the built-in `MingoIcon` when no config is
+  // `<EntityIcon>`) — falling back to the Mingo agent's identity mark when no config is
   // in play (host mode with no `activeAgentSlug`).
   const mingoAssistantIcon = useMemo(
     () =>

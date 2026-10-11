@@ -24,7 +24,8 @@ describe('the icon loader table', () => {
       .filter(name => /^[A-Z][A-Za-z0-9]*Icon$/.test(name))
       .sort();
     expect(Object.keys(ICON_LOADERS).sort()).toEqual(exported);
-  });
+    // The whole set is imported here (about 1,800 modules): slow when the suite runs in parallel.
+  }, 30_000);
 
   it('loads the icon the set exports under that name', async () => {
     const set: Record<string, unknown> = await import('../icons-v2-generated');

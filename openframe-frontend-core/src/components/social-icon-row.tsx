@@ -2,22 +2,20 @@
 
 import { Mail, Music } from 'lucide-react';
 import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-platforms';
-import {
-  GitHubIcon,
-  RedditIcon,
-  XLogo,
-  LinkedInIcon,
-  LumaIcon,
-  WhatsAppIcon,
-  GlobeIcon,
-  MessageCircleIcon,
-  TelegramIcon,
-  YouTubeIcon,
-  InstagramIcon,
-  FacebookIcon,
-  SlackIcon,
-  CopyIcon,
-} from './icons';
+import { FacebookClassicIcon } from './icons-v2-generated/brand-logos/facebook-classic-icon';
+import { GithubClassicIcon } from './icons-v2-generated/brand-logos/github-classic-icon';
+import { InstagramClassicIcon } from './icons-v2-generated/brand-logos/instagram-classic-icon';
+import { LinkedinClassicIcon } from './icons-v2-generated/brand-logos/linkedin-classic-icon';
+import { LumaIcon } from './icons-v2-generated/brand-logos/luma-icon';
+import { RedditIcon } from './icons-v2-generated/brand-logos/reddit-icon';
+import { SlackMonoIcon } from './icons-v2-generated/brand-logos/slack-mono-icon';
+import { TelegramIcon } from './icons-v2-generated/brand-logos/telegram-icon';
+import { WhatsappIcon } from './icons-v2-generated/brand-logos/whatsapp-icon';
+import { XLogoIcon } from './icons-v2-generated/brand-logos/x-logo-icon';
+import { YoutubeClassicIcon } from './icons-v2-generated/brand-logos/youtube-classic-icon';
+import { CopyIcon } from './icons-v2-generated/interface/copy-icon';
+import { GlobeIcon } from './icons-v2-generated/interface/globe-icon';
+import { MessageCircleIcon } from './icons-v2-generated/interface/message-circle-icon';
 import { Button } from './ui/button';
 
 /** Re-exported for call sites that already import the link type from this module. */
@@ -59,20 +57,20 @@ type SocialIconComponent = (props: { className?: string }) => React.ReactElement
  * fail to type-check against a list in this file.
  */
 export const SOCIAL_ICON_COMPONENTS: Record<string, SocialIconComponent> = {
-  github: props => <GitHubIcon {...props} />,
-  twitter: props => <XLogo {...props} />,
-  reddit: props => <RedditIcon {...props} variant="white" />,
-  linkedin: props => <LinkedInIcon {...props} />,
+  github: props => <GithubClassicIcon {...props} />,
+  twitter: props => <XLogoIcon {...props} />,
+  reddit: props => <RedditIcon {...props} />,
+  linkedin: props => <LinkedinClassicIcon {...props} />,
   luma: props => <LumaIcon {...props} />,
-  whatsapp: props => <WhatsAppIcon {...props} />,
+  whatsapp: props => <WhatsappIcon {...props} />,
   email: props => <Mail {...props} />,
   website: props => <GlobeIcon {...props} />,
-  slack: props => <SlackIcon {...props} injectedColor="white" />,
+  slack: props => <SlackMonoIcon {...props} />,
   discord: props => <MessageCircleIcon {...props} />,
   telegram: props => <TelegramIcon {...props} />,
-  youtube: props => <YouTubeIcon {...props} />,
-  instagram: props => <InstagramIcon {...props} />,
-  facebook: props => <FacebookIcon {...props} />,
+  youtube: props => <YoutubeClassicIcon {...props} />,
+  instagram: props => <InstagramClassicIcon {...props} />,
+  facebook: props => <FacebookClassicIcon {...props} />,
   tiktok: props => <Music {...props} />,
   // CopyIcon's default fill is grey and would mismatch its row-mates — force the
   // themed foreground via the ODS token (tracks the theme).

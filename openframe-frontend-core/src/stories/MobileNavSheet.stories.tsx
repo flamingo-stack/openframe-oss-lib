@@ -1,17 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
-
-import { OpenFrameLogo } from '../components/icons';
+import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
 import { MobileNavSheet } from '../components/navigation/mobile-nav-sheet';
 import { SocialIconRow } from '../components/social-icon-row';
 import { Button } from '../components/ui/button';
+import { iconColors } from '../utils/icon-colors';
 import { simpleNav, siteNav } from './site-nav-fixtures';
 
 const logo = (
-  <OpenFrameLogo
+  <OpenframeLogoIcon
+    style={iconColors({ secondary: 'var(--color-accent-primary)' })}
     className="h-6 w-6 shrink-0"
-    upperPathColor="var(--color-text-primary)"
-    lowerPathColor="var(--color-accent-primary)"
+    color="var(--color-text-primary)"
   />
 );
 

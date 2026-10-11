@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ReactNode } from 'react';
+import { AgentMark } from '../components/agent-mark';
 import { MingoInfoCard } from '../components/chat/mingo-info-card';
-import { MingoIcon } from '../components/icons';
 import { ArrowRightUpIcon } from '../components/icons-v2-generated/arrows/arrow-right-up-icon';
 import { SlackLogoGreyIcon } from '../components/icons-v2-generated/brand-logos/slack-logo-grey-icon';
 import { ChartBar01VerIcon } from '../components/icons-v2-generated/charts/chart-bar-01-ver-icon';
@@ -74,14 +74,7 @@ const openMenu = (href: string, openDetails?: { label: string; icon: ReactNode }
       {
         id: 'discuss',
         label: 'Ask Mingo',
-        icon: (
-          <MingoIcon
-            className="size-5"
-            color="white"
-            eyesColor="var(--ods-flamingo-cyan-base)"
-            cornerColor="var(--ods-flamingo-cyan-base)"
-          />
-        ),
+        icon: <AgentMark agent="mingo" className="size-5" />,
         onClick: () => {
           console.log('[story] ask mingo', href);
         },

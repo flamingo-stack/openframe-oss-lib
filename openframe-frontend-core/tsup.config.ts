@@ -163,7 +163,6 @@ export default defineConfig([
       'components/ui/file-manager/index': 'src/components/ui/file-manager/index.ts',
       'components/features/index': 'src/components/features/index.ts',
       'components/toast/index': 'src/components/toast/index.ts',
-      'components/icons/index': 'src/components/icons/index.ts',
       'components/icons-v2-generated/index': 'src/components/icons-v2-generated/index.ts',
       'components/navigation/index': 'src/components/navigation/index.ts',
       // Doc-viewer subpath — DocViewer + hooks + multi-navigator context +

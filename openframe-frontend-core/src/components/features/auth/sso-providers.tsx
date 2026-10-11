@@ -1,10 +1,11 @@
 'use client';
 
 import type { ComponentType } from 'react';
-import { OpenFrameLogo } from '../../icons';
+import { iconColors } from '../../../utils/icon-colors';
 import { AppleLogoIcon } from '../../icons-v2-generated/brand-logos/apple-logo-icon';
 import { GoogleLogoIcon } from '../../icons-v2-generated/brand-logos/google-logo-icon';
 import { MicrosoftLogoIcon } from '../../icons-v2-generated/brand-logos/microsoft-logo-icon';
+import { OpenframeLogoIcon } from '../../icons-v2-generated/logos/openframe-logo-icon';
 import { Button } from '../../ui/button';
 
 /** SSO providers offered on the auth forms. */
@@ -14,10 +15,10 @@ export const PROVIDER_META: Record<AuthSsoProvider, { name: string; Icon: Compon
   openframe: {
     name: 'OpenFrame',
     Icon: ({ className }) => (
-      <OpenFrameLogo
+      <OpenframeLogoIcon
+        style={iconColors({ secondary: 'var(--color-accent-primary)' })}
         className={className}
-        lowerPathColor="var(--color-accent-primary)"
-        upperPathColor="var(--color-text-primary)"
+        color="var(--color-text-primary)"
       />
     ),
   },

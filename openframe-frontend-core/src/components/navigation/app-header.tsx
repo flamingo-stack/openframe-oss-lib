@@ -3,11 +3,15 @@
 import React from 'react';
 import { useMdUp } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
+import { iconColors } from '../../utils/icon-colors';
 import { useOptionalNotifications } from '../features/notifications/notifications-context';
 import { TimeTrackerHeaderButton } from '../features/time-tracker';
-import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons';
 import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated';
 import { BellIcon } from '../icons-v2-generated/interface/bell-icon';
+import { LogOutIcon } from '../icons-v2-generated/interface/log-out-icon';
+import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
+import { OpenframeTextIcon } from '../icons-v2-generated/logos/openframe-text-icon';
+import { UserClassicIcon } from '../icons-v2-generated/users/user-classic-icon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui';
 import { HeaderButton } from './header-button';
 import { HeaderGlobalSearch } from './header-global-search';
@@ -202,12 +206,12 @@ export const AppHeader = React.memo(function AppHeaderImpl({
       logo={
         !isMdUp && (
           <>
-            <OpenFrameLogo
+            <OpenframeLogoIcon
+              style={iconColors({ secondary: 'var(--color-accent-primary)' })}
               className="h-6 w-6 shrink-0"
-              upperPathColor="var(--color-text-primary)"
-              lowerPathColor="var(--color-accent-primary)"
+              color="var(--color-text-primary)"
             />
-            <OpenFrameText textColor="var(--color-text-primary)" className="h-4" />
+            <OpenframeTextIcon color="var(--color-text-primary)" className="h-4 w-[87px]" />
           </>
         )
       }
@@ -308,7 +312,7 @@ export const AppHeader = React.memo(function AppHeaderImpl({
                   className="cursor-pointer rounded-none border-b border-ods-border bg-ods-card px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80"
                 >
                   <div className="flex items-center gap-2">
-                    <UserIcon className="h-6 w-6 shrink-0 text-ods-text-primary" />
+                    <UserClassicIcon className="h-6 w-6 shrink-0 text-ods-text-primary" />
                     <span className="text-ods-text-primary text-h4">Profile Settings</span>
                   </div>
                 </DropdownMenuItem>

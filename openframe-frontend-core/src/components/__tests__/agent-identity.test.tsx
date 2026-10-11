@@ -41,15 +41,32 @@ describe("an agent's mark is its identity's icon", () => {
     error.mockRestore();
   });
 
-  it('draws the glyph an identity names, with the props the identity gives it', () => {
+  it('draws the glyph an identity names, with the props the identity gives it', async () => {
     const html = markup(
-      <AgentIdentityProvider icons={{ mingo: { name: 'mingo', url: null, props: { cornerColor: 'red' } } }}>
+      <AgentIdentityProvider icons={{ mingo: { name: 'mingo', url: null, props: { color: 'red' } } }}>
         <AgentMark agent="mingo" className="size-5" />
       </AgentIdentityProvider>,
     );
     expect(html).toContain('<svg');
-    expect(html).toContain('fill="red"');
-    expect(html).toContain('fill="currentColor"');
+    // The glyph's module is loaded when it is drawn.
+    await waitFor(() => expect(screen.getByTestId('marks').innerHTML).toContain('fill="red"'));
+  });
+
+  it("draws an agent's glyph in one colour wherever it sits, never the tint of its slot", async () => {
+    markup(
+      <AgentIdentityProvider icons={{ mingo: { name: 'mingo', url: null } }}>
+        <span style={{ color: 'green' }}>
+          <AgentMark agent="mingo" className="size-5" />
+          <EntityIcon icon={{ name: 'mingo' }} size={20} />
+        </span>
+      </AgentIdentityProvider>,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('marks').innerHTML.match(/fill="var\(--color-text-primary\)"/g)?.length,
+      ).toBeGreaterThan(1),
+    );
+    expect(screen.getByTestId('marks').innerHTML).not.toContain('currentColor');
   });
 
   it('draws the Mingo glyph for the identity that names it', () => {

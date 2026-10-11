@@ -24,7 +24,7 @@ import {
   toStripProfile,
   type VideoBiteStripProfile,
 } from '../../features/video-bites-shared';
-import { GitHubIcon } from '../../icons/github-icon';
+import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
 import { PageShell } from '../../layout/article-detail-layout';
 import { PageLayout } from '../../layout/page-layout';
 import { Card, CardContent } from '../../ui/card';
@@ -533,7 +533,7 @@ export function ReleaseDetailPage({
                   <>
                     {githubReleases.map(ghRelease => (
                       <div key={ghRelease.id} className="flex items-start gap-1">
-                        <GitHubIcon className="shrink-0" width={24} height={24} color="var(--color-text-secondary)" />
+                        <GithubClassicIcon className="shrink-0" size={24} color="var(--color-text-secondary)" />
                         <span className="text-ods-text-primary text-h4">Github Release</span>
                         <Link
                           href={ghRelease.github_release_url}

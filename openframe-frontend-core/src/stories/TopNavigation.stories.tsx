@@ -1,22 +1,23 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
-
-import { OpenFrameLogo, OpenFrameText } from '../components/icons';
 import { ClockHistoryIcon } from '../components/icons-v2-generated/date-and-time/clock-history-icon';
 import { BellIcon } from '../components/icons-v2-generated/interface/bell-icon';
+import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
+import { OpenframeTextIcon } from '../components/icons-v2-generated/logos/openframe-text-icon';
 import { HeaderButton } from '../components/navigation/header-button';
 import { HeaderMingoButton } from '../components/navigation/header-mingo-button';
 import { TopNavigation } from '../components/navigation/top-navigation';
 import { Button } from '../components/ui/button';
+import { iconColors } from '../utils/icon-colors';
 
 const logo = (
   <>
-    <OpenFrameLogo
+    <OpenframeLogoIcon
+      style={iconColors({ secondary: 'var(--color-accent-primary)' })}
       className="h-6 w-6 shrink-0"
-      upperPathColor="var(--color-text-primary)"
-      lowerPathColor="var(--color-accent-primary)"
+      color="var(--color-text-primary)"
     />
-    <OpenFrameText textColor="var(--color-text-primary)" className="h-4" />
+    <OpenframeTextIcon color="var(--color-text-primary)" className="h-4 w-[87px]" />
   </>
 );
 

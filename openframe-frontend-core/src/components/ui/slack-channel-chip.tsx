@@ -1,6 +1,6 @@
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
-import { SlackIcon } from '../icons/slack-icon';
+import { SlackIcon } from '../icons-v2-generated/brand-logos/slack-icon';
 
 export interface SlackChannelChipProps {
   /** Channel display name, no '#' prefix. Falls back to plain "Slack" when null. */

@@ -1,7 +1,8 @@
 'use client';
 
 import { cn } from '../../utils/cn';
-import { OpenFrameLogo } from '../icons/openframe-logo';
+import { iconColors } from '../../utils/icon-colors';
+import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 
 export interface PageLoaderProps {
   /**
@@ -37,10 +38,10 @@ export function PageLoader({
       <div className="flex flex-col items-center gap-6 p-6">
         {showIcon && (
           <div className="relative h-6 w-6">
-            <OpenFrameLogo
+            <OpenframeLogoIcon
+              style={iconColors({ secondary: 'var(--color-text-tertiary)' })}
               className="h-6 w-6 animate-pulse text-ods-accent"
-              upperPathColor="currentColor"
-              lowerPathColor="var(--color-text-tertiary)"
+              color="currentColor"
             />
           </div>
         )}
@@ -62,10 +63,10 @@ export function CompactPageLoader({ title = 'Loading', description, className, s
       <div className="flex flex-col items-center gap-4">
         {showIcon && (
           <div className="relative h-6 w-6">
-            <OpenFrameLogo
+            <OpenframeLogoIcon
+              style={iconColors({ secondary: 'var(--color-text-tertiary)' })}
               className="h-6 w-6 animate-pulse text-ods-accent"
-              upperPathColor="currentColor"
-              lowerPathColor="var(--color-text-tertiary)"
+              color="currentColor"
             />
           </div>
         )}

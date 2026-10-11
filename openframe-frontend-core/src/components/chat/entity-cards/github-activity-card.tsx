@@ -20,7 +20,7 @@ import { GitPullRequest, Eye, ExternalLink } from 'lucide-react';
 import React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
-import { GitHubIcon } from '../../icons/github-icon';
+import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
 import type { GitHubActivityItem, GitHubActivityKind, PrReviewState } from '../types/entities/github-activity';
 import {
   COMPACT_CARD_ICON_SLOT,
@@ -60,7 +60,7 @@ function kindIcon(kind: GitHubActivityKind, className = 'h-4 w-4') {
       return <Eye className={`${className} shrink-0`} />;
     case 'commit':
     default:
-      return <GitHubIcon className={`${className} shrink-0`} />;
+      return <GithubClassicIcon className={`${className} shrink-0`} />;
   }
 }
 

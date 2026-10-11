@@ -194,12 +194,6 @@
       "require": "./dist/components/toast/index.cjs",
       "default": "./dist/components/toast/index.js"
     },
-    "./components/icons": {
-      "types": "./dist/components/icons/index.d.ts",
-      "import": "./dist/components/icons/index.js",
-      "require": "./dist/components/icons/index.cjs",
-      "default": "./dist/components/icons/index.js"
-    },
     "./components/navigation": {
       "types": "./dist/components/navigation/index.d.ts",
       "import": "./dist/components/navigation/index.js",

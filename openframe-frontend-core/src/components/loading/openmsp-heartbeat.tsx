@@ -1,6 +1,7 @@
 'use client';
 
-import { OpenmspLogo } from '../openmsp-logo';
+import { iconColors } from '../../utils/icon-colors';
+import { OpenmspLogoIcon } from '../icons-v2-generated/logos/openmsp-logo-icon';
 
 export function OpenmspHeartbeatLoader({
   className = '',
@@ -43,11 +44,10 @@ export function OpenmspHeartbeatLoader({
             display: 'inline-flex',
           }}
         >
-          <OpenmspLogo
+          <OpenmspLogoIcon
+            style={iconColors({ secondary: '#000000', tertiary: '#FFC008' })}
             className="mb-10 h-16 w-16 text-ods-accent opacity-90 md:h-24 md:w-24"
-            frontBubbleColor="#f1f1f1"
-            innerFrontBubbleColor="#000000"
-            backBubbleColor="#FFC008"
+            color="#f1f1f1"
           />
         </div>
 

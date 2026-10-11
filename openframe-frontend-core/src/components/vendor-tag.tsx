@@ -2,13 +2,15 @@
 
 import { Boxes, Database, Hand, Plug, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { iconColors } from '../utils/icon-colors';
 import {
   OPENFRAME_CLASSIFICATIONS,
   isOpenFrameClassification,
   type OpenFrameClassification,
 } from '../utils/vendor-classification';
-import { OpenSourceIcon, CoinsIcon } from './icons-stub';
-import { OpenFrameLogo } from './openframe-logo';
+import { CoinsClassicIcon } from './icons-v2-generated/finance/coins-classic-icon';
+import { OpenSourceIcon } from './icons-v2-generated/interface/open-source-icon';
+import { OpenframeLogoIcon } from './icons-v2-generated/logos/openframe-logo-icon';
 
 export interface VendorTagProps {
   type:
@@ -43,7 +45,11 @@ function openFrameTag(classification: OpenFrameClassification, text?: string) {
     text: text || OPENFRAME_CLASSIFICATIONS[classification].word,
     textColor: undefined,
     icon: (
-      <OpenFrameLogo lowerPathColor="currentColor" upperPathColor="currentColor" className="h-4 w-4 text-ods-accent" />
+      <OpenframeLogoIcon
+        style={iconColors({ secondary: 'currentColor' })}
+        color="currentColor"
+        className="h-4 w-4 text-ods-accent"
+      />
     ),
   };
 }
@@ -96,7 +102,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
               className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent"
               style={accentColor ? { backgroundColor: accentColor } : undefined}
             >
-              <OpenSourceIcon width={10} height={10} className="text-ods-text-on-accent" />
+              <OpenSourceIcon size={10} className="text-ods-text-on-accent" />
             </div>
           ),
         };
@@ -105,7 +111,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           text: text || 'Commercial Vendor',
           icon: (
             <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-              <CoinsIcon width={10} height={10} className="text-ods-text-secondary" />
+              <CoinsClassicIcon size={10} className="text-ods-text-secondary" />
             </div>
           ),
         };
@@ -169,7 +175,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           text: text || 'Paid',
           icon: (
             <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-              <CoinsIcon width={10} height={10} className="text-ods-text-secondary" />
+              <CoinsClassicIcon size={10} className="text-ods-text-secondary" />
             </div>
           ),
         };
@@ -200,7 +206,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
             text: 'Open Source',
             icon: (
               <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent">
-                <OpenSourceIcon width={10} height={10} className="text-ods-text-on-accent" />
+                <OpenSourceIcon size={10} className="text-ods-text-on-accent" />
               </div>
             ),
           };
@@ -209,7 +215,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
             text: 'Commercial Vendor',
             icon: (
               <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-                <CoinsIcon width={10} height={10} className="text-ods-text-secondary" />
+                <CoinsClassicIcon size={10} className="text-ods-text-secondary" />
               </div>
             ),
           };

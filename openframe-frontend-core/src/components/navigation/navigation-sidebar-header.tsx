@@ -1,7 +1,9 @@
 'use client';
 
 import { cn } from '../../utils';
-import { OpenFrameLogo, OpenFrameText } from '../icons';
+import { iconColors } from '../../utils/icon-colors';
+import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
+import { OpenframeTextIcon } from '../icons-v2-generated/logos/openframe-text-icon';
 
 export interface NavigationSidebarHeaderProps {
   minimized: boolean;
@@ -11,10 +13,10 @@ export function NavigationSidebarHeader({ minimized }: NavigationSidebarHeaderPr
   return (
     <div className="flex h-14 items-center justify-start border-b border-ods-border p-[var(--spacing-system-m)]">
       <div className="flex-shrink-0">
-        <OpenFrameLogo
+        <OpenframeLogoIcon
+          style={iconColors({ secondary: 'var(--color-accent-primary)' })}
           className="h-6 w-6"
-          upperPathColor="var(--color-text-primary)"
-          lowerPathColor="var(--color-accent-primary)"
+          color="var(--color-text-primary)"
         />
       </div>
 
@@ -25,7 +27,7 @@ export function NavigationSidebarHeader({ minimized }: NavigationSidebarHeaderPr
         )}
         aria-hidden={minimized}
       >
-        <OpenFrameText textColor="var(--color-text-primary)" />
+        <OpenframeTextIcon color="var(--color-text-primary)" className="h-[15px] w-[87px]" />
       </div>
     </div>
   );

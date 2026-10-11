@@ -4,7 +4,7 @@ import type React from 'react';
 import { useState, useEffect } from 'react';
 import Link from '../embed-shims/next-link';
 import { getPlatformUrl } from '../platform-domains';
-import { FlamingoLogo } from './flamingo-logo';
+import { FlamingoMarkIcon } from './icons-v2-generated/logos/flamingo-mark-icon';
 
 interface MadeWithLoveProps {
   /** Custom class name for the container */
@@ -111,7 +111,7 @@ export function MadeWithLove({ className = '', size = 'md', showOnMobile = true 
         onMouseLeave={() => setIsHovered(false)}
       >
         <div style={logoStyle}>
-          <FlamingoLogo
+          <FlamingoMarkIcon
             size={config.logoSize}
             color="#f357bb" // Direct hex instead of CSS variable for cross-framework compatibility
           />

@@ -2,7 +2,7 @@
 
 import type { ReactElement } from 'react';
 import Image from '../embed-shims/next-image';
-import { useAgentIdentityIcon } from './agent-identity';
+import { AGENT_GLYPH_COLOR, useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
 
 /** Unified icon value used across the app (announcement bar, chat quick actions,
@@ -54,5 +54,9 @@ export function EntityIcon({
     );
   }
   const Glyph = resolveIcon(identity?.name ?? icon?.name ?? undefined);
-  return <Glyph size={size} className={className} {...(identity?.props ?? {})} {...(icon?.props ?? {})} />;
+  // An agent's glyph is one colour wherever it sits; any other icon takes its slot's.
+  const agentColor = identity ? { color: AGENT_GLYPH_COLOR } : {};
+  return (
+    <Glyph size={size} className={className} {...agentColor} {...(identity?.props ?? {})} {...(icon?.props ?? {})} />
+  );
 }

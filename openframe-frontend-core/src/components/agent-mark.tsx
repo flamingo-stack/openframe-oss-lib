@@ -4,7 +4,7 @@ import { createElement } from 'react';
 
 import Image from '../embed-shims/next-image';
 import { cn } from '../utils/cn';
-import { useAgentIdentityIcon } from './agent-identity';
+import { AGENT_GLYPH_COLOR, useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
 
 /** The agents the product ships. A mark is drawn for any agent slug the server has an identity for. */
@@ -26,7 +26,7 @@ const MARK_IMAGE_SIZES = '96px';
  * An agent's picture is a record the product keeps (its identity: a name and an
  * icon), served to every host (`AgentIdentityProvider`). The mark is that icon:
  * an uploaded picture, or the library glyph the identity names, with the props
- * the identity gives it. The library packages no picture of an agent, so an
+ * the identity gives it, in one colour wherever it sits (`AGENT_GLYPH_COLOR`). The library packages no picture of an agent, so an
  * agent the server names no icon for draws nothing: its box is kept empty, at
  * the size the caller gave it, so nothing around it moves while the identities
  * are on their way. Decorative in every form; the caller sizes and boxes it.
@@ -45,6 +45,7 @@ export function AgentMark({ agent, className = '' }: AgentMarkProps) {
     return createElement(resolveIcon(identity.name), {
       className,
       'aria-hidden': true,
+      color: AGENT_GLYPH_COLOR,
       ...(identity.props ?? {}),
     } as Record<string, unknown>);
   }

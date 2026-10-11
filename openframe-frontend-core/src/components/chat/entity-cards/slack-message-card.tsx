@@ -13,7 +13,7 @@ import { ExternalLink, Hash } from 'lucide-react';
 import React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
-import { SlackIcon } from '../../icons/slack-icon';
+import { SlackIcon } from '../../icons-v2-generated/brand-logos/slack-icon';
 import type { SlackMessageItem } from '../types/entities/slack-message';
 import {
   COMPACT_CARD_ICON_SLOT,

@@ -1,7 +1,8 @@
 'use client';
 
 import { cn } from '../../utils/cn';
-import { GridViewIcon, TableViewIcon } from '../icons';
+import { GridViewIcon } from '../icons-v2-generated/interface/grid-view-icon';
+import { TableViewIcon } from '../icons-v2-generated/interface/table-view-icon';
 import { ToggleGroup, ToggleGroupItem } from '../ui';
 
 type ViewMode = 'grid' | 'table';

@@ -1,5 +1,6 @@
 'use client';
 
+import { iconColors } from '../../../utils/icon-colors';
 import {
   ChatOffIcon,
   ChatTextIcon,
@@ -9,7 +10,7 @@ import {
   MonitorIcon,
   Settings01Icon,
 } from '../../icons-v2-generated';
-import { OpenFrameLogo } from '../../icons/openframe-logo';
+import { OpenframeLogoIcon } from '../../icons-v2-generated/logos/openframe-logo-icon';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../../ui/actions-menu';
 import { Button } from '../../ui/button/button';
 
@@ -44,7 +45,11 @@ export function RemoteDesktopFullscreenToolbar({
 }: RemoteDesktopFullscreenToolbarProps) {
   return (
     <>
-      <OpenFrameLogo className="absolute left-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] z-10 h-6 w-6 opacity-50" />
+      <OpenframeLogoIcon
+        color="#1A1A1A"
+        style={iconColors({ secondary: '#ffffff' })}
+        className="absolute left-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] z-10 h-6 w-6 opacity-50"
+      />
       <div
         className={
           'absolute left-1/2 top-0 z-10 w-[calc(100%-7rem)] -translate-x-1/2 ' +

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import Link from '../../embed-shims/next-link';
 import { socialCache } from '../../utils/social-embed-cache';
-import { XLogo } from '../icons/x-logo';
+import { XLogoIcon } from '../icons-v2-generated/brand-logos/x-logo-icon';
 import { TwitterContainer } from './embed-container';
 import { useRichMarkdownRuntime } from './rich-markdown-runtime';
 
@@ -53,7 +53,7 @@ const UserIcon = () => (
 );
 
 // X glyph: the lib's standard XLogo (color follows the text context).
-const XIcon = () => <XLogo className="h-5 w-5" color="currentColor" />;
+const XIcon = () => <XLogoIcon className="h-5 w-5" color="currentColor" />;
 
 interface TwitterOEmbedResponse {
   url: string;

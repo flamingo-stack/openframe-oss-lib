@@ -5,7 +5,6 @@ export * from './chat';
 export * from './docs';
 export * from './embeds';
 export * from './features';
-export * from './icons';
 export * from './navigation';
 export * from './platform';
 export * from './ui';
@@ -36,7 +35,6 @@ export * from './filter-chip';
 export * from './unified-filter-logic';
 export * from './unified-pagination';
 export * from './hero-image-uploader';
-export * from './icons-block';
 export * from './image-cropper';
 export * from './media-carousel';
 // Explicit re-export disambiguates the star-export collision with the

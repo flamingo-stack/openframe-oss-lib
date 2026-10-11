@@ -1,9 +1,14 @@
 import { Globe } from 'lucide-react';
 import type React from 'react';
 import type { SelectableOption } from '../components/features';
-import { OpenmspLogo, FlamingoLogo, OpenFrameLogo, MiamiCyberGangLogoFaceOnly, MlgLogo } from '../components/icons';
+import { FlamingoMarkIcon } from '../components/icons-v2-generated/logos/flamingo-mark-icon';
+import { MiamiCyberGangLogoFaceOnlyIcon } from '../components/icons-v2-generated/logos/miami-cyber-gang-logo-face-only-icon';
+import { MlgLogoIcon } from '../components/icons-v2-generated/logos/mlg-logo-icon';
+import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
+import { OpenmspLogoIcon } from '../components/icons-v2-generated/logos/openmsp-logo-icon';
 import type { PlatformConfig, PlatformName } from '../types/platform';
 import { cn } from './cn';
+import { iconColors } from './icon-colors';
 import { getPlatformBrandClasses } from './platform-identity';
 
 /**
@@ -25,31 +30,30 @@ function renderPlatformIcon(platformName: string, className: string): React.Reac
     case 'openframe':
       // `lowerPathColor` is the accent; the upper path is the neutral greys white.
       return (
-        <OpenFrameLogo
+        <OpenframeLogoIcon
+          style={iconColors({ secondary: 'currentColor' })}
           className={tinted}
-          lowerPathColor="currentColor"
-          upperPathColor="var(--ods-system-greys-white)"
+          color="var(--ods-system-greys-white)"
         />
       );
     case 'openmsp':
       // `OpenmspLogo`'s paths set their own fills, so a root `fill` is a no-op:
       // the accent is the BACK bubble. The other two are the neutral greys.
       return (
-        <OpenmspLogo
+        <OpenmspLogoIcon
+          style={iconColors({ secondary: 'var(--ods-system-greys-black)', tertiary: 'currentColor' })}
           className={tinted}
-          backBubbleColor="currentColor"
-          frontBubbleColor="var(--ods-system-greys-white)"
-          innerFrontBubbleColor="var(--ods-system-greys-black)"
+          color="var(--ods-system-greys-white)"
         />
       );
     case 'tmcg':
-      return <MiamiCyberGangLogoFaceOnly className={className} />;
+      return <MiamiCyberGangLogoFaceOnlyIcon className={className} />;
     case 'mlg':
-      return <MlgLogo className={tinted} size={20} />;
+      return <MlgLogoIcon className={tinted} size={20} />;
     case 'universal':
       return <Globe className={tinted} />;
     default:
-      return <FlamingoLogo className={tinted} fill="currentColor" />;
+      return <FlamingoMarkIcon className={tinted} color="currentColor" />;
   }
 }
 

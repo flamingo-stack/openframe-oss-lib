@@ -2,10 +2,11 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
+import { iconColors } from '../../../utils/icon-colors';
 import { trialLabels } from '../../../utils/trial';
-import { OpenFrameLogo } from '../../icons';
 import { FileOffIcon } from '../../icons-v2-generated/documents/file-off-icon';
 import { CreditCardXmarkIcon } from '../../icons-v2-generated/finance/credit-card-xmark-icon';
+import { OpenframeLogoIcon } from '../../icons-v2-generated/logos/openframe-logo-icon';
 import { FlaskVialIcon } from '../../icons-v2-generated/school/flask-vial-icon';
 import { XmarkAltIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-alt-icon';
 import { Button } from '../../ui/button';
@@ -81,10 +82,10 @@ export function AuthBenefitsPanel({
         href={learnMoreUrl}
         openInNewTab
         leftIcon={
-          <OpenFrameLogo
+          <OpenframeLogoIcon
+            style={iconColors({ secondary: 'var(--color-accent-primary)' })}
             className="h-6 w-6"
-            lowerPathColor="var(--color-accent-primary)"
-            upperPathColor="var(--color-text-primary)"
+            color="var(--color-text-primary)"
           />
         }
         className="w-full md:w-auto md:self-start"

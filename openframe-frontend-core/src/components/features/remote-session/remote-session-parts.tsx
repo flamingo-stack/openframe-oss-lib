@@ -2,8 +2,9 @@
 
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import { cn } from '../../../utils/cn';
+import { iconColors } from '../../../utils/icon-colors';
 import { DraggerIcon, RecordingIcon } from '../../icons-v2-generated';
-import { OpenFrameLogo } from '../../icons/openframe-logo';
+import { OpenframeLogoIcon } from '../../icons-v2-generated/logos/openframe-logo-icon';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { RemoteSessionViewers } from './remote-session-viewers';
 import type { RemoteSessionDragHandlers, RemoteSessionViewer } from './types';
@@ -85,7 +86,7 @@ export function RemoteSessionOrgLogo({ name, logoUrl, sizePx, className }: Remot
         className,
       )}
     >
-      <OpenFrameLogo className="size-1/2" />
+      <OpenframeLogoIcon color="#1A1A1A" style={iconColors({ secondary: '#ffffff' })} className="size-1/2" />
     </div>
   );
 }

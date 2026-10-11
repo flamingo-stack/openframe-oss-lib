@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import type { MouseEvent } from 'react';
-import { MicrosoftIcon, GoogleLogo, SlackIcon, GitHubIcon, AppleIcon } from '../icons';
+import { AppleClassicIcon } from '../icons-v2-generated/brand-logos/apple-classic-icon';
+import { GithubClassicIcon } from '../icons-v2-generated/brand-logos/github-classic-icon';
+import { GoogleLogoClassicIcon } from '../icons-v2-generated/brand-logos/google-logo-classic-icon';
+import { MicrosoftIcon } from '../icons-v2-generated/brand-logos/microsoft-icon';
+import { SlackIcon } from '../icons-v2-generated/brand-logos/slack-icon';
 import { Button } from '../ui/button';
 
 interface ProviderButtonProps {
@@ -19,7 +23,7 @@ const PROVIDER_CONFIG = {
   },
   google: {
     displayName: 'Continue with Google',
-    icon: GoogleLogo,
+    icon: GoogleLogoClassicIcon,
   },
   slack: {
     displayName: 'Continue with Slack',
@@ -27,11 +31,11 @@ const PROVIDER_CONFIG = {
   },
   github: {
     displayName: 'Continue with GitHub',
-    icon: GitHubIcon,
+    icon: GithubClassicIcon,
   },
   apple: {
     displayName: 'Continue with Apple',
-    icon: AppleIcon,
+    icon: AppleClassicIcon,
   },
 };
 

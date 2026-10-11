@@ -10,6 +10,14 @@ import {
 
 export { AGENT_IDENTITIES_API_PATH, type AgentIdentityIcon, type AgentIdentityIcons };
 
+/**
+ * The colour an agent's GLYPH is drawn in when its identity names none: the
+ * theme's text colour, the same wherever the mark sits. An agent's mark is one
+ * picture everywhere, never tinted by the surface around it (a status-coloured
+ * tile, a muted button). An identity's own `props.color` wins.
+ */
+export const AGENT_GLYPH_COLOR = 'var(--color-text-primary)';
+
 /** `null` with no provider above: nothing was asked to supply the identities. */
 const AgentIdentityContext = createContext<ReadonlyMap<string, AgentIdentityIcon> | null>(null);
 
