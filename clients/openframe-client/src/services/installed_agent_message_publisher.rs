@@ -20,7 +20,7 @@ impl InstalledAgentMessagePublisher {
         agent_type: String,
         version: String,
     ) -> anyhow::Result<()> {
-        let topic = Self::build_topic_name(machine_id);
+        let topic = Self::build_topic_name(machine_id)?;
         let message = Self::build_message(agent_type, version);
         self.nats_message_publisher
             .publish(&topic, message)
@@ -31,8 +31,18 @@ impl InstalledAgentMessagePublisher {
             ))
     }
 
-    fn build_topic_name(machine_id: String) -> String {
-        format!("machine.{}.installed-agent", machine_id)
+    fn build_topic_name(machine_id: String) -> anyhow::Result<String> {
+        if machine_id.is_empty()
+            || !machine_id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            anyhow::bail!(
+                "Invalid machine_id: must be a non-empty alphanumeric string (with '-' or '_'), got: {}",
+                machine_id
+            );
+        }
+        Ok(format!("machine.{}.installed-agent", machine_id))
     }
 
     fn build_message(agent_type: String, version: String) -> InstalledAgentMessage {
