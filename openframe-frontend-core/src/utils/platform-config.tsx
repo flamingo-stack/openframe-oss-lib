@@ -8,7 +8,6 @@ import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openfr
 import { OpenmspLogoIcon } from '../components/icons-v2-generated/logos/openmsp-logo-icon';
 import type { PlatformConfig, PlatformName } from '../types/platform';
 import { cn } from './cn';
-import { iconColors } from './icon-colors';
 import { getPlatformBrandClasses } from './platform-identity';
 
 /**
@@ -30,18 +29,15 @@ function renderPlatformIcon(platformName: string, className: string): React.Reac
     case 'openframe':
       // `lowerPathColor` is the accent; the upper path is the neutral greys white.
       return (
-        <OpenframeLogoIcon
-          style={iconColors({ secondary: 'currentColor' })}
-          className={tinted}
-          color="var(--ods-system-greys-white)"
-        />
+        <OpenframeLogoIcon secondaryColor="currentColor" className={tinted} color="var(--ods-system-greys-white)" />
       );
     case 'openmsp':
       // `OpenmspLogo`'s paths set their own fills, so a root `fill` is a no-op:
       // the accent is the BACK bubble. The other two are the neutral greys.
       return (
         <OpenmspLogoIcon
-          style={iconColors({ secondary: 'var(--ods-system-greys-black)', tertiary: 'currentColor' })}
+          secondaryColor="var(--ods-system-greys-black)"
+          tertiaryColor="currentColor"
           className={tinted}
           color="var(--ods-system-greys-white)"
         />

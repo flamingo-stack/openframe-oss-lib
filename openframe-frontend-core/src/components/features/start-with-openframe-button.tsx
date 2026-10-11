@@ -2,7 +2,6 @@
 
 import { type CSSProperties, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils';
-import { iconColors } from '../../utils/icon-colors';
 import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 import { Button, type ButtonProps } from '../ui/button';
 import { StatusBadge } from '../ui/status-badge';
@@ -97,11 +96,7 @@ export const StartWithOpenFrameButton = forwardRef<HTMLButtonElement, StartWithO
         style={customStyle}
         leftIcon={
           !loading ? (
-            <OpenframeLogoIcon
-              style={iconColors({ secondary: iconLowerPath })}
-              className="h-5 w-5"
-              color={iconUpperPath}
-            />
+            <OpenframeLogoIcon secondaryColor={iconLowerPath} className="h-5 w-5" color={iconUpperPath} />
           ) : undefined
         }
         rightIcon={<StatusBadge text="Beta" variant="button" colorScheme="yellow" />}

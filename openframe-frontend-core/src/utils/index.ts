@@ -472,5 +472,4 @@ export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './
 // Footer copyright line (one owner; never a double period after "Inc.").
 export { copyrightLine } from './copyright-line';
 export * from './path-pattern';
-export * from './icon-colors';
 export * from './random-id';

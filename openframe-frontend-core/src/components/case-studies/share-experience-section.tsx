@@ -127,7 +127,7 @@ export function ShareExperienceSection({
             <BenefitCard
               icon={
                 <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ods-border bg-ods-bg p-2">
-                  <G2Icon color="#ff492c" size={24} />
+                  <G2Icon color="var(--social-g2)" size={24} />
                 </div>
               }
               title="G2"

@@ -1,6 +1,5 @@
 'use client';
 
-import { iconColors } from '../../../utils/icon-colors';
 import { FlamingoLogoIcon } from '../../icons-v2-generated/logos/flamingo-logo-icon';
 import { OpenframeLogoIcon } from '../../icons-v2-generated/logos/openframe-logo-icon';
 
@@ -9,7 +8,7 @@ export function OpenFrameWordmark() {
   return (
     <div className="flex items-center gap-[var(--spacing-system-xs)]">
       <OpenframeLogoIcon
-        style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+        secondaryColor="var(--color-accent-primary)"
         className="h-10 w-10"
         color="var(--color-text-primary)"
       />

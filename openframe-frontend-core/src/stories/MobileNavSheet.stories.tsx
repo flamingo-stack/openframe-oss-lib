@@ -4,12 +4,11 @@ import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openfr
 import { MobileNavSheet } from '../components/navigation/mobile-nav-sheet';
 import { SocialIconRow } from '../components/social-icon-row';
 import { Button } from '../components/ui/button';
-import { iconColors } from '../utils/icon-colors';
 import { simpleNav, siteNav } from './site-nav-fixtures';
 
 const logo = (
   <OpenframeLogoIcon
-    style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+    secondaryColor="var(--color-accent-primary)"
     className="h-6 w-6 shrink-0"
     color="var(--color-text-primary)"
   />

@@ -1,7 +1,20 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs';
+import { tmpdir } from 'os';
 import { basename, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -14,11 +27,12 @@ const rootDir = join(__dirname, '..');
 const ICONS_V2_DIR = join(rootDir, 'src/components/icons-v2');
 const OUTPUT_DIR = join(rootDir, 'src/components/icons-v2-generated');
 
-// An icon whose own colour is not the text colour of its slot (a mark that is
-// white wherever it sits, a brand's orange) states it here, by
-// `<category>/<file name>`: the generated component takes it as the default of
-// its `color` prop instead of `currentColor`.
-const DEFAULT_COLORS = JSON.parse(readFileSync(join(ICONS_V2_DIR, 'default-colors.json'), 'utf8'));
+// An icon's own colours, by `<category>/<file name>`: the default of its
+// `color` prop when that is not the text colour of its slot (a brand's orange, a
+// mark that is the theme's text colour wherever it sits), and, for a mark drawn
+// in more than one colour, the defaults of `secondaryColor` / `tertiaryColor`
+// (the parts its SVG paints `#fe0001` / `#fe0002`). ODS tokens only.
+const ICON_COLORS = JSON.parse(readFileSync(join(ICONS_V2_DIR, 'icon-colors.json'), 'utf8'));
 
 // Convert kebab-case or space-separated to PascalCase
 function toPascalCase(str) {
@@ -88,7 +102,7 @@ function getOriginalSvgNames(categoryPath) {
 }
 
 // Process generated files in a category
-function processGeneratedCategory(categoryPath, originalNames) {
+function processGeneratedCategory(categoryPath, originalNames, category = basename(categoryPath)) {
   const files = readdirSync(categoryPath).filter(f => f.endsWith('.tsx') && f !== 'index.tsx');
   const exports = [];
 
@@ -133,9 +147,17 @@ function processGeneratedCategory(categoryPath, originalNames) {
 
     content = fixSmilReferences(content);
 
-    const defaultColor = DEFAULT_COLORS[`${basename(categoryPath)}/${normalizedKebabName}`];
-    if (defaultColor) {
-      content = content.replace(/color = (['"])currentColor\1/, `color = ${JSON.stringify(defaultColor)}`);
+    const colors = ICON_COLORS[`${category}/${normalizedKebabName}`] ?? {};
+    if (colors.color) {
+      content = content.replace(/color = (['"])currentColor\1/, `color = ${JSON.stringify(colors.color)}`);
+    }
+    // A mark with more colours than one takes each as a prop of its own.
+    for (const extra of ['secondaryColor', 'tertiaryColor']) {
+      if (!content.includes(`{${extra}}`)) continue;
+      if (!colors[extra]) throw new Error(`${normalizedKebabName}: icon-colors.json names no ${extra}`);
+      content = content
+        .replace(/(\n\s*)color\?: string;/, `$1color?: string;$1${extra}?: string;`)
+        .replace(/(\n\s*)(color = (?:'[^']*'|"[^"]*"),)/, `$1$2$1${extra} = ${JSON.stringify(colors[extra])},`);
     }
 
     writeFileSync(newFilePath, content);
@@ -173,6 +195,8 @@ function processGeneratedCategory(categoryPath, originalNames) {
 // CLI:
 //   node scripts/generate-icons.mjs                # regenerate every category
 //   node scripts/generate-icons.mjs <category>     # regenerate one category only
+//   node scripts/generate-icons.mjs <category> <icon> [<icon> ...]
+//                                                  # add or regenerate the named icons only
 //
 // `<category>` is the subfolder name under `src/components/icons-v2/`
 // (e.g. `brand-logos`, `arrows`). The single-category form is a scoped
@@ -182,14 +206,64 @@ function processGeneratedCategory(categoryPath, originalNames) {
 // after the run (not from the source listing), so missing categories
 // stay missing and added categories get picked up automatically.
 const targetCategory = process.argv[2];
+const targetIcons = process.argv.slice(3);
+
+/**
+ * The named icons of one category, and nothing else: every other icon of the
+ * category is left exactly as it is on disk. An icon is named by its SVG's file
+ * name without the extension.
+ */
+function generateNamedIcons(category, icons) {
+  const inputPath = join(ICONS_V2_DIR, category);
+  const outputPath = join(OUTPUT_DIR, category);
+  const work = mkdtempSync(join(tmpdir(), 'icons-'));
+  const workIn = join(work, 'in');
+  const workOut = join(work, 'out');
+  mkdirSync(workIn);
+  for (const icon of icons) {
+    if (!existsSync(join(inputPath, `${icon}.svg`))) throw new Error(`No ${category}/${icon}.svg`);
+    copyFileSync(join(inputPath, `${icon}.svg`), join(workIn, `${icon}.svg`));
+  }
+  execSync(`npx @svgr/cli --config-file svgr.config.cjs --out-dir "${workOut}" -- "${workIn}"`, {
+    cwd: rootDir,
+    stdio: 'pipe',
+  });
+  processGeneratedCategory(workOut, icons, category);
+  mkdirSync(outputPath, { recursive: true });
+  const written = readdirSync(workOut).filter(file => file.endsWith('-icon.tsx'));
+  for (const file of written) renameSync(join(workOut, file), join(outputPath, file));
+  rmSync(work, { recursive: true, force: true });
+
+  // The category's index names every icon now in it.
+  const exports = readdirSync(outputPath)
+    .filter(file => file.endsWith('-icon.tsx'))
+    .map(file => ({
+      file: basename(file, '.tsx'),
+      name: /export function (\w+)/.exec(readFileSync(join(outputPath, file), 'utf8'))?.[1],
+    }))
+    .filter(entry => entry.name)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  writeFileSync(
+    join(outputPath, 'index.ts'),
+    exports.map(({ name, file }) => `export { ${name} } from './${file}';`).join('\n') + '\n',
+  );
+  const files = [...written.map(file => join(outputPath, file)), join(outputPath, 'index.ts')];
+  execSync(`npx prettier --write ${files.map(file => `"${file}"`).join(' ')}`, { cwd: rootDir, stdio: 'pipe' });
+  return written.length;
+}
 
 const allCategories = getCategories();
 let categoriesToProcess;
-if (targetCategory) {
-  if (!allCategories.includes(targetCategory)) {
-    console.error(`Unknown category: "${targetCategory}".\n` + `Available: ${allCategories.join(', ')}`);
-    process.exit(1);
-  }
+if (targetCategory && !allCategories.includes(targetCategory)) {
+  console.error(`Unknown category: "${targetCategory}".\n` + `Available: ${allCategories.join(', ')}`);
+  process.exit(1);
+}
+let namedIconCount = 0;
+if (targetCategory && targetIcons.length > 0) {
+  categoriesToProcess = [];
+  console.log(`Generating ${targetIcons.length} icon(s) of "${targetCategory}"...\n`);
+  namedIconCount = generateNamedIcons(targetCategory, targetIcons);
+} else if (targetCategory) {
   categoriesToProcess = [targetCategory];
   console.log(`Generating icons for category "${targetCategory}"...\n`);
 
@@ -212,7 +286,7 @@ if (targetCategory) {
   mkdirSync(OUTPUT_DIR, { recursive: true });
 }
 
-let totalIcons = 0;
+let totalIcons = namedIconCount;
 
 for (const category of categoriesToProcess) {
   const inputPath = join(ICONS_V2_DIR, category);

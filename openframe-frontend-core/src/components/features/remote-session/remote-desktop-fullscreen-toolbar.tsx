@@ -1,6 +1,5 @@
 'use client';
 
-import { iconColors } from '../../../utils/icon-colors';
 import {
   ChatOffIcon,
   ChatTextIcon,
@@ -46,8 +45,8 @@ export function RemoteDesktopFullscreenToolbar({
   return (
     <>
       <OpenframeLogoIcon
-        color="#1A1A1A"
-        style={iconColors({ secondary: '#ffffff' })}
+        color="var(--color-text-on-accent)"
+        secondaryColor="var(--color-text-primary)"
         className="absolute left-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] z-10 h-6 w-6 opacity-50"
       />
       <div

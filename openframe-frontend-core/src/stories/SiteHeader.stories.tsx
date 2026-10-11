@@ -8,13 +8,12 @@ import { HeaderButton } from '../components/navigation/header-button';
 import { SiteHeader, type SiteHeaderProps } from '../components/navigation/site-header';
 import { SocialIconRow } from '../components/social-icon-row';
 import { Button } from '../components/ui/button';
-import { iconColors } from '../utils/icon-colors';
 import { adminNav, simpleNav, siteNav } from './site-nav-fixtures';
 
 const logo = (
   <span className="flex items-center gap-2">
     <OpenframeLogoIcon
-      style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+      secondaryColor="var(--color-accent-primary)"
       className="h-6 w-6 shrink-0"
       color="var(--color-text-primary)"
     />

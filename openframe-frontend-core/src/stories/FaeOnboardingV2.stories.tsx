@@ -4,7 +4,6 @@ import { PoweredByFlamingo } from '../components/features/auth/auth-branding';
 import { ClockCheckIcon, MessagesIcon, UserCheckIcon } from '../components/icons-v2-generated';
 import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
 import { SquareAvatar } from '../components/ui/square-avatar';
-import { iconColors } from '../utils/icon-colors';
 import { withFaeBrand } from './fae-brand-decorator';
 
 const STEPS: OnboardingCarouselStep[] = [
@@ -40,7 +39,7 @@ function Screen() {
     <div className="flex h-[800px] w-[1024px] flex-col items-center gap-[calc(2*var(--spacing-system-xlf))] bg-ods-bg px-[calc(2*var(--spacing-system-xlf))] py-[var(--spacing-system-xl)]">
       <span className="flex items-center gap-[var(--spacing-system-xxs)] text-ods-text-primary">
         <OpenframeLogoIcon
-          style={iconColors({ secondary: 'var(--ods-open-yellow-base)' })}
+          secondaryColor="var(--ods-open-yellow-base)"
           className="size-6"
           color="var(--color-text-primary)"
         />

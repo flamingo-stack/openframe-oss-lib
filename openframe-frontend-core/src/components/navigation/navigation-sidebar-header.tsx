@@ -1,7 +1,6 @@
 'use client';
 
 import { cn } from '../../utils';
-import { iconColors } from '../../utils/icon-colors';
 import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 import { OpenframeTextIcon } from '../icons-v2-generated/logos/openframe-text-icon';
 
@@ -14,7 +13,7 @@ export function NavigationSidebarHeader({ minimized }: NavigationSidebarHeaderPr
     <div className="flex h-14 items-center justify-start border-b border-ods-border p-[var(--spacing-system-m)]">
       <div className="flex-shrink-0">
         <OpenframeLogoIcon
-          style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+          secondaryColor="var(--color-accent-primary)"
           className="h-6 w-6"
           color="var(--color-text-primary)"
         />

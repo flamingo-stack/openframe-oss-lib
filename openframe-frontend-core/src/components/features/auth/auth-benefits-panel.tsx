@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
-import { iconColors } from '../../../utils/icon-colors';
 import { trialLabels } from '../../../utils/trial';
 import { FileOffIcon } from '../../icons-v2-generated/documents/file-off-icon';
 import { CreditCardXmarkIcon } from '../../icons-v2-generated/finance/credit-card-xmark-icon';
@@ -83,7 +82,7 @@ export function AuthBenefitsPanel({
         openInNewTab
         leftIcon={
           <OpenframeLogoIcon
-            style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+            secondaryColor="var(--color-accent-primary)"
             className="h-6 w-6"
             color="var(--color-text-primary)"
           />

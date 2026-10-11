@@ -1,0 +1,250 @@
+{
+  "brand-logos/bash": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/carta": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/cmd": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/deno": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/facebook-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/g2": {
+    "color": "var(--social-g2)"
+  },
+  "brand-logos/github-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/google-gemini": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/hubspot": {
+    "color": "var(--social-hubspot)"
+  },
+  "brand-logos/instagram-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/linkedin-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/linux": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/macos": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/nushell": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/openai": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/quickbooks": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/reddit": {
+    "color": "var(--color-text-secondary)"
+  },
+  "brand-logos/shell": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/telegram": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/whatsapp": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/windows-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/x-logo": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/youtube-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "buildings/buildings-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "buildings/hotel-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "coding/package-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "design/shape-circle-dash-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "documents/folder-shield-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "finance/coins-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "finance/hand-dollar-classic": {
+    "color": "var(--ods-flamingo-cyan-base)"
+  },
+  "interface/about": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/alert-triangle-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/community": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/community-hub": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/compare": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/copy": {
+    "color": "var(--color-text-secondary)"
+  },
+  "interface/custom-external-link": {
+    "color": "var(--color-text-secondary)"
+  },
+  "interface/custom-fork": {
+    "color": "var(--color-text-secondary)"
+  },
+  "interface/custom-license": {
+    "color": "var(--color-text-secondary)"
+  },
+  "interface/custom-star": {
+    "color": "var(--color-text-secondary)"
+  },
+  "interface/custom-time": {
+    "color": "var(--color-text-secondary)"
+  },
+  "interface/document": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/donut": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/edit-profile": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/error": {
+    "color": "var(--ods-attention-red-error)"
+  },
+  "interface/explore-categories": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/eye-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/globe": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/grid-view": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/hamburger": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/it": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/jump-in": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/log-out": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/message-circle": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/noc": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/open-source": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/ops": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/search-classic": {
+    "color": "var(--color-text-secondary)"
+  },
+  "interface/send": {
+    "color": "var(--color-text-on-accent)"
+  },
+  "interface/settings": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/soc": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/sun": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/table-view": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/transparent-trusted": {
+    "color": "var(--ods-flamingo-pink-base)"
+  },
+  "interface/vendor-directory": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/vendors": {
+    "color": "var(--color-text-primary)"
+  },
+  "interface/x-small": {
+    "color": "var(--color-text-primary)"
+  },
+  "logos/flamingo-mark": {
+    "color": "var(--ods-flamingo-pink-base)"
+  },
+  "logos/miami-cyber-gang-logo": {
+    "secondaryColor": "var(--ods-accent)",
+    "tertiaryColor": "var(--color-text-primary)"
+  },
+  "logos/miami-cyber-gang-logo-face-only": {
+    "secondaryColor": "var(--ods-accent)",
+    "tertiaryColor": "var(--color-text-primary)"
+  },
+  "logos/openframe-logo": {
+    "color": "var(--color-text-primary)",
+    "secondaryColor": "var(--color-accent-primary)"
+  },
+  "logos/openframe-text": {
+    "color": "var(--color-text-on-accent)"
+  },
+  "logos/openmsp-logo": {
+    "color": "var(--color-text-primary)",
+    "secondaryColor": "var(--color-bg)",
+    "tertiaryColor": "var(--ods-open-yellow-base)"
+  },
+  "security/shield-check-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "security/shield-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "security/shield-lock-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "shopping/thumbs-down-classic": {
+    "color": "var(--ods-flamingo-cyan-base)"
+  },
+  "shopping/thumbs-up-classic": {
+    "color": "var(--ods-flamingo-pink-base)"
+  },
+  "users/user-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "users/users-classic": {
+    "color": "var(--color-text-primary)"
+  },
+  "weather-and-nature/moon-classic": {
+    "color": "var(--color-text-primary)"
+  }
+}

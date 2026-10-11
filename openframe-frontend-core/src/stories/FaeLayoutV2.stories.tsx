@@ -20,7 +20,6 @@ import {
 } from '../components/icons-v2-generated';
 import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
 import { Button } from '../components/ui/button';
-import { iconColors } from '../utils/icon-colors';
 import { withFaeBrand } from './fae-brand-decorator';
 
 const at = (minute: number) => new Date(2026, 8, 29, 14, minute);
@@ -60,7 +59,7 @@ function Layout({ withChats, withThread }: { withChats: boolean; withThread: boo
           logo={
             <span className="flex items-center gap-[var(--spacing-system-xxs)] text-ods-text-primary">
               <OpenframeLogoIcon
-                style={iconColors({ secondary: 'var(--ods-open-yellow-base)' })}
+                secondaryColor="var(--ods-open-yellow-base)"
                 className="size-6"
                 color="var(--color-text-primary)"
               />

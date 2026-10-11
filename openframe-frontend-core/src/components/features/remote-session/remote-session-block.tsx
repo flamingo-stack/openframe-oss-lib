@@ -2,7 +2,6 @@
 
 import { forwardRef, type ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
-import { iconColors } from '../../../utils/icon-colors';
 import { ChatsIcon, Chevrons03LeftIcon, Chevrons03RightIcon, MonitorOffIcon } from '../../icons-v2-generated';
 import { OpenframeLogoIcon } from '../../icons-v2-generated/logos/openframe-logo-icon';
 import { Button } from '../../ui/button/button';
@@ -48,7 +47,11 @@ export const RemoteSessionBlockFrame = forwardRef<HTMLDivElement, RemoteSessionB
         >
           <Chevrons03RightIcon size={24} />
           <span className="min-w-0 flex-1 truncate text-left text-ods-text-secondary text-h4">Hide this Block</span>
-          <OpenframeLogoIcon color="#1A1A1A" style={iconColors({ secondary: '#ffffff' })} className="size-6 shrink-0" />
+          <OpenframeLogoIcon
+            color="var(--color-text-on-accent)"
+            secondaryColor="var(--color-text-primary)"
+            className="size-6 shrink-0"
+          />
         </button>
       </div>
     );

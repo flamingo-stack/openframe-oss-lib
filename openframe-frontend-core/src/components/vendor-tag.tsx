@@ -2,7 +2,6 @@
 
 import { Boxes, Database, Hand, Plug, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from '../utils/cn';
-import { iconColors } from '../utils/icon-colors';
 import {
   OPENFRAME_CLASSIFICATIONS,
   isOpenFrameClassification,
@@ -44,13 +43,7 @@ function openFrameTag(classification: OpenFrameClassification, text?: string) {
   return {
     text: text || OPENFRAME_CLASSIFICATIONS[classification].word,
     textColor: undefined,
-    icon: (
-      <OpenframeLogoIcon
-        style={iconColors({ secondary: 'currentColor' })}
-        color="currentColor"
-        className="h-4 w-4 text-ods-accent"
-      />
-    ),
+    icon: <OpenframeLogoIcon secondaryColor="currentColor" color="currentColor" className="h-4 w-4 text-ods-accent" />,
   };
 }
 

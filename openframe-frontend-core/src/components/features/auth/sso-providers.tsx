@@ -1,7 +1,6 @@
 'use client';
 
 import type { ComponentType } from 'react';
-import { iconColors } from '../../../utils/icon-colors';
 import { AppleLogoIcon } from '../../icons-v2-generated/brand-logos/apple-logo-icon';
 import { GoogleLogoIcon } from '../../icons-v2-generated/brand-logos/google-logo-icon';
 import { MicrosoftLogoIcon } from '../../icons-v2-generated/brand-logos/microsoft-logo-icon';
@@ -16,7 +15,7 @@ export const PROVIDER_META: Record<AuthSsoProvider, { name: string; Icon: Compon
     name: 'OpenFrame',
     Icon: ({ className }) => (
       <OpenframeLogoIcon
-        style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+        secondaryColor="var(--color-accent-primary)"
         className={className}
         color="var(--color-text-primary)"
       />

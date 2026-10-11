@@ -6,7 +6,6 @@ import { useMemo, useState } from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { cn } from '../../utils/cn';
-import { iconColors } from '../../utils/icon-colors';
 import { Copy01Icon } from '../icons-v2-generated/documents';
 import { EyeClassicIcon } from '../icons-v2-generated/interface/eye-classic-icon';
 import { EyeOffClassicIcon } from '../icons-v2-generated/interface/eye-off-classic-icon';
@@ -52,7 +51,7 @@ function MaskedValue({ value, isRevealed }: { value: string; isRevealed: boolean
 export function ServiceCard({ title, subtitle, icon, tag, rows, className }: ServiceCardProps) {
   const resolvedIcon = icon ?? (
     <OpenframeLogoIcon
-      style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+      secondaryColor="var(--color-accent-primary)"
       className="h-10 w-10"
       color={'var(--color-text-primary)'}
     />

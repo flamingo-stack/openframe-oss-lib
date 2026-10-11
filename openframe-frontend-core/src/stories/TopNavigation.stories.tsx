@@ -8,12 +8,11 @@ import { HeaderButton } from '../components/navigation/header-button';
 import { HeaderMingoButton } from '../components/navigation/header-mingo-button';
 import { TopNavigation } from '../components/navigation/top-navigation';
 import { Button } from '../components/ui/button';
-import { iconColors } from '../utils/icon-colors';
 
 const logo = (
   <>
     <OpenframeLogoIcon
-      style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+      secondaryColor="var(--color-accent-primary)"
       className="h-6 w-6 shrink-0"
       color="var(--color-text-primary)"
     />

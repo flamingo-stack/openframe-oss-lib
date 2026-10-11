@@ -30,7 +30,6 @@
 
 import { Megaphone, Bell, Info, Star, Package as PackageGlyph } from 'lucide-react';
 import { createElement, lazy, useEffect, useRef, useSyncExternalStore, type ComponentType, type SVGProps } from 'react';
-import { iconColors } from '../../../utils/icon-colors';
 import { platformAccentVarName } from '../../../utils/platform-identity';
 import { ICON_LOADERS, type LoadedIconProps } from '../../icons-v2-generated/icon-loaders';
 import { ICON_REGISTRY, getIconComponent, normalizeIconKey } from './icon-registry';
@@ -179,25 +178,27 @@ const brandColor = (platform: string) => `var(${platformAccentVarName(platform)}
 /** The size a mark registered here draws at when it is given none (a chip, a command row). */
 const MARK_DEFAULT_SIZE = 16;
 
+/** The colours a mark of the set is registered with: its `color`, and the other parts of a multi-colour mark. */
+interface MarkColors {
+  color?: string;
+  secondaryColor?: string;
+  tertiaryColor?: string;
+}
+
 /**
  * A mark of the set registered with colours of its own: the `color` it takes
- * when the caller gives none, and its other parts (`iconColors`). `brand` keeps
- * those colours whatever the caller passes: a platform's mark is never tinted
- * by the slot it sits in.
+ * when the caller gives none, and its other parts. `brand` keeps those colours
+ * whatever the caller passes: a platform's mark is never tinted by the slot it
+ * sits in.
  */
-function markWith(
-  exportName: string,
-  colors: { color?: string; secondary?: string; tertiary?: string },
-  options: { brand?: boolean } = {},
-): IconComponent {
-  const mark = setIcon(exportName) as ComponentType<SetIconProps>;
-  const style = iconColors(colors);
+function markWith(exportName: string, colors: MarkColors, options: { brand?: boolean } = {}): IconComponent {
+  const mark = setIcon(exportName) as ComponentType<SetIconProps & MarkColors>;
   return function Mark({ size = MARK_DEFAULT_SIZE, className, color }) {
     return createElement(mark, {
+      ...colors,
       size,
       className,
       color: (options.brand ? undefined : color) ?? colors.color,
-      style,
     });
   };
 }
@@ -206,7 +207,7 @@ function markWith(
 // text and background tokens and the back bubble OpenMSP's brand colour.
 const OpenmspLogoIcon = markWith(
   'OpenmspLogoIcon',
-  { color: 'var(--color-text-primary)', secondary: 'var(--color-bg)', tertiary: brandColor('openmsp') },
+  { color: 'var(--color-text-primary)', secondaryColor: 'var(--color-bg)', tertiaryColor: brandColor('openmsp') },
   { brand: true },
 );
 const FlamingoLogoIcon = markWith('FlamingoMarkIcon', { color: brandColor('flamingo') }, { brand: true });
@@ -218,7 +219,7 @@ const FlamingoLogoGreyIcon = markWith('FlamingoMarkIcon', { color: 'currentColor
 const MlgLogoIcon = markWith('MlgLogoIcon', { color: 'var(--color-text-primary)' });
 const TmcgLogoIcon = markWith(
   'MiamiCyberGangLogoFaceOnlyIcon',
-  { secondary: brandColor('tmcg'), tertiary: 'var(--color-text-primary)' },
+  { secondaryColor: brandColor('tmcg'), tertiaryColor: 'var(--color-text-primary)' },
   { brand: true },
 );
 
@@ -226,10 +227,10 @@ const TmcgLogoIcon = markWith(
  * The OpenFrame logo as a GLYPH: both of its parts in one colour, the slot's
  * own unless the icon's props name one, so it tints like every icon beside it.
  */
-const OpenframeLogoMark = setIcon('OpenframeLogoIcon') as ComponentType<SetIconProps>;
+const OpenframeLogoMark = setIcon('OpenframeLogoIcon') as ComponentType<SetIconProps & MarkColors>;
 function LogoOpenframeIcon({ size = MARK_DEFAULT_SIZE, className, color }: LoadedIconProps) {
   const tint = color ?? 'currentColor';
-  return createElement(OpenframeLogoMark, { size, className, color: tint, style: iconColors({ secondary: tint }) });
+  return createElement(OpenframeLogoMark, { size, className, color: tint, secondaryColor: tint });
 }
 
 /**

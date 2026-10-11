@@ -3,7 +3,6 @@
 import React from 'react';
 import { useMdUp } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
-import { iconColors } from '../../utils/icon-colors';
 import { useOptionalNotifications } from '../features/notifications/notifications-context';
 import { TimeTrackerHeaderButton } from '../features/time-tracker';
 import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated';
@@ -207,7 +206,7 @@ export const AppHeader = React.memo(function AppHeaderImpl({
         !isMdUp && (
           <>
             <OpenframeLogoIcon
-              style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+              secondaryColor="var(--color-accent-primary)"
               className="h-6 w-6 shrink-0"
               color="var(--color-text-primary)"
             />

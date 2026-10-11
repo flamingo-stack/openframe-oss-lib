@@ -13,7 +13,6 @@ import { formatPhoneE164 } from '../../utils/country-phone-utils';
 import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { hasGenericEmailDomain } from '../../utils/generic-domain-utils';
 import type { HumanitySignals } from '../../utils/humanity-signals';
-import { iconColors } from '../../utils/icon-colors';
 import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 import { Button } from '../ui/button';
 import { CheckboxBlock } from '../ui/checkbox-block';
@@ -304,7 +303,13 @@ export function WaitlistForm({
           type="button"
           loading={isSubmitting}
           disabled={isSubmitting}
-          leftIcon={<OpenframeLogoIcon color="#1A1A1A" style={iconColors({ secondary: '#ffffff' })} size={32} />}
+          leftIcon={
+            <OpenframeLogoIcon
+              color="var(--color-text-on-accent)"
+              secondaryColor="var(--color-text-primary)"
+              size={32}
+            />
+          }
           onClick={handleSubmit}
           className="w-full content-md:w-auto"
         >

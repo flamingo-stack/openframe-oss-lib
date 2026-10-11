@@ -63,7 +63,6 @@ import {
   Youtube,
 } from 'lucide-react';
 import { createElement, type ComponentType, type ReactNode } from 'react';
-import { iconColors } from '../../../utils/icon-colors';
 import { ClickupIcon } from '../../icons-v2-generated/brand-logos/clickup-icon';
 import { FacebookClassicIcon } from '../../icons-v2-generated/brand-logos/facebook-classic-icon';
 import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
@@ -90,12 +89,8 @@ const OpenFrameLogoIcon: ComponentType<{ className?: string; color?: string }> =
   createElement(RawOpenFrameLogo, {
     className,
     color: 'currentColor',
-    style: iconColors({ secondary: 'var(--ods-system-greys-white)' }),
+    secondaryColor: 'var(--ods-system-greys-white)',
   });
-
-/** HubSpot's mark in its own orange unless the caller names a colour. */
-const HubspotBrandIcon: ComponentType<{ className?: string; color?: string }> = ({ className, color }) =>
-  createElement(HubspotIcon, { className, color: color ?? '#FF7A59' });
 
 /**
  * Loose icon-component shape: every entry accepts `className`; `color` is
@@ -163,7 +158,7 @@ export const ICON_REGISTRY: Record<string, IconComponent> = {
   // brand-only icons (no lucide variant in current use)
   slack: SlackIcon,
   clickup: ClickupIcon,
-  hubspot: HubspotBrandIcon,
+  hubspot: HubspotIcon,
   linkedin: LinkedinClassicIcon,
   x: XLogoIcon,
   openframe: OpenFrameLogoIcon,

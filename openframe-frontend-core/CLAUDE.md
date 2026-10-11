@@ -216,7 +216,7 @@ import '@flamingo-stack/openframe-frontend-core/styles'
 - `src/components/navigation/` — Header, AppLayout, NavigationSidebar, SlidingSidebar, StickySectionNav
 - `src/components/chat/` — embeddable Mingo/Fae chat + the chat stream engine (chunk processor, history merge)
 - `src/components/tickets/`, `docs/`, `embeds/`, `help-center-pages/`, `onboarding-guides/`, `faq/`, `contact/`, `case-studies/`, `related-content/` — content/page verticals
-- There is ONE icon set, `icons-v2`: every icon, logo and platform mark is a generated component with `size`, `className` and one `color`. A mark drawn in more than one colour takes its other parts from `iconColors({ secondary, tertiary })` (`src/utils/icon-colors.ts`). A new icon is an SVG in `src/components/icons-v2/<category>/`; never a hand-written icon component.
+- There is ONE icon set, `icons-v2`: every icon, logo and platform mark is a generated component with `size`, `className` and one `color`. A mark drawn in more than one colour has `secondaryColor` / `tertiaryColor` props. An icon's own default colours are ODS tokens in `src/components/icons-v2/icon-colors.json`; `npm run generate:icons <category> <icon>` adds one icon without touching the rest. A new icon is an SVG in `src/components/icons-v2/<category>/`; never a hand-written icon component.
 - `src/components/icons-v2/` (raw SVGs) → `src/components/icons-v2-generated/` (SVGR output, the `components/icons-v2` export) — regenerate via `npm run generate:icons`
 - `src/hooks/ui/` `hooks/state/` (URL-state: useApiParams, useQueryParams, introspector) `hooks/platform/` `hooks/nats/`; `hooks/api/` is intentionally empty
 - `src/nats/` — nats.ws client, NatsProvider, `buildNatsWsUrl`

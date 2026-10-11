@@ -4,13 +4,12 @@ import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openfr
 import { OpenframeTextIcon } from '../components/icons-v2-generated/logos/openframe-text-icon';
 import { SiteFooter } from '../components/navigation/site-footer';
 import { Button } from '../components/ui/button';
-import { iconColors } from '../utils/icon-colors';
 import { simpleNav, siteNav } from './site-nav-fixtures';
 
 const logo = (
   <span className="flex items-center gap-2">
     <OpenframeLogoIcon
-      style={iconColors({ secondary: 'var(--color-accent-primary)' })}
+      secondaryColor="var(--color-accent-primary)"
       className="h-7 w-7 shrink-0"
       color="var(--color-text-primary)"
     />

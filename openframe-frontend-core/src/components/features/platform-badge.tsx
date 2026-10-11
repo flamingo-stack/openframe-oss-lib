@@ -2,7 +2,6 @@
 
 import { Globe } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { iconColors } from '../../utils/icon-colors';
 import { getPlatformBrandClasses } from '../../utils/platform-identity';
 import { FlamingoMarkIcon } from '../icons-v2-generated/logos/flamingo-mark-icon';
 import { MiamiCyberGangLogoFaceOnlyIcon } from '../icons-v2-generated/logos/miami-cyber-gang-logo-face-only-icon';
@@ -47,7 +46,8 @@ const PlatformIcon = ({ platform, className }: { platform: string; className: st
     case 'openmsp':
       return (
         <OpenmspLogoIcon
-          style={iconColors({ secondary: 'var(--ods-system-greys-black)', tertiary: 'currentColor' })}
+          secondaryColor="var(--ods-system-greys-black)"
+          tertiaryColor="currentColor"
           className={className}
           color="currentColor"
         />
@@ -56,7 +56,13 @@ const PlatformIcon = ({ platform, className }: { platform: string; className: st
     case 'flamingo-teaser':
       return <FlamingoMarkIcon color="var(--ods-flamingo-pink-base)" className={className} />;
     case 'openframe':
-      return <OpenframeLogoIcon color="#1A1A1A" style={iconColors({ secondary: '#ffffff' })} className={className} />;
+      return (
+        <OpenframeLogoIcon
+          color="var(--color-text-on-accent)"
+          secondaryColor="var(--color-text-primary)"
+          className={className}
+        />
+      );
     case 'tmcg':
       return <MiamiCyberGangLogoFaceOnlyIcon size={size} className={className} />;
     case 'company-hub':

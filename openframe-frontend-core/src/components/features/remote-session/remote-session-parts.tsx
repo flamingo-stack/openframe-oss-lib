@@ -2,7 +2,6 @@
 
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import { cn } from '../../../utils/cn';
-import { iconColors } from '../../../utils/icon-colors';
 import { DraggerIcon, RecordingIcon } from '../../icons-v2-generated';
 import { OpenframeLogoIcon } from '../../icons-v2-generated/logos/openframe-logo-icon';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -86,7 +85,11 @@ export function RemoteSessionOrgLogo({ name, logoUrl, sizePx, className }: Remot
         className,
       )}
     >
-      <OpenframeLogoIcon color="#1A1A1A" style={iconColors({ secondary: '#ffffff' })} className="size-1/2" />
+      <OpenframeLogoIcon
+        color="var(--color-text-on-accent)"
+        secondaryColor="var(--color-text-primary)"
+        className="size-1/2"
+      />
     </div>
   );
 }

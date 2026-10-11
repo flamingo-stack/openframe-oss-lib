@@ -38,12 +38,7 @@ export function RoadmapVoteButton({
       variant="outline"
       onClick={onClick}
       disabled={disabled}
-      leftIcon={
-        <Icon
-          className="h-5 w-5"
-          color={color ?? (voteType === 'up' ? 'var(--ods-flamingo-pink-base)' : 'var(--ods-flamingo-cyan-base)')}
-        />
-      }
+      leftIcon={<Icon className="h-5 w-5" color={color} />}
       className={cn(
         className,
         'flex h-full items-center justify-center gap-[2px] border-0 border-ods-border bg-ods-bg p-[12px]',
