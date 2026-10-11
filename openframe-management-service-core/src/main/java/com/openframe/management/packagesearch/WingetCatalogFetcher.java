@@ -28,6 +28,7 @@ public class WingetCatalogFetcher {
     public List<PackageCatalogEntry> fetchAll() {
         byte[] msix = restClient.get().uri(INDEX_PATH).retrieve().body(byte[].class);
         if (msix == null) {
+            log.error("Winget index fetch returned an empty response from {}", INDEX_PATH);
             throw new IllegalStateException("empty winget index response");
         }
         List<WingetEntry> indexEntries = wingetIndexReader.read(msix);

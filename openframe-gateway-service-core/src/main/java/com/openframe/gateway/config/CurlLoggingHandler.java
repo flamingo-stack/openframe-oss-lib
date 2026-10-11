@@ -1,6 +1,7 @@
 package com.openframe.gateway.config;
 
 import java.net.URI;
+import java.util.Set;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelDuplexHandler;
@@ -18,6 +19,9 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
     private final StringBuilder curl = new StringBuilder();
     private boolean isRequest = false;
     private static final AttributeKey<URI> TARGET_URI = AttributeKey.valueOf("target_uri");
+    private static final Set<String> SENSITIVE_HEADERS = Set.of(
+            "Authorization", "Cookie", "X-Api-Key", "Proxy-Authorization");
+    private static final String REDACTED = "***REDACTED***";
 
     @Override
     public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
@@ -49,12 +53,14 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
             curl.append("  -X '").append(request.method()).append("' \\\n");
             
             // Add headers, excluding the Host header since it's handled by WebClient
+            // and redacting sensitive headers to avoid leaking secrets in logs
             request.headers().forEach(header -> {
                 if (!"Host".equalsIgnoreCase(header.getKey())) {
+                    String value = isSensitiveHeader(header.getKey()) ? REDACTED : header.getValue();
                     curl.append("  -H '")
                         .append(header.getKey())
                         .append(": ")
-                        .append(header.getValue())
+                        .append(value)
                         .append("' \\\n");
                 }
             });
@@ -66,7 +72,7 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
             if (buffer.isReadable()) {
                 String body = buffer.toString(io.netty.util.CharsetUtil.UTF_8);
                 if (!StringUtil.isNullOrEmpty(body)) {
-                    curl.append("  --data-raw '").append(body).append("'");
+                    curl.append("  --data-raw '").append(REDACTED).append("'");
                 }
             }
 
@@ -77,5 +83,9 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
         }
 
         ctx.write(msg, promise);
+    }
+
+    private static boolean isSensitiveHeader(String headerName) {
+        return SENSITIVE_HEADERS.stream().anyMatch(sensitive -> sensitive.equalsIgnoreCase(headerName));
     }
 } 
