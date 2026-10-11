@@ -23,3 +23,14 @@ export const GitHubIcon: React.FC<GitHubIconProps> = ({ className = '', width = 
     </svg>
   );
 };
+
+/**
+ * @deprecated This is a legacy, hand-authored SVG implementation kept for
+ * backwards compatibility with existing imports. New code should use the
+ * canonical generated brand icon (GithubIcon from
+ * `icons-v2-generated/brand-logos/github-icon`) instead of importing
+ * `GitHubIcon` from this module, to avoid visual drift between duplicate
+ * GitHub marks.
+ */
+export const LegacyGitHubIcon = GitHubIcon;
+

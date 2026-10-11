@@ -4,8 +4,13 @@ import { cn } from '../../utils/cn';
 /**
  * HubSpot brand logo (solid orange)
  * Usage: <HubspotIcon className="h-4 w-4" />
+ *
+ * @deprecated This locally-bundled brand icon is deprecated in favor of the
+ * canonical icon set. New code MUST import the HubSpot icon from
+ * `icons-v2-generated` instead of this module. This component is retained
+ * only for backwards compatibility with existing consumers and will be
+ * removed once migration to `icons-v2-generated` is complete.
  */
-/** @deprecated Use icons from icons-v2-generated instead. */
 export function HubspotIcon({ className, fill = '#FF7A59', ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
