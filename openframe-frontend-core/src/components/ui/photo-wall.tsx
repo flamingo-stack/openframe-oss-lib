@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Image from '../../embed-shims/next-image';
+import Image, { resizedImageUrl } from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
 import { MarqueeWall } from './marquee-wall';
 
@@ -44,6 +44,21 @@ const COLUMN_GAP_PX = 12;
 // A column is repeated until it is this much taller than the wall.
 const FILL_FACTOR = 1.25;
 const MAX_REPEATS = 8;
+/**
+ * The widths a wall photo is asked for. A column is a fraction of the wall, so a
+ * photo is requested at the first step that covers its column on this screen
+ * (at most twice the column, for dense screens), never at the caller's one size
+ * for every viewport. Steps, not the exact width, so a resize by a few pixels
+ * asks for nothing new.
+ */
+const PHOTO_WIDTH_STEPS_PX = [240, 360, 480, 640, 960] as const;
+const MAX_PIXEL_DENSITY = 2;
+
+/** The width to ask a photo at for a column `columnWidth` wide; `null` when no step covers it (the caller's url is used). */
+export function photoWallRequestWidth(columnWidth: number, pixelDensity: number): number | null {
+  const needed = columnWidth * Math.min(Math.max(1, pixelDensity), MAX_PIXEL_DENSITY);
+  return PHOTO_WIDTH_STEPS_PX.find(step => step >= needed) ?? null;
+}
 
 export function photoOrientation(naturalWidth: number, naturalHeight: number): PhotoOrientation {
   if (!(naturalWidth > 0) || !(naturalHeight > 0)) return 'wide';
@@ -177,12 +192,29 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
     return () => observer.disconnect();
   }, []);
 
-  // One frame per picture: a url listed twice is its first entry.
+  // The width a photo is asked for: its column's, on this screen. Unknown until the wall is measured,
+  // and while the wall is not displayed (a wall hidden at this breakpoint has no width and asks for nothing).
+  const columnCount = Math.max(1, columns);
+  const requestWidth =
+    box && box.width > 0
+      ? photoWallRequestWidth(
+          (box.width - COLUMN_GAP_PX * (columnCount - 1)) / columnCount,
+          typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1,
+        )
+      : undefined;
+  // One frame per picture: a url listed twice is its first entry. Each picture
+  // is asked for at the column's width (the host's resizer; the same url is
+  // measured and drawn, so it is downloaded once). Nothing is asked for before
+  // the wall knows its width.
   const unique = useMemo(() => {
+    if (requestWidth === undefined) return [];
     const byUrl = new Map<string, PhotoWallImage>();
-    for (const image of images) if (!byUrl.has(image.url)) byUrl.set(image.url, image);
+    for (const image of images) {
+      const url = requestWidth === null ? image.url : resizedImageUrl(image.url, requestWidth);
+      if (!byUrl.has(url)) byUrl.set(url, { ...image, url });
+    }
     return Array.from(byUrl.values());
-  }, [images]);
+  }, [images, requestWidth]);
   const urls = useMemo(() => unique.map(image => image.url), [unique]);
   const orientations = usePhotoOrientations(urls);
 
@@ -209,7 +241,7 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
 
   if (images.length === 0 && !loading) return null;
   // Until the pictures arrive AND their sizes are known, the same placeholder frames.
-  const columnsToDraw = loading ? null : layout;
+  const columnsToDraw = loading || requestWidth === undefined ? null : layout;
 
   const gridStyle = {
     gridTemplateColumns: `repeat(${columnsToDraw?.length || columns}, minmax(0, 1fr))`,
