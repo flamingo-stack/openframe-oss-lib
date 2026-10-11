@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
@@ -32,40 +33,34 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Configuration
+@EnableConfigurationProperties(PinotConfigProperties.class)
 public class PinotConfigInitializer {
 
     private final ResourceLoader resourceLoader;
     private final Environment environment;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final PinotConfigProperties pinotConfigProperties;
 
     @Value("${pinot.controller.url}")
     private String pinotControllerUrl;
-
-    @Value("${pinot.config.enabled:true}")
-    private boolean pinotConfigEnabled;
-
-    @Value("${pinot.config.retry.max-attempts:5}")
-    private int maxRetries;
-
-    @Value("${pinot.config.retry.delay-ms:5000}")
-    private long retryDelayMs;
 
     private static final List<PinotConfig> PINOT_CONFIGS = Arrays.asList(
             new PinotConfig("devices", "schema-devices.json", "table-config-devices.json", null),
             new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null)
     );
 
-    public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
+    public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment, PinotConfigProperties pinotConfigProperties) {
         this.resourceLoader = resourceLoader;
         this.environment = environment;
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
+        this.pinotConfigProperties = pinotConfigProperties;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
-        if (!pinotConfigEnabled) {
+        if (!pinotConfigProperties.getEnabled()) {
             log.info("Pinot configuration deployment is disabled");
             return;
         }
@@ -136,6 +131,8 @@ public class PinotConfigInitializer {
     private void deployWithRetry(Runnable deployment, String configType) {
         int retryCount = 0;
         Exception lastException = null;
+        int maxRetries = pinotConfigProperties.getRetry().getMaxAttempts();
+        long retryDelayMs = pinotConfigProperties.getRetry().getDelayMs();
 
         while (retryCount < maxRetries) {
             try {
@@ -274,3 +271,4 @@ public class PinotConfigInitializer {
         return headers;
     }
 }
+

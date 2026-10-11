@@ -24,31 +24,31 @@ public class HubspotApiEmailService implements EmailService {
     @Value("${openframe.mail.from}")
     private String from;
 
-    @Value("${openframe.invitations.link-template:}")
+    @Value("${openframe.invitations.link-template}")
     private String linkTemplate;
 
-    @Value("${openframe.password-reset.link-template:}")
+    @Value("${openframe.password-reset.link-template}")
     private String resetLinkTemplate;
 
-    @Value("${openframe.email-verify.link-template:}")
+    @Value("${openframe.email-verify.link-template}")
     private String verifyLinkTemplate;
 
     @Value("${openframe.mail.hubspot.access-token}")
     private String accessToken;
 
-    @Value("${openframe.mail.hubspot.invitation-email-id:}")
+    @Value("${openframe.mail.hubspot.invitation-email-id}")
     private String invitationEmailId;
 
-    @Value("${openframe.mail.hubspot.reset-email-id:}")
+    @Value("${openframe.mail.hubspot.reset-email-id}")
     private String resetEmailId;
 
-    @Value("${openframe.mail.hubspot.verify-email-id:}")
+    @Value("${openframe.mail.hubspot.verify-email-id}")
     private String verifyEmailId;
 
-    @Value("${openframe.mail.hubspot.owner-transfer-email-id:}")
+    @Value("${openframe.mail.hubspot.owner-transfer-email-id}")
     private String ownerTransferEmailId;
 
-    @Value("${openframe.mail.hubspot.delete-account-email-id:}")
+    @Value("${openframe.mail.hubspot.delete-account-email-id}")
     private String deleteAccountEmailId;
 
     @Value("${openframe.mail.hubspot.base-url}")

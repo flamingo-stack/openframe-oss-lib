@@ -41,7 +41,7 @@ public class SoftwareScheduleOnlineDispatchService {
     private final SoftwareScheduleRepository scheduleRepository;
     private final SoftwareScheduleFireDispatcher fireDispatcher;
 
-    @Value("${openframe.rmm.software.schedule.online-dispatch.batch-size:500}")
+    @Value("${openframe.rmm.software.schedule.online-dispatch.batch-size}")
     private int batchSize;
 
     public void processReconnectedDevices() {
@@ -117,3 +117,4 @@ public class SoftwareScheduleOnlineDispatchService {
         return changed;
     }
 }
+

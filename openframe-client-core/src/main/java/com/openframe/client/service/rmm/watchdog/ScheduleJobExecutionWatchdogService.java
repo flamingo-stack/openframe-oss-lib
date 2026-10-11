@@ -23,7 +23,7 @@ public class ScheduleJobExecutionWatchdogService {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
 
-    @Value("${openframe.rmm.schedule.watchdog.threshold-seconds:900}")
+    @Value("${openframe.rmm.schedule.watchdog.threshold-seconds}")
     private long thresholdSeconds;
 
     public boolean finalizeIfSettled(String tenantId, String executionId) {
