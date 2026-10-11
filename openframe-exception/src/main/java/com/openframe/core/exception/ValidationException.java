@@ -23,5 +23,10 @@ public class ValidationException extends BaseException {
         return fieldErrors;
     }
 
-    public record FieldError(String field, String message) {}
+    @lombok.Getter
+    @lombok.AllArgsConstructor
+    public static class FieldError {
+        private final String field;
+        private final String message;
+    }
 }

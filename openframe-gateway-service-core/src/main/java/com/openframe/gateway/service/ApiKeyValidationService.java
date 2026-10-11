@@ -2,6 +2,7 @@ package com.openframe.gateway.service;
 
 import com.openframe.data.document.apikey.ApiKey;
 import com.openframe.data.reactive.repository.apikey.ReactiveApiKeyRepository;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,29 +43,29 @@ public class ApiKeyValidationService {
         log.debug("Validating API key format and credentials");
 
         ParsedApiKey parsed = parseApiKey(fullApiKey);
-        if (!parsed.valid()) {
-            log.warn("Invalid API key format: {}", parsed.errorMessage());
-            return Mono.just(ApiKeyValidationResult.invalid(parsed.errorMessage()));
+        if (!parsed.isValid()) {
+            log.warn("Invalid API key format: {}", parsed.getErrorMessage());
+            return Mono.just(ApiKeyValidationResult.invalid(parsed.getErrorMessage()));
         }
 
-        return apiKeyRepository.findById(parsed.keyId())
+        return apiKeyRepository.findById(parsed.getKeyId())
                 .map(apiKey -> {
                     if (!apiKey.isActive()) {
-                        log.warn("API key is not active or expired: {}", parsed.keyId());
+                        log.warn("API key is not active or expired: {}", parsed.getKeyId());
                         return ApiKeyValidationResult.invalid("API key is not active or expired");
                     }
 
-                    if (!passwordEncoder.matches(parsed.secret(), apiKey.getHashedKey())) {
-                        log.warn("Invalid secret for API key: {}", parsed.keyId());
-                        apiKeyStatsService.incrementFailed(parsed.keyId(), tenantId);
+                    if (!passwordEncoder.matches(parsed.getSecret(), apiKey.getHashedKey())) {
+                        log.warn("Invalid secret for API key: {}", parsed.getKeyId());
+                        apiKeyStatsService.incrementFailed(parsed.getKeyId(), tenantId);
                         return ApiKeyValidationResult.invalid("Invalid API key secret");
                     }
 
-                    log.debug("API key validation successful for: {}", parsed.keyId());
+                    log.debug("API key validation successful for: {}", parsed.getKeyId());
                     return ApiKeyValidationResult.valid(apiKey);
                 })
                 .switchIfEmpty(Mono.defer(() -> {
-                    log.warn("API key not found: {}", parsed.keyId());
+                    log.warn("API key not found: {}", parsed.getKeyId());
                     return Mono.just(ApiKeyValidationResult.invalid("API key not found"));
                 }))
                 .onErrorResume(error -> {
@@ -136,7 +137,13 @@ public class ApiKeyValidationService {
     /**
      * Internal class for parsed API key components
      */
-    private record ParsedApiKey(boolean valid, String errorMessage, String keyId, String secret) {
+    @Getter
+    @AllArgsConstructor
+    private static class ParsedApiKey {
+        private final boolean valid;
+        private final String errorMessage;
+        private final String keyId;
+        private final String secret;
 
         public static ParsedApiKey valid(String keyId, String secret) {
             return new ParsedApiKey(true, null, keyId, secret);

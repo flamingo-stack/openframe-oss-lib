@@ -3,7 +3,10 @@ package com.openframe.api.dto.organization;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -14,28 +17,30 @@ import java.time.LocalDate;
  * 
  * Note: organizationId is generated automatically on the backend as UUID.
  */
+@Data
 @Builder
-public record CreateOrganizationRequest(
+@NoArgsConstructor
+@AllArgsConstructor
+public class CreateOrganizationRequest {
         @NotBlank(message = "Name is required")
-        String name,
+        private String name;
 
-        String category,
+        private String category;
 
         @PositiveOrZero(message = "Number of employees must be zero or positive")
-        Integer numberOfEmployees,
+        private Integer numberOfEmployees;
 
-        String websiteUrl,
+        private String websiteUrl;
 
-        String notes,
+        private String notes;
 
         @Valid
-        ContactInformationDto contactInformation,
+        private ContactInformationDto contactInformation;
 
         @PositiveOrZero(message = "Monthly revenue must be zero or positive")
-        BigDecimal monthlyRevenue,
+        private BigDecimal monthlyRevenue;
 
-        LocalDate contractStartDate,
+        private LocalDate contractStartDate;
 
-        LocalDate contractEndDate
-) {
+        private LocalDate contractEndDate;
 }
