@@ -362,14 +362,7 @@ function ProgramEditorialCard({
 
   if (!feature) {
     return (
-      <ContentCardFrame
-        as="a"
-        href={href}
-        target={target}
-        rel={rel}
-        aria-label={`Open ${title}`}
-        className={cn(EDITORIAL_ROW_GRID, className)}
-      >
+      <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn(EDITORIAL_ROW_GRID, className)}>
         <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
           {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
           {playable && cover && <CardHoverPlay size="md" />}
@@ -384,14 +377,7 @@ function ProgramEditorialCard({
   }
 
   return (
-    <ContentCardFrame
-      as="a"
-      href={href}
-      target={target}
-      rel={rel}
-      aria-label={`Open ${title}`}
-      className={cn('flex flex-col', className)}
-    >
+    <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn('flex flex-col', className)}>
       <span
         className={cn(EDITORIAL_FEATURE_COVER, 'transition-colors duration-300')}
         style={{ backgroundColor: edgeColor }}
@@ -691,14 +677,7 @@ export function ProgramCard<T extends BaseProgramItem>({
 
   if (wholeCardClickable) {
     return (
-      <ContentCardFrame
-        as="a"
-        href={href}
-        target={target}
-        rel={rel}
-        className={cardFrameClass}
-        aria-label={`Open ${item.title}`}
-      >
+      <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cardFrameClass}>
         {cardHeader}
         {images.length > 0 && <MediaGallery images={images} title={item.title} />}
         <div className={DEFAULT_FOOTER}>
@@ -716,7 +695,7 @@ export function ProgramCard<T extends BaseProgramItem>({
 
   return (
     <ContentCardFrame as="div" className={cardFrameClass}>
-      <a href={href} target={target} rel={rel} className="block" aria-label={`Open ${item.title}`}>
+      <a href={href} target={target} rel={rel} className="block">
         {cardHeader}
       </a>
       {images.length > 0 && <MediaGallery images={images} title={item.title} />}

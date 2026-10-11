@@ -180,7 +180,8 @@ export function SnapCarousel<T>({
             role="group"
             aria-roledescription="slide"
             aria-label={`${itemIndex + 1} / ${count}`}
-            aria-hidden={itemIndex !== index}
+            // Never `aria-hidden`: the neighbouring slides are on screen and their links take focus.
+            aria-current={itemIndex === index ? 'true' : undefined}
             className={cn('flex shrink-0 grow-0 snap-start', slideClassName)}
           >
             <div className="min-w-0 flex-1">{renderItem(item, itemIndex)}</div>

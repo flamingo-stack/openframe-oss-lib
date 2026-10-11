@@ -382,7 +382,7 @@ export function ProductReleaseCard({
     // anchorProps WINS over onClick.
     if (anchorProps) {
       return (
-        <a {...anchorProps} className={frameClass} aria-label={`Open ${title}`}>
+        <a {...anchorProps} className={frameClass}>
           {innerLayout}
         </a>
       );

@@ -138,7 +138,6 @@ export function MingoAiButton({
       variant={field ? 'glyph' : 'transparent'}
       size="wrap"
       font="regular"
-      aria-label={label}
       aria-keyshortcuts={shortcutHint && visitor.known ? (commandKey ? 'Meta+K' : 'Control+K') : undefined}
       onClick={e => {
         if (runtimeOpen) runtimeOpen({});
@@ -198,11 +197,14 @@ export function MingoAiButton({
         />
       )}
       {/* In the header the name collapses below lg, with the menus: on a phone
-          the launcher is its glyph alone (the name stays the accessible name). */}
+          the launcher is its glyph alone. The name stays in the button for
+          assistive tech (visually hidden, never `display: none`), so the
+          button is named by its own text at every width and needs no label
+          that could disagree with it. */}
       <span
         className={cn(
           'relative whitespace-nowrap',
-          field ? 'min-w-0 flex-1 truncate' : inPage ? 'text-h6' : 'hidden text-h6 lg:inline',
+          field ? 'min-w-0 flex-1 truncate' : inPage ? 'text-h6' : 'sr-only text-h6 lg:not-sr-only',
         )}
       >
         {label}
@@ -212,6 +214,7 @@ export function MingoAiButton({
         // read is decoration) and the label's colour, which clears 4.5:1 on
         // the bar. It keeps its width before the platform is known.
         <kbd
+          aria-hidden="true"
           className={cn(
             'relative h-6 min-w-9 items-center justify-center rounded border border-ods-border px-[var(--spacing-system-xxs)] text-h6',
             inPage ? 'inline-flex' : 'hidden lg:inline-flex',

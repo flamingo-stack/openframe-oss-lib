@@ -238,11 +238,12 @@ export function SiteFooter({
         )}
       </div>
 
-      {/* The legal line is text, not navigation: muted, with its links in the
-          accent so they still read as links (prototype `.nf-legal`). */}
+      {/* The legal line is text, not navigation: the secondary text colour (the muted
+          one is 3.4:1 on the footer at this size), with its links in the accent so
+          they still read as links (prototype `.nf-legal`). */}
       <div
         className={cn(
-          'flex flex-col gap-[var(--spacing-system-xxs)] border-t border-ods-border pb-[var(--spacing-system-xlf)] pt-[var(--spacing-system-lf)] text-ods-text-muted text-h6 md:flex-row md:items-center md:justify-between md:gap-[var(--spacing-system-lf)]',
+          'flex flex-col gap-[var(--spacing-system-xxs)] border-t border-ods-border pb-[var(--spacing-system-xlf)] pt-[var(--spacing-system-lf)] text-ods-text-secondary text-h6 md:flex-row md:items-center md:justify-between md:gap-[var(--spacing-system-lf)]',
         )}
       >
         <span>

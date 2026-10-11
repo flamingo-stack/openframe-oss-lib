@@ -138,13 +138,7 @@ export function BlogCard({
     const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
     const firstCategory = post.categories?.find(c => c && c.name)?.name;
     return (
-      <a
-        href={href}
-        target={target}
-        rel={rel}
-        className={cn(COMPACT_CARD_OUTER, className)}
-        aria-label={`Read article: ${post.title}`}
-      >
+      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {displayImage ? (
             <Image
@@ -209,13 +203,7 @@ export function BlogCard({
   const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
   return (
     <article className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col', className)} role="article">
-      <a
-        href={href}
-        target={target}
-        rel={rel}
-        className="flex h-full flex-col focus:outline-none"
-        aria-label={`Read article: ${post.title}`}
-      >
+      <a href={href} target={target} rel={rel} className="flex h-full flex-col focus:outline-none">
         <div className="relative aspect-[1200/630] w-full overflow-hidden bg-ods-bg">
           {displayImage ? (
             <Image

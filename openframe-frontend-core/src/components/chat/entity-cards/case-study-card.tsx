@@ -353,13 +353,7 @@ export function CaseStudyCard({
     const metric = headlineMetric(study);
     if (!metric) return null;
     return (
-      <Link
-        href={href}
-        target={target}
-        rel={rel}
-        className={cn('block h-full', className)}
-        aria-label={`Read ${study.title}`}
-      >
+      <Link href={href} target={target} rel={rel} className={cn('block h-full', className)}>
         <Card className={cn(CONTENT_CARD_FRAME_CLASS, CASE_STUDY_RESULT_STACK)}>
           <CaseStudyPersonRow study={study} />
           <div className={CASE_STUDY_RESULT_METRIC_BOX} data-testid="case-study-metric">
