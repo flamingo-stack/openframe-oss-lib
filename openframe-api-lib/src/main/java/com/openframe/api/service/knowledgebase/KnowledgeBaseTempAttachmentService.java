@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -103,7 +102,6 @@ public class KnowledgeBaseTempAttachmentService {
 
         List<KnowledgeBaseItemAttachment> attachments = temps.stream()
                 .map(temp -> moveToArticle(articleId, temp, uploadedBy))
-                .filter(Objects::nonNull)
                 .toList();
 
         if (!attachments.isEmpty()) {
@@ -131,7 +129,7 @@ public class KnowledgeBaseTempAttachmentService {
                     .build();
         } catch (Exception e) {
             log.error("Failed to move temp file to article: {}", temp.getId(), e);
-            return null;
+            throw new IllegalStateException("Failed to move temp attachment " + temp.getId() + " to article " + articleId, e);
         }
     }
 
