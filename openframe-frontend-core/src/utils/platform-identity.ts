@@ -65,20 +65,6 @@ export const platformSlogans = {
   universal: 'Universal Platform',
 };
 
-export const platformIconNames = {
-  openmsp: 'openmsp-logo',
-  openframe: 'openframe-logo',
-  flamingo: 'flamingo-logo',
-  universal: 'globe',
-  'marketing-hub': 'flamingo-logo',
-  'product-hub': 'flamingo-logo',
-  'revenue-hub': 'flamingo-logo',
-  'people-hub': 'flamingo-logo',
-  'company-hub': 'flamingo-logo',
-  tmcg: 'tmcg-logo',
-  mlg: 'mlg-logo',
-};
-
 export function getPlatformDisplayName(platformName: string): string {
   return platformDisplayNames[platformName as keyof typeof platformDisplayNames] || platformName;
 }
@@ -94,10 +80,6 @@ export function getPlatformDescription(platformName: string): string {
 
 export function getPlatformSlogan(platformName: string): string {
   return platformSlogans[platformName as keyof typeof platformSlogans] || platformName;
-}
-
-export function getDefaultIconForPlatform(platformName: string): string {
-  return platformIconNames[platformName as keyof typeof platformIconNames] || platformIconNames.universal;
 }
 
 // ── Colour stems ────────────────────────────────────────────────────────────

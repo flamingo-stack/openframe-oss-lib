@@ -109,7 +109,7 @@ export const ICON_ALIASES: Readonly<Record<string, IconRef>> = {
   // Major League GitHub draws its mark in the theme's text colour on its own site, never in an accent.
   'mlg-logo': { set: 'MlgLogoIcon', size: MARK_SIZE, color: 'var(--color-text-primary)' },
   'tmcg-logo': {
-    set: 'MiamiCyberGangLogoFaceOnlyIcon',
+    set: 'TmcgMarkIcon',
     size: MARK_SIZE,
     secondaryColor: brandColor('tmcg'),
     tertiaryColor: 'var(--color-text-primary)',

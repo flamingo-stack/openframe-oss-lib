@@ -57,7 +57,6 @@ export interface PlatformConfig {
   name: string; // same as name
   display_name: string;
   default_color: string;
-  default_icon: string;
   description: string;
 }
 

@@ -232,3 +232,46 @@ export function NamedIcon({ icon, ...props }: { icon: IconRef } & LoadedIconProp
   // The icon's own component, loaded by its name (drawn through `createElement`: not a component made here).
   return createElement(requireIcon(icon), props);
 }
+
+// ── Platform marks, by convention ───────────────────────────────────────────
+//
+// A platform's mark is never listed anywhere. The platform is its name, and:
+//   1. its mark is the set's `<name>-mark` icon, else its `<name>-logo`
+//      (`tmcg` → `TmcgMarkIcon`, `openmsp` → `OpenmspLogoIcon`);
+//   2. a platform with neither is drawn with the house mark, in its own accent;
+//   3. every mark is drawn inside its platform's palette (`data-app-type`), so
+//      the accent a mark's own colours name is that platform's accent wherever
+//      the mark sits (a hub's mark is its hub's colour on any site).
+// A new platform gets a mark by adding `<name>-mark.svg` to the set, or nothing.
+
+/** The mark of a platform that has none of its own. */
+const HOUSE_MARK: IconRef = { set: 'FlamingoMarkIcon', color: 'var(--color-accent-primary)' };
+
+/** The scope "every platform". Not a platform: it is drawn as a globe. */
+const EVERY_PLATFORM = 'universal';
+const EVERY_PLATFORM_MARK: IconRef = { lucide: 'globe' };
+
+/** `marketing-hub` → `MarketingHub`: a platform's name as the set spells it in an export. */
+function setStem(platform: string): string {
+  return platform
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join('');
+}
+
+/** The mark a platform is drawn with, as data, by the convention above. */
+export function platformMarkRef(platform: string): IconRef {
+  if (platform === EVERY_PLATFORM) return EVERY_PLATFORM_MARK;
+  const stem = setStem(platform);
+  for (const exportName of [`${stem}MarkIcon`, `${stem}LogoIcon`]) {
+    if (Object.prototype.hasOwnProperty.call(ICON_LOADERS, exportName)) return { set: exportName };
+  }
+  return HOUSE_MARK;
+}
+
+/** A platform's mark, drawn in that platform's palette. THE way a platform is drawn as an icon. */
+export function PlatformMark({ platform, ...props }: { platform: string } & LoadedIconProps) {
+  const mark = requireIcon(platformMarkRef(platform)) as ComponentType<LoadedIconProps & { 'data-app-type': string }>;
+  return createElement(mark, { ...props, 'data-app-type': platform });
+}

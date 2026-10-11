@@ -1,5 +1,5 @@
 import type { SVGProps } from "react";
-export interface MiamiCyberGangLogoFaceOnlyIconProps
+export interface TmcgMarkIconProps
   extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
   className?: string;
   size?: number;
@@ -7,14 +7,14 @@ export interface MiamiCyberGangLogoFaceOnlyIconProps
   tertiaryColor?: string;
   secondaryColor?: string;
 }
-export function MiamiCyberGangLogoFaceOnlyIcon({
+export function TmcgMarkIcon({
   className = "",
   size = 24,
   color = "currentColor",
   tertiaryColor = "var(--color-text-primary)",
   secondaryColor = "var(--ods-accent)",
   ...props
-}: MiamiCyberGangLogoFaceOnlyIconProps) {
+}: TmcgMarkIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

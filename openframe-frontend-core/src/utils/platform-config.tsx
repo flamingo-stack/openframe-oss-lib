@@ -1,61 +1,20 @@
 import { createElement } from 'react';
 import type React from 'react';
-import { NamedIcon, type IconRef } from '../components/chat/utils/icon-loading';
+import { PlatformMark } from '../components/chat/utils/icon-loading';
 import type { SelectableOption } from '../components/features';
 import type { PlatformConfig, PlatformName } from '../types/platform';
 import { cn } from './cn';
 import { getPlatformBrandClasses } from './platform-identity';
 
 /**
- * Per-platform ICON rendering. The colour decision lives in `platform-identity`
- * (`PLATFORM_BRAND` → `ODS_STEM_CLASSES`), never here: each mark is tinted by the
- * platform's accent CLASS and paints itself with `currentColor`. There is ONE
- * lookup, parameterized by `className`; the three former hand-written switches
- * (`getPlatformIcon`, `getSmallPlatformIcon`, `getPlatformIconComponent`) are
- * thin wrappers that only pick a size.
- *
- * Two marks take no accent colour prop and are named exceptions:
- *   - `universal` is lucide's globe, an outline: it takes the class only.
- *   - `tmcg` is a two-colour mark with colours of its own.
+ * Per-platform ICON rendering. Which mark a platform has is a convention, stated
+ * once beside the icon loader (`PlatformMark`); this module only picks a size and
+ * adds the platform's accent class, which a single-colour mark is painted with.
  */
-const FLAMINGO_MARK: IconRef = { set: 'FlamingoMarkIcon', color: 'currentColor' };
-
-/**
- * Each platform's mark, by the platform's name. Data: a mark is loaded when it
- * is drawn. `tinted` marks take the platform's accent class and paint their
- * accent part with `currentColor`.
- */
-const PLATFORM_MARKS: Readonly<Record<string, { mark: IconRef; tinted: boolean }>> = {
-  // The squares are the accent; the frame is the neutral greys white.
-  openframe: {
-    mark: { set: 'OpenframeLogoIcon', color: 'var(--ods-system-greys-white)', secondaryColor: 'currentColor' },
-    tinted: true,
-  },
-  // The accent is the BACK bubble. The other two are the neutral greys.
-  openmsp: {
-    mark: {
-      set: 'OpenmspLogoIcon',
-      color: 'var(--ods-system-greys-white)',
-      secondaryColor: 'var(--ods-system-greys-black)',
-      tertiaryColor: 'currentColor',
-    },
-    tinted: true,
-  },
-  tmcg: { mark: { set: 'MiamiCyberGangLogoFaceOnlyIcon' }, tinted: false },
-  mlg: { mark: { set: 'MlgLogoIcon', size: 20 }, tinted: true },
-  universal: { mark: { lucide: 'globe' }, tinted: true },
-};
-
-/** Every other platform is drawn with the Flamingo mark in its own accent. */
-const DEFAULT_MARK = { mark: FLAMINGO_MARK, tinted: true };
-
 function renderPlatformIcon(platformName: string, className: string): React.ReactNode {
-  const { mark, tinted } = Object.prototype.hasOwnProperty.call(PLATFORM_MARKS, platformName)
-    ? PLATFORM_MARKS[platformName]
-    : DEFAULT_MARK;
-  return createElement(NamedIcon, {
-    icon: mark,
-    className: tinted ? cn(className, getPlatformBrandClasses(platformName).accentText) : className,
+  return createElement(PlatformMark, {
+    platform: platformName,
+    className: cn(className, getPlatformBrandClasses(platformName).accentText),
   });
 }
 
@@ -81,7 +40,6 @@ export {
   platformShortNames,
   platformDescriptions,
   platformSlogans,
-  platformIconNames,
   platformHexColors,
   platformColors,
   getPlatformDisplayName,
@@ -90,7 +48,6 @@ export {
   getPlatformSlogan,
   getPlatformColor,
   getDefaultColorForPlatform,
-  getDefaultIconForPlatform,
 } from './platform-identity';
 
 export function transformPlatformConfigsToOptions(platformConfigs: PlatformConfig[]): SelectableOption[] {
