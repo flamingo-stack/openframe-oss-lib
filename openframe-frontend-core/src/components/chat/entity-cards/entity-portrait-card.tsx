@@ -108,7 +108,7 @@ export function EntityPortraitCard({
   const edgeColor = useImageEdgeColor(isWide === false ? src : null, 'var(--color-bg-surface)');
 
   return (
-    <Link href={href} target={target} rel={rel} className={cn('block h-full', className)}>
+    <Link href={href} target={target} rel={rel} className={cn('block h-full', className)} aria-label={`Open ${title}`}>
       <Card className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col gap-6 p-6')}>
         {/* Media zone — the real cover always wins: wide → cover-fill;
             non-wide → contained on the edge-color fill (news-card treatment). */}

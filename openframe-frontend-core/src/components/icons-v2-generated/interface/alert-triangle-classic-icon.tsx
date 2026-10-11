@@ -14,7 +14,7 @@ export function AlertTriangleClassicIcon({
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      fill={color}
+      fill="none"
       viewBox="0 0 24 24"
       width={size}
       height={size}
