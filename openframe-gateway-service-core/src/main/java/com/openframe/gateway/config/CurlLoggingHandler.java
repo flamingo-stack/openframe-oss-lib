@@ -18,6 +18,7 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
     private final StringBuilder curl = new StringBuilder();
     private boolean isRequest = false;
     private static final AttributeKey<URI> TARGET_URI = AttributeKey.valueOf("target_uri");
+    private static final boolean LOG_REQUEST_BODY = Boolean.getBoolean("openframe.gateway.curlLogging.logBody");
 
     @Override
     public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
@@ -63,7 +64,7 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
         if (isRequest && msg instanceof HttpContent) {
             HttpContent content = (HttpContent) msg;
             ByteBuf buffer = content.content();
-            if (buffer.isReadable()) {
+            if (LOG_REQUEST_BODY && buffer.isReadable()) {
                 String body = buffer.toString(io.netty.util.CharsetUtil.UTF_8);
                 if (!StringUtil.isNullOrEmpty(body)) {
                     curl.append("  --data-raw '").append(body).append("'");
@@ -71,7 +72,11 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
             }
 
             if (msg instanceof LastHttpContent) {
-                log.debug("Proxied request as curl command: \n{}", curl);
+                if (LOG_REQUEST_BODY) {
+                    log.debug("Proxied request as curl command: \n{}", curl);
+                } else {
+                    log.debug("Proxied request as curl command (body omitted, enable -Dopenframe.gateway.curlLogging.logBody=true to include): \n{}", curl);
+                }
                 isRequest = false;
             }
         }
