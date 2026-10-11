@@ -75,9 +75,19 @@ export function EmbeddableChatOnDemand({ panelProps, ...props }: EmbeddableChatO
   useEffect(() => {
     if (!wanted) return undefined;
     let current = true;
-    void Promise.all([loadPanel(), panelPropsRef.current?.() ?? {}]).then(([Panel, extra]) => {
-      if (current) setLoaded({ Panel, props: extra });
-    });
+    Promise.all([loadPanel(), panelPropsRef.current?.() ?? {}])
+      .then(([Panel, extra]) => {
+        if (current) setLoaded({ Panel, props: extra });
+      })
+      .catch((error: unknown) => {
+        // The panel's script or the host's props could not be loaded (a deploy
+        // replaced the script, the network dropped). The request is forgotten, so
+        // the next open asks again instead of leaving the chat dead until a reload.
+        console.error('[chat] the chat panel could not be loaded:', error);
+        if (!current) return;
+        pending.current = null;
+        setRequested(false);
+      });
     return () => {
       current = false;
     };

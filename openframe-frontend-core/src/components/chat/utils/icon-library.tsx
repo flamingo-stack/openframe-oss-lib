@@ -278,7 +278,11 @@ function sameProps(a: SetIconProps, b: SetIconProps): boolean {
  * then throws the server's markup away and draws the page again (measured: the
  * home page's heading was drawn a second time seconds after it was first
  * shown). So:
- *   - on the server the icon is drawn in full (it waits for its module there);
+ *   - on the server the icon is drawn in full: a streaming render waits for its
+ *     module (no boundary of its own, so the markup is the icon alone and the
+ *     browser adopts it as it is). A host that renders with the synchronous
+ *     `renderToString` must have drawn the icon once before, or wrap it in its
+ *     own `<Suspense>`;
  *   - in the browser, an icon the server drew keeps that `<svg>` as it is and
  *     loads nothing, until its props change;
  *   - an icon first drawn in the browser is an empty `<svg>` of its own size

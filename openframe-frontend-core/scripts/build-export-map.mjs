@@ -71,6 +71,8 @@ function read(file) {
     if (!target) continue;
     if (named !== undefined) for (const [from, to] of specifiers(named)) info.forwarded.set(to, [target, from]);
     else if (star && !namespace) info.stars.push(target);
+    // `export * as X from`: the namespace object is made HERE, so `X` is this module's own export.
+    else if (namespace) info.own.add(namespace);
   }
   for (const [, list] of code.matchAll(RE_EXPORT_LIST)) {
     for (const [local, to] of specifiers(list)) {

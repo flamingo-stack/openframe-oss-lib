@@ -24,8 +24,14 @@
     "!src/components/icons-v2/**/*.svg"
   ],
   "exports": {
-    "./optimize-imports-loader": "./dist/build/optimize-imports-loader.cjs",
-    "./dist/*": "./dist/*",
+    "./optimize-imports-loader": {
+      "require": "./dist/build/optimize-imports-loader.cjs",
+      "default": "./dist/build/optimize-imports-loader.cjs"
+    },
+    "./dist/*.js": {
+      "import": "./dist/*.js",
+      "default": "./dist/*.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
