@@ -1,5 +1,6 @@
 package com.openframe.stream.deserializer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -82,22 +83,15 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
 
     @Override
     protected Optional<String> getMessage(JsonNode after) {
-        Optional<String> activityType = getSourceEventType(after);
-
-        // Try to get policy name from details
         String policyName = getPolicyName(after);
 
-        if (activityType.isPresent()) {
-            Optional<String> baseMessage = FleetActivityTypeMapping.getMessage(activityType.get());
-            if (baseMessage.isPresent() && policyName != null) {
-                return Optional.of(String.format("%s '%s'", baseMessage.get(), policyName));
-            }
-            if (baseMessage.isPresent()) {
-                return baseMessage;
-            }
-        }
+        Optional<String> formatted = getSourceEventType(after)
+                .flatMap(FleetActivityTypeMapping::getMessage)
+                .map(baseMessage -> policyName != null
+                        ? String.format("%s '%s'", baseMessage, policyName)
+                        : baseMessage);
 
-        return parseStringField(after, FIELD_DETAILS);
+        return formatted.or(() -> parseStringField(after, FIELD_DETAILS));
     }
 
     @Override
@@ -110,18 +104,17 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
     protected String getResult(JsonNode after) {
         return getPolicyInfo(after)
                 .map(policy -> {
+                    ObjectNode resultJson = mapper.createObjectNode();
+                    putIfPresent(resultJson, "policy_name", policy.getName());
+                    putIfPresent(resultJson, "query", policy.getQuery());
+                    putIfPresent(resultJson, "resolution", policy.getResolution());
+                    putIfPresent(resultJson, "description", policy.getDescription());
+                    putIfPresent(resultJson, "platform", policy.getPlatform());
+                    putIfPresent(resultJson, "critical", policy.getCritical());
                     try {
-                        ObjectNode resultJson = mapper.createObjectNode();
-                        putIfPresent(resultJson, "policy_name", policy.getName());
-                        putIfPresent(resultJson, "query", policy.getQuery());
-                        putIfPresent(resultJson, "resolution", policy.getResolution());
-                        putIfPresent(resultJson, "description", policy.getDescription());
-                        putIfPresent(resultJson, "platform", policy.getPlatform());
-                        putIfPresent(resultJson, "critical", policy.getCritical());
                         return mapper.writeValueAsString(resultJson);
-                    } catch (Exception e) {
-                        log.error("Failed to create policy result JSON", e);
-                        return null;
+                    } catch (JsonProcessingException e) {
+                        throw new IllegalStateException("Failed to create policy result JSON", e);
                     }
                 })
                 .orElse(null);
@@ -142,7 +135,7 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
                 if (nameNode != null && !nameNode.isNull()) {
                     return nameNode.asText();
                 }
-            } catch (Exception e) {
+            } catch (JsonProcessingException e) {
                 log.debug("Could not parse details JSON for policy name: {}", detailsStr);
             }
         }
@@ -156,15 +149,17 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
     private Optional<Policy> getPolicyInfo(JsonNode after) {
         Optional<Long> policyIdOpt = extractPolicyId(after);
 
-        // Evict cache on policy mutation events so subsequent lookups get fresh data
         String eventTenantId = eventTenantId(after);
-        policyIdOpt.ifPresent(policyId ->
-                getSourceEventType(after)
-                        .filter(POLICY_MUTATION_TYPES::contains)
-                        .ifPresent(type -> fleetMdmCacheService.evictPolicyCache(policyId, eventTenantId))
-        );
+        policyIdOpt.ifPresent(policyId -> evictCacheIfMutation(after, policyId, eventTenantId));
 
         return policyIdOpt.flatMap(policyId -> fleetMdmCacheService.getPolicyById(policyId, eventTenantId));
+    }
+
+    /** Evict cache on policy mutation events so subsequent lookups get fresh data. */
+    private void evictCacheIfMutation(JsonNode after, Long policyId, String eventTenantId) {
+        getSourceEventType(after)
+                .filter(POLICY_MUTATION_TYPES::contains)
+                .ifPresent(type -> fleetMdmCacheService.evictPolicyCache(policyId, eventTenantId));
     }
 
     private Optional<Long> extractPolicyId(JsonNode after) {
@@ -175,7 +170,7 @@ public class FleetPolicyActivityDeserializer extends IntegratedToolEventDeserial
                         return Optional.ofNullable(detailsNode.get("policy_id"))
                                 .filter(node -> !node.isNull())
                                 .map(JsonNode::asLong);
-                    } catch (Exception e) {
+                    } catch (JsonProcessingException e) {
                         log.debug("Could not parse details JSON for policy_id: {}", detailsStr);
                         return Optional.empty();
                     }
