@@ -5,9 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
-/**
- * Default no-op implementation of UserEmailVerifiedProcessor.
- */
 @Slf4j
 @Component
 @ConditionalOnMissingBean(value = UserEmailVerifiedProcessor.class, ignored = DefaultUserEmailVerifiedProcessor.class)

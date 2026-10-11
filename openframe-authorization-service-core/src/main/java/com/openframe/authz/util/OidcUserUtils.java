@@ -3,26 +3,24 @@ package com.openframe.authz.util;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import java.util.Map;
+import java.util.Optional;
 
 public final class OidcUserUtils {
 
     private OidcUserUtils() {
     }
 
-    /**
-     * Resolve an email-like identifier from claims, falling back for AAD org accounts.
-     * Order: email -> preferred_username -> upn -> unique_name
-     */
-    public static String resolveEmail(OidcUser user) {
+    // Order: email -> preferred_username -> upn -> unique_name, to support AAD org accounts
+    public static Optional<String> resolveEmail(OidcUser user) {
         String email = user.getEmail();
-        if (email != null && !email.isBlank()) return email;
+        if (email != null && !email.isBlank()) return Optional.of(email);
         Object preferred = user.getClaims().get("preferred_username");
-        if (preferred instanceof String s && !s.isBlank()) return s;
+        if (preferred instanceof String s && !s.isBlank()) return Optional.of(s);
         Object upn = user.getClaims().get("upn");
-        if (upn instanceof String s2 && !s2.isBlank()) return s2;
+        if (upn instanceof String s2 && !s2.isBlank()) return Optional.of(s2);
         Object uniq = user.getClaims().get("unique_name");
-        if (uniq instanceof String s3 && !s3.isBlank()) return s3;
-        return null;
+        if (uniq instanceof String s3 && !s3.isBlank()) return Optional.of(s3);
+        return Optional.empty();
     }
 
     /**
@@ -53,25 +51,14 @@ public final class OidcUserUtils {
         return true;
     }
 
-    /**
-     * Returns string if non-blank, otherwise null.
-     */
-    public static String stringClaim(Object value) {
-        return value instanceof String s && !s.isBlank() ? s : null;
+    public static Optional<String> stringClaim(Object value) {
+        return value instanceof String s && !s.isBlank() ? Optional.of(s) : Optional.empty();
     }
 
-    /**
-     * Resolve [firstName, lastName] from OIDC claims.
-     * Prefers the standard `given_name` / `family_name` claims (provided by Google), and falls back
-     * to splitting the `name` claim when they are absent. Microsoft's id_token frequently carries only
-     * `name`, so without this fallback such logins produce blank first/last names.
-     * As a last resort, when no name claim is present at all, firstName falls back to the email
-     * local-part (before `@`) so the user is never created with a blank first name.
-     * Never returns null entries (blanks instead) so callers can persist directly.
-     */
+    // Falls back to splitting `name` (Microsoft only sends this), then to the email local-part, so first name is never blank
     public static String[] resolveNames(OidcUser user) {
-        String givenName = stringClaim(user.getClaims().get("given_name"));
-        String familyName = stringClaim(user.getClaims().get("family_name"));
+        String givenName = stringClaim(user.getClaims().get("given_name")).orElse(null);
+        String familyName = stringClaim(user.getClaims().get("family_name")).orElse(null);
         if ((givenName == null || givenName.isBlank()) && (familyName == null || familyName.isBlank())) {
             String full = user.getFullName();
             if (full != null && !full.isBlank()) {
@@ -81,29 +68,23 @@ public final class OidcUserUtils {
             }
         }
         if (givenName == null || givenName.isBlank()) {
-            givenName = emailLocalPart(user);
+            givenName = emailLocalPart(user).orElse(null);
         }
         return new String[]{givenName != null ? givenName : "", familyName != null ? familyName : ""};
     }
 
-    /**
-     * The portion of the resolved email before `@`, or null when no email is available.
-     */
-    private static String emailLocalPart(OidcUser user) {
-        String email = resolveEmail(user);
-        if (email == null || email.isBlank()) {
-            return null;
+    private static Optional<String> emailLocalPart(OidcUser user) {
+        Optional<String> email = resolveEmail(user);
+        if (email.isEmpty() || email.get().isBlank()) {
+            return Optional.empty();
         }
-        int at = email.indexOf('@');
-        return at > 0 ? email.substring(0, at) : email;
+        String e = email.get();
+        int at = e.indexOf('@');
+        return Optional.of(at > 0 ? e.substring(0, at) : e);
     }
 
-    /**
-     * Resolve a profile picture URL from OIDC claims.
-     * Standard OIDC `picture` claim is provided by Google. Microsoft does not provide it via id_token claims
-     * (it requires a Microsoft Graph call to /me/photo/$value), so this returns null for Microsoft.
-     */
-    public static String resolvePictureUrl(OidcUser user) {
+    // Microsoft does not expose `picture` via id_token claims (requires a Graph call), so this is empty for Microsoft
+    public static Optional<String> resolvePictureUrl(OidcUser user) {
         return stringClaim(user.getClaims().get("picture"));
     }
 }
