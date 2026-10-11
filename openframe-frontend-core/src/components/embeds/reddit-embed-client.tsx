@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from '../../embed-shims/next-link';
 import { formatLargeNumber } from '../../utils/format';
 import type { MediaItem as CarouselMediaItem } from '../../utils/media-carousel-utils-stub';
 import { socialCache } from '../../utils/social-embed-cache';
@@ -257,7 +258,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
               This Reddit post could not be loaded. It may have been deleted, made private, or the subreddit may be
               restricted.
             </p>
-            <a
+            <Link
               href={url}
               target="_blank"
               rel="noopener noreferrer"
@@ -265,7 +266,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
             >
               <RedditIcon />
               <span>View on Reddit</span>
-            </a>
+            </Link>
           </div>
         </div>
       </RedditContainer>
@@ -558,7 +559,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
 
         {/* Footer - Matching Twitter Style */}
         <div className="border-t border-ods-border bg-ods-bg-surface px-4 py-3">
-          <a
+          <Link
             href={url}
             target="_blank"
             rel="noopener noreferrer"
@@ -566,7 +567,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           >
             <ExternalLinkIcon />
             <span>View on Reddit</span>
-          </a>
+          </Link>
         </div>
       </div>
     </RedditContainer>

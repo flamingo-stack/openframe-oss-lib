@@ -256,14 +256,7 @@ export function MingoChatRail({
       aria-label="Mingo chats"
       logo={
         <div className="flex flex-1 items-center justify-between">
-          <AgentMark
-            agent="mingo"
-            color="currentColor"
-            eyesColor="var(--ods-flamingo-cyan-base)"
-            cornerColor="var(--ods-flamingo-cyan-base)"
-            className="size-6 text-ods-text-primary"
-            aria-hidden
-          />
+          <AgentMark agent="mingo" className="size-6 text-ods-text-primary" />
           {onExpand && (
             <Button
               variant="transparent"

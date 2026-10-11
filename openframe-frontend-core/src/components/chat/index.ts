@@ -98,17 +98,15 @@ export * from './stream';
 // Chat utilities
 export * from './utils';
 
-// EmbeddableChat — full chat orchestrator (lib-portable port of hub's
-// `<GlobalAskAI>`). Hosts mount it once at the root after providing a
-// <ChatRuntimeContext.Provider>.
+// EmbeddableChat — THE chat. Hosts mount it once at the root after providing a
+// <ChatRuntimeContext.Provider>; it loads the panel (`EmbeddableChatPanel`, its
+// own module) when the chat is first needed.
 export {
   type ChatPrefillDraft,
   EmbeddableChat,
   type EmbeddableChatHandle,
   type EmbeddableChatProps,
-  MINGO_V2_RAIL_WIDTH,
-  MINGO_V2_SPLIT_WIDTH,
 } from './embeddable-chat';
-export { EmbeddableChatOnDemand, type EmbeddableChatOnDemandProps } from './embeddable-chat-on-demand';
+export { MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from './embeddable-chat-panel';
 export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_EVENTS, ASK_AI_OPEN_WITH_REF_EVENT } from './utils/ask-ai-events';
 export * from './proxy-credentials-panel';

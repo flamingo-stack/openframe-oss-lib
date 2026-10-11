@@ -35,6 +35,13 @@ type ImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'placeholder
   placeholder?: 'blur' | 'empty' | `data:image/${string}`;
   blurDataURL?: string;
   unoptimized?: boolean;
+  /**
+   * Draw the picture about this many pixels wide: the host's registered resizer
+   * (`registerImageResizer`) answers the URL, and the picture is drawn as it
+   * comes, with no second optimizer pass. For a slot whose width the caller
+   * measured (a wall column); a host with no resizer draws `src` as usual.
+   */
+  optimizedWidth?: number;
   onLoadingComplete?: (img: HTMLImageElement) => void;
   loader?: unknown;
 };
@@ -78,7 +85,12 @@ export function resizedImageUrl(src: string, widthPx: number): string {
   return resizer ? resizer(src, widthPx) : src;
 }
 
-const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim(props, ref) {
+const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ optimizedWidth, ...given }, ref) {
+  // A picture asked for at a width is the host resizer's URL, drawn as it comes.
+  const props: ImageProps =
+    optimizedWidth && resizer && typeof given.src === 'string'
+      ? { ...given, src: resizer(given.src, optimizedWidth), unoptimized: true }
+      : given;
   // Real impl path — registered by the host. Hand off untouched so
   // every Next-specific prop (priority, placeholder, sizes, loader…)
   // reaches the real component intact.

@@ -65,13 +65,7 @@ export function HeaderMingoButton({
       ) : (
         // Outer frame follows the button's text color (currentColor); the eyes
         // and corner block are ODS cyan.
-        <AgentMark
-          agent="mingo"
-          color="currentColor"
-          eyesColor="var(--ods-flamingo-cyan-base)"
-          cornerColor="var(--ods-flamingo-cyan-base)"
-          className="h-6 w-6 shrink-0"
-        />
+        <AgentMark agent="mingo" className="h-6 w-6 shrink-0" />
       )}
       {!iconOnly && <span className="whitespace-nowrap font-bold tracking-[-0.36px] text-h3">Mingo AI</span>}
     </button>

@@ -137,7 +137,22 @@ package, so **edit the rules only here**:
 
 @src/ODS_TOKEN_RULES.md
 
-### 3. React Hooks — always at the top, unconditionally
+### 3. Links and pictures are the boxed primitives, never raw tags
+
+A link is `Link` from `src/embed-shims/next-link`, a picture is `Image` from `src/embed-shims/next-image`.
+Never write a raw `<a>` or `<img>` in a component: the boxed ones are the host's router link and image
+optimizer where a host registered them, and a plain anchor or image everywhere else, so one component is
+right in every host.
+
+- Lint enforces both: `flamingo/no-raw-anchor` and `@next/next/no-img-element`. The only exemptions are the
+  named blocks in `eslint.config.mjs` (the primitives' own fallbacks, a `blob:` preview).
+- A picture whose slot the caller measured asks for that width with `optimizedWidth` (the host's resizer
+  answers the URL). Do not build a resized URL by hand next to an `<Image>`.
+- An AI agent's picture is its identity's (`AgentMark`, `EntityIcon`, fed by `AgentIdentityProvider`). The
+  library packages no picture of an agent.
+- A random id is `randomId()` (`src/utils/random-id.ts`); no caller carries its own `crypto.randomUUID` fallback.
+
+### 4. React Hooks — always at the top, unconditionally
 
 ```typescript
 // BAD — hook after early return
@@ -450,7 +465,7 @@ Standard admin skeleton: 12 items in a 3-column grid matching the real content l
 
 1. **Reuse over recreate** — search first (see Core Rule 1)
 2. **ODS compliance** — tokens only, no hardcoded colors or raw font sizes (see Core Rule 2)
-3. **Hooks** unconditional at the top (see Core Rule 3)
+3. **Hooks** unconditional at the top (see Core Rule 4)
 4. **Platform agnostic** — core components must work across all platforms
 5. **TypeScript strict** — zero errors
 6. **Accessibility** — ARIA, keyboard, focus management

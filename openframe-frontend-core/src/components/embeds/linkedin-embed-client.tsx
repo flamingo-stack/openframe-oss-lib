@@ -2,6 +2,7 @@
 
 import { ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import Link from '../../embed-shims/next-link';
 import { LinkedinIcon } from '../icons-v2-generated/brand-logos/linkedin-icon';
 import { LinkedInContainer } from './embed-container';
 
@@ -42,7 +43,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
             <LinkedinIcon className="h-5 w-5 shrink-0" />
             <span>LinkedIn post</span>
           </div>
-          <a
+          <Link
             href={url}
             target="_blank"
             rel="noopener noreferrer"
@@ -50,7 +51,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
           >
             <LinkedinIcon className="h-4 w-4" />
             <span>View on LinkedIn</span>
-          </a>
+          </Link>
         </div>
       </LinkedInContainer>
     );
@@ -85,7 +86,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
         />
       </div>
       <div className="border-t border-ods-border bg-ods-bg-surface px-4 py-3">
-        <a
+        <Link
           href={url}
           target="_blank"
           rel="noopener noreferrer"
@@ -93,7 +94,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
         >
           <ExternalLink className="h-4 w-4" />
           <span>View on LinkedIn</span>
-        </a>
+        </Link>
       </div>
     </LinkedInContainer>
   );

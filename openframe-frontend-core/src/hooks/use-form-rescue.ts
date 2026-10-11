@@ -22,6 +22,7 @@ import {
   type FormDraftSaveRequest,
   type FormRescueDefinition,
 } from '../utils/form-rescue';
+import { randomId } from '../utils/random-id';
 
 /** A local draft older than this is ignored and replaced. */
 const LOCAL_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -52,17 +53,6 @@ export interface FormRescueHandle {
   submitFields: () => Record<string, string>;
   /** Call after a successful submit: clears the local draft and starts a fresh attempt. */
   complete: () => void;
-}
-
-function newAttemptId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  // RFC 4122 v4 from getRandomValues for older browsers.
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function readLocalDraft(formId: string): LocalDraft | null {
@@ -165,7 +155,7 @@ export function useFormRescue({ form, fieldNames, onRestore, getSignals }: UseFo
   });
 
   const attemptId = useCallback((): string => {
-    if (!attemptIdRef.current) attemptIdRef.current = newAttemptId();
+    if (!attemptIdRef.current) attemptIdRef.current = randomId();
     return attemptIdRef.current;
   }, []);
 

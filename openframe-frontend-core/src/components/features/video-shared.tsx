@@ -190,13 +190,6 @@ export interface VideoCommonProps {
  * reaches FilePlayer for free.
  */
 export interface VideoFilePlaybackProps {
-  /**
-   * SRT raw content. Deprecated: pass `captionsUrl` (VTT) instead.
-   * Native `<track>` requires a URL; raw SRT can't be rendered without
-   * a custom overlay. Setting this without `captionsUrl` is a no-op
-   * with a dev warning.
-   */
-  srtContent?: string | null;
   /** HTTPS URL to a VTT captions file. Rendered as a native `<track>`. */
   captionsUrl?: string | null;
   /** Autoplay muted on mount (forwarded as MuxPlayer `autoPlay="muted"`). */
@@ -237,7 +230,6 @@ export interface VideoFilePlaybackProps {
  *  or misspelled key; the assertion below rejects a MISSING one (which would
  *  otherwise compile fine and silently stop forwarding that prop). */
 const VIDEO_FILE_PLAYBACK_KEYS = [
-  'srtContent',
   'captionsUrl',
   'autoPlay',
   'loop',

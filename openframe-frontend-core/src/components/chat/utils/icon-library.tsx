@@ -28,7 +28,6 @@
  * misconfigured row still renders.
  */
 
-import { Megaphone, Bell, Info, Star, Package as PackageGlyph } from 'lucide-react';
 import {
   createElement,
   lazy,
@@ -40,176 +39,17 @@ import {
   type SVGProps,
 } from 'react';
 import { platformAccentVarName } from '../../../utils/platform-identity';
-import { HeadphoneIcon } from '../../icons-v2-generated/audio-and-visual/headphone-icon';
-import { VideoRecorderIcon } from '../../icons-v2-generated/audio-and-visual/video-recorder-icon';
-import { ClickupLogoGreyIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-grey-icon';
-import { GithubIcon } from '../../icons-v2-generated/brand-logos/github-icon';
-import { HubspotLogoGreyIcon } from '../../icons-v2-generated/brand-logos/hubspot-logo-grey-icon';
-import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
-import { BracketCurlyIcon } from '../../icons-v2-generated/coding/bracket-curly-icon';
-import { BugIcon } from '../../icons-v2-generated/coding/bug-icon';
-import { ChatsIcon } from '../../icons-v2-generated/communication/chats-icon';
-import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
-import { LayersIcon } from '../../icons-v2-generated/design/layers-icon';
-import { FileIcon } from '../../icons-v2-generated/documents/file-icon';
-import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon';
-import { ICON_LOADERS } from '../../icons-v2-generated/icon-loaders';
-import { SearchIcon } from '../../icons-v2-generated/interface/search-icon';
-import { BriefcaseIcon } from '../../icons-v2-generated/map-and-travel/briefcase-icon';
-import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon';
-import { BookIcon } from '../../icons-v2-generated/school/book-icon';
-import { GraduationCapIcon } from '../../icons-v2-generated/school/graduation-cap-icon';
-import { TicketIcon } from '../../icons-v2-generated/shopping/ticket-icon';
-import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
+import { ICON_LOADERS, type LoadedIconProps } from '../../icons-v2-generated/icon-loaders';
 import { FlamingoLogo } from '../../icons/flamingo-logo';
 import { MiamiCyberGangLogoFaceOnly } from '../../icons/miami-cyber-gang-logo-face-only';
+import { MingoIcon } from '../../icons/mingo-icon';
 import { MlgLogo } from '../../icons/mlg-logo';
 import { OpenFrameLogo } from '../../icons/openframe-logo';
 import { OpenmspLogo } from '../../icons/openmsp-logo';
 import { ICON_REGISTRY, getIconComponent, normalizeIconKey } from './icon-registry';
 
-/** Shape used by every icon registered here (matches `icons-v2-generated`). */
-export type IconComponent = ComponentType<{
-  size?: number;
-  className?: string;
-  color?: string;
-}>;
-
-/** Wrap a brand logo (className/SVG-sized) so it satisfies the `size`-prop
- *  `IconComponent` contract — drives size via `style` (CSS wins over
- *  the logo's hardcoded width/height), keeping the logo's own brand fill. */
-function sizedLogo(Logo: ComponentType<{ className?: string; style?: CSSProperties }>): IconComponent {
-  return function SizedLogo({ size = 16, className }) {
-    return <Logo className={className} style={{ width: size, height: size }} />;
-  };
-}
-// A sister platform's mark is drawn in THAT platform's brand colour (the
-// platform brand registry), never in the accent of the page showing it: on
-// flamingo.run the OpenMSP mark stays OpenMSP yellow, not flamingo pink.
-const brandColor = (platform: string) => `var(${platformAccentVarName(platform)})`;
-// The OpenMSP mark's own defaults are black and white (made for a light page):
-// on the dark surfaces every glyph sits on, the bubbles take the theme's text
-// and background tokens and the back bubble OpenMSP's brand colour.
-const OpenmspLogoIcon: IconComponent = ({ size = 16, className }) => (
-  <OpenmspLogo
-    className={className}
-    style={{ width: size, height: size }}
-    frontBubbleColor="var(--color-text-primary)"
-    innerFrontBubbleColor="var(--color-bg)"
-    backBubbleColor={brandColor('openmsp')}
-  />
-);
-const FlamingoLogoIcon = sizedLogo(FlamingoLogo);
-// The same mark as a GLYPH: it takes the colour of the slot it sits in, like every icon beside it (a source
-// chip, a command row, a card), where the brand pink would be the one coloured icon in the list.
-const FlamingoLogoGreyIcon: IconComponent = ({ size = 16, className, color }) => (
-  <FlamingoLogo className={className} fill={color ?? 'currentColor'} style={{ width: size, height: size }} />
-);
-// The two community marks size themselves through a `size` prop, the resolver's own contract.
-// Major League GitHub draws its mark in the theme's text colour on its own site
-// (its header, hero and footer), never in an accent: so does every glyph of it.
-const MlgLogoIcon: IconComponent = ({ size = 16, className, color }) => (
-  <MlgLogo size={size} className={className} color={color ?? 'var(--color-text-primary)'} />
-);
-const TmcgLogoIcon: IconComponent = ({ size = 16, className }) => (
-  <MiamiCyberGangLogoFaceOnly
-    size={size}
-    className={className}
-    originalPink={brandColor('tmcg')}
-    originalWhite="var(--color-text-primary)"
-  />
-);
-
-/**
- * `OpenFrameLogo` from `components/icons/` predates the v2 set and:
- *   1. hardcodes `width="32" height="32"` AFTER spreading `{...props}`,
- *      so we can't override via the `width` / `height` props — we drive
- *      size through `style` instead (CSS attribute wins over the HTML
- *      `width` / `height` attributes).
- *   2. defaults `lowerPathColor` to white and `upperPathColor` to
- *      `#1A1A1A` — the dark frame disappears on the chat's `ods-bg`
- *      surface. We pin both paths to `currentColor` so the glyph tints
- *      to whatever the card icon slot is (`ods-text-secondary` ≈ #888).
- */
-function LogoOpenframeIcon({ size = 16, className, color }: { size?: number; className?: string; color?: string }) {
-  // Forward `color` (from `icon_props.color`) like every other resolver-backed
-  // glyph; default to `currentColor` so the logo tints to its slot.
-  const tint = color ?? 'currentColor';
-  return (
-    <OpenFrameLogo
-      className={className}
-      lowerPathColor={tint}
-      upperPathColor={tint}
-      style={{ width: size, height: size }}
-    />
-  );
-}
-
-/**
- * Static registry — backend `iconName` → React component. Brand-grey
- * logos live in `icons-v2-generated/brand-logos/`; the rest are
- * monochrome v2 glyphs that inherit `currentColor` from the card slot
- * (`text-ods-text-secondary`).
- */
-export const ICON_ALIASES: Record<string, IconComponent> = {
-  // Production `/api/docs/commands` keys (multi-platform-hub contract)
-  clickup: ClickupLogoGreyIcon,
-  slack: SlackLogoGreyIcon,
-  hubspot: HubspotLogoGreyIcon,
-  github: GithubIcon,
-  openframe: LogoOpenframeIcon,
-  newspaper: NewspaperIcon,
-  rocket: Rocket02Icon,
-  briefcase: BriefcaseIcon,
-  'graduation-cap': GraduationCapIcon,
-  video: VideoRecorderIcon,
-  headphones: HeadphoneIcon,
-  calendar: CalendarIcon,
-  compass: CompassIcon,
-
-  // Figma-canonical aliases (node 7363:205938) — kept for Storybook
-  // fixtures and any older feed entries still using the long names.
-  'clickup-logo': ClickupLogoGreyIcon,
-  'clickup-logo-grey': ClickupLogoGreyIcon,
-  'slack-logo': SlackLogoGreyIcon,
-  'slack-logo-grey': SlackLogoGreyIcon,
-  'hubspot-logo': HubspotLogoGreyIcon,
-  'hubspot-logo-grey': HubspotLogoGreyIcon,
-  'github-logo': GithubIcon,
-  'logo-openframe': LogoOpenframeIcon,
-  'rocket-01': Rocket02Icon,
-  'rocket-02': Rocket02Icon,
-
-  // Announcement-bar legacy names — folded in so resolveIcon covers them too
-  // (was the separate `renderSvgIcon` map; now ONE resolver everywhere).
-  'openframe-logo': LogoOpenframeIcon,
-  'openmsp-logo': OpenmspLogoIcon,
-  'mlg-logo': MlgLogoIcon,
-  'tmcg-logo': TmcgLogoIcon,
-  flamingo: FlamingoLogoIcon,
-  'flamingo-logo': FlamingoLogoIcon,
-  'flamingo-logo-grey': FlamingoLogoGreyIcon,
-  megaphone: Megaphone,
-  bell: Bell,
-  info: Info,
-  star: Star,
-  package: PackageGlyph,
-
-  // Generic v2-native keys — useful fall-throughs for slash commands that
-  // don't have a brand-specific glyph in the design.
-  search: SearchIcon,
-  ticket: TicketIcon,
-  book: BookIcon,
-  'book-open': BookIcon,
-  bug: BugIcon,
-  layers: LayersIcon,
-  file: FileIcon,
-  'file-text': FileIcon,
-  chats: ChatsIcon,
-  'message-square': ChatsIcon,
-  'message-circle': ChatsIcon,
-  'bracket-curly': BracketCurlyIcon,
-};
+/** Every icon registered here is a component of the generated set's own props (`icons-v2-generated`). */
+export type IconComponent = ComponentType<LoadedIconProps>;
 
 /** The size a generated icon draws at when it is given none; its loading box matches it. */
 const SET_ICON_DEFAULT_SIZE = 24;
@@ -218,10 +58,8 @@ const SET_ICON_DEFAULT_SIZE = 24;
 const setIcons = new Map<string, IconComponent>();
 
 /** What a generated icon takes: the icon props plus whatever its `<svg>` accepts. */
-type SetIconProps = { size?: number; className?: string; color?: string } & Omit<
-  SVGProps<SVGSVGElement>,
-  'ref' | 'width' | 'height' | 'color' | 'children' | 'dangerouslySetInnerHTML'
->;
+type SetIconProps = LoadedIconProps &
+  Omit<SVGProps<SVGSVGElement>, 'ref' | 'width' | 'height' | 'color' | 'children' | 'dangerouslySetInnerHTML'>;
 
 /** The set's icon modules that have arrived, by export name. */
 const loadedSetIcons = new Map<string, ComponentType<SetIconProps>>();
@@ -328,6 +166,188 @@ function iconFromSet(exportName: string): IconComponent | undefined {
   setIcons.set(exportName, SetIcon as IconComponent);
   return SetIcon as IconComponent;
 }
+
+/** An icon the generated set is known to hold, by its export name. A name the set lost fails here, when the library loads. */
+function setIcon(exportName: string): IconComponent {
+  const icon = iconFromSet(exportName);
+  if (!icon) throw new Error(`icon-library: the generated icon set has no "${exportName}"`);
+  return icon;
+}
+
+// The glyphs the aliases below name. Like every icon of the set they are loaded when drawn, never with the page.
+const FileIcon = setIcon('FileIcon');
+const ClickupLogoGreyIcon = setIcon('ClickupLogoGreyIcon');
+const SlackLogoGreyIcon = setIcon('SlackLogoGreyIcon');
+const HubspotLogoGreyIcon = setIcon('HubspotLogoGreyIcon');
+const GithubIcon = setIcon('GithubIcon');
+const Rocket02Icon = setIcon('Rocket02Icon');
+const BookIcon = setIcon('BookIcon');
+const ChatsIcon = setIcon('ChatsIcon');
+
+/** Wrap a brand logo (className/SVG-sized) so it satisfies the `size`-prop
+ *  `IconComponent` contract — drives size via `style` (CSS wins over
+ *  the logo's hardcoded width/height), keeping the logo's own brand fill. */
+function sizedLogo(Logo: ComponentType<{ className?: string; style?: CSSProperties }>): IconComponent {
+  return function SizedLogo({ size = 16, className }) {
+    return <Logo className={className} style={{ width: size, height: size }} />;
+  };
+}
+// A sister platform's mark is drawn in THAT platform's brand colour (the
+// platform brand registry), never in the accent of the page showing it: on
+// flamingo.run the OpenMSP mark stays OpenMSP yellow, not flamingo pink.
+const brandColor = (platform: string) => `var(${platformAccentVarName(platform)})`;
+// The OpenMSP mark's own defaults are black and white (made for a light page):
+// on the dark surfaces every glyph sits on, the bubbles take the theme's text
+// and background tokens and the back bubble OpenMSP's brand colour.
+const OpenmspLogoIcon: IconComponent = ({ size = 16, className }) => (
+  <OpenmspLogo
+    className={className}
+    style={{ width: size, height: size }}
+    frontBubbleColor="var(--color-text-primary)"
+    innerFrontBubbleColor="var(--color-bg)"
+    backBubbleColor={brandColor('openmsp')}
+  />
+);
+const FlamingoLogoIcon = sizedLogo(FlamingoLogo);
+// The same mark as a GLYPH: it takes the colour of the slot it sits in, like every icon beside it (a source
+// chip, a command row, a card), where the brand pink would be the one coloured icon in the list.
+const FlamingoLogoGreyIcon: IconComponent = ({ size = 16, className, color }) => (
+  <FlamingoLogo className={className} fill={color ?? 'currentColor'} style={{ width: size, height: size }} />
+);
+// The two community marks size themselves through a `size` prop, the resolver's own contract.
+// Major League GitHub draws its mark in the theme's text colour on its own site
+// (its header, hero and footer), never in an accent: so does every glyph of it.
+const MlgLogoIcon: IconComponent = ({ size = 16, className, color }) => (
+  <MlgLogo size={size} className={className} color={color ?? 'var(--color-text-primary)'} />
+);
+const TmcgLogoIcon: IconComponent = ({ size = 16, className }) => (
+  <MiamiCyberGangLogoFaceOnly
+    size={size}
+    className={className}
+    originalPink={brandColor('tmcg')}
+    originalWhite="var(--color-text-primary)"
+  />
+);
+
+/**
+ * `OpenFrameLogo` from `components/icons/` predates the v2 set and:
+ *   1. hardcodes `width="32" height="32"` AFTER spreading `{...props}`,
+ *      so we can't override via the `width` / `height` props — we drive
+ *      size through `style` instead (CSS attribute wins over the HTML
+ *      `width` / `height` attributes).
+ *   2. defaults `lowerPathColor` to white and `upperPathColor` to
+ *      `#1A1A1A` — the dark frame disappears on the chat's `ods-bg`
+ *      surface. We pin both paths to `currentColor` so the glyph tints
+ *      to whatever the card icon slot is (`ods-text-secondary` ≈ #888).
+ */
+function LogoOpenframeIcon({ size = 16, className, color }: { size?: number; className?: string; color?: string }) {
+  // Forward `color` (from `icon_props.color`) like every other resolver-backed
+  // glyph; default to `currentColor` so the logo tints to its slot.
+  const tint = color ?? 'currentColor';
+  return (
+    <OpenFrameLogo
+      className={className}
+      lowerPathColor={tint}
+      upperPathColor={tint}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
+/**
+ * Mingo's mark as a glyph: the frame takes the colour of the slot it sits in and
+ * the eyes and the corner Mingo's own cyan, unless the icon's props (an agent
+ * identity's) say otherwise.
+ */
+const MINGO_OWN_COLOR = 'var(--ods-flamingo-cyan-base)';
+function MingoMarkIcon({
+  size,
+  className,
+  color,
+  eyesColor,
+  cornerColor,
+}: LoadedIconProps & { eyesColor?: string; cornerColor?: string }) {
+  return (
+    <MingoIcon
+      className={className}
+      color={color ?? 'currentColor'}
+      eyesColor={eyesColor ?? MINGO_OWN_COLOR}
+      cornerColor={cornerColor ?? MINGO_OWN_COLOR}
+      focusable="false"
+      {...(size ? { width: size, height: size } : {})}
+    />
+  );
+}
+
+/**
+ * Static registry — backend `iconName` → React component. Brand-grey
+ * logos live in `icons-v2-generated/brand-logos/`; the rest are
+ * monochrome v2 glyphs that inherit `currentColor` from the card slot
+ * (`text-ods-text-secondary`).
+ */
+export const ICON_ALIASES: Record<string, IconComponent> = {
+  // Production `/api/docs/commands` keys (multi-platform-hub contract)
+  clickup: ClickupLogoGreyIcon,
+  slack: SlackLogoGreyIcon,
+  hubspot: HubspotLogoGreyIcon,
+  github: GithubIcon,
+  openframe: LogoOpenframeIcon,
+  newspaper: setIcon('NewspaperIcon'),
+  rocket: Rocket02Icon,
+  briefcase: setIcon('BriefcaseIcon'),
+  'graduation-cap': setIcon('GraduationCapIcon'),
+  video: setIcon('VideoRecorderIcon'),
+  headphones: setIcon('HeadphoneIcon'),
+  calendar: setIcon('CalendarIcon'),
+  compass: setIcon('CompassIcon'),
+
+  // Figma-canonical aliases (node 7363:205938) — kept for Storybook
+  // fixtures and any older feed entries still using the long names.
+  'clickup-logo': ClickupLogoGreyIcon,
+  'clickup-logo-grey': ClickupLogoGreyIcon,
+  'slack-logo': SlackLogoGreyIcon,
+  'slack-logo-grey': SlackLogoGreyIcon,
+  'hubspot-logo': HubspotLogoGreyIcon,
+  'hubspot-logo-grey': HubspotLogoGreyIcon,
+  'github-logo': GithubIcon,
+  'logo-openframe': LogoOpenframeIcon,
+  'rocket-01': Rocket02Icon,
+  'rocket-02': Rocket02Icon,
+
+  // Announcement-bar legacy names — folded in so resolveIcon covers them too
+  // (was the separate `renderSvgIcon` map; now ONE resolver everywhere).
+  'openframe-logo': LogoOpenframeIcon,
+  'openmsp-logo': OpenmspLogoIcon,
+  'mlg-logo': MlgLogoIcon,
+  'tmcg-logo': TmcgLogoIcon,
+  flamingo: FlamingoLogoIcon,
+  'flamingo-logo': FlamingoLogoIcon,
+  'flamingo-logo-grey': FlamingoLogoGreyIcon,
+  // The glyph the Mingo agent's identity names.
+  mingo: MingoMarkIcon,
+  // Microsoft 365 is drawn with the Office 365 mark, which the set names by the product's older name.
+  'microsoft-365-logo-grey': setIcon('Office365LogoGreyIcon'),
+  megaphone: setIcon('Megaphone01Icon'),
+  bell: setIcon('BellIcon'),
+  info: setIcon('InfoCircleIcon'),
+  star: setIcon('StarIcon'),
+  package: setIcon('PackageIcon'),
+
+  // Generic v2-native keys — useful fall-throughs for slash commands that
+  // don't have a brand-specific glyph in the design.
+  search: setIcon('SearchIcon'),
+  ticket: setIcon('TicketIcon'),
+  book: BookIcon,
+  'book-open': BookIcon,
+  bug: setIcon('BugIcon'),
+  layers: setIcon('LayersIcon'),
+  file: FileIcon,
+  'file-text': FileIcon,
+  chats: ChatsIcon,
+  'message-square': ChatsIcon,
+  'message-circle': ChatsIcon,
+  'bracket-curly': setIcon('BracketCurlyIcon'),
+};
 
 /**
  * Generic resolution against the FULL `icons-v2-generated` set.

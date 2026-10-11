@@ -1,52 +1,52 @@
 'use client';
 
-import { createElement, lazy, Suspense } from 'react';
+import { createElement } from 'react';
 
+import Image from '../embed-shims/next-image';
+import { cn } from '../utils/cn';
 import { useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
-import { MingoIcon, type MingoIconProps } from './icons/mingo-icon';
 
-/** Fae's packaged avatar, fetched when it is drawn: a host that provides the identities never needs it. */
-const PackagedFaeAvatar = lazy(() => import('./agent-mark-packaged-fae'));
-
+/** The agents the product ships. A mark is drawn for any agent slug the server has an identity for. */
 export type AgentName = 'fae' | 'mingo';
 
-export interface AgentMarkProps extends Pick<MingoIconProps, 'color' | 'eyesColor' | 'outerColor' | 'cornerColor'> {
-  /** Which AI agent's mark to render. */
-  agent: AgentName;
+export interface AgentMarkProps {
+  /** The slug of the AI agent whose mark to draw. */
+  agent: AgentName | (string & {});
   /** Sizing/positioning classes applied to the mark (e.g. `w-5 h-5`). */
   className?: string;
-  /** Override Fae's packaged avatar. The agent's identity icon, when the host provides one, still wins. */
-  faeAvatarSrc?: string;
 }
 
+// A mark is at most 48px on screen; twice that covers dense screens.
+const MARK_IMAGE_SIZES = '96px';
+
 /**
- * Unified Fae/Mingo agent mark — the ONE place that knows how each agent is drawn.
+ * An AI agent's mark: the icon its IDENTITY holds, and nothing else.
  *
- * The mark is the icon the agent's IDENTITY holds, when the host provides the
- * identities (`AgentIdentityProvider`): an uploaded picture, or a library glyph
- * it names. Only with no identity icon does the agent's packaged mark answer:
- * Mingo's vector (tinted by the colour props), Fae's avatar. Just the glyph —
- * the caller sizes/boxes it. Decorative in every form.
+ * An agent's picture is a record the product keeps (its identity: a name and an
+ * icon), served to every host (`AgentIdentityProvider`). The mark is that icon:
+ * an uploaded picture, or the library glyph the identity names, with the props
+ * the identity gives it. The library packages no picture of an agent, so an
+ * agent the server names no icon for draws nothing: its box is kept empty, at
+ * the size the caller gave it, so nothing around it moves while the identities
+ * are on their way. Decorative in every form; the caller sizes and boxes it.
  */
-export function AgentMark({ agent, className = '', faeAvatarSrc, ...mingoColors }: AgentMarkProps) {
+export function AgentMark({ agent, className = '' }: AgentMarkProps) {
   const identity = useAgentIdentityIcon(agent);
   if (identity?.url) {
-    return <img src={identity.url} alt="" className={className} loading="lazy" decoding="async" />;
+    return (
+      <span aria-hidden="true" className={cn('relative inline-block overflow-hidden', className)}>
+        <Image src={identity.url} alt="" fill sizes={MARK_IMAGE_SIZES} className="object-cover" />
+      </span>
+    );
   }
-  // The identity names a library glyph of its own (not this agent's packaged mark).
-  if (identity?.name && identity.name !== agent) {
-    const glyphProps: Record<string, unknown> = { className, 'aria-hidden': true, ...(identity.props ?? {}) };
-    return createElement(resolveIcon(identity.name), glyphProps);
+  if (identity?.name) {
+    // The identity's glyph, drawn through `createElement`: it is the icon set's component, not one made here.
+    return createElement(resolveIcon(identity.name), {
+      className,
+      'aria-hidden': true,
+      ...(identity.props ?? {}),
+    } as Record<string, unknown>);
   }
-  return agent === 'mingo' ? (
-    <MingoIcon className={className} aria-hidden="true" focusable="false" {...mingoColors} />
-  ) : faeAvatarSrc ? (
-    <img src={faeAvatarSrc} alt="" className={className} />
-  ) : (
-    // The mark's own box holds the place while the packaged picture loads.
-    <Suspense fallback={<span aria-hidden="true" className={className} />}>
-      <PackagedFaeAvatar className={className} />
-    </Suspense>
-  );
+  return <span aria-hidden="true" className={className} />;
 }

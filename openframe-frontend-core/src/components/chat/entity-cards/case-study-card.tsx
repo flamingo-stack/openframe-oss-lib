@@ -239,7 +239,7 @@ export function CaseStudyCard({
 
   if (size === 'sm') {
     return (
-      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
+      <Link href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {coverImage ? (
             <Image
@@ -266,7 +266,7 @@ export function CaseStudyCard({
             <span className={COMPACT_CARD_SUMMARY}>{study.summary || COMPACT_CARD_ROW_FILLER}</span>
           </span>
         </span>
-      </a>
+      </Link>
     );
   }
 
@@ -393,7 +393,7 @@ export function CaseStudyCard({
   }
 
   return (
-    <a href={href} target={target} rel={rel} className={cn('block h-full', className)}>
+    <Link href={href} target={target} rel={rel} className={cn('block h-full', className)}>
       <Card className={cn(CONTENT_CARD_FRAME_CLASS, 'flex flex-col gap-6 p-6')}>
         {/* Fixed aspect ratio matches the standard OG card source aspect
             (1200×630 = 1.91:1), so the image fits with near-zero CSS-side
@@ -421,6 +421,6 @@ export function CaseStudyCard({
 
         <CaseStudyPersonRow study={study} />
       </Card>
-    </a>
+    </Link>
   );
 }

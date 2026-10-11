@@ -6,6 +6,7 @@
  */
 
 import type React from 'react';
+import Link from '../../embed-shims/next-link';
 import type { ToolType } from '../../types/tool.types';
 import { cn } from '../../utils/cn';
 import { getToolLabel } from '../../utils/tool-utils';
@@ -73,9 +74,9 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
         {node}
       </NavLinkAnchorViaRuntime>
     ) : href ? (
-      <a href={href} target="_blank" rel="noopener noreferrer" title={text || undefined} className={linkClassName}>
+      <Link href={href} target="_blank" rel="noopener noreferrer" title={text || undefined} className={linkClassName}>
         {node}
-      </a>
+      </Link>
     ) : (
       node
     );

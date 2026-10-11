@@ -10,6 +10,7 @@
 
 import { Video } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import type { CustomerInterview } from '../../../types/customer-interview';
 import { cn } from '../../../utils/cn';
 import { Card } from '../../ui/card';
@@ -118,7 +119,7 @@ export function CustomerInterviewCard({
 
   if (size === 'sm') {
     return (
-      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
+      <Link href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {thumbnailUrl ? (
             <Image
@@ -150,7 +151,7 @@ export function CustomerInterviewCard({
             <span className={COMPACT_CARD_SUMMARY}>{interview.video_summary || COMPACT_CARD_ROW_FILLER}</span>
           </span>
         </span>
-      </a>
+      </Link>
     );
   }
 
@@ -178,7 +179,7 @@ export function CustomerInterviewCard({
   }
 
   return (
-    <a href={href} target={target} rel={rel} className={cn('block h-full', className)}>
+    <Link href={href} target={target} rel={rel} className={cn('block h-full', className)}>
       <Card className={cn(CONTENT_CARD_FRAME_CLASS, 'flex flex-col gap-6 p-6')}>
         {/* Fixed aspect matching standard OG card source (1200×630, 1.91:1)
             — image renders with near-zero CSS-side crop, subject anchored
@@ -262,6 +263,6 @@ export function CustomerInterviewCard({
           </div>
         </div>
       </Card>
-    </a>
+    </Link>
   );
 }

@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useState, useEffect } from 'react';
+import Link from '../embed-shims/next-link';
 import { getPlatformUrl } from '../platform-domains';
 import { FlamingoLogo } from './flamingo-logo';
 
@@ -101,7 +102,7 @@ export function MadeWithLove({ className = '', size = 'md', showOnMobile = true 
   return (
     <div style={containerStyle} className={className}>
       Made with love by
-      <a
+      <Link
         href={flamingoUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -116,7 +117,7 @@ export function MadeWithLove({ className = '', size = 'md', showOnMobile = true 
           />
         </div>
         <span style={textStyle}>Flamingo</span>
-      </a>
+      </Link>
     </div>
   );
 }

@@ -253,13 +253,7 @@ export function MingoWelcome({
             content, so the region scrolls instead of the greeting overlapping
             the grid. Padding is modest so it never dominates the narrow panel. */}
                 <div className="flex flex-1 flex-col items-center justify-center gap-[var(--spacing-system-l)] px-[var(--spacing-system-l)] py-[var(--spacing-system-xxl)] text-center">
-                  <AgentMark
-                    agent="mingo"
-                    className="h-12 w-12"
-                    color="white"
-                    eyesColor="var(--ods-flamingo-cyan-base)"
-                    cornerColor="var(--ods-flamingo-cyan-base)"
-                  />
+                  <AgentMark agent="mingo" className="h-12 w-12" />
                   <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
                     <p className="text-ods-text-primary text-h2">{heading}</p>
                     <p className="text-ods-text-secondary text-h4">{subtitle}</p>

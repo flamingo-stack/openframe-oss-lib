@@ -27,19 +27,32 @@ describe("an agent's mark is its identity's icon", () => {
     expect(html).not.toContain('data:image');
   });
 
-  it('keeps the packaged marks when the host names no identity icon', async () => {
+  it('draws no picture of its own: an agent with no identity keeps an empty box of the size it was given', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const html = markup(
       <>
-        <AgentMark agent="fae" />
-        <AgentMark agent="mingo" />
+        <AgentMark agent="fae" className="size-6" />
+        <AgentMark agent="mingo" className="size-6" />
       </>,
     );
-    expect(html).toContain('<svg');
-    // Fae's packaged picture is fetched when it is drawn.
-    await waitFor(() => expect(screen.getByTestId('marks').innerHTML).toContain('data:image'));
+    expect(html).toBe('<span aria-hidden="true" class="size-6"></span><span aria-hidden="true" class="size-6"></span>');
+    // With no provider at all the host is told, outside production.
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('<AgentIdentityProvider>'));
+    error.mockRestore();
   });
 
-  it("keeps the packaged mark for an identity that names the agent's own mark", () => {
+  it('draws the glyph an identity names, with the props the identity gives it', () => {
+    const html = markup(
+      <AgentIdentityProvider icons={{ mingo: { name: 'mingo', url: null, props: { cornerColor: 'red' } } }}>
+        <AgentMark agent="mingo" className="size-5" />
+      </AgentIdentityProvider>,
+    );
+    expect(html).toContain('<svg');
+    expect(html).toContain('fill="red"');
+    expect(html).toContain('fill="currentColor"');
+  });
+
+  it('draws the Mingo glyph for the identity that names it', () => {
     const html = markup(
       <AgentIdentityProvider icons={{ mingo: { name: 'mingo', url: null } }}>
         <AgentMark agent="mingo" />
@@ -101,17 +114,17 @@ describe('with no copy from the host, the identities are read from the server', 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/content/api/ai-agents', expect.anything()));
   });
 
-  it('keeps the packaged mark when the identities cannot be read', async () => {
+  it('keeps the mark an empty box when the identities cannot be read', async () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
     page(
       <div data-testid="marks">
         <AgentIdentityProvider>
-          <AgentMark agent="fae" />
+          <AgentMark agent="fae" className="size-6" />
         </AgentIdentityProvider>
       </div>,
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByTestId('marks').innerHTML).toContain('data:image'));
+    expect(screen.getByTestId('marks').innerHTML).toBe('<span aria-hidden="true" class="size-6"></span>');
   });
 
   it('asks for nothing, and needs no query client, when the host gave its copy', () => {

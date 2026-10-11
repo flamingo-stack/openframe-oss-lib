@@ -3,7 +3,6 @@
 import type { ReactElement } from 'react';
 import Image from '../embed-shims/next-image';
 import { useAgentIdentityIcon } from './agent-identity';
-import { AgentMark, type AgentName } from './agent-mark';
 import { resolveIcon } from './chat/utils/icon-library';
 
 /** Unified icon value used across the app (announcement bar, chat quick actions,
@@ -17,13 +16,11 @@ export interface EntityIconValue {
   props?: Record<string, unknown> | null;
 }
 
-const BRAND_MARK_NAMES = new Set<string>(['fae', 'mingo']);
-
 /**
  * THE single icon-display path for the whole app. Resolution order:
  *   1. `url` → uploaded image
- *   2. `name` = an agent's slug → that agent's identity icon when the host provides
- *      it (`AgentIdentityProvider`), else its packaged `AgentMark` (fae, mingo)
+ *   2. `name` = an agent's slug → that agent's identity icon (`AgentIdentityProvider`):
+ *      its picture, or the glyph its identity names
  *   3. `name` → library glyph via `resolveIcon` (+ `props`)
  *
  * Replaces the old per-surface logic (the announcement bar's `renderSvgIcon`
@@ -39,8 +36,8 @@ export function EntityIcon({
   size?: number;
   className?: string;
 }): ReactElement {
-  // An agent named by its slug is drawn from its identity, when the host provides it
-  // (`AgentIdentityProvider`): its uploaded picture wins over the packaged mark.
+  // An agent named by its slug is drawn from its identity (`AgentIdentityProvider`):
+  // its uploaded picture, or the glyph the identity names with the identity's props.
   const identity = useAgentIdentityIcon(icon?.url ? null : icon?.name);
   const url = icon?.url ?? identity?.url;
   if (url) {
@@ -56,19 +53,6 @@ export function EntityIcon({
       />
     );
   }
-  if (icon?.name && BRAND_MARK_NAMES.has(icon.name)) {
-    // Size via `className` when provided (so responsive Tailwind sizing like
-    // `w-6 content-md:w-8` works); fall back to a fixed `size` px box ONLY when no
-    // className is given — an inline `style` would otherwise override the class.
-    return (
-      <span
-        className={`inline-flex${className ? ` ${className}` : ''}`}
-        style={className ? undefined : { width: size, height: size }}
-      >
-        <AgentMark agent={icon.name as AgentName} className="h-full w-full" />
-      </span>
-    );
-  }
-  const Glyph = resolveIcon(icon?.name ?? undefined);
-  return <Glyph size={size} className={className} {...(icon?.props ?? {})} />;
+  const Glyph = resolveIcon(identity?.name ?? icon?.name ?? undefined);
+  return <Glyph size={size} className={className} {...(identity?.props ?? {})} {...(icon?.props ?? {})} />;
 }

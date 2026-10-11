@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type React from 'react';
 import { useMemo } from 'react';
 import { within, userEvent } from 'storybook/test';
-import { EmbeddableChat } from '../components/chat/embeddable-chat';
+import { EmbeddableChatPanel as EmbeddableChat } from '../components/chat/embeddable-chat-panel';
 import type {
   UseNatsChatAdapterConfig,
   FetchDialogsResult,

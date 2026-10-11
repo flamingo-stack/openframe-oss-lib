@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import {
   AGENT_IDENTITIES_API_PATH,
   useAgentIdentities,
@@ -10,7 +10,8 @@ import {
 
 export { AGENT_IDENTITIES_API_PATH, type AgentIdentityIcon, type AgentIdentityIcons };
 
-const AgentIdentityContext = createContext<ReadonlyMap<string, AgentIdentityIcon>>(new Map());
+/** `null` with no provider above: nothing was asked to supply the identities. */
+const AgentIdentityContext = createContext<ReadonlyMap<string, AgentIdentityIcon> | null>(null);
 
 function Provide({ icons, children }: { icons: AgentIdentityIcons | undefined; children: ReactNode }) {
   const bySlug = useMemo(() => {
@@ -40,8 +41,9 @@ function ProvideFromServer({ endpoint, children }: { endpoint: string; children:
  *   - no `icons`: read FROM THE SERVER by `useAgentIdentities` (`endpoint`,
  *     default `AGENT_IDENTITIES_API_PATH`; an embedder passes its proxy path).
  *
- * Until the answer lands, when it cannot be read, and with no provider at all
- * (a story, a test) each agent keeps the mark packaged with the library.
+ * The library packages no picture of an agent. Until the answer lands and when
+ * it cannot be read a mark's box is empty; with no provider at all that is a
+ * mistake of the host, said once in the console outside production.
  */
 export function AgentIdentityProvider({
   icons,
@@ -60,5 +62,14 @@ export function AgentIdentityProvider({
 
 /** The icon the identity of the agent with this slug holds; undefined when none is known. */
 export function useAgentIdentityIcon(slug: string | null | undefined): AgentIdentityIcon | undefined {
-  return useContext(AgentIdentityContext).get(slug ?? '');
+  const identities = useContext(AgentIdentityContext);
+  const unprovided = !identities && Boolean(slug);
+  useEffect(() => {
+    if (!unprovided || process.env.NODE_ENV === 'production') return;
+    console.error(
+      `[AgentIdentity] the mark of "${slug}" was asked for with no <AgentIdentityProvider> above it: ` +
+        'agents are drawn from their server identities only, so mount the provider once at the root.',
+    );
+  }, [unprovided, slug]);
+  return identities?.get(slug ?? '');
 }

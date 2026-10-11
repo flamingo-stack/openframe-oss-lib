@@ -163,13 +163,7 @@ export function GuideWelcome({
               // match the default Mingo mark (48px).
               <EntityIcon icon={{ name: icon.name, url: icon.url, props: icon.props }} size={48} />
             ) : (
-              <AgentMark
-                agent="mingo"
-                className="h-12 w-12"
-                color="white"
-                eyesColor="var(--ods-flamingo-cyan-base)"
-                cornerColor="var(--ods-flamingo-cyan-base)"
-              />
+              <AgentMark agent="mingo" className="h-12 w-12" />
             )}
             <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
               <p className="text-ods-text-primary text-h2">{title}</p>

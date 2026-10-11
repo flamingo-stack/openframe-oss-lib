@@ -1,29 +1,6 @@
-import type { FC } from 'react';
-import { type ToolType, ToolTypeValues } from '../types/tool.types';
+import { createElement, type FC } from 'react';
+import type { ToolType } from '../types/tool.types';
 import { findIcon, type IconComponent } from './chat/utils/icon-library';
-
-/**
- * Each tool's mark, by its NAME in the icon set. Every mark is the grey
- * (`currentColor`) cut of the brand logo, the OpenFrame one included, so a row
- * of tool icons reads as one set and takes the text colour of wherever it sits.
- *
- * Named, not imported: the set's resolver loads a mark when a tool is drawn. A
- * static import put every tool's logo (the MeshCentral one is an embedded
- * picture, 58 KB) into every page that can show a toast.
- */
-const TOOL_ICON_NAME: Record<ToolType, string | null> = {
-  [ToolTypeValues.FLEET_MDM]: 'fleet-mdm-logo-grey',
-  [ToolTypeValues.MESHCENTRAL]: 'meshcentral-logo-grey',
-  [ToolTypeValues.OPENFRAME]: 'openframe-logo-grey',
-  [ToolTypeValues.OPENFRAME_CHAT]: 'openframe-logo-grey',
-  [ToolTypeValues.OPENFRAME_CLIENT]: 'openframe-logo-grey',
-  [ToolTypeValues.OPENFRAME_RMM]: 'openframe-logo-grey',
-  [ToolTypeValues.AUTHENTIK]: 'authentik-logo-grey',
-  [ToolTypeValues.OSQUERY]: 'osquery-logo-grey',
-  [ToolTypeValues.SYSTEM]: null,
-  [ToolTypeValues.MICROSOFT_365]: 'office-365-logo-grey',
-  [ToolTypeValues.GOOGLE_WORKSPACE]: 'google-logo-grey',
-};
 
 export interface ToolIconProps {
   toolType: ToolType;
@@ -31,14 +8,36 @@ export interface ToolIconProps {
   className?: string;
 }
 
-/** Each tool's mark as a component. Building one fetches nothing: the mark's module loads when it is first drawn. */
-const TOOL_ICONS = Object.fromEntries(
-  Object.entries(TOOL_ICON_NAME).map(([tool, name]) => [tool, findIcon(name)]),
-) as Record<ToolType, IconComponent | null>;
+/** Each tool's mark, found once per tool. */
+const TOOL_ICONS = new Map<string, IconComponent | null>();
+
+/**
+ * A tool's mark, by CONVENTION: the grey (`currentColor`) cut of the logo named
+ * after the tool in the icon set, `<tool>-logo-grey`, so a row of tool icons
+ * reads as one set and takes the text colour of wherever it sits. A tool that
+ * is a part of a product draws the product's mark: the tool's leading words are
+ * tried longest first (`OPENFRAME_CHAT` is `openframe-chat-logo-grey`, then
+ * `openframe-logo-grey`). A tool with no logo by its name (`SYSTEM`) has no mark.
+ *
+ * No list of tools: a new tool is drawn the day its logo is in the icon set.
+ * Named, never imported: the set's resolver loads a mark when it is drawn.
+ */
+function toolIcon(toolType: string): IconComponent | null {
+  const known = TOOL_ICONS.get(toolType);
+  if (known !== undefined) return known;
+  const words = toolType.toLowerCase().split('_').filter(Boolean);
+  let icon: IconComponent | null = null;
+  for (let count = words.length; count >= 1 && !icon; count -= 1) {
+    icon = findIcon(`${words.slice(0, count).join('-')}-logo-grey`);
+  }
+  TOOL_ICONS.set(toolType, icon);
+  return icon;
+}
 
 export const ToolIcon: FC<ToolIconProps> = ({ toolType, size = 16, className }) => {
-  const Icon = TOOL_ICONS[toolType];
-  return Icon ? <Icon size={size} className={className} /> : null;
+  // A mark found by its name, drawn through `createElement`: it is the icon set's component, not one made here.
+  const icon = toolIcon(toolType);
+  return icon ? createElement(icon, { size, className }) : null;
 };
 
 ToolIcon.displayName = 'ToolIcon';

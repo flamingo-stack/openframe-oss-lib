@@ -13,6 +13,7 @@
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { getProxiedImageUrl } from '../../../utils/image-proxy';
 import { FigmaIcon } from '../../icons/figma-icon';
@@ -260,9 +261,9 @@ export function RoadmapCard({
       );
     }
     return (
-      <a href={compactHref} target={target} rel={rel} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link href={compactHref} target={target} rel={rel} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {body}
-      </a>
+      </Link>
     );
   }
 

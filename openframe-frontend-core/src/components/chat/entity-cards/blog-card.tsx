@@ -20,6 +20,7 @@
 
 import { Eye } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import type { BlogPostSummary } from '../../../types/blog';
 import { cn } from '../../../utils/cn';
 import { formatDateWithTimezone } from '../../../utils/format';
@@ -138,7 +139,7 @@ export function BlogCard({
     const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
     const firstCategory = post.categories?.find(c => c && c.name)?.name;
     return (
-      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
+      <Link href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {displayImage ? (
             <Image
@@ -170,7 +171,7 @@ export function BlogCard({
             <span className={COMPACT_CARD_SUMMARY}>{post.summary || COMPACT_CARD_ROW_FILLER}</span>
           </span>
         </span>
-      </a>
+      </Link>
     );
   }
 
@@ -203,7 +204,7 @@ export function BlogCard({
   const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
   return (
     <article className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col', className)} role="article">
-      <a href={href} target={target} rel={rel} className="flex h-full flex-col focus:outline-none">
+      <Link href={href} target={target} rel={rel} className="flex h-full flex-col focus:outline-none">
         <div className="relative aspect-[1200/630] w-full overflow-hidden bg-ods-bg">
           {displayImage ? (
             <Image
@@ -264,7 +265,7 @@ export function BlogCard({
             </div>
           </div>
         </div>
-      </a>
+      </Link>
     </article>
   );
 }

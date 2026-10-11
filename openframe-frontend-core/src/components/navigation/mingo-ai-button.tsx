@@ -34,8 +34,6 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
   variant?: 'inline' | 'button' | 'field';
 }
 
-const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
-
 export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT };
 
 /** What an `ask-ai:open` event carries. */
@@ -190,9 +188,6 @@ export function MingoAiButton({
       ) : (
         <AgentMark
           agent="mingo"
-          color="currentColor"
-          eyesColor={MINGO_ACCENT}
-          cornerColor={MINGO_ACCENT}
           className={cn('relative shrink-0 text-ods-text-primary', field ? 'size-6' : 'size-5')}
         />
       )}
