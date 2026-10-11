@@ -27,6 +27,31 @@ describe("an agent's mark is its identity's icon", () => {
     expect(html).not.toContain('data:image');
   });
 
+  it('crops an agent picture to a circle wherever it is drawn: the stored file is a plain square', () => {
+    const html = markup(
+      <AgentIdentityProvider icons={{ fae: { name: null, url: FAE_URL } }}>
+        <AgentMark agent="fae" />
+        <EntityIcon icon={{ name: 'fae' }} size={24} />
+      </AgentIdentityProvider>,
+    );
+    const pictures = html.match(/<img[^>]*>/g) ?? [];
+    expect(pictures).toHaveLength(2);
+    for (const picture of pictures) {
+      expect(picture).toContain('rounded-full');
+      expect(picture).toContain('object-cover');
+    }
+  });
+
+  it('leaves any other uploaded icon as it is: only an agent picture is cropped', () => {
+    const html = markup(
+      <AgentIdentityProvider icons={{}}>
+        <EntityIcon icon={{ name: null, url: 'https://files.test/logo.png' }} size={24} />
+      </AgentIdentityProvider>,
+    );
+    expect(html).toContain('logo.png');
+    expect(html).not.toContain('rounded-full');
+  });
+
   it('draws no picture of its own: an agent with no identity keeps an empty box of the size it was given', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const html = markup(

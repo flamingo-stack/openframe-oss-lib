@@ -2,7 +2,8 @@
 
 import type { ReactElement } from 'react';
 import Image from '../embed-shims/next-image';
-import { AGENT_GLYPH_COLOR, useAgentIdentityIcon } from './agent-identity';
+import { cn } from '../utils/cn';
+import { AGENT_GLYPH_COLOR, AGENT_PICTURE_CLASS, useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
 
 /** Unified icon value used across the app (announcement bar, chat quick actions,
@@ -39,11 +40,23 @@ export function EntityIcon({
   // An agent named by its slug is drawn from its identity (`AgentIdentityProvider`):
   // its uploaded picture, or the glyph the identity names with the identity's props.
   const identity = useAgentIdentityIcon(icon?.url ? null : icon?.name);
-  const url = icon?.url ?? identity?.url;
-  if (url) {
+  if (!icon?.url && identity?.url) {
+    // An agent's picture: a square file, cropped to a circle like every picture of an agent.
     return (
       <Image
-        src={url}
+        src={identity.url}
+        alt=""
+        width={size}
+        height={size}
+        className={cn(AGENT_PICTURE_CLASS, className)}
+        unoptimized
+      />
+    );
+  }
+  if (icon?.url) {
+    return (
+      <Image
+        src={icon.url}
         alt=""
         width={size}
         height={size}

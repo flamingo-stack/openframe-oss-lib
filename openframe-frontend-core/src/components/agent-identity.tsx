@@ -18,6 +18,13 @@ export { AGENT_IDENTITIES_API_PATH, type AgentIdentityIcon, type AgentIdentityIc
  */
 export const AGENT_GLYPH_COLOR = 'var(--color-text-primary)';
 
+/**
+ * How an agent's PICTURE is drawn, everywhere: cropped to a circle, filling its
+ * box. The picture an identity stores is a plain square; the circle is made here,
+ * by the page, never baked into the file.
+ */
+export const AGENT_PICTURE_CLASS = 'rounded-full object-cover';
+
 /** `null` with no provider above: nothing was asked to supply the identities. */
 const AgentIdentityContext = createContext<ReadonlyMap<string, AgentIdentityIcon> | null>(null);
 
