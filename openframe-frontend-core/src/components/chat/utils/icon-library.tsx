@@ -136,7 +136,14 @@ function iconFromSet(exportName: string): IconComponent | undefined {
     });
     if (typeof window === 'undefined') return <ServerDrawn {...props} />;
     if (arrived) return createElement(arrived, props);
-    const { size, color: _color, ...rest } = props;
+    // The colours are the loaded icon's props, never attributes of the placeholder `<svg>`.
+    const {
+      size,
+      color: _color,
+      secondaryColor: _secondaryColor,
+      tertiaryColor: _tertiaryColor,
+      ...rest
+    } = props as SetIconProps & MarkColors;
     return (
       <svg
         {...rest}
