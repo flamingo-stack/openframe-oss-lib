@@ -8,7 +8,7 @@ export interface EyeOffClassicIconProps
 export function EyeOffClassicIcon({
   className = "",
   size = 24,
-  color = "currentColor",
+  color = "var(--color-text-primary)",
   ...props
 }: EyeOffClassicIconProps) {
   return (

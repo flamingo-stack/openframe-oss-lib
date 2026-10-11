@@ -70,7 +70,7 @@ const PlatformIcon = ({ platform, className }: { platform: string; className: st
     case 'product-hub':
     case 'revenue-hub':
     case 'people-hub':
-      return <FlamingoMarkIcon className={className} color="currentColor" />;
+      return <FlamingoMarkIcon className={className} color="var(--ods-flamingo-pink-base)" />;
     default:
       return <Globe className={className} />;
   }

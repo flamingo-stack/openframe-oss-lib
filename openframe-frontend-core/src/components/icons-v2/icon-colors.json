@@ -140,6 +140,9 @@
   "interface/eye-classic": {
     "color": "var(--color-text-primary)"
   },
+  "interface/eye-off-classic": {
+    "color": "var(--color-text-primary)"
+  },
   "interface/globe": {
     "color": "var(--color-text-primary)"
   },

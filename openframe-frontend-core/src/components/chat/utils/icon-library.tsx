@@ -329,10 +329,27 @@ function resolveFromLibrary(iconName: string): IconComponent | undefined {
     `${tokens.map(t => (t === 'ai' ? 'AI' : cap(t))).join('')}Icon`,
   ];
   for (const name of candidates) {
-    const Icon = iconFromSet(name);
-    if (Icon) return Icon;
+    if (iconFromSet(name)) return inTextColour(name);
   }
   return undefined;
+}
+
+/** The set's icons as a NAME draws them, one component per icon. */
+const namedIcons = new Map<string, IconComponent>();
+
+/**
+ * An icon found by its name takes the text colour of wherever it sits, like its
+ * row-mates: a few icons of the set carry a default colour of their own (the
+ * one their artwork was drawn in), which is right where a component places the
+ * icon and wrong in a row of named glyphs. A caller's own `color` still wins.
+ */
+function inTextColour(exportName: string): IconComponent {
+  const known = namedIcons.get(exportName);
+  if (known) return known;
+  const icon = setIcon(exportName);
+  const Named: IconComponent = props => createElement(icon, { ...props, color: props.color ?? 'currentColor' });
+  namedIcons.set(exportName, Named);
+  return Named;
 }
 
 /**

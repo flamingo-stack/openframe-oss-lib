@@ -1,14 +1,12 @@
 'use client';
 
-import { Boxes, Database, Hand, Plug, ShieldCheck, Sparkles } from 'lucide-react';
+import { Boxes, Code, Database, DollarSign, Hand, Plug, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from '../utils/cn';
 import {
   OPENFRAME_CLASSIFICATIONS,
   isOpenFrameClassification,
   type OpenFrameClassification,
 } from '../utils/vendor-classification';
-import { CoinsClassicIcon } from './icons-v2-generated/finance/coins-classic-icon';
-import { OpenSourceIcon } from './icons-v2-generated/interface/open-source-icon';
 import { OpenframeLogoIcon } from './icons-v2-generated/logos/openframe-logo-icon';
 
 export interface VendorTagProps {
@@ -95,7 +93,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
               className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent"
               style={accentColor ? { backgroundColor: accentColor } : undefined}
             >
-              <OpenSourceIcon size={10} className="text-ods-text-on-accent" />
+              <Code width={10} height={10} className="text-ods-text-on-accent" />
             </div>
           ),
         };
@@ -104,7 +102,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           text: text || 'Commercial Vendor',
           icon: (
             <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-              <CoinsClassicIcon size={10} className="text-ods-text-secondary" />
+              <DollarSign width={10} height={10} className="text-ods-text-secondary" />
             </div>
           ),
         };
@@ -168,7 +166,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           text: text || 'Paid',
           icon: (
             <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-              <CoinsClassicIcon size={10} className="text-ods-text-secondary" />
+              <DollarSign width={10} height={10} className="text-ods-text-secondary" />
             </div>
           ),
         };
@@ -199,7 +197,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
             text: 'Open Source',
             icon: (
               <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent">
-                <OpenSourceIcon size={10} className="text-ods-text-on-accent" />
+                <Code width={10} height={10} className="text-ods-text-on-accent" />
               </div>
             ),
           };
@@ -208,7 +206,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
             text: 'Commercial Vendor',
             icon: (
               <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-                <CoinsClassicIcon size={10} className="text-ods-text-secondary" />
+                <DollarSign width={10} height={10} className="text-ods-text-secondary" />
               </div>
             ),
           };
