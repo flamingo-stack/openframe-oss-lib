@@ -1,7 +1,6 @@
 'use client';
 
-import { Download, Eye } from 'lucide-react';
-import { AdobePdfIcon } from '../icons-v2-generated';
+import { AdobePdfIcon, DownloadIcon, EyeIcon } from '../icons-v2-generated';
 import { Button } from '../ui';
 import { EmbedViewerFrame } from './embed-viewer-frame';
 
@@ -38,7 +37,7 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
             href={onPreview ? undefined : src}
             openInNewTab={!onPreview}
             onClick={onPreview}
-            leftIcon={<Eye className="h-4 w-4" />}
+            leftIcon={<EyeIcon className="h-4 w-4" />}
             className="flex-1 content-sm:flex-initial"
           >
             Preview
@@ -49,7 +48,7 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
             href={onDownload ? undefined : src}
             openInNewTab={!onDownload}
             onClick={onDownload}
-            leftIcon={<Download className="h-4 w-4" />}
+            leftIcon={<DownloadIcon className="h-4 w-4" />}
             className="flex-1 content-sm:flex-initial"
           >
             Download
