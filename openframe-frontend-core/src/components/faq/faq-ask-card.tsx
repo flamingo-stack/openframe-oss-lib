@@ -11,9 +11,10 @@ export interface FaqAskOptions {
   /**
    * What this FAQ is about: ANY string the host's questions endpoint knows (it
    * is sent as `section`, and reported with every click). Questions written
-   * for the topic are picked first. Whoever renders the FAQ passes it. Absent:
-   * the entity the FAQ is attached to (`FaqSection`'s `entityType`). With
-   * neither, the FAQ has no card: the lib names no topic of its own.
+   * for the topic are picked first. Absent: the FAQ's own topic
+   * (`FaqSection`'s `topic`), else the entity the FAQ is attached to (its
+   * `entityType`). With none, the FAQ has no card: the lib names no topic of
+   * its own.
    */
   topic?: string;
   /**

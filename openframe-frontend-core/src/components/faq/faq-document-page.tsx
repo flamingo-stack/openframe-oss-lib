@@ -49,6 +49,8 @@ export interface FaqDocumentPageProps {
   jsonLd?: FaqSchemaOptions;
   /** Base URL `FaqSection` appends `/api/faqs` to (reverse-proxy embedders). */
   apiBaseUrl?: string;
+  /** What the page is about (forwarded to `FaqSection`): its FAQs and its ask card are the ones written for the topic. */
+  topic?: string;
   /** Optional entity scoping forwarded to `FaqSection`. */
   entityType?: string;
   entityId?: number | string;
@@ -70,6 +72,7 @@ export function FaqDocumentPage({
   entityType,
   entityId,
   minResults,
+  topic,
   ask,
   shell = true,
 }: FaqDocumentPageProps) {
@@ -97,6 +100,7 @@ export function FaqDocumentPage({
         entityType={entityType}
         entityId={entityId}
         minResults={minResults}
+        topic={topic}
         ask={ask}
       />
     </PageLayout>

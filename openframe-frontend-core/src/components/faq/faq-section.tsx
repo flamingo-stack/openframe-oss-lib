@@ -28,6 +28,15 @@ export interface FaqSectionProps {
   entityType?: string;
   entityId?: number | string;
   /**
+   * What the page this FAQ sits on is about: ANY string the host's FAQ
+   * endpoint knows. ONE topic for the whole block: the questions are the FAQs
+   * written for it (`/api/faqs?topic=`; `initialFaqs` are then the host's read
+   * of the same topic) and the "ask the assistant" card offers the questions
+   * written for it. Whoever renders the FAQ states it; the lib names none.
+   * Ignored for the questions when the FAQ is attached to an entity.
+   */
+  topic?: string;
+  /**
    * Heading node above the grouped list. `undefined` → default
    * `<h2>`"Frequently Asked Questions". `null` → no heading (the host page
    * owns the `<h1>`, as the standalone /faqs surface does). A React node lets a
@@ -60,10 +69,10 @@ export interface FaqSectionProps {
    * The "ask the assistant" card beside the questions. Shown wherever the
    * host's assistant runtime says a chat is there to open
    * (`AssistantRuntimeContext`: its name, glyph, questions endpoint and
-   * opener) AND the FAQ has a topic: `ask.topic` (any string the host's
-   * questions endpoint knows), else the `entityType` the FAQ is attached to.
-   * No runtime or no topic: the FAQ is the single column it always was; the
-   * lib names no topic of its own. `false` switches the card off; the object
+   * opener) AND the FAQ has a topic: the block's `topic`, else the
+   * `entityType` the FAQ is attached to (`ask.topic` states another one for
+   * the card alone). No runtime or no topic: the FAQ is the single column it
+   * always was; the lib names no topic of its own. `false` switches the card off; the object
    * also states the questions to leave out, the wording and the chat it opens
    * (`onOpen`). An `aside` takes the card's place.
    */
@@ -75,8 +84,22 @@ const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
 /** URL composition shared with RelatedContentSection (`buildSuggestionUrl`)
  *  — byte-identical to the historical `buildFaqsUrl` output when
  *  `minResults`/`apiBaseUrl` are absent. */
-function buildFaqsUrl(entityType?: string, entityId?: number | string, minResults?: number, apiBaseUrl = ''): string {
-  return buildSuggestionUrl('/api/faqs', { apiBaseUrl, entityType, entityId, count: minResults });
+function buildFaqsUrl(
+  entityType?: string,
+  entityId?: number | string,
+  minResults?: number,
+  apiBaseUrl = '',
+  topic?: string,
+): string {
+  // An entity's FAQs are the entity's: a topic narrows only the platform's own list.
+  const entityScoped = !!entityType && entityId !== undefined && entityId !== null && entityId !== '';
+  return buildSuggestionUrl('/api/faqs', {
+    apiBaseUrl,
+    entityType,
+    entityId,
+    count: minResults,
+    extraParams: entityScoped ? undefined : { topic },
+  });
 }
 
 interface FaqGroup {
@@ -390,6 +413,8 @@ interface FaqsResponse {
  *   page owns the <h1>) + `emitJsonLd` with `jsonLd` overrides for SEO.
  * - Per-entity embed: pass `entityType` + `entityId` (no `initialFaqs`); the
  *   hook self-fetches `GET /api/faqs`, and `heading` is this block's own <h2>.
+ * - A page's own FAQ: pass `topic` (what the page is about); the hook
+ *   self-fetches `GET /api/faqs?topic=`, and the ask card takes the same topic.
  *
  * CONTRACT: the consuming app MUST implement `GET /api/faqs`. On a fetch error
  * (or zero FAQs) the component renders nothing so the host page isn't
@@ -400,6 +425,7 @@ export function FaqSection({
   initialFaqs,
   entityType,
   entityId,
+  topic,
   heading,
   emitJsonLd = false,
   jsonLd,
@@ -412,22 +438,25 @@ export function FaqSection({
   const assistant = useAssistantRuntime();
   // The host's own block wins; else the card, where a chat is there to open and the FAQ has a topic
   // (an empty topic is no topic, as the questions request reads it).
-  const askTopic = ask === false ? undefined : ask?.topic || entityType;
+  const askTopic = ask === false ? undefined : ask?.topic || topic || entityType;
   const aside =
     asideProp ??
     (ask !== false && askTopic && faqAskCardShown(assistant) ? <FaqAskCard {...ask} topic={askTopic} /> : undefined);
-  const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl);
+  const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl, topic);
   // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
   // wrapper object would setState-loop under re-rendering parents.
   const initialData = useMemo<FaqsResponse | undefined>(
     () => (initialFaqs ? { faqs: initialFaqs } : undefined),
     [initialFaqs],
   );
-  const { data, isLoading, error } = useSelfFetch<FaqsResponse>(url, { initialData });
+  const { data, dataUrl, isLoading, error } = useSelfFetch<FaqsResponse>(url, { initialData });
 
-  // Memoised because the `??` fallback minted a NEW array on every
-  // render, which made the memo below re-run every time — i.e. do nothing.
-  const faqs = useMemo(() => data?.faqs ?? [], [data?.faqs]);
+  // Only the answer for THIS url: while another topic's questions load, the
+  // previous topic's are not this page's. Memoised because the `??` fallback
+  // minted a NEW array on every render, which made the memo below re-run
+  // every time — i.e. do nothing.
+  const held = dataUrl === url ? data?.faqs : undefined;
+  const faqs = useMemo(() => held ?? [], [held]);
   // Grouped before the early returns so the hook order stays stable.
   const groups = useMemo(() => (faqs.length > 0 ? groupFaqsBySection(faqs) : []), [faqs]);
 

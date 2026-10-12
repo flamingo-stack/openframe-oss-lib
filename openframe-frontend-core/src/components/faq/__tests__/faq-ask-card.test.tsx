@@ -184,6 +184,69 @@ describe('FaqSection ask card', () => {
   });
 });
 
+describe('FaqSection topic', () => {
+  /** Answers the FAQ endpoint and the questions endpoint each with its own shape. */
+  const answerByUrl = () =>
+    fetchMock.mockImplementation((input: unknown) =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(String(input).includes('/api/faqs') ? { faqs: FAQS } : { prompts: PROMPTS }),
+      }),
+    );
+  const requested = (path: string) =>
+    fetchMock.mock.calls.map(call => new URL(String(call[0]), 'https://host.test')).filter(u => u.pathname === path);
+
+  it('fetches the FAQs written for its topic and offers the questions of the same topic', async () => {
+    answerByUrl();
+    renderFaq(RUNTIME, <FaqSection topic="pricing" apiBaseUrl="/content" />);
+
+    expect(await screen.findByText('What is OpenFrame?')).toBeInTheDocument();
+    expect(await screen.findByText('How does pricing work?')).toBeInTheDocument();
+    const [faqs] = requested('/content/api/faqs');
+    expect(faqs.searchParams.get('topic')).toBe('pricing');
+    const [questions] = requested('/api/quick-actions/questions');
+    expect(questions.searchParams.get('section')).toBe('pricing');
+  });
+
+  it("does not re-fetch the host's own read of the topic", async () => {
+    answerByUrl();
+    renderFaq(RUNTIME, <FaqSection topic="pricing" initialFaqs={FAQS} />);
+    expect(await screen.findByText('How does pricing work?')).toBeInTheDocument();
+    expect(requested('/api/faqs')).toHaveLength(0);
+  });
+
+  it('lets the card state another topic than the block', async () => {
+    answerByUrl();
+    renderFaq(RUNTIME, <FaqSection topic="pricing" initialFaqs={FAQS} ask={{ topic: 'ai-tokens' }} />);
+    await waitFor(() => expect(requested('/api/quick-actions/questions')).toHaveLength(1));
+    expect(requested('/api/quick-actions/questions')[0].searchParams.get('section')).toBe('ai-tokens');
+  });
+
+  it("keeps an entity's FAQs the entity's: the topic is not sent with an entity scope", async () => {
+    answerByUrl();
+    renderFaq(RUNTIME, <FaqSection topic="blog" entityType="blog_post" entityId={3} />);
+    await waitFor(() => expect(requested('/api/faqs')).toHaveLength(1));
+    const [faqs] = requested('/api/faqs');
+    expect(faqs.searchParams.get('entityType')).toBe('blog_post');
+    expect(faqs.searchParams.has('topic')).toBe(false);
+  });
+
+  it("shows the new topic's questions, never the previous topic's, when the topic changes", async () => {
+    fetchMock.mockImplementation((input: unknown) => {
+      const url = new URL(String(input), 'https://host.test');
+      const faqs =
+        url.searchParams.get('topic') === 'careers' ? [{ ...FAQS[0], id: 2, question: 'Do you hire remotely?' }] : FAQS;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ faqs }) });
+    });
+    const { rerender } = render(<FaqSection topic="pricing" ask={false} />);
+    expect(await screen.findByText('What is OpenFrame?')).toBeInTheDocument();
+
+    rerender(<FaqSection topic="careers" ask={false} />);
+    expect(screen.queryByText('What is OpenFrame?')).not.toBeInTheDocument();
+    expect(await screen.findByText('Do you hire remotely?')).toBeInTheDocument();
+  });
+});
+
 describe('MingoAiButton', () => {
   it('takes its name and its opener from the assistant runtime, with no prop', () => {
     const open = vi.fn();
