@@ -8,6 +8,12 @@ export interface AgentIdentityIcon {
   name?: string | null;
   url?: string | null;
   props?: Record<string, unknown> | null;
+  /**
+   * The identity's accent, travelling with its icon: a hex colour (`#5efaf0`),
+   * as the server stores it. What is drawn in the agent's colour (its tab, the
+   * step it is on) reads it through `useAgentAccents`; unset, that is the platform's accent.
+   */
+  accent?: string | null;
 }
 
 /** Each agent's identity icon, keyed by the agent's slug. */

@@ -1,12 +1,13 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import {
   AGENT_IDENTITIES_API_PATH,
   useAgentIdentities,
   type AgentIdentityIcon,
   type AgentIdentityIcons,
 } from '../hooks/use-agent-identities';
+import { HEX_PATTERN } from '../utils/ods-color-utils';
 
 export { AGENT_IDENTITIES_API_PATH, type AgentIdentityIcon, type AgentIdentityIcons };
 
@@ -106,4 +107,22 @@ export function useAgentIdentityIcon(slug: string | null | undefined): AgentIden
     );
   }, [unprovided, slug]);
   return identities?.get(slug ?? '');
+}
+
+/**
+ * Each agent identity's accent, as a lookup by slug: the hex colour its
+ * identity stores, or undefined when it names none (the caller then draws the platform's
+ * accent). THE way anything is drawn in an agent's colour: never a colour
+ * chosen per agent in a component. A lookup, not one value, because a row of
+ * agents (a tab per agent) needs every one of them.
+ */
+export function useAgentAccents(): (slug: string | null | undefined) => string | undefined {
+  const identities = useContext(AgentIdentityContext);
+  return useCallback(
+    slug => {
+      const accent = identities?.get(slug ?? '')?.accent;
+      return typeof accent === 'string' && HEX_PATTERN.test(accent) ? accent : undefined;
+    },
+    [identities],
+  );
 }

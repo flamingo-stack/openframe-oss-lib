@@ -6,7 +6,6 @@ import { useInView } from '../../hooks/ui/use-in-view';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
-import { PlaybackToggle } from './playback-toggle';
 
 /** The row under the track: the dots, the counter, the pause and the two arrows (the arrows set its height). */
 const SNAP_CAROUSEL_CONTROLS_CLASS = 'mt-3 flex items-center gap-2';
@@ -28,9 +27,6 @@ export interface SnapCarouselProps<T> {
   label: string;
   /** Move to the next slide after this long. `0` turns auto-advance off. Default 5000. */
   autoAdvanceMs?: number;
-  /** Names of the stop/start control. */
-  playLabel?: string;
-  pauseLabel?: string;
   /** Width of one slide. Default `basis-[300px]`. */
   slideClassName?: string;
   prevLabel?: string;
@@ -67,10 +63,10 @@ function DotFill({ durationMs }: { durationMs: number }) {
  *
  * WHEN IT ADVANCES is `useAutoplay`'s rule, the same one the looping demos
  * use: mostly on screen, tab visible, not paused, motion allowed. A swipe or
- * an arrow moves it and it carries on from there after a full interval; it
- * waits only while a finger or the mouse button is actually down on it. The
- * small pause control stops it for good, and starts it again. While it is
- * auto-playing the active dot fills over the interval, so the wait is visible.
+ * an arrow moves it and it carries on from there after a full interval. It
+ * waits while the visitor holds it (`useAutoplay`'s hold: a finger or the
+ * mouse button down on it, the keyboard inside it); there is no pause button. While it is auto-playing the active dot fills over the
+ * interval, so the wait is visible.
  */
 export function SnapCarousel<T>({
   items,
@@ -78,8 +74,6 @@ export function SnapCarousel<T>({
   getKey,
   label,
   autoAdvanceMs = 5000,
-  playLabel,
-  pauseLabel,
   slideClassName = 'basis-[300px]',
   prevLabel = 'Previous',
   nextLabel = 'Next',
@@ -88,8 +82,6 @@ export function SnapCarousel<T>({
 }: SnapCarouselProps<T>) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [index, setIndex] = useState(0);
-  // Held only while a finger or the mouse button is down on it: the visitor is mid-swipe.
-  const [pressed, setPressed] = useState(false);
   const { ref: viewRef, inView } = useInView<HTMLDivElement>({ threshold: 0.5 });
   const auto = useAutoplay(inView);
   const count = items.length;
@@ -127,24 +119,8 @@ export function SnapCarousel<T>({
     setIndex(Math.min(count - 1, Math.round(track.scrollLeft / step)));
   }, [count, slideStep]);
 
-  // The release is listened for on the WINDOW: a press that ends outside the
-  // carousel (a drag that leaves it, a scroll the browser takes over) must
-  // still end, or the carousel would wait forever.
-  useEffect(() => {
-    if (!pressed) return undefined;
-    const release = () => setPressed(false);
-    window.addEventListener('pointerup', release);
-    window.addEventListener('pointercancel', release);
-    window.addEventListener('blur', release);
-    return () => {
-      window.removeEventListener('pointerup', release);
-      window.removeEventListener('pointercancel', release);
-      window.removeEventListener('blur', release);
-    };
-  }, [pressed]);
-
   const canAutoAdvance = autoAdvanceMs > 0 && count > 1;
-  const playing = auto.playing && canAutoAdvance && !pressed;
+  const playing = auto.playing && canAutoAdvance;
 
   // Restarts on every slide change, so a swipe or an arrow is followed by a full interval.
   useEffect(() => {
@@ -164,7 +140,7 @@ export function SnapCarousel<T>({
   if (count === 0) return null;
 
   return (
-    <div className={className} onPointerDown={() => setPressed(true)}>
+    <div className={className} {...auto.holdProps}>
       <div
         ref={setRefs}
         onScroll={onScroll}
@@ -212,14 +188,6 @@ export function SnapCarousel<T>({
         >
           {index + 1} / {count}
         </span>
-        {canAutoAdvance && !auto.reducedMotion && (
-          <PlaybackToggle
-            paused={auto.paused}
-            onChange={auto.setPaused}
-            playLabel={playLabel}
-            pauseLabel={pauseLabel}
-          />
-        )}
         <button
           type="button"
           aria-label={prevLabel}
