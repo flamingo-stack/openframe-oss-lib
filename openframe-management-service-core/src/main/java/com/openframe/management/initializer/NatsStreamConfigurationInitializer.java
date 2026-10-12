@@ -37,15 +37,6 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
-            // client feature flags stream: the engine publishes to core NATS, the stream is for the agent still on JetStream
-            // consumers, which reads the very switch that moves it off JetStream from here; it goes with the other
-            // command streams once every agent is on the engine's subscription
-            StreamConfiguration.builder()
-                    .name("CLIENT_FEATURE_FLAGS")
-                    .subjects(List.of("machine.*.feature-flags"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .build(),
             // client uninstall stream (the message itself is the command, empty payload)
             StreamConfiguration.builder()
                     .name("CLIENT_UNINSTALL")
