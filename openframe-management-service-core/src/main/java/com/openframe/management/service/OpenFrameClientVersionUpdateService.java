@@ -11,6 +11,6 @@ public class OpenFrameClientVersionUpdateService {
     private final OpenFrameClientUpdatePublisher openFrameClientUpdatePublisher;
 
     public void process(String newReleaseVersion) {
-
+        openFrameClientUpdatePublisher.publish(newReleaseVersion);
     }
 }
