@@ -41,6 +41,8 @@ const WIDE_MIN_RATIO = 1.2;
 // A picture the browser has neither loaded nor refused by now is laid out as a landscape.
 const MEASURE_TIMEOUT_MS = 4000;
 const COLUMN_GAP_PX = 12;
+/** How many of a column's first frames load at once (they are in view when the wall is drawn). */
+const EAGER_PHOTOS_PER_COLUMN = 2;
 // A column is repeated until it is this much taller than the wall.
 const FILL_FACTOR = 1.25;
 const MAX_REPEATS = 8;
@@ -280,6 +282,10 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
                     // caller's url is drawn as it is (already sized by its own image service).
                     optimizedWidth={drawnWidth}
                     unoptimized
+                    // A column's first frames are on screen when the wall appears (one of them is
+                    // usually the page's largest paint), so they are not left to lazy loading.
+                    loading={i < EAGER_PHOTOS_PER_COLUMN ? 'eager' : 'lazy'}
+                    fetchPriority={index === 0 && i === 0 ? 'high' : undefined}
                   />
                 </div>
               ))}
