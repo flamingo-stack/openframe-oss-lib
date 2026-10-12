@@ -236,7 +236,7 @@ public class NewDevicePage {
                   for (const el of all) {
                     if (el.onclick) {
                       const txt = el.textContent?.trim();
-                      if (txt === platformName || txt.startsWith(platformName)) {
+                      if (txt != null && (txt === platformName || txt.startsWith(platformName))) {
                         const inner = el.children[0];
                         if (inner && typeof inner.className === 'string') {
                           return !inner.className.includes('opacity-50') && !inner.className.includes('cursor-not-allowed');
