@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Controller
 public class LoginController {
 
-    @Value("${openframe.password-reset.page-url:}")
+    @Value("${openframe.password-reset.page-url}")
     private String passwordResetPageUrl;
 
     @GetMapping("/login")
