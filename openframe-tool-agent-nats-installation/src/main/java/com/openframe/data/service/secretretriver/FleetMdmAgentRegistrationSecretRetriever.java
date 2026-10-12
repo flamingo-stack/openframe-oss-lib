@@ -25,10 +25,10 @@ public class FleetMdmAgentRegistrationSecretRetriever implements ToolAgentRegist
     private final IntegratedToolService integratedToolService;
     private final ToolUrlService toolUrlService;
 
-    @Value("${TENANT_ID:}")
+    @Value("${TENANT_ID}")
     private String tenantId;
 
-    @Value("${openframe.fleet.multi-tenancy.enabled:false}")
+    @Value("${openframe.fleet.multi-tenancy.enabled}")
     private boolean fleetMultiTenancyEnabled;
 
     @PostConstruct
