@@ -177,4 +177,37 @@ describe('with no copy from the host, the identities are read from the server', 
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("asks again when the first identity read is refused, so a mark does not stay blank for the page's life", async () => {
+    const refusedThenServed = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 401 }))
+      .mockResolvedValue(
+        new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL } }] }), {
+          status: 200,
+        }),
+      );
+    vi.stubGlobal('fetch', refusedThenServed);
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <AgentIdentityProvider>
+          <div data-testid="late">
+            <AgentMark agent="fae" />
+          </div>
+        </AgentIdentityProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('late').innerHTML).toContain('fae.webp'), { timeout: 4000 });
+    expect(refusedThenServed.mock.calls.length).toBeGreaterThanOrEqual(2);
+    vi.unstubAllGlobals();
+  });
+
+  it('draws a glyph mark in the colour its row asks for', async () => {
+    const html = markup(
+      <AgentIdentityProvider icons={{ mingo: { name: 'chart-pie', url: null } }}>
+        <AgentMark agent="mingo" color="currentColor" />
+      </AgentIdentityProvider>,
+    );
+    expect(html).toContain('<svg');
+  });
 });

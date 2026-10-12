@@ -15,6 +15,12 @@ export interface AgentMarkProps {
   agent: AgentName | (string & {});
   /** Sizing/positioning classes applied to the mark (e.g. `w-5 h-5`). */
   className?: string;
+  /**
+   * The colour of the mark when it is a GLYPH, for a mark that sits in a row of icons and must
+   * match them (`currentColor` takes the row's text colour). Omitted, the glyph is the theme's
+   * text colour everywhere. A colour the identity itself names still wins; a picture ignores it.
+   */
+  color?: string;
 }
 
 // A mark is at most 48px on screen; twice that covers dense screens.
@@ -31,7 +37,7 @@ const MARK_IMAGE_SIZES = '96px';
  * the size the caller gave it, so nothing around it moves while the identities
  * are on their way. Decorative in every form; the caller sizes and boxes it.
  */
-export function AgentMark({ agent, className = '' }: AgentMarkProps) {
+export function AgentMark({ agent, className = '', color = AGENT_GLYPH_COLOR }: AgentMarkProps) {
   const identity = useAgentIdentityIcon(agent);
   if (identity?.url) {
     return (
@@ -45,7 +51,7 @@ export function AgentMark({ agent, className = '' }: AgentMarkProps) {
     return createElement(resolveIcon(identity.name), {
       className,
       'aria-hidden': true,
-      color: AGENT_GLYPH_COLOR,
+      color,
       ...(identity.props ?? {}),
     } as Record<string, unknown>);
   }
