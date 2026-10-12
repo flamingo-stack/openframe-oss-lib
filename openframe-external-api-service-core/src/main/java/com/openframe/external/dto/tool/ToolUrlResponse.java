@@ -1,11 +1,23 @@
 package com.openframe.external.dto.tool;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "Tool URL configuration")
-public record ToolUrlResponse(
-        @Schema(description = "URL endpoint", example = "https://rmm.example.com") String url,
-        @Schema(description = "Port number", example = "8443") String port,
-        @Schema(description = "URL type", example = "DASHBOARD") String type
-) {
+public class ToolUrlResponse {
+    @Schema(description = "URL endpoint", example = "https://rmm.example.com")
+    private String url;
+
+    @Schema(description = "Port number", example = "8443")
+    private String port;
+
+    @Schema(description = "URL type", example = "DASHBOARD")
+    private String type;
 }
