@@ -18,9 +18,9 @@
  * `<NamedIcon>`, and never calls these functions itself.
  */
 
-import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import { createElement, lazy, useEffect, useRef, useSyncExternalStore, type ComponentType, type SVGProps } from 'react';
-import { ICON_LOADERS, type LoadedIconProps } from '../../icons-v2-generated/icon-loaders';
+import type { LoadedIconProps } from '../../icons-v2-generated/icon-loaders';
+import { ICON_SET_NAMES, LUCIDE_ICON_NAMES } from '../../icons-v2-generated/icon-names';
 
 /** Every icon loaded here is a component of the generated set's own props (`icons-v2-generated`). */
 export type IconComponent = ComponentType<LoadedIconProps>;
@@ -157,10 +157,34 @@ function loadedOnDemand(key: string, displayName: string, loader: IconLoader): I
   return OnDemandIcon as IconComponent;
 }
 
+// The two loader tables are NOT imported with this module. Bundled, they are the
+// largest script a page would load (each `import()` is written out as the files it
+// needs: about 340 KB for 3,300 icons), and a page whose icons the server drew
+// never reads them. Whether a name exists is answered by `icon-names` (the names
+// alone); a table is fetched the first time an icon is loaded by name.
+type LoaderTable = Readonly<Record<string, IconLoader | undefined>>;
+
+/** What a name draws when its table has lost it (a consumer's lucide older than the list of names): nothing. */
+const NO_ICON: IconModule = { default: () => null };
+
+function fromTable(table: () => Promise<LoaderTable>, name: string): IconLoader {
+  return () => table().then(loaders => loaders[name]?.() ?? NO_ICON);
+}
+
+let setTable: Promise<LoaderTable> | undefined;
+const setLoaders = () =>
+  (setTable ??= import('../../icons-v2-generated/icon-loaders').then(module => module.ICON_LOADERS as LoaderTable));
+
+let lucideTable: Promise<LoaderTable> | undefined;
+const lucideLoaders = () =>
+  (lucideTable ??= import('lucide-react/dynamicIconImports').then(
+    module => (module.default ?? module) as unknown as LoaderTable,
+  ));
+
 /** An icon of the generated set by its EXPORT name (`ChartPieIcon`), or `undefined` when the set has none by that name. */
 export function iconFromSet(exportName: string): IconComponent | undefined {
-  if (!Object.prototype.hasOwnProperty.call(ICON_LOADERS, exportName)) return undefined;
-  return loadedOnDemand(`set:${exportName}`, exportName, ICON_LOADERS[exportName]);
+  if (!ICON_SET_NAMES.has(exportName)) return undefined;
+  return loadedOnDemand(`set:${exportName}`, exportName, fromTable(setLoaders, exportName));
 }
 
 /** An icon the generated set is known to hold, by its export name. A name the set lost fails where it is asked for. */
@@ -170,12 +194,10 @@ export function setIcon(exportName: string): IconComponent {
   return icon;
 }
 
-const lucideLoaders = dynamicIconImports as unknown as Readonly<Record<string, IconLoader>>;
-
 /** A lucide icon by its kebab-case name (`message-circle`), or `undefined` when lucide has none by that name. */
 export function lucideIcon(name: string): IconComponent | undefined {
-  if (!Object.prototype.hasOwnProperty.call(lucideLoaders, name)) return undefined;
-  return loadedOnDemand(`lucide:${name}`, `Lucide(${name})`, lucideLoaders[name]);
+  if (!LUCIDE_ICON_NAMES.has(name)) return undefined;
+  return loadedOnDemand(`lucide:${name}`, `Lucide(${name})`, fromTable(lucideLoaders, name));
 }
 
 /**
@@ -275,7 +297,7 @@ export function platformMarkRef(platform: string): IconRef {
   if (platform === EVERY_PLATFORM) return EVERY_PLATFORM_MARK;
   const stem = setStem(platform);
   for (const exportName of [`${stem}MarkIcon`, `${stem}LogoIcon`]) {
-    if (Object.prototype.hasOwnProperty.call(ICON_LOADERS, exportName)) return { set: exportName };
+    if (ICON_SET_NAMES.has(exportName)) return { set: exportName };
   }
   return HOUSE_MARK;
 }
