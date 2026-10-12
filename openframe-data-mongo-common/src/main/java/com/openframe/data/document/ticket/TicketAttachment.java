@@ -12,10 +12,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-/**
- * File attachment linked to a ticket.
- * Files are stored externally (S3/MinIO), this stores metadata.
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -35,9 +31,6 @@ public class TicketAttachment implements TenantScoped {
 
     private Long fileSize;
 
-    /**
-     * Storage path/key (e.g., S3 key or MinIO path).
-     */
     private String storagePath;
 
     @CreatedDate
