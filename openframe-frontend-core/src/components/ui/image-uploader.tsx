@@ -1,6 +1,5 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
@@ -77,6 +76,25 @@ function matchesAccept(file: File, accept: string): boolean {
       return fileType.startsWith(pattern.slice(0, -1)) || fileMediaType(file) === pattern.slice(0, -2);
     return fileType === pattern;
   });
+}
+
+function LoadingSpinner({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('animate-spin', className)}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
+  );
 }
 
 export function ImageUploader({
@@ -244,12 +262,12 @@ export function ImageUploader({
 
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center rounded-md bg-ods-overlay">
-                <Loader2 className="size-8 animate-spin text-ods-text-on-dark" />
+                <LoadingSpinner className="size-8 text-ods-text-on-dark" />
               </div>
             )}
           </>
         ) : loading ? (
-          <Loader2 className="size-8 animate-spin text-ods-accent" />
+          <LoadingSpinner className="size-8 text-ods-accent" />
         ) : (
           <>
             <div className="flex shrink-0 items-center justify-center rounded-full border border-ods-border bg-ods-card p-[var(--spacing-system-s)]">
