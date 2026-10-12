@@ -11,15 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ServerWebExchange;
 
+import java.util.Optional;
+
 import com.openframe.core.constants.SsoFlowCookieNames;
 import static com.openframe.security.oauth.SecurityConstants.ACCESS_TOKEN;
 import static com.openframe.security.oauth.SecurityConstants.REFRESH_TOKEN;
 import static org.springframework.http.HttpHeaders.SET_COOKIE;
 
-/**
- * Service for managing HTTP cookies used for authentication tokens.
- * Handles setting, getting, and clearing access and refresh token cookies.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -77,10 +75,6 @@ public class CookieService {
         }
     }
 
-    /**
-     * Adds a short-lived signed OAuth state cookie bound to the specific state value.
-     * Cookie name format: of_oauth_{state}, Path=/oauth
-     */
     public void addOAuthStateCookie(HttpHeaders headers, String state, String jwtValue, int ttlSeconds) {
         String name = OAUTH_STATE_COOKIE_PREFIX + state;
         ResponseCookie cookie = ResponseCookie.from(name, jwtValue)
@@ -94,9 +88,6 @@ public class CookieService {
         headers.add(SET_COOKIE, cookie.toString());
     }
 
-    /**
-     * Clears the OAuth state cookie for given state.
-     */
     public void addClearOAuthStateCookie(HttpHeaders headers, String state) {
         String name = OAUTH_STATE_COOKIE_PREFIX + state;
         ResponseCookie cleared = createClearedCookie(name, "/oauth");
@@ -135,32 +126,21 @@ public class CookieService {
         return createCookie(name, "", path, 0, false);
     }
 
-    /**
-     * Get JWT access token from reactive ServerWebExchange cookies
-     * This is automatically sent by browser on every request
-     */
-    public String getAccessTokenFromCookies(ServerWebExchange exchange) {
+    public Optional<String> getAccessTokenFromCookies(ServerWebExchange exchange) {
         return getCookieValueFromExchange(exchange, ACCESS_TOKEN_COOKIE);
     }
 
-    /**
-     * Common method to extract cookie value from ServerWebExchange
-     *
-     * @param exchange   the ServerWebExchange containing the request
-     * @param cookieName the name of the cookie to extract
-     * @return cookie value or null if not found
-     */
-    private String getCookieValueFromExchange(ServerWebExchange exchange, String cookieName) {
+    private Optional<String> getCookieValueFromExchange(ServerWebExchange exchange, String cookieName) {
         ServerHttpRequest request = exchange.getRequest();
         MultiValueMap<String, HttpCookie> cookies = request.getCookies();
 
         HttpCookie cookie = cookies.getFirst(cookieName);
         if (cookie != null) {
             log.debug("Found {} cookie in request", cookieName);
-            return cookie.getValue();
+            return Optional.of(cookie.getValue());
         }
 
         log.debug("Cookie {} not found in request", cookieName);
-        return null;
+        return Optional.empty();
     }
 } 
