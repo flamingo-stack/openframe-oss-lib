@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub mod clients;
 mod config;
@@ -29,6 +29,9 @@ pub mod service_adapter;
 pub mod system;
 pub mod utils;
 
+#[cfg(test)]
+mod test_support;
+
 pub mod cli;
 pub use cli::run;
 
@@ -38,8 +41,12 @@ pub mod executor;
 use crate::clients::build_agent_http_client;
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
-use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
+use crate::config::update_config::{
+    DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS, SELF_RESTART_EXIT_CODE,
+    SELF_RESTART_HANDOFF_SECS,
+};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
+use crate::listener::command::{CommandContext, CommandListener, FeatureFlagsHandler};
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
@@ -59,6 +66,7 @@ use crate::services::deactivation_service::DeactivationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
+use crate::services::feature_flags_service::FeatureFlagsService;
 use crate::services::github_download_service::GithubDownloadService;
 use crate::services::hostname_report_publisher::HostnameReportPublisher;
 use crate::services::initial_authentication_processor::InitialAuthenticationProcessor;
@@ -172,6 +180,8 @@ pub struct Client {
     tool_agent_update_listener: ToolAgentUpdateListener,
     client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
+    feature_flags_listener: CommandListener<FeatureFlagsHandler>,
+    command_context: CommandContext,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
@@ -366,6 +376,10 @@ impl Client {
 
         let tool_ops = ToolOps::default();
 
+        let feature_flags_service = Arc::new(FeatureFlagsService::load(
+            directory_manager.secured_dir().join("feature_flags.json"),
+        ));
+
         // Initialize tool run manager
         let tool_run_manager = ToolRunManager::new(
             installed_tools_service.clone(),
@@ -553,6 +567,20 @@ impl Client {
         );
         let result_store_for_recovery = result_store.clone();
 
+        let command_context = CommandContext::new(
+            nats_connection_manager.clone(),
+            config_service.clone(),
+            tool_ops.clone(),
+            tool_run_manager.clone(),
+            nats_message_publisher.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
+        let feature_flags_listener = CommandListener::new(
+            FeatureFlagsHandler::new(feature_flags_service),
+            command_context.clone(),
+        );
+
         let command_execution_listener = ExecutionListener::<CommandMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
@@ -635,6 +663,8 @@ impl Client {
             tool_agent_update_listener,
             client_uninstall_message_listener,
             remote_access_message_listener,
+            feature_flags_listener,
+            command_context,
             command_execution_listener,
             script_execution_listener,
             script_bootstrap_execution_listener,
@@ -712,6 +742,34 @@ impl Client {
         self.nats_connection_manager.connect().await?;
 
         self.nats_connection_manager.start_connection_watchdog();
+
+        self.feature_flags_listener.start().await?;
+        let command_context = self.command_context.clone();
+        tokio::spawn(async move {
+            command_context.restart_requested().await;
+            match crate::platform::detached_process::spawn_detached(
+                &crate::service::Service::get_install_location(),
+                cli::RESTART_SERVICE_SUBCOMMAND,
+            ) {
+                Ok(pid) => {
+                    info!(pid, "Service restart handed to a detached process");
+                    tokio::time::sleep(Duration::from_secs(SELF_RESTART_HANDOFF_SECS)).await;
+                    warn!(
+                        "Service was not restarted within {}s, exiting instead",
+                        SELF_RESTART_HANDOFF_SECS
+                    );
+                }
+                Err(e) => warn!(
+                    "Cannot hand the service restart off, exiting instead: {:#}",
+                    e
+                ),
+            }
+            info!(
+                code = SELF_RESTART_EXIT_CODE,
+                "Exiting so the service manager restarts the client"
+            );
+            std::process::exit(SELF_RESTART_EXIT_CODE);
+        });
 
         // Handle any pending update from previous run (after NATS is connected)
         if let Err(e) = self.update_handler_service.handle_pending_update().await {
