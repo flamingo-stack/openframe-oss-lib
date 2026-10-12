@@ -19,7 +19,7 @@ public class ShedLockConfig {
     public LockProvider lockProvider(
             RedisConnectionFactory connectionFactory,
             OpenframeRedisKeyBuilder keyBuilder,
-            @Value("${openframe.shedlock.environment:default}") String environment
+            @Value("${openframe.shedlock.environment}") String environment
     ) {
         // Make ShedLock keys tenant-scoped:
         // of:{tenantId}:job-lock:<environment>:<lockName>
