@@ -80,6 +80,22 @@ const FILL_CLASSES: Record<string, string> = {
   lg: 'lg:absolute lg:inset-0',
 };
 
+/**
+ * Item mode before the first measure (the server's markup, and the page until it
+ * hydrates): the items past the first N are hidden by CSS, so the block is its
+ * collapsed height in the very first paint. Without it the whole list showed and
+ * the measure then cut it, which moved everything under it. Spelled out per N:
+ * Tailwind only emits classes it can read.
+ */
+const UNMEASURED_ITEMS_CLASSES: Record<number, string> = {
+  1: '[&>*>*:nth-child(n+2)]:hidden',
+  2: '[&>*>*:nth-child(n+3)]:hidden',
+  3: '[&>*>*:nth-child(n+4)]:hidden',
+  4: '[&>*>*:nth-child(n+5)]:hidden',
+  5: '[&>*>*:nth-child(n+6)]:hidden',
+  6: '[&>*>*:nth-child(n+7)]:hidden',
+};
+
 const cssLength = (value: number | string) => (typeof value === 'number' ? `${value}px` : value);
 
 export function FadePreview({
@@ -198,6 +214,7 @@ export function FadePreview({
         className={cn(
           'overflow-hidden transition-[max-height,height] duration-500',
           fill && FILL_CLASSES[String(fill)],
+          itemMode && itemsHeight == null && !expanded && UNMEASURED_ITEMS_CLASSES[visible],
         )}
         style={{
           transitionTimingFunction: 'cubic-bezier(0.33, 1, 0.68, 1)',
