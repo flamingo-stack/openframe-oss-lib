@@ -10,6 +10,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
 import com.openframe.delivery.dispatch.DeliverySink;
+import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -19,6 +20,8 @@ import com.openframe.delivery.spec.DeliverySpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
@@ -38,18 +41,20 @@ public class DeliveryRolloutService {
     private final DeliveryProperties properties;
     private final DeliveryPayloadJson payloadJson;
     private final DeliverySink sink;
+    private final DeliveryMetrics metrics;
 
     public void advance() {
         List<MachineDeliveryRollout> running = repository.findByStatus(DeliveryRolloutStatus.RUNNING);
         running.forEach(this::advanceOne);
     }
 
-    // a batch that fails midway is repeated next tick from the same cursor: the machines already handed out get a
-    // second row with the same sequence, which the agent treats as the same decision
+    // a batch that fails midway is repeated next tick from the same cursor: the machines already handed out have a
+    // row with this very sequence, so the repeat skips them as outranked and nothing reaches the agent twice
     private void advanceOne(MachineDeliveryRollout rollout) {
         try {
             dispatchNextBatch(rollout);
         } catch (Exception e) {
+            metrics.recordRolloutBatchFailed(rollout.getType());
             log.error("Delivery rollout batch failed, repeated next tick: id={}", rollout.getId(), e);
         }
     }
@@ -60,7 +65,7 @@ public class DeliveryRolloutService {
         Set<DeviceStatus> statuses = spec.getDeliverableStatuses();
         int batchSize = properties.getSweep().getBatchSize();
         String cursor = rollout.getCursor();
-        List<Machine> machines = machineRepository.findByStatusInAndMachineIdGreaterThanOrderByMachineIdAsc(statuses, cursor, Limit.of(batchSize));
+        List<Machine> machines = machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(statuses, cursor, Limit.of(batchSize));
         machines.forEach(machine -> dispatchTo(machine, rollout, spec));
         String id = rollout.getId();
         int sequence = rollout.getSequence();
@@ -71,10 +76,24 @@ public class DeliveryRolloutService {
             return;
         }
         Machine last = machines.get(dispatched - 1);
-        repository.advance(id, sequence, last.getMachineId(), dispatched);
+        repository.advance(id, sequence, last.getId(), dispatched);
     }
 
+    // Mongo being away stops the batch, and the tick after retries it; any other failure is this one machine's and
+    // must not hold the rest of the tenant: the machine is skipped and counted, it catches up at registration or on
+    // the next rollout
     private void dispatchTo(Machine machine, MachineDeliveryRollout rollout, DeliverySpec<DeliverySeed, DeliveryPayload> spec) {
+        try {
+            dispatchToMachine(machine, rollout, spec);
+        } catch (DataAccessResourceFailureException | TransientDataAccessException mongoAway) {
+            throw mongoAway;
+        } catch (RuntimeException thisMachineOnly) {
+            metrics.recordRolloutMachineSkipped(rollout.getType());
+            log.error("Delivery rollout skipped a machine: id={} machineId={}", rollout.getId(), machine.getMachineId(), thisMachineOnly);
+        }
+    }
+
+    private void dispatchToMachine(Machine machine, MachineDeliveryRollout rollout, DeliverySpec<DeliverySeed, DeliveryPayload> spec) {
         DeliveryType type = rollout.getType();
         String targetId = rollout.getTargetId();
         Class<DeliveryPayload> payloadClass = spec.getPayloadClass();

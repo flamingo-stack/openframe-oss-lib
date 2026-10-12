@@ -23,6 +23,8 @@ public class DeliveryMetrics {
     private static final String DISPATCH_DUPLICATE_COUNTER = "openframe.delivery.dispatch.duplicate";
     private static final String DISPATCH_REJECTED_COUNTER = "openframe.delivery.dispatch.rejected";
     private static final String SWEEP_TIMER = "openframe.delivery.sweep.duration";
+    private static final String ROLLOUT_BATCH_FAILED_COUNTER = "openframe.delivery.rollout.batch_failed";
+    private static final String ROLLOUT_MACHINE_SKIPPED_COUNTER = "openframe.delivery.rollout.machine_skipped";
     private static final String TAG_TYPE = "type";
     private static final String TAG_REASON = "reason";
     private static final String TAG_SINK = "sink";
@@ -74,6 +76,16 @@ public class DeliveryMetrics {
 
     public void recordRowError() {
         meterRegistry.counter(ROW_ERROR_COUNTER).increment();
+    }
+
+    public void recordRolloutBatchFailed(DeliveryType type) {
+        String typeTag = tagValue(type.name());
+        meterRegistry.counter(ROLLOUT_BATCH_FAILED_COUNTER, TAG_TYPE, typeTag).increment();
+    }
+
+    public void recordRolloutMachineSkipped(DeliveryType type) {
+        String typeTag = tagValue(type.name());
+        meterRegistry.counter(ROLLOUT_MACHINE_SKIPPED_COUNTER, TAG_TYPE, typeTag).increment();
     }
 
     public void timeSweepPass(String pass, Runnable body) {

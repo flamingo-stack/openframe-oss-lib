@@ -43,7 +43,7 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
 
     List<Machine> findByStatusIn(Collection<DeviceStatus> statuses);
 
-    List<Machine> findByStatusInAndMachineIdGreaterThanOrderByMachineIdAsc(Collection<DeviceStatus> statuses, String machineId, Limit limit);
+    List<Machine> findByStatusInAndIdGreaterThanOrderByIdAsc(Collection<DeviceStatus> statuses, String id, Limit limit);
 
     long countByStatusIn(Collection<DeviceStatus> statuses);
 

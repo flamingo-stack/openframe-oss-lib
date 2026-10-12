@@ -12,6 +12,7 @@ import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
 import com.openframe.delivery.dispatch.DeliverySink;
+import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -26,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.domain.Limit;
 
 import java.util.EnumSet;
@@ -56,6 +58,7 @@ class DeliveryRolloutServiceTest {
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliverySink sink;
     @Mock private DeliverySpec<DeliverySeed, DeliveryPayload> spec;
+    @Mock private DeliveryMetrics metrics;
 
     @Captor private ArgumentCaptor<DeliveryRequest<?>> requestCaptor;
 
@@ -66,7 +69,7 @@ class DeliveryRolloutServiceTest {
     void setUp() {
         DeliveryProperties properties = DeliveryTestPolicies.properties();
         properties.getSweep().setBatchSize(BATCH_SIZE);
-        service = new DeliveryRolloutService(repository, machineRepository, registry, properties, new DeliveryPayloadJson(new ObjectMapper()), sink);
+        service = new DeliveryRolloutService(repository, machineRepository, registry, properties, new DeliveryPayloadJson(new ObjectMapper()), sink, metrics);
         TestPayload payload = new TestPayload();
         payload.setValue("1.5.11");
         payload.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UPDATE, TARGET_ID, "d-rollout"));
@@ -88,7 +91,7 @@ class DeliveryRolloutServiceTest {
     @Test
     void advance_fullBatch_everyMachineDispatchedWithTheRolloutSequenceAndCursorMoved() {
         // setup
-        when(machineRepository.findByStatusInAndMachineIdGreaterThanOrderByMachineIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
                 .thenReturn(List.of(machine("m-1"), machine("m-2")));
 
         // execution
@@ -104,14 +107,14 @@ class DeliveryRolloutServiceTest {
         assertThat(first.getSequence()).isEqualTo(SEQUENCE);
         assertThat(second.getSequence()).isEqualTo(SEQUENCE);
         assertThat(first.getDispatchId()).isNotEqualTo(second.getDispatchId()).isNotEqualTo("d-rollout");
-        verify(repository).advance(ROLLOUT_ID, SEQUENCE, "m-2", 2);
+        verify(repository).advance(ROLLOUT_ID, SEQUENCE, "id-m-2", 2);
         verify(repository, never()).finish(any(), anyInt(), anyInt());
     }
 
     @Test
     void advance_shortBatch_lastMachinesDispatchedAndRolloutFinished() {
         // setup
-        when(machineRepository.findByStatusInAndMachineIdGreaterThanOrderByMachineIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
                 .thenReturn(List.of(machine("m-9")));
 
         // execution
@@ -124,11 +127,11 @@ class DeliveryRolloutServiceTest {
     }
 
     @Test
-    void advance_batchFails_cursorKeptSoTheBatchIsRepeatedNextTick() {
+    void advance_mongoAwayMidBatch_cursorKeptSoTheBatchIsRepeatedNextTick() {
         // setup
-        when(machineRepository.findByStatusInAndMachineIdGreaterThanOrderByMachineIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
                 .thenReturn(List.of(machine("m-1"), machine("m-2")));
-        doThrow(new IllegalStateException("mongo down")).when(sink).accept(any());
+        doThrow(new DataAccessResourceFailureException("mongo down")).when(sink).accept(any());
 
         // execution
         service.advance();
@@ -136,10 +139,30 @@ class DeliveryRolloutServiceTest {
         // verifications
         verify(repository, never()).advance(any(), anyInt(), any(), anyInt());
         verify(repository, never()).finish(any(), anyInt(), anyInt());
+        verify(metrics).recordRolloutBatchFailed(DeliveryType.CLIENT_UPDATE);
+        verify(metrics, never()).recordRolloutMachineSkipped(any());
+    }
+
+    @Test
+    void advance_oneMachineFails_thatMachineSkippedAndCountedTheBatchGoesOn() {
+        // setup
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(machine("m-1"), machine("m-2")));
+        doThrow(new IllegalStateException("bad machine")).doNothing().when(sink).accept(any());
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(sink, times(2)).accept(any());
+        verify(metrics).recordRolloutMachineSkipped(DeliveryType.CLIENT_UPDATE);
+        verify(metrics, never()).recordRolloutBatchFailed(any());
+        verify(repository).advance(ROLLOUT_ID, SEQUENCE, "id-m-2", 2);
     }
 
     private static Machine machine(String machineId) {
         Machine machine = new Machine();
+        machine.setId("id-" + machineId);
         machine.setMachineId(machineId);
         return machine;
     }
