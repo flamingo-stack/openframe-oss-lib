@@ -1,20 +1,12 @@
 import { cn } from '../../utils/cn';
-import { ODS_STEM_CLASSES, type OdsColorStem } from '../../utils/platform-identity';
-
-/** The classes of a lit step: the given colour stem's, or the platform's accent when none is given. */
-function litClasses(accent: OdsColorStem | undefined): { border: string; text: string } {
-  return accent
-    ? { border: ODS_STEM_CLASSES[accent].border, text: ODS_STEM_CLASSES[accent].text }
-    : { border: 'border-ods-accent', text: 'text-ods-accent' };
-}
 
 export interface StepNumberProps {
   /** The step's number, as shown (1-based). */
   number: number;
   /** The step being shown now: its ring and number take the accent. */
   current?: boolean;
-  /** The lit colour, as a colour stem (an agent's). Omitted, it is the platform's accent. */
-  accent?: OdsColorStem;
+  /** The lit colour (a CSS colour, such as the hex an agent's identity stores). Omitted, it is the platform's accent. */
+  accent?: string;
   className?: string;
 }
 
@@ -23,14 +15,14 @@ export interface StepNumberProps {
  * in a ring. Grey at rest, the accent when it is the current one.
  */
 export function StepNumber({ number, current = false, accent, className }: StepNumberProps) {
-  const lit = litClasses(accent);
   return (
     <span
       className={cn(
         'grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 font-bold transition-colors duration-200 text-h6 motion-reduce:transition-none',
-        current ? `${lit.border} ${lit.text}` : 'border-ods-text-secondary text-ods-text-secondary',
+        current ? !accent && 'border-ods-accent text-ods-accent' : 'border-ods-text-secondary text-ods-text-secondary',
         className,
       )}
+      style={current && accent ? { borderColor: accent, color: accent } : undefined}
     >
       {number}
     </span>
@@ -60,7 +52,6 @@ export function NumberedStep({
   titleAs: Title = 'h3',
   className,
 }: NumberedStepProps) {
-  const lit = litClasses(accent);
   return (
     <div className={cn('flex items-start gap-[var(--spacing-system-xs)]', className)}>
       <StepNumber number={number} current={current} accent={accent} />
@@ -68,8 +59,9 @@ export function NumberedStep({
         <Title
           className={cn(
             'm-0 transition-colors duration-200 text-h3 motion-reduce:transition-none',
-            current ? lit.text : 'text-ods-text-primary',
+            current ? !accent && 'text-ods-accent' : 'text-ods-text-primary',
           )}
+          style={current && accent ? { color: accent } : undefined}
         >
           {title}
         </Title>

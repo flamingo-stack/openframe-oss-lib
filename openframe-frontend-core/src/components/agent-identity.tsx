@@ -7,7 +7,7 @@ import {
   type AgentIdentityIcon,
   type AgentIdentityIcons,
 } from '../hooks/use-agent-identities';
-import { isOdsColorStem, type OdsColorStem } from '../utils/platform-identity';
+import { HEX_PATTERN } from '../utils/ods-color-utils';
 
 export { AGENT_IDENTITIES_API_PATH, type AgentIdentityIcon, type AgentIdentityIcons };
 
@@ -110,18 +110,18 @@ export function useAgentIdentityIcon(slug: string | null | undefined): AgentIden
 }
 
 /**
- * Each agent identity's accent, as a lookup by slug: a colour stem, or
- * undefined when the identity names none (the caller then draws the platform's
+ * Each agent identity's accent, as a lookup by slug: the hex colour its
+ * identity stores, or undefined when it names none (the caller then draws the platform's
  * accent). THE way anything is drawn in an agent's colour: never a colour
  * chosen per agent in a component. A lookup, not one value, because a row of
  * agents (a tab per agent) needs every one of them.
  */
-export function useAgentAccents(): (slug: string | null | undefined) => OdsColorStem | undefined {
+export function useAgentAccents(): (slug: string | null | undefined) => string | undefined {
   const identities = useContext(AgentIdentityContext);
   return useCallback(
     slug => {
       const accent = identities?.get(slug ?? '')?.accent;
-      return isOdsColorStem(accent) ? accent : undefined;
+      return typeof accent === 'string' && HEX_PATTERN.test(accent) ? accent : undefined;
     },
     [identities],
   );

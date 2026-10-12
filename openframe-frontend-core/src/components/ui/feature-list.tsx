@@ -1,7 +1,6 @@
 'use client';
 
 import type React from 'react';
-import type { OdsColorStem } from '../../utils/platform-identity';
 import { Button } from './button';
 import { NumberedStep } from './numbered-step';
 
@@ -29,10 +28,10 @@ export interface FeatureListProps {
    */
   activeIndex?: number;
   /**
-   * `numbered` only. The colour of the step being shown, as a colour stem (the
-   * agent's whose demo it is). Omitted, it is the platform's accent.
+   * `numbered` only. The colour of the step being shown (a CSS colour, such as
+   * the hex of the agent whose demo it is). Omitted, it is the platform's accent.
    */
-  accent?: OdsColorStem;
+  accent?: string;
   /**
    * `numbered` only. Makes every step a button: choosing one reports its index
    * (a demo jumps to that step). Omit for a list that is only read.

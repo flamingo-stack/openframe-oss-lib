@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FocusEvent, PointerEvent } from 'react';
 import { usePrefersReducedMotionState } from './use-prefers-reduced-motion';
 
@@ -86,11 +86,39 @@ export function useAutoplay(onScreen: boolean): UseAutoplayResult {
     };
   }, [pressed]);
 
+  // Focus is re-checked against the document, never trusted to a blur: a tab or
+  // app switch reports none, and neither does a focused control that is removed.
+  // While held by focus, anything that can move it (a focus change, a press, the
+  // tab coming back) asks again whether the keyboard is still inside.
+  const focusHost = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!focused) return undefined;
+    const recheck = () => {
+      const active = document.activeElement;
+      const inside = !!active && !!focusHost.current?.contains(active) && active.matches(':focus-visible');
+      if (!inside) setFocused(false);
+    };
+    // After the event has finished moving focus.
+    const later = () => setTimeout(recheck, 0);
+    document.addEventListener('focusin', later);
+    document.addEventListener('pointerdown', later);
+    document.addEventListener('visibilitychange', later);
+    window.addEventListener('focus', later);
+    return () => {
+      document.removeEventListener('focusin', later);
+      document.removeEventListener('pointerdown', later);
+      document.removeEventListener('visibilitychange', later);
+      window.removeEventListener('focus', later);
+    };
+  }, [focused]);
+
   const holdProps = useMemo<AutoplayHoldProps>(
     () => ({
       onPointerDown: () => setPressed(true),
       onFocus: event => {
-        if (event.target.matches(':focus-visible')) setFocused(true);
+        if (!event.target.matches(':focus-visible')) return;
+        focusHost.current = event.currentTarget;
+        setFocused(true);
       },
       onBlur: event => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);

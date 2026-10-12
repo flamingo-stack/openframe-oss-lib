@@ -91,22 +91,6 @@ export function getPlatformSlogan(platformName: string): string {
 export type OdsColorStem =
   'flamingo-pink' | 'flamingo-cyan' | 'open-yellow' | 'success' | 'warning' | 'error' | 'text-secondary';
 
-/** Each stem's name as an editor offers it (an agent's accent, a platform's). */
-export const ODS_STEM_LABELS: Record<OdsColorStem, string> = {
-  'flamingo-pink': 'Pink',
-  'flamingo-cyan': 'Cyan',
-  'open-yellow': 'Yellow',
-  success: 'Green',
-  warning: 'Amber',
-  error: 'Red',
-  'text-secondary': 'Grey',
-};
-
-/** Whether a stored value names a colour stem (a column holds text; only a stem is ever drawn). */
-export function isOdsColorStem(value: unknown): value is OdsColorStem {
-  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(ODS_STEM_LABELS, value);
-}
-
 /** Stem → ODS token name (without the `--ods-` prefix). THE token spelling. */
 export const ODS_STEM_TOKENS: Record<OdsColorStem, string> = {
   'flamingo-pink': 'flamingo-pink-base',
@@ -123,60 +107,51 @@ export const ODS_STEM_TOKENS: Record<OdsColorStem, string> = {
  * scanner reads source text, so a template-built class would be purged.
  * This is the ONLY place a stem-to-class literal exists.
  */
-export const ODS_STEM_CLASSES: Record<
-  OdsColorStem,
-  { text: string; bg: string; bgSoft: string; border: string; borderSoft: string }
-> = {
-  'flamingo-pink': {
-    text: 'text-ods-flamingo-pink',
-    bg: 'bg-ods-flamingo-pink',
-    bgSoft: 'bg-ods-flamingo-pink/10',
-    border: 'border-ods-flamingo-pink',
-    borderSoft: 'border-ods-flamingo-pink/30',
-  },
-  'flamingo-cyan': {
-    text: 'text-ods-flamingo-cyan',
-    bg: 'bg-ods-flamingo-cyan',
-    bgSoft: 'bg-ods-flamingo-cyan/10',
-    border: 'border-ods-flamingo-cyan',
-    borderSoft: 'border-ods-flamingo-cyan/30',
-  },
-  'open-yellow': {
-    text: 'text-ods-open-yellow',
-    bg: 'bg-ods-open-yellow',
-    bgSoft: 'bg-ods-open-yellow/10',
-    border: 'border-ods-open-yellow',
-    borderSoft: 'border-ods-open-yellow/30',
-  },
-  success: {
-    text: 'text-ods-success',
-    bg: 'bg-ods-success',
-    bgSoft: 'bg-ods-success/10',
-    border: 'border-ods-success',
-    borderSoft: 'border-ods-success/30',
-  },
-  warning: {
-    text: 'text-ods-warning',
-    bg: 'bg-ods-warning',
-    bgSoft: 'bg-ods-warning/10',
-    border: 'border-ods-warning',
-    borderSoft: 'border-ods-warning/30',
-  },
-  error: {
-    text: 'text-ods-error',
-    bg: 'bg-ods-error',
-    bgSoft: 'bg-ods-error/10',
-    border: 'border-ods-error',
-    borderSoft: 'border-ods-error/30',
-  },
-  'text-secondary': {
-    text: 'text-ods-text-secondary',
-    bg: 'bg-ods-text-secondary',
-    bgSoft: 'bg-ods-text-secondary/10',
-    border: 'border-ods-text-secondary',
-    borderSoft: 'border-ods-text-secondary/30',
-  },
-};
+export const ODS_STEM_CLASSES: Record<OdsColorStem, { text: string; bg: string; bgSoft: string; borderSoft: string }> =
+  {
+    'flamingo-pink': {
+      text: 'text-ods-flamingo-pink',
+      bg: 'bg-ods-flamingo-pink',
+      bgSoft: 'bg-ods-flamingo-pink/10',
+      borderSoft: 'border-ods-flamingo-pink/30',
+    },
+    'flamingo-cyan': {
+      text: 'text-ods-flamingo-cyan',
+      bg: 'bg-ods-flamingo-cyan',
+      bgSoft: 'bg-ods-flamingo-cyan/10',
+      borderSoft: 'border-ods-flamingo-cyan/30',
+    },
+    'open-yellow': {
+      text: 'text-ods-open-yellow',
+      bg: 'bg-ods-open-yellow',
+      bgSoft: 'bg-ods-open-yellow/10',
+      borderSoft: 'border-ods-open-yellow/30',
+    },
+    success: {
+      text: 'text-ods-success',
+      bg: 'bg-ods-success',
+      bgSoft: 'bg-ods-success/10',
+      borderSoft: 'border-ods-success/30',
+    },
+    warning: {
+      text: 'text-ods-warning',
+      bg: 'bg-ods-warning',
+      bgSoft: 'bg-ods-warning/10',
+      borderSoft: 'border-ods-warning/30',
+    },
+    error: {
+      text: 'text-ods-error',
+      bg: 'bg-ods-error',
+      bgSoft: 'bg-ods-error/10',
+      borderSoft: 'border-ods-error/30',
+    },
+    'text-secondary': {
+      text: 'text-ods-text-secondary',
+      bg: 'bg-ods-text-secondary',
+      bgSoft: 'bg-ods-text-secondary/10',
+      borderSoft: 'border-ods-text-secondary/30',
+    },
+  };
 
 // ── Theme + surface ─────────────────────────────────────────────────────────
 

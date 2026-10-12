@@ -14,7 +14,6 @@ import {
 } from 'react';
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation';
 import { cn } from '../../utils/cn';
-import { ODS_STEM_CLASSES, type OdsColorStem } from '../../utils/platform-identity';
 import { Tag } from './tag';
 
 export interface TabItem {
@@ -65,11 +64,11 @@ export interface TabItem {
    */
   progress?: number;
   /**
-   * The tab's own colour, as a colour stem: its underline and its icon take it
-   * while the tab is open (a tab that is an agent's shows that agent's accent).
-   * Omitted, they are the platform's accent.
+   * The tab's own colour (a CSS colour, such as the hex an agent's identity
+   * stores): its underline and its icon take it while the tab is open. Omitted,
+   * they are the platform's accent.
    */
-  accent?: OdsColorStem;
+  accent?: string;
 }
 
 export interface TabNavigationUrlSyncOptions {
@@ -345,7 +344,6 @@ const TabBar = memo(function TabBarImpl({
   const progress = hasProgress ? Math.max(0, Math.min(1, activeProgress)) : 1;
   // The open tab's own colour, when it has one; else the platform's accent.
   const activeAccent = tabs.find(tab => tab.id === activeTab)?.accent;
-  const accentClasses = activeAccent ? ODS_STEM_CLASSES[activeAccent] : null;
   const indicatorStyle: React.CSSProperties = {
     width: `${indicator.width * progress}px`,
     transform: `translateX(${indicator.left}px)`,
@@ -412,9 +410,10 @@ const TabBar = memo(function TabBarImpl({
                     className={cn(
                       'h-4 w-4 transition-colors content-md:h-6 content-md:w-6',
                       isActive
-                        ? (accentClasses?.text ?? 'text-ods-accent')
+                        ? !tab.accent && 'text-ods-accent'
                         : 'text-ods-text-secondary group-hover:text-ods-text-primary',
                     )}
+                    style={isActive && tab.accent ? { color: tab.accent } : undefined}
                   />
                   {tab.indicator && <StatusDot indicator={tab.indicator} className="absolute right-0 top-[-3px]" />}
                 </div>
@@ -479,10 +478,10 @@ const TabBar = memo(function TabBarImpl({
           data-testid="tab-navigation-underline"
           className={cn(
             'pointer-events-none absolute bottom-0 left-0 h-1 motion-reduce:transition-none',
-            accentClasses?.bg ?? 'bg-ods-accent',
+            !activeAccent && 'bg-ods-accent',
             !hasProgress && shouldAnimateIndicator && 'transition-[transform,width,opacity] duration-200 ease-out',
           )}
-          style={indicatorStyle}
+          style={activeAccent ? { ...indicatorStyle, backgroundColor: activeAccent } : indicatorStyle}
         />
       </div>
 
