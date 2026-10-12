@@ -1,8 +1,8 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
 import { type ButtonHTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../../utils/cn';
+import { Chevron02RightIcon } from '../../icons-v2-generated/arrows/chevron-02-right-icon';
 import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon';
 import { Skeleton } from '../../ui/skeleton';
 import { Tag } from '../../ui/tag';
@@ -157,7 +157,7 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
             ticket.unread ? 'border-ods-open-yellow bg-ods-open-yellow' : 'border-ods-border bg-ods-card',
           )}
         >
-          <ChevronRight
+          <Chevron02RightIcon
             className={cn('size-6', ticket.unread ? 'text-ods-text-on-accent' : 'text-ods-text-secondary')}
           />
         </div>
