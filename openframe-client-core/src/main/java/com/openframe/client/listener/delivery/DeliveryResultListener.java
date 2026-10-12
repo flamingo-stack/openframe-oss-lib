@@ -90,6 +90,7 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
             message.ack();
         } catch (Exception e) {
             log.error("Unexpected error processing delivery result: {}", payload, e);
+            message.nak();
         }
     }
 
