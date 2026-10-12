@@ -475,8 +475,16 @@ const AppLayoutDrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Co
             }
             if (!dismissOnInteractOutside) event.preventDefault();
           }}
+          // A drawer that renders no AppLayoutDrawerDescription says so, the
+          // way Radix asks; a caller's own `aria-describedby` still wins.
+          {...('aria-describedby' in props ? {} : { 'aria-describedby': undefined })}
           {...props}
         >
+          {/* A drawer named by `aria-label` (its content draws its own header)
+              still gets the title Radix requires, read by screen readers only. */}
+          {props['aria-label'] ? (
+            <DialogPrimitive.Title className="sr-only">{props['aria-label']}</DialogPrimitive.Title>
+          ) : null}
           {/* The resize grip sits just OUTSIDE the panel's inner edge
               (`right-full` etc.), so the wrapper's `translateX(100%)` close
               transform doesn't carry it off-screen — it stays as a ~12px sliver

@@ -167,6 +167,12 @@ export interface SectionHeadingProps {
   /** `page` = the page's `<h1>` (a hero); `section` = an `<h2>`. Default `section`. */
   level?: 'page' | 'section';
   /**
+   * Draw the heading's text without a heading element. For a loading state that
+   * shows a heading's words before the content that carries the real heading
+   * arrives: the page then never holds the same `<h1>` twice.
+   */
+  presentational?: boolean;
+  /**
    * The brand whose accent the eyebrow and the sentence marks take, for a section
    * that shows ANOTHER product. Omitted: the platform the page runs on.
    */
@@ -190,17 +196,18 @@ export function SectionHeading({
   intro,
   action,
   level = 'section',
+  presentational = false,
   platform,
   tone = 'accent',
   className,
 }: SectionHeadingProps) {
   const accentClassName = headingAccentClass(platform, tone);
   const layout = SECTION_HEADING_LAYOUT[level];
-  const Tag = level === 'page' ? 'h1' : 'h2';
+  const Tag = presentational ? 'div' : level === 'page' ? 'h1' : 'h2';
   const stack = (
     <div className={layout.stack}>
       {eyebrow ? <span className={`text-h5 ${accentClassName}`}>{eyebrow}</span> : null}
-      <Tag className={layout.heading}>
+      <Tag className={layout.heading} data-section-heading>
         {accentSentenceMarks(title, platform, tone)}
         {punctuation ? <span className={accentClassName}>{punctuation}</span> : null}
       </Tag>

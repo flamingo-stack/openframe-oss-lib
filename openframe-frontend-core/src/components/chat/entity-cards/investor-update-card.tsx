@@ -10,6 +10,7 @@
 
 import { Calendar } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { formatInvestorUpdatePeriod, type InvestorUpdate } from '../types/entities/investor-update';
 import {
   COMPACT_CARD_IMAGE_SLOT,
@@ -107,7 +108,7 @@ export function InvestorUpdateCard({
   if (size === 'sm') {
     const periodText = formatInvestorUpdatePeriod(update.period_start, update.period_end);
     return (
-      <a href={href} target={target} rel={rel} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link href={href} target={target} rel={rel} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {coverImage ? (
             <Image
@@ -148,7 +149,7 @@ export function InvestorUpdateCard({
             </span>
           </span>
         </span>
-      </a>
+      </Link>
     );
   }
 
@@ -174,7 +175,7 @@ export function InvestorUpdateCard({
   }
 
   return (
-    <a href={href} target={target} rel={rel} className={`block h-full ${className ?? ''}`}>
+    <Link href={href} target={target} rel={rel} className={`block h-full ${className ?? ''}`}>
       <AdminContentCard
         imageUrl={update.featured_image}
         placeholderUrl={placeholderUrl}
@@ -196,6 +197,6 @@ export function InvestorUpdateCard({
           ) : undefined
         }
       />
-    </a>
+    </Link>
   );
 }

@@ -16,8 +16,10 @@ export {
 // Number / currency / byte / date formatters live in `./format` (single
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
-export { formatDate, formatNumber, formatPrice, formatBytes } from './format';
-export { TRIAL_DAYS, TRIAL_LABELS } from './trial';
+export { formatDate, formatNumber, formatPrice, formatBytes, formatUrlForDisplay } from './format';
+export * from './ai-providers';
+export * from './model-token-rates';
+export { TRIAL_TERMS, trialLabels, trialLengthLabel } from './trial';
 export {
   VENDOR_CLASSIFICATIONS,
   OPENFRAME_CLASSIFICATIONS,
@@ -118,6 +120,8 @@ export * from './video-bite-id';
 // OS type utilities
 export * from './os-utils';
 export * from './visitor-os';
+// Also exported via the granular subpath `./utils/mobile-app` (server and Edge consumers).
+export * from './mobile-app';
 // Phone utilities
 export * from './country-phone-utils';
 export * from './compliance-standards';
@@ -468,3 +472,4 @@ export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './
 // Footer copyright line (one owner; never a double period after "Inc.").
 export { copyrightLine } from './copyright-line';
 export * from './path-pattern';
+export * from './random-id';

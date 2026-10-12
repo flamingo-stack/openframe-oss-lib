@@ -4,15 +4,16 @@
  * Slack Message Card — unified visual for slack-messages markers.
  *
  * PURE PRESENTATION (no internal nav). The card receives the structured
- * `<a>` prop bundle via `anchorProps` (composed by the caller from a
+ * `<Link>` prop bundle via `anchorProps` (composed by the caller from a
  * runtime hook) and renders the rest from the `SlackMessageItem` shape
  * directly.
  */
 
 import { ExternalLink, Hash } from 'lucide-react';
 import React from 'react';
+import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
-import { SlackIcon } from '../../icons/slack-icon';
+import { SlackIcon } from '../../icons-v2-generated/brand-logos/slack-icon';
 import type { SlackMessageItem } from '../types/entities/slack-message';
 import {
   COMPACT_CARD_ICON_SLOT,
@@ -134,15 +135,15 @@ export function SlackMessageCard({ item, variant = 'compact', className, anchorP
   );
   if (anchorProps) {
     return (
-      <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {body}
-      </a>
+      </Link>
     );
   }
   return href ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+    <Link href={href} target="_blank" rel="noopener noreferrer" className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
       {body}
-    </a>
+    </Link>
   ) : (
     <span className={`${COMPACT_CARD_OUTER_STATIC} ${className ?? ''}`} aria-label="No link available">
       {body}

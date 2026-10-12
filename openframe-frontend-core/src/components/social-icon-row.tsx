@@ -1,23 +1,8 @@
 'use client';
 
-import { Mail, Music } from 'lucide-react';
+import { createElement } from 'react';
 import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-platforms';
-import {
-  GitHubIcon,
-  RedditIcon,
-  XLogo,
-  LinkedInIcon,
-  LumaIcon,
-  WhatsAppIcon,
-  GlobeIcon,
-  MessageCircleIcon,
-  TelegramIcon,
-  YouTubeIcon,
-  InstagramIcon,
-  FacebookIcon,
-  SlackIcon,
-  CopyIcon,
-} from './icons';
+import { iconOf, type IconComponent, type IconRef } from './chat/utils/icon-loading';
 import { Button } from './ui/button';
 
 /** Re-exported for call sites that already import the link type from this module. */
@@ -46,44 +31,52 @@ const defaultLinks: SocialIconLink[] = [
   { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' },
 ];
 
-type SocialIconComponent = (props: { className?: string }) => React.ReactElement;
+/** The colour a social mark is drawn in: the themed foreground, so a row reads as one set. */
+const MARK = 'var(--color-text-primary)';
 
 /**
- * Platform name → glyph. The ONLY thing about a social platform that lives in
- * code, because an icon is a component and a table cannot hold one; the DB
- * names the glyph it wants through `social_platforms.icon_name`.
+ * Platform name → the icon it draws, as DATA: the icon is loaded when a link to
+ * that platform is drawn, so a row fetches only the marks of its own links. The
+ * ONLY thing about a social platform that lives in code; the DB names the glyph
+ * it wants through `social_platforms.icon_name`.
  *
  * Deliberately an OPEN record, not `satisfies Record<SomeUnion, …>`: the set of
  * platforms is the `social_platforms` table's to decide, and a row added there
  * must render — with the globe, until somebody adds art for it — rather than
  * fail to type-check against a list in this file.
  */
-export const SOCIAL_ICON_COMPONENTS: Record<string, SocialIconComponent> = {
-  github: props => <GitHubIcon {...props} />,
-  twitter: props => <XLogo {...props} />,
-  reddit: props => <RedditIcon {...props} variant="white" />,
-  linkedin: props => <LinkedInIcon {...props} />,
-  luma: props => <LumaIcon {...props} />,
-  whatsapp: props => <WhatsAppIcon {...props} />,
-  email: props => <Mail {...props} />,
-  website: props => <GlobeIcon {...props} />,
-  slack: props => <SlackIcon {...props} injectedColor="white" />,
-  discord: props => <MessageCircleIcon {...props} />,
-  telegram: props => <TelegramIcon {...props} />,
-  youtube: props => <YouTubeIcon {...props} />,
-  instagram: props => <InstagramIcon {...props} />,
-  facebook: props => <FacebookIcon {...props} />,
-  tiktok: props => <Music {...props} />,
-  // CopyIcon's default fill is grey and would mismatch its row-mates — force the
-  // themed foreground via the ODS token (tracks the theme).
-  copy: props => <CopyIcon {...props} color="var(--color-text-primary)" />,
+const SOCIAL_ICONS: Readonly<Record<string, IconRef>> = {
+  github: { set: 'GithubClassicIcon' },
+  twitter: { set: 'XLogoIcon' },
+  reddit: { set: 'RedditIcon', color: MARK },
+  linkedin: { set: 'LinkedinClassicIcon' },
+  luma: { set: 'LumaIcon' },
+  whatsapp: { set: 'WhatsappIcon' },
+  email: { lucide: 'mail' },
+  website: { set: 'GlobeIcon' },
+  slack: { set: 'SlackMonoIcon', color: MARK },
+  discord: { set: 'MessageCircleIcon' },
+  telegram: { set: 'TelegramIcon' },
+  youtube: { set: 'YoutubeClassicIcon' },
+  instagram: { set: 'InstagramIcon', color: MARK },
+  facebook: { set: 'FacebookIcon', color: MARK },
+  tiktok: { lucide: 'music' },
+  // CopyIcon's default fill is grey and would mismatch its row-mates.
+  copy: { set: 'CopyIcon', color: MARK },
 };
+
+/** The icon of a social platform, or `undefined` for a platform with no art yet. */
+export function socialIcon(platform: string): IconComponent | undefined {
+  if (!Object.prototype.hasOwnProperty.call(SOCIAL_ICONS, platform)) return undefined;
+  return iconOf(SOCIAL_ICONS[platform]) ?? undefined;
+}
 
 /** The globe stands in for any platform with no art yet — never a blank slot. */
 function renderSocialIcon(platform: string) {
   const key = normalizeSocialPlatform(platform) ?? 'website';
-  const Icon = SOCIAL_ICON_COMPONENTS[key] ?? SOCIAL_ICON_COMPONENTS.website;
-  return <Icon className="h-5 w-5" />;
+  // The icon's own component, loaded by the platform's name (drawn through `createElement`: not a component made here).
+  const icon = socialIcon(key) ?? socialIcon('website');
+  return icon ? createElement(icon, { className: 'h-5 w-5' }) : null;
 }
 
 export function SocialIconRow({

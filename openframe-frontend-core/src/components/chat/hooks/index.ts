@@ -45,9 +45,10 @@ export {
   buildAskPromptsUrl,
   useAskPrompts,
   useAssistantOpen,
-  useShownAskPromptIds,
-  useShownAskPrompts,
+  useAskSurface,
   type AskPromptsResponse,
   type UseAskPromptsOptions,
   type UseAskPromptsResult,
+  type UseAskSurfaceOptions,
+  type UseAskSurfaceResult,
 } from './use-ask-prompts';

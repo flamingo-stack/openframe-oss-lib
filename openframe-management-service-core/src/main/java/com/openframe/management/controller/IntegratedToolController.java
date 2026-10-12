@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
@@ -60,15 +61,30 @@ public class IntegratedToolController {
             // The request payload may carry _id == key, but _id is global in the shared multi-tenant DB —
             // keeping it would make save() replace another tenant's doc by _id (last-writer-wins ownership
             // flip). Uniqueness is on (tenantId, key) via tenant_key_idx.
-            toolService.getToolByKey(key).ifPresentOrElse(
-                    existing -> tool.setId(existing.getId()),
+            Optional<IntegratedTool> existingTool = toolService.getToolByKey(key);
+            existingTool.ifPresentOrElse(
+                    existing -> {
+                        tool.setId(existing.getId());
+                        // The chart's register Job re-posts the tool on every sync without the API key
+                        // FleetMdmSetupScheduler minted; don't wipe the stored one with null.
+                        if (tool.getCredentials() != null && tool.getCredentials().getApiKey() == null
+                                && existing.getCredentials() != null) {
+                            tool.getCredentials().setApiKey(existing.getCredentials().getApiKey());
+                        }
+                    },
                     () -> tool.setId(null));
             tool.setKey(key);
             tool.setTenantId(tenantId);
             tool.setEnabled(true);
 
-            IntegratedTool savedTool = toolService.saveTool(tool);
-            log.info("Successfully saved tool configuration for: {}", key);
+            IntegratedTool savedTool;
+            if (existingTool.isPresent() && existingTool.get().equals(tool)) {
+                savedTool = existingTool.get();
+                log.info("Tool configuration unchanged, not saving: {}", key);
+            } else {
+                savedTool = toolService.saveTool(tool);
+                log.info("Successfully saved tool configuration for: {}", key);
+            }
 
             debeziumService.createOrUpdateDebeziumConnector(savedTool.getDebeziumConnectors());
 

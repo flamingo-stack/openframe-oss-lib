@@ -3,7 +3,7 @@
 /**
  * Campaign Card Admin (chat compact variant).
  *
- * PURE PRESENTATION. Receives a pre-composed `<a>` prop bundle and
+ * PURE PRESENTATION. Receives a pre-composed `<Link>` prop bundle and
  * renders a 3-row compact card. The hub still owns the full-size admin
  * card (with delete + manage buttons) — only the compact chat variant
  * lives here in lib.
@@ -11,6 +11,7 @@
 
 import { Megaphone } from 'lucide-react';
 import type React from 'react';
+import Link from '../../../embed-shims/next-link';
 import { formatDateShort } from '../../../utils/date-formatters';
 import {
   COMPACT_CARD_ICON_SLOT,
@@ -80,9 +81,9 @@ export function CampaignCardAdmin({ campaign, className, anchorProps }: Campaign
   );
   if (anchorProps) {
     return (
-      <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {innerChildren}
-      </a>
+      </Link>
     );
   }
   return (

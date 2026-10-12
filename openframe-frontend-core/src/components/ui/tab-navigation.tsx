@@ -58,10 +58,17 @@ export interface TabItem {
   /**
    * 0..1. Set on the ACTIVE tab, the underline stops being a selection marker
    * and becomes a progress line: its width is this fraction of the tab, and it
-   * moves there linearly over `progressTransitionMs`. A timed, auto-advancing
+   * moves there linearly over `progressTransitionMs`. Start it above 0 (the
+   * first step of N is 1/N): at 0 the open tab has no underline at all. A timed, auto-advancing
    * strip (a looping demo) uses it; `0` snaps back with no animation.
    */
   progress?: number;
+  /**
+   * The tab's own colour (a CSS colour, such as the hex an agent's identity
+   * stores): its underline and its icon take it while the tab is open. Omitted,
+   * they are the platform's accent.
+   */
+  accent?: string;
 }
 
 export interface TabNavigationUrlSyncOptions {
@@ -334,7 +341,34 @@ const TabBar = memo(function TabBarImpl({
   // A tab that reports `progress` turns the underline into a progress line.
   const activeProgress = tabs.find(tab => tab.id === activeTab)?.progress;
   const hasProgress = typeof activeProgress === 'number';
-  const progress = hasProgress ? Math.max(0, Math.min(1, activeProgress)) : 1;
+  // A progress line always GROWS from the start of its tab. A run that starts
+  // over (another tab opened, by the rotation or by choice, or the same tab
+  // chosen again: its progress fell back) is first drawn EMPTY, with no
+  // transition, and only then let run to its value. Without that the line
+  // either slid across from the last tab, shrank back, or appeared already
+  // part-way and sat still until the next step.
+  const target = hasProgress ? Math.max(0, Math.min(1, activeProgress)) : 1;
+  // It starts on no tab at all, so the FIRST paint is a run starting over too:
+  // a page load, the rotation and a click all begin the line the same way.
+  const [run, setRun] = useState<{ tab: string | null; progress: number }>({ tab: null, progress: 0 });
+  const startsOver = hasProgress && (run.tab !== activeTab || target < run.progress);
+  // The same run moving forward: follow it (state derived from props during render).
+  if (hasProgress && !startsOver && run.progress !== target) setRun({ tab: activeTab, progress: target });
+  useEffect(() => {
+    if (!startsOver) return undefined;
+    // Two frames: the empty line has to be painted before it is let run.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setRun({ tab: activeTab, progress: target }));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [startsOver, activeTab, target]);
+  const progress = startsOver ? 0 : target;
+  // The open tab's own colour, when it has one; else the platform's accent.
+  const activeAccent = tabs.find(tab => tab.id === activeTab)?.accent;
   const indicatorStyle: React.CSSProperties = {
     width: `${indicator.width * progress}px`,
     transform: `translateX(${indicator.left}px)`,
@@ -362,7 +396,7 @@ const TabBar = memo(function TabBarImpl({
           `relative` makes this the offsetParent the underline is measured against. */}
       <div
         ref={scrollRef}
-        className="scrollbar-hide relative flex h-full items-center justify-start gap-[var(--spacing-system-xxs)] overflow-x-auto overflow-y-hidden"
+        className="scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden"
       >
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
@@ -375,28 +409,19 @@ const TabBar = memo(function TabBarImpl({
               onClick={() => onTabChange(tab.id)}
               aria-label={tab.badge ? `${tab.label} (${tab.badge})` : undefined}
               className={cn(
-                'relative flex shrink-0 cursor-pointer items-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]',
+                'group relative flex shrink-0 cursor-pointer items-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]',
                 tabAlign === 'start' ? 'justify-start text-left' : 'justify-center',
                 // Named rather than `transition-all`: the only thing that moves
-                // here is colour. `all` also made the browser re-check every
-                // property each frame, including the background GRADIENT — which
-                // never animated anyway, since the inactive state has no
-                // background-image to interpolate from.
+                // here is colour.
                 'border-none bg-transparent outline-none transition-colors duration-200',
                 // `outline-none` above drops the browser's own focus ring, so
                 // put one back or the strip is un-navigable by keyboard — you
                 // can tab through it with nothing to show where you are. Inset,
-                // so it stays within the button instead of overlapping the tab
-                // sitting 4px away.
+                // so it stays within the button: the tabs touch.
                 'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
                 stretchTabs && 'flex-1',
                 tab.avatar && 'gap-[var(--spacing-system-xsf)]',
-                // Known limitation: ODS color vars hold hex values, so Tailwind
-                // alpha modifiers (to-ods-accent/10) silently produce no CSS.
-                // color-mix() accepts hex, so we derive the 10%-alpha stop from the token.
-                isActive
-                  ? 'bg-gradient-to-b from-transparent to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'
-                  : 'hover:bg-gradient-to-b hover:from-transparent hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]',
+                // The open tab is marked by the underline alone: no surface of its own.
               )}
             >
               {tab.avatar ? (
@@ -409,8 +434,11 @@ const TabBar = memo(function TabBarImpl({
                   <tab.icon
                     className={cn(
                       'h-4 w-4 transition-colors content-md:h-6 content-md:w-6',
-                      isActive ? 'text-ods-accent' : 'text-ods-text-secondary',
+                      isActive
+                        ? !tab.accent && 'text-ods-accent'
+                        : 'text-ods-text-secondary group-hover:text-ods-text-primary',
                     )}
+                    style={isActive && tab.accent ? { color: tab.accent } : undefined}
                   />
                   {tab.indicator && <StatusDot indicator={tab.indicator} className="absolute right-0 top-[-3px]" />}
                 </div>
@@ -425,7 +453,7 @@ const TabBar = memo(function TabBarImpl({
                   <span
                     className={cn(
                       'whitespace-nowrap transition-colors text-h4',
-                      isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                      isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary group-hover:text-ods-text-primary',
                     )}
                   >
                     {tab.label}
@@ -471,11 +499,11 @@ const TabBar = memo(function TabBarImpl({
           // tests) rather than incidental styling.
           data-testid="tab-navigation-underline"
           className={cn(
-            'pointer-events-none absolute bottom-0 left-0 bg-ods-accent motion-reduce:transition-none',
-            hasProgress ? 'h-0.5' : 'h-1',
+            'pointer-events-none absolute bottom-0 left-0 h-1 motion-reduce:transition-none',
+            !activeAccent && 'bg-ods-accent',
             !hasProgress && shouldAnimateIndicator && 'transition-[transform,width,opacity] duration-200 ease-out',
           )}
-          style={indicatorStyle}
+          style={activeAccent ? { ...indicatorStyle, backgroundColor: activeAccent } : indicatorStyle}
         />
       </div>
 

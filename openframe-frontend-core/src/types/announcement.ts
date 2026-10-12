@@ -136,6 +136,9 @@ export interface AnnouncementResponse {
  * defaults and the admin form both reference. Announcement colors are
  * admin-chosen data (not ODS-token surfaces) by design.
  */
+/** The icon of an announcement that names none: the bar, the admin form and its preview all read it. */
+export const ANNOUNCEMENT_DEFAULT_ICON = 'openframe-logo';
+
 export const ANNOUNCEMENT_CTA_DEFAULTS = {
   background: '#1A1A1A',
   text: '#FAFAFA',

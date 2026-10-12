@@ -1,7 +1,7 @@
 // Every hub path derived from CONTENT, exactly once. The runtime factory, the
 // data layer, and the pages all read from EP — no page re-interpolates `${CONTENT}`,
 // no endpoint literal exists twice.
-import { TRUST_CENTER_API_PATH } from '@flamingo-stack/openframe-frontend-core/types'
+import { DOWNLOADS_API_PATH, TRUST_CENTER_API_PATH } from '@flamingo-stack/openframe-frontend-core/types'
 import { CONTENT, CONTENT_PREFIX } from './content'
 
 // approvalToolUrl + the three conversational ticket tool paths derive from
@@ -93,6 +93,9 @@ export const EP = {
   // (`TRUST_CENTER_API_PATH` = `/api/trust-center`), so it is prefixed rather
   // than re-spelled.
   trustCenter: `${CONTENT_PREFIX}${TRUST_CENTER_API_PATH}`,
+  // downloads (desktop installers + install commands). The lib owns the hub path
+  // (`DOWNLOADS_API_PATH` = `/api/downloads`), prefixed the same way.
+  downloads: `${CONTENT_PREFIX}${DOWNLOADS_API_PATH}`,
   // misc surfaces
   legal: (docType: string) => `${CONTENT}/legal/${docType}`,
   contact: `${CONTENT}/contact`,

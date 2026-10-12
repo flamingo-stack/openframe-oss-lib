@@ -5,7 +5,7 @@
  *
  * ONE page, not tabs (2026 trust-center practice: buyers skim and Ctrl-F, and a
  * questionnaire needs a deep link per section): hero with the monitoring status
- * and the two actions, then anchored sections in reading order
+ * (with the page's PDF as a quiet link at its end) and the Request access action, then anchored sections in reading order
  * (`TRUST_CENTER_SECTIONS`: AI & data use → compliance → controls → documents →
  * subprocessors → FAQ → questions) with a sticky section rail on desktop
  * (`StickySectionNav` + `useScrollSpy`, the vendor-page / DocViewer pattern).
@@ -34,11 +34,12 @@ import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
   TRUST_CENTER_API_PATH,
   TRUST_CENTER_CACHE_SECONDS,
-  TRUST_CENTER_SECTIONS,
   TRUST_CENTER_TAGLINE,
   TRUST_CENTER_TITLE,
-  isTrustCenterMonitored,
+  trustCenterMonitoringStatus,
   trustCenterDocumentUrl,
+  trustCenterPdfUrl,
+  visibleTrustCenterSections,
   type TrustCenterControlsPage,
   type TrustCenterPublic,
   type TrustCenterSectionId,
@@ -50,6 +51,7 @@ import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { DataAttribution } from '../ui/data-attribution';
+import { DownloadButton } from '../ui/download-button';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
 import { StatusIndicator } from '../ui/status-indicator';
@@ -85,26 +87,19 @@ export interface TrustCenterPageProps {
   subtitle?: string;
   /** The FAQ section's "ask the assistant" card (`FaqSection`'s `ask`): the host states its topic. Absent: no card. */
   ask?: FaqSectionProps['ask'];
+  /**
+   * Host content shown after the trust sections and BEFORE the FAQ (the hub's
+   * own "why we build in the open" sections). The FAQ is the last thing on a
+   * page, so with this the page draws: trust sections, this content at the
+   * page's full width, then the FAQ. Absent: the FAQ closes the sections column.
+   */
+  beforeFaq?: ReactNode;
 }
 
 /** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
 interface TrustSectionView {
   lead?: string;
   render: (data: TrustCenterPublic) => ReactNode;
-}
-
-/** Sections that have content, in page order. */
-function visibleSections(data: TrustCenterPublic): Array<(typeof TRUST_CENTER_SECTIONS)[number]> {
-  const hasContent: Record<TrustCenterSectionId, boolean> = {
-    ai: data.aiPractices.length > 0,
-    compliance: data.frameworks.length > 0,
-    controls: data.controlDomains.length > 0,
-    documents: data.documents.length > 0,
-    subprocessors: data.subprocessors.length > 0,
-    faq: data.faqs.length > 0,
-    contact: true,
-  };
-  return TRUST_CENTER_SECTIONS.filter(section => hasContent[section.id]);
 }
 
 /**
@@ -136,12 +131,9 @@ function monitoringStatus(
   hydrated: boolean,
   nowMs: number,
 ): { status: 'success' | 'pending' | 'missing'; label: string } {
-  if (!data.connected) return { status: 'missing', label: 'Live control monitoring is not enabled yet' };
   // Before mount the clock is the server's, so the text claims nothing either way.
-  if (!hydrated) return { status: 'missing', label: 'Checking monitoring status' };
-  return isTrustCenterMonitored(data, nowMs)
-    ? { status: 'success', label: 'Controls continuously monitored' }
-    : { status: 'pending', label: 'Monitoring paused' };
+  if (data.connected && !hydrated) return { status: 'missing', label: 'Checking monitoring status' };
+  return trustCenterMonitoringStatus(data, nowMs);
 }
 
 export function TrustCenterPage({
@@ -152,6 +144,7 @@ export function TrustCenterPage({
   title = TRUST_CENTER_TITLE,
   subtitle = TRUST_CENTER_TAGLINE,
   ask,
+  beforeFaq,
 }: TrustCenterPageProps) {
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
     initialData,
@@ -180,7 +173,7 @@ export function TrustCenterPage({
     documentTitle: null,
   });
 
-  const sections = useMemo(() => (data ? visibleSections(data) : []), [data]);
+  const sections = useMemo(() => (data ? visibleTrustCenterSections(data) : []), [data]);
   // Anchors. The scroll spy lights the rail from whatever scrolls the sections
   // (the window, or a host shell's `<main overflow-y-auto>` — OpenFrame's
   // `AppLayout`) and keeps the URL's hash on the section in view (`syncHash`;
@@ -205,9 +198,15 @@ export function TrustCenterPage({
   const actions = hasGatedDocuments
     ? [{ label: 'Request access', variant: 'accent' as const, onClick: () => openRequest(null) }]
     : undefined;
+  // The page as a file (the hub's `pdf` route beside `endpoint`). An occasional
+  // utility on a read-only page, so it is NOT a header action (a button there,
+  // and a fixed bar on a phone, are for the page's task: Request access). It is
+  // the shared small `DownloadButton` at the end of the status line under the
+  // title, at every width.
+  const download = <DownloadButton label="Download PDF" href={trustCenterPdfUrl(endpoint)} />;
 
   // Section id → its content. Titles come from `TRUST_CENTER_SECTIONS`; which
-  // sections show comes from `visibleSections` — this map only says what each renders.
+  // sections show comes from `visibleTrustCenterSections` — this map only says what each renders.
   const views: Record<TrustCenterSectionId, TrustSectionView> = {
     ai: {
       lead: TRUST_SECTION_LEADS.ai,
@@ -239,6 +238,11 @@ export function TrustCenterPage({
     contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };
 
+  // With host content before it, the FAQ leaves the sections column and closes the page (below).
+  const faqSection = sections.find(section => section.id === 'faq');
+  const faqLast = Boolean(beforeFaq) && Boolean(faqSection);
+  const columnSections = faqLast ? sections.filter(section => section.id !== 'faq') : sections;
+
   let body: ReactNode;
   if (error && !data) {
     body = <LoadError message="Could not load the trust center" onRetry={reload} />;
@@ -264,13 +268,16 @@ export function TrustCenterPage({
               }
               source={data.dataSource.name}
               lastUpdated={data.syncedAt}
+              action={download}
             />
-          ) : null}
+          ) : (
+            download
+          )}
         </div>
 
         <div className={TRUST_BODY_GRID_CLASS}>
           <div className={TRUST_SECTIONS_COLUMN_CLASS}>
-            {sections.map(section => {
+            {columnSections.map(section => {
               const view = views[section.id];
               return (
                 <TrustSection key={section.id} id={section.id} title={section.label} lead={view.lead}>
@@ -302,9 +309,23 @@ export function TrustCenterPage({
   }
 
   return (
-    <TrustCenterChrome shell={shell} title={title} subtitle={subtitle} backButton={backButton} actions={actions}>
-      {body}
-    </TrustCenterChrome>
+    <>
+      <TrustCenterChrome shell={shell} title={title} subtitle={subtitle} backButton={backButton} actions={actions}>
+        {body}
+      </TrustCenterChrome>
+      {beforeFaq}
+      {faqLast && faqSection && data ? (
+        // The page's own content box at its FULL width (no section-rail column): a closing FAQ takes the
+        // same space the FAQ block takes at the foot of every other page.
+        <div className={shell ? 'bg-ods-bg' : undefined}>
+          <div className={shell ? 'page-shell-content mx-auto max-w-[1920px]' : 'page-shell-content'}>
+            <TrustSection id={faqSection.id} title={faqSection.label} lead={views.faq.lead}>
+              {views.faq.render(data)}
+            </TrustSection>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 

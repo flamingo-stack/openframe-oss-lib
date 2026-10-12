@@ -24,10 +24,13 @@
  *     icon registry, chip-styles, click-utils, etc.) re-resolved against
  *     the equivalent lib modules.
  *
- * Public surface — `<EmbeddableChat />` taking the same prop bundle the hub
+ * Surface — `<EmbeddableChat />` taking the same prop bundle the hub
  * shell passes (minus `requireAuth`, which the hub's wrapper handles), plus
  * an optional `extras` opt-in for the chat-card dispatch helpers that need
  * host-supplied builders (program configs, product-release prop builder).
+ *
+ * Hosts mount it through the chat barrel, which loads this module on its own,
+ * after the page's code.
  */
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
@@ -39,12 +42,13 @@ import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { chatProgressLabel } from '../../chat-protocol/progress';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
+import Link from '../../embed-shims/next-link';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
 import { formatCitationIndices } from '../../utils/source-grouping';
+import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
-import { MingoIcon } from '../icons';
 import {
   Arrow02RightIcon,
   Arrow02LeftIcon,
@@ -66,6 +70,7 @@ import { ChatArchivePage } from './chat-archive-page';
 import { ChatAttachmentChipStrip } from './chat-attachment-bar';
 import { ChatComposer, type ChatComposerLock } from './chat-composer';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
+import { CHAT_BLOCK_MIN_WIDTH, MINGO_V2_RAIL_WIDTH } from './chat-dimensions';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatMessageList } from './chat-message-list';
@@ -106,6 +111,7 @@ import type {
   UnifiedChatState,
   UnifiedSendMessageOptions,
 } from './types/unified-chat-state.types';
+import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
@@ -128,11 +134,6 @@ import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row
  * self-contained — the host wires nothing.
  */
 const HISTORY_RAIL_WIDTH = 320;
-/** The v2 chat list (`MingoChatRail`, Figma `chat-sidebar`): the narrowest the v2 chat draws. */
-export const MINGO_V2_RAIL_WIDTH = 296;
-const CHAT_BLOCK_MIN_WIDTH = 400;
-/** Mingo v2: the list and the chat side by side at their narrowest. */
-export const MINGO_V2_SPLIT_WIDTH = MINGO_V2_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 
 // Desktop drawer is this fraction of the viewport width (clamped to the
@@ -833,14 +834,14 @@ function SourceChip({
     const resolvedHref = resolveHrefForRuntime(cta.href, runtime);
     const isNewTab = decideTab(resolvedHref, cta.targetPlatform ?? null);
     return wrapChip(
-      <a
+      <Link
         href={resolvedHref}
         {...newTabAnchorAttrs(isNewTab)}
         onClick={buildClickHandler(resolvedHref, null, cta.targetPlatform ?? null, isNewTab)}
         className={chipClass}
       >
         {chipBody(src.name)}
-      </a>,
+      </Link>,
     );
   }
 
@@ -849,7 +850,7 @@ function SourceChip({
     const resolvedHref = resolveHrefForRuntime(cta.href, runtime);
     const isNewTab = decideTab(resolvedHref, cta.targetPlatform ?? null);
     return wrapChip(
-      <a
+      <Link
         href={resolvedHref}
         {...newTabAnchorAttrs(isNewTab)}
         onClick={buildClickHandler(resolvedHref, src.path, cta.targetPlatform ?? null, isNewTab)}
@@ -857,7 +858,7 @@ function SourceChip({
         title={displayName}
       >
         {chipBody(displayName)}
-      </a>,
+      </Link>,
     );
   }
 
@@ -1639,14 +1640,14 @@ function EmbeddableChatInner({
   // bubbles — and re-mounting their inline cards — on every realtime chunk).
   // The Mingo avatar comes from the resolved agent CONFIG icon when one is
   // available (same server-driven path as every other identity glyph, via
-  // `<EntityIcon>`) — falling back to the built-in `MingoIcon` when no config is
+  // `<EntityIcon>`) — falling back to the Mingo agent's identity mark when no config is
   // in play (host mode with no `activeAgentSlug`).
   const mingoAssistantIcon = useMemo(
     () =>
       effectiveAssistantIcon ? (
         <EntityIcon icon={effectiveAssistantIcon} size={24} />
       ) : (
-        <MingoIcon className="h-6 w-6" cornerColor="var(--ods-flamingo-cyan-base)" />
+        <AgentMark agent="mingo" className="h-6 w-6" />
       ),
     [effectiveAssistantIcon],
   );
@@ -1852,8 +1853,8 @@ function EmbeddableChatInner({
       setIsOpen(true);
       setTimeout(() => askAbout(detail.ref as ChatRef), 0);
     };
-    window.addEventListener('ask-ai:open-with-ref', handler);
-    return () => window.removeEventListener('ask-ai:open-with-ref', handler);
+    window.addEventListener(ASK_AI_OPEN_WITH_REF_EVENT, handler);
+    return () => window.removeEventListener(ASK_AI_OPEN_WITH_REF_EVENT, handler);
   }, [source, askAbout, setIsOpen]);
 
   // Listen for plain "open chat" events (no row context). Fired by the
@@ -1899,9 +1900,12 @@ function EmbeddableChatInner({
       const prompt = typeof detail.prompt === 'string' ? detail.prompt.trim() : '';
       if (prompt) setTimeout(() => sendAskPrompt(prompt), 0);
     };
-    window.addEventListener('ask-ai:open', handler);
-    return () => window.removeEventListener('ask-ai:open', handler);
+    window.addEventListener(ASK_AI_OPEN_EVENT, handler);
+    return () => window.removeEventListener(ASK_AI_OPEN_EVENT, handler);
   }, [source, setIsOpen, sendAskPrompt]);
+  // Declared after both open listeners, so it runs once they are attached: an
+  // open sent while this chat's code was still loading reaches it now.
+  useEffect(() => chatListensForAskAiOpens(), []);
 
   const hasMessages = messages.length > 0;
   // First dialog page in flight and nothing cached yet — we don't yet know if
@@ -3124,7 +3128,7 @@ function EmbeddableChatInner({
           <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6">
             <Button
               onClick={handleOpen}
-              leftIcon={<MingoIcon className="h-5 w-5" color="currentColor" />}
+              leftIcon={<AgentMark agent="mingo" className="h-5 w-5" />}
               tabIndex={isOpen ? -1 : 0}
               className={`pointer-events-auto !w-auto shadow-lg ${isOpen ? '!pointer-events-none' : ''}`}
             >
