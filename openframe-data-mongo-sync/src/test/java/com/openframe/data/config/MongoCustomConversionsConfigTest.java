@@ -31,16 +31,22 @@ class MongoCustomConversionsConfigTest {
     }
 
     @Test
-    void shouldWriteBigDecimalAsString() {
+    void shouldWriteBigDecimalAsDecimal128() {
         Document document = new Document();
 
         converter.write(new Priced(new BigDecimal("12.50")), document);
 
-        assertThat(document.get("amountUsd")).isEqualTo("12.50");
+        assertThat(document.get("amountUsd")).isEqualTo(new Decimal128(new BigDecimal("12.50")));
     }
 
     @Test
-    void shouldReadBigDecimalWrittenEitherAsStringOrAsDecimal128() {
+    void shouldWriteBigDecimalInAPartialUpdateAsDecimal128() {
+        // Update.set(...) values go through convertToMongoType, not through write(...)
+        assertThat(converter.convertToMongoType(new BigDecimal("12.50"))).isEqualTo(new Decimal128(new BigDecimal("12.50")));
+    }
+
+    @Test
+    void shouldReadBigDecimalWrittenEitherAsDecimal128OrAsAStringBefore() {
         Priced fromString = converter.read(Priced.class, new Document("amountUsd", "12.50"));
         Priced fromDecimal128 = converter.read(Priced.class, new Document("amountUsd", new Decimal128(new BigDecimal("12.50"))));
 
