@@ -259,8 +259,17 @@ function ManagedCell({
   const cloneRef = useSuppressCloneFocus(ctx.isClone);
   return (
     <div
-      className="shrink-0 self-stretch"
-      style={{ width: ctx.isMobile ? cardWidthMobile : desktopWidth, maxWidth: STRIP_CELL_MAX_WIDTH }}
+      // The width is CSS's (the engine's own 767px line), never a script's: the
+      // first paint is the cell's final width, so a phone's strip never resizes
+      // when the page hydrates.
+      className="w-[var(--strip-cell-mobile)] shrink-0 self-stretch min-[768px]:w-[var(--strip-cell-desktop)]"
+      style={
+        {
+          '--strip-cell-mobile': `${cardWidthMobile}px`,
+          '--strip-cell-desktop': `${desktopWidth}px`,
+          maxWidth: STRIP_CELL_MAX_WIDTH,
+        } as React.CSSProperties
+      }
       data-strip-card-key={ctx.cardKey}
       onPointerEnter={ctx.isTouch ? undefined : () => ctx.onActivate(ctx.cardKey)}
       onPointerLeave={ctx.isTouch ? undefined : () => ctx.onDeactivate(ctx.cardKey)}

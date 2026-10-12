@@ -147,7 +147,8 @@ export function VideoBitesStrip({
           cardKey={ctx.cardKey}
           isClone={ctx.isClone}
           isTouch={ctx.isTouch}
-          height={ctx.isMobile ? cardHeightMobile : cardHeightDesktop}
+          height={cardHeightDesktop}
+          heightMobile={cardHeightMobile}
           active={ctx.active}
           onActivate={ctx.onActivate}
           onDeactivate={ctx.onDeactivate}
@@ -178,6 +179,9 @@ export interface VideoBiteCardProps {
   /** Fixed card height (strip). Omit → width-driven: card fills its grid
    *  cell and the aspect-ratio derives the height (editor grids). */
   height?: number;
+  /** With `height`: the height under the strip's 768px line. The switch is CSS's,
+   *  so the first paint is the card's final size on a phone too. */
+  heightMobile?: number;
   /** Controlled hover-activation (strip). Omit → the card manages its own
    *  hover/focus state. */
   active?: boolean;
@@ -211,6 +215,7 @@ export function VideoBiteCard({
   sectionHref,
   onBiteNavigate,
   height,
+  heightMobile,
   active,
   onActivate,
   onDeactivate,
@@ -356,10 +361,24 @@ export function VideoBiteCard({
 
   const media = (
     <div
-      className="relative w-full"
+      className={cn(
+        'relative w-full',
+        height !== undefined && 'h-[var(--bite-height-mobile)] min-[768px]:h-[var(--bite-height)]',
+      )}
       // Strip mode: fixed height + aspect drive the width (capped at 90vw,
       // same as the old single-box layout). Editor mode: width-driven.
-      style={{ aspectRatio: cssAspect, ...(height !== undefined ? { height, maxWidth: STRIP_CELL_MAX_WIDTH } : {}) }}
+      style={
+        {
+          aspectRatio: cssAspect,
+          ...(height !== undefined
+            ? {
+                '--bite-height': `${height}px`,
+                '--bite-height-mobile': `${heightMobile ?? height}px`,
+                maxWidth: STRIP_CELL_MAX_WIDTH,
+              }
+            : {}),
+        } as React.CSSProperties
+      }
     >
       {/* THE shared hover-preview media zone (poster → facade → badge →
           controlled hover playback + near-viewport mount gate). The bite strip
