@@ -136,7 +136,7 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
           </div>
         ) : (
           <div className="flex w-full items-center justify-between">
-            <h2 className="font-['Azeret_Mono'] text-[32px] font-semibold leading-[40px] tracking-[-0.64px] text-ods-text-primary md:text-[40px] md:leading-[48px] md:tracking-[-0.8px] lg:text-[48px] lg:leading-[56px] lg:tracking-[-0.96px]">
+            <h2 className="font-['Azeret_Mono'] text-[32px] font-semibold leading-[40px] tracking-[-0.64px] text-ods-text-primary content-md:text-[40px] content-md:leading-[48px] content-md:tracking-[-0.8px] content-lg:text-[48px] content-lg:leading-[56px] content-lg:tracking-[-0.96px]">
               {section.hero.title}
               <span className="text-ods-accent">:</span>
             </h2>

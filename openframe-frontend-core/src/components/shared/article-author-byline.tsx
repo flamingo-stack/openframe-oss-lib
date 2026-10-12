@@ -111,7 +111,7 @@ export function ArticleAuthorByline({
     <div
       className={cn(
         'rounded-lg border border-ods-border bg-ods-card p-6',
-        'flex flex-col items-start gap-4 md:flex-row',
+        'flex flex-col items-start gap-4 content-md:flex-row',
         className,
       )}
     >

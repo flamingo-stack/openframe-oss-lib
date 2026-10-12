@@ -2,6 +2,8 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
+import Link from '../../embed-shims/next-link';
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { Faq } from '../../types/faq';
@@ -12,6 +14,7 @@ import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 import { FaqAccordion, type FaqItem } from '../faq-accordion';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { FaqAskCard, faqAskCardShown, type FaqAskOptions } from './faq-ask-card';
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld';
 
 export interface FaqSectionProps {
@@ -46,6 +49,25 @@ export interface FaqSectionProps {
   /** Fetch-URL prefix for third-party embeds / reverse proxies
    *  ('' = same-origin relative). */
   apiBaseUrl?: string;
+  /**
+   * A block beside the questions, in place of the "ask the assistant" card.
+   * From the content `lg` step the heading, the category nav and this block
+   * form a left column and the questions the right one; below it the block
+   * follows the questions.
+   */
+  aside?: React.ReactNode;
+  /**
+   * The "ask the assistant" card beside the questions. Shown wherever the
+   * host's assistant runtime says a chat is there to open
+   * (`AssistantRuntimeContext`: its name, glyph, questions endpoint and
+   * opener) AND the FAQ has a topic: `ask.topic` (any string the host's
+   * questions endpoint knows), else the `entityType` the FAQ is attached to.
+   * No runtime or no topic: the FAQ is the single column it always was; the
+   * lib names no topic of its own. `false` switches the card off; the object
+   * also states the questions to leave out, the wording and the chat it opens
+   * (`onOpen`). An `aside` takes the card's place.
+   */
+  ask?: false | FaqAskOptions;
 }
 
 const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
@@ -114,7 +136,12 @@ const groupKey = (g: FaqGroup): string => g.slug ?? UNCATEGORIZED_KEY;
 function GroupedFaqList({
   groups,
   categoryHeadingAs,
+  heading,
+  aside,
 }: {
+  /** With `aside`, the section heading: it sits in the left column above the category nav. */
+  heading?: React.ReactNode;
+  aside?: React.ReactNode;
   groups: FaqGroup[];
   /** Heading tag for each category, so the document outline nests correctly
    *  under whatever owns the heading above this block: `h2` on the standalone
@@ -265,49 +292,69 @@ function GroupedFaqList({
     });
   }, []);
 
-  return (
-    <div className="space-y-8">
-      {navGroups.length > 1 && (
-        <nav aria-label="FAQ categories" className="flex flex-wrap gap-2">
-          {navGroups.map(group => {
-            const isActive = group.slug === activeSlug;
-            return (
-              <a
-                key={group.slug}
-                href={`#${group.slug}`}
-                aria-current={isActive ? 'true' : undefined}
-                onClick={e => handleJump(e, group.slug as string)}
-                className={cn(
-                  'rounded-full border px-4 py-2 transition-colors text-h6',
-                  isActive
-                    ? 'border-ods-text-primary bg-ods-card text-ods-text-primary'
-                    : 'border-ods-border bg-ods-card text-ods-text-secondary hover:border-ods-text-secondary hover:text-ods-text-primary',
-                )}
-              >
-                {group.section}
-              </a>
-            );
-          })}
-        </nav>
-      )}
-      <div className="space-y-10">
-        {groups.map(group => {
-          const key = groupKey(group);
-          return (
-            <section key={key} id={group.slug ?? undefined} className="scroll-mt-24 space-y-4">
-              {group.section && <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>}
-              <FaqAccordion
-                // Re-key on item-hash changes so the remount picks up the new
-                // `defaultOpenIds` (the accordion is uncontrolled). Stable for
-                // section hashes — category navigation doesn't disturb state.
-                key={`${key}:${accordionKeySuffix}`}
-                items={group.items}
-                defaultOpenIds={defaultOpenByGroupKey?.get(key)}
-              />
-            </section>
-          );
-        })}
+  const categoryNav = navGroups.length > 1 && (
+    <nav aria-label="FAQ categories" className="flex flex-wrap gap-2">
+      {navGroups.map(group => {
+        const isActive = group.slug === activeSlug;
+        return (
+          <Link
+            key={group.slug}
+            href={`#${group.slug}`}
+            aria-current={isActive ? 'true' : undefined}
+            onClick={e => handleJump(e, group.slug as string)}
+            className={cn(
+              'rounded-full border px-4 py-2 transition-colors text-h6',
+              isActive
+                ? 'border-ods-text-primary bg-ods-card text-ods-text-primary'
+                : 'border-ods-border bg-ods-card text-ods-text-secondary hover:border-ods-text-secondary hover:text-ods-text-primary',
+            )}
+          >
+            {group.section}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+  const questions = (
+    <div className="space-y-10">
+      {groups.map(group => {
+        const key = groupKey(group);
+        return (
+          <section key={key} id={group.slug ?? undefined} className="scroll-mt-24 space-y-4">
+            {group.section && <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>}
+            <FaqAccordion
+              // Re-key on item-hash changes so the remount picks up the new
+              // `defaultOpenIds` (the accordion is uncontrolled). Stable for
+              // section hashes — category navigation doesn't disturb state.
+              key={`${key}:${accordionKeySuffix}`}
+              items={group.items}
+              defaultOpenIds={defaultOpenByGroupKey?.get(key)}
+            />
+          </section>
+        );
+      })}
+    </div>
+  );
+
+  if (!aside) {
+    return (
+      <div className="space-y-8">
+        {categoryNav}
+        {questions}
       </div>
+    );
+  }
+
+  // One instance of each block, placed by the grid: questions second in the
+  // document (and on a narrow area), in the right column from `lg`.
+  return (
+    <div className="grid gap-10 content-lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] content-lg:grid-rows-[auto_1fr] content-lg:gap-x-16">
+      <div className="space-y-8">
+        {heading}
+        {categoryNav}
+      </div>
+      <div className="content-lg:col-start-2 content-lg:row-span-2 content-lg:row-start-1">{questions}</div>
+      <div className="content-lg:col-start-1 content-lg:row-start-2">{aside}</div>
     </div>
   );
 }
@@ -315,10 +362,10 @@ function GroupedFaqList({
 function FaqSkeleton() {
   return (
     <div className="animate-pulse space-y-8">
-      <div className="h-12 w-2/3 rounded bg-ods-border md:h-14" />
+      <div className="h-12 w-2/3 rounded bg-ods-border content-md:h-14" />
       <div className="w-full divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent">
         {Array.from({ length: 8 }).map((_, idx) => (
-          <div key={idx} className="flex items-center justify-between gap-6 px-6 py-4 md:gap-10">
+          <div key={idx} className="flex items-center justify-between gap-6 px-6 py-4 content-md:gap-10">
             <div className="h-6 w-5/6 rounded bg-ods-border" />
             <div className="size-6 rounded bg-ods-border" />
           </div>
@@ -359,7 +406,16 @@ export function FaqSection({
   className,
   minResults,
   apiBaseUrl = '',
+  aside: asideProp,
+  ask,
 }: FaqSectionProps) {
+  const assistant = useAssistantRuntime();
+  // The host's own block wins; else the card, where a chat is there to open and the FAQ has a topic
+  // (an empty topic is no topic, as the questions request reads it).
+  const askTopic = ask === false ? undefined : ask?.topic || entityType;
+  const aside =
+    asideProp ??
+    (ask !== false && askTopic && faqAskCardShown(assistant) ? <FaqAskCard {...ask} topic={askTopic} /> : undefined);
   const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl);
   // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
   // wrapper object would setState-loop under re-rendering parents.
@@ -398,8 +454,13 @@ export function FaqSection({
   return (
     <>
       <section className={className ?? 'space-y-10'}>
-        {headingNode}
-        <GroupedFaqList groups={groups} categoryHeadingAs={heading === null ? 'h2' : 'h3'} />
+        {!aside && headingNode}
+        <GroupedFaqList
+          groups={groups}
+          categoryHeadingAs={heading === null ? 'h2' : 'h3'}
+          heading={aside ? headingNode : undefined}
+          aside={aside}
+        />
       </section>
       {schema && (
         <script

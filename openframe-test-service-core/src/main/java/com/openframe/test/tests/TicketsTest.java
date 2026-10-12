@@ -484,6 +484,32 @@ public class TicketsTest extends BaseTest {
 
     @Tag("feature")
     @Test
+    @DisplayName("Filter tickets by device")
+    @Order(8)
+    public void testFilterTicketsByDevice() {
+        Ticket ticket = newOwnTicket(me());
+        String deviceId = ticket.getDeviceId();
+        assertThat(deviceId).as("The ticket starts linked to a device").isNotBlank();
+        assertThat(ticket.getStatusDefinition()).as("The ticket opens in a lifecycle column").isNotNull();
+        TicketFilterInput ofDevice = TicketGenerator.ticketsOfDeviceInStatus(deviceId, ticket.getStatusDefinition().getId());
+
+        TicketConnection linked = TicketApi.getTickets(ofDevice, limit(20));
+        assertThat(linked.getEdges()).extracting(edge -> edge.getNode().getId())
+                .as("The device filter returns the ticket linked to that device")
+                .contains(ticket.getId());
+        assertThat(linked.getEdges()).extracting(edge -> edge.getNode().getDeviceId())
+                .as("The device filter returns nothing linked to another device")
+                .containsOnly(deviceId);
+
+        TicketApi.unlinkDeviceFromTicket(ticket.getId());
+        TicketConnection afterUnlink = TicketApi.getTickets(ofDevice, limit(20));
+        assertThat(afterUnlink.getEdges()).extracting(edge -> edge.getNode().getId())
+                .as("An unlinked ticket drops out of its former device's list")
+                .doesNotContain(ticket.getId());
+    }
+
+    @Tag("feature")
+    @Test
     @DisplayName("Edit, reassign and unlink a ticket")
     @Order(8)
     public void testEditAssignAndUnlink() {

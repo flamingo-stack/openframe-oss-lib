@@ -62,7 +62,7 @@ export function TicketNotesSection({
             onClick={handleSend}
             disabled={!noteText.trim() || isAddingNote}
             className={cn(
-              'flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] md:h-12 md:w-12',
+              'flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] content-md:h-12 content-md:w-12',
               'border border-ods-border bg-ods-card',
               'transition-colors hover:bg-ods-bg-hover',
               'disabled:cursor-not-allowed disabled:opacity-50',

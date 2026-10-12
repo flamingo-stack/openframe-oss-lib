@@ -1,7 +1,14 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { getScrollableAncestor, scrollElementIntoView } from '../../utils/scroll-into-view';
+import {
+  ACTIVE_ANCHOR_ATTRIBUTE,
+  getHashTargetElement,
+  isScrollSyncedHash,
+  normalizeHashFragment,
+  replaceLocationHash,
+} from '../../utils/same-page-hash-nav';
+import { declaredScrollMarginTop, getScrollableAncestor, scrollElementIntoView } from '../../utils/scroll-into-view';
 
 // Default sticky-chrome height. Used for BOTH the scroll target offset (where a
 // clicked section lands) AND the active-section detection threshold (where the
@@ -15,6 +22,11 @@ const SCROLL_OFFSET = 100;
 // so the join is unambiguous and the key can be split back apart.
 const ID_SEPARATOR = '\n';
 
+// A section that a link just landed on sits ON the line, give or take a
+// sub-pixel of layout rounding: without this it reads as "not reached yet" and
+// the section above stays active (and, with `syncHash`, takes the URL back).
+const LINE_TOLERANCE_PX = 1;
+
 interface ScrollSpySection {
   id: string;
   title?: string;
@@ -23,13 +35,35 @@ interface ScrollSpySection {
 
 export interface UseScrollSpyOptions {
   /**
-   * Keep the URL's `#hash` on the section being read (`replaceState`: no
+   * Keep the URL's `#hash` on where the reader IS (`replaceLocationHash`: no
    * history entry, and no `hashchange`, so `useScrollToHash` never re-scrolls
    * to it) — as the user SCROLLS, and when a rail click scrolls for them.
    * Above the first section the hash is cleared. Only a scroll or a click
    * writes it — mounting a page never adds a hash.
+   *
+   * TWO LEVELS. The hash names the section being read, or an anchor INSIDE it:
+   *   - a section that marks one of its descendants with
+   *     `ACTIVE_ANCHOR_ATTRIBUTE` (and an `id`) is named by that child: a tab
+   *     group whose open tab has its own anchor. The section remembers its
+   *     child while the reader is elsewhere, so coming back restores it;
+   *   - otherwise a hash that already names something inside the section (a
+   *     card, a question a link landed on) is finer than the section's own and
+   *     is kept until the reader leaves the section.
+   *
+   * RELOAD. The browser restores the exact scroll position and the hash only
+   * mirrors it, so nothing scrolls (`useScrollToHash` stands down for a synced
+   * hash). When the two disagree (the position was not restored: a scroll
+   * container, a layout that changed), the hash wins and the spy scrolls to
+   * it, once, without a tween.
    */
   syncHash?: boolean;
+  /**
+   * What is active above the first section. `'first'` (default): the first
+   * section, a table of contents that always has a current entry. `'none'`:
+   * nothing (`activeSection` is `''`), for a page with a hero above its
+   * sections, so the nav and the URL (no hash there) say the same thing.
+   */
+  aboveFirst?: 'first' | 'none';
   /**
    * Sticky-chrome height in px: where a clicked section lands AND the line a
    * section's top must pass to become the active one. One number for both, so
@@ -38,12 +72,29 @@ export interface UseScrollSpyOptions {
   headerOffset?: number;
 }
 
-/** Point the URL's hash at `sectionId` (or clear it) without a history entry or a `hashchange`. */
-function replaceHash(sectionId: string | null): void {
-  const { pathname, search, hash } = window.location;
-  const next = sectionId ? `#${sectionId}` : '';
-  if (hash === next) return;
-  window.history.replaceState(window.history.state, '', `${pathname}${search}${next}`);
+/** The id the URL's hash names, or `''`. */
+function currentHashId(): string {
+  return normalizeHashFragment(window.location.hash).slice(1);
+}
+
+/** The child anchor a section declares as its active one, if any (`ACTIVE_ANCHOR_ATTRIBUTE`). */
+function activeChildAnchor(section: HTMLElement): string | null {
+  return section.querySelector<HTMLElement>(`[${ACTIVE_ANCHOR_ATTRIBUTE}][id]`)?.id ?? null;
+}
+
+/** Whether the URL's hash names `section` or something inside it. */
+function hashIsWithin(section: HTMLElement): boolean {
+  return section.contains(getHashTargetElement(currentHashId()));
+}
+
+/**
+ * The hash for a section being READ: its active child, else the hash already
+ * in the URL when it names something inside the section, else the section.
+ */
+function hashForSection(sectionId: string): string {
+  const section = document.getElementById(sectionId);
+  if (!section) return sectionId;
+  return activeChildAnchor(section) ?? (hashIsWithin(section) ? currentHashId() : sectionId);
 }
 
 /**
@@ -108,9 +159,11 @@ export function useScrollSpy(
   sections: ScrollSpySection[] | undefined,
   options: UseScrollSpyOptions = {},
 ): UseScrollSpyReturn {
-  const { syncHash = false, headerOffset = SCROLL_OFFSET } = options;
+  const { syncHash = false, headerOffset = SCROLL_OFFSET, aboveFirst = 'first' } = options;
   const [activeSection, setActiveSection] = useState('');
   const isScrollingFromClick = useRef(false);
+  // The restored-position check (see `syncHash`) runs once per page, not on every re-subscription.
+  const restoredChecked = useRef(false);
 
   // The scroll listener only ever needs the section IDS, and callers rebuild
   // the `sections` array on every render — so the value-stable joined key IS
@@ -128,7 +181,9 @@ export function useScrollSpy(
       setActiveSection(sectionId);
       // The click IS the reader's position now: say so in the URL right away
       // rather than waiting for a scroll event the click guard below swallows.
-      if (syncHash) replaceHash(sectionId);
+      // A click on a section's own entry goes to its head: its active child
+      // still names it, a finer hash from an earlier link does not.
+      if (syncHash) replaceLocationHash(activeChildAnchor(targetElement) ?? sectionId);
 
       scrollElementIntoView(targetElement, { headerOffset });
 
@@ -154,12 +209,17 @@ export function useScrollSpy(
 
       const scrollTop = scroller.scrollTop();
       const viewportTop = scroller.viewportTop();
-      const scrollPosition = scrollTop + headerOffset;
       // A section's top in the scroller's coordinates. `offsetTop` is relative
       // to the nearest POSITIONED ancestor, which is neither the document nor
       // the scroll container inside most layouts — measure from the viewport
       // and translate.
       const sectionTop = (element: HTMLElement) => element.getBoundingClientRect().top - viewportTop + scrollTop;
+      // The line a section's top must reach is where a link LANDS it: the
+      // offset, or the section's own larger `scroll-margin-top` (the rule
+      // `scrollElementIntoView` lands by). One number for both, per section.
+      const reached = (element: HTMLElement) =>
+        scrollTop + Math.max(headerOffset, declaredScrollMarginTop(element)) + LINE_TOLERANCE_PX >= sectionTop(element);
+      const first = document.getElementById(sectionIds[0] ?? '');
       let currentSection = sectionIds[0] ?? '';
 
       // At the bottom of the page the last sections can never reach the offset
@@ -175,20 +235,35 @@ export function useScrollSpy(
       } else {
         for (let i = sectionIds.length - 1; i >= 0; i--) {
           const element = document.getElementById(sectionIds[i]);
-          if (element && scrollPosition >= sectionTop(element)) {
+          if (element && reached(element)) {
             currentSection = sectionIds[i];
             break;
           }
         }
       }
 
-      setActiveSection(prev => (prev !== currentSection ? currentSection : prev));
+      const isAboveFirst = !atBottom && first !== null && !reached(first);
+      const active = isAboveFirst && aboveFirst === 'none' ? '' : currentSection;
+      setActiveSection(prev => (prev !== active ? active : prev));
 
-      if (syncHash && fromScroll) {
-        const first = document.getElementById(sectionIds[0] ?? '');
-        const aboveFirst = !atBottom && first !== null && scrollPosition < sectionTop(first);
-        replaceHash(aboveFirst ? null : currentSection);
+      if (!syncHash) return;
+      if (fromScroll) {
+        replaceLocationHash(isAboveFirst ? null : hashForSection(currentSection));
+        return;
       }
+      // First pass with the sections on the page: a hash the reader's scrolling
+      // left behind (a reload) must agree with where the browser restored the
+      // page. It agrees when it names the section at the line or something
+      // inside it; otherwise the hash wins, in one instant write. A hash that
+      // names nothing in the sections known so far waits for the next set (a
+      // section that joins the nav after hydration).
+      if (restoredChecked.current || !isScrollSyncedHash()) return;
+      const target = getHashTargetElement(currentHashId());
+      const tracked = sectionIds.some(id => document.getElementById(id)?.contains(target) ?? false);
+      if (!target || !tracked) return;
+      restoredChecked.current = true;
+      const section = isAboveFirst ? null : document.getElementById(currentSection);
+      if (!section?.contains(target)) scrollElementIntoView(target, { headerOffset, behavior: 'instant' });
     };
 
     let scrollTimer: ReturnType<typeof setTimeout>;
@@ -204,7 +279,7 @@ export function useScrollSpy(
       scroller.target.removeEventListener('scroll', throttledScroll);
       clearTimeout(scrollTimer);
     };
-  }, [sectionIdsKey, syncHash, headerOffset]);
+  }, [sectionIdsKey, syncHash, headerOffset, aboveFirst]);
 
   return { activeSection, handleSectionClick };
 }

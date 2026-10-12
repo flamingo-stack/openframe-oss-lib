@@ -18,10 +18,10 @@ export function DetailPageSkeleton({
   bare = false,
 }: DetailPageSkeletonProps = {}) {
   const content = (
-    <div className="animate-pulse space-y-6 md:space-y-10">
+    <div className="animate-pulse space-y-6 content-md:space-y-10">
       {/* Title Block */}
       <div className="flex w-full flex-col gap-6">
-        <div className="h-16 w-full max-w-3xl rounded bg-ods-card md:h-20"></div>
+        <div className="h-16 w-full max-w-3xl rounded bg-ods-card content-md:h-20"></div>
       </div>
 
       {/* Category Tags Skeleton */}
@@ -33,10 +33,13 @@ export function DetailPageSkeleton({
 
       {/* Metadata Grid Skeleton */}
       <div
-        className={`grid grid-cols-1 md:grid-cols-${metadataColumns} w-full overflow-hidden rounded-md border border-ods-border`}
+        className={`grid grid-cols-1 content-md:grid-cols-${metadataColumns} w-full overflow-hidden rounded-md border border-ods-border`}
       >
         {Array.from({ length: metadataColumns }).map((_, i) => (
-          <div key={i} className="border-b border-ods-border bg-ods-card p-4 last:border-r-0 md:border-b-0 md:border-r">
+          <div
+            key={i}
+            className="border-b border-ods-border bg-ods-card p-4 last:border-r-0 content-md:border-b-0 content-md:border-r"
+          >
             <div className="mb-2 h-6 w-24 rounded bg-ods-border"></div>
             <div className="h-5 w-20 rounded bg-ods-border"></div>
           </div>
@@ -70,7 +73,10 @@ export function DetailPageSkeleton({
   );
   if (bare) return content;
   return (
-    <PageLayout showHeader={false} className="mx-auto max-w-[1280px] bg-ods-bg px-6 py-6 md:px-20 md:py-10">
+    <PageLayout
+      showHeader={false}
+      className="mx-auto max-w-[1280px] bg-ods-bg px-6 py-6 content-md:px-20 content-md:py-10"
+    >
       {content}
     </PageLayout>
   );

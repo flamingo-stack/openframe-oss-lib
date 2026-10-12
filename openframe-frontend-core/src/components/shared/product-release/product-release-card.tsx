@@ -3,6 +3,7 @@
 import { AlertTriangle, Eye, Package, Sparkles, TrendingUp, Wrench } from 'lucide-react';
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import {
   CONTENT_CARD_FRAME_CLASS,
@@ -38,12 +39,12 @@ import { StatusBadge } from '../../ui/status-badge';
 export type ProductReleaseCardSize = 'lg' | 'sm';
 
 /**
- * Minimal structural `<a>` prop bundle the consumer composes (typically
+ * Minimal structural `<Link>` prop bundle the consumer composes (typically
  * via the hub's `useNavLink` hook — single source of truth for click
  * routing). Kept structural here so the OSS lib has zero hub coupling;
  * the consumer's `NavLinkProps` is type-compatible by shape.
  *
- * When supplied, the outer element renders as `<a {...anchorProps}>` so
+ * When supplied, the outer element renders as `<Link {...anchorProps}>` so
  * the SAME routing decision (modifier-click → browser default, cross-
  * origin → new tab, same-origin → `router.push`) runs identically to
  * every other entity card. When absent, the legacy `onClick` branch is
@@ -73,7 +74,7 @@ export interface ProductReleaseCardProps {
    */
   onClick?: () => void;
   /**
-   * `<a>` prop bundle from the consumer's `useNavLink` (or equivalent).
+   * `<Link>` prop bundle from the consumer's `useNavLink` (or equivalent).
    * When provided, the card's outer element renders as a real anchor so
    * routing (cross-origin → new tab, same-origin → soft RSC nav,
    * modifier-click → browser default) is owned by the hook — the card
@@ -211,8 +212,8 @@ export function ProductReleaseCard({
     // skeleton's shape matches the loaded card exactly. The earlier
     // dynamic `gridColsClass` ternary collapsed missing cells and
     // caused 28-56px reflow on resolve.
-    const gridColsClass = 'md:grid-cols-4';
-    const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border';
+    const gridColsClass = 'content-md:grid-cols-4';
+    const dividerClass = 'border-b content-md:border-b-0 content-md:border-r border-ods-border';
 
     // THE shared card frame: interactive (accent border on hover) when the card
     // links or clicks, the static frame when it does neither.
@@ -228,8 +229,8 @@ export function ProductReleaseCard({
     const innerLayout = (
       <>
         {/* HERO ZONE — cover LEFT + version pill + title + summary RIGHT */}
-        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className="w-full flex-shrink-0 md:w-[256px]">
+        <div className="flex flex-col gap-4 content-md:flex-row content-md:gap-6">
+          <div className="w-full flex-shrink-0 content-md:w-[256px]">
             <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-lg bg-ods-bg">
               {coverImage ? (
                 <Image
@@ -256,8 +257,8 @@ export function ProductReleaseCard({
                 1-line titles don't shrink and the catalog skeleton-to-
                 content transition is shift-free. Mirrors the
                 onboarding-guide catalog card. */}
-            <div className="mb-3 flex min-h-[60px] items-start md:min-h-[72px]">
-              <h3 className="line-clamp-2 font-['Azeret_Mono'] text-xl font-semibold leading-tight text-ods-text-primary md:text-2xl">
+            <div className="mb-3 flex min-h-[60px] items-start content-md:min-h-[72px]">
+              <h3 className="line-clamp-2 font-['Azeret_Mono'] text-xl font-semibold leading-tight text-ods-text-primary content-md:text-2xl">
                 {title}
               </h3>
             </div>
@@ -265,10 +266,10 @@ export function ProductReleaseCard({
                 summaries at 3 lines; `min-h` reserves the same vertical
                 space when content is shorter, so the catalog grid stays
                 row-consistent regardless of per-card content length.
-                Heights derived from text-sm md:text-base × leading-relaxed
+                Heights derived from text-sm content-md:text-base × leading-relaxed
                 (1.625): 14×1.625×3 ≈ 68 px mobile, 16×1.625×3 ≈ 78 px desktop. */}
-            <div className="min-h-[68px] md:min-h-[78px]">
-              <p className="line-clamp-3 font-['DM_Sans'] text-sm leading-relaxed text-ods-text-secondary md:text-base">
+            <div className="min-h-[68px] content-md:min-h-[78px]">
+              <p className="line-clamp-3 font-['DM_Sans'] text-sm leading-relaxed text-ods-text-secondary content-md:text-base">
                 {summary ?? ''}
               </p>
             </div>
@@ -382,9 +383,9 @@ export function ProductReleaseCard({
     // anchorProps WINS over onClick.
     if (anchorProps) {
       return (
-        <a {...anchorProps} className={frameClass} aria-label={`Open ${title}`}>
+        <Link {...anchorProps} className={frameClass}>
           {innerLayout}
-        </a>
+        </Link>
       );
     }
     if (onClick) {
@@ -400,11 +401,11 @@ export function ProductReleaseCard({
   }
 
   // ----- COMPACT branch (chat / tight surfaces) ------------------------------
-  // Outer must be a phrasing-content element (`<a>` or `<span>`) — block
+  // Outer must be a phrasing-content element (`<Link>` or `<span>`) — block
   // elements like `<div>`/`<h3>` are illegal inside markdown `<p>`, so we
   // cannot reuse `InteractiveCard` (a `<div>`).
   //
-  // - When `anchorProps` is set, render as a real `<a>` so the consumer's
+  // - When `anchorProps` is set, render as a real `<Link>` so the consumer's
   //   click hook (`useNavLink`) owns routing identically to every other
   //   entity card — cross-origin → new tab, same-origin → soft RSC nav.
   // - Else fall back to legacy `<span role="button">` behavior driven by
@@ -430,7 +431,7 @@ export function ProductReleaseCard({
       // kept identical by hand — if you edit one, edit the other.
       //
       // The interactive branch ADDS `cursor-pointer` + a focus-
-      // visible ring. The `<a>` form would normally get focus styling
+      // visible ring. The `<Link>` form would normally get focus styling
       // from the browser, but `no-underline` strips the default
       // affordance, so explicit ring styles match the `<span role>` form.
       'my-1.5 flex w-full items-start gap-3 p-2',
@@ -493,14 +494,14 @@ export function ProductReleaseCard({
     );
     // Anchor variant — consumer's `useNavLink` (or equivalent) owns the
     // click decision; the card just spreads the prop bundle and renders
-    // a real `<a>` so cmd/ctrl-click new-tab + middle-click work without
+    // a real `<Link>` so cmd/ctrl-click new-tab + middle-click work without
     // any extra JS. This is the SAME pattern BlogCard / CaseStudyCard /
     // ProgramCard / etc. use across the consumer codebase.
     if (anchorProps) {
       return (
-        <a {...anchorProps} className={outerClassName}>
+        <Link {...anchorProps} className={outerClassName}>
           {innerChildren}
-        </a>
+        </Link>
       );
     }
     // Legacy fallback — `onClick` (no href). Keeps the public `/releases`

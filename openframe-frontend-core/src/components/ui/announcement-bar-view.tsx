@@ -1,16 +1,8 @@
 'use client';
 
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
+import { breakpoints } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
-
-/**
- * Mirrors `screens.md` in tailwind.config.ts (800px), which is also where the
- * ODS responsive tokens step up (ods-responsive-tokens.css). ONE breakpoint
- * for the whole bar: the `md:` variants below and the `onContentClick` guard
- * must never disagree (they did before — the guard read a stale 768px while
- * the CSS switched at 800px).
- */
-const MD_QUERY = '(min-width: 800px)';
 
 export interface AnnouncementBarViewProps {
   /**
@@ -92,7 +84,7 @@ export function AnnouncementBarView({
 }: AnnouncementBarViewProps) {
   const handleContentClick = onContentClick
     ? () => {
-        if (!window.matchMedia(MD_QUERY).matches) onContentClick();
+        if (!window.matchMedia(breakpoints.md).matches) onContentClick();
       }
     : undefined;
 

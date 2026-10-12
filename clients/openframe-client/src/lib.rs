@@ -35,12 +35,14 @@ pub use cli::run;
 #[cfg(any(unix, windows))]
 pub mod executor;
 
+use crate::clients::build_agent_http_client;
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
 use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
+use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
 use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
 use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
@@ -86,6 +88,7 @@ use crate::services::tool_installation_service::ToolInstallationService;
 use crate::services::tool_restart_service::ToolRestartService;
 use crate::services::tool_uninstall_service::ToolUninstallService;
 use crate::services::InstalledToolsService;
+use crate::services::MachineIdService;
 use crate::services::{
     AgentAuthService, AgentRegistrationService, InitialConfigurationService,
     ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolRunManager,
@@ -95,7 +98,6 @@ use crate::services::{
     InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
-use crate::services::{MachineIdService, MACHINE_ID_HEADER};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -169,6 +171,7 @@ pub struct Client {
     openframe_client_update_listener: OpenFrameClientUpdateListener,
     tool_agent_update_listener: ToolAgentUpdateListener,
     client_uninstall_message_listener: ClientUninstallMessageListener,
+    remote_access_message_listener: RemoteAccessMessageListener,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
@@ -228,32 +231,21 @@ impl Client {
             .get_or_create()
             .context("Failed to get or create machine ID")?;
 
-        let mut default_headers = reqwest::header::HeaderMap::new();
-        default_headers.insert(
-            MACHINE_ID_HEADER,
-            reqwest::header::HeaderValue::from_str(&machine_id)
-                .context("Invalid machine ID for header")?,
-        );
+        let local_mode = initial_configuration_service.is_local_mode()?;
 
-        let http_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS))
-            .default_headers(default_headers.clone())
-            // disable TLS verification for dev mode only
-            .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
-            .no_proxy()
-            // disable connection pooling to force fresh DNS lookup on each request
-            .pool_max_idle_per_host(0)
-            .build()
-            .context("Failed to create HTTP client")?;
+        let http_client = build_agent_http_client(
+            &machine_id,
+            Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS),
+            local_mode,
+        )
+        .context("Failed to create HTTP client")?;
 
-        let download_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS))
-            .default_headers(default_headers)
-            .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
-            .no_proxy()
-            .pool_max_idle_per_host(0)
-            .build()
-            .context("Failed to create download HTTP client")?;
+        let download_client = build_agent_http_client(
+            &machine_id,
+            Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS),
+            local_mode,
+        )
+        .context("Failed to create download HTTP client")?;
 
         // Initialize http url
         let http_url = format!(
@@ -531,6 +523,13 @@ impl Client {
             config_service.clone(),
         );
 
+        // Relaunches the chat app on remote-access traffic so sessions reach a device whose chat has exited
+        let remote_access_message_listener = RemoteAccessMessageListener::new(
+            nats_connection_manager.clone(),
+            config_service.clone(),
+            tool_run_manager.clone(),
+        );
+
         let execution_service = ExecutionService::new();
 
         let result_store = Arc::new(ResultStore::open_or_degrade(
@@ -627,6 +626,7 @@ impl Client {
             openframe_client_update_listener,
             tool_agent_update_listener,
             client_uninstall_message_listener,
+            remote_access_message_listener,
             command_execution_listener,
             script_execution_listener,
             script_bootstrap_execution_listener,
@@ -736,6 +736,8 @@ impl Client {
 
         // Start client uninstall listener in background
         self.client_uninstall_message_listener.start().await?;
+
+        self.remote_access_message_listener.start().await?;
 
         // Recover interrupted scheduled scripts, then start the outbox flusher,
         // both strictly before any execution listener can accept new batches

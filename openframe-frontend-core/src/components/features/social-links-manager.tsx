@@ -1,8 +1,9 @@
 'use client';
 
 import { Trash2, User } from 'lucide-react';
+import { createElement } from 'react';
 import { normalizeSocialPlatform } from '../../utils/social-platforms';
-import { SOCIAL_ICON_COMPONENTS } from '../social-icon-row';
+import { socialIcon } from '../social-icon-row';
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
 
 export interface SocialLink {
@@ -61,8 +62,8 @@ export function SocialLinksManager({
     const iconKey = platform?.icon_name || link.platform;
     const key = normalizeSocialPlatform(iconKey);
     if (!key) return null;
-    const IconComponent = SOCIAL_ICON_COMPONENTS[key];
-    return <IconComponent className="h-5 w-5 text-ods-text-secondary" />;
+    const icon = socialIcon(key);
+    return icon ? createElement(icon, { className: 'h-5 w-5 text-ods-text-secondary' }) : null;
   };
 
   return (

@@ -7,7 +7,7 @@ import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 
 /** The design size, when a caller does not state one. */
-const ENTITY_IMAGE_SIZE = 'size-[52px] md:size-[60px]';
+const ENTITY_IMAGE_SIZE = 'size-[52px] content-md:size-[60px]';
 
 export interface EntityImageProps {
   src?: string | null;
@@ -18,10 +18,10 @@ export interface EntityImageProps {
    * REPLACES the default size, for both the image and its initials fallback.
    *
    * Sizing through `className` does NOT work here and cannot be made to:
-   * the default is responsive (`size-[52px] md:size-[60px]`), and
+   * the default is responsive (`size-[52px] content-md:size-[60px]`), and
    * tailwind-merge lets `size-*` override `w`/`h` but never the reverse — so a
    * caller passing `h-4 w-6` dropped the base `size-[52px]` and kept
-   * `md:size-[60px]`, rendering 16px on a phone and 60px on a desktop. State
+   * `content-md:size-[60px]`, rendering 16px on a phone and 60px on a desktop. State
    * the size here instead; it is substituted, not merged.
    */
   sizeClassName?: string;

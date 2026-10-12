@@ -52,11 +52,15 @@ const statusBadgeVariants = cva('inline-flex items-center justify-center rounded
  * Per product direction: the TEXT colour is constant (the full platform
  * `--ods-accent`) so every generation stays equally legible; only the BACKGROUND
  * opacity steps down (Gen1 strongest → later gens fainter). Returns the % of the
- * accent mixed into the badge background. */
+ * accent mixed into the badge background.
+ *
+ * The strongest step is 10%: the text is the accent itself, so the more accent
+ * the background holds the less the text stands out from it. On a card, pink on
+ * 10% of itself is 4.65:1; the former 30% was 3.4:1 and 18% was 4.1:1. */
 export function genBadgeBgOpacity(gen: number): number {
-  if (gen <= 1) return 30;
-  if (gen === 2) return 18;
-  return Math.max(10 - (gen - 3) * 6, 4);
+  if (gen <= 1) return 10;
+  if (gen === 2) return 7;
+  return Math.max(4 - (gen - 3), 2);
 }
 
 /** Parse the whole-number gen tier out of a ClickUp Target Version label

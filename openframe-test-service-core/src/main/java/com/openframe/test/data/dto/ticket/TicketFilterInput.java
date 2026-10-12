@@ -30,6 +30,8 @@ public class TicketFilterInput {
      * {@link com.openframe.test.data.generator.TicketGenerator#firstTicketWithStatusKindNotIn}.
      */
     private List<String> statusIds;
+    // Raw machine ids (the ticket's deviceId), not Relay global ids.
+    private List<String> deviceIds;
     // Raw organization ids (the ticket's organizationId), not Relay global ids.
     private List<String> organizationIds;
     // Raw user ids (the ticket's assignedTo), not Relay global ids.

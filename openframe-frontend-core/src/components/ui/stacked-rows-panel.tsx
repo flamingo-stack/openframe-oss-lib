@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 
 /**
@@ -83,15 +84,15 @@ const CELL_ITEMS_ALIGN: Record<PanelColumnAlign, string> = {
 };
 
 const HIDE_CLASS: Record<PanelHideAt, string> = {
-  md: 'hidden md:flex',
-  lg: 'hidden lg:flex',
-  xl: 'hidden xl:flex',
+  md: 'hidden content-md:flex',
+  lg: 'hidden content-lg:flex',
+  xl: 'hidden content-xl:flex',
 };
 
 // Base column-row class. Row height is content-driven via the min-heights, matching
 // the joined-row pattern used across the detail layouts (56px mobile, 80px tablet+).
 const ROW_CLASS =
-  'flex items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] min-h-14 md:min-h-20 border-b border-ods-border last:border-b-0';
+  'flex items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] min-h-14 content-md:min-h-20 border-b border-ods-border last:border-b-0';
 
 function CellValue({ column }: { column: PanelColumn }) {
   const valueNode = (
@@ -108,14 +109,14 @@ function CellValue({ column }: { column: PanelColumn }) {
       <div className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)]">
         {column.icon && <span className="shrink-0">{column.icon}</span>}
         {column.href ? (
-          <a
+          <Link
             href={column.href}
             target="_blank"
             rel="noreferrer"
             className="min-w-0 transition-opacity hover:opacity-80"
           >
             {valueNode}
-          </a>
+          </Link>
         ) : (
           valueNode
         )}

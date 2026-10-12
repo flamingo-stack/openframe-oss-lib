@@ -27,7 +27,7 @@ export function CategoryVendorSelectorSkeleton({ subcategories = 3, className }:
             {/* Subcategory title */}
             <TextSkeleton.Subheading className="w-1/3" />
             {/* Vendor slots container */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4 content-md:grid-cols-3">
               {Array.from({ length: 2 }).map((__, j) => (
                 <UnifiedSkeleton key={j} className="h-20 rounded-lg" />
               ))}

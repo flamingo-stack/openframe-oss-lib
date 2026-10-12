@@ -153,7 +153,7 @@ export function TicketInfoSection({
   return (
     <div className={cn('overflow-hidden rounded-[6px] border border-ods-border', className)}>
       {/* Header row */}
-      <div className="grid grid-cols-2 items-center gap-4 border-b border-ods-border bg-ods-card px-4 py-3 lg:grid-cols-[1fr_1fr_1fr_auto]">
+      <div className="grid grid-cols-2 items-center gap-4 border-b border-ods-border bg-ods-card px-4 py-3 content-lg:grid-cols-[1fr_1fr_1fr_auto]">
         {/* Organization with image */}
         <div className="flex min-w-0 items-center gap-2">
           <SquareAvatar

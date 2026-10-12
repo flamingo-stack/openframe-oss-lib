@@ -41,6 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
+
 /**
  * Security configuration for all non-Authorization-Server requests: the login page, form login,
  * and OAuth2/OIDC login against the external SSO providers.
@@ -83,7 +85,8 @@ public class SecurityConfig {
                                 "/management/**",
                                 "/.well-known/**",
                                 "/error",
-                                "/sso/providers/**"
+                                "/sso/providers/**",
+                                "/graphql"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -113,8 +116,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationFailureHandler oauth2LoginFailureHandler(AuthErrorResponder authErrorResponder) {
         return (HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) ->
-                authErrorResponder.send(response, request, "oauth2-login", exception,
-                        "SSO login failed. Please try again.");
+                authErrorResponder.send(response, request, "oauth2-login", exception, SSO_LOGIN_FAILED);
     }
 
     /** One entry per distinct SSO config (its cache key), NOT per login — bounded by active configs. */

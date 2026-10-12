@@ -161,7 +161,7 @@ export function HelpCenterCard({
         disabled={!isExpandable}
         aria-expanded={isExpandable ? isExpanded : undefined}
         aria-controls={isExpanded ? `help-center-drawer-${ticket.id}` : undefined}
-        className="w-full p-[12px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent disabled:cursor-default md:p-[16px]"
+        className="w-full p-[12px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent disabled:cursor-default content-md:p-[16px]"
       >
         <DevCardRowContent
           title={title}

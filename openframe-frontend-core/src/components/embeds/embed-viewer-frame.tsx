@@ -121,7 +121,7 @@ export function EmbedViewerFrame({
         isFullscreen && 'overflow-auto bg-ods-bg p-[var(--spacing-system-mf)]',
       )}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 content-sm:flex-row content-sm:items-center content-sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
           {icon}
           {titleVariant === 'h3' ? (
@@ -133,12 +133,12 @@ export function EmbedViewerFrame({
         {/* Same responsive action-row idiom as the PDF viewer's button pair
             and every viewer's own action: full-width stacked on mobile,
             inline row from `sm:` up, SAME Button idiom (outline /
-            small-legacy / w-4 icon / w-full sm:w-auto). Without the
+            small-legacy / w-4 icon / w-full content-sm:w-auto). Without the
             fullscreen toggle, `actions` renders EXACTLY as before — the
             wrapper exists only when the toggle joins it, so pre-existing
             viewers (figma/pdf/sheets) are byte-identical. */}
         {fullscreenControl && src ? (
-          <div className="flex flex-col gap-[var(--spacing-system-xsf)] sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-[var(--spacing-system-xsf)] content-sm:flex-row content-sm:items-center">
             {actions}
             <Button
               variant="outline"
@@ -146,7 +146,7 @@ export function EmbedViewerFrame({
               onClick={toggleFullscreen}
               aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
               leftIcon={isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-              className="w-full sm:w-auto"
+              className="w-full content-sm:w-auto"
             >
               {isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             </Button>

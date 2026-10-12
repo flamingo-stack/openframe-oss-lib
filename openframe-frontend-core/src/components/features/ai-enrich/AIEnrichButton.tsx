@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../../utils/cn';
-import { SparklesIcon } from '../../icons/sparkles-icon';
+import { SparklesIcon } from '../../icons-v2-generated/interface/sparkles-icon';
 import { Button } from '../../ui/button';
 
 export interface AIEnrichButtonProps {

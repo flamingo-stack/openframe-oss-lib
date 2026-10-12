@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
-import { MingoIcon } from '../icons';
+import { AgentMark } from '../agent-mark';
 import { XmarkIcon } from '../icons-v2-generated';
 
 export interface HeaderMingoButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -12,6 +12,9 @@ export interface HeaderMingoButtonProps extends React.ButtonHTMLAttributes<HTMLB
    *  control collapses to a square `HeaderButton`-sized affordance on narrow
    *  viewports). Defaults to `false`. */
   iconOnly?: boolean;
+  /** Show the close "X" while active with the wordmark too, not only in
+   *  `iconOnly` mode. Defaults to `false`. */
+  closeWhenActive?: boolean;
   className?: string;
 }
 
@@ -25,11 +28,18 @@ export interface HeaderMingoButtonProps extends React.ButtonHTMLAttributes<HTMLB
  *
  * Figma: 7532:222103 — `button-full`.
  */
-export function HeaderMingoButton({ isActive = false, iconOnly = false, className, ...props }: HeaderMingoButtonProps) {
+export function HeaderMingoButton({
+  isActive = false,
+  iconOnly = false,
+  closeWhenActive = false,
+  className,
+  ...props
+}: HeaderMingoButtonProps) {
+  const showClose = isActive && (iconOnly || closeWhenActive);
   return (
     <button
       type="button"
-      aria-label={iconOnly && isActive ? 'Close Mingo AI' : 'Mingo AI'}
+      aria-label={showClose ? 'Close Mingo AI' : 'Mingo AI'}
       aria-pressed={isActive}
       className={cn(
         'flex h-full shrink-0 items-center gap-2 px-4',
@@ -47,7 +57,7 @@ export function HeaderMingoButton({ isActive = false, iconOnly = false, classNam
       )}
       {...props}
     >
-      {iconOnly && isActive ? (
+      {showClose ? (
         // Mobile, drawer open: the icon-only button doubles as the close
         // affordance, so swap the Mingo logo for an X. Match the other header
         // icons (e.g. notifications): secondary color, w-4 h-4 → md:w-6 h-6.
@@ -55,12 +65,7 @@ export function HeaderMingoButton({ isActive = false, iconOnly = false, classNam
       ) : (
         // Outer frame follows the button's text color (currentColor); the eyes
         // and corner block are ODS cyan.
-        <MingoIcon
-          color="currentColor"
-          eyesColor="var(--ods-flamingo-cyan-base)"
-          cornerColor="var(--ods-flamingo-cyan-base)"
-          className="h-6 w-6 shrink-0"
-        />
+        <AgentMark agent="mingo" className="h-6 w-6 shrink-0" />
       )}
       {!iconOnly && <span className="whitespace-nowrap font-bold tracking-[-0.36px] text-h3">Mingo AI</span>}
     </button>

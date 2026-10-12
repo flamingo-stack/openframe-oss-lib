@@ -175,7 +175,14 @@ export function FilterModal({
   const isEmpty = !isLoading && !hasSort && !hasFilterGroups && !hasTagFilter && !dateFilter;
 
   return (
-    <ModalV2 isOpen={isOpen} onClose={onClose} className={cn('max-h-[90vh] max-w-none', className)}>
+    <ModalV2
+      isOpen={isOpen}
+      onClose={onClose}
+      // Full width as the phone's bottom sheet. A wide window gets the medium dialog
+      // width instead: page content narrowed by a docked side panel shows the
+      // mobile filter button there too, and a window-wide sheet read as broken.
+      className={cn('max-h-[90vh] max-w-none md:max-w-[min(42rem,calc(100vw-2rem))]', className)}
+    >
       <ModalV2Header>
         <ModalV2Title>{title}</ModalV2Title>
       </ModalV2Header>

@@ -141,7 +141,7 @@ export function PageLayout({
       <div
         className={cn(
           'flex flex-1 flex-col gap-[var(--spacing-system-l)]',
-          needsBottomPadding && 'pb-28 md:pb-0',
+          needsBottomPadding && 'pb-28 content-md:pb-0',
           contentClassName,
         )}
       >

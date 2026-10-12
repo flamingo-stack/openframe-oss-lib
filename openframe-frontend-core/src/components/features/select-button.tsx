@@ -47,7 +47,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
         disabled={disabled}
         onClick={onClick}
         className={cn(
-          'group flex h-11 items-center gap-1 rounded-[6px] border px-3 py-3 transition-colors duration-200 md:h-16 md:gap-2 md:px-4',
+          'group flex h-11 items-center gap-1 rounded-[6px] border px-3 py-3 transition-colors duration-200 content-md:h-16 content-md:gap-2 content-md:px-4',
           'w-full text-left font-body',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
           'disabled:pointer-events-none disabled:opacity-50',
@@ -63,7 +63,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
         {icon && (
           <span
             className={cn(
-              'flex size-4 shrink-0 items-center justify-center md:size-6',
+              'flex size-4 shrink-0 items-center justify-center content-md:size-6',
               selected ? 'text-ods-accent' : 'text-ods-text-secondary',
             )}
           >
@@ -91,7 +91,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
           {description && (
             <span
               className={cn(
-                'hidden truncate text-h6 md:flex',
+                'hidden truncate text-h6 content-md:flex',
                 selected ? 'text-ods-accent' : 'text-ods-text-secondary',
               )}
               title={description}
@@ -103,7 +103,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
 
         {tag && <Tag variant={tagVariant} className="shrink-0" label={tag} />}
 
-        {selected && <CheckCircleIcon className="size-4 shrink-0 text-ods-accent md:size-6" />}
+        {selected && <CheckCircleIcon className="size-4 shrink-0 text-ods-accent content-md:size-6" />}
       </button>
     );
   },

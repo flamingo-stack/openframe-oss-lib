@@ -11,8 +11,9 @@
  */
 
 import type React from 'react';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
-import { CustomExternalLinkIcon } from '../icons';
+import { CustomExternalLinkIcon } from '../icons-v2-generated/interface/custom-external-link-icon';
 
 export interface CveLinkProps {
   /** CVE ID (e.g., "CVE-2024-1234") */
@@ -25,7 +26,7 @@ export const CveLink: React.FC<CveLinkProps> = ({ cveId, className }) => {
   const nistUrl = `https://nvd.nist.gov/vuln/detail/${cveId}`;
 
   return (
-    <a
+    <Link
       href={nistUrl}
       target="_blank"
       rel="noopener noreferrer"
@@ -35,8 +36,11 @@ export const CveLink: React.FC<CveLinkProps> = ({ cveId, className }) => {
       )}
     >
       <span>{cveId}</span>
-      <CustomExternalLinkIcon className="h-4 w-4 text-ods-text-secondary transition-colors group-hover:text-ods-accent" />
-    </a>
+      <CustomExternalLinkIcon
+        color="var(--color-text-secondary)"
+        className="h-4 w-4 text-ods-text-secondary transition-colors group-hover:text-ods-accent"
+      />
+    </Link>
   );
 };
 

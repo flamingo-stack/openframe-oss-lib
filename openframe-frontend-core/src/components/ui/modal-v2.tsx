@@ -2,6 +2,7 @@
 
 import { type ReactNode, createContext, forwardRef, useContext, useRef, useEffect, useState } from 'react';
 import { RemoveScroll } from 'react-remove-scroll';
+import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
 import { XmarkIcon } from '../icons-v2-generated';
 
@@ -235,7 +236,9 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
           mirrored there as INSET_TRANSITION_MS — it delays the app's
           scroll-the-focused-field re-assert until this transition settles. */}
         <div
-          className="fixed inset-0 z-[1300] flex items-end justify-center transition-[padding] duration-200 md:items-center"
+          // `ods-viewport-layer`: a modal follows the window, so a modal opened from a
+          // narrow content area takes the window's tokens, not the area's mobile ones.
+          className="ods-viewport-layer fixed inset-0 z-[1300] flex items-end justify-center transition-[padding] duration-200 md:items-center"
           style={{ paddingBottom: 'var(--of-keyboard-inset, 0px)' }}
         >
           <div
@@ -303,7 +306,9 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
             role="dialog"
             aria-modal="true"
           >
-            <ModalContext.Provider value={{ onClose }}>{children}</ModalContext.Provider>
+            <ModalContext.Provider value={{ onClose }}>
+              <ViewportBreakpoints>{children}</ViewportBreakpoints>
+            </ModalContext.Provider>
           </div>
         </div>
       </RemoveScroll>

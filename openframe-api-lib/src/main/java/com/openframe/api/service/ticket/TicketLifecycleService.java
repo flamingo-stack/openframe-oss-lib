@@ -394,6 +394,7 @@ public class TicketLifecycleService {
                 .statusIds(List.of(resolvedStatusId));
         if (filterInput != null) {
             builder.organizationIds(filterInput.getOrganizationIds())
+                    .deviceIds(filterInput.getDeviceIds())
                     .assigneeIds(filterInput.getAssigneeIds());
         }
         return builder.build();

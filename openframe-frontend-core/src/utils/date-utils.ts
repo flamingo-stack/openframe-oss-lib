@@ -56,7 +56,14 @@ export function formatTicketFullTimestamp(iso: string): string {
  * formatRelativeTime(new Date()) // 'Just now'
  */
 export function formatRelativeTime(timestamp: string | Date): string {
-  const now = new Date();
+  return formatRelativeTimeFrom(timestamp, new Date());
+}
+
+/**
+ * {@link formatRelativeTime} against a given "now": for a view that renders
+ * with a fixed clock (a product screen fed by a fixture, a test).
+ */
+export function formatRelativeTimeFrom(timestamp: string | Date, now: Date): string {
   const targetTime = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
 
   // Validate the date

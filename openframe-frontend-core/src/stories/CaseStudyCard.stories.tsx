@@ -46,3 +46,20 @@ export const Default: Story = {
     rel: 'noopener noreferrer',
   },
 };
+
+const caseStudyWithMetrics = {
+  ...caseStudy,
+  metrics: [
+    { value: '50%', label: 'of routine tasks automated' },
+    { value: '3x', label: 'faster onboarding' },
+  ],
+};
+
+/** A customer result: who, the first metric large, the title and the way in. */
+export const Result: Story = {
+  args: {
+    study: caseStudyWithMetrics,
+    href: '/case-studies/' + caseStudy.slug,
+    size: 'result',
+  },
+};

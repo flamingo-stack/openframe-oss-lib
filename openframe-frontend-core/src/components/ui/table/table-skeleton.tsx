@@ -5,7 +5,7 @@ import type { TableCardSkeletonProps } from './types';
 
 // INNER row heights: the bordered row card adds 1px top + bottom, so the
 // outer block totals the designed 68px / 80px.
-const ROW_HEIGHT_DESKTOP = 'h-[66px] md:h-[78px]';
+const ROW_HEIGHT_DESKTOP = 'h-[66px] content-md:h-[78px]';
 /**
  * A `compact` row's floor. Compact rows are content-sized (`py-2`), but every
  * row in one table renders the same cell shapes, so pinning a minimum makes the
@@ -47,7 +47,7 @@ export function TableCardSkeleton({
               the two here made every compact table jump on its first paint. */}
           <div
             className={cn(
-              'hidden items-center gap-4 px-4 md:flex',
+              'hidden items-center gap-4 px-4 content-md:flex',
               compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
               rowClassName,
             )}
@@ -81,7 +81,7 @@ export function TableCardSkeleton({
           {/* Mobile Skeleton */}
           <div
             className={cn(
-              'flex items-center justify-start gap-3 px-3 md:hidden',
+              'flex items-center justify-start gap-3 px-3 content-md:hidden',
               // Mirror the real row on mobile too: a compact row is
               // content-sized with a floor, a normal row a fixed height.
               // Hard-wiring ROW_HEIGHT_MOBILE made every COMPACT table jump

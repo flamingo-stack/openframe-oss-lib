@@ -511,6 +511,10 @@ pub async fn uninstall_windows(
     remove_binary_siblings(install_path);
     remove_update_temp_files(install_path);
 
+    if let Err(e) = crate::platform::apps_entry::unregister() {
+        warn!("Failed to remove Apps & Features entry: {:#}", e);
+    }
+
     // Launch cleanup script to remove binary after process exit
     if install_path.exists() {
         info!("Launching binary cleanup script...");

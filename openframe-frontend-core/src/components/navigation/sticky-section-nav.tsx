@@ -2,8 +2,10 @@
 
 import type React from 'react';
 import { useEffect, useState, useCallback, useRef } from 'react';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils';
 import { scrollElementIntoView } from '../../utils/scroll-into-view';
+import { ScrollShadow } from '../ui/scroll-fade';
 
 export interface StickyNavSection {
   id: string;
@@ -17,6 +19,85 @@ interface StickySectionNavProps {
   className?: string;
   ribbonPosition?: 'left' | 'right';
   ribbonColor?: string;
+  /**
+   * `vertical` (default): the table of contents beside a document.
+   * `horizontal`: a bar across the page (stick it under the header with
+   * `className`): `brand` at the start, the sections as a pill row that scrolls
+   * sideways when it does not fit, `action` at the end.
+   */
+  orientation?: 'vertical' | 'horizontal';
+  /** Horizontal only: what the bar belongs to (a product mark and name). Hidden on a narrow area. */
+  brand?: React.ReactNode;
+  /** Horizontal only: one link or button at the end of the bar. Hidden on a narrow area. */
+  action?: React.ReactNode;
+  /** Names the navigation for assistive tech. */
+  label?: string;
+}
+
+function HorizontalSectionNav({
+  sections,
+  activeSection,
+  onSectionClick,
+  className,
+  brand,
+  action,
+  label,
+}: Omit<StickySectionNavProps, 'ribbonPosition' | 'ribbonColor' | 'orientation'>) {
+  const navRef = useRef<HTMLElement>(null);
+  // Keep the pill of the section being read in view when the row scrolls. The
+  // row is the pill's parent: the lib's `ScrollShadow` owns the scrolling element.
+  useEffect(() => {
+    const pill = navRef.current?.querySelector<HTMLElement>(`[data-section="${CSS.escape(activeSection)}"]`);
+    const row = pill?.parentElement;
+    if (!row || !pill) return;
+    const left = pill.offsetLeft - row.offsetLeft;
+    if (left < row.scrollLeft || left + pill.offsetWidth > row.scrollLeft + row.clientWidth) {
+      row.scrollTo({ left: Math.max(0, left - 12), behavior: 'smooth' });
+    }
+  }, [activeSection]);
+
+  return (
+    <nav ref={navRef} aria-label={label} className={cn('flex h-14 items-stretch gap-6 bg-ods-bg', className)}>
+      {brand && (
+        <div className="hidden shrink-0 items-center gap-2.5 border-r border-ods-border pr-6 text-ods-text-primary text-h4 content-lg:flex">
+          {brand}
+        </div>
+      )}
+      {/* The scrolling row and its edge fades are the lib's one pattern (`ScrollShadow`), not a second one. */}
+      <ScrollShadow
+        axis="horizontal"
+        className="min-w-0 flex-1"
+        scrollClassName="flex h-full items-center gap-1 [scrollbar-width:none] content-lg:items-stretch"
+      >
+        {sections.map(section => {
+          const active = activeSection === section.id;
+          return (
+            <Link
+              key={section.id}
+              href={`#${section.id}`}
+              data-section={section.id}
+              aria-current={active ? 'location' : undefined}
+              onClick={event => {
+                event.preventDefault();
+                onSectionClick(section.id);
+              }}
+              className={cn(
+                // A pill on a narrow area; from the content `lg` step a tab the height of the bar.
+                'flex shrink-0 items-center whitespace-nowrap rounded-full border px-3 py-1.5 transition-colors text-h6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
+                'content-lg:rounded-none content-lg:border-x-0 content-lg:border-b-2 content-lg:border-t-0 content-lg:py-0',
+                active
+                  ? 'border-ods-border bg-ods-card text-ods-text-primary content-lg:border-ods-accent content-lg:bg-transparent content-lg:bg-gradient-to-b content-lg:from-transparent content-lg:to-ods-accent/10'
+                  : 'border-transparent text-ods-text-secondary hover:text-ods-text-primary content-lg:hover:bg-ods-bg-hover',
+              )}
+            >
+              {section.label}
+            </Link>
+          );
+        })}
+      </ScrollShadow>
+      {action && <div className="hidden shrink-0 items-center content-lg:flex">{action}</div>}
+    </nav>
+  );
 }
 
 /**
@@ -30,11 +111,28 @@ export function StickySectionNav({
   className,
   ribbonPosition = 'left',
   ribbonColor = 'var(--color-accent-primary)',
+  orientation = 'vertical',
+  brand,
+  action,
+  label,
 }: StickySectionNavProps) {
+  if (orientation === 'horizontal') {
+    return (
+      <HorizontalSectionNav
+        sections={sections}
+        activeSection={activeSection}
+        onSectionClick={onSectionClick}
+        className={className}
+        brand={brand}
+        action={action}
+        label={label}
+      />
+    );
+  }
   const navHeight = sections.length * 40; // 40px per item (h-10)
 
   return (
-    <nav className={cn('relative bg-ods-bg', className)}>
+    <nav aria-label={label} className={cn('relative bg-ods-bg', className)}>
       {/* Background gray vertical line for all nav items */}
       <div
         className="absolute bg-ods-border"

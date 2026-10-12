@@ -328,7 +328,9 @@ export function MediaGalleryManager({
             <h3 className="text-ods-text-primary text-h3">Media Gallery ({media.length})</h3>
             <p className="text-ods-text-secondary text-h6">Drag to reorder</p>
           </div>
-          <div className={cn('grid grid-cols-1 gap-4 md:grid-cols-2', columns === 3 && 'lg:grid-cols-3')}>
+          <div
+            className={cn('grid grid-cols-1 gap-4 content-md:grid-cols-2', columns === 3 && 'content-lg:grid-cols-3')}
+          >
             {media.map((item, index) => (
               <Card
                 key={item.id ?? `${item.media_url}-${index}`}

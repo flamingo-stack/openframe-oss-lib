@@ -164,21 +164,21 @@ export function EmptyState({
   const ctaButtonVariant = ctaVariant === 'primary' ? 'accent' : 'outline';
 
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-6 text-center md:py-16">
+    <div className="flex flex-col items-center justify-center px-6 py-6 text-center content-md:py-16">
       {/* Icon */}
-      <div className="mb-3 flex items-center justify-center md:mb-6">
-        <div className="rounded-full border border-ods-border bg-ods-card p-3 md:p-6">
-          <div className="flex h-8 w-8 items-center justify-center text-ods-text-secondary md:h-16 md:w-16">
+      <div className="mb-3 flex items-center justify-center content-md:mb-6">
+        <div className="rounded-full border border-ods-border bg-ods-card p-3 content-md:p-6">
+          <div className="flex h-8 w-8 items-center justify-center text-ods-text-secondary content-md:h-16 content-md:w-16">
             {defaultContent.icon}
           </div>
         </div>
       </div>
 
       {/* Title */}
-      <h2 className="mb-2 text-ods-text-primary text-h3 md:mb-3">{displayTitle}</h2>
+      <h2 className="mb-2 text-ods-text-primary text-h3 content-md:mb-3">{displayTitle}</h2>
 
       {/* Description */}
-      <p className="mb-4 max-w-md text-ods-text-secondary text-h6 md:mb-8">{displayDescription}</p>
+      <p className="mb-4 max-w-md text-ods-text-secondary text-h6 content-md:mb-8">{displayDescription}</p>
 
       {/* Link CTA (ctaHref) — SSR-safe, no path sniffing */}
       {showCTA && ctaHref && (

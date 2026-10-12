@@ -65,7 +65,7 @@ export interface RoadmapGridSkeletonProps {
 
 export function RoadmapGridSkeleton({ count = 4, showLeftMargin = true }: RoadmapGridSkeletonProps) {
   return (
-    <div className={`grid grid-cols-1 gap-6 md:grid-cols-2 ${showLeftMargin ? 'md:ml-[120px]' : ''}`}>
+    <div className={`grid grid-cols-1 gap-6 content-md:grid-cols-2 ${showLeftMargin ? 'content-md:ml-[120px]' : ''}`}>
       {Array.from({ length: count }).map((_, i) => (
         <RoadmapCardSkeleton key={i} />
       ))}

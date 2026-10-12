@@ -61,11 +61,6 @@ export interface EntityVideoSectionProps {
   bitesAutoScroll?: boolean;
   /** Markdown renderer component injected by the host app. */
   MarkdownRenderer?: ComponentType<MarkdownRendererProps>;
-  /**
-   * Raw SRT content. Deprecated — pass `captionsUrl` instead.
-   * Forwarded to `<Video>` for the dev-only warning.
-   */
-  srtContent?: string | null;
   /** HTTPS URL to a VTT captions file (rendered as native `<track>`). */
   captionsUrl?: string | null;
   /**
@@ -103,7 +98,6 @@ export function EntityVideoSection({
   onBiteNavigate,
   bitesAutoScroll = true,
   MarkdownRenderer,
-  srtContent,
   captionsUrl: captionsUrlProp,
   highlightCaptionsUrl: highlightCaptionsUrlProp,
   captionsEntity,
@@ -143,13 +137,13 @@ export function EntityVideoSection({
             <TabsList className="inline-flex h-auto justify-start gap-0 rounded-none bg-transparent p-0">
               <TabsTrigger
                 value="full-video"
-                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none md:px-6"
+                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none content-md:px-6"
               >
                 Full Video
               </TabsTrigger>
               <TabsTrigger
                 value="highlights"
-                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none md:px-6"
+                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none content-md:px-6"
               >
                 Highlights
               </TabsTrigger>
@@ -161,7 +155,6 @@ export function EntityVideoSection({
                 url={fullVideoUrl}
                 poster={mainVideoPoster}
                 title={title}
-                srtContent={srtContent}
                 captionsUrl={captionsUrl}
                 layout="centered"
                 priority={priority}
@@ -183,7 +176,6 @@ export function EntityVideoSection({
             url={fullVideoUrl}
             poster={mainVideoPoster}
             title={title}
-            srtContent={srtContent}
             captionsUrl={captionsUrl}
             layout="centered"
             priority={priority}

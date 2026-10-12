@@ -420,6 +420,7 @@ public class TicketService {
         return TicketQueryFilter.builder()
                 .statusIds(filter.getStatusIds())
                 .organizationIds(filter.getOrganizationIds())
+                .deviceIds(filter.getDeviceIds())
                 .assigneeIds(filter.getAssigneeIds())
                 .activity(ticketStalenessResolver.resolve(filter.getActivity()))
                 .build();

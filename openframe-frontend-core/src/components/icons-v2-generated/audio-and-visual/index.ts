@@ -34,6 +34,7 @@ export { ImageAIIcon } from './image-ai-icon';
 export { ImageArrowDownIcon } from './image-arrow-down-icon';
 export { ImageArrowUpIcon } from './image-arrow-up-icon';
 export { ImageCheckIcon } from './image-check-icon';
+export { ImageClassicIcon } from './image-classic-icon';
 export { ImageIcon } from './image-icon';
 export { ImageOffIcon } from './image-off-icon';
 export { ImagePlusIcon } from './image-plus-icon';

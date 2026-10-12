@@ -41,7 +41,7 @@ const doc = (index: number): ChatSource => ({
 });
 
 describe('groupsByTable', () => {
-  it('groups every table except whole documents', () => {
+  it('a server folds every table into one citation except whole documents', () => {
     expect(groupsByTable('internal_task')).toBe(true);
     expect(groupsByTable(undefined)).toBe(true);
     expect(groupsByTable('markdown')).toBe(false);
@@ -138,9 +138,15 @@ describe('groupSourcesByTable', () => {
     ]);
   });
 
-  it('never groups doc-table rows: each document is its own chip', () => {
-    const docs = [doc(1), doc(2), doc(3)];
-    expect(groupSourcesByTable(docs)).toEqual(docs);
+  it('groups documents under their table like every other record, each keeping its own citation number and path', () => {
+    const chips = groupSourcesByTable([doc(1), doc(2), doc(3)]);
+    expect(chips).toHaveLength(1);
+    expect(chips[0].sourceRepo).toBe('openframe-docs');
+    expect(chips[0].name).toContain('(3 records)');
+    expect(chips[0].items?.map(item => item.index)).toEqual([1, 2, 3]);
+    // A row opens its own document: the path the doc viewer navigates by rides each row.
+    expect(chips[0].items?.map(item => item.path)).toEqual(['guides/doc-1', 'guides/doc-2', 'guides/doc-3']);
+    expect(chips[0].items?.map(item => item.documentType)).toEqual(['markdown', 'markdown', 'markdown']);
   });
 
   it('passes a server-grouped chip through untouched', () => {
@@ -193,9 +199,11 @@ describe('groupSourcesByTable', () => {
     expect(chips[0].items?.map(item => item.documentType)).toEqual(['internal_task', 'internal_task']);
   });
 
-  it('still treats a typeless row of a doc table as a whole document', () => {
+  it('gives a typeless row of a doc table its table type, so its row still opens as a document', () => {
     const typelessDoc = { ...doc(1), documentType: '' };
-    expect(groupSourcesByTable([typelessDoc, doc(2)])).toEqual([typelessDoc, doc(2)]);
+    const chips = groupSourcesByTable([typelessDoc, doc(2)]);
+    expect(chips).toHaveLength(1);
+    expect(chips[0].items?.map(item => item.documentType)).toEqual(['markdown', 'markdown']);
   });
 
   it('leaves a row that names no table as its own chip', () => {

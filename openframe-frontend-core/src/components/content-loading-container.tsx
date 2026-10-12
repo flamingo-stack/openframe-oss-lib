@@ -62,7 +62,7 @@ export function ContentLoadingContainer({
   children,
   skeletonComponent,
   className,
-  minHeight = 'min-h-[300px] md:min-h-[800px]',
+  minHeight = 'min-h-[300px] content-md:min-h-[800px]',
   loadingOpacity = 1,
   transitionDuration = 300,
 }: ContentLoadingContainerProps) {
@@ -120,7 +120,9 @@ export function useContentLoading(isLoading: boolean) {
 
   const getMinHeight = (contentType: 'vendor' | 'blog') => {
     // Vendor cards are typically taller, need more space
-    return contentType === 'vendor' ? 'min-h-[400px] md:min-h-[900px]' : 'min-h-[300px] md:min-h-[800px]';
+    return contentType === 'vendor'
+      ? 'min-h-[400px] content-md:min-h-[900px]'
+      : 'min-h-[300px] content-md:min-h-[800px]';
   };
 
   return {

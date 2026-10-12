@@ -6,6 +6,7 @@ import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
+import com.openframe.core.exception.AuthFlowException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -14,6 +15,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
 import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
+import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
 
 /**
  * Verified-email gate for the TENANT-SCOPED web login — the same nOAuth defense the email-less
@@ -70,7 +72,7 @@ public class MicrosoftLoginEmailGate {
         if (!emailTrustPolicy.emailTrustedForRouting(MICROSOFT, user.getClaims())) {
             log.warn("event=sso-login-unverified-email provider=microsoft tenant={} sub={} {}",
                     tenantId, user.getSubject(), OidcUserUtils.describeEmailTrustSignals(user.getClaims()));
-            throw new IllegalStateException(
+            throw new AuthFlowException(EMAIL_NOT_VERIFIED,
                     "This account's email is not verified by the provider. Please contact your administrator.");
         }
     }

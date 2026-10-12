@@ -2,8 +2,8 @@
 
 /**
  * TicketAlertsButton — the unified header affordance for support-ticket
- * unread indication. Mounted by BOTH header shells (hub `Header` via
- * `HeaderConfig.tickets`, console `AppHeader` via `showTicketAlerts`).
+ * unread indication. Mounted by BOTH header shells (the `SiteHeader` through its
+ * `sideActions` slot, console `AppHeader` via `showTicketAlerts`).
  *
  * ATTENTION-ONLY element, deliberately unlike the always-on header cells:
  *   - renders NOTHING unless there are unread support replies (and a

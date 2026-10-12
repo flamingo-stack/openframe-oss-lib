@@ -2,6 +2,7 @@ import containerQueries from '@tailwindcss/container-queries';
 import type { Config } from 'tailwindcss';
 import tailwindcssAnimate from 'tailwindcss-animate';
 import plugin from 'tailwindcss/plugin';
+import { LAYOUT_STEPS } from './src/styles/layout-steps';
 
 const odsTypographyPlugin = plugin(({ addUtilities }) => {
   addUtilities({
@@ -79,6 +80,42 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
 });
 
 /**
+ * Content-area breakpoints: `content-md:` and friends apply by the width of the
+ * nearest `.ods-content-area`, not the viewport. Each step is the viewport
+ * step less the navigation sidebar (`sm` is phone-only, where there is none),
+ * so a page with nothing docked beside it switches where it did before.
+ *
+ * Outside a content area (apps without a side panel, overlays portalled to
+ * <body>) each falls back to its viewport step, so a component can switch to
+ * them without changing anywhere else it renders. So does everything under an
+ * `.ods-viewport-layer`: a modal or drawer that renders inside the content
+ * area but follows the window.
+ *
+ * Registered `max-*` first and then ascending, like Tailwind's own screens, so
+ * a wider step wins over a narrower one on the same property.
+ */
+const CONTENT_STEPS = Object.entries(LAYOUT_STEPS).map(([name, step]) => ({ name, ...step }));
+
+const odsContentAreaPlugin = plugin(({ addVariant }) => {
+  const viewportLayer = '.ods-viewport-layer, .ods-viewport-layer *';
+  const byContent = `&:where(:not(${viewportLayer}))`;
+  const byViewport = `&:where(:not(.ods-content-area *), ${viewportLayer})`;
+  for (const { name, content, viewport } of CONTENT_STEPS) {
+    if (name !== 'md' && name !== 'lg') continue;
+    addVariant(`content-max-${name}`, [
+      `@container ods-content not (min-width: ${content}px) { ${byContent} }`,
+      `@media not all and (min-width: ${viewport}px) { ${byViewport} }`,
+    ]);
+  }
+  for (const { name, content, viewport } of CONTENT_STEPS) {
+    addVariant(`content-${name}`, [
+      `@container ods-content (min-width: ${content}px) { ${byContent} }`,
+      `@media (min-width: ${viewport}px) { ${byViewport} }`,
+    ]);
+  }
+});
+
+/**
  * Make Tailwind opacity modifiers (`bg-ods-error/10`, `hover:bg-ods-accent/90`, …)
  * actually work on var()-based ODS tokens. Without `<alpha-value>` in the color
  * definition Tailwind v3 silently generates NOTHING for `ods-*\/N` classes — the
@@ -106,6 +143,8 @@ const config: Config = {
     'lg:hidden',
     'md:flex',
     'lg:flex',
+    // ...and their content-area forms (DataTable `hideAt`)
+    ...['md', 'lg', 'xl', '2xl'].flatMap(step => [`content-${step}:hidden`, `content-${step}:flex`]),
   ],
   theme: {
     container: {
@@ -305,12 +344,8 @@ const config: Config = {
           current: 'var(--ods-current)',
         }),
       },
-      // Custom breakpoints (aligned with ODS responsive tokens from Figma)
-      screens: {
-        md: '800px', // Tablet: 50rem
-        lg: '1280px', // Desktop: 80rem
-        xl: '1440px', // Large desktop: 90rem
-      },
+      // Aligned with the ODS responsive tokens from Figma: md tablet, lg desktop.
+      screens: Object.fromEntries(CONTENT_STEPS.map(({ name, viewport }) => [name, `${viewport}px`])),
 
       borderRadius: {
         lg: 'var(--radius)', // 8px
@@ -429,7 +464,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [tailwindcssAnimate, odsTypographyPlugin, containerQueries],
+  plugins: [tailwindcssAnimate, odsTypographyPlugin, odsContentAreaPlugin, containerQueries],
 };
 
 export default config;

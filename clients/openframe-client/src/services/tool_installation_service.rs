@@ -3,7 +3,7 @@ use crate::clients::tool_api_client::ToolApiClient;
 use crate::models::download_configuration::{DownloadConfiguration, InstallationType};
 use crate::models::tool_installation_message::AssetSource;
 use crate::models::ToolInstallationMessage;
-use crate::models::{Installation, InstalledTool, ToolRecordState};
+use crate::models::{FirstRunState, Installation, InstalledTool, ToolRecordState};
 #[cfg(target_os = "windows")]
 use crate::platform::file_lock::log_file_lock_info;
 use crate::platform::DirectoryManager;
@@ -119,6 +119,11 @@ impl ToolInstallationService {
         // Create tool-specific directory
         let base_folder_path = self.directory_manager.app_support_dir();
         let tool_folder_path = base_folder_path.join(tool_agent_id);
+        let mut first_run = if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
+            FirstRunState::Pending
+        } else {
+            FirstRunState::Done
+        };
 
         // Check if tool is already installed
         if let Some(installed_tool) = self
@@ -126,6 +131,7 @@ impl ToolInstallationService {
             .get_by_tool_agent_id(tool_agent_id)
             .await?
         {
+            first_run = installed_tool.first_run;
             if reinstall {
                 info!(
                     "Reinstalling tool {} with version {}",
@@ -789,6 +795,7 @@ impl ToolInstallationService {
             installation,
             assets: Vec::new(),
             state: ToolRecordState::Installed,
+            first_run,
         };
 
         self.installed_tools_service
@@ -804,7 +811,7 @@ impl ToolInstallationService {
                 .process(tool_agent_id, installed_tool.run_command_args.clone())
                 .unwrap_or_else(|_| installed_tool.run_command_args.clone());
             // For openframe-chat, add --background flag to start in tray
-            if tool_agent_id == "openframe-chat" {
+            if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                 launch_args.push("--background".to_string());
             }
             let command_path = self

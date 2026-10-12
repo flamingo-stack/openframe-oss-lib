@@ -52,10 +52,10 @@ export interface DataTableBodyProps<T = unknown> {
    * 34px per missing row too short — on a 15-row page with 5 results, 340px of
    * jump against every other page. Appending a height through `rowClassName`
    * cannot fix it either: tailwind-merge drops the plain `h-[66px]` but keeps
-   * the `md:h-[78px]` beside it, so the override holds on a phone and loses on
+   * the `content-md:h-[78px]` beside it, so the override holds on a phone and loses on
    * a desktop. Pass it here and every row slot in the table agrees.
    *
-   * Responsive values belong in the string itself, e.g. `'h-[200px] md:h-[112px]'`.
+   * Responsive values belong in the string itself, e.g. `'h-[200px] content-md:h-[112px]'`.
    */
   rowHeightClassName?: string;
   /**

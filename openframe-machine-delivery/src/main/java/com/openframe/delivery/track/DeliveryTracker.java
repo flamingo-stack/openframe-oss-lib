@@ -5,6 +5,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
+import com.openframe.delivery.spec.DeliveryRef;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,11 @@ public class DeliveryTracker {
     private final DeliveryProperties properties;
     private final DeliveryCloser closer;
 
-    public void acknowledge(DeliveryType type, String targetId, String machineId, String dispatchId) {
+    // ref = the delivery block the agent copied back from the command; the row is looked up by that exact dispatch
+    public void acknowledge(DeliveryRef ref, String machineId) {
+        DeliveryType type = ref.getType();
+        String targetId = ref.getTargetId();
+        String dispatchId = ref.getDispatchId();
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Policy policy = properties.resolve(type);
@@ -34,7 +39,10 @@ public class DeliveryTracker {
         }
     }
 
-    public void complete(DeliveryType type, String targetId, String machineId, String dispatchId) {
+    public void done(DeliveryRef ref, String machineId) {
+        DeliveryType type = ref.getType();
+        String targetId = ref.getTargetId();
+        String dispatchId = ref.getDispatchId();
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Instant expiresAt = expiresAt(type, now);
@@ -46,19 +54,9 @@ public class DeliveryTracker {
         }
     }
 
-    public void fail(DeliveryType type, String targetId, String machineId, String dispatchId, String error) {
+    public void fail(DeliveryRef ref, String machineId, String error) {
         Instant now = Instant.now();
-        closer.failReported(type, targetId, machineId, dispatchId, error, now);
-    }
-
-    public void cancel(DeliveryType type, String targetId, String machineId) {
-        String id = DeliveryId.of(type, targetId, machineId);
-        Instant now = Instant.now();
-        Instant expiresAt = expiresAt(type, now);
-        boolean cancelled = repository.markCancelled(id, DeliveryStatus.OPEN, now, expiresAt);
-        if (cancelled) {
-            log.info("Delivery CANCELLED: type={} targetId={} machineId={}", type, targetId, machineId);
-        }
+        closer.failReported(ref.getType(), ref.getTargetId(), machineId, ref.getDispatchId(), error, now);
     }
 
     private Instant expiresAt(DeliveryType type, Instant now) {

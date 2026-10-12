@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { useMdUp } from '../../hooks';
+import { useContentMdUp } from '../../hooks/ui/use-content-breakpoint';
 
 type ProgressBarProps = {
   progress: number; // 0–100
@@ -27,7 +27,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   mobileHeight = 8,
   inverted = false,
 }) => {
-  const isMdUp = useMdUp() ?? true;
+  const isMdUp = useContentMdUp() ?? true;
   const effectiveSegmentWidth = isMdUp ? segmentWidth : mobileSegmentWidth;
   const effectiveHeight = isMdUp ? height : mobileHeight;
 

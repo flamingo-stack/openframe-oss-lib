@@ -9,10 +9,13 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.tenant.TenantDomainService;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.organization.Organization;
 import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
+import com.openframe.data.repository.organization.OrganizationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,12 +30,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -57,16 +62,19 @@ class DeviceLogServiceTest {
     @Mock private LokiClient lokiClient;
     @Mock private DeviceService deviceService;
     @Mock private TenantDomainService tenantDomainService;
+    @Mock private OrganizationRepository organizationRepository;
 
     private final DeviceLogProperties properties = new DeviceLogProperties();
     private DeviceLogService service;
 
     @BeforeEach
     void setUp() {
-        service = new DeviceLogService(lokiClient, deviceService, tenantDomainService, properties);
+        service = new DeviceLogService(lokiClient, deviceService, tenantDomainService, properties, organizationRepository);
         when(deviceService.findByMachineIds(anyCollection())).thenAnswer(invocation ->
                 invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceTest::machine).toList());
         when(tenantDomainService.getTenantDomain()).thenReturn(TENANT_DOMAIN);
+        when(organizationRepository.findByOrganizationIdIn(anySet())).thenAnswer(invocation ->
+                invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceTest::organization).toList());
     }
 
     @Test
@@ -248,6 +256,52 @@ class DeviceLogServiceTest {
     }
 
     @Test
+    void filtersByOrganizationAcrossTheTenantAndLooksBackOneDay() {
+        service.queryLogs(null, List.of("org-1", "org-2", "org-1"), DeviceLogFilterCriteria.builder().to(TO).build(),
+                page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}"
+                        + " | organization_id=\"org-1\" or organization_id=\"org-2\"",
+                TO_NANOS - Duration.ofDays(1).toNanos(), TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+        verify(organizationRepository).findByOrganizationIdIn(Set.of("org-1", "org-2"));
+    }
+
+    @Test
+    void intersectsDevicesAndOrganizationsWithSeparateMetadataStages() {
+        service.queryLogs(List.of(MACHINE_ID, "machine-2"), List.of("org-1"), window(), page(null, null));
+
+        verify(lokiClient).queryRange(
+                "{job=\"agent-logs\", tenant_domain=\"acme.openframe.ai\"}"
+                        + " | machine_id=\"machine-1\" or machine_id=\"machine-2\" | organization_id=\"org-1\"",
+                FROM_NANOS, TO_NANOS + 1, 101, LokiDirection.BACKWARD, TENANT_DOMAIN);
+    }
+
+    @Test
+    void rejectsAnEmptyOrganizationListAndMoreThanFiftyOrganizations() {
+        assertThatThrownBy(() -> service.queryLogs(null, List.of(), window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one organization");
+        assertThatThrownBy(() -> service.queryLogs(null, List.of(" "), window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        List<String> tooMany = java.util.stream.IntStream.range(0, 51).mapToObj(i -> "org-" + i).toList();
+        assertThatThrownBy(() -> service.queryLogs(null, tooMany, window(), page(null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("50 organizations");
+        verifyNoInteractions(lokiClient);
+    }
+
+    @Test
+    void unknownOrganizationIsNotFoundWithoutQueryingLoki() {
+        when(organizationRepository.findByOrganizationIdIn(anySet())).thenReturn(List.of(organization("org-1")));
+
+        assertThatThrownBy(() -> service.queryLogs(null, List.of("org-1", "org-other-tenant"), window(), page(null, null)))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("org-other-tenant");
+        verifyNoInteractions(lokiClient);
+    }
+
+    @Test
     void firstPageReportsNextPageAndCursors() {
         when(lokiClient.queryRange(anyString(), anyLong(), anyLong(), eq(3), eq(LokiDirection.BACKWARD), eq(TENANT_DOMAIN)))
                 .thenReturn(List.of(entry(300, "c"), entry(200, "b"), entry(100, "a")));
@@ -318,6 +372,7 @@ class DeviceLogServiceTest {
                 .thenReturn(List.of(new LokiLogEntry(TO_NANOS + 35, "Control channel disconnected", Map.of(
                         "level", "ERROR",
                         "machine_id", MACHINE_ID,
+                        "organization_id", "org-1",
                         "hostname", "Mishas-MacBook-Pro.local",
                         "agent_ts", "2026-09-14T11:59:59.487Z",
                         "count", "2"))));
@@ -328,6 +383,7 @@ class DeviceLogServiceTest {
         assertThat(entry.getAgentTimestamp()).isEqualTo(Instant.parse("2026-09-14T11:59:59.487Z"));
         assertThat(entry.getLevel()).isEqualTo("ERROR");
         assertThat(entry.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(entry.getOrganizationId()).isEqualTo("org-1");
         assertThat(entry.getHostname()).isEqualTo("Mishas-MacBook-Pro.local");
         assertThat(entry.getCount()).isEqualTo(2L);
     }
@@ -393,6 +449,12 @@ class DeviceLogServiceTest {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
         return machine;
+    }
+
+    private static Organization organization(String organizationId) {
+        Organization organization = new Organization();
+        organization.setOrganizationId(organizationId);
+        return organization;
     }
 
     private static CursorPaginationCriteria page(Integer limit, String rawCursor) {

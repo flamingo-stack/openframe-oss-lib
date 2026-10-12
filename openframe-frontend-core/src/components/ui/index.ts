@@ -45,7 +45,6 @@ export * from './modal';
 export * from './modal-v2';
 export * from './modal-guarded-close';
 export * from './admin-form-drawer';
-export * from './playback-toggle';
 export * from './admin-form-modal';
 export * from './separator';
 export * from './sheet';
@@ -73,6 +72,7 @@ export * from './status-badge';
 export * from './palette-badge';
 export * from './department-badge';
 export * from './store-badges';
+export * from './mobile-app-qr';
 export * from './status-indicator';
 export * from './toaster';
 // TODO: Add other UI components as they are moved to ui-kit
@@ -107,6 +107,7 @@ export * from './device-card';
 export * from './device-card-compact';
 export * from './entity-image';
 export * from './data-attribution';
+export * from './download-button';
 export * from './compliance-badge';
 export * from './feature-card';
 export * from './feature-list';
@@ -234,7 +235,12 @@ export { LazyMount, type LazyMountProps } from './lazy-mount';
 // Product-demo stage primitives (marketing pages): window + phone chrome, the
 // incident feed, the swipe carousel and the sticky call-to-action bar.
 export * from './app-window-frame';
+export * from './product-screen-frame';
 export * from './phone-frame';
+export * from './notification-stack';
+export * from './numbered-step';
+export * from './device-wallpaper';
+export * from './analyzing-state';
 export * from './incident-feed';
 export * from './status-line';
 export * from './snap-carousel';

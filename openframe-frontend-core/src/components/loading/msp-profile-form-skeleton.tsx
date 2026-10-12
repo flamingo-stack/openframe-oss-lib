@@ -26,7 +26,7 @@ interface SkeletonProps {
 export function MspProfileFormSkeleton({ className, fields = 4 }: SkeletonProps) {
   return (
     <div
-      className={cn('grid grid-cols-1 items-stretch gap-6 md:grid-cols-2', className)}
+      className={cn('grid grid-cols-1 items-stretch gap-6 content-md:grid-cols-2', className)}
       role="status"
       aria-label="Loading MSP profile form"
     >
@@ -34,13 +34,13 @@ export function MspProfileFormSkeleton({ className, fields = 4 }: SkeletonProps)
       <div className="flex h-full flex-col space-y-2">
         {/* Label skeleton */}
         <TextSkeleton.Body className="w-28" />
-        <div className="min-h-[180px] flex-1 md:min-h-full">
+        <div className="min-h-[180px] flex-1 content-md:min-h-full">
           <UnifiedSkeleton className="h-full w-full rounded-lg" aria-label="Loading company logo" />
         </div>
       </div>
 
       {/* Right – Input fields grid (mirrors form) */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 content-md:grid-cols-2">
         {Array.from({ length: fields }).map((_, idx) => (
           <div key={idx} className="flex flex-col space-y-2">
             <TextSkeleton.Body className="w-40" />

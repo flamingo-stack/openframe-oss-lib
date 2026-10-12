@@ -78,7 +78,7 @@ export function TabSelector({
           'flex gap-[var(--spacing-system-xxs)] bg-ods-bg p-[var(--spacing-system-xxs)]',
           flush
             ? 'h-10 w-full'
-            : cn('h-11 rounded-md border border-ods-border md:h-12', scrollable ? 'overflow-x-auto' : 'w-full'),
+            : cn('h-11 rounded-md border border-ods-border content-md:h-12', scrollable ? 'overflow-x-auto' : 'w-full'),
         )}
       >
         {items.map(item => {
@@ -112,7 +112,7 @@ export function TabSelector({
               )}
             >
               {item.icon && (
-                <span className="flex size-4 shrink-0 items-center justify-center md:size-6">{item.icon}</span>
+                <span className="flex size-4 shrink-0 items-center justify-center content-md:size-6">{item.icon}</span>
               )}
               {item.label}
               {item.badge && item.badge}

@@ -246,7 +246,7 @@ export const SkeletonPresets = {
    * Vendor grid skeleton (specific to the app)
    */
   VendorGrid: ({ items = 6 }: { items?: number }) => (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2 content-lg:grid-cols-3">
       {Array.from({ length: items }, (_, index) => (
         <div key={index} className="space-y-3 rounded-lg border border-ods-border bg-ods-card p-4">
           <div className="flex items-center gap-3">

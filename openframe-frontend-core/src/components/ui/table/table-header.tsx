@@ -1,6 +1,6 @@
 'use client';
 
-import { useLgUp } from '../../../hooks/ui/use-media-query';
+import { useContentLgUp } from '../../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../../utils/cn';
 import { Arrow01DownIcon } from '../../icons-v2-generated/arrows/arrow-01-down-icon';
 import { Arrow01UpIcon } from '../../icons-v2-generated/arrows/arrow-01-up-icon';
@@ -72,12 +72,12 @@ export function TableHeader<T = TableRowData>({
     );
   };
 
-  const isLgUp = useLgUp() ?? false;
+  const isLgUp = useContentLgUp() ?? false;
 
   return (
     <div
       className={cn(
-        'relative hidden h-11 items-center gap-4 px-4 py-3 md:flex',
+        'relative hidden h-11 items-center gap-4 px-4 py-3 content-md:flex',
         stickyHeader && `sticky z-10 bg-ods-bg ${stickyHeaderOffset || 'top-0'}`,
         className,
       )}

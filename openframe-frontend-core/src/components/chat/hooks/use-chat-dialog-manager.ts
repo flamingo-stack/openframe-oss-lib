@@ -9,6 +9,9 @@ export interface UseChatDialogManagerArgs {
   dialogs: ReadonlyArray<DialogItem>;
   /** Currently-open dialog id. */
   activeDialogId: string | null | undefined;
+  /** The host's own record of the open conversation (`UnifiedChatState.activeDialog`):
+   *  resolves a conversation that is not in `dialogs`, and says when it is archived. */
+  activeDialog?: DialogItem | null;
   /** Open a dialog by id. */
   selectDialog: (id: string | null) => void;
   /** Reset the open conversation (drops back to the list / empty state). */
@@ -37,6 +40,7 @@ export interface UseChatDialogManagerArgs {
 export function useChatDialogManager({
   dialogs,
   activeDialogId,
+  activeDialog: hostActiveDialog,
   selectDialog,
   clearMessages,
   renameDialog,
@@ -196,7 +200,18 @@ export function useChatDialogManager({
     setRestoreTarget(null);
   }, [restoreTarget, unarchiveDialog]);
 
-  const isViewingArchived = viewingArchivedId != null && viewingArchivedId === activeDialogId;
+  // The host's record of the open conversation - only when it is about THIS
+  // conversation: a host may hand over the previous dialog's record for a
+  // render while the new one loads.
+  const hostDialog = hostActiveDialog != null && hostActiveDialog.id === activeDialogId ? hostActiveDialog : undefined;
+
+  // Read-only when the conversation was opened from the archive page, OR when
+  // the host's record says it is archived. The click is the only signal this
+  // panel has, and a conversation that arrived by link, notification or reload
+  // was never clicked here: without the host's record it opened writable and
+  // the backend refused the message.
+  const isViewingArchived =
+    (viewingArchivedId != null && viewingArchivedId === activeDialogId) || hostDialog?.archived === true;
 
   // Header back-chevron: from an archived chat, return to the Chat Archive
   // page (not the current-chats list); otherwise reset to the list.
@@ -228,10 +243,13 @@ export function useChatDialogManager({
 
   // Active-conversation dialog — resolved from the active list, or the
   // archived list when an archived chat is open (archived dialogs aren't in
-  // `dialogs`, so the header title and ⋯ / restore actions need this).
+  // `dialogs`, so the header title and ⋯ / restore actions need this), or the
+  // host's record when it is in neither: reached by link, notification or
+  // reload, where no list was clicked.
   const activeDialog = useMemo(
-    () => dialogs.find(d => d.id === activeDialogId) ?? archivedDialogs.find(d => d.id === activeDialogId),
-    [dialogs, archivedDialogs, activeDialogId],
+    () =>
+      dialogs.find(d => d.id === activeDialogId) ?? archivedDialogs.find(d => d.id === activeDialogId) ?? hostDialog,
+    [dialogs, archivedDialogs, activeDialogId, hostDialog],
   );
 
   return {

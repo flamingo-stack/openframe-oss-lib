@@ -149,7 +149,7 @@ export function TagSearchInput<T = string>({
       {/* ---- Visible container ---- */}
       <div
         className={cn(
-          'flex h-11 cursor-text items-center rounded-[6px] border md:h-12',
+          'flex h-11 cursor-text items-center rounded-[6px] border content-md:h-12',
           'transition-colors duration-200',
           'border-ods-border bg-ods-card',
           'has-[:focus]:border-ods-accent',
@@ -170,7 +170,7 @@ export function TagSearchInput<T = string>({
       >
         {/* Search icon — pinned left, responsive size */}
         <div className="flex shrink-0 items-center pl-3">
-          <SearchIcon className="size-4 text-ods-text-secondary md:size-6" />
+          <SearchIcon className="size-4 text-ods-text-secondary content-md:size-6" />
         </div>
 
         {/* Middle zone: tags + input — overflow hidden so tags never push clear btn */}
@@ -234,7 +234,7 @@ export function TagSearchInput<T = string>({
             className="flex shrink-0 cursor-pointer items-center justify-center pr-3 transition-opacity hover:opacity-70"
             aria-label="Clear all"
           >
-            <XmarkCircleIcon className="size-4 text-ods-text-secondary md:size-6" />
+            <XmarkCircleIcon className="size-4 text-ods-text-secondary content-md:size-6" />
           </button>
         )}
       </div>

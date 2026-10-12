@@ -5,6 +5,7 @@ import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.filter.UserQueryFilter;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseParentFilter;
 import com.openframe.data.repository.organization.CustomOrganizationRepositoryImpl;
 import com.openframe.data.repository.tool.CustomIntegratedToolRepositoryImpl;
 import com.openframe.data.repository.user.CustomUserRepositoryImpl;
@@ -126,7 +127,7 @@ class SearchInputQuotingTest {
         MongoTemplate template = mock(MongoTemplate.class);
         CustomKnowledgeBaseItemRepositoryImpl repo = new CustomKnowledgeBaseItemRepositoryImpl(template);
 
-        repo.findFoldersForParent(null, HOSTILE, null);
+        repo.findFolders(KnowledgeBaseParentFilter.root(), HOSTILE, null, null, 10);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).find(captor.capture(), eq(KnowledgeBaseItem.class));

@@ -84,6 +84,15 @@ applied to tests or stories.
   hook that is not a zustand subscription (a context getter, say) is a false positive: carry it in
   a named `files:` block.
 
+## Layout variant rule
+
+`base` carries `flamingo/no-mixed-layout-variants` from `./layout-variants.js`: one class string may
+not hold both a viewport breakpoint (`md:`) and a content-area one (`content-md:`). Tailwind emits
+every `content-*` rule before the viewport ones, so where the two set the same property the viewport
+class wins at any content width, and nothing says so. A class that stacks them
+(`md:content-max-md:`) is the deliberate form and is allowed. The rule reads one string at a time:
+classes split across `cn()` arguments are not compared.
+
 ## Why not ESLint 10
 
 ESLint 10 is out, and `eslint@9` is marked deprecated on npm. It still does not work here:

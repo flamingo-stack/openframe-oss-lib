@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PHOTO_WALL_FRAME, arrangePhotoWall, photoOrientation } from '../photo-wall';
+import { PHOTO_WALL_FRAME, arrangePhotoWall, photoOrientation, photoWallRequestWidth } from '../photo-wall';
 
 describe('photoOrientation', () => {
   it('reads a portrait, a landscape and a square from the natural size', () => {
@@ -65,5 +65,21 @@ describe('arrangePhotoWall', () => {
 
   it('drops empty columns when there are fewer pictures than columns', () => {
     expect(arrangePhotoWall([photo('a', 'wide')], 3)).toHaveLength(1);
+  });
+});
+
+describe('photoWallRequestWidth', () => {
+  it('asks for the first step that covers the column on this screen', () => {
+    expect(photoWallRequestWidth(176, 1)).toBe(240);
+    expect(photoWallRequestWidth(176, 2)).toBe(360);
+    expect(photoWallRequestWidth(274, 2)).toBe(640);
+  });
+
+  it('never counts a screen denser than twice', () => {
+    expect(photoWallRequestWidth(176, 3)).toBe(360);
+  });
+
+  it('leaves the url alone when no step covers the column', () => {
+    expect(photoWallRequestWidth(600, 2)).toBeNull();
   });
 });

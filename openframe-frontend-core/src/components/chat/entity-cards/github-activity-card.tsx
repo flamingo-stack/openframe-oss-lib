@@ -4,7 +4,7 @@
  * GitHub Activity Card — unified visual for commits, PRs, and PR reviews.
  *
  * PURE PRESENTATION (no internal nav, no internal data fetching). The card
- * receives the structured `<a>` prop bundle via `anchorProps` (composed by
+ * receives the structured `<Link>` prop bundle via `anchorProps` (composed by
  * the caller from a runtime hook) and renders the rest from the
  * `GitHubActivityItem` shape directly.
  *
@@ -18,8 +18,9 @@
 
 import { GitPullRequest, Eye, ExternalLink } from 'lucide-react';
 import React from 'react';
+import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
-import { GitHubIcon } from '../../icons/github-icon';
+import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
 import type { GitHubActivityItem, GitHubActivityKind, PrReviewState } from '../types/entities/github-activity';
 import {
   COMPACT_CARD_ICON_SLOT,
@@ -59,7 +60,7 @@ function kindIcon(kind: GitHubActivityKind, className = 'h-4 w-4') {
       return <Eye className={`${className} shrink-0`} />;
     case 'commit':
     default:
-      return <GitHubIcon className={`${className} shrink-0`} />;
+      return <GithubClassicIcon className={`${className} shrink-0`} />;
   }
 }
 
@@ -180,8 +181,8 @@ export interface GitHubActivityCardProps {
   item: GitHubActivityItem;
   variant?: 'row' | 'compact';
   className?: string;
-  /** Pre-composed `<a>` prop bundle (typically from a `useNavLink` hook in
-   *  the consumer). When provided, the outer renders as a real `<a>`. */
+  /** Pre-composed `<Link>` prop bundle (typically from a `useNavLink` hook in
+   *  the consumer). When provided, the outer renders as a real `<Link>`. */
   anchorProps?: GitHubActivityCardAnchorProps;
 }
 
@@ -269,15 +270,15 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
   );
   if (anchorProps) {
     return (
-      <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {body}
-      </a>
+      </Link>
     );
   }
   return href ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+    <Link href={href} target="_blank" rel="noopener noreferrer" className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
       {body}
-    </a>
+    </Link>
   ) : (
     <span className={`${COMPACT_CARD_OUTER_STATIC} ${className ?? ''}`} aria-label="No link available">
       {body}

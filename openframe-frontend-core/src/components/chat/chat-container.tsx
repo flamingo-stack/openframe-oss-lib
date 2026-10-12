@@ -1,8 +1,8 @@
 import { type FC, type HTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated';
+import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { PlusCircleIcon } from '../plus-circle-icon';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
 import { SquareAvatar as Avatar } from '../ui/square-avatar';
@@ -154,7 +154,7 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
                   onClick={onNewChat}
                   variant="transparent"
                   size="small-legacy"
-                  leftIcon={<PlusCircleIcon className="h-5 w-5" whiteOverlay />}
+                  leftIcon={<PlusCircleIcon className="h-5 w-5" />}
                   className="text-ods-text-primary hover:bg-ods-bg-hover"
                 >
                   New Chat

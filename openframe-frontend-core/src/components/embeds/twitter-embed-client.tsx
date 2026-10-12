@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from '../../embed-shims/next-image';
+import Link from '../../embed-shims/next-link';
 import { socialCache } from '../../utils/social-embed-cache';
-import { XLogo } from '../icons/x-logo';
+import { XLogoIcon } from '../icons-v2-generated/brand-logos/x-logo-icon';
 import { TwitterContainer } from './embed-container';
 import { useRichMarkdownRuntime } from './rich-markdown-runtime';
 
@@ -52,7 +53,7 @@ const UserIcon = () => (
 );
 
 // X glyph: the lib's standard XLogo (color follows the text context).
-const XIcon = () => <XLogo className="h-5 w-5" color="currentColor" />;
+const XIcon = () => <XLogoIcon className="h-5 w-5" color="currentColor" />;
 
 interface TwitterOEmbedResponse {
   url: string;
@@ -175,7 +176,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
             <p className="mb-4 text-ods-text-secondary text-h6">
               This tweet could not be loaded. It may have been deleted, made private, or the account may be suspended.
             </p>
-            <a
+            <Link
               href={url}
               target="_blank"
               rel="noopener noreferrer"
@@ -183,7 +184,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
             >
               <XIcon />
               <span>View on X</span>
-            </a>
+            </Link>
           </div>
         </div>
       </TwitterContainer>
@@ -281,7 +282,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
           {links.length > 0 && (
             <div className="mb-4 space-y-2">
               {links.map((link, index) => (
-                <a
+                <Link
                   key={index}
                   href={link.url}
                   target="_blank"
@@ -290,7 +291,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
                 >
                   <ExternalLinkIcon />
                   <span className="underline">{link.text}</span>
-                </a>
+                </Link>
               ))}
             </div>
           )}
@@ -314,7 +315,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
 
         {/* Footer */}
         <div className="border-t border-ods-border bg-ods-bg-surface px-4 py-3">
-          <a
+          <Link
             href={url}
             target="_blank"
             rel="noopener noreferrer"
@@ -322,7 +323,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
           >
             <ExternalLinkIcon />
             <span>View on X</span>
-          </a>
+          </Link>
         </div>
       </div>
     </TwitterContainer>

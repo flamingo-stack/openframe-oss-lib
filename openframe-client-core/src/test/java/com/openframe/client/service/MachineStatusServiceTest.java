@@ -5,6 +5,7 @@ import com.openframe.client.event.DeviceFirstConnectedEvent;
 import com.openframe.client.exception.MachineNotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,7 @@ class MachineStatusServiceTest {
         Machine m = new Machine();
         m.setMachineId(MACHINE);
         m.setStatus(status);
+        m.setTelemetryStatus(status == DeviceStatus.OFFLINE ? TelemetryStatus.OFFLINE : TelemetryStatus.ONLINE);
         m.setLastSeen(lastSeen);
         return m;
     }
@@ -215,13 +217,42 @@ class MachineStatusServiceTest {
     }
 
     @Test
-    @DisplayName("T11: a device being deleted is left alone — neither save() nor updateLastSeen")
-    void pendingDeletion_touchesNothing() {
+    @DisplayName("T11: a device being deleted keeps its status, only its connectivity moves")
+    void pendingDeletion_presenceOnly() {
         machineIs(DeviceStatus.PENDING_DELETION);
 
         service.processHeartbeat(MACHINE, LATER);
 
+        verify(machineRepository).updateLastSeen(MACHINE, LATER);
         verify(machineRepository, never()).save(any(Machine.class));
+    }
+
+    @Test
+    @DisplayName("T11b: a deleted device that disconnects records the connectivity flip, status untouched")
+    void deleted_connectivityFlipSaved() {
+        Machine machine = machine(DeviceStatus.DELETED);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
+
+        service.updateToOffline(MACHINE, LATER);
+
+        verify(machineRepository).save(machine);
         verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
+        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.DELETED);
+        assertThat(machine.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
+    }
+
+    @Test
+    @DisplayName("T12: the first heartbeat after the field appeared fills telemetryStatus through save()")
+    void firstHeartbeat_telemetryStillEmpty_saved() {
+        Machine machine = machine(DeviceStatus.ONLINE);
+        machine.setTelemetryStatus(null);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(machine));
+
+        service.processHeartbeat(MACHINE, LATER);
+
+        verify(machineRepository).save(machine);
+        verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
+        assertThat(machine.getTelemetryStatus()).isEqualTo(TelemetryStatus.ONLINE);
+        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.ONLINE);
     }
 }

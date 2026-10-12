@@ -117,7 +117,7 @@ export interface SearchInputProps {
 
 const containerStyles = cn(
   // Layout & spacing — matches lib Input component
-  'flex h-11 cursor-text items-center gap-2 rounded-[6px] border px-3 md:h-12',
+  'flex h-11 cursor-text items-center gap-2 rounded-[6px] border px-3 content-md:h-12',
   'has-[:focus-visible]:outline-none',
   'group',
   'transition-colors duration-200',
@@ -456,7 +456,7 @@ export function SearchInput({
             }}
           >
             {/* Start Adornment — pinned left, shrink-0 */}
-            <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent [&_svg]:size-4 md:[&_svg]:size-6">
+            <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent [&_svg]:size-4 content-md:[&_svg]:size-6">
               {startAdornment !== undefined ? startAdornment : <SearchIcon />}
             </span>
 

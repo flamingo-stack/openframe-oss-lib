@@ -155,8 +155,7 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
  *
  * Deliberately in this file, beside `NavigationSidebarItemButton`: the two must
  * agree on `h-14`, the `p-[var(--spacing-system-m)]` inset, the 24px icon box and
- * the label column, or the nav resizes on the handoff. Same reason
- * `header-skeleton.tsx` sits beside `header.tsx`.
+ * the label column, or the nav resizes on the handoff.
  *
  * `showLabel` is the sidebar's own minimized state, so the caller passes what it
  * already passes the real row — no separate width handling.

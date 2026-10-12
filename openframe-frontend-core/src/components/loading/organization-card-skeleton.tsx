@@ -84,7 +84,7 @@ export function OrganizationCardSkeleton({
         {showFooter && (
           <div className="flex w-full min-w-0 items-center justify-between gap-2">
             {/* Stats Container */}
-            <div className="flex min-w-0 flex-shrink items-center gap-3 md:gap-4">
+            <div className="flex min-w-0 flex-shrink items-center gap-3 content-md:gap-4">
               {/* Stat 1 */}
               <div className="flex flex-shrink-0 items-center gap-1">
                 <MediaSkeleton.Icon size="sm" className="h-5 w-5" />
@@ -137,7 +137,7 @@ export function OrganizationCardSkeletonGrid({
 }) {
   return (
     <div
-      className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3', className)}
+      className={cn('grid grid-cols-1 gap-4 content-md:grid-cols-2 content-md:gap-6 content-lg:grid-cols-3', className)}
       role="status"
       aria-label={`Loading ${count} organization cards`}
     >

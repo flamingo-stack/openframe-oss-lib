@@ -59,9 +59,9 @@ export interface FeatureCardGridProps {
 }
 
 const GRID_COLUMNS = {
-  2: 'grid-cols-1 md:grid-cols-2',
-  3: 'grid-cols-1 md:grid-cols-3',
-  4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
+  2: 'grid-cols-1 content-md:grid-cols-2',
+  3: 'grid-cols-1 content-md:grid-cols-3',
+  4: 'grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-4',
 } as const;
 
 /**
@@ -75,10 +75,10 @@ function fourColumnBorders(index: number, count: number): string {
   if (index < count - 1) classes.push('border-b');
   const mdRows = Math.ceil(count / 2);
   const lgRows = Math.ceil(count / 4);
-  classes.push(index % 2 === 0 && index < count - 1 ? 'md:border-r' : 'md:border-r-0');
-  classes.push(Math.floor(index / 2) < mdRows - 1 ? 'md:border-b' : 'md:border-b-0');
-  classes.push(index % 4 !== 3 && index < count - 1 ? 'lg:border-r' : 'lg:border-r-0');
-  classes.push(Math.floor(index / 4) < lgRows - 1 ? 'lg:border-b' : 'lg:border-b-0');
+  classes.push(index % 2 === 0 && index < count - 1 ? 'content-md:border-r' : 'content-md:border-r-0');
+  classes.push(Math.floor(index / 2) < mdRows - 1 ? 'content-md:border-b' : 'content-md:border-b-0');
+  classes.push(index % 4 !== 3 && index < count - 1 ? 'content-lg:border-r' : 'content-lg:border-r-0');
+  classes.push(Math.floor(index / 4) < lgRows - 1 ? 'content-lg:border-b' : 'content-lg:border-b-0');
   return ` ${classes.join(' ')}`;
 }
 
@@ -117,7 +117,7 @@ export function FeatureCardGrid({
     if (!isLastInRow) {
       // On mobile (1 column), never show right border
       // On desktop (2/3 columns), show right border except for last in row
-      classes += ' md:border-r border-ods-border';
+      classes += ' content-md:border-r border-ods-border';
     }
 
     // Bottom border logic
@@ -130,10 +130,10 @@ export function FeatureCardGrid({
 
     // Desktop: override mobile border, show bottom border for all rows except last
     if (!isLastRow) {
-      classes += ' md:border-b border-ods-border';
+      classes += ' content-md:border-b border-ods-border';
     } else {
       // Last row on desktop - remove bottom border
-      classes += ' md:border-b-0';
+      classes += ' content-md:border-b-0';
     }
 
     return classes;

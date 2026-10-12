@@ -1,6 +1,8 @@
 'use client';
 
 import type React from 'react';
+import { Button } from './button';
+import { NumberedStep } from './numbered-step';
 
 export interface FeatureListItemData {
   /** Shown in the boxed slot. Not used by the `numbered` variant. */
@@ -15,16 +17,21 @@ export interface FeatureListProps {
   iconBoxSize?: number;
   /**
    * `boxed` (default): one bordered card, a boxed icon per row.
-   * `numbered`: an ordered list of open rows separated by hairlines, each led
-   * by its two-digit number (process steps).
+   * `numbered`: an ordered list of open rows, each led by its number in a
+   * round marker (process steps).
    */
   variant?: 'boxed' | 'numbered';
   /**
-   * `numbered` only. The step being shown now: it stays at full strength and
-   * the others step back, so the list reads as "you are here" beside a timed
-   * demo. Omit for a plain list where every step is equal.
+   * `numbered` only. The step being shown now: its marker and its title take
+   * the accent and its description reads at full strength, so the list reads as
+   * "you are here" beside a timed demo. Omit for a plain list where every step is equal.
    */
   activeIndex?: number;
+  /**
+   * `numbered` only. The colour of the step being shown (a CSS colour, such as
+   * the hex of the agent whose demo it is). Omitted, it is the platform's accent.
+   */
+  accent?: string;
   /**
    * `numbered` only. Makes every step a button: choosing one reports its index
    * (a demo jumps to that step). Omit for a list that is only read.
@@ -38,45 +45,42 @@ export function FeatureList({
   iconBoxSize = 72,
   variant = 'boxed',
   activeIndex,
+  accent,
   onSelect,
 }: FeatureListProps) {
   if (variant === 'numbered') {
     const dims = typeof activeIndex === 'number';
     return (
-      <ol className={`flex flex-col ${className}`}>
+      <ol className={`flex flex-col gap-[var(--spacing-system-lf)] ${className}`}>
         {items.map((item, index) => {
           const current = dims && index === activeIndex;
-          const row = (
-            <>
-              <span className={`text-h5 ${current ? 'text-ods-flamingo-pink' : 'text-ods-text-secondary'}`}>
-                {String(index + 1).padStart(2, '0')}
-              </span>
-              <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-                <h3 className="text-ods-text-primary text-h3">{item.title}</h3>
-                <p className="text-ods-text-secondary text-h4">{item.description}</p>
-              </div>
-            </>
+          // Every numbered step on a page is the one `NumberedStep`.
+          const step = (
+            <NumberedStep
+              number={index + 1}
+              title={item.title}
+              description={item.description}
+              current={current}
+              accent={accent}
+              className={onSelect ? 'w-full' : undefined}
+            />
           );
-          const layout =
-            'grid grid-cols-[48px_minmax(0,1fr)] gap-[var(--spacing-system-m)] py-[var(--spacing-system-l)]';
           return (
-            <li
-              key={index}
-              aria-current={current ? 'step' : undefined}
-              className={`border-t border-ods-border transition-opacity duration-200 last:border-b motion-reduce:transition-none ${
-                dims && !current ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''
-              }`}
-            >
+            <li key={index} aria-current={current ? 'step' : undefined}>
               {onSelect ? (
-                <button
-                  type="button"
+                // The unified Button with no box of its own (`wrap`): it brings the
+                // target, the focus ring and the keyboard semantics; the row is the look.
+                <Button
+                  variant="transparent"
+                  size="wrap"
+                  fullWidth
                   onClick={() => onSelect(index)}
-                  className={`${layout} w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus`}
+                  className="items-start justify-start whitespace-normal text-left hover:bg-transparent active:bg-transparent"
                 >
-                  {row}
-                </button>
+                  {step}
+                </Button>
               ) : (
-                <div className={layout}>{row}</div>
+                step
               )}
             </li>
           );

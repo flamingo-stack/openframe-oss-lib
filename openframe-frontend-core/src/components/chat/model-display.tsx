@@ -5,7 +5,9 @@ import { cn } from '../../utils/cn';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
 import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
 import { Skeleton } from '../ui/skeleton';
+import { useChatAppearance } from './chat-appearance-context';
 import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
+import { CHAT_APPEARANCE } from './types/chat.types';
 
 const getProviderIcon = (provider?: string) => {
   if (!provider) return null;
@@ -66,6 +68,9 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
   ) => {
     const icon = getProviderIcon(provider);
     const name = displayName || modelName;
+    // v2 spells the counts out ("372 / 50,000 tokens used"); classic keeps them short.
+    const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
+    const formatCount = (count: number) => (isV2 ? count.toLocaleString('en-US') : formatTokenCount(count));
 
     // Inline pill: provider icon + model name + "X / Y tokens used".
     // The "tokens used" tail renders as soon as `contextWindow` is known
@@ -79,7 +84,9 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
         <span className="font-body">{name}</span>
         {contextWindow != null && (
           <span className="ml-auto opacity-70 text-h6">
-            {usedTokens != null ? formatTokenCount(usedTokens) : '—'}/{formatTokenCount(contextWindow)} tokens used
+            {usedTokens != null ? formatCount(usedTokens) : '—'}
+            {isV2 ? ' / ' : '/'}
+            {formatCount(contextWindow)} tokens used
           </span>
         )}
       </div>

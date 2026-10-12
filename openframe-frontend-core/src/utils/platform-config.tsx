@@ -1,56 +1,21 @@
-import { Globe } from 'lucide-react';
+import { createElement } from 'react';
 import type React from 'react';
+import { PlatformMark } from '../components/chat/utils/icon-loading';
 import type { SelectableOption } from '../components/features';
-import { OpenmspLogo, FlamingoLogo, OpenFrameLogo, MiamiCyberGangLogoFaceOnly, MlgLogo } from '../components/icons';
 import type { PlatformConfig, PlatformName } from '../types/platform';
 import { cn } from './cn';
 import { getPlatformBrandClasses } from './platform-identity';
 
 /**
- * Per-platform ICON rendering. The colour decision lives in `platform-identity`
- * (`PLATFORM_BRAND` → `ODS_STEM_CLASSES`), never here: each mark is tinted by the
- * platform's accent CLASS and paints itself with `currentColor`. There is ONE
- * lookup, parameterized by `className`; the three former hand-written switches
- * (`getPlatformIcon`, `getSmallPlatformIcon`, `getPlatformIconComponent`) are
- * thin wrappers that only pick a size.
- *
- * Two marks cannot take an accent fill and are named exceptions:
- *   - `universal` is a lucide `Globe`; lucide spreads `...rest` AFTER `fill: 'none'`,
- *     so a `fill` prop would paint a solid disc. It takes the class only.
- *   - `tmcg` is a two-colour mark (`MiamiCyberGangLogoFaceOnly`) with no fill prop.
+ * Per-platform ICON rendering. Which mark a platform has is a convention, stated
+ * once beside the icon loader (`PlatformMark`); this module only picks a size and
+ * adds the platform's accent class, which a single-colour mark is painted with.
  */
 function renderPlatformIcon(platformName: string, className: string): React.ReactNode {
-  const tinted = cn(className, getPlatformBrandClasses(platformName).accentText);
-  switch (platformName) {
-    case 'openframe':
-      // `lowerPathColor` is the accent; the upper path is the neutral greys white.
-      return (
-        <OpenFrameLogo
-          className={tinted}
-          lowerPathColor="currentColor"
-          upperPathColor="var(--ods-system-greys-white)"
-        />
-      );
-    case 'openmsp':
-      // `OpenmspLogo`'s paths set their own fills, so a root `fill` is a no-op:
-      // the accent is the BACK bubble. The other two are the neutral greys.
-      return (
-        <OpenmspLogo
-          className={tinted}
-          backBubbleColor="currentColor"
-          frontBubbleColor="var(--ods-system-greys-white)"
-          innerFrontBubbleColor="var(--ods-system-greys-black)"
-        />
-      );
-    case 'tmcg':
-      return <MiamiCyberGangLogoFaceOnly className={className} />;
-    case 'mlg':
-      return <MlgLogo className={tinted} size={20} />;
-    case 'universal':
-      return <Globe className={tinted} />;
-    default:
-      return <FlamingoLogo className={tinted} fill="currentColor" />;
-  }
+  return createElement(PlatformMark, {
+    platform: platformName,
+    className: cn(className, getPlatformBrandClasses(platformName).accentText),
+  });
 }
 
 /** Platform icons mapping (5x5), tinted by each platform's accent class. */
@@ -58,7 +23,6 @@ export const platformIcons: Record<PlatformName, React.ReactNode> = {
   openframe: renderPlatformIcon('openframe', 'h-5 w-5'),
   openmsp: renderPlatformIcon('openmsp', 'h-5 w-5'),
   flamingo: renderPlatformIcon('flamingo', 'h-5 w-5'),
-  'flamingo-teaser': renderPlatformIcon('flamingo-teaser', 'h-5 w-5'),
   'marketing-hub': renderPlatformIcon('marketing-hub', 'h-5 w-5'),
   'product-hub': renderPlatformIcon('product-hub', 'h-5 w-5'),
   'revenue-hub': renderPlatformIcon('revenue-hub', 'h-5 w-5'),
@@ -76,7 +40,6 @@ export {
   platformShortNames,
   platformDescriptions,
   platformSlogans,
-  platformIconNames,
   platformHexColors,
   platformColors,
   getPlatformDisplayName,
@@ -85,7 +48,6 @@ export {
   getPlatformSlogan,
   getPlatformColor,
   getDefaultColorForPlatform,
-  getDefaultIconForPlatform,
 } from './platform-identity';
 
 export function transformPlatformConfigsToOptions(platformConfigs: PlatformConfig[]): SelectableOption[] {

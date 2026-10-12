@@ -2,6 +2,7 @@
 
 import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
 import { formatDate, formatTime } from '../../utils/format-date';
@@ -450,9 +451,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             );
           }
           return (
-            <a href={href} className={linkClassName} {...rest}>
+            <Link href={href} className={linkClassName} {...rest}>
               {children}
-            </a>
+            </Link>
           );
         },
       };
@@ -522,9 +523,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // its own short line above the message (on the right for the user), never
     // beside it: a face in the row indents every line of the message by its
     // width. The NAME is written only where it is the information itself: a
-    // system line and a human technician. Every face carries its name for
-    // assistive tech and on hover.
-    const showName = isSystem || authorType === 'admin';
+    // system line and a human technician answering. Mingo sends the admin's
+    // own turns as `admin` too; those are the user's words and draw as such.
+    // Every face carries its name for assistive tech and on hover.
+    const showName = isSystem || (authorType === 'admin' && !isUser);
     const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
     const faceBox = 'h-5 w-5 flex-shrink-0';
     const face: ReactNode =

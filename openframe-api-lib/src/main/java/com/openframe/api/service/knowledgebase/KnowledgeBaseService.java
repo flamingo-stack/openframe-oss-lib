@@ -3,10 +3,11 @@ package com.openframe.api.service.knowledgebase;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.knowledgebase.CreateArticleCommand;
 import com.openframe.api.dto.knowledgebase.FolderChildrenAction;
+import com.openframe.api.dto.knowledgebase.KnowledgeBaseCursors;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
+import com.openframe.api.dto.knowledgebase.KnowledgeBaseScope;
 import com.openframe.api.dto.knowledgebase.PagedArticles;
 import com.openframe.api.dto.knowledgebase.UpdateArticleCommand;
-import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.service.AssignmentService;
@@ -19,8 +20,11 @@ import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemCursor;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseParentFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,10 +34,14 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
@@ -45,32 +53,72 @@ public class KnowledgeBaseService {
     private final KnowledgeBaseItemRepository repository;
     private final KnowledgeBaseTagService knowledgeBaseTagService;
     private final AssignmentService assignmentService;
+    private final KnowledgeBaseTempAttachmentService knowledgeBaseTempAttachmentService;
+    private final KnowledgeBaseAttachmentService knowledgeBaseAttachmentService;
 
+    /**
+     * One page of a listing: folders first (by name), then articles (most recently updated first),
+     * both paged in the database. The cursor says which of the two streams the page continues.
+     */
     public CountedGenericQueryResult<KnowledgeBaseItem> queryItems(
             KnowledgeBaseFilterCriteria filter, String search,
             CursorPaginationCriteria paginationCriteria) {
         log.debug("Querying KB items: filter={}, search={}", filter, search);
 
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
-
-        boolean recursive = filter.getType() != KnowledgeBaseItemType.FOLDER
-                && (StringUtils.hasText(search)
-                    || (StringUtils.hasText(filter.getParentId())
-                        && filter.getTagIds() != null
-                        && !filter.getTagIds().isEmpty()));
-        if (recursive) {
-            return queryArticlesInSubtree(filter, search, normalized);
-        }
+        int limit = normalized.getLimit();
 
         List<String> restrictToItemIds = resolveTagFilter(filter.getTagIds());
+        boolean wantsFolders = filter.getType() != KnowledgeBaseItemType.ARTICLE;
+        boolean wantsArticles = filter.getType() != KnowledgeBaseItemType.FOLDER;
+        // Folders and articles always read from the same parents: a search that reaches three
+        // levels down for articles reaches three levels down for folders too.
+        KnowledgeBaseParentFilter parent = parentFilter(
+                filter.getParentId(), effectiveScope(filter, search, restrictToItemIds != null));
 
-        if (filter.getType() == KnowledgeBaseItemType.FOLDER) {
-            return queryFoldersOnly(filter, search, restrictToItemIds, normalized);
+        // A folder cursor continues the folder stream; an article cursor means the folders have
+        // already been served.
+        KnowledgeBaseItemCursor cursor = resolveCursor(normalized.getCursor());
+        boolean pastFolders = cursor != null && cursor.type() == KnowledgeBaseItemType.ARTICLE;
+
+        List<KnowledgeBaseItem> folders = List.of();
+        long folderCount = 0;
+        boolean hasNextPage = false;
+        if (wantsFolders) {
+            folderCount = repository.countFolders(parent, search, restrictToItemIds);
+            if (!pastFolders) {
+                List<KnowledgeBaseItem> raw = repository.findFolders(
+                        parent, search, restrictToItemIds, cursor, limit + 1);
+                hasNextPage = raw.size() > limit;
+                folders = hasNextPage ? raw.subList(0, limit) : raw;
+            }
         }
-        if (filter.getType() == KnowledgeBaseItemType.ARTICLE) {
-            return queryArticlesOnly(filter, search, restrictToItemIds, normalized);
+
+        List<KnowledgeBaseItem> articles = List.of();
+        long articleCount = 0;
+        if (wantsArticles) {
+            articleCount = repository.countArticles(
+                    parent, search, restrictToItemIds, filter.getStatuses());
+            int articleLimit = limit - folders.size();
+            if (articleLimit > 0) {
+                PagedArticles paged = fetchArticlesPage(parent, search, restrictToItemIds,
+                        filter.getStatuses(), pastFolders ? cursor : null, articleLimit);
+                articles = paged.items();
+                hasNextPage = paged.hasNextPage();
+            } else if (!hasNextPage) {
+                // A page filled by folders alone still has a next page when articles follow them.
+                hasNextPage = articleCount > 0;
+            }
         }
-        return queryMixed(filter, search, restrictToItemIds, normalized);
+
+        List<KnowledgeBaseItem> combined = Stream.concat(folders.stream(), articles.stream()).toList();
+        PageInfo pageInfo = buildPageInfo(combined, hasNextPage, normalized.hasCursor());
+
+        return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
+                .items(combined)
+                .pageInfo(pageInfo)
+                .filteredCount((int) (folderCount + articleCount))
+                .build();
     }
 
     public Optional<KnowledgeBaseItem> getItem(String id) {
@@ -183,20 +231,60 @@ public class KnowledgeBaseService {
         createAssignments(saved.getId(), AssignmentTargetType.DEVICE, cmd.getAssignedDeviceIds());
         createAssignments(saved.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
         createAssignments(saved.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
+        knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
+                saved.getId(), cmd.getAttachmentTempIds(), currentUserId);
 
         return saved;
     }
 
+    /**
+     * One save of an article: its own fields and status and, when the command carries them, its
+     * tags, assignments and attachments. A null field or list is left as it is; an empty list
+     * means none.
+     *
+     * These live in separate collections and nothing here rolls a failed save back, so the order
+     * is what keeps a failure from leaving the article half-saved:
+     * 1. everything that can be refused is checked before the first write;
+     * 2. tags, assignments and new attachments are written first — each is safe to repeat;
+     * 3. the article itself follows, text and status in one document write, so a failure up to
+     *    here leaves it exactly as it was and never publishes text with half its tags;
+     * 4. attachments are deleted last, because that cannot be undone.
+     */
     @Transactional
     public KnowledgeBaseItem updateArticle(String currentUserId, UpdateArticleCommand cmd) {
         log.info("Updating article {} by user {}", cmd.getId(), currentUserId);
         KnowledgeBaseItem article = getById(cmd.getId());
+
+        if (cmd.getParentId() != null) {
+            if (cmd.isMoveToRoot()) {
+                throw new ValidationException("parentId and moveToRoot cannot both be set.");
+            }
+            validateParentIsFolder(cmd.getParentId());
+        }
+        if (article.getType() != KnowledgeBaseItemType.ARTICLE && carriesArticleOnlyFields(cmd)) {
+            throw new ConflictException(ErrorCode.CONFLICT,
+                    "Only articles have a status, tags, assignments and attachments.");
+        }
+        List<KnowledgeBaseItemAttachment> attachmentsToDelete =
+                knowledgeBaseAttachmentService.getArticleAttachments(article.getId(), cmd.getDeleteAttachmentIds());
+
+        if (cmd.getTagIds() != null) {
+            knowledgeBaseTagService.replaceItemTags(article.getId(), cmd.getTagIds());
+        }
+        replaceAssignments(article.getId(), AssignmentTargetType.ORGANIZATION, cmd.getAssignedOrganizationIds());
+        replaceAssignments(article.getId(), AssignmentTargetType.DEVICE, cmd.getAssignedDeviceIds());
+        replaceAssignments(article.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
+        replaceAssignments(article.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
+        List<KnowledgeBaseItemAttachment> linked = knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
+                article.getId(), cmd.getAttachmentTempIds(), currentUserId);
+
         if (cmd.getName() != null) {
             article.setName(cmd.getName());
         }
         if (cmd.getParentId() != null) {
-            validateParentIsFolder(cmd.getParentId());
             article.setParentId(cmd.getParentId());
+        } else if (cmd.isMoveToRoot()) {
+            article.setParentId(null);
         }
         if (cmd.getContent() != null) {
             article.setContent(cmd.getContent());
@@ -204,8 +292,31 @@ public class KnowledgeBaseService {
         if (cmd.getSummary() != null) {
             article.setSummary(cmd.getSummary());
         }
+        if (cmd.getStatus() != null) {
+            // Any status from any status: DRAFT/PUBLISHED on an archived article restores it as
+            // exactly that, rather than as PUBLISHED the way unarchiveArticle does.
+            article.setStatus(cmd.getStatus());
+        }
         article.setLastModifiedBy(currentUserId);
-        return repository.save(article);
+        KnowledgeBaseItem saved = repository.save(article);
+
+        // An attachment replaced by a file of the same name was just overwritten by the link
+        // above: its path now holds the new file and must survive the deletion of the old record.
+        Set<String> pathsStillInUse = linked.stream()
+                .map(KnowledgeBaseItemAttachment::getStoragePath)
+                .collect(Collectors.toSet());
+        knowledgeBaseAttachmentService.deleteAttachments(attachmentsToDelete, pathsStillInUse);
+        return saved;
+    }
+
+    /** The fields of a save that only make sense on an article; the older ones a folder has always accepted. */
+    private static boolean carriesArticleOnlyFields(UpdateArticleCommand cmd) {
+        return Stream.of(
+                        cmd.getStatus(), cmd.getTagIds(),
+                        cmd.getAssignedOrganizationIds(), cmd.getAssignedDeviceIds(),
+                        cmd.getAssignedTicketIds(), cmd.getAssignedKnowledgeArticleIds(),
+                        cmd.getAttachmentTempIds(), cmd.getDeleteAttachmentIds())
+                .anyMatch(Objects::nonNull);
     }
 
     @Transactional
@@ -276,130 +387,82 @@ public class KnowledgeBaseService {
         return repository.save(item);
     }
 
-    private CountedGenericQueryResult<KnowledgeBaseItem> queryMixed(
-            KnowledgeBaseFilterCriteria filter, String search,
-            List<String> restrictToItemIds, CursorPaginationCriteria normalized) {
-        String cursor = normalized.getCursor();
-        int limit = normalized.getLimit();
-
-        List<KnowledgeBaseItem> allFolders = repository.findFoldersForParent(
-                filter.getParentId(), search, restrictToItemIds);
-        long articleCount = repository.countArticles(
-                filter.getParentId(), search,
-                KnowledgeBaseItemType.ARTICLE, restrictToItemIds, filter.getStatuses());
-        long totalCount = allFolders.size() + articleCount;
-
-        // Folders come first, then articles. A cursor pointing at a folder continues the folder list;
-        // any other cursor is an article cursor and the folders have already been served.
-        int folderCursorIndex = indexOfId(allFolders, cursor);
-        boolean inFolders = cursor == null || folderCursorIndex >= 0;
-        List<KnowledgeBaseItem> remainingFolders = inFolders
-                ? allFolders.subList(folderCursorIndex + 1, allFolders.size())
-                : List.of();
-        List<KnowledgeBaseItem> displayedFolders = remainingFolders.size() > limit
-                ? remainingFolders.subList(0, limit)
-                : remainingFolders;
-        boolean foldersTruncated = remainingFolders.size() > displayedFolders.size();
-
-        int articleLimit = Math.max(0, limit - displayedFolders.size());
-        String articleCursor = inFolders ? null : cursor;
-        PagedArticles paged = articleLimit > 0
-                ? fetchArticlesPage(filter.getParentId(), search,
-                        restrictToItemIds, filter.getStatuses(), articleCursor, articleLimit)
-                : new PagedArticles(List.of(), false);
-
-        List<KnowledgeBaseItem> combined = Stream.concat(displayedFolders.stream(), paged.items().stream()).toList();
-        // A page filled by folders alone still has a next page when articles follow them.
-        boolean articlesPending = articleLimit == 0 && inFolders && articleCount > 0;
-        boolean hasNextPage = paged.hasNextPage() || foldersTruncated || articlesPending;
-        PageInfo pageInfo = buildPageInfo(combined, hasNextPage, normalized.hasCursor());
-
-        return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
-                .items(combined)
-                .pageInfo(pageInfo)
-                .filteredCount((int) totalCount)
-                .build();
-    }
-
-    private static int indexOfId(List<KnowledgeBaseItem> items, String id) {
-        return items.stream().map(KnowledgeBaseItem::getId).toList().indexOf(id);
-    }
-
-    private CountedGenericQueryResult<KnowledgeBaseItem> queryFoldersOnly(
-            KnowledgeBaseFilterCriteria filter, String search,
-            List<String> restrictToItemIds, CursorPaginationCriteria normalized) {
-        List<KnowledgeBaseItem> folders = repository.findFoldersForParent(
-                filter.getParentId(), search, restrictToItemIds);
-        PageInfo pageInfo = buildPageInfo(folders, false, normalized.hasCursor());
-
-        return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
-                .items(folders)
-                .pageInfo(pageInfo)
-                .filteredCount(folders.size())
-                .build();
-    }
-
-    private CountedGenericQueryResult<KnowledgeBaseItem> queryArticlesOnly(
-            KnowledgeBaseFilterCriteria filter, String search,
-            List<String> restrictToItemIds, CursorPaginationCriteria normalized) {
-        long count = repository.countArticles(
-                filter.getParentId(), search,
-                KnowledgeBaseItemType.ARTICLE, restrictToItemIds, filter.getStatuses());
-        PagedArticles paged = fetchArticlesPage(filter.getParentId(),
-                search, restrictToItemIds, filter.getStatuses(),
-                normalized.getCursor(), normalized.getLimit());
-
-        PageInfo pageInfo = buildPageInfo(paged.items(), paged.hasNextPage(), normalized.hasCursor());
-
-        return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
-                .items(paged.items())
-                .pageInfo(pageInfo)
-                .filteredCount((int) count)
-                .build();
-    }
-
-    private CountedGenericQueryResult<KnowledgeBaseItem> queryArticlesInSubtree(
-            KnowledgeBaseFilterCriteria filter, String search,
-            CursorPaginationCriteria normalized) {
-        Set<String> subtreeArticleIds = new HashSet<>(collectArticleIdsInSubtree(filter.getParentId()));
-        if (subtreeArticleIds.isEmpty()) {
-            return buildEmptyResult(normalized);
+    /**
+     * A listing that names no scope reads one level — unless it narrows by a search or by tags,
+     * then it reads the whole subtree. Narrowing a single level is rarely what is meant: the match
+     * a user is looking for is usually further down.
+     */
+    private static KnowledgeBaseScope effectiveScope(KnowledgeBaseFilterCriteria filter, String search,
+                                                     boolean tagFiltered) {
+        if (filter.getScope() != null) {
+            return filter.getScope();
         }
+        return StringUtils.hasText(search) || tagFiltered
+                ? KnowledgeBaseScope.DESCENDANTS
+                : KnowledgeBaseScope.CHILDREN;
+    }
 
-        List<String> tagFilteredIds = resolveTagFilter(filter.getTagIds());
-        List<String> targetIds;
-        if (tagFilteredIds == null) {
-            targetIds = new ArrayList<>(subtreeArticleIds);
-        } else {
-            targetIds = tagFilteredIds.stream()
-                    .filter(subtreeArticleIds::contains)
-                    .toList();
-            if (targetIds.isEmpty()) {
-                return buildEmptyResult(normalized);
+    private KnowledgeBaseParentFilter parentFilter(String parentId, KnowledgeBaseScope scope) {
+        boolean hasParent = StringUtils.hasText(parentId);
+        if (scope == KnowledgeBaseScope.DESCENDANTS) {
+            return hasParent
+                    ? KnowledgeBaseParentFilter.of(collectFolderIdsInSubtree(parentId))
+                    : KnowledgeBaseParentFilter.any();
+        }
+        return hasParent ? KnowledgeBaseParentFilter.of(List.of(parentId)) : KnowledgeBaseParentFilter.root();
+    }
+
+    /**
+     * The folder itself plus every folder below it. One read of all folders' (id, parentId) pairs,
+     * walked in memory — a subtree's items are then the items whose parent is one of these.
+     */
+    private List<String> collectFolderIdsInSubtree(String folderId) {
+        Map<String, List<String>> childFolderIds = new HashMap<>();
+        for (KnowledgeBaseItem folder : repository.findFolderLinks()) {
+            if (folder.getParentId() != null) {
+                childFolderIds.computeIfAbsent(folder.getParentId(), parent -> new ArrayList<>()).add(folder.getId());
             }
         }
 
-        long count = repository.countArticles(
-                null, search, KnowledgeBaseItemType.ARTICLE, targetIds, filter.getStatuses());
-        PagedArticles paged = fetchArticlesPage(null, search,
-                targetIds, filter.getStatuses(),
-                normalized.getCursor(), normalized.getLimit());
-
-        PageInfo pageInfo = buildPageInfo(paged.items(), paged.hasNextPage(), normalized.hasCursor());
-
-        return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
-                .items(paged.items())
-                .pageInfo(pageInfo)
-                .filteredCount((int) count)
-                .build();
+        List<String> folderIds = new ArrayList<>();
+        // Guards the walk against a parent cycle in the data.
+        Set<String> seen = new HashSet<>();
+        Deque<String> queue = new ArrayDeque<>();
+        queue.add(folderId);
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            if (seen.add(current)) {
+                folderIds.add(current);
+                queue.addAll(childFolderIds.getOrDefault(current, List.of()));
+            }
+        }
+        return folderIds;
     }
 
-    private PagedArticles fetchArticlesPage(String parentId, String search,
+    /**
+     * A cursor issued before cursors carried their stream and sort key is a bare item id. It is
+     * positioned the way it always was — off the document as it is now, or by the id alone when
+     * the document is gone — so a client paging across the deploy keeps its place.
+     */
+    private KnowledgeBaseItemCursor resolveCursor(String rawCursor) {
+        if (!StringUtils.hasText(rawCursor)) {
+            return null;
+        }
+        KnowledgeBaseItemCursor tagged = KnowledgeBaseItemCursor.parse(rawCursor);
+        if (tagged != null) {
+            return tagged;
+        }
+        return repository.findById(rawCursor)
+                .map(KnowledgeBaseItemCursor::of)
+                .orElseGet(() -> new KnowledgeBaseItemCursor(KnowledgeBaseItemType.ARTICLE, rawCursor, null, null));
+    }
+
+    private PagedArticles fetchArticlesPage(KnowledgeBaseParentFilter parent, String search,
                                              List<String> itemIds,
                                              List<KnowledgeBaseArticleStatus> statuses,
-                                             String cursor, int limit) {
+                                             KnowledgeBaseItemCursor cursor, int limit) {
         List<KnowledgeBaseItem> raw = repository.findArticles(
-                parentId, search, KnowledgeBaseItemType.ARTICLE, itemIds, statuses, cursor, limit + 1);
+                parent, search, itemIds, statuses, cursor, limit + 1);
         boolean hasNextPage = raw.size() > limit;
         List<KnowledgeBaseItem> page = hasNextPage ? raw.subList(0, limit) : raw;
         return new PagedArticles(page, hasNextPage);
@@ -410,19 +473,10 @@ public class KnowledgeBaseService {
                                                       CursorPaginationCriteria normalized) {
         int limit = normalized.getLimit();
         List<KnowledgeBaseItem> raw = repository.findArchivedArticles(
-                search, itemIds, normalized.getCursor(), limit + 1);
+                search, itemIds, resolveCursor(normalized.getCursor()), limit + 1);
         boolean hasNextPage = raw.size() > limit;
         List<KnowledgeBaseItem> page = hasNextPage ? raw.subList(0, limit) : raw;
         return new PagedArticles(page, hasNextPage);
-    }
-
-    private CountedGenericQueryResult<KnowledgeBaseItem> buildEmptyResult(CursorPaginationCriteria normalized) {
-        PageInfo pageInfo = buildPageInfo(List.of(), false, normalized.hasCursor());
-        return CountedGenericQueryResult.<KnowledgeBaseItem>builder()
-                .items(List.of())
-                .pageInfo(pageInfo)
-                .filteredCount(0)
-                .build();
     }
 
     private List<String> collectArticleIdsInSubtree(String folderId) {
@@ -454,6 +508,13 @@ public class KnowledgeBaseService {
         }
         targetIds.forEach(targetId ->
                 assignmentService.assignItem(articleId, AssignmentItemType.KNOWLEDGE_ARTICLE, targetType, targetId));
+    }
+
+    private void replaceAssignments(String articleId, AssignmentTargetType targetType, List<String> targetIds) {
+        if (targetIds == null) {
+            return;
+        }
+        assignmentService.replaceAssignments(articleId, AssignmentItemType.KNOWLEDGE_ARTICLE, targetType, targetIds);
     }
 
     private void moveChildren(List<KnowledgeBaseItem> children, String targetFolderId, String currentFolderId) {
@@ -522,8 +583,8 @@ public class KnowledgeBaseService {
     }
 
     private PageInfo buildPageInfo(List<KnowledgeBaseItem> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
-        String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getFirst().getId());
-        String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getLast().getId());
+        String startCursor = pageItems.isEmpty() ? null : KnowledgeBaseCursors.encode(pageItems.getFirst());
+        String endCursor = pageItems.isEmpty() ? null : KnowledgeBaseCursors.encode(pageItems.getLast());
 
         return PageInfo.builder()
                 .hasNextPage(hasNextPage)

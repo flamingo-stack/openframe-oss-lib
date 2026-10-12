@@ -110,7 +110,7 @@ function timeLabelInZone(ms: number, timeZone: string): string {
  * 48px targets and the COLUMN widens to house it, rather than the buttons
  * shrinking to fit a narrower column.
  */
-const CALENDAR_W = 'md:w-[19rem] md:shrink-0 lg:w-[16rem]';
+const CALENDAR_W = 'content-md:w-[19rem] content-md:shrink-0 content-lg:w-[16rem]';
 
 /** Column heading ("Select Date & Time" / the chosen day) — body-weight
  *  primary, 4px above its content, mirrored by both skeletons. */
@@ -150,7 +150,7 @@ const CHIP_GRID_CLASS = cn(
   // 700px card into a 1500px one and buries whatever the page puts below
   // it. This is the one nested scroller worth having: a small, obviously
   // bounded list with a visible edge, exactly as drawn.
-  'max-h-[9.75rem] md:max-h-none',
+  'max-h-[9.75rem] content-md:max-h-none',
   // No height of its own, and none borrowed from the calendar either: the card
   // states one height, the panel and this row pass it down, and what is left
   // after the column heading IS the scroll box. A long day scrolls inside it.
@@ -188,24 +188,24 @@ const CHIP_CLASS = 'w-full px-[var(--spacing-system-xxs)]';
  * is worse than the thing it saves.
  */
 const SLOT_ROW_CLASS = cn(
-  'flex min-w-0 flex-col md:flex-row',
+  'flex min-w-0 flex-col content-md:flex-row',
   // Default `stretch` at every width, deliberately. Stacked, that is what
   // makes each section span the card — an `items-start` here (it was here, to
   // stop a column growing taller than its month) collapses both sections to
   // their intrinsic WIDTH instead, which on a phone left the calendar and the
   // chips huddled against the left edge with half the card empty. The
   // calendar no longer needs protecting: its height is fixed, not derived.
-  'md:min-h-0 md:flex-1 lg:gap-[var(--spacing-system-lf)]',
+  'content-md:min-h-0 content-md:flex-1 content-lg:gap-[var(--spacing-system-lf)]',
 );
 
 /** Shared by both columns: self-padded until the panel takes over at `lg`.
  *  Widths are per-column — the calendar states one (`CALENDAR_W`) and the
  *  times take what is left, rather than a 50/50 split that would size the
  *  month by the card's width. */
-const COLUMN_BOX = 'p-[var(--spacing-system-l)] lg:p-0';
+const COLUMN_BOX = 'p-[var(--spacing-system-l)] content-lg:p-0';
 
 /** The rule between the two, wherever the layout puts it. */
-const COLUMN_DIVIDER = 'border-b border-ods-border md:border-b-0 md:border-r lg:border-0';
+const COLUMN_DIVIDER = 'border-b border-ods-border content-md:border-b-0 content-md:border-r content-lg:border-0';
 
 /** Deterministic month caption for a given offset (fixed en-US locale so
  *  the SSR and client first-paint markup agree byte-for-byte). */
@@ -288,7 +288,7 @@ function DayCalendar({ monthOffset, onMonthOffsetChange, selectedDay, onSelectDa
 export function SlotPickerSkeleton({ monthOffset = 0 }: { monthOffset?: number }) {
   return (
     <div className={SLOT_ROW_CLASS}>
-      <div className={cn(COLUMN_STACK, COLUMN_BOX, COLUMN_DIVIDER, CALENDAR_W, 'md:overflow-y-auto')}>
+      <div className={cn(COLUMN_STACK, COLUMN_BOX, COLUMN_DIVIDER, CALENDAR_W, 'content-md:overflow-y-auto')}>
         {/* Needs no data — the heading renders REAL in every loading state. */}
         <p className={COLUMN_HEADING_CLASS}>{SLOT_PICKER_HEADING}</p>
         <DayCalendar
@@ -299,7 +299,7 @@ export function SlotPickerSkeleton({ monthOffset = 0 }: { monthOffset?: number }
           slotsByDay={null}
         />
       </div>
-      <div className={cn(COLUMN_STACK, COLUMN_BOX, 'min-w-0 md:flex-1')}>
+      <div className={cn(COLUMN_STACK, COLUMN_BOX, 'min-w-0 content-md:flex-1')}>
         <TimeChipsSkeleton />
       </div>
     </div>
@@ -320,8 +320,8 @@ export function TimeChipsSkeleton() {
             grid's track count follows the card width, so no fixed number
             lands flush and a partial last row is the honest shape anyway. */}
         {Array.from({ length: 16 }, (_, i) => (
-          // h-11 md:h-12 — the loaded chip's own default-size height.
-          <Skeleton key={i} className={cn(CHIP_CLASS, 'h-11 md:h-12')} />
+          // h-11 content-md:h-12 — the loaded chip's own default-size height.
+          <Skeleton key={i} className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />
         ))}
       </div>
     </>
@@ -367,7 +367,7 @@ export function SlotPicker({
 
   return (
     <div className={SLOT_ROW_CLASS}>
-      <div className={cn(COLUMN_STACK, COLUMN_BOX, COLUMN_DIVIDER, CALENDAR_W, 'md:overflow-y-auto')}>
+      <div className={cn(COLUMN_STACK, COLUMN_BOX, COLUMN_DIVIDER, CALENDAR_W, 'content-md:overflow-y-auto')}>
         <p className={COLUMN_HEADING_CLASS}>{SLOT_PICKER_HEADING}</p>
         {/* Stays mounted through a month load — `slotsByDay: null` is what
             "nothing selectable yet" looks like, not an unmount. */}
@@ -379,7 +379,7 @@ export function SlotPicker({
           slotsByDay={isLoading ? null : slotsByDay}
         />
       </div>
-      <div className={cn(COLUMN_STACK, COLUMN_BOX, 'min-w-0 md:flex-1')}>
+      <div className={cn(COLUMN_STACK, COLUMN_BOX, 'min-w-0 content-md:flex-1')}>
         {isLoading ? (
           <TimeChipsSkeleton />
         ) : selectedDay ? (

@@ -38,8 +38,9 @@ export interface ChatPanelHeaderProps {
   /** Back-chevron handler. Required only when `showBack` — the list view has no
    *  back affordance. */
   onBack?: () => void;
-  /** Close the panel. */
-  onClose: () => void;
+  /** Close the panel. Omit for a panel that cannot close (docked in the
+   *  layout): the close button is left out. */
+  onClose?: () => void;
   /** Restore/unarchive — renders the refresh button (archived view only). */
   onRestore?: () => void;
   /** Rename — adds the "Rename Chat" item to the ⋯ menu. */
@@ -209,9 +210,11 @@ export function ChatPanelHeader({
           </ChatHeaderIconButton>
         )}
 
-        <ChatHeaderIconButton onClick={onClose} aria-label="Close">
-          <XmarkIcon size={24} />
-        </ChatHeaderIconButton>
+        {onClose && (
+          <ChatHeaderIconButton onClick={onClose} aria-label="Close">
+            <XmarkIcon size={24} />
+          </ChatHeaderIconButton>
+        )}
       </div>
     </>
   );

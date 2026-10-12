@@ -100,6 +100,7 @@ function Stage() {
         onTabChange={() => go(0)}
         progressTransitionMs={1700}
         stretchTabs
+        tabAlign="start"
       />
       <div className="grid items-end gap-7 lg:grid-cols-[1fr_640px_236px]">
         <FeatureList variant="numbered" items={STEPS} activeIndex={activeStep} className="self-center" />
@@ -108,11 +109,7 @@ function Stage() {
           className="h-[540px]"
           footer={<div className="px-5 py-3.5 text-ods-text-primary text-h6">{feedAt(step).length} found</div>}
         >
-          <IncidentFeed
-            items={feedAt(step)}
-            statusLabels={STATUS_LABELS}
-            emptyLabel="All quiet. Mingo is reading your logs."
-          />
+          <IncidentFeed items={feedAt(step)} statusLabels={STATUS_LABELS} emptyLabel="Mingo is analyzing your logs" />
         </AppWindowFrame>
         <PhoneFrame dateLabel="Thursday, October 1" timeLabel="5:09" className="h-[540px]">
           {step >= 5 && (

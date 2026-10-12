@@ -24,7 +24,7 @@ import {
   toStripProfile,
   type VideoBiteStripProfile,
 } from '../../features/video-bites-shared';
-import { GitHubIcon } from '../../icons/github-icon';
+import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
 import { PageShell } from '../../layout/article-detail-layout';
 import { PageLayout } from '../../layout/page-layout';
 import { Card, CardContent } from '../../ui/card';
@@ -87,7 +87,6 @@ export interface VideoDisplaySectionProps {
   bitesProfile?: VideoBiteStripProfile | null;
   /** Overlay-footer navigation target (the release the bites originated from). */
   bitesHref?: string;
-  srtContent?: string | null;
   captionsUrl?: string | null;
   /** VTT captions URL for the highlight reel (variant=highlight). */
   highlightCaptionsUrl?: string | null;
@@ -333,14 +332,14 @@ export function ReleaseDetailPage({
       titleWrap
       backButton={showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined}
     >
-      <div className="space-y-6 md:space-y-8">
+      <div className="space-y-6 content-md:space-y-8">
         {/* Tags — flat product_release_tags[] from entity_tags */}
         <EntityTagBadges tags={release.product_release_tags as TagAssoc[] | undefined} />
 
         {/* Metadata Grid */}
-        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border md:grid-cols-4">
+        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border content-md:grid-cols-4">
           {/* Release Type */}
-          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r">
+          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 content-md:border-b-0 content-md:border-r">
             <div className="flex flex-col gap-0">
               <p className="text-ods-text-primary text-h4">{releaseType.toLocaleUpperCase()}</p>
               <p className="text-ods-text-secondary text-h6">Release Type</p>
@@ -348,7 +347,7 @@ export function ReleaseDetailPage({
           </div>
 
           {/* Release Status */}
-          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r">
+          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 content-md:border-b-0 content-md:border-r">
             <div className="flex flex-col gap-0">
               <p className="text-ods-text-primary text-h4">{releaseStatus.toLocaleUpperCase()}</p>
               <p className="text-ods-text-secondary text-h6">Release Status</p>
@@ -356,7 +355,7 @@ export function ReleaseDetailPage({
           </div>
 
           {/* Release Date */}
-          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r">
+          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 content-md:border-b-0 content-md:border-r">
             <div className="flex flex-col gap-0">
               <p className="text-ods-text-primary text-h4">{formatReleaseDate(releaseDate)}</p>
               <p className="text-ods-text-secondary text-h6">Release Date</p>
@@ -397,7 +396,6 @@ export function ReleaseDetailPage({
             filterPublishedBites={true}
             bitesProfile={toStripProfile(author)}
             bitesHref={typeof release.slug === 'string' ? `/releases/${release.slug}` : undefined}
-            srtContent={release?.srt_content as string | null | undefined}
             captionsUrl={captionsUrl}
             highlightCaptionsUrl={highlightCaptionsUrl}
           />
@@ -409,14 +407,7 @@ export function ReleaseDetailPage({
               HLS, and MP4 paths.
             */}
             {youtubeUrl && <Video kind="youtube" url={youtubeUrl} title={`${releaseTitle} - Video`} layout="native" />}
-            {!youtubeUrl && mainVideoUrl && (
-              <Video
-                url={mainVideoUrl}
-                srtContent={release?.srt_content as string | undefined}
-                captionsUrl={captionsUrl}
-                layout="centered"
-              />
-            )}
+            {!youtubeUrl && mainVideoUrl && <Video url={mainVideoUrl} captionsUrl={captionsUrl} layout="centered" />}
             {highlightVideoUrl && (
               <Video
                 url={highlightVideoUrl}
@@ -542,16 +533,16 @@ export function ReleaseDetailPage({
                   <>
                     {githubReleases.map(ghRelease => (
                       <div key={ghRelease.id} className="flex items-start gap-1">
-                        <GitHubIcon className="shrink-0" width={24} height={24} color="var(--color-text-secondary)" />
+                        <GithubClassicIcon className="shrink-0" size={24} color="var(--color-text-secondary)" />
                         <span className="text-ods-text-primary text-h4">Github Release</span>
-                        <a
+                        <Link
                           href={ghRelease.github_release_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-ods-accent text-h4 hover:underline"
                         >
                           {ghRelease.github_release_url.split('/').pop()}
-                        </a>
+                        </Link>
                         <ExternalLink className="h-6 w-6 shrink-0 text-ods-accent" />
                       </div>
                     ))}
@@ -589,14 +580,14 @@ export function ReleaseDetailPage({
                 {migrationGuideUrl && (
                   <div className="flex items-start gap-1">
                     <BookMarked className="h-6 w-6 shrink-0 text-ods-text-secondary" />
-                    <a
+                    <Link
                       href={migrationGuideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-ods-accent text-h4 hover:underline"
                     >
                       📖 Migration Guide
-                    </a>
+                    </Link>
                     <ExternalLink className="h-6 w-6 shrink-0 text-ods-accent" />
                   </div>
                 )}
@@ -605,14 +596,14 @@ export function ReleaseDetailPage({
                 {documentationUrl && (
                   <div className="flex items-start gap-1">
                     <BookMarked className="h-6 w-6 shrink-0 text-ods-text-secondary" />
-                    <a
+                    <Link
                       href={documentationUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-ods-accent text-h4 hover:underline"
                     >
                       📚 Documentation
-                    </a>
+                    </Link>
                     <ExternalLink className="h-6 w-6 shrink-0 text-ods-accent" />
                   </div>
                 )}

@@ -1,23 +1,24 @@
 package com.openframe.api.service.packagesearch;
 
-import com.openframe.core.rest.PackageSearchRestClientFactory;
-import com.openframe.data.document.packagesearch.PackageCatalogEntry;
-import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.openframe.api.service.packagesearch.PackageSearchProperties;
-import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.api.dto.packagesearch.PackageDetails;
-import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.api.dto.packagesearch.PackageSearchHit;
 import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.dto.packagesearch.PackageVersion;
 import com.openframe.api.exception.PackageNotFoundException;
 import com.openframe.api.exception.PackageSourceUnavailableException;
+import com.openframe.core.rest.PackageSearchRestClientFactory;
+import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
+import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.repository.packagesearch.PackageCatalogHit;
+import com.openframe.data.repository.packagesearch.PackageCatalogOrder;
+import com.openframe.data.repository.packagesearch.PackageCatalogPage;
+import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -25,9 +26,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -36,9 +35,6 @@ public class WingetPackageClient implements PackageManagerClient {
     private static final String UNAVAILABLE_MESSAGE =
             "The winget catalog is temporarily unavailable. Please try again later.";
     private static final int DETAILS_CACHE_MAX_SIZE = 5000;
-
-    // winget publishes no install counts, so the unfiltered list is alphabetical
-    private static final Sort BY_NAME = Sort.by(Sort.Order.asc("name"), Sort.Order.asc("packageId"));
 
     private final PackageCatalogRepository packageCatalogRepository;
     private final RestClient restClient;
@@ -59,37 +55,25 @@ public class WingetPackageClient implements PackageManagerClient {
         return PackageManagerType.WINGET;
     }
 
+    // winget publishes no install counts, so the unfiltered list is alphabetical
     @Override
-    public PackageSearchResult search(String query, int limit, int offset) {
-        String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
-        if (normalizedQuery.isEmpty()) {
-            return listCatalog(limit, offset);
-        }
-        List<Scored> matched = scoreCandidates(normalizedQuery);
-        List<PackageSearchItem> items = pageOf(matched, limit, offset);
-        int total = matched.size();
-        boolean hasMore = offset + limit < total;
+    public PackageSearchResult search(String query, String afterCursor, int limit) {
+        PackageCatalogPage page = packageCatalogRepository.searchByName(
+                PackageManagerType.WINGET, query, PackageCatalogOrder.BY_NAME, afterCursor, limit);
+        List<PackageSearchHit> hits = page.getHits().stream()
+                .map(this::toHit)
+                .toList();
+        int total = (int) page.getTotal();
         return PackageSearchResult.builder()
-                .items(items)
+                .hits(hits)
                 .total(total)
-                .hasMore(hasMore)
+                .hasMore(page.isHasMore())
                 .build();
     }
 
-    private PackageSearchResult listCatalog(int limit, int offset) {
-        // a cursor can land on any offset, and a Pageable only pages in whole page sizes
-        PageRequest firstRows = PageRequest.of(0, offset + limit, BY_NAME);
-        List<PackageSearchItem> items = packageCatalogRepository.findByManager(PackageManagerType.WINGET, firstRows).stream()
-                .skip(offset)
-                .map(this::toItem)
-                .toList();
-        int total = (int) packageCatalogRepository.countByManager(PackageManagerType.WINGET);
-        boolean hasMore = offset + limit < total;
-        return PackageSearchResult.builder()
-                .items(items)
-                .total(total)
-                .hasMore(hasMore)
-                .build();
+    private PackageSearchHit toHit(PackageCatalogHit hit) {
+        PackageSearchItem item = toItem(hit.getEntry());
+        return new PackageSearchHit(item, hit.getCursor());
     }
 
     @Override
@@ -101,39 +85,6 @@ public class WingetPackageClient implements PackageManagerClient {
         PackageCatalogEntry entry = found.getFirst();
         String cacheKey = entry.getPackageId();
         return detailsCache.get(cacheKey, key -> loadDetails(entry));
-    }
-
-    private List<Scored> scoreCandidates(String query) {
-        List<PackageCatalogEntry> candidates = packageCatalogRepository.findByManagerAndSearchBlobContaining(PackageManagerType.WINGET, query);
-        return candidates.stream()
-                .map(entry -> scoreEntry(query, entry))
-                .filter(Scored::isMatch)
-                .sorted(byRelevance())
-                .toList();
-    }
-
-    private Scored scoreEntry(String query, PackageCatalogEntry entry) {
-        int score = PackageMatcher.score(query, entry.getPackageId(), entry.getName(),
-                entry.getAliases(), null);
-        return new Scored(score, entry);
-    }
-
-    // locale forks share the canonical package's moniker (Mozilla.Firefox.ach etc. all carry
-    // "firefox"), so on equal score the shortest id wins — that is the canonical package
-    private static Comparator<Scored> byRelevance() {
-        Comparator<Scored> byScore = Comparator.comparingInt(Scored::getScore).reversed();
-        return byScore
-                .thenComparingInt(Scored::idLength)
-                .thenComparing(Scored::entryName, String.CASE_INSENSITIVE_ORDER);
-    }
-
-    private List<PackageSearchItem> pageOf(List<Scored> matched, int limit, int offset) {
-        return matched.stream()
-                .skip(offset)
-                .limit(limit)
-                .map(Scored::getEntry)
-                .map(this::toItem)
-                .toList();
     }
 
     private PackageSearchItem toItem(PackageCatalogEntry entry) {
@@ -313,24 +264,5 @@ public class WingetPackageClient implements PackageManagerClient {
             return value.substring(1, value.length() - 1);
         }
         return value;
-    }
-
-    @Getter
-    @AllArgsConstructor
-    private static final class Scored {
-        private final int score;
-        private final PackageCatalogEntry entry;
-
-        private boolean isMatch() {
-            return score > 0;
-        }
-
-        private int idLength() {
-            return entry.getPackageId().length();
-        }
-
-        private String entryName() {
-            return entry.getName();
-        }
     }
 }

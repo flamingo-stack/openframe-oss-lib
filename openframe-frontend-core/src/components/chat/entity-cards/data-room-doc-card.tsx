@@ -3,7 +3,7 @@
 /**
  * Data-room / OpenFrame-docs inline chat card.
  *
- * PURE PRESENTATION. The card receives a pre-composed `<a>` prop bundle
+ * PURE PRESENTATION. The card receives a pre-composed `<Link>` prop bundle
  * (`anchorProps`) plus a pre-resolved badge label — both decisions
  * (URL composition + cross-app routing) are made in the consumer's
  * runtime layer, not inside this card.
@@ -15,6 +15,7 @@
 
 import { ExternalLink } from 'lucide-react';
 import type React from 'react';
+import Link from '../../../embed-shims/next-link';
 import { StatusBadge } from '../../ui/status-badge';
 import type { DataRoomDocCardItem } from '../types/entities/data-room-doc';
 import {
@@ -50,8 +51,8 @@ export interface DataRoomDocCardProps {
    *  card. The hub-side dispatcher already passes
    *  `getSourceLabel(sourceRepo)` with a non-null fallback. */
   badgeText: string;
-  /** Pre-composed `<a>` prop bundle. When provided, the outer renders
-   *  as `<a {...anchorProps}>`; otherwise the card is non-interactive. */
+  /** Pre-composed `<Link>` prop bundle. When provided, the outer renders
+   *  as `<Link {...anchorProps}>`; otherwise the card is non-interactive. */
   anchorProps?: DataRoomDocCardAnchorProps;
 }
 
@@ -92,9 +93,9 @@ export function DataRoomDocCard({ item, className, badgeText, anchorProps }: Dat
     );
   }
   return (
-    <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+    <Link {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
       {body}
-    </a>
+    </Link>
   );
 }
 

@@ -127,7 +127,7 @@ export function OrganizationCard({
         customFooter
       ) : footerStats && footerStats.length > 0 ? (
         <div className="flex w-full min-w-0 items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-shrink items-center gap-3 md:gap-4">
+          <div className="flex min-w-0 flex-shrink items-center gap-3 content-md:gap-4">
             {footerStats.map((stat, index) => (
               <div key={index} className="flex flex-shrink-0 items-center gap-1">
                 {stat.icon}

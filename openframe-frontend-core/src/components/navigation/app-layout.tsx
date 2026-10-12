@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { ContentAreaWidthContext } from '../../hooks/ui/use-content-breakpoint';
+import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import type { NavigationSidebarConfig } from '../../types/navigation';
 import { cn } from '../../utils';
 import { NotificationDrawer } from '../features/notifications/notification-drawer';
@@ -12,6 +14,7 @@ import {
   AppLayoutDrawerCoordinationContext,
   type AppLayoutDrawerHandle,
 } from './app-layout-context';
+import { AppLayoutSidePanel, type AppLayoutSidePanelConfig, useAppLayoutSidePanel } from './app-layout-side-panel';
 import { MobileBurgerMenu, type MobileBurgerMenuProps } from './mobile-burger-menu';
 import { NavigationSidebar } from './navigation-sidebar';
 
@@ -46,6 +49,15 @@ export interface AppLayoutProps {
    * area occupy the remaining height below it.
    */
   topBar?: ReactNode;
+  /**
+   * A panel docked beside the content (the Mingo chat). It narrows the
+   * content instead of covering it, and the content then lays out by its own
+   * width: `<main>` becomes an `ods-content-area` whose tokens and
+   * `content-md:` / `content-lg:` classes follow the room the panel leaves.
+   * Without room to dock (or on a phone) the header's Mingo button opens it
+   * over the content area. Optional; without it the layout is unchanged.
+   */
+  sidePanel?: AppLayoutSidePanelConfig;
 }
 
 export function AppLayout({
@@ -58,9 +70,38 @@ export function AppLayout({
   disabled = false,
   drawer,
   topBar,
+  sidePanel,
 }: AppLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
+  const [mainElement, setMainElement] = useState<HTMLElement | null>(null);
+  const [contentWidth, setContentWidth] = useState<number | null>(null);
+
+  const hasSidePanel = sidePanel !== undefined;
+  const sidePanelState = useAppLayoutSidePanel(sidePanel, drawerContainer);
+
+  useIsomorphicLayoutEffect(() => {
+    if (!hasSidePanel || !mainElement) return undefined;
+    const update = () => setContentWidth(mainElement.clientWidth);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(mainElement);
+    return () => observer.disconnect();
+  }, [hasSidePanel, mainElement]);
+
+  // With a side panel the header's Mingo button only exists while the panel
+  // cannot dock: it opens the panel over the content and closes it again.
+  const resolvedHeaderProps =
+    sidePanelState === null
+      ? headerProps
+      : {
+          ...headerProps,
+          showMingoAI: !sidePanelState.canDock,
+          onMingoAI: sidePanelState.toggle,
+          isMingoAIActive: sidePanelState.isOpen,
+          mingoAICloseWhenActive: true,
+        };
+  const contentCovered = sidePanelState?.coversContent === true;
 
   // Mirrors `mobileMenuOpen` so the toggle callback can stay identity-stable.
   // Refreshed after every commit rather than in the render body: the only
@@ -114,7 +155,7 @@ export function AppLayout({
             `relative` so the tablet sidebar (position:absolute) anchors to this
             row — below the topBar — instead of the viewport. */}
           <div className="relative flex min-h-0 flex-1">
-            <NavigationSidebar config={sidebarConfig} disabled={disabled} />
+            <NavigationSidebar config={sidebarConfig} disabled={disabled} pushOnTablet={hasSidePanel} />
             {/* Mobile Burger Menu - opens below header */}
             <MobileBurgerMenu
               {...mobileBurgerMenuProps}
@@ -127,7 +168,7 @@ export function AppLayout({
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col overflow-hidden">
               <AppHeader
-                {...headerProps}
+                {...resolvedHeaderProps}
                 isMobileMenuOpen={mobileMenuOpen}
                 onToggleMobileMenu={handleToggleMobileMenu}
                 disabled={disabled}
@@ -140,8 +181,32 @@ export function AppLayout({
               animation visually AND contains layout overflow so it doesn't
               propagate up to <html>. (Scroll-snap-back below handles the
               browser's programmatic scroll-on-focus side effect.) */}
-              <div ref={setDrawerContainer} className="relative flex flex-1 flex-col overflow-hidden">
-                <main className={cn('flex-1 overflow-y-auto', mainClassName)}>{children}</main>
+              <div
+                ref={setDrawerContainer}
+                className={cn('relative flex flex-1 overflow-hidden', sidePanel ? 'flex-row' : 'flex-col')}
+              >
+                {sidePanel ? (
+                  // `hidden` while the panel covers the area: the page stays
+                  // mounted, it just takes no room.
+                  <main
+                    ref={setMainElement}
+                    className={cn(
+                      'ods-content-area min-w-0 flex-1 overflow-y-auto',
+                      contentCovered && 'hidden',
+                      // While the panel is drawn over the page, keep the page's own
+                      // z-indexed layers (sticky headers, fixed bars) under it.
+                      sidePanelState?.overlapsContent && 'isolate',
+                      mainClassName,
+                    )}
+                  >
+                    <ContentAreaWidthContext.Provider value={contentWidth}>
+                      <div className="ods-content-scope">{children}</div>
+                    </ContentAreaWidthContext.Provider>
+                  </main>
+                ) : (
+                  <main className={cn('flex-1 overflow-y-auto', mainClassName)}>{children}</main>
+                )}
+                {sidePanel && sidePanelState && <AppLayoutSidePanel config={sidePanel} state={sidePanelState} />}
                 {/* `drawer` slot — rendered here so it sits inside the
                 AppLayoutDrawerContainerContext and can portal into this exact
                 container. Mount location is irrelevant for visual placement

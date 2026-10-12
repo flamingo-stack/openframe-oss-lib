@@ -93,7 +93,7 @@ export function TicketStatusConfigRow({
     <div
       className={cn(
         // Transparent background — only the border outlines the row.
-        'flex w-full items-start gap-3 rounded-md border border-ods-border md:gap-[var(--spacing-system-m)]',
+        'flex w-full items-start gap-3 rounded-md border border-ods-border content-md:gap-[var(--spacing-system-m)]',
         'p-[var(--spacing-system-m)]',
         // The dragged row travels over its siblings, so it needs an opaque back.
         isDragging && 'bg-ods-bg opacity-70 shadow-lg',
@@ -102,7 +102,7 @@ export function TicketStatusConfigRow({
       {dragAndDropEnabled && (
         <div
           className={cn(
-            'flex h-11 w-8 shrink-0 items-center justify-center text-ods-text-secondary md:h-12',
+            'flex h-11 w-8 shrink-0 items-center justify-center text-ods-text-secondary content-md:h-12',
             fieldRowOffset,
           )}
         >
@@ -131,14 +131,14 @@ export function TicketStatusConfigRow({
           and the chip pins to the card's right edge on tablet/mobile. */}
       <div
         className={cn(
-          'min-w-0 flex-1 items-start gap-x-3 gap-y-[var(--spacing-system-m)] md:gap-x-[var(--spacing-system-m)]',
+          'min-w-0 flex-1 items-start gap-x-3 gap-y-[var(--spacing-system-m)] content-md:gap-x-[var(--spacing-system-m)]',
           isSystem
             ? 'flex flex-wrap'
             : // Mobile custom rows are a strict two-column grid, per the mock:
               // fields (name / color / hex, all one width) on the left, the
               // controls and the chip stacked in the right column. From md up
               // the same children flow as a wrapping flex row.
-              'grid grid-cols-[minmax(0,1fr)_auto] md:flex md:flex-wrap',
+              'grid grid-cols-[minmax(0,1fr)_auto] content-md:flex content-md:flex-wrap',
         )}
       >
         {/* System rows keep the chip beside the name on every width, so the name
@@ -158,7 +158,7 @@ export function TicketStatusConfigRow({
         </div>
 
         {showColorPicker ? (
-          <div className="order-3 flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] md:order-2 md:basis-0">
+          <div className="order-3 flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] content-md:order-2 content-md:basis-0">
             <Label variant="large">Color</Label>
             <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
             {/* Custom hex: a second field row inside the Color column, directly
@@ -170,16 +170,16 @@ export function TicketStatusConfigRow({
             )}
           </div>
         ) : (
-          <div aria-hidden className="hidden min-w-0 grow basis-0 lg:order-2 lg:block" />
+          <div aria-hidden className="hidden min-w-0 grow basis-0 content-lg:order-2 content-lg:block" />
         )}
 
         {/* Reserved desktop column slot (the mock's "No activity Indicator" zone). */}
-        <div aria-hidden className="hidden min-w-0 grow basis-0 lg:order-3 lg:block" />
+        <div aria-hidden className="hidden min-w-0 grow basis-0 content-lg:order-3 content-lg:block" />
 
         {isSystem ? (
           <div
             className={cn(
-              'order-2 flex h-11 min-w-0 grow basis-0 items-center justify-end md:h-12 lg:order-4',
+              'order-2 flex h-11 min-w-0 grow basis-0 items-center justify-end content-md:h-12 content-lg:order-4',
               fieldRowOffset,
             )}
           >
@@ -191,7 +191,7 @@ export function TicketStatusConfigRow({
                 before the controls. */}
             <div
               className={cn(
-                'hidden h-12 min-w-0 grow basis-0 items-center justify-end lg:order-4 lg:flex',
+                'hidden h-12 min-w-0 grow basis-0 items-center justify-end content-lg:order-4 content-lg:flex',
                 fieldRowOffset,
               )}
             >
@@ -199,25 +199,25 @@ export function TicketStatusConfigRow({
             </div>
             {/* Tablet: the chip takes a full row of its own, pinned to the
                 card's right edge (the controls above no longer narrow it). */}
-            <div className="hidden min-w-0 basis-full items-center justify-end md:order-4 md:flex lg:hidden">
+            <div className="hidden min-w-0 basis-full items-center justify-end content-md:order-4 content-md:flex content-lg:hidden">
               {chip}
             </div>
             {/* Mobile: the chip fills the second grid column beside the color
                 field, left-aligned with the controls above it. */}
-            <div className={cn('order-4 flex h-11 min-w-0 items-center md:hidden', fieldRowOffset)}>{chip}</div>
+            <div className={cn('order-4 flex h-11 min-w-0 items-center content-md:hidden', fieldRowOffset)}>{chip}</div>
           </>
         )}
 
         <div
           className={cn(
-            'flex h-11 shrink-0 items-center justify-end gap-[var(--spacing-system-s)] md:h-12 lg:order-5',
-            isSystem ? 'order-3' : 'order-2 md:order-3',
+            'flex h-11 shrink-0 items-center justify-end gap-[var(--spacing-system-s)] content-md:h-12 content-lg:order-5',
+            isSystem ? 'order-3' : 'order-2 content-md:order-3',
             fieldRowOffset,
           )}
         >
           {!isSystem && moveButtons}
           {isSystem ? (
-            <div className="flex w-11 justify-center md:w-12">
+            <div className="flex w-11 justify-center content-md:w-12">
               <TouchFriendlyTooltip content={systemTooltip}>
                 <button
                   type="button"
@@ -238,7 +238,7 @@ export function TicketStatusConfigRow({
                   aria-label="Delete status"
                   disabled={deleteDisabled}
                   onClick={deleteDisabled ? undefined : onDelete}
-                  className={cn('size-11 md:size-12', deleteDisabled && 'pointer-events-none')}
+                  className={cn('size-11 content-md:size-12', deleteDisabled && 'pointer-events-none')}
                 >
                   <TrashIcon className="text-ods-error" />
                 </Button>
