@@ -1,0 +1,93 @@
+extend type Query {
+    # Users of the tenant, ordered by email.
+    # search: every whitespace-separated word must match the first name, last name or email
+    # (a self-deleted user's placeholder email is not matched).
+    users(
+        filter: UserFilterInput
+        search: String
+        first: Int       # 1-100, default 20
+        after: String
+    ): UserConnection!
+
+    # Open invitations (not accepted, not revoked), newest first. search matches the email.
+    invitations(
+        filter: InvitationFilterInput
+        search: String
+        first: Int       # 1-100, default 20
+        after: String
+    ): InvitationConnection!
+}
+
+type User implements Node {
+    id: ID!
+    firstName: String
+    lastName: String
+    email: String
+    status: UserStatus
+    # Effective roles: an OWNER is an ADMIN too.
+    roles: [UserRole!]!
+    image: UserImage
+}
+
+type UserImage {
+    imageUrl: String
+    hash: String
+}
+
+enum UserStatus {
+    ACTIVE
+    # Deleted by an admin; personal data is kept and a re-invite revives the account.
+    DELETED
+    # Deleted by the user; personal data is anonymized.
+    SELF_DELETED
+}
+
+enum UserRole {
+    ADMIN
+    OWNER
+}
+
+input UserFilterInput {
+    statuses: [UserStatus!]  # Omit or leave empty for every status
+}
+
+type UserConnection {
+    edges: [UserEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type UserEdge {
+    node: User!
+    cursor: String!
+}
+
+type Invitation implements Node {
+    id: ID!
+    email: String!
+    roles: [UserRole!]!
+    status: InvitationStatus!
+    createdAt: Instant
+    expiresAt: Instant!
+}
+
+enum InvitationStatus {
+    PENDING
+    # Pending past expiresAt; can be resent.
+    EXPIRED
+}
+
+input InvitationFilterInput {
+    statuses: [InvitationStatus!]  # Omit or leave empty for both
+}
+
+type InvitationConnection {
+    edges: [InvitationEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type InvitationEdge {
+    node: Invitation!
+    cursor: String!
+}

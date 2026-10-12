@@ -14,6 +14,8 @@ import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
+import com.openframe.api.service.user.InvitationService;
+import com.openframe.api.service.user.UserService;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
 import graphql.relay.Relay;
@@ -41,6 +43,8 @@ public class NodeDataFetcher {
     private final ScriptExecutionService scriptExecutionService;
     private final ScheduleScriptService scheduleScriptService;
     private final ScheduleRunService scheduleRunService;
+    private final UserService userService;
+    private final InvitationService invitationService;
     private final ObjectProvider<TenantRepository> tenantRepository;
     private final ObjectProvider<SoftwareBundleService> softwareBundleService;
 
@@ -86,6 +90,8 @@ public class NodeDataFetcher {
             case SOFTWARE_BUNDLE -> Optional.ofNullable(softwareBundleService.getIfAvailable())
                     .flatMap(service -> service.findById(globalId.getId()))
                     .orElse(null);
+            case USER -> userService.findUserById(globalId.getId()).orElse(null);
+            case INVITATION -> invitationService.findOpenInvitation(globalId.getId()).orElse(null);
             default -> throw new IllegalArgumentException("Unsupported node type: " + globalId.getType());
         };
     }

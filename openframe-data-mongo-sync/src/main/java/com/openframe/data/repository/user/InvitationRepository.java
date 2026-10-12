@@ -11,7 +11,7 @@ import java.util.Collection;
 import java.util.Optional;
 
 @Repository
-public interface InvitationRepository extends MongoRepository<Invitation, String> {
+public interface InvitationRepository extends MongoRepository<Invitation, String>, CustomInvitationRepository {
     Optional<Invitation> findByEmailAndStatus(String email, String status);
 
     Page<Invitation> findByStatusNotIn(Collection<InvitationStatus> statuses, Pageable pageable);

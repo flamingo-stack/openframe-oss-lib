@@ -2,12 +2,14 @@ package com.openframe.data.repository;
 
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
+import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.filter.UserQueryFilter;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseParentFilter;
 import com.openframe.data.repository.organization.CustomOrganizationRepositoryImpl;
 import com.openframe.data.repository.tool.CustomIntegratedToolRepositoryImpl;
+import com.openframe.data.repository.user.CustomInvitationRepositoryImpl;
 import com.openframe.data.repository.user.CustomUserRepositoryImpl;
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -119,6 +122,28 @@ class SearchInputQuotingTest {
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).find(captor.capture(), eq(User.class));
         assertQuoted(captor.getValue().getQueryObject(), "email", "firstName", "lastName");
+    }
+
+    @Test
+    @DisplayName("users page search: name and email clauses quote each search word")
+    void userPageSearchIsQuoted() {
+        MongoTemplate template = mock(MongoTemplate.class);
+        new CustomUserRepositoryImpl(template).findUsersPage(null, HOSTILE, null, 10);
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(template).find(captor.capture(), eq(User.class));
+        assertQuoted(captor.getValue().getQueryObject(), "email", "firstName", "lastName");
+    }
+
+    @Test
+    @DisplayName("invitations page search: the email clause quotes the input")
+    void invitationPageSearchIsQuoted() {
+        MongoTemplate template = mock(MongoTemplate.class);
+        new CustomInvitationRepositoryImpl(template).findOpenInvitationsPage(null, Instant.now(), HOSTILE, null, 10);
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(template).find(captor.capture(), eq(Invitation.class));
+        assertQuoted(captor.getValue().getQueryObject(), "email");
     }
 
     @Test

@@ -11,6 +11,8 @@ import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
+import com.openframe.api.service.user.InvitationService;
+import com.openframe.api.service.user.UserService;
 import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
@@ -49,6 +51,8 @@ class NodeDataFetcherOptionalNodeTest {
     @Mock private ScriptExecutionService scriptExecutionService;
     @Mock private ScheduleScriptService scheduleScriptService;
     @Mock private ScheduleRunService scheduleRunService;
+    @Mock private UserService userService;
+    @Mock private InvitationService invitationService;
     @Mock private TenantRepository tenantRepository;
     @Mock private SoftwareBundleService softwareBundleService;
 
@@ -110,7 +114,8 @@ class NodeDataFetcherOptionalNodeTest {
     private NodeDataFetcher fetcher(TenantRepository tenants, SoftwareBundleService bundles) {
         return new NodeDataFetcher(deviceService, organizationService, toolService, tagService,
                 toolConnectionService, installedAgentService, scriptService, scriptExecutionService,
-                scheduleScriptService, scheduleRunService, providerOf(tenants), providerOf(bundles));
+                scheduleScriptService, scheduleRunService, userService, invitationService,
+                providerOf(tenants), providerOf(bundles));
     }
 
     @SuppressWarnings("unchecked")

@@ -1,6 +1,11 @@
 package com.openframe.api.service.user;
 
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.user.UpdateUserRequest;
+import com.openframe.api.dto.user.UserFilterInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.api.exception.OperationNotAllowedException;
@@ -12,6 +17,7 @@ import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.auth.SsoIdentityRepository;
+import com.openframe.data.repository.user.UserPageCursor;
 import com.openframe.data.repository.user.UserRepository;
 import com.openframe.notification.mail.service.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -51,8 +58,14 @@ public class UserService {
         return userRepository.existsByEmailAndStatus(email, UserStatus.ACTIVE);
     }
 
+    /** Upper bound for a REST page; lower it once no client asks for the whole tenant in one page. */
+    static final int MAX_REST_PAGE_SIZE = 1000;
+
+    /** The order of the GraphQL connection, so a REST page and a GraphQL page agree. */
+    static final Sort USER_ORDER = Sort.by(Sort.Order.asc("email"), Sort.Order.asc("_id"));
+
     public UserPageResponse listUsers(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_REST_PAGE_SIZE), USER_ORDER);
         Page<User> p = userRepository.findAll(pageable);
         UserPageResponse response = UserPageResponse.builder()
                 .items(p.getContent().stream().map(userMapper::toResponse).toList())
@@ -64,6 +77,34 @@ public class UserService {
                 .build();
         userProcessor.postProcessUserGet(response);
         return response;
+    }
+
+    public CountedGenericQueryResult<UserResponse> queryUsers(UserFilterInput filter, String search,
+                                                             CursorPaginationCriteria pagination) {
+        CursorPaginationCriteria page = pagination.normalize();
+        List<UserStatus> statuses = filter != null ? filter.getStatuses() : null;
+        long filteredCount = userRepository.countUsers(statuses, search);
+        List<User> raw = userRepository.findUsersPage(statuses, search, page.getCursor(), page.getLimit() + 1);
+        boolean hasNextPage = raw.size() > page.getLimit();
+        List<UserResponse> items = toResponses(hasNextPage ? raw.subList(0, page.getLimit()) : raw);
+        return CountedGenericQueryResult.<UserResponse>builder()
+                .items(items)
+                .pageInfo(PageInfo.builder()
+                        .hasNextPage(hasNextPage)
+                        .hasPreviousPage(page.hasCursor())
+                        .startCursor(items.isEmpty() ? null : cursorOf(items.getFirst()))
+                        .endCursor(items.isEmpty() ? null : cursorOf(items.getLast()))
+                        .build())
+                .filteredCount((int) filteredCount)
+                .build();
+    }
+
+    public Optional<UserResponse> findUserById(String id) {
+        return userRepository.findById(id).map(user -> toResponses(List.of(user)).getFirst());
+    }
+
+    private static String cursorOf(UserResponse user) {
+        return CursorCodec.encode(UserPageCursor.of(user.getEmail(), user.getId()));
     }
 
     public UserResponse getUserById(String id) {
@@ -78,7 +119,11 @@ public class UserService {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
-        List<User> users = userRepository.findAllById(ids);
+        return toResponses(userRepository.findAllById(ids));
+    }
+
+    /** Maps through the {@link UserProcessor}, which adds the avatar in SaaS. */
+    private List<UserResponse> toResponses(List<User> users) {
         UserPageResponse pageResponse = UserPageResponse.builder()
                 .items(users.stream().map(userMapper::toResponse).toList())
                 .build();
