@@ -7,8 +7,8 @@
  */
 
 import { cn } from '../../../utils/cn';
-import { ThumbsDownIcon } from '../../icons/thumbs-down-icon';
-import { ThumbsUpIcon } from '../../icons/thumbs-up-icon';
+import { ThumbsDownClassicIcon } from '../../icons-v2-generated/shopping/thumbs-down-classic-icon';
+import { ThumbsUpClassicIcon } from '../../icons-v2-generated/shopping/thumbs-up-classic-icon';
 import { Button } from '../../ui/button/button';
 
 export interface RoadmapVoteButtonProps {
@@ -32,7 +32,7 @@ export function RoadmapVoteButton({
   color,
   className,
 }: RoadmapVoteButtonProps) {
-  const Icon = voteType === 'up' ? ThumbsUpIcon : ThumbsDownIcon;
+  const Icon = voteType === 'up' ? ThumbsUpClassicIcon : ThumbsDownClassicIcon;
   return (
     <Button
       variant="outline"

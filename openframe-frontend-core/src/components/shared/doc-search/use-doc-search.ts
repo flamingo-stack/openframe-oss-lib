@@ -44,6 +44,7 @@ import { useRouter } from '../../../embed-shims';
 import { useDebounce } from '../../../hooks/ui/use-debounce';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import { contentFetch } from '../../../utils/embed-content-fetch';
+import { ASK_AI_OPEN_WITH_REF_EVENT } from '../../chat/utils/ask-ai-events';
 import {
   resolveExternalNavigation,
   stripSameOriginToPath,
@@ -318,7 +319,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
           // GlobalAskAI listens for — opens chat + drills via
           // `entityIdFilter` (primary-key only, same as inline-card Ask).
           setKeepOpen(false);
-          window.dispatchEvent(new CustomEvent('ask-ai:open-with-ref', { detail: action.detail }));
+          window.dispatchEvent(new CustomEvent(ASK_AI_OPEN_WITH_REF_EVENT, { detail: action.detail }));
           return;
         case 'route':
           // Final fallback: legacy navigation by path. Hits when a row

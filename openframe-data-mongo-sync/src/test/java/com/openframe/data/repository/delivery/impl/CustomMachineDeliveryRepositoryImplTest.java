@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.convert.MongoConverter;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -80,10 +82,46 @@ class CustomMachineDeliveryRepositoryImplTest {
 
         // verifications
         verify(mongoTemplate).upsert(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class));
-        assertThat(queryCaptor.getValue().getQueryObject().toString()).contains(ID);
+        assertThat(queryCaptor.getValue().getQueryObject().toString()).contains(ID).contains("$or").contains("sequence");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("$set")
                 .contains("tenantId=" + TENANT_ID);
+    }
+
+    @Test
+    void upsertPending_rowHeldByANewerDispatch_duplicateKeyThenNoRowMatchesFalse() {
+        // setup
+        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).sequence(42).build();
+        when(mongoTemplate.getConverter()).thenReturn(converter);
+        when(mongoTemplate.tenantId()).thenReturn(TENANT_ID);
+        when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(MachineDelivery.class)))
+                .thenThrow(new DuplicateKeyException("E11000"));
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(MachineDelivery.class)))
+                .thenReturn(UpdateResult.acknowledged(0, 0L, null));
+
+        // execution
+        boolean taken = repository.upsertPending(delivery);
+
+        // verifications
+        assertThat(taken).isFalse();
+    }
+
+    @Test
+    void upsertPending_olderRowInsertedByAnotherPodMeanwhile_duplicateKeyThenUpdateMatchesTrue() {
+        // setup
+        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).sequence(42).build();
+        when(mongoTemplate.getConverter()).thenReturn(converter);
+        when(mongoTemplate.tenantId()).thenReturn(TENANT_ID);
+        when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(MachineDelivery.class)))
+                .thenThrow(new DuplicateKeyException("E11000"));
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(MachineDelivery.class)))
+                .thenReturn(UpdateResult.acknowledged(1, 1L, null));
+
+        // execution
+        boolean taken = repository.upsertPending(delivery);
+
+        // verifications
+        assertThat(taken).isTrue();
     }
 
     @Test

@@ -1,7 +1,5 @@
 package com.openframe.delivery.sweep;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
@@ -13,6 +11,7 @@ import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.config.DeliveryProperties.Sweep;
+import com.openframe.delivery.dispatch.DeliveryPayloadJson;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
@@ -44,7 +43,7 @@ public class DeliverySweepService {
     private final DeliveryCloser closer;
     private final DeliveryMetrics metrics;
     private final DeliveryPublisher publisher;
-    private final ObjectMapper objectMapper;
+    private final DeliveryPayloadJson payloadJson;
 
     public void retryPending() {
         Instant now = Instant.now();
@@ -113,7 +112,8 @@ public class DeliverySweepService {
         DeliveryType type = delivery.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
-        DeliveryPayload payload = readPayload(delivery, payloadClass);
+        String json = delivery.getPayloadJson();
+        DeliveryPayload payload = payloadJson.read(json, payloadClass);
         String machineId = delivery.getMachineId();
         boolean published = publish(spec, machineId, payload);
         if (!published) {
@@ -182,15 +182,6 @@ public class DeliverySweepService {
         Policy policy = properties.resolve(type);
         long delaySeconds = policy.getMaxRetryIntervalSeconds();
         return now.plusSeconds(delaySeconds);
-    }
-
-    private <P> P readPayload(MachineDelivery delivery, Class<P> payloadClass) {
-        String payloadJson = delivery.getPayloadJson();
-        try {
-            return objectMapper.readValue(payloadJson, payloadClass);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Corrupt delivery payload: " + delivery.getId(), e);
-        }
     }
 
     private static long retryDelaySeconds(int attempt, Policy policy) {

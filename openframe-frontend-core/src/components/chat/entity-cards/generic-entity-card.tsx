@@ -4,12 +4,13 @@
  * Generic compact entity/document card for any chat type that doesn't
  * warrant a bespoke component.
  *
- * PURE PRESENTATION. Receives pre-composed `<a>` props via `anchorProps`
+ * PURE PRESENTATION. Receives pre-composed `<Link>` props via `anchorProps`
  * and renders the rest from the item shape.
  */
 
 import { ExternalLink } from 'lucide-react';
 import type React from 'react';
+import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { StatusBadge } from '../../ui/status-badge';
 import {
@@ -105,15 +106,15 @@ export function GenericEntityCard({ item, className, anchorProps }: GenericEntit
   );
   if (anchorProps) {
     return (
-      <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {body}
-      </a>
+      </Link>
     );
   }
   return href ? (
-    <a href={href} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+    <Link href={href} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
       {body}
-    </a>
+    </Link>
   ) : (
     <span className={`${COMPACT_CARD_OUTER_STATIC} ${className ?? ''}`} aria-label="No link available">
       {body}

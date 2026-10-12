@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { Button } from './button';
+import { NumberedStep } from './numbered-step';
 
 export interface FeatureListItemData {
   /** Shown in the boxed slot. Not used by the `numbered` variant. */
@@ -21,11 +22,16 @@ export interface FeatureListProps {
    */
   variant?: 'boxed' | 'numbered';
   /**
-   * `numbered` only. The step being shown now: it stays at full strength with
-   * its marker lit and the others step back, so the list reads as "you are here" beside a timed
-   * demo. Omit for a plain list where every step is equal.
+   * `numbered` only. The step being shown now: its marker and its title take
+   * the accent and its description reads at full strength, so the list reads as
+   * "you are here" beside a timed demo. Omit for a plain list where every step is equal.
    */
   activeIndex?: number;
+  /**
+   * `numbered` only. The colour of the step being shown (a CSS colour, such as
+   * the hex of the agent whose demo it is). Omitted, it is the platform's accent.
+   */
+  accent?: string;
   /**
    * `numbered` only. Makes every step a button: choosing one reports its index
    * (a demo jumps to that step). Omit for a list that is only read.
@@ -39,6 +45,7 @@ export function FeatureList({
   iconBoxSize = 72,
   variant = 'boxed',
   activeIndex,
+  accent,
   onSelect,
 }: FeatureListProps) {
   if (variant === 'numbered') {
@@ -47,32 +54,19 @@ export function FeatureList({
       <ol className={`flex flex-col gap-[var(--spacing-system-lf)] ${className}`}>
         {items.map((item, index) => {
           const current = dims && index === activeIndex;
-          const row = (
-            <>
-              <span
-                className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition-colors duration-200 text-h5 motion-reduce:transition-none ${
-                  current
-                    ? 'border-ods-flamingo-pink bg-ods-flamingo-pink-secondary text-ods-text-primary'
-                    : 'border-ods-border text-ods-text-secondary'
-                }`}
-              >
-                {index + 1}
-              </span>
-              <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-                <h3 className="text-ods-text-primary text-h4">{item.title}</h3>
-                <p className="text-ods-text-secondary text-h6">{item.description}</p>
-              </div>
-            </>
+          // Every numbered step on a page is the one `NumberedStep`.
+          const step = (
+            <NumberedStep
+              number={index + 1}
+              title={item.title}
+              description={item.description}
+              current={current}
+              accent={accent}
+              className={onSelect ? 'w-full' : undefined}
+            />
           );
-          const layout = 'flex items-start gap-[var(--spacing-system-sf)]';
           return (
-            <li
-              key={index}
-              aria-current={current ? 'step' : undefined}
-              className={`transition-opacity duration-200 motion-reduce:transition-none ${
-                dims && !current ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''
-              }`}
-            >
+            <li key={index} aria-current={current ? 'step' : undefined}>
               {onSelect ? (
                 // The unified Button with no box of its own (`wrap`): it brings the
                 // target, the focus ring and the keyboard semantics; the row is the look.
@@ -81,12 +75,12 @@ export function FeatureList({
                   size="wrap"
                   fullWidth
                   onClick={() => onSelect(index)}
-                  className={`${layout} justify-start whitespace-normal text-left hover:bg-transparent active:bg-transparent`}
+                  className="items-start justify-start whitespace-normal text-left hover:bg-transparent active:bg-transparent"
                 >
-                  {row}
+                  {step}
                 </Button>
               ) : (
-                <div className={layout}>{row}</div>
+                step
               )}
             </li>
           );

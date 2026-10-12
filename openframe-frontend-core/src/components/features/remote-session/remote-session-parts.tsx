@@ -3,7 +3,7 @@
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import { cn } from '../../../utils/cn';
 import { DraggerIcon, RecordingIcon } from '../../icons-v2-generated';
-import { OpenFrameLogo } from '../../icons/openframe-logo';
+import { OpenframeLogoIcon } from '../../icons-v2-generated/logos/openframe-logo-icon';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { RemoteSessionViewers } from './remote-session-viewers';
 import type { RemoteSessionDragHandlers, RemoteSessionViewer } from './types';
@@ -85,7 +85,11 @@ export function RemoteSessionOrgLogo({ name, logoUrl, sizePx, className }: Remot
         className,
       )}
     >
-      <OpenFrameLogo className="size-1/2" />
+      <OpenframeLogoIcon
+        color="var(--color-text-on-accent)"
+        secondaryColor="var(--color-text-primary)"
+        className="size-1/2"
+      />
     </div>
   );
 }

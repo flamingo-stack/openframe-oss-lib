@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useState } from 'react';
+import { randomId } from '../../../utils/random-id';
 import { PlusCircleIcon } from '../../icons-v2-generated';
 import { Button, type PageActionButton, PageLayout, RadioGroupBlock } from '../../ui';
 import { PACKAGE_MANAGER_OS } from './package-managers';
@@ -117,7 +118,7 @@ export function SoftwareActionForm<TRef extends string = string>({
 
   const updateRow = (next: SoftwareRow) => setRows(current => current.map(row => (row.key === next.key ? next : row)));
   const removeRow = (key: string) => setRows(current => current.filter(row => row.key !== key));
-  const addRow = () => setRows(current => [...current, newSoftwareRow(crypto.randomUUID())]);
+  const addRow = () => setRows(current => [...current, newSoftwareRow(randomId())]);
 
   const inline = runModeLayout === 'inline';
   const runModeField = (

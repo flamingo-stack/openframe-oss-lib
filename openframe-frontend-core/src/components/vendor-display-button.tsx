@@ -28,7 +28,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
   // chances for the three calls to disagree.
   const logoUrl = getVendorLogo(vendor);
 
-  // Compact variant for flamingo-teaser
+  // Compact variant
   if (variant === 'compact') {
     return (
       <button

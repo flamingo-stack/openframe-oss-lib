@@ -81,4 +81,13 @@ describe('the badges on their own', () => {
       expect(badge).not.toHaveAttribute('style');
     }
   });
+
+  /** A store with no listing has no badge; with neither, there is no row. */
+  it('draws only the stores it is given', () => {
+    const { container, rerender } = render(<StoreBadgeLinks appStoreUrl={APP_STORE} googlePlayUrl={null} />);
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link')).toHaveAttribute('href', APP_STORE);
+    rerender(<StoreBadgeLinks appStoreUrl={null} />);
+    expect(container).toBeEmptyDOMElement();
+  });
 });

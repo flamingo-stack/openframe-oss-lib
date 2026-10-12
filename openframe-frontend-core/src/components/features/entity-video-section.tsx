@@ -61,11 +61,6 @@ export interface EntityVideoSectionProps {
   bitesAutoScroll?: boolean;
   /** Markdown renderer component injected by the host app. */
   MarkdownRenderer?: ComponentType<MarkdownRendererProps>;
-  /**
-   * Raw SRT content. Deprecated — pass `captionsUrl` instead.
-   * Forwarded to `<Video>` for the dev-only warning.
-   */
-  srtContent?: string | null;
   /** HTTPS URL to a VTT captions file (rendered as native `<track>`). */
   captionsUrl?: string | null;
   /**
@@ -103,7 +98,6 @@ export function EntityVideoSection({
   onBiteNavigate,
   bitesAutoScroll = true,
   MarkdownRenderer,
-  srtContent,
   captionsUrl: captionsUrlProp,
   highlightCaptionsUrl: highlightCaptionsUrlProp,
   captionsEntity,
@@ -161,7 +155,6 @@ export function EntityVideoSection({
                 url={fullVideoUrl}
                 poster={mainVideoPoster}
                 title={title}
-                srtContent={srtContent}
                 captionsUrl={captionsUrl}
                 layout="centered"
                 priority={priority}
@@ -183,7 +176,6 @@ export function EntityVideoSection({
             url={fullVideoUrl}
             poster={mainVideoPoster}
             title={title}
-            srtContent={srtContent}
             captionsUrl={captionsUrl}
             layout="centered"
             priority={priority}

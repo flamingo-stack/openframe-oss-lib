@@ -34,6 +34,7 @@
 import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
 import { Card } from '../../ui/card';
@@ -107,7 +108,7 @@ export function EntityPortraitCard({
   const edgeColor = useImageEdgeColor(isWide === false ? src : null, 'var(--color-bg-surface)');
 
   return (
-    <a href={href} target={target} rel={rel} className={cn('block h-full', className)} aria-label={`Open ${title}`}>
+    <Link href={href} target={target} rel={rel} className={cn('block h-full', className)}>
       <Card className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col gap-6 p-6')}>
         {/* Media zone — the real cover always wins: wide → cover-fill;
             non-wide → contained on the edge-color fill (news-card treatment). */}
@@ -194,6 +195,6 @@ export function EntityPortraitCard({
           )}
         </div>
       </Card>
-    </a>
+    </Link>
   );
 }

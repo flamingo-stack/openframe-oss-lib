@@ -226,7 +226,6 @@ export function OnboardingGuideCard({
         rel={rel}
         prefetch={false}
         className={cn(CONTENT_CARD_FRAME_CLASS, 'block no-underline', className)}
-        aria-label={`Open ${guide.title}`}
       >
         <div className="flex flex-col gap-4 p-6">
           <div className="flex flex-col gap-4 md:flex-row md:gap-6">
