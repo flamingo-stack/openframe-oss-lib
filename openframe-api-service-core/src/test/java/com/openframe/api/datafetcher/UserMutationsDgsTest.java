@@ -95,13 +95,15 @@ class UserMutationsDgsTest {
     @DisplayName("updateUser: the payload user has a global id and the new name")
     void updateUser() {
         when(userService.updateUser(eq("u-1"), any()))
-                .thenReturn(UserResponse.builder().id("u-1").firstName("Jane").status("ACTIVE").roles(List.of()).build());
+                .thenReturn(UserResponse.builder().id("u-1").firstName("Jane").status("ACTIVE").emailVerified(true)
+                        .roles(List.of()).build());
 
         Map<String, Object> user = queryExecutor.executeAndExtractJsonPath(
-                "mutation($id: ID!) { updateUser(input: { id: $id, firstName: \"Jane\" }) { user { id firstName status } } }",
+                "mutation($id: ID!) { updateUser(input: { id: $id, firstName: \"Jane\" }) { user { id firstName status emailVerified } } }",
                 "data.updateUser.user", Map.of("id", CODEC.encode(USER, "u-1")));
 
-        assertThat(user).isEqualTo(Map.of("id", CODEC.encode(USER, "u-1"), "firstName", "Jane", "status", "ACTIVE"));
+        assertThat(user).isEqualTo(Map.of(
+                "id", CODEC.encode(USER, "u-1"), "firstName", "Jane", "status", "ACTIVE", "emailVerified", true));
     }
 
     @SpringBootConfiguration

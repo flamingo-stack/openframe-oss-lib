@@ -47,6 +47,8 @@ type User implements Node {
     firstName: String
     lastName: String
     email: String
+    # Whether the user confirmed the email address.
+    emailVerified: Boolean!
     status: UserStatus
     # Effective roles: an OWNER is an ADMIN too.
     roles: [UserRole!]!
