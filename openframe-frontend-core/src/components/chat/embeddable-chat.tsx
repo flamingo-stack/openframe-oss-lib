@@ -481,6 +481,22 @@ export interface EmbeddableChatProps {
     items: ChatContextItem[];
     onRemove?: (item: ChatContextItem) => void;
   };
+  /**
+   * Host content pinned between the thread and the composer: the thread
+   * scrolls above it, the composer stays below, and it keeps its place while
+   * the thread grows (e.g. a guided tour the host attaches to one
+   * conversation, deciding by `mingoState.activeDialogId`). Rendered wherever
+   * the composer is - a conversation or the new-chat surface - and never on
+   * the chat list. Sized by its content: a tall block is the host's to cap or
+   * scroll. `null`/unset leaves the layout as it was.
+   */
+  aboveComposer?: React.ReactNode;
+  /**
+   * v2: what the list's "What to ask Mingo?" opens. Default: a new chat, the
+   * same as "Start New Chat"; a host with its own suggestions surface (a
+   * guided tour in a conversation of its own) points it there instead.
+   */
+  onWhatToAsk?: () => void;
 }
 
 // =============================================================================
@@ -1045,6 +1061,8 @@ function EmbeddableChatInner({
   guidePendingPrompt,
   onGuidePromptConsumed,
   contextMemory,
+  aboveComposer,
+  onWhatToAsk,
   handleRef,
 }: EmbeddableChatProps & { handleRef?: React.Ref<EmbeddableChatHandle> }) {
   // `shell` 'none' / 'inline' means the consumer hosts us inside their own panel
@@ -2397,8 +2415,8 @@ function EmbeddableChatInner({
     onNewChat: leaveArchiveThen(handleNewChat),
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
-    // The suggestions a new chat opens on.
-    onWhatToAsk: leaveArchiveThen(handleNewChat),
+    // The suggestions a new chat opens on, unless the host has a surface of its own.
+    onWhatToAsk: leaveArchiveThen(onWhatToAsk ?? handleNewChat),
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
     onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,
@@ -2986,6 +3004,15 @@ function EmbeddableChatInner({
                             )}
                           </div>
                         </div>
+
+                        {/* Host block pinned above the composer (`aboveComposer`):
+                            the thread's own bottom padding separates them, the
+                            composer's horizontal inset is repeated so the two line up. */}
+                        {aboveComposer != null && aboveComposer !== false && (
+                          <div className="shrink-0 px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
+                            {aboveComposer}
+                          </div>
+                        )}
 
                         <ChatAttachmentChipStrip
                           attachments={stagedAttachments}

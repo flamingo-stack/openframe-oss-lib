@@ -266,20 +266,13 @@ impl StandardToGuiAppMigrator {
         }
 
         // Launch in user session so it's visible in the system tray
-        match crate::services::tool_run_manager::launch_process_in_user_session(
-            executable_path,
-            &args,
-        ) {
-            Ok((pid, process_handle)) => {
+        match crate::platform::user_session::launch_in_user_session(executable_path, &args) {
+            Ok(pid) => {
                 info!(
                     tool_id = %tool_agent_id,
                     "GuiApp launched in user session after migration, PID: {}",
                     pid
                 );
-                // Fire-and-forget — the HKLM Run autorun entry relaunches it at the next logon
-                unsafe {
-                    let _ = windows::Win32::Foundation::CloseHandle(process_handle);
-                }
             }
             Err(e) => {
                 warn!(

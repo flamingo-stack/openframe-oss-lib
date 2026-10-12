@@ -12,8 +12,8 @@ use crate::models::ToolRecordState;
 use crate::platform::DirectoryManager;
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::tool_kill_service::ToolKillService;
+use crate::services::tool_ops::ToolOps;
 use crate::services::tool_restart_service::{RestartOutcome, ToolRestartService};
-use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::{
     AgentConfigurationService, InitialConfigurationService, InstalledToolsService,
 };
@@ -61,7 +61,7 @@ pub struct MeshSelfHealService {
     tool_restart: ToolRestartService,
     initial_config: InitialConfigurationService,
     agent_config: AgentConfigurationService,
-    tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
     deactivation: Arc<DeactivationService>,
     http: reqwest::Client,
 }
@@ -75,7 +75,7 @@ impl MeshSelfHealService {
         tool_restart: ToolRestartService,
         initial_config: InitialConfigurationService,
         agent_config: AgentConfigurationService,
-        tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
         deactivation: Arc<DeactivationService>,
         http: reqwest::Client,
     ) -> Self {
@@ -86,7 +86,7 @@ impl MeshSelfHealService {
             tool_restart,
             initial_config,
             agent_config,
-            tool_run_manager,
+            tool_ops,
             deactivation,
             http,
         }
@@ -196,7 +196,7 @@ impl MeshSelfHealService {
             }
 
             // Agent is being replaced by an update — drop stale history so we don't restart it post-update.
-            if self.tool_run_manager.is_updating(MESH_TOOL_ID).await {
+            if self.tool_ops.is_busy(MESH_TOOL_ID) {
                 stuck_since = None;
                 last_activity = Instant::now();
                 last_healthy = None;

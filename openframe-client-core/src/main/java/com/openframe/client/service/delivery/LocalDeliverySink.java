@@ -2,9 +2,11 @@ package com.openframe.client.service.delivery;
 
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
+import com.openframe.delivery.dispatch.DeliveryRecordOutcome;
 import com.openframe.delivery.dispatch.DeliveryRecorder;
 import com.openframe.delivery.dispatch.DeliverySink;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.rollout.DeliveryRolloutRecorder;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySeed;
@@ -21,24 +23,51 @@ import org.springframework.stereotype.Component;
 public class LocalDeliverySink implements DeliverySink {
 
     public static final String SINK = "local";
+    static final String REJECTED_OUTRANKED = "outranked";
 
     private final DeliverySpecRegistry registry;
     private final DeliveryRecorder recorder;
+    private final DeliveryRolloutRecorder rollouts;
     private final DeliveryPublisher publisher;
     private final DeliveryMetrics metrics;
 
     @Override
     public void accept(DeliveryRequest<?> request) {
-        DeliveryType type = request.getType();
-        String machineId = request.getMachineId();
-        boolean recorded = recorder.record(request);
-        if (!recorded) {
-            metrics.recordDispatchDuplicate(type);
-            log.info("Delivery already recorded, hand-off repeated: type={} targetId={} machineId={}",
-                    type, request.getTargetId(), machineId);
-            return;
+        if (isRollout(request)) {
+            rollouts.record(request);
+        } else {
+            dispatchToMachine(request);
         }
-        publish(request);
+    }
+
+    // every machine, of a type that may be rolled out; anything else goes the ordinary way and fails there if it must
+    private boolean isRollout(DeliveryRequest<?> request) {
+        if (!request.isForEveryMachine()) {
+            return false;
+        }
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(request.getType());
+        return spec.canDeliverToEveryMachine();
+    }
+
+    private void dispatchToMachine(DeliveryRequest<?> request) {
+        DeliveryRecordOutcome outcome = recorder.record(request);
+        if (outcome == DeliveryRecordOutcome.RECORDED) {
+            publish(request);
+        } else {
+            skip(request, outcome);
+        }
+    }
+
+    // replayed = the hand-off was repeated; outranked = a newer dispatch of the same key holds the row
+    private void skip(DeliveryRequest<?> request, DeliveryRecordOutcome outcome) {
+        DeliveryType type = request.getType();
+        if (outcome == DeliveryRecordOutcome.REPLAYED) {
+            metrics.recordDispatchDuplicate(type);
+        } else {
+            metrics.recordDispatchRejected(REJECTED_OUTRANKED);
+        }
+        log.info("Delivery not published, {}: type={} targetId={} machineId={}",
+                outcome, type, request.getTargetId(), request.getMachineId());
     }
 
     // the row is the source of truth: a publish that fails here is retried by the sweep, never by the caller or Kafka
