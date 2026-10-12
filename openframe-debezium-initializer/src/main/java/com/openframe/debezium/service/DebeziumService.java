@@ -109,11 +109,7 @@ public class DebeziumService {
         }
     }
 
-    /**
-     * Identity-strategy path: a connector with the exact base name already exists,
-     * so push the latest config in place. PUT /connectors/{name}/config is
-     * idempotent and overrides whatever was stored.
-     */
+    // Identity-strategy path: connector with the exact base name already exists, so PUT is idempotent and overrides it.
     private void tryUpdateExistingIdentityConnector(String baseName, Map<String, Object> config, List<String> existing) {
         if (config == null || !existing.contains(baseName)) {
             return;
@@ -127,22 +123,7 @@ public class DebeziumService {
         }
     }
 
-    /**
-     * Versioned-strategy path: compare the incoming config to whatever is currently
-     * running under the latest version. If they match, do nothing. If they differ,
-     * gate the recreate on {@link RecreationTracker} (when present) to prevent
-     * register-job replay storms.
-     *
-     * <p>Special cases:
-     * <ul>
-     *   <li>{@code getConnectorConfig} returns null because Kafka Connect is
-     *       transiently unreachable → skip (don't spuriously recreate). The
-     *       distinction between "gone" (404) and "transient" is made inside
-     *       {@code getConnectorConfig}.</li>
-     *   <li>Rate-limit reached → skip with a warn; the connector keeps running
-     *       under {@code currentName} until the window rolls.</li>
-     * </ul>
-     */
+    // Versioned-strategy path: compare incoming config to the current version's config; recreate on drift, gated by RecreationTracker to avoid replay storms.
     private void recreateOnConfigDrift(String baseName, Map<String, Object> incomingConfig, List<String> existing) {
         Optional<String> currentNameOpt = nameStrategy.currentVersion(baseName, existing);
         if (currentNameOpt.isEmpty()) {
@@ -188,13 +169,7 @@ public class DebeziumService {
                 .forEach(this::deleteConnector);
     }
 
-    /**
-     * Compare two connector-config maps for semantic equality. Kafka Connect's
-     * {@code GET /config} returns all values as strings, but specs loaded from
-     * Mongo may carry Integer/Boolean/etc. We stringify both sides for an
-     * apples-to-apples compare and drop the {@code name} key (it always differs
-     * between the running versioned name and the base in the incoming spec).
-     */
+    // Stringify both sides and drop 'name' before comparing, since Kafka Connect returns all config values as strings.
     private boolean configsEquivalent(Map<String, Object> a, Map<String, Object> b) {
         if (a == null || b == null) return a == b;
         return normalisedForCompare(a).equals(normalisedForCompare(b));
@@ -209,10 +184,7 @@ public class DebeziumService {
         return out;
     }
 
-    /**
-     * POST a new connector to Kafka Connect under the given effective name.
-     * The supplied config map is shallow-copied with {@code name} overridden to match.
-     */
+    // POST a new connector under effectiveName, overriding 'name' in a shallow-copied config.
     public void createConnector(String effectiveName, Map<String, Object> config) {
         Map<String, Object> payload = ConnectorSpecs.connectorPayload(effectiveName, config);
         ResponseEntity<String> response =
@@ -220,9 +192,7 @@ public class DebeziumService {
         log.info("Connector '{}' created. Response: {}", effectiveName, response.getStatusCode());
     }
 
-    /**
-     * DELETE /connectors/{name}. Tolerates 404 (already gone).
-     */
+    // DELETE /connectors/{name}, tolerating 404 (already gone).
     public void deleteConnector(String name) {
         try {
             restTemplate.delete(connectorUrl(name));
@@ -234,12 +204,7 @@ public class DebeziumService {
         }
     }
 
-    /**
-     * List all registered connectors. Returns empty list on transient failure —
-     * callers that need to distinguish "no connectors" from "Kafka Connect down"
-     * must guard their own logic (e.g. the health-check scheduler skips reconcile
-     * when it expects connectors but receives an empty list).
-     */
+    // Returns empty list on transient failure; callers needing "no connectors" vs "Kafka Connect down" must guard their own logic.
     @SuppressWarnings("unchecked")
     public List<String> listConnectors() {
         try {
@@ -251,12 +216,7 @@ public class DebeziumService {
         }
     }
 
-    /**
-     * Get connector status. Returns {@code null} on a 404, which is ambiguous:
-     * the connector may be gone (deleted between iterations) or registered
-     * without a status ("No status found" — worker never started it). Callers
-     * disambiguate via {@link #getConnectorConfig(String)}.
-     */
+    // Returns null on 404 — ambiguous between "gone" and "registered without status"; callers disambiguate via getConnectorConfig.
     public ConnectorStatus getConnectorStatus(String connectorName) {
         try {
             return restTemplate.getForObject(connectorUrl(connectorName) + PATH_STATUS, ConnectorStatus.class);
@@ -265,10 +225,7 @@ public class DebeziumService {
         }
     }
 
-    /**
-     * Get the currently-deployed config of a connector. Returns {@code null} if
-     * the connector is gone or Kafka Connect is unreachable.
-     */
+    // Returns null if the connector is gone or Kafka Connect is unreachable.
     @SuppressWarnings("unchecked")
     public Map<String, Object> getConnectorConfig(String connectorName) {
         try {
@@ -281,9 +238,7 @@ public class DebeziumService {
         }
     }
 
-    /**
-     * Restart connector and all failed tasks in a single call (KIP-745).
-     */
+    // Restart connector and all failed tasks in a single call (KIP-745).
     public void restartConnectorWithFailedTasks(String connectorName) {
         String url = UriComponentsBuilder.fromHttpUrl(connectorUrl(connectorName) + PATH_RESTART)
                 .queryParam("includeTasks", "true")
@@ -294,10 +249,7 @@ public class DebeziumService {
         log.info("Triggered KIP-745 restart for connector '{}' (includeTasks=true, onlyFailed=true)", connectorName);
     }
 
-    /**
-     * Extract expected base names from enabled IntegratedTool configurations.
-     * Disabled tools are skipped — they must not be reconciled into Kafka Connect.
-     */
+    // Disabled tools are skipped here — they must not be reconciled into Kafka Connect.
     public Set<String> extractExpectedConnectorNames(List<IntegratedTool> tools) {
         return tools.stream()
                 .filter(IntegratedTool::isEnabled)
@@ -307,11 +259,7 @@ public class DebeziumService {
                 .collect(Collectors.toSet());
     }
 
-    /**
-     * Recreate connectors that are expected (in MongoDB) but missing from Kafka Connect.
-     * Matching honours the active {@link ConnectorNameStrategy} — a versioned strategy
-     * considers a base "present" as long as any {@code base_vN} exists.
-     */
+    // Matching honours the active ConnectorNameStrategy — e.g. a versioned strategy treats base_vN as "present".
     public void reconcileMissingConnectors(List<IntegratedTool> tools, Set<String> missingNames) {
         tools.stream()
                 .filter(IntegratedTool::isEnabled)
@@ -324,27 +272,8 @@ public class DebeziumService {
                         }));
     }
 
-    /**
-     * Prune connectors in Kafka Connect down to one canonical version per known
-     * base, deleting:
-     * <ul>
-     *   <li><b>orphans</b> — connectors whose base name maps to no known tool spec
-     *       (e.g. an old tenant-prefixed naming scheme the active strategy no
-     *       longer recognises): reconcile never recreates them, recovery keeps
-     *       restarting them, and they may hold replication slots that block the
-     *       canonical connector;</li>
-     *   <li><b>stale versions</b> — older {@code <base>_vN} of a known base left
-     *       behind by an interrupted recreate; only the current (highest) version
-     *       is kept.</li>
-     * </ul>
-     * Base-name and version resolution honour the active {@link ConnectorNameStrategy}
-     * (a no-op for stale-version pruning under the identity strategy).
-     *
-     * <p>{@code knownBaseNames} must be derived from ALL tools (enabled and
-     * disabled) — a temporarily-disabled tool's connector is not an orphan. The
-     * caller must guarantee {@code knownBaseNames} and {@code actualConnectors}
-     * are non-empty to avoid mass-deletion on a transient outage.
-     */
+    // Prunes to one canonical version per known base: deletes orphans (no matching tool spec) and stale older versions.
+    // knownBaseNames must come from ALL tools (enabled and disabled); caller must ensure both args are non-empty to avoid mass-deletion on a transient outage.
     public void deleteOrphanedConnectors(Set<String> knownBaseNames, List<String> actualConnectors) {
         actualConnectors.stream()
                 .filter(name -> !knownBaseNames.contains(nameStrategy.extractBaseName(name)))
