@@ -18,6 +18,7 @@ export { ExclamationIcon } from './exclamation-icon';
 export { GenderFemaleIcon } from './gender-female-icon';
 export { GenderMaleIcon } from './gender-male-icon';
 export { HashIcon } from './hash-icon';
+export { InfoCircleClassicIcon } from './info-circle-classic-icon';
 export { InfoCircleIcon } from './info-circle-icon';
 export { InfoIcon } from './info-icon';
 export { KeyCommandIcon } from './key-command-icon';

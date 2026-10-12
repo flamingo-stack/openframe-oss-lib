@@ -162,7 +162,6 @@ Platforms set **brand accent + link colors only** (and a couple of intentional b
 | `openframe`       | Yellow `--ods-open-yellow-base`     | Cyan links                    |
 | `openmsp`         | Yellow `--ods-open-yellow-base`     |                               |
 | `flamingo`        | Pink `--ods-flamingo-pink-base`     | Dark scrim by-design          |
-| `flamingo-teaser` | Pink `--ods-flamingo-pink-base`     |                               |
 | `tmcg`            | Pink `--ods-flamingo-pink-base`     | Cards share page background; dark scrim |
 | `marketing-hub`   | Pink `--ods-flamingo-pink-base`     |                               |
 | `product-hub`     | Green `--ods-attention-green-success` |                             |

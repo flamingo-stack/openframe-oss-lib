@@ -42,11 +42,32 @@ interface LayoutProps {
  */
 export function PageShell({ children, schemas, contentClassName }: LayoutProps) {
   return (
+    <MainFrame schemas={schemas} contentClassName={cn('page-shell-content mx-auto max-w-[1920px]', contentClassName)}>
+      {children}
+    </MainFrame>
+  );
+}
+
+/** The main landmark with its structured data and ONE content box: what both layouts below are. */
+function MainFrame({ children, schemas, contentClassName }: LayoutProps) {
+  return (
     <main className="bg-ods-bg">
       {schemas}
-      <div className={cn('page-shell-content mx-auto max-w-[1920px]', contentClassName)}>{children}</div>
+      <div className={contentClassName}>{children}</div>
     </main>
   );
+}
+
+/**
+ * The page's ONE main landmark, for a page made of full-width sections (a
+ * marketing page: each section is its own band and brings its own padding).
+ * `PageShell` is the same landmark with the shell's padding around its content.
+ *
+ * No `min-h-screen`, for the reason `PageShell` gives: the site chrome already
+ * grows the content area to the viewport.
+ */
+export function PageMain({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <main className={cn('bg-ods-bg', className)}>{children}</main>;
 }
 
 /**
@@ -58,11 +79,11 @@ export function PageShell({ children, schemas, contentClassName }: LayoutProps) 
  */
 export function ArticleDetailLayout({ children, schemas, contentClassName }: LayoutProps) {
   return (
-    <main className="bg-ods-bg">
-      {schemas}
-      <div className={cn('mx-auto max-w-[1280px] px-6 py-6 content-md:px-20 content-md:py-10', contentClassName)}>
-        {children}
-      </div>
-    </main>
+    <MainFrame
+      schemas={schemas}
+      contentClassName={cn('mx-auto max-w-[1280px] px-6 py-6 content-md:px-20 content-md:py-10', contentClassName)}
+    >
+      {children}
+    </MainFrame>
   );
 }

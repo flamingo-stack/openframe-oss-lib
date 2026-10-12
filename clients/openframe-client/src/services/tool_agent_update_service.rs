@@ -540,7 +540,12 @@ impl ToolAgentUpdateService {
                 .get_asset_path(tool_agent_id, asset_filename, is_executable);
 
         if is_executable {
-            binary_writer::write_executable(&bytes, &asset_path)
+            #[cfg(target_os = "macos")]
+            self.tool_kill_service
+                .stop_asset(asset_id, tool_agent_id)
+                .await
+                .with_context(|| format!("Failed to stop asset {} before replace", asset_id))?;
+            binary_writer::replace_executable(&bytes, &asset_path)
                 .await
                 .with_context(|| format!("Failed to write executable asset: {}", asset_id))?;
         } else {

@@ -7,7 +7,7 @@ import {
   getConfidenceTextClass,
   getConfidenceLabel,
 } from '../../../utils/confidence-helpers';
-import { SparklesIcon } from '../../icons/sparkles-icon';
+import { SparklesIcon } from '../../icons-v2-generated/interface/sparkles-icon';
 
 export type AIStatus = 'idle' | 'loading' | 'success' | 'error';
 

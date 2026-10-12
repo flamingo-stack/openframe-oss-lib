@@ -1,6 +1,9 @@
 'use client';
 
 // Chat components exports
+import { createElement, forwardRef, lazy, Suspense, useEffect } from 'react';
+import type { EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
+import { holdAskAiOpens } from './utils/ask-ai-events';
 export * from './approval-request-message';
 export * from './approval-batch-message';
 export * from './escalation-offer-message';
@@ -24,6 +27,7 @@ export * from './chat-message-skeleton';
 
 export * from './quick-action-chip';
 export * from './ask-prompts';
+export * from './assistant-ask-prompts';
 export * from './quick-action-marquee';
 export * from './quick-action-wall';
 export * from './chat-ticket-list';
@@ -97,15 +101,19 @@ export * from './stream';
 // Chat utilities
 export * from './utils';
 
-// EmbeddableChat — full chat orchestrator (lib-portable port of hub's
-// `<GlobalAskAI>`). Hosts mount it once at the root after providing a
-// <ChatRuntimeContext.Provider>.
-export {
-  type ChatPrefillDraft,
-  EmbeddableChat,
-  type EmbeddableChatHandle,
-  type EmbeddableChatProps,
-  MINGO_V2_RAIL_WIDTH,
-  MINGO_V2_SPLIT_WIDTH,
-} from './embeddable-chat';
+// EmbeddableChat — THE chat. Hosts mount it once at the root after providing a
+// <ChatRuntimeContext.Provider>. Its module is loaded on its own, after the
+// page's code (`lazy`), so a page never ships the chat with its first script;
+// an open sent before it has loaded is held and delivered (`ask-ai-events`).
+export type { ChatPrefillDraft, EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
+const LoadedEmbeddableChat = lazy(() =>
+  import('./embeddable-chat').then(module => ({ default: module.EmbeddableChat })),
+);
+export const EmbeddableChat = forwardRef<EmbeddableChatHandle, EmbeddableChatProps>((props, ref) => {
+  useEffect(() => holdAskAiOpens(), []);
+  return createElement(Suspense, { fallback: null }, createElement(LoadedEmbeddableChat, { ...props, ref }));
+});
+EmbeddableChat.displayName = 'EmbeddableChat';
+export { MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from './chat-dimensions';
+export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_EVENTS, ASK_AI_OPEN_WITH_REF_EVENT } from './utils/ask-ai-events';
 export * from './proxy-credentials-panel';

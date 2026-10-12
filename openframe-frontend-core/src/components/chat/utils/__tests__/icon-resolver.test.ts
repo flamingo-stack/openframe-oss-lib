@@ -25,7 +25,6 @@ const BRAND_NAMES = [
   'youtube',
   'twitter',
   'instagram',
-  'discord',
   'rocket',
   // PascalCase social_platforms.icon_name values:
   'LinkedInIcon',
@@ -42,6 +41,11 @@ describe('unified resolveIcon — brand variant preserves getIconComponent exact
       expect(resolveIcon(name, { variant: 'brand' })).toBe(getIconComponent(name));
     });
   }
+
+  it('a name the brand set does not hold is drawn from the design set, never as the file fallback', () => {
+    expect(resolveIcon('discord', { variant: 'brand' })).toBe(resolveIcon('discord'));
+    expect(resolveIcon('discord', { variant: 'brand' })).not.toBe(getIconComponent('discord'));
+  });
 
   it('null/undefined brand → same fallback as getIconComponent, no throw', () => {
     expect(resolveIcon(null, { variant: 'brand' })).toBe(getIconComponent(null));

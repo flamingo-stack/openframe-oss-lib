@@ -13,6 +13,7 @@ import { StopIcon } from '../../icons-v2-generated/media-playback/stop-icon';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { MinusIcon } from '../../icons-v2-generated/signs-and-symbols/minus-icon';
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { DEVICE_WALLPAPER_CLASS } from '../../ui/device-wallpaper';
 import type { RemoteSessionFixture } from '../fixtures/remote-session';
 
 function DesktopShortcut({ icon, label }: { icon: ReactNode; label: string }) {
@@ -56,7 +57,7 @@ function TaskbarApp({ icon, active = false }: { icon: ReactNode; active?: boolea
  */
 export function RemoteDesktopPicture({ desktop }: { desktop: RemoteSessionFixture['desktop'] }) {
   return (
-    <div className="absolute inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-ods-flamingo-cyan-secondary via-ods-bg-surface to-ods-flamingo-pink-secondary">
+    <div className={`absolute inset-0 flex flex-col overflow-hidden ${DEVICE_WALLPAPER_CLASS}`}>
       <div className="relative min-h-0 flex-1">
         {/* A narrow box shows the window alone: the shortcuts would leave it no room. */}
         <div className="absolute left-[var(--spacing-system-sf)] top-[var(--spacing-system-sf)] hidden flex-col gap-[var(--spacing-system-sf)] content-md:flex">

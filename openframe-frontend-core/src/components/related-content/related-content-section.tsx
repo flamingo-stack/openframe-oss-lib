@@ -28,12 +28,12 @@
  * `renderSkeletonForType` so the placeholder height matches the loaded card
  * exactly (zero layout shift on resolve).
  *
- * One API call per content type via the shared list-URL builder
- * (`buildListUrl` — injectable; defaults to the lib's byte-parity-tested
- * builder prefixed with `apiBaseUrl`). Fetching uses `useSelfFetch` (plain
- * fetch, NO react-query) so third-party embedders need no QueryClientProvider;
- * cards are imported via DEEP module paths (not the chat barrel) so this
- * chunk never reaches `@tanstack/react-query`.
+ * One API call per page of a content type, carrying only that page's ids, via
+ * the shared list-URL builder (`buildListUrl` — injectable; defaults to the
+ * lib's byte-parity-tested builder prefixed with `apiBaseUrl`). Fetching uses
+ * `useSelfFetch` (plain fetch, NO react-query) so third-party embedders need
+ * no QueryClientProvider; cards are imported via DEEP module paths (not the
+ * chat barrel) so this chunk never reaches `@tanstack/react-query`.
  *
  * The per-type card + skeleton dispatch lives in `./card-registry`
  * (`RELATED_CARD_REGISTRY`): ONE entry per content type, each carrying that
@@ -49,7 +49,7 @@
  */
 
 import type React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import {
@@ -246,23 +246,29 @@ function CardForType({
 }
 
 // =============================================================================
-// Fetch all items for a type in ONE server-sorted call, via the injectable
-// list-URL builder. `useSelfFetch` (URL = cache key) replaces the hub's old
-// react-query usage: `enabled` ≙ `url === null`, `!res.ok`/network error ≙
-// `error → items null → group renders nothing`. Accepted deltas vs
-// react-query: no retry/backoff, no focus refetch, no cross-mount cache.
+// Fetch ONE page of a group — only the ids on screen go into the list URL.
+// Pages already fetched are kept by url, so paging back renders without a
+// request. `useSelfFetch` replaces the hub's old react-query usage: `enabled`
+// ≙ `url === null` (no list API → `items: null`), `!res.ok`/network error ≙
+// an empty page. Accepted deltas vs react-query: no retry/backoff, no focus
+// refetch, no cross-mount cache.
 // =============================================================================
 
 function useGroupItems(type: string, refs: ContentRef[], buildUrl: (type: string, ids: string[]) => string | null) {
   const ids = refs.map(r => r.id);
   const url = ids.length > 0 ? buildUrl(type, ids) : null;
-  const { data, isLoading } = useSelfFetch<unknown>(url);
-  const items = data != null ? extractItems(data) : null;
-  return { items, isLoading };
+  const [pages, setPages] = useState<ReadonlyMap<string, unknown[]>>(() => new Map());
+  const cached = url !== null ? pages.get(url) : undefined;
+  const { data, dataUrl, error } = useSelfFetch<unknown>(cached ? null : url);
+  if (data != null && dataUrl !== null && !pages.has(dataUrl)) {
+    setPages(new Map(pages).set(dataUrl, extractItems(data)));
+  }
+  if (url === null) return { items: null, isLoading: false };
+  return { items: cached ?? (error ? [] : null), isLoading: !cached && !error };
 }
 
 // =============================================================================
-// Per-group renderer — one API call, server-sorted, then render cards via the
+// Per-group renderer — one API call per page, then render cards via the
 // dispatcher with per-type skeletons + per-type layout from CONTENT_REF_GROUPS.
 // =============================================================================
 
@@ -325,41 +331,33 @@ function ContentGroup({
    *  its heading too — no orphaned titles. */
   heading: React.ReactNode;
 }) {
-  const { items, isLoading } = useGroupItems(type, refs, buildUrl);
   const config = resolveGroupConfig(type);
   const isListLayout = config.layout === 'list';
   const cardSize = config.gridSize;
 
   // Per-group pagination for big groups (author pages): GROUP_PAGE_SIZE items
-  // per page with the standard Pagination control below the group. Client-side
-  // slicing — useGroupItems already fetched every row in one batched call, so
-  // page flips are instant. Hooks live above every early return (file
-  // convention). Page is clamped so a shrinking refs array (suggestion
-  // refetch) can never strand the view past the last page, and RESET when the
-  // ref set actually changes (shrink→grow must not return to a stale page).
+  // per page with the standard Pagination control below the group, each page
+  // fetched on its own. Back to page 1 whenever the ref set changes (a
+  // suggestion refetch can shrink it) — reset while rendering, so the stale
+  // page is never requested.
   const [page, setPage] = useState(1);
   const refsKey = refs.map(r => r.id).join('|');
-  const prevRefsKeyRef = useRef(refsKey);
-  useEffect(() => {
-    if (prevRefsKeyRef.current !== refsKey) {
-      prevRefsKeyRef.current = refsKey;
-      setPage(1);
-    }
-  }, [refsKey]);
+  const [pagedRefsKey, setPagedRefsKey] = useState(refsKey);
+  if (pagedRefsKey !== refsKey) {
+    setPagedRefsKey(refsKey);
+    setPage(1);
+  }
   const totalGroupPages = pageCount(refs.length, GROUP_PAGE_SIZE);
-  const safePage = Math.min(page, totalGroupPages);
-  const visibleGroupRefs =
-    refs.length > GROUP_PAGE_SIZE ? refs.slice((safePage - 1) * GROUP_PAGE_SIZE, safePage * GROUP_PAGE_SIZE) : refs;
+  const pageRefs = refs.slice((page - 1) * GROUP_PAGE_SIZE, page * GROUP_PAGE_SIZE);
+  const { items, isLoading } = useGroupItems(type, pageRefs, buildUrl);
   const groupPagination =
-    totalGroupPages > 1 ? (
-      <Pagination currentPage={safePage} totalPages={totalGroupPages} onPageChange={setPage} />
-    ) : null;
+    totalGroupPages > 1 ? <Pagination currentPage={page} totalPages={totalGroupPages} onPageChange={setPage} /> : null;
 
-  // Skeleton gate: `isLoading && !items` — SSR HTML and the client's first
-  // paint render identical skeletons (useSelfFetch starts isLoading=true on
-  // both sides), and once items exist they are never replaced by skeletons.
-  if (isLoading && !items) {
-    const skeletons = visibleGroupRefs.map(r => (
+  // Skeletons until this page's rows land — SSR HTML and the client's first
+  // paint render identical skeletons (useSelfFetch starts loading on both
+  // sides). The pager stays in place while an unfetched page loads.
+  if (isLoading) {
+    const skeletons = pageRefs.map(r => (
       <div key={r.id}>{renderSkeletonForType(type, cardSize, adminCampaignCard)}</div>
     ));
     return (
@@ -370,11 +368,12 @@ function ContentGroup({
         ) : (
           <div className={gridClassFor(columns)}>{skeletons}</div>
         )}
+        {groupPagination}
       </div>
     );
   }
 
-  if (!items || items.length === 0) return null;
+  if (!items) return null;
 
   // Index fetched rows by id, then render in REF order — refs carry the
   // intended sequence (suggestion mode: the engine's tier order, so
@@ -393,7 +392,7 @@ function ContentGroup({
   };
   const itemById = new Map(items.map(it => [rowKey(it), it]));
 
-  const cards = visibleGroupRefs
+  const cards = pageRefs
     .map(contentRef => {
       const itemId = String(contentRef.id);
       const item = itemById.get(itemId);
@@ -426,9 +425,9 @@ function ContentGroup({
     .filter(Boolean);
 
   if (cards.length === 0) {
-    // Current PAGE resolved zero cards (rows deleted between the ref fetch
-    // and the group fetch, or a stricter list-API gate dropped them). When a
-    // pager exists the user must keep the controls to navigate back —
+    // Current PAGE resolved zero cards (its fetch failed, rows were deleted
+    // between the ref fetch and the page fetch, or a stricter list-API gate
+    // dropped them). When a pager exists the user must keep the controls —
     // dropping the whole group would strand them. A genuinely empty group
     // (no pager) still vanishes with its heading.
     if (groupPagination) {
