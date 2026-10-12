@@ -140,15 +140,19 @@ describe('SnapCarousel', () => {
     expect(scrolledTo.length).toBe(2);
   });
 
-  it('stops and starts with its pause control', () => {
+  it('has no pause button: it waits while keyboard focus is inside it, and carries on after', () => {
     renderCarousel();
     setInView(true);
-    fireEvent.click(screen.getByLabelText('Pause'));
+    expect(screen.queryByLabelText('Pause')).toBeNull();
+    const next = screen.getByLabelText('Next');
+    const matches = vi.spyOn(next, 'matches').mockReturnValue(true);
+    fireEvent.focus(next);
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
     expect(scrolledTo).toEqual([]);
-    fireEvent.click(screen.getByLabelText('Play'));
+    fireEvent.blur(next);
+    matches.mockRestore();
     act(() => {
       vi.advanceTimersByTime(5_000);
     });

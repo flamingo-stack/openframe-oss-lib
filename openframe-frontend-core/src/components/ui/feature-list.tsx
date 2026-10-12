@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { ODS_STEM_CLASSES, type OdsColorStem } from '../../utils/platform-identity';
 import { Button } from './button';
 
 export interface FeatureListItemData {
@@ -21,11 +22,16 @@ export interface FeatureListProps {
    */
   variant?: 'boxed' | 'numbered';
   /**
-   * `numbered` only. The step being shown now: it stays at full strength with
-   * its marker lit and the others step back, so the list reads as "you are here" beside a timed
-   * demo. Omit for a plain list where every step is equal.
+   * `numbered` only. The step being shown now: its marker and its title take
+   * the accent and its description reads at full strength, so the list reads as
+   * "you are here" beside a timed demo. Omit for a plain list where every step is equal.
    */
   activeIndex?: number;
+  /**
+   * `numbered` only. The colour of the step being shown, as a colour stem (the
+   * agent's whose demo it is). Omitted, it is the platform's accent.
+   */
+  accent?: OdsColorStem;
   /**
    * `numbered` only. Makes every step a button: choosing one reports its index
    * (a demo jumps to that step). Omit for a list that is only read.
@@ -39,10 +45,14 @@ export function FeatureList({
   iconBoxSize = 72,
   variant = 'boxed',
   activeIndex,
+  accent,
   onSelect,
 }: FeatureListProps) {
   if (variant === 'numbered') {
     const dims = typeof activeIndex === 'number';
+    const lit = accent
+      ? { border: ODS_STEM_CLASSES[accent].border, text: ODS_STEM_CLASSES[accent].text }
+      : { border: 'border-ods-accent', text: 'text-ods-accent' };
     return (
       <ol className={`flex flex-col gap-[var(--spacing-system-lf)] ${className}`}>
         {items.map((item, index) => {
@@ -50,29 +60,33 @@ export function FeatureList({
           const row = (
             <>
               <span
-                className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition-colors duration-200 text-h5 motion-reduce:transition-none ${
-                  current
-                    ? 'border-ods-flamingo-pink bg-ods-flamingo-pink-secondary text-ods-text-primary'
-                    : 'border-ods-border text-ods-text-secondary'
+                className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 font-bold transition-colors duration-200 text-h6 motion-reduce:transition-none ${
+                  current ? `${lit.border} ${lit.text}` : 'border-ods-text-secondary text-ods-text-secondary'
                 }`}
               >
                 {index + 1}
               </span>
               <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-                <h3 className="text-ods-text-primary text-h4">{item.title}</h3>
-                <p className="text-ods-text-secondary text-h6">{item.description}</p>
+                <h3
+                  className={`transition-colors duration-200 text-h3 motion-reduce:transition-none ${
+                    current ? lit.text : 'text-ods-text-primary'
+                  }`}
+                >
+                  {item.title}
+                </h3>
+                <p
+                  className={`transition-colors duration-200 text-h4 motion-reduce:transition-none ${
+                    current ? 'text-ods-text-primary' : 'text-ods-text-secondary'
+                  }`}
+                >
+                  {item.description}
+                </p>
               </div>
             </>
           );
-          const layout = 'flex items-start gap-[var(--spacing-system-sf)]';
+          const layout = 'flex items-start gap-[var(--spacing-system-xs)]';
           return (
-            <li
-              key={index}
-              aria-current={current ? 'step' : undefined}
-              className={`transition-opacity duration-200 motion-reduce:transition-none ${
-                dims && !current ? 'opacity-55 focus-within:opacity-100 hover:opacity-100' : ''
-              }`}
-            >
+            <li key={index} aria-current={current ? 'step' : undefined}>
               {onSelect ? (
                 // The unified Button with no box of its own (`wrap`): it brings the
                 // target, the focus ring and the keyboard semantics; the row is the look.
