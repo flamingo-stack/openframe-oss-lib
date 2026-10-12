@@ -20,7 +20,7 @@ import java.util.List;
 @Component
 public class TicketMapper extends BaseRestMapper {
 
-    /** Per-ticket related data gathered by the read service. */
+    // Per-ticket related data gathered by the read service.
     public record TicketRelations(List<Tag> tags,
                                   List<TicketNote> notes,
                                   List<TicketAttachment> attachments,
@@ -176,3 +176,4 @@ public class TicketMapper extends BaseRestMapper {
                 .build();
     }
 }
+
