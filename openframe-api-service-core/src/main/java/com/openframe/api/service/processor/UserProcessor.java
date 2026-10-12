@@ -4,29 +4,20 @@ import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.data.document.user.User;
 
-/**
- * Processor interface for user operations in API service.
- * Provides hooks for processing user operations.
- * Future implementations can publish events to Kafka.
- */
+// Processor interface for user operations in API service.
+// Provides hooks for processing user operations.
+// Future implementations can publish events to Kafka.
 public interface UserProcessor {
 
-    /**
-     * Process after a user has been soft deleted.
-     *
-     * @param user The soft deleted user with DELETED status (admin delete) or
-     *             SELF_DELETED status (self delete, personal data anonymized)
-     */
+    // Process after a user has been soft deleted.
+    // The soft deleted user with DELETED status (admin delete) or
+    // SELF_DELETED status (self delete, personal data anonymized)
     void postProcessUserDeleted(User user);
 
     void postProcessUserGet(UserPageResponse response);
 
     void postProcessUserGet(UserResponse response);
 
-    /**
-     * Process after a user has been updated.
-     *
-     * @param user The updated user
-     */
+    // Process after a user has been updated.
     void postProcessUserUpdated(User user);
 }
