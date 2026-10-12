@@ -83,7 +83,7 @@ class UserNodeTest {
                 .build());
 
         CountedGenericConnection<GenericEdge<UserResponse>> connection = new UserDataFetcher(
-                userService, new GraphQLUserMapper()).users(null, "jane", 10, CursorCodec.encode("a@acme.io_u-1"));
+                userService, new GraphQLUserMapper(), CODEC).users(null, "jane", 10, CursorCodec.encode("a@acme.io_u-1"));
 
         ArgumentCaptor<CursorPaginationCriteria> pagination = ArgumentCaptor.forClass(CursorPaginationCriteria.class);
         verify(userService).queryUsers(isNull(), eq("jane"), pagination.capture());
@@ -108,7 +108,7 @@ class UserNodeTest {
                         .build());
 
         CountedGenericConnection<GenericEdge<InvitationResponse>> connection = new InvitationDataFetcher(
-                invitationService, new GraphQLUserMapper()).invitations(null, null, null, null);
+                invitationService, new GraphQLUserMapper(), CODEC).invitations(null, null, null, null);
 
         assertThat(CursorCodec.decode(connection.getEdges().getFirst().getCursor()))
                 .isEqualTo(createdAt.toEpochMilli() + "_inv-1");

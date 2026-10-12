@@ -144,7 +144,7 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
         userProcessor.postProcessUserUpdated(savedUser);
-        return userMapper.toResponse(savedUser);
+        return toResponses(List.of(savedUser)).getFirst();
     }
 
     public void softDeleteUser(String id, String requesterUserId) {

@@ -8,10 +8,13 @@ import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.Role;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.MutationError;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.mapper.InvitationMapper;
 import com.openframe.api.service.processor.InvitationProcessor;
 import com.openframe.core.email.EmailDomainPolicy;
+import com.openframe.core.exception.BaseException;
+import com.openframe.core.validation.ValidEmail;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.InvitationStatus;
 import com.openframe.data.repository.user.InvitationPageCursor;
@@ -26,8 +29,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -57,6 +65,41 @@ public class InvitationService {
         log.info("Created invitation id={} email={} expiresAt={} ", saved.getId(), saved.getEmail(), saved.getExpiresAt());
 
         return invitationMapper.toResponse(saved);
+    }
+
+    private static final Pattern EMAIL = Pattern.compile(ValidEmail.DEFAULT_REGEX);
+
+    /** The invitations sent, in input order, and an error per email that was not, keyed ["emails", "<index>"]. */
+    public record InviteUsersResult(List<InvitationResponse> invitations, List<MutationError> errors) {
+    }
+
+    /** Invites each email on its own: one that cannot be invited is reported and the rest are still sent. */
+    public InviteUsersResult inviteUsers(List<String> emails) {
+        List<InvitationResponse> invitations = new ArrayList<>();
+        List<MutationError> errors = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < emails.size(); i++) {
+            String email = emails.get(i) == null ? "" : emails.get(i).trim();
+            String problem = null;
+            if (!EMAIL.matcher(email).matches()) {
+                problem = "Invalid email format";
+            } else if (!seen.add(email.toLowerCase(Locale.ROOT))) {
+                problem = "Listed twice";
+            } else {
+                try {
+                    invitations.add(createInvitation(CreateInvitationRequest.builder().email(email).build()));
+                } catch (IllegalArgumentException | IllegalStateException | BaseException e) {
+                    problem = e.getMessage();
+                } catch (RuntimeException e) {
+                    log.error("Failed to invite {}", email, e);
+                    problem = "Could not send the invitation. Please try again.";
+                }
+            }
+            if (problem != null) {
+                errors.add(MutationError.builder().field(List.of("emails", String.valueOf(i))).message(problem).build());
+            }
+        }
+        return new InviteUsersResult(invitations, errors);
     }
 
     /** Upper bound for a REST page; lower it once no client asks for every invitation in one page. */
