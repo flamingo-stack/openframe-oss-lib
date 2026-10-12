@@ -5,7 +5,8 @@ extend type Query {
     users(
         filter: UserFilterInput
         search: String
-        first: Int       # 1-100, default 20
+        # 1-100, default 20
+        first: Int
         after: String
     ): UserConnection!
 
@@ -13,7 +14,8 @@ extend type Query {
     invitations(
         filter: InvitationFilterInput
         search: String
-        first: Int       # 1-100, default 20
+        # 1-100, default 20
+        first: Int
         after: String
     ): InvitationConnection!
 }
@@ -48,7 +50,8 @@ enum UserRole {
 }
 
 input UserFilterInput {
-    statuses: [UserStatus!]  # Omit or leave empty for every status
+    # Omit or leave empty for every status.
+    statuses: [UserStatus!]
 }
 
 type UserConnection {
@@ -78,7 +81,8 @@ enum InvitationStatus {
 }
 
 input InvitationFilterInput {
-    statuses: [InvitationStatus!]  # Omit or leave empty for both
+    # Omit or leave empty for both.
+    statuses: [InvitationStatus!]
 }
 
 type InvitationConnection {
