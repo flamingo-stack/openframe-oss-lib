@@ -40,28 +40,10 @@ const subscribeToTab = (onChange: () => void) => {
 };
 const tabIsHidden = () => document.visibilityState === 'hidden';
 
-// Keyboard focus: also the document's own state. Whatever can move it re-asks the question.
-const subscribeToFocus = (onChange: () => void) => {
-  const stopDocument = listen(document, ['focusin', 'focusout', 'visibilitychange'], onChange);
-  const stopWindow = listen(window, ['focus', 'blur'], onChange);
-  return () => {
-    stopDocument();
-    stopWindow();
-  };
-};
-
 const never = () => false;
 
-/** Whether the keyboard is inside `host`: focus the browser draws a ring for, on it or within it. */
-function keyboardIsInside(host: HTMLElement | null): boolean {
-  if (!host?.isConnected) return false;
-  try {
-    return host.matches(':focus-visible, :has(:focus-visible)');
-  } catch {
-    // An engine without `:has()`: no keyboard hold, never a thrown render.
-    return false;
-  }
-}
+/** Every way a press can end. A drag the browser takes over (an image, selected text) ends in `dragend`, never `pointerup`. */
+const RELEASE_EVENTS = ['pointerup', 'pointercancel', 'mouseup', 'touchend', 'dragend', 'blur'] as const;
 
 /**
  * THE rule for anything that moves by itself (a looping demo, an
@@ -80,16 +62,21 @@ function keyboardIsInside(host: HTMLElement | null): boolean {
  * it. Each ends by itself (the press is released, wherever that happens; focus
  * moves on), so it can never be left stopped with no visible way to start it again.
  *
- * HOW it knows, which is what keeps it from sticking:
- *   - the tab and the keyboard's focus are READ FROM THE DOCUMENT
- *     (`useSyncExternalStore`), never copied into state and kept in step by
- *     hand. "Is the keyboard inside" is one selector asked of the element
- *     (`:has(:focus-visible)`), so a tab switch, an app switch or a focused
- *     control that is removed cannot leave a stale "yes" behind;
- *   - a press is the one thing with a beginning and an end: it starts on the
- *     element and its release is listened for on the WINDOW, once, by listeners
- *     that remove themselves (a drag that leaves the element, or a scroll the
- *     browser takes over, still ends it).
+ * HOW it knows, which is what keeps it from sticking. Each hold has more than
+ * one way to end, and every one of them is checked:
+ *   - a PRESS ends on its release, listened for on the WINDOW (a drag that
+ *     leaves the element still ends it), by ANY of the events a release can
+ *     arrive as (`RELEASE_EVENTS`: a native drag ends in `dragend`, not
+ *     `pointerup`), and, as the net under those, by the first pointer movement
+ *     that reports no button down;
+ *   - the KEYBOARD holds it only when focus ARRIVED by keyboard (the browser
+ *     drew a ring for it as it came in), and only until focus leaves the
+ *     element or the visitor reaches for the pointer. "Is `:focus-visible`
+ *     inside" alone is not the test: a browser turns the ring on for a control
+ *     that was CLICKED as soon as any key is pressed, which held the demo for a
+ *     visitor who clicked a tab and then scrolled with the space bar;
+ *   - the tab is read from the document (`useSyncExternalStore`), never copied
+ *     into state.
  *
  * What does NOT hold it, each tried and removed:
  *   - HOVER: a visitor watching a demo rests the mouse on it, so it stopped the
@@ -105,11 +92,29 @@ export function useAutoplay(onScreen: boolean): UseAutoplayResult {
 
   // The element the handlers are on: known from the first event it receives, so no ref has to be threaded to it.
   const host = useRef<HTMLElement | null>(null);
-  const focused = useSyncExternalStore(
-    subscribeToFocus,
-    useCallback(() => keyboardIsInside(host.current), []),
-    never,
-  );
+  // True from the moment focus comes in by keyboard until it leaves or the pointer is used.
+  const keyboardCameIn = useRef(false);
+  const subscribeToKeyboard = useCallback((onChange: () => void) => {
+    const usedPointer = () => {
+      keyboardCameIn.current = false;
+      onChange();
+    };
+    const stopFocus = listen(document, ['focusin', 'focusout', 'visibilitychange'], onChange);
+    const stopPointer = listen(document, ['pointerdown', 'pointermove'], usedPointer);
+    const stopWindow = listen(window, ['focus', 'blur'], onChange);
+    return () => {
+      stopFocus();
+      stopPointer();
+      stopWindow();
+    };
+  }, []);
+  const keyboardIsInside = useCallback(() => {
+    if (!keyboardCameIn.current) return false;
+    const inside = !!host.current?.isConnected && host.current.contains(document.activeElement);
+    if (!inside) keyboardCameIn.current = false;
+    return inside;
+  }, []);
+  const focused = useSyncExternalStore(subscribeToKeyboard, keyboardIsInside, never);
 
   const [pressed, setPressed] = useState(false);
   const holdProps = useMemo<AutoplayHoldProps>(
@@ -117,19 +122,26 @@ export function useAutoplay(onScreen: boolean): UseAutoplayResult {
       onPointerDown: event => {
         host.current = event.currentTarget;
         setPressed(true);
-        // One release ends it, wherever it happens; the same signal removes all three listeners.
+        // One release ends it, wherever and however it happens; the same signal removes every listener.
         const released = new AbortController();
         const release = () => {
           setPressed(false);
           released.abort();
         };
-        for (const type of ['pointerup', 'pointercancel', 'blur']) {
-          window.addEventListener(type, release, { signal: released.signal });
-        }
+        for (const type of RELEASE_EVENTS) window.addEventListener(type, release, { signal: released.signal });
+        // The net: a pointer that moves with no button down has been released, whatever was or was not reported.
+        window.addEventListener(
+          'pointermove',
+          (move: globalThis.PointerEvent) => {
+            if (move.buttons === 0) release();
+          },
+          { signal: released.signal },
+        );
       },
-      // Only names the element: the focus store asks the document whether the keyboard is inside it.
       onFocus: event => {
         host.current = event.currentTarget;
+        // Only focus that arrives by keyboard holds it (the browser draws its ring as it comes in).
+        if (event.target.matches(':focus-visible')) keyboardCameIn.current = true;
       },
     }),
     [],
