@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, RotateCcw, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, Home } from '@openframe/icons-v2';
 import { cn } from '../../utils/cn';
 import { Button } from './button';
 
@@ -185,3 +185,4 @@ export function CursorPaginationSimple({
     </div>
   );
 }
+
