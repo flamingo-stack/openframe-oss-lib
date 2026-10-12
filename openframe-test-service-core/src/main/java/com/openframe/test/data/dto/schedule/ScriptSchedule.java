@@ -9,16 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/**
- * A script schedule as exposed by the {@code scriptSchedule}/{@code scriptSchedules} GraphQL API
- * (openframe-api-service-core {@code script-schedule.graphqls}). Enum-typed fields carry the schema
- * enum names: {@code trigger} DATE_TIME | DEVICE_ONLINE, {@code timeReference} SERVER | DEVICE_LOCAL,
- * {@code offlineBehavior} SKIP | RETRY_ON_RECONNECT, {@code selectionMode} SPECIFIC | CRITERIA,
- * {@code status} ACTIVE | ARCHIVED | DELETED. Instants are ISO-8601 strings.
- * <p>
- * Not to be confused with {@code data.dto.script.ScriptSchedule}, which is the legacy Tactical-RMM
- * task shape and matches nothing in this schema.
- */
+// Not to be confused with data.dto.script.ScriptSchedule, the legacy Tactical-RMM task shape (matches nothing in this schema).
 @Data
 @Builder
 @NoArgsConstructor
