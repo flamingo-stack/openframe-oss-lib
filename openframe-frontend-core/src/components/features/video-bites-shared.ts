@@ -102,7 +102,7 @@ export function programItemToStripProfile(item: {
 }): VideoBiteStripProfile | null {
   const fromAuthor = toStripProfile(item.author);
   if (fromAuthor) return fromAuthor;
-  const host = Array.isArray(item.hosts) ? item.hosts[0] : null;
+  const host = item.hosts?.[0] ?? null;
   if (!host?.name) return null;
   return toStripProfile({ full_name: host.name, avatar_url: host.avatar_url ?? null });
 }
