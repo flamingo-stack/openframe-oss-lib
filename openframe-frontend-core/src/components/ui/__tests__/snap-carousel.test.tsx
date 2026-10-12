@@ -145,13 +145,20 @@ describe('SnapCarousel', () => {
     setInView(true);
     expect(screen.queryByLabelText('Pause')).toBeNull();
     const next = screen.getByLabelText('Next');
-    const matches = vi.spyOn(next, 'matches').mockReturnValue(true);
-    fireEvent.focus(next);
+    // jsdom answers neither `:focus-visible` nor `:has()`: the keyboard being inside is stubbed on the element asked.
+    let keyboardInside = true;
+    const matches = vi.spyOn(Element.prototype, 'matches').mockImplementation(() => keyboardInside);
+    act(() => {
+      next.focus();
+    });
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
     expect(scrolledTo).toEqual([]);
-    fireEvent.blur(next);
+    keyboardInside = false;
+    act(() => {
+      next.blur();
+    });
     matches.mockRestore();
     act(() => {
       vi.advanceTimersByTime(5_000);

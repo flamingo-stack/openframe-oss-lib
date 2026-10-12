@@ -32,6 +32,13 @@ export interface UseScenarioPlayerOptions {
    * never gets to play (it is never scrolled into view) still reads complete.
    */
   startAtEnd?: boolean;
+  /**
+   * Whether step 0 of every scenario is an EMPTY stage, to be left at once
+   * (default true: a stage that sits empty for a whole step after a tap reads
+   * as not responding). False when step 0 already shows something to read: it
+   * then lasts a whole `stepMs` like every other step.
+   */
+  emptyFirstStep?: boolean;
 }
 
 export interface UseScenarioPlayerResult {
@@ -79,6 +86,7 @@ export function useScenarioPlayer({
   enabled = true,
   initialScenario = 0,
   startAtEnd = false,
+  emptyFirstStep = true,
 }: UseScenarioPlayerOptions): UseScenarioPlayerResult {
   const auto = useAutoplay(enabled);
   const { reducedMotion, held, holdProps } = auto;
@@ -101,11 +109,11 @@ export function useScenarioPlayer({
     if (!playing) return undefined;
     const atEnd = rawStep >= lastStep;
     // The first step comes quickly, both after it becomes playable and at the
-    // top of every scenario (the rotation moved on, or the visitor chose a
-    // tab): step 0 is the empty stage, and a stage that sits empty for a whole
-    // step after a tap reads as not responding. A finished scenario still
+    // top of every scenario whose step 0 is the empty stage (the rotation
+    // moved on, or the visitor chose a tab): a stage that sits empty for a
+    // whole step after a tap reads as not responding. A finished scenario still
     // holds its full time: it is there to be read.
-    const quickStart = (starting.current || rawStep === 0) && !atEnd;
+    const quickStart = (starting.current || (emptyFirstStep && rawStep === 0)) && !atEnd;
     starting.current = false;
     const timer = setTimeout(
       () => {
@@ -119,7 +127,7 @@ export function useScenarioPlayer({
       atEnd ? holdMs : quickStart ? Math.min(START_MS, stepMs) : stepMs,
     );
     return () => clearTimeout(timer);
-  }, [playing, rawStep, lastStep, stepMs, holdMs, scenario, scenarioCount]);
+  }, [playing, rawStep, lastStep, stepMs, holdMs, scenario, scenarioCount, emptyFirstStep]);
 
   const setStep = useCallback((next: number) => setRawStep(Math.max(0, Math.min(lastStep, next))), [lastStep]);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { FocusEvent, PointerEvent } from 'react';
 import { usePrefersReducedMotionState } from './use-prefers-reduced-motion';
 
@@ -8,7 +8,6 @@ import { usePrefersReducedMotionState } from './use-prefers-reduced-motion';
 export interface AutoplayHoldProps {
   onPointerDown: (event: PointerEvent<HTMLElement>) => void;
   onFocus: (event: FocusEvent<HTMLElement>) => void;
-  onBlur: (event: FocusEvent<HTMLElement>) => void;
 }
 
 export interface UseAutoplayResult {
@@ -22,14 +21,55 @@ export interface UseAutoplayResult {
   reducedMotion: boolean;
 }
 
+/** Subscribes to `events` on `target` for as long as React keeps the subscription; one signal removes them all. */
+function listen(target: EventTarget, events: readonly string[], onChange: () => void): () => void {
+  const controller = new AbortController();
+  for (const event of events) target.addEventListener(event, onChange, { signal: controller.signal });
+  return () => controller.abort();
+}
+
+// The tab: hidden or not is the document's own state, read where it lives (never mirrored into React state).
+const subscribeToTab = (onChange: () => void) => {
+  const stopDocument = listen(document, ['visibilitychange'], onChange);
+  // `pageshow`: a page restored from the back/forward cache.
+  const stopWindow = listen(window, ['pageshow'], onChange);
+  return () => {
+    stopDocument();
+    stopWindow();
+  };
+};
+const tabIsHidden = () => document.visibilityState === 'hidden';
+
+// Keyboard focus: also the document's own state. Whatever can move it re-asks the question.
+const subscribeToFocus = (onChange: () => void) => {
+  const stopDocument = listen(document, ['focusin', 'focusout', 'visibilitychange'], onChange);
+  const stopWindow = listen(window, ['focus', 'blur'], onChange);
+  return () => {
+    stopDocument();
+    stopWindow();
+  };
+};
+
+const never = () => false;
+
+/** Whether the keyboard is inside `host`: focus the browser draws a ring for, on it or within it. */
+function keyboardIsInside(host: HTMLElement | null): boolean {
+  if (!host?.isConnected) return false;
+  try {
+    return host.matches(':focus-visible, :has(:focus-visible)');
+  } catch {
+    // An engine without `:has()`: no keyboard hold, never a thrown render.
+    return false;
+  }
+}
+
 /**
  * THE rule for anything that moves by itself (a looping demo, an
  * auto-advancing carousel): it plays while four plain facts hold, and nothing
  * else decides it.
  *
  *   1. it is on screen (`onScreen`, the caller's `useInView`);
- *   2. the browser tab is visible (`visibilitychange`, and `pageshow` for a
- *      page restored from the back/forward cache);
+ *   2. the browser tab is visible;
  *   3. the visitor is not holding it (`holdProps`: the way to stop it that
  *      WCAG 2.2.2 asks of anything that moves for more than five seconds);
  *   4. motion is allowed (never under reduced motion, and not before the
@@ -40,88 +80,56 @@ export interface UseAutoplayResult {
  * it. Each ends by itself (the press is released, wherever that happens; focus
  * moves on), so it can never be left stopped with no visible way to start it again.
  *
+ * HOW it knows, which is what keeps it from sticking:
+ *   - the tab and the keyboard's focus are READ FROM THE DOCUMENT
+ *     (`useSyncExternalStore`), never copied into state and kept in step by
+ *     hand. "Is the keyboard inside" is one selector asked of the element
+ *     (`:has(:focus-visible)`), so a tab switch, an app switch or a focused
+ *     control that is removed cannot leave a stale "yes" behind;
+ *   - a press is the one thing with a beginning and an end: it starts on the
+ *     element and its release is listened for on the WINDOW, once, by listeners
+ *     that remove themselves (a drag that leaves the element, or a scroll the
+ *     browser takes over, still ends it).
+ *
  * What does NOT hold it, each tried and removed:
  *   - HOVER: a visitor watching a demo rests the mouse on it, so it stopped the
  *     moment it had their attention and read as stuck;
  *   - a WHEEL event or a passing touch: that is what scrolling the PAGE past
  *     the thing produces (the browser cancels a press the moment it becomes a scroll);
- *   - focus the browser shows no ring for (`:focus-visible` is the test): a
- *     browser re-reports focus when its window is re-activated, and a mouse
- *     click on a control inside it is not the keyboard.
+ *   - focus the browser shows no ring for: a browser re-reports focus when its
+ *     window is re-activated, and a mouse click on a control is not the keyboard.
  */
 export function useAutoplay(onScreen: boolean): UseAutoplayResult {
   const reducedState = usePrefersReducedMotionState();
+  const tabHidden = useSyncExternalStore(subscribeToTab, tabIsHidden, never);
+
+  // The element the handlers are on: known from the first event it receives, so no ref has to be threaded to it.
+  const host = useRef<HTMLElement | null>(null);
+  const focused = useSyncExternalStore(
+    subscribeToFocus,
+    useCallback(() => keyboardIsInside(host.current), []),
+    never,
+  );
+
   const [pressed, setPressed] = useState(false);
-  const [focused, setFocused] = useState(false);
-  const [tabHidden, setTabHidden] = useState(false);
-
-  useEffect(() => {
-    const sync = () => {
-      const hidden = document.visibilityState === 'hidden';
-      setTabHidden(hidden);
-      // A press released while the tab was away never reports its release.
-      if (hidden) setPressed(false);
-    };
-    sync();
-    document.addEventListener('visibilitychange', sync);
-    window.addEventListener('pageshow', sync);
-    return () => {
-      document.removeEventListener('visibilitychange', sync);
-      window.removeEventListener('pageshow', sync);
-    };
-  }, []);
-
-  // The release is listened for on the WINDOW: a press that ends outside the
-  // element (a drag that leaves it, a scroll the browser takes over) must still end.
-  useEffect(() => {
-    if (!pressed) return undefined;
-    const release = () => setPressed(false);
-    window.addEventListener('pointerup', release);
-    window.addEventListener('pointercancel', release);
-    window.addEventListener('blur', release);
-    return () => {
-      window.removeEventListener('pointerup', release);
-      window.removeEventListener('pointercancel', release);
-      window.removeEventListener('blur', release);
-    };
-  }, [pressed]);
-
-  // Focus is re-checked against the document, never trusted to a blur: a tab or
-  // app switch reports none, and neither does a focused control that is removed.
-  // While held by focus, anything that can move it (a focus change, a press, the
-  // tab coming back) asks again whether the keyboard is still inside.
-  const focusHost = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    if (!focused) return undefined;
-    const recheck = () => {
-      const active = document.activeElement;
-      const inside = !!active && !!focusHost.current?.contains(active) && active.matches(':focus-visible');
-      if (!inside) setFocused(false);
-    };
-    // After the event has finished moving focus.
-    const later = () => setTimeout(recheck, 0);
-    document.addEventListener('focusin', later);
-    document.addEventListener('pointerdown', later);
-    document.addEventListener('visibilitychange', later);
-    window.addEventListener('focus', later);
-    return () => {
-      document.removeEventListener('focusin', later);
-      document.removeEventListener('pointerdown', later);
-      document.removeEventListener('visibilitychange', later);
-      window.removeEventListener('focus', later);
-    };
-  }, [focused]);
-
   const holdProps = useMemo<AutoplayHoldProps>(
     () => ({
-      onPointerDown: () => setPressed(true),
-      onFocus: event => {
-        if (!event.target.matches(':focus-visible')) return;
-        focusHost.current = event.currentTarget;
-        setFocused(true);
+      onPointerDown: event => {
+        host.current = event.currentTarget;
+        setPressed(true);
+        // One release ends it, wherever it happens; the same signal removes all three listeners.
+        const released = new AbortController();
+        const release = () => {
+          setPressed(false);
+          released.abort();
+        };
+        for (const type of ['pointerup', 'pointercancel', 'blur']) {
+          window.addEventListener(type, release, { signal: released.signal });
+        }
       },
-      onBlur: event => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      // Only names the element: the focus store asks the document whether the keyboard is inside it.
+      onFocus: event => {
+        host.current = event.currentTarget;
       },
     }),
     [],
