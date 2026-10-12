@@ -35,8 +35,9 @@ export interface UseScenarioPlayerOptions {
   /**
    * Whether step 0 of every scenario is an EMPTY stage, to be left at once
    * (default true: a stage that sits empty for a whole step after a tap reads
-   * as not responding). False when step 0 already shows something to read: it
-   * then lasts a whole `stepMs` like every other step.
+   * as not responding). False when step 0 already shows something to read:
+   * every step then lasts a whole `stepMs`, however the scenario was started
+   * (a page load, the rotation and a chosen tab all pace it the same).
    */
   emptyFirstStep?: boolean;
 }
@@ -113,7 +114,7 @@ export function useScenarioPlayer({
     // moved on, or the visitor chose a tab): a stage that sits empty for a
     // whole step after a tap reads as not responding. A finished scenario still
     // holds its full time: it is there to be read.
-    const quickStart = (starting.current || (emptyFirstStep && rawStep === 0)) && !atEnd;
+    const quickStart = emptyFirstStep && (starting.current || rawStep === 0) && !atEnd;
     starting.current = false;
     const timer = setTimeout(
       () => {

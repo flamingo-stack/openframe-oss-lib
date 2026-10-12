@@ -341,7 +341,32 @@ const TabBar = memo(function TabBarImpl({
   // A tab that reports `progress` turns the underline into a progress line.
   const activeProgress = tabs.find(tab => tab.id === activeTab)?.progress;
   const hasProgress = typeof activeProgress === 'number';
-  const progress = hasProgress ? Math.max(0, Math.min(1, activeProgress)) : 1;
+  // A progress line always GROWS from the start of its tab. A run that starts
+  // over (another tab opened, by the rotation or by choice, or the same tab
+  // chosen again: its progress fell back) is first drawn EMPTY, with no
+  // transition, and only then let run to its value. Without that the line
+  // either slid across from the last tab, shrank back, or appeared already
+  // part-way and sat still until the next step.
+  const target = hasProgress ? Math.max(0, Math.min(1, activeProgress)) : 1;
+  // It starts on no tab at all, so the FIRST paint is a run starting over too:
+  // a page load, the rotation and a click all begin the line the same way.
+  const [run, setRun] = useState<{ tab: string | null; progress: number }>({ tab: null, progress: 0 });
+  const startsOver = hasProgress && (run.tab !== activeTab || target < run.progress);
+  // The same run moving forward: follow it (state derived from props during render).
+  if (hasProgress && !startsOver && run.progress !== target) setRun({ tab: activeTab, progress: target });
+  useEffect(() => {
+    if (!startsOver) return undefined;
+    // Two frames: the empty line has to be painted before it is let run.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setRun({ tab: activeTab, progress: target }));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [startsOver, activeTab, target]);
+  const progress = startsOver ? 0 : target;
   // The open tab's own colour, when it has one; else the platform's accent.
   const activeAccent = tabs.find(tab => tab.id === activeTab)?.accent;
   const indicatorStyle: React.CSSProperties = {
@@ -472,9 +497,6 @@ const TabBar = memo(function TabBarImpl({
           // carries no text, so there is no accessible query for it, and its
           // computed width/transform is a real contract (see tab-navigation
           // tests) rather than incidental styling.
-          // A progress line belongs to ONE tab: re-keyed per tab, it starts under
-          // the newly opened tab at once, instead of shrinking across from the last one.
-          key={hasProgress ? activeTab : 'underline'}
           data-testid="tab-navigation-underline"
           className={cn(
             'pointer-events-none absolute bottom-0 left-0 h-1 motion-reduce:transition-none',
