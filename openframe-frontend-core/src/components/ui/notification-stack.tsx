@@ -24,8 +24,11 @@ export interface NotificationStackProps {
 /** The most card edges drawn for the folded pile: past two a pile only reads as "more". */
 const MAX_PILE_EDGES = 2;
 
-const ARRIVE = { type: 'spring', stiffness: 420, damping: 36, mass: 0.9 } as const;
-const FOLD = { type: 'spring', stiffness: 300, damping: 34, mass: 1 } as const;
+// Gentle on purpose: a notification eases into place and the ones under it
+// drift down with it. Soft springs with no overshoot; nothing snaps or bounces.
+const ARRIVE = { type: 'spring', stiffness: 150, damping: 26, mass: 1 } as const;
+const PUSH = { type: 'spring', stiffness: 130, damping: 26, mass: 1 } as const;
+const FOLD = { type: 'spring', stiffness: 140, damping: 28, mass: 1 } as const;
 
 /**
  * Notifications as a phone keeps them: the most recent on top, the list
@@ -90,16 +93,17 @@ export function NotificationStack({
             key={item.key}
             layout={reducedMotion ? false : 'position'}
             // It drops in from above, into the top place.
-            initial={{ opacity: 0, y: reducedMotion ? 0 : -40, scale: reducedMotion ? 1 : 0.96 }}
+            initial={{ opacity: 0, y: reducedMotion ? 0 : -20, scale: reducedMotion ? 1 : 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1, transition: reducedMotion ? still : ARRIVE }}
             // Folding: it slips up behind the one above it.
             exit={{
               opacity: 0,
-              y: reducedMotion ? 0 : -44,
-              scale: reducedMotion ? 1 : 0.9,
+              y: reducedMotion ? 0 : -28,
+              scale: reducedMotion ? 1 : 0.94,
               transition: reducedMotion ? still : FOLD,
             }}
-            transition={reducedMotion ? still : FOLD}
+            // The push: how the ones already there make room.
+            transition={reducedMotion ? still : PUSH}
             // `isolate`: the pile's edges sit behind the notification, never behind the screen.
             className="relative isolate min-w-0"
           >
