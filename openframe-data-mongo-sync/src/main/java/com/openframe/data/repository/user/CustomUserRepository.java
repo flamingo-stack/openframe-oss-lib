@@ -14,9 +14,10 @@ public interface CustomUserRepository {
     /**
      * Users ordered by {@code (email, _id)}, starting after {@code cursor} (a {@link UserPageCursor}).
      * {@code search} matches every whitespace-separated token against first name, last name or email;
-     * the synthetic email of a self-deleted user is not matched.
+     * the synthetic email of a self-deleted user is not matched. {@code excludeIds} are left out.
      */
-    List<User> findUsersPage(Collection<UserStatus> statuses, String search, String cursor, int limit);
+    List<User> findUsersPage(Collection<UserStatus> statuses, Collection<String> excludeIds, String search,
+                             String cursor, int limit);
 
-    long countUsers(Collection<UserStatus> statuses, String search);
+    long countUsers(Collection<UserStatus> statuses, Collection<String> excludeIds, String search);
 }

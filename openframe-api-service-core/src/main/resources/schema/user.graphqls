@@ -87,6 +87,8 @@ enum UserRole {
 input UserFilterInput {
     "Omit or leave empty for every status."
     statuses: [UserStatus!]
+    "Users to leave out, e.g. yourself in a picker of someone to hand something over to."
+    excludeIds: [ID!]
 }
 
 type UserConnection {

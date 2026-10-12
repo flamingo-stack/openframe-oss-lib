@@ -52,7 +52,17 @@ public class UserDataFetcher {
         log.debug("Fetching users: filter={}, search={}, first={}, after={}", filter, search, first, after);
         CursorPaginationCriteria pagination = CursorPaginationCriteria.fromConnectionArgs(
                 ConnectionArgs.builder().first(first).after(after).build());
-        return mapper.toUserConnection(userService.queryUsers(filter, search, pagination));
+        return mapper.toUserConnection(userService.queryUsers(withRawIds(filter), search, pagination));
+    }
+
+    private UserFilterInput withRawIds(UserFilterInput filter) {
+        if (filter == null || filter.getExcludeIds() == null) {
+            return filter;
+        }
+        return UserFilterInput.builder()
+                .statuses(filter.getStatuses())
+                .excludeIds(relayIdCodec.decodeAll(filter.getExcludeIds(), USER))
+                .build();
     }
 
     @DgsMutation

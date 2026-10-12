@@ -33,7 +33,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: sorted by email asc / _id asc, limited, continued after the (email, id) cursor")
     void usersArePagedByEmailThenId() {
-        users.findUsersPage(null, null, UserPageCursor.of("jane_doe@acme.io", USER_ID), 21);
+        users.findUsersPage(null, null, null, UserPageCursor.of("jane_doe@acme.io", USER_ID), 21);
 
         Query query = captured(User.class);
         assertThat(query.getLimit()).isEqualTo(21);
@@ -50,7 +50,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: statuses become $in, and every search word must match a name or a non-placeholder email")
     void usersFilterByStatusAndEverySearchWord() {
-        users.findUsersPage(List.of(UserStatus.ACTIVE, UserStatus.DELETED), "  Jane   Doe ", null, 21);
+        users.findUsersPage(List.of(UserStatus.ACTIVE, UserStatus.DELETED), null, "  Jane   Doe ", null, 21);
 
         List<Document> and = and(captured(User.class));
         assertThat(and).hasSize(3);
@@ -67,15 +67,25 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: no filter, no search and no cursor query the whole tenant")
     void usersWithoutConstraintsHaveAnEmptyFilter() {
-        users.findUsersPage(List.of(), " ", null, 21);
+        users.findUsersPage(List.of(), List.of(), " ", null, 21);
 
         assertThat(captured(User.class).getQueryObject()).isEmpty();
     }
 
     @Test
+    @DisplayName("users: excluded ids become a $nin on _id")
+    void usersLeaveOutExcludedIds() {
+        users.findUsersPage(List.of(UserStatus.ACTIVE), List.of(USER_ID), null, null, 21);
+
+        List<Document> and = and(captured(User.class));
+        assertThat(and).hasSize(2);
+        assertThat(and.get(1).get("_id")).isEqualTo(new Document("$nin", List.of(USER_ID)));
+    }
+
+    @Test
     @DisplayName("users: the count applies the filter and search but no position")
     void usersCountHasNoPosition() {
-        users.countUsers(List.of(UserStatus.ACTIVE), "jane");
+        users.countUsers(List.of(UserStatus.ACTIVE), null, "jane");
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).count(captor.capture(), eq(User.class));

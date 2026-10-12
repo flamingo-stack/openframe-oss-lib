@@ -83,8 +83,9 @@ public class UserService {
                                                              CursorPaginationCriteria pagination) {
         CursorPaginationCriteria page = pagination.normalize();
         List<UserStatus> statuses = filter != null ? filter.getStatuses() : null;
-        long filteredCount = userRepository.countUsers(statuses, search);
-        List<User> raw = userRepository.findUsersPage(statuses, search, page.getCursor(), page.getLimit() + 1);
+        List<String> excludeIds = filter != null ? filter.getExcludeIds() : null;
+        long filteredCount = userRepository.countUsers(statuses, excludeIds, search);
+        List<User> raw = userRepository.findUsersPage(statuses, excludeIds, search, page.getCursor(), page.getLimit() + 1);
         boolean hasNextPage = raw.size() > page.getLimit();
         List<UserResponse> items = toResponses(hasNextPage ? raw.subList(0, page.getLimit()) : raw);
         return CountedGenericQueryResult.<UserResponse>builder()

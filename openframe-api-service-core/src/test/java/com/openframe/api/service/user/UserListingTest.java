@@ -75,12 +75,12 @@ class UserListingTest {
     @DisplayName("users: one extra row decides hasNextPage, cursors follow (email, id), the count is the filtered total")
     void usersPage() {
         List<UserStatus> statuses = List.of(UserStatus.ACTIVE);
-        when(userRepository.countUsers(statuses, "jane")).thenReturn(7L);
-        when(userRepository.findUsersPage(statuses, "jane", "a@acme.io_u0", 3))
+        when(userRepository.countUsers(statuses, List.of("u0"), "jane")).thenReturn(7L);
+        when(userRepository.findUsersPage(statuses, List.of("u0"), "jane", "a@acme.io_u0", 3))
                 .thenReturn(List.of(user("u1", "b@acme.io"), user("u2", "c@acme.io"), user("u3", "d@acme.io")));
 
         CountedGenericQueryResult<UserResponse> page = userService().queryUsers(
-                UserFilterInput.builder().statuses(statuses).build(), "jane",
+                UserFilterInput.builder().statuses(statuses).excludeIds(List.of("u0")).build(), "jane",
                 CursorPaginationCriteria.builder().limit(2).cursor("a@acme.io_u0").build());
 
         assertThat(page.getItems()).extracting(UserResponse::getId).containsExactly("u1", "u2");
@@ -96,8 +96,8 @@ class UserListingTest {
     @Test
     @DisplayName("users: the last page has no next page and an empty page has no cursors")
     void usersLastAndEmptyPage() {
-        when(userRepository.countUsers(null, null)).thenReturn(1L, 0L);
-        when(userRepository.findUsersPage(null, null, null, 21))
+        when(userRepository.countUsers(null, null, null)).thenReturn(1L, 0L);
+        when(userRepository.findUsersPage(null, null, null, null, 21))
                 .thenReturn(List.of(user("u1", "b@acme.io")), List.of());
 
         CountedGenericQueryResult<UserResponse> last =

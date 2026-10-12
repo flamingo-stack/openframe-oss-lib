@@ -128,7 +128,7 @@ class SearchInputQuotingTest {
     @DisplayName("users page search: name and email clauses quote each search word")
     void userPageSearchIsQuoted() {
         MongoTemplate template = mock(MongoTemplate.class);
-        new CustomUserRepositoryImpl(template).findUsersPage(null, HOSTILE, null, 10);
+        new CustomUserRepositoryImpl(template).findUsersPage(null, null, HOSTILE, null, 10);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).find(captor.capture(), eq(User.class));

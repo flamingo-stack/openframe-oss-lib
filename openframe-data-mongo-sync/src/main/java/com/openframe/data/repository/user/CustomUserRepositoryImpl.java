@@ -41,8 +41,9 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
     }
 
     @Override
-    public List<User> findUsersPage(Collection<UserStatus> statuses, String search, String cursor, int limit) {
-        List<Criteria> criteria = listCriteria(statuses, search);
+    public List<User> findUsersPage(Collection<UserStatus> statuses, Collection<String> excludeIds, String search,
+                                    String cursor, int limit) {
+        List<Criteria> criteria = listCriteria(statuses, excludeIds, search);
         UserPageCursor.parse(cursor).ifPresent(after -> criteria.add(new Criteria().orOperator(
                 Criteria.where(FIELD_EMAIL).gt(after.email()),
                 new Criteria().andOperator(
@@ -56,14 +57,17 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
     }
 
     @Override
-    public long countUsers(Collection<UserStatus> statuses, String search) {
-        return mongoTemplate.count(toQuery(listCriteria(statuses, search)), User.class);
+    public long countUsers(Collection<UserStatus> statuses, Collection<String> excludeIds, String search) {
+        return mongoTemplate.count(toQuery(listCriteria(statuses, excludeIds, search)), User.class);
     }
 
-    private List<Criteria> listCriteria(Collection<UserStatus> statuses, String search) {
+    private List<Criteria> listCriteria(Collection<UserStatus> statuses, Collection<String> excludeIds, String search) {
         List<Criteria> criteria = new ArrayList<>();
         if (statuses != null && !statuses.isEmpty()) {
             criteria.add(Criteria.where(FIELD_STATUS).in(statuses));
+        }
+        if (excludeIds != null && !excludeIds.isEmpty()) {
+            criteria.add(Criteria.where(FIELD_ID).nin(excludeIds));
         }
         if (hasText(search)) {
             for (String token : search.trim().split("\\s+")) {

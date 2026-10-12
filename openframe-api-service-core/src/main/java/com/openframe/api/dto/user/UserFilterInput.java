@@ -14,4 +14,6 @@ import java.util.List;
 @AllArgsConstructor
 public class UserFilterInput {
     private List<UserStatus> statuses;
+    /** Users left out; the data fetcher hands the service raw ids. */
+    private List<String> excludeIds;
 }
