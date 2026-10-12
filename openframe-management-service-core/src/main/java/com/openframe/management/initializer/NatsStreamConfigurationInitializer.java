@@ -37,6 +37,13 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
+            // client feature flags stream: the whole set of switches a client runs with, one message per release
+            StreamConfiguration.builder()
+                    .name("CLIENT_FEATURE_FLAGS")
+                    .subjects(List.of("machine.*.feature-flags"))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
             // client uninstall stream (the message itself is the command, empty payload)
             StreamConfiguration.builder()
                     .name("CLIENT_UNINSTALL")

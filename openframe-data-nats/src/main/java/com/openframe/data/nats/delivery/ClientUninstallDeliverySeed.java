@@ -9,7 +9,6 @@ import lombok.Getter;
 @AllArgsConstructor
 public class ClientUninstallDeliverySeed implements DeliverySeed {
 
-    private static final String TARGET_ID = "openframe-client";
 
     private final String machineId;
 
@@ -20,6 +19,6 @@ public class ClientUninstallDeliverySeed implements DeliverySeed {
 
     @Override
     public String getTargetId() {
-        return TARGET_ID;
+        return OpenFrameClientTarget.ID;
     }
 }
