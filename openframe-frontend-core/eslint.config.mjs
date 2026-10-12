@@ -134,6 +134,17 @@ export default defineConfig([
   },
 
   {
+    // zod is the other namespace import. Its named `z` export is the whole
+    // library as one object, so a bundler has to keep all of it, every locale
+    // included (about 400 KB of script in a consumer's first load, measured
+    // 2026-10-12). `import * as z from 'zod'` is zod's own tree-shakable form:
+    // the consumer keeps only what the schemas call.
+    name: 'openframe-frontend-core/zod-is-a-namespace',
+    files: ['src/schemas/**/*.ts'],
+    rules: { 'import/no-namespace': 'off' },
+  },
+
+  {
     // `no-node-access` / `no-container` encode "test what the user sees, not
     // the markup". That is right for a component test and wrong for these four,
     // where the DOM *is* the unit under test and a semantic query cannot

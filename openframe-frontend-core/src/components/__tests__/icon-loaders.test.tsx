@@ -3,11 +3,17 @@ import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
-import { listGeneratedIcons, renderIconLoaders } from '../../../scripts/generate-icon-loaders.mjs';
+import {
+  listGeneratedIcons,
+  listLucideNames,
+  renderIconLoaders,
+  renderIconNames,
+} from '../../../scripts/generate-icon-loaders.mjs';
 import { AVAILABLE_SVG_ICONS } from '../../types/announcement';
 import { findIcon, ICON_OPTIONS, resolveIcon } from '../chat/utils/icon-library';
 import { normalizeIconKey, registryIcon } from '../chat/utils/icon-registry';
 import { ICON_LOADERS } from '../icons-v2-generated/icon-loaders';
+import { ICON_SET_NAMES, LUCIDE_ICON_NAMES } from '../icons-v2-generated/icon-names';
 
 /**
  * The name-to-icon resolver loads an icon's own module on demand through
@@ -18,6 +24,21 @@ describe('the icon loader table', () => {
   it('is what the generator writes from the set today', () => {
     const committed = readFileSync(join(__dirname, '../icons-v2-generated/icon-loaders.ts'), 'utf8');
     expect(committed).toBe(renderIconLoaders(listGeneratedIcons()));
+  });
+
+  it('has a names file that is what the generator writes, and lists exactly what the two tables hold', async () => {
+    const committed = readFileSync(join(__dirname, '../icons-v2-generated/icon-names.ts'), 'utf8');
+    expect(committed).toBe(renderIconNames(listGeneratedIcons(), listLucideNames()));
+    expect([...ICON_SET_NAMES].sort()).toEqual(Object.keys(ICON_LOADERS).sort());
+    const lucide = await import('lucide-react/dynamicIconImports');
+    expect([...LUCIDE_ICON_NAMES].sort()).toEqual(Object.keys(lucide.default).sort());
+  });
+
+  it('is not imported by the name resolver: the page loads names, and a table only when an icon is loaded', () => {
+    const resolver = readFileSync(join(__dirname, '../chat/utils/icon-loading.tsx'), 'utf8');
+    expect(resolver).not.toMatch(/^import \{[^}]*ICON_LOADERS[^}]*\} from/m);
+    expect(resolver).not.toMatch(/^import \w+ from 'lucide-react\/dynamicIconImports'/m);
+    expect(resolver).toMatch(/import\('\.\.\/\.\.\/icons-v2-generated\/icon-loaders'\)/);
   });
 
   it('names every icon the set exports, and nothing else', async () => {

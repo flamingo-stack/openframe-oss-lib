@@ -76,3 +76,33 @@ export function sortBitesByFeaturedAtDesc(a: VideoTeaser, b: VideoTeaser): numbe
   if (!b.featured_at) return -1;
   return new Date(b.featured_at).getTime() - new Date(a.featured_at).getTime();
 }
+
+/**
+ * Client-safe author subset hydrated onto program items from the entity's
+ * `author_id → profiles` FK join (podcast episodes / webinars). Deliberately
+ * excludes `email` — this shape is serialized into public payloads.
+ */
+export interface ProgramAuthorRef {
+  id?: string | null;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  job_title?: string | null;
+}
+
+/**
+ * Video-bites overlay profile for a program item: internal author first
+ * (`author_id → profiles`), then the provider-synced primary host (Livestorm
+ * speakers / Podbean hosts). Host `role` is a raw provider enum (e.g.
+ * `team_member`) — never display copy, so it is not used as the subtitle.
+ * Routes through `toStripProfile` (the SSoT — null on missing names).
+ */
+export function programItemToStripProfile(item: {
+  author?: ProgramAuthorRef | null;
+  hosts?: ReadonlyArray<{ name?: string | null; avatar_url?: string | null }> | null;
+}): VideoBiteStripProfile | null {
+  const fromAuthor = toStripProfile(item.author);
+  if (fromAuthor) return fromAuthor;
+  const host = Array.isArray(item.hosts) ? item.hosts[0] : null;
+  if (!host?.name) return null;
+  return toStripProfile({ full_name: host.name, avatar_url: host.avatar_url ?? null });
+}

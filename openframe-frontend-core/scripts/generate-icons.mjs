@@ -73,6 +73,36 @@ function fixSmilReferences(content) {
   });
 }
 
+// An SVG's ids (masks, gradients, clip paths) are global to the page, and SVGR
+// writes them as fixed strings. Two copies of one icon then share an id, and
+// the browser resolves every `url(#id)` to the FIRST copy in the document: when
+// that copy is hidden (a mobile and a desktop layout each draw the icon and CSS
+// hides one), the visible copy's mask and gradients point at nothing and the
+// mark is drawn broken. So each instance gets its own ids, from React's `useId`.
+function scopeIds(content) {
+  const ids = [...content.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
+  if (ids.length === 0) return content;
+  // A SMIL timing reference names an id inside a larger expression; such an icon keeps its ids.
+  if (ids.some(id => new RegExp(`\\b(begin|end)="[^"]*${id}\\.`).test(content))) return content;
+
+  let out = content;
+  for (const id of ids) {
+    const esc = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out
+      .replace(new RegExp(`\\bid="${esc}"`, 'g'), `id={\`\${uid}${id}\`}`)
+      .replace(new RegExp(`="url\\(#${esc}\\)"`, 'g'), `={\`url(#\${uid}${id})\`}`)
+      .replace(new RegExp(`\\b(href|xlinkHref)="#${esc}"`, 'g'), `$1={\`#\${uid}${id}\`}`);
+  }
+  if (/\bid="|"url\(#|(?:href|xlinkHref)="#/.test(out))
+    throw new Error('scopeIds: an id or a reference to one was left unscoped');
+  return out
+    .replace(/import type \{ SVGProps \} from (['"])react\1;/, `import { useId, type SVGProps } from $1react$1;`)
+    .replace(
+      /(\}: \w+Props\) \{\n)/,
+      `$1  // Per-instance ids: see scopeIds in scripts/generate-icons.mjs.\n  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');\n`,
+    );
+}
+
 // Get all category directories
 function getCategories() {
   return readdirSync(ICONS_V2_DIR).filter(item => {
@@ -146,6 +176,7 @@ function processGeneratedCategory(categoryPath, originalNames, category = basena
       .replace(new RegExp(`function ${svgrFuncName}\\(`, 'g'), `function ${componentName}(`);
 
     content = fixSmilReferences(content);
+    content = scopeIds(content);
 
     const colors = ICON_COLORS[`${category}/${normalizedKebabName}`] ?? {};
     if (colors.color) {
