@@ -47,8 +47,8 @@ export function createChatConversationStorage(source: string): LocalStorageAdapt
  * Sweep THIS source's stale keys: the other-identity variants (base vs
  * impersonation), and retired key shapes from before the server-minted-id
  * design (raw `mingo-chat-<source>` and versioned `-v1`/`-v2` full-history
- * stores). Boundary-aware: a hyphen-extended sibling source (`flamingo` vs
- * `flamingo-teaser`) is NOT this source's namespace and must never be swept.
+ * stores). Boundary-aware: a hyphen-extended sibling source (`openframe` vs
+ * `openframe-dashboard`) is NOT this source's namespace and must never be swept.
  *
  * Raw storage enumeration is unavoidable here — the adapter abstraction is
  * per-key and Web Storage only exposes iteration on the raw object.

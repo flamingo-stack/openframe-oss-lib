@@ -6,8 +6,10 @@ import { useMemo, useState } from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { cn } from '../../utils/cn';
-import { EyeIcon, OpenFrameLogo } from '../icons';
 import { Copy01Icon } from '../icons-v2-generated/documents';
+import { EyeClassicIcon } from '../icons-v2-generated/interface/eye-classic-icon';
+import { EyeOffClassicIcon } from '../icons-v2-generated/interface/eye-off-classic-icon';
+import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols';
 import { FloatingTooltip } from './floating-tooltip';
 import { TruncateText } from './truncate-text';
@@ -48,10 +50,10 @@ function MaskedValue({ value, isRevealed }: { value: string; isRevealed: boolean
 
 export function ServiceCard({ title, subtitle, icon, tag, rows, className }: ServiceCardProps) {
   const resolvedIcon = icon ?? (
-    <OpenFrameLogo
+    <OpenframeLogoIcon
+      secondaryColor="var(--color-accent-primary)"
       className="h-10 w-10"
-      lowerPathColor={'var(--color-accent-primary)'}
-      upperPathColor={'var(--color-text-primary)'}
+      color={'var(--color-text-primary)'}
     />
   );
 
@@ -139,7 +141,7 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
               className="rounded p-2 text-ods-text-secondary hover:bg-ods-card"
               aria-label={revealed ? 'Hide' : 'Reveal'}
             >
-              <EyeIcon className="h-5 w-5" off={revealed} />
+              {revealed ? <EyeOffClassicIcon className="h-5 w-5" /> : <EyeClassicIcon className="h-5 w-5" />}
             </button>
           )}
 

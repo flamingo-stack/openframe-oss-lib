@@ -1,8 +1,8 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import graphql.relay.Relay;
 import com.openframe.api.dto.device.DeviceFilterOption;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.rmm.script.ScriptTagService;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.tag.Tag;
@@ -15,22 +15,17 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
+import static com.openframe.graphql.relay.NodeType.TAG;
+
 @DgsComponent
 @Slf4j
 @Validated
 @RequiredArgsConstructor
 public class TagDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final TagService tagService;
     private final ScriptTagService scriptTagService;
-
-    @DgsData(parentType = "Tag", field = "id")
-    public String tagNodeId(DgsDataFetchingEnvironment dfe) {
-        Tag tag = dfe.getSource();
-        return RELAY.toGlobalId("Tag", tag.getId());
-    }
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public List<Tag> tags() {
@@ -90,14 +85,14 @@ public class TagDataFetcher {
             @InputArgument String key,
             @InputArgument String description,
             @InputArgument String color) {
-        String rawId = RELAY.fromGlobalId(id).getId();
+        String rawId = relayIdCodec.decode(id, TAG);
         log.info("Updating tag with global ID: {}, rawId: {}", id, rawId);
         return tagService.updateTag(rawId, key, description, color);
     }
 
     @DgsMutation
     public boolean deleteTag(@InputArgument @NotBlank String id) {
-        String rawId = RELAY.fromGlobalId(id).getId();
+        String rawId = relayIdCodec.decode(id, TAG);
         log.info("Deleting tag with global ID: {}, rawId: {}", id, rawId);
         tagService.deleteTag(rawId);
         return true;

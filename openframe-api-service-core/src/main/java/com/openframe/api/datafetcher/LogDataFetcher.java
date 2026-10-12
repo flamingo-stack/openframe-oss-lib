@@ -1,7 +1,6 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import graphql.relay.Relay;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.audit.*;
@@ -27,22 +26,8 @@ import java.util.Optional;
 @ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
 public class LogDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final LogService logService;
     private final GraphQLLogMapper logMapper;
-
-    @DgsData(parentType = "LogEvent", field = "id")
-    public String logEventId(DgsDataFetchingEnvironment dfe) {
-        LogEvent event = dfe.getSource();
-        return RELAY.toGlobalId("LogEvent", event.getId());
-    }
-
-    @DgsData(parentType = "LogDetails", field = "id")
-    public String logDetailsId(DgsDataFetchingEnvironment dfe) {
-        LogDetails details = dfe.getSource();
-        return RELAY.toGlobalId("LogDetails", details.getId());
-    }
 
     @DgsQuery
     public LogFilters logFilters(@InputArgument @Valid LogFilterInput filter) {

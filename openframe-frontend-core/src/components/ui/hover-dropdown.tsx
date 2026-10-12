@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useState, useRef, useCallback } from 'react';
+import Link from '../../embed-shims/next-link';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 
 // =============================================================================
@@ -90,9 +91,9 @@ interface HoverDropdownProps {
  */
 function DefaultAnchor({ href, className, children }: HoverDropdownRenderAnchorArgs) {
   return (
-    <a href={href} className={className}>
+    <Link href={href} className={className}>
       {children}
-    </a>
+    </Link>
   );
 }
 

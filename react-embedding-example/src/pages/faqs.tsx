@@ -9,6 +9,11 @@ import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
  * ACTIVE list (identical to what the hub's SSR `/faqs` page renders), so this
  * embed matches the hub byte-for-byte.
  *
+ * THE ASK CARD: `FaqSection` renders it itself because the embed mounts an
+ * assistant runtime (app-providers.tsx). This page only states its topic, which
+ * the hub's questions endpoint receives as `section`; a click opens the embed's
+ * own chat (`openEmbedChat`), with the question.
+ *
  * We rely on the DEFAULT back button ("Back to home" → `/`), consistent with
  * roadmap/delivery/releases — do NOT pass `backButton={false}` (only `legal`
  * opts out of the back affordance).
@@ -18,6 +23,7 @@ export function FaqsPage() {
     <FaqDocumentPage
       apiBaseUrl={CONTENT_PREFIX}
       subtitle="Answers to the most common questions about OpenFrame."
+      ask={{ topic: 'faq' }}
     />
   )
 }

@@ -10,7 +10,7 @@
  * styles/app-globals.css).
  *
  * Glyphs come from THE icon system — never inline SVG paths here:
- * PlayFilledIcon / VolumeOffFilledIcon (components/icons — the FILLED
+ * PlayFilledIcon / VolumeOffFilledIcon (the icon set — the FILLED
  * media-chrome-matching glyphs, so custom affordances are pixel-identical to
  * MuxPlayer's native center button on real players).
  *
@@ -25,8 +25,8 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
-import { PlayFilledIcon } from '../icons/play-filled-icon';
-import { VolumeOffFilledIcon } from '../icons/volume-off-filled-icon';
+import { PlayFilledIcon } from '../icons-v2-generated/interface/play-filled-icon';
+import { VolumeOffFilledIcon } from '../icons-v2-generated/interface/volume-off-filled-icon';
 
 export type VideoCenterBadgeSize = 'sm' | 'md' | 'lg';
 

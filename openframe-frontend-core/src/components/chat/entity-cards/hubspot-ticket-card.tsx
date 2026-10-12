@@ -4,13 +4,14 @@
  * HubSpot Ticket Card — unified visual for hubspot-tickets markers.
  *
  * PURE PRESENTATION (no internal nav). The card receives the structured
- * `<a>` prop bundle via `anchorProps` (composed by the caller from a
+ * `<Link>` prop bundle via `anchorProps` (composed by the caller from a
  * runtime hook) and renders the rest from the `HubspotTicketItem` shape
  * directly.
  */
 
 import { ExternalLink } from 'lucide-react';
 import React from 'react';
+import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { StatusBadge } from '../../ui/status-badge';
 import type { HubspotTicketItem } from '../types/entities/hubspot-ticket';
@@ -151,15 +152,15 @@ export function HubspotTicketCard({ item, variant = 'compact', className, anchor
   );
   if (anchorProps) {
     return (
-      <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {body}
-      </a>
+      </Link>
     );
   }
   return href ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+    <Link href={href} target="_blank" rel="noopener noreferrer" className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
       {body}
-    </a>
+    </Link>
   ) : (
     <span className={`${COMPACT_CARD_OUTER_STATIC} ${className ?? ''}`} aria-label="No link available">
       {body}

@@ -8,6 +8,20 @@ export interface DataAttributionProps {
   source: string;
   /** ISO instant of the last successful sync, or null when it never ran. */
   lastUpdated: string | null;
+  /** One control at the end of the line: a way to take this data away (a `DownloadButton` for a file of it). */
+  action?: ReactNode;
+}
+
+const LINE_CLASS =
+  'flex shrink-0 flex-col gap-[var(--spacing-system-xsf)] text-ods-text-primary text-h6 content-sm:flex-row content-sm:items-center content-sm:gap-[var(--spacing-system-sf)]';
+const ITEM_CLASS = 'flex items-center gap-[var(--spacing-system-xsf)]';
+
+function Separator() {
+  return (
+    <span className="hidden text-ods-text-secondary content-sm:inline" aria-hidden="true">
+      &middot;
+    </span>
+  );
 }
 
 /**
@@ -16,17 +30,16 @@ export interface DataAttributionProps {
  * UTC (`formatDate`), so a server-rendered page and its hydrated copy print the
  * same text.
  */
-export function DataAttribution({ icon, source, lastUpdated }: DataAttributionProps) {
+export function DataAttribution({ icon, source, lastUpdated, action }: DataAttributionProps) {
   return (
-    <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] text-ods-text-primary text-h6 content-sm:flex-row content-sm:items-center content-sm:gap-[var(--spacing-system-sf)]">
-      <div className="flex items-center gap-[var(--spacing-system-xsf)]">
+    <div className={LINE_CLASS}>
+      <div className={ITEM_CLASS}>
         {icon}
         <span>Data synced from {source}</span>
       </div>
-      <span className="hidden text-ods-text-secondary content-sm:inline" aria-hidden="true">
-        &middot;
-      </span>
+      <Separator />
       <span className="text-ods-text-secondary">Last updated: {lastUpdated ? formatDate(lastUpdated) : 'Never'}</span>
+      {action ? <div className="flex content-sm:pl-[var(--spacing-system-xs)]">{action}</div> : null}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from '../../embed-shims/next-link';
 import { useCopyToClipboard } from '../../hooks';
 import { cn } from '../../utils/cn';
 import { CheckIcon } from '../icons-v2-generated';
@@ -132,14 +133,14 @@ function InfoCardFooter({ footer }: { footer: InfoCardFooterData }) {
         {footer.logo}
       </div>
       {footer.link && (
-        <a
+        <Link
           href={footer.link.href}
           target="_blank"
           rel="noopener noreferrer"
           className="truncate text-ods-text-secondary underline text-h6 hover:text-ods-text-primary"
         >
           {footer.link.label ?? footer.link.href.replace(/^https?:\/\//, '')}
-        </a>
+        </Link>
       )}
     </div>
   );

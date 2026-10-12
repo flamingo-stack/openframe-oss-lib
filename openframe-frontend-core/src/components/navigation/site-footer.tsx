@@ -78,8 +78,10 @@ function FooterColumn({
       {group.title &&
         (accordion ? (
           <>
-            {/* Below md the heading is the accordion's button; from md it is a plain heading. */}
-            <h3 className="md:hidden">
+            {/* Below md the title is the accordion's button; from md it is a plain label.
+                Neither is a heading: a column of navigation links is not a section of the
+                page's content, and six footer headings on every page blur its outline. */}
+            <div className="md:hidden">
               <Button
                 type="button"
                 variant="glyph"
@@ -100,11 +102,11 @@ function FooterColumn({
                   className={cn('h-5 w-5 shrink-0 transition-transform duration-150', open && 'rotate-180')}
                 />
               </Button>
-            </h3>
-            <h3 className={cn('hidden md:block', HEADING_CLASS)}>{group.title}</h3>
+            </div>
+            <p className={cn('hidden md:block', HEADING_CLASS)}>{group.title}</p>
           </>
         ) : (
-          <h3 className={HEADING_CLASS}>{group.title}</h3>
+          <p className={HEADING_CLASS}>{group.title}</p>
         ))}
       {/* Always in the DOM (crawlers read the footer links); a folded
           accordion only hides its list below md. */}
@@ -236,11 +238,12 @@ export function SiteFooter({
         )}
       </div>
 
-      {/* The legal line is text, not navigation: muted, with its links in the
-          accent so they still read as links (prototype `.nf-legal`). */}
+      {/* The legal line is text, not navigation: the secondary text colour (the muted
+          one is 3.4:1 on the footer at this size), with its links in the accent so
+          they still read as links (prototype `.nf-legal`). */}
       <div
         className={cn(
-          'flex flex-col gap-[var(--spacing-system-xxs)] border-t border-ods-border pb-[var(--spacing-system-xlf)] pt-[var(--spacing-system-lf)] text-ods-text-muted text-h6 md:flex-row md:items-center md:justify-between md:gap-[var(--spacing-system-lf)]',
+          'flex flex-col gap-[var(--spacing-system-xxs)] border-t border-ods-border pb-[var(--spacing-system-xlf)] pt-[var(--spacing-system-lf)] text-ods-text-secondary text-h6 md:flex-row md:items-center md:justify-between md:gap-[var(--spacing-system-lf)]',
         )}
       >
         <span>

@@ -29,7 +29,7 @@ import { canonicalContentRefType } from '../../../utils/list-url';
 import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
 import type { ChatRef } from '../chat-ref.types';
 import { safeHref } from './compact-card-classes';
-import { getIconComponent } from './icon-registry';
+import { resolveIcon } from './icon-library';
 import { getSourceIconName } from './source-icons';
 
 /** Path sanitization — keep alphanumerics, slash, dash, dot, underscore;
@@ -146,11 +146,11 @@ export function sourceRowCtxFromRuntime(
 /**
  * Pure icon-resolution helper — `sourceRepo` (RagTableConfig.id) →
  * icon_name via `SOURCE_ICON_NAMES`, then icon_name → React component
- * via `ICON_REGISTRY`.
+ * via `resolveIcon` (the brand set, else the design set).
  */
 function pickSourceIcon(sourceRepo: string | null, documentType: string | null | undefined) {
   const iconName = sourceRepo ? getSourceIconName(sourceRepo) : undefined;
-  const icon = iconName ? getIconComponent(iconName) : FileText;
+  const icon = iconName ? resolveIcon(iconName, { variant: 'brand' }) : FileText;
   const iconLabel = documentType ?? 'Source';
   return { icon, iconLabel };
 }

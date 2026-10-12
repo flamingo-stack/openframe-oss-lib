@@ -1,12 +1,8 @@
 'use client';
 
-import { Globe } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { getPlatformBrandClasses } from '../../utils/platform-identity';
-import { FlamingoLogo } from '../flamingo-logo';
-import { MiamiCyberGangLogoFaceOnly } from '../icons/miami-cyber-gang-logo-face-only';
-import { OpenFrameLogo } from '../icons/openframe-logo';
-import { OpenmspLogo } from '../openmsp-logo';
+import { PlatformMark } from '../chat/utils/icon-loading';
 
 interface PlatformBadgeProps {
   platform?: {
@@ -37,39 +33,6 @@ const sizeClasses = {
   },
 };
 
-const PlatformIcon = ({ platform, className }: { platform: string; className: string }) => {
-  // Extract size from className (h-4 w-4 -> 16, h-5 w-5 -> 20, etc.)
-  const sizeMatch = className.match(/h-(\d+)/);
-  const size = sizeMatch ? parseInt(sizeMatch[1]) * 4 : 16; // Convert Tailwind size to pixels
-
-  switch (platform) {
-    case 'openmsp':
-      return (
-        <OpenmspLogo
-          className={className}
-          frontBubbleColor="currentColor"
-          innerFrontBubbleColor="var(--ods-system-greys-black)"
-          backBubbleColor="currentColor"
-        />
-      );
-    case 'flamingo':
-    case 'flamingo-teaser':
-      return <FlamingoLogo className={className} />;
-    case 'openframe':
-      return <OpenFrameLogo className={className} />;
-    case 'tmcg':
-      return <MiamiCyberGangLogoFaceOnly size={size} className={className} />;
-    case 'company-hub':
-    case 'marketing-hub':
-    case 'product-hub':
-    case 'revenue-hub':
-    case 'people-hub':
-      return <FlamingoLogo className={className} fill="currentColor" />;
-    default:
-      return <Globe className={className} />;
-  }
-};
-
 export function PlatformBadge({ platform, size = 'sm', showLabel = true, className }: PlatformBadgeProps) {
   if (!platform) {
     return null;
@@ -92,7 +55,7 @@ export function PlatformBadge({ platform, size = 'sm', showLabel = true, classNa
         className,
       )}
     >
-      <PlatformIcon platform={platform.name} className={sizes.icon} />
+      <PlatformMark platform={platform.name} className={sizes.icon} />
       {showLabel && <span className={sizes.text}>{platform.display_name || platform.name}</span>}
     </div>
   );
