@@ -9,7 +9,7 @@
  * lives here in lib.
  */
 
-import { Megaphone } from 'lucide-react';
+import { Megaphone02Icon } from '../../icons-v2-generated';
 import type React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { formatDateShort } from '../../../utils/date-formatters';
@@ -56,7 +56,7 @@ export function CampaignCardAdmin({ campaign, className, anchorProps }: Campaign
   const innerChildren = (
     <>
       <span className={COMPACT_CARD_ICON_SLOT}>
-        <Megaphone className="h-5 w-5" />
+        <Megaphone02Icon className="h-5 w-5" />
       </span>
       <span className={COMPACT_CARD_TEXT_COL}>
         <span className={COMPACT_CARD_TITLE_ROW}>
