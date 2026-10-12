@@ -5,6 +5,10 @@ import com.openframe.data.service.TenantIdProvider;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.core.ExecutableFindOperation;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.MatchOperation;
 import org.springframework.data.mongodb.core.convert.MongoConverter;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.CriteriaDefinition;
@@ -17,6 +21,7 @@ import com.mongodb.client.result.UpdateResult;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -117,6 +122,33 @@ public class TenantAwareMongoTemplate extends MongoTemplate {
             query.addCriteria(Criteria.where("tenantId").is(tenantIdProvider.getTenantId()));
         }
         return query;
+    }
+
+    /**
+     * Ensures the aggregation pipeline is scoped to the current tenant when the input type is
+     * TenantScoped. If no $match stage referencing tenantId is present as the first operation,
+     * one is injected automatically so callers cannot silently bypass tenant isolation.
+     */
+    protected Aggregation scopeAggregation(Aggregation aggregation, Class<?> inputType) {
+        if (inputType == null || !TenantScoped.class.isAssignableFrom(inputType)) {
+            return aggregation;
+        }
+        List<AggregationOperation> operations = new ArrayList<>(aggregation.getPipeline().getOperations());
+        boolean alreadyScoped = false;
+        if (!operations.isEmpty() && operations.get(0) instanceof MatchOperation matchOperation) {
+            org.bson.Document matchDocument = matchOperation.toPipelineStages(
+                    org.springframework.data.mongodb.core.aggregation.Aggregation.DEFAULT_CONTEXT).get(0).get("$match", org.bson.Document.class);
+            if (matchDocument != null && matchDocument.containsKey("tenantId")) {
+                alreadyScoped = true;
+            }
+        }
+        if (!alreadyScoped) {
+            operations.add(0, org.springframework.data.mongodb.core.aggregation.Aggregation.match(
+                    Criteria.where("tenantId").is(tenantIdProvider.getTenantId())));
+        }
+        Aggregation scoped = org.springframework.data.mongodb.core.aggregation.Aggregation.newAggregation(operations);
+        scoped.setOptions(aggregation.getOptions());
+        return scoped;
     }
 
     @Override
@@ -228,5 +260,29 @@ public class TenantAwareMongoTemplate extends MongoTemplate {
     public <T> T findAndRemove(Query query, Class<T> entityClass, String collectionName) {
         return super.findAndRemove(scope(query, entityClass), entityClass, collectionName);
     }
-    // aggregate() intentionally NOT overridden — callers must add tenantId $match explicitly
+
+    @Override
+    public <O> AggregationResults<O> aggregate(Aggregation aggregation, Class<?> inputType, Class<O> outputType) {
+        return super.aggregate(scopeAggregation(aggregation, inputType), inputType, outputType);
+    }
+
+    @Override
+    public <O> AggregationResults<O> aggregate(Aggregation aggregation, String collectionName, Class<O> outputType) {
+        return super.aggregate(aggregation, collectionName, outputType);
+    }
+
+    @Override
+    public <O> AggregationResults<O> aggregate(Aggregation aggregation, Class<O> outputType) {
+        return super.aggregate(aggregation, outputType);
+    }
+
+    @Override
+    public <O> Stream<O> aggregateStream(Aggregation aggregation, Class<?> inputType, Class<O> outputType) {
+        return super.aggregateStream(scopeAggregation(aggregation, inputType), inputType, outputType);
+    }
+
+    @Override
+    public <O> Stream<O> aggregateStream(Aggregation aggregation, String collectionName, Class<O> outputType) {
+        return super.aggregateStream(aggregation, collectionName, outputType);
+    }
 }
