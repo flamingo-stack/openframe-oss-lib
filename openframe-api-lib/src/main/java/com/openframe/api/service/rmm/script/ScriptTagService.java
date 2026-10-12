@@ -19,14 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Manages the many-to-many link between {@code Script}s and real {@code Tag}
- * entities through {@link TagAssignment} rows (entity type {@code SCRIPT}).
- *
- * <p>Mirrors {@code KnowledgeBaseTagService}. Tags are NOT stored on the script
- * document — they live in {@code tag_assignments}, so reads here join the two
- * collections and writes replace the assignment set.
- */
+// Mirrors KnowledgeBaseTagService: tags live in tag_assignments, not on the script document.
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -39,10 +32,7 @@ public class ScriptTagService {
     private final TagAssignmentRepository tagAssignmentRepository;
     private final ScriptRepository scriptRepository;
 
-    /**
-     * Tags for each script id, aligned with the input order — the batched shape
-     * the GraphQL {@code Script.tags} DataLoader needs.
-     */
+    // Batched shape the GraphQL Script.tags DataLoader needs: aligned with input order.
     public List<List<Tag>> getTagsByScriptIds(List<String> scriptIds) {
         if (scriptIds == null || scriptIds.isEmpty()) {
             return List.of();
@@ -67,11 +57,6 @@ public class ScriptTagService {
                 .toList();
     }
 
-    /**
-     * Tag keys assigned to scripts filtered by archive state. When {@code archived}
-     * is true, returns tags assigned to archived scripts; otherwise to active scripts.
-     * Mirrors {@code KnowledgeBaseTagService.getAllTags}.
-     */
     public List<Tag> getAllTags(boolean archived) {
         List<TagAssignment> assignments = tagAssignmentRepository.findByEntityType(ENTITY_TYPE);
         if (assignments.isEmpty()) {
