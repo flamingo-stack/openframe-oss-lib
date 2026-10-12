@@ -23,6 +23,7 @@
  */
 
 import type React from 'react';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 
 export interface CardHitLayerProps {
@@ -61,7 +62,7 @@ export function CardHitLayer({
   const a11y = decorative ? { 'aria-hidden': true as const, tabIndex: -1 } : { 'aria-label': label };
   if (href) {
     return (
-      <a
+      <Link
         href={href}
         {...a11y}
         onClick={onClick}

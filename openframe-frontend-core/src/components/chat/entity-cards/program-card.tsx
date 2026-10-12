@@ -30,6 +30,7 @@ import { ArrowRight, ExternalLink, Clock, Play, Video } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
 import { formatProgramDate, formatProgramDateRange } from '../../../utils/format';
@@ -218,7 +219,7 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   /** Detail URL resolved by the caller. */
   href: string;
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
-   *  `computeIsNewTab` so the inner `<a>` matches the runtime
+   *  `computeIsNewTab` so the inner `<Link>` matches the runtime
    *  nav decision (cross-platform / embed → new tab). Defaults to
    *  same-tab for non-chat callsites. */
   target?: '_blank';
@@ -362,14 +363,7 @@ function ProgramEditorialCard({
 
   if (!feature) {
     return (
-      <ContentCardFrame
-        as="a"
-        href={href}
-        target={target}
-        rel={rel}
-        aria-label={`Open ${title}`}
-        className={cn(EDITORIAL_ROW_GRID, className)}
-      >
+      <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn(EDITORIAL_ROW_GRID, className)}>
         <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
           {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
           {playable && cover && <CardHoverPlay size="md" />}
@@ -384,14 +378,7 @@ function ProgramEditorialCard({
   }
 
   return (
-    <ContentCardFrame
-      as="a"
-      href={href}
-      target={target}
-      rel={rel}
-      aria-label={`Open ${title}`}
-      className={cn('flex flex-col', className)}
-    >
+    <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn('flex flex-col', className)}>
       <span
         className={cn(EDITORIAL_FEATURE_COVER, 'transition-colors duration-300')}
         style={{ backgroundColor: edgeColor }}
@@ -540,7 +527,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       (s): s is string => typeof s === 'string' && s.length > 0,
     );
     return (
-      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, 'group', className)}>
+      <Link href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, 'group', className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
             <Image src={compactCover} alt={item.title} fill sizes="56px" className="object-contain" unoptimized />
@@ -571,7 +558,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         <span className="flex h-5 shrink-0 items-center self-start text-ods-text-secondary">
           <ExternalLink className="h-3.5 w-3.5" />
         </span>
-      </a>
+      </Link>
     );
   }
 
@@ -691,14 +678,7 @@ export function ProgramCard<T extends BaseProgramItem>({
 
   if (wholeCardClickable) {
     return (
-      <ContentCardFrame
-        as="a"
-        href={href}
-        target={target}
-        rel={rel}
-        className={cardFrameClass}
-        aria-label={`Open ${item.title}`}
-      >
+      <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cardFrameClass}>
         {cardHeader}
         {images.length > 0 && <MediaGallery images={images} title={item.title} />}
         <div className={DEFAULT_FOOTER}>
@@ -716,9 +696,9 @@ export function ProgramCard<T extends BaseProgramItem>({
 
   return (
     <ContentCardFrame as="div" className={cardFrameClass}>
-      <a href={href} target={target} rel={rel} className="block" aria-label={`Open ${item.title}`}>
+      <Link href={href} target={target} rel={rel} className="block">
         {cardHeader}
-      </a>
+      </Link>
       {images.length > 0 && <MediaGallery images={images} title={item.title} />}
       <div className={DEFAULT_FOOTER}>
         <Button

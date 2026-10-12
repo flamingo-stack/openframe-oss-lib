@@ -27,6 +27,7 @@ import { fileTypeFromBlob } from 'file-type';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { randomId } from '../../../utils/random-id';
 import { CHAT_ATTACHMENT_MIME_TYPES, CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER } from '../chat-attachment-bar';
 import type { ChatAttachment } from '../utils/chat-attachment-markdown';
 
@@ -353,7 +354,7 @@ export function useChatAttachments(): UseChatAttachmentsApi {
         // round-trip on obviously-too-big files.
         if (file.size > CHAT_ATTACHMENT_MAX_SIZE_BYTES) {
           additions.push({
-            id: crypto.randomUUID(),
+            id: randomId(),
             file,
             status: 'error',
             progress: 0,
@@ -364,7 +365,7 @@ export function useChatAttachments(): UseChatAttachmentsApi {
         }
 
         additions.push({
-          id: crypto.randomUUID(),
+          id: randomId(),
           file,
           status: 'sniffing',
           progress: 0,

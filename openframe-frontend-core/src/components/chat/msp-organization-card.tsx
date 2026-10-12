@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { ExternalLinkIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
@@ -70,9 +71,9 @@ export function MspOrganizationCard({
         </div>
         {href ? (
           <Button asChild variant="outline" size="icon-sm" aria-label={actionLabel}>
-            <a href={href} target="_blank" rel="noreferrer noopener">
+            <Link href={href} target="_blank" rel="noreferrer noopener">
               <ExternalLinkIcon />
-            </a>
+            </Link>
           </Button>
         ) : onOpenWebsite ? (
           <Button variant="outline" size="icon-sm" aria-label={actionLabel} onClick={onOpenWebsite}>
@@ -102,9 +103,9 @@ export function MspOrganizationCard({
 
       {href ? (
         <Button asChild variant="outline" size="icon" aria-label={actionLabel}>
-          <a href={href} target="_blank" rel="noreferrer noopener">
+          <Link href={href} target="_blank" rel="noreferrer noopener">
             <ExternalLinkIcon />
-          </a>
+          </Link>
         </Button>
       ) : onOpenWebsite ? (
         <Button variant="outline" size="icon" aria-label={actionLabel} onClick={onOpenWebsite}>

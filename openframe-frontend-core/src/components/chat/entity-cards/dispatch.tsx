@@ -56,8 +56,8 @@ import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
+import { AgentMark } from '../../agent-mark';
 import { EntityIcon } from '../../icon-display';
-import { MingoIcon } from '../../icons';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
@@ -2089,16 +2089,7 @@ export function ChatCardLoader({
   const discuss: CardDiscussAction | undefined = discussFn
     ? {
         label: useDisplay ? 'Display' : 'Ask Mingo',
-        icon: useDisplay ? (
-          <FileContentIcon size={20} />
-        ) : (
-          <MingoIcon
-            className="size-5"
-            color="white"
-            eyesColor="var(--ods-flamingo-cyan-base)"
-            cornerColor="var(--ods-flamingo-cyan-base)"
-          />
-        ),
+        icon: useDisplay ? <FileContentIcon size={20} /> : <AgentMark agent="mingo" className="size-5" />,
         run: () => discussFn(finalChatRef),
       }
     : undefined;

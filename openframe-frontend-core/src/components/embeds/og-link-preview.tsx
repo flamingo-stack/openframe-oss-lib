@@ -3,6 +3,7 @@
 import type React from 'react';
 import { useState, useEffect, Component, type ReactNode } from 'react';
 import Image from '../../embed-shims/next-image';
+import Link from '../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../hooks';
 
 /**
@@ -392,7 +393,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   if (isLocalhost) {
     return (
       <div className="my-6">
-        <a
+        <Link
           href={url}
           target="_blank"
           rel="noopener noreferrer"
@@ -400,7 +401,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
         >
           <span className="underline">{url}</span>
           <ExternalLinkIcon size={14} />
-        </a>
+        </Link>
       </div>
     );
   }
@@ -461,7 +462,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
     if (!hasImage) {
       return (
         <div className="my-4">
-          <a
+          <Link
             href={effectiveData.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -477,13 +478,13 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
               {description && <p className="truncate text-ods-text-secondary text-h6">{description}</p>}
             </div>
             <ExternalLinkIcon size={14} />
-          </a>
+          </Link>
         </div>
       );
     }
     return (
       <div className="my-4">
-        <a
+        <Link
           href={effectiveData.url}
           target="_blank"
           rel="noopener noreferrer"
@@ -512,7 +513,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             )}
             <div className="mt-1 truncate text-ods-text-secondary text-h6">{effectiveData.siteName || ogDomain}</div>
           </div>
-        </a>
+        </Link>
       </div>
     );
   }
@@ -520,7 +521,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   if (!hasImage) {
     return (
       <div className="my-6">
-        <a
+        <Link
           href={effectiveData.url}
           target="_blank"
           rel="noopener noreferrer"
@@ -536,14 +537,14 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             {description && <p className="truncate text-ods-text-secondary text-h6">{description}</p>}
           </div>
           <ExternalLinkIcon />
-        </a>
+        </Link>
       </div>
     );
   }
 
   return (
     <div className="my-6">
-      <a
+      <Link
         href={effectiveData.url}
         target="_blank"
         rel="noopener noreferrer"
@@ -592,7 +593,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             </div>
           </div>
         </div>
-      </a>
+      </Link>
     </div>
   );
 };

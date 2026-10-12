@@ -2,7 +2,8 @@
 
 import type { ReactElement } from 'react';
 import Image from '../embed-shims/next-image';
-import { AgentMark, type AgentName } from './agent-mark';
+import { cn } from '../utils/cn';
+import { AGENT_GLYPH_COLOR, AGENT_PICTURE_CLASS, useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
 
 /** Unified icon value used across the app (announcement bar, chat quick actions,
@@ -16,12 +17,11 @@ export interface EntityIconValue {
   props?: Record<string, unknown> | null;
 }
 
-const BRAND_MARK_NAMES = new Set<string>(['fae', 'mingo']);
-
 /**
  * THE single icon-display path for the whole app. Resolution order:
  *   1. `url` → uploaded image
- *   2. `name` ∈ {fae,mingo} → packaged `AgentMark`
+ *   2. `name` = an agent's slug → that agent's identity icon (`AgentIdentityProvider`):
+ *      its picture, or the glyph its identity names
  *   3. `name` → library glyph via `resolveIcon` (+ `props`)
  *
  * Replaces the old per-surface logic (the announcement bar's `renderSvgIcon`
@@ -37,6 +37,22 @@ export function EntityIcon({
   size?: number;
   className?: string;
 }): ReactElement {
+  // An agent named by its slug is drawn from its identity (`AgentIdentityProvider`):
+  // its uploaded picture, or the glyph the identity names with the identity's props.
+  const identity = useAgentIdentityIcon(icon?.url ? null : icon?.name);
+  if (!icon?.url && identity?.url) {
+    // An agent's picture: a square file, cropped to a circle like every picture of an agent.
+    return (
+      <Image
+        src={identity.url}
+        alt=""
+        width={size}
+        height={size}
+        className={cn(AGENT_PICTURE_CLASS, className)}
+        unoptimized
+      />
+    );
+  }
   if (icon?.url) {
     return (
       <Image
@@ -50,19 +66,10 @@ export function EntityIcon({
       />
     );
   }
-  if (icon?.name && BRAND_MARK_NAMES.has(icon.name)) {
-    // Size via `className` when provided (so responsive Tailwind sizing like
-    // `w-6 content-md:w-8` works); fall back to a fixed `size` px box ONLY when no
-    // className is given — an inline `style` would otherwise override the class.
-    return (
-      <span
-        className={`inline-flex${className ? ` ${className}` : ''}`}
-        style={className ? undefined : { width: size, height: size }}
-      >
-        <AgentMark agent={icon.name as AgentName} className="h-full w-full" />
-      </span>
-    );
-  }
-  const Glyph = resolveIcon(icon?.name ?? undefined);
-  return <Glyph size={size} className={className} {...(icon?.props ?? {})} />;
+  const Glyph = resolveIcon(identity?.name ?? icon?.name ?? undefined);
+  // An agent's glyph is one colour wherever it sits; any other icon takes its slot's.
+  const agentColor = identity ? { color: AGENT_GLYPH_COLOR } : {};
+  return (
+    <Glyph size={size} className={className} {...agentColor} {...(identity?.props ?? {})} {...(icon?.props ?? {})} />
+  );
 }

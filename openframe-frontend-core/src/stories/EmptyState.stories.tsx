@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Database, FileText, Inbox, Plus, Search, Settings, Sparkles, Upload, Zap } from 'lucide-react';
-import { MingoIcon } from '../components/icons';
+import { AgentMark } from '../components/agent-mark';
 import { Button } from '../components/ui/button';
 import { NoData, NoDataAction, NoDataActions, NoDataMessage } from '../components/ui/no-data';
 
@@ -25,9 +25,7 @@ type Story = StoryObj<typeof meta>;
 
 const noop = () => {};
 
-const mingoButtonIcon = (
-  <MingoIcon className="size-5" eyesColor="var(--ods-flamingo-cyan-base)" cornerColor="var(--ods-flamingo-cyan-base)" />
-);
+const mingoButtonIcon = <AgentMark agent="mingo" className="size-5" />;
 
 const defaultActions = [
   { icon: <Zap />, label: 'Feature Description' },

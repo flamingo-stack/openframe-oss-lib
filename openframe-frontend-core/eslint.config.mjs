@@ -1,5 +1,6 @@
 import { defineConfig, globalIgnores } from 'eslint/config';
 
+import { flamingoPlugin } from './eslint-config/base.js';
 import next from './eslint-config/next.js';
 import prettierCompat from './eslint-config/prettier-compat.js';
 import storybook from './eslint-config/storybook.js';
@@ -236,7 +237,7 @@ export default defineConfig([
 
   {
     // `no-img-element` is on for a reason (§ header) and 24 raw `<img>` tags in
-    // this library were converted to the `next/image` embed shim. These three
+    // this library were converted to the `next/image` embed shim. These two
     // are the residue where the rule's premise does not hold — the whole point
     // of `next/image` is an optimizer fetching the source, and none of these
     // sources can be fetched:
@@ -244,18 +245,10 @@ export default defineConfig([
     //     itself is infinite recursion.
     //   - chat-attachment-bar renders a `blob:` object URL for a file the user
     //     has not uploaded yet. It exists only in this tab's memory.
-    //   - agent-mark renders Fae's avatar, a base64 `data:` URI packaged with
-    //     the library, and its contract is that the CALLER sizes it via
-    //     `className` — there is no intrinsic width/height to hand `next/image`,
-    //     which refuses to render without one.
     // Declared as a named block so the reasoning is reviewable and a new raw
     // `<img>` anywhere else still fails the build.
     name: 'openframe-frontend-core/img-the-optimizer-cannot-fetch',
-    files: [
-      'src/embed-shims/next-image.tsx',
-      'src/components/chat/chat-attachment-bar.tsx',
-      'src/components/agent-mark.tsx',
-    ],
+    files: ['src/embed-shims/next-image.tsx', 'src/components/chat/chat-attachment-bar.tsx'],
     rules: { '@next/next/no-img-element': 'off' },
   },
 
@@ -336,7 +329,7 @@ export default defineConfig([
     // pipeline for zero lint benefit.
     name: 'openframe-frontend-core/imperative-external-systems',
     files: [
-      'src/components/features/video.tsx',
+      'src/components/features/video-file-player.tsx',
       'src/components/features/figma-prototype-viewer.tsx',
       'src/components/chat/hooks/use-nats-chat-adapter.ts',
     ],
@@ -372,6 +365,25 @@ export default defineConfig([
       'src/components/ui/data-table/data-table-infinite-footer.tsx',
     ],
     rules: { 'flamingo/no-whole-store-subscription': 'off' },
+  },
+
+  {
+    // A link is the boxed `Link` (`src/embed-shims/next-link`), the way a
+    // picture is the boxed `Image` (`@next/next/no-img-element`): see
+    // ./eslint-config/boxed-primitives.js. Tests and stories are not shipped.
+    name: 'openframe-frontend-core/boxed-link',
+    files: ['src/**/*.{jsx,tsx}'],
+    ignores: ['**/*.{test,spec}.{jsx,tsx}', '**/__tests__/**', '**/*.stories.{jsx,tsx}'],
+    plugins: { flamingo: flamingoPlugin },
+    rules: { 'flamingo/no-raw-anchor': 'error' },
+  },
+
+  {
+    // The two link primitives own their `<a>`: the boxed `Link`'s fallback, and
+    // the chat's link, whose click is decided by the host's navigation rule.
+    name: 'openframe-frontend-core/link-primitives',
+    files: ['src/embed-shims/next-link.tsx', 'src/components/chat/nav-link-anchor-via-runtime.tsx'],
+    rules: { 'flamingo/no-raw-anchor': 'off' },
   },
 
   ...prettierCompat,
