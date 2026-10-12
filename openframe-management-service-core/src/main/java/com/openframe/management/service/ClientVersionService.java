@@ -77,13 +77,13 @@ public class ClientVersionService {
     // the rollout starts only when the version moved: propagate also runs on every management start
     private void propagate(String version) {
         boolean versionMoved = openFrameClientConfigurationService.updateVersion(version);
-        if (versionMoved && isClientUpdateOnTheEngine()) {
+        if (versionMoved && isClientUpdateDeliveryEnabled()) {
             rollOutClientUpdate();
         }
         updateReleaseAgents(version);
     }
 
-    private boolean isClientUpdateOnTheEngine() {
+    private boolean isClientUpdateDeliveryEnabled() {
         return deliveryProperties.isEnabled(DeliveryType.CLIENT_UPDATE);
     }
 

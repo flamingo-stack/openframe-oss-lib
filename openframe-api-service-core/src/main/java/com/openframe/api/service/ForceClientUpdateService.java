@@ -49,7 +49,7 @@ public class ForceClientUpdateService {
                 .map(Machine::getMachineId)
                 .toList();
         log.info("Found {} machines to process", machineIds.size());
-        List<ForceClientUpdateResponseItem> responseItems = isClientUpdateOnTheEngine()
+        List<ForceClientUpdateResponseItem> responseItems = isClientUpdateDeliveryEnabled()
                 ? rollOutToEveryMachine(machineIds)
                 : processMachines(machineIds);
         ForceClientUpdateResponse response = new ForceClientUpdateResponse();
@@ -91,7 +91,7 @@ public class ForceClientUpdateService {
     private ForceClientUpdateResponseItem processMachine(String machineId) {
         try {
             OpenFrameClientConfiguration configuration = loadConfiguration();
-            if (isClientUpdateOnTheEngine()) {
+            if (isClientUpdateDeliveryEnabled()) {
                 deliveryDispatcher.dispatch(ClientUpdateDeliverySeed.forMachine(machineId, configuration));
             } else {
                 clientUpdateService.send(configuration);
@@ -108,7 +108,7 @@ public class ForceClientUpdateService {
                 .orElseThrow(() -> new IllegalStateException("Not found client configuration"));
     }
 
-    private boolean isClientUpdateOnTheEngine() {
+    private boolean isClientUpdateDeliveryEnabled() {
         return deliveryProperties.isEnabled(DeliveryType.CLIENT_UPDATE);
     }
 
