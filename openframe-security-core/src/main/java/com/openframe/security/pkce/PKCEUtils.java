@@ -44,15 +44,7 @@ public final class PKCEUtils {
         return base64UrlEncode(bytes);
     }
 
-    /**
-     * Generates a code challenge from a code verifier using SHA-256.
-     * The challenge is sent to the authorization server, while the verifier
-     * is kept secret and sent during token exchange.
-     * 
-     * @param codeVerifier the code verifier to generate challenge from
-     * @return Base64URL encoded code challenge
-     * @throws IllegalStateException if SHA-256 algorithm is not available
-     */
+    // Challenge derivation per RFC 7636: SHA-256 of the verifier, Base64URL encoded without padding.
     public static String generateCodeChallenge(String codeVerifier) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
