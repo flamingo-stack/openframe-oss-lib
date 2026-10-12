@@ -8,6 +8,7 @@ import org.springframework.http.converter.HttpMessageConverters;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.cfg.MapperBuilder;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -21,7 +22,8 @@ import tools.jackson.databind.json.JsonMapper;
  *     <li>properties are written in declaration order, not alphabetically, so API responses, messages and the
  *     tool results models see keep their shape;</li>
  *     <li>constructors of any visibility can bind a class, e.g. the package-private one Lombok's {@code @Builder}
- *     generates, as Jackson 2 allowed.</li>
+ *     generates, as Jackson 2 allowed;</li>
+ *     <li>enums are written and read by {@code name()}, not {@code toString()}.</li>
  * </ul>
  * A {@code WebClient.builder()} or {@code RestClient.builder()} encodes and decodes with its own default mapper, so
  * clients built that way take these settings through {@link #webClientCodecs} or {@link #restClientConverters}.
@@ -35,6 +37,7 @@ public final class Jackson2Compatibility {
         return builder
                 .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
                 .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+                .disable(EnumFeature.WRITE_ENUMS_USING_TO_STRING, EnumFeature.READ_ENUMS_USING_TO_STRING)
                 .changeDefaultVisibility(visibility -> visibility.withCreatorVisibility(Visibility.ANY))
                 .annotationIntrospector(new PreferNoArgsConstructorIntrospector());
     }

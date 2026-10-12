@@ -84,14 +84,14 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
         JsonNode errorNode = afterField.get("error");
         if (errorNode != null && !errorNode.isNull()) {
             if (queryName != null) {
-                return Optional.of(String.format("Query '%s' execution failed: %s", queryName, errorNode.asString()));
+                return Optional.of(String.format("Query '%s' execution failed: %s", queryName, errorNode.asString("")));
             }
-            return Optional.of("Query execution failed: " + errorNode.asString());
+            return Optional.of("Query execution failed: " + errorNode.asString(""));
         }
         
         // Check if data is present
         JsonNode dataNode = afterField.get("data");
-        if (dataNode != null && !dataNode.isNull() && !dataNode.asString().isEmpty()) {
+        if (dataNode != null && !dataNode.isNull() && !dataNode.asString("").isEmpty()) {
             if (queryName != null) {
                 return Optional.of(String.format("Query '%s' executed successfully", queryName));
             }
@@ -108,7 +108,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
     protected String getError(JsonNode after) {
         // Check if error field is present in the event
         JsonNode errorNode = after.get("error");
-        if (errorNode == null || errorNode.isNull() || errorNode.asString().isEmpty()) {
+        if (errorNode == null || errorNode.isNull() || errorNode.asString("").isEmpty()) {
             return null;
         }
 
@@ -116,7 +116,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
             ObjectNode errorJson = mapper.createObjectNode();
             
             // Try to parse error as JSON, fallback to plain text
-            String errorText = errorNode.asString();
+            String errorText = errorNode.asString("");
             try {
                 JsonNode parsedError = mapper.readTree(errorText);
                 errorJson.set("output", parsedError);
@@ -143,7 +143,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
     protected String getResult(JsonNode after) {
         // Get the data field from the event
         JsonNode dataNode = after.get("data");
-        if (dataNode == null || dataNode.isNull() || dataNode.asString().isEmpty()) {
+        if (dataNode == null || dataNode.isNull() || dataNode.asString("").isEmpty()) {
             return null;
         }
 
@@ -151,7 +151,7 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
             ObjectNode resultJson = mapper.createObjectNode();
             
             // Parse the data field as JSON
-            String dataText = dataNode.asString();
+            String dataText = dataNode.asString("");
             try {
                 JsonNode parsedData = mapper.readTree(dataText);
                 resultJson.set("output", parsedData);

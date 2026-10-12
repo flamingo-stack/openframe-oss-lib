@@ -10,6 +10,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -20,6 +21,28 @@ class Jackson2CompatibilityTest {
     private static final String BODY_WITHOUT_PRIMITIVES = "{\"id\":\"c-1\",\"archived\":null}";
 
     record Contact(String id, boolean archived, int score) {
+    }
+
+    enum Channel {
+        EMAIL;
+
+        @Override
+        public String toString() {
+            return "Email";
+        }
+    }
+
+    record Subscription(Channel channel) {
+    }
+
+    @Test
+    void shouldWriteAndReadEnumsByName() {
+        JsonMapper mapper = Jackson2Compatibility.jsonMapper();
+
+        String json = mapper.writeValueAsString(new Subscription(Channel.EMAIL));
+
+        assertThat(json).isEqualTo("{\"channel\":\"EMAIL\"}");
+        assertThat(mapper.readValue(json, Subscription.class)).isEqualTo(new Subscription(Channel.EMAIL));
     }
 
     @Test

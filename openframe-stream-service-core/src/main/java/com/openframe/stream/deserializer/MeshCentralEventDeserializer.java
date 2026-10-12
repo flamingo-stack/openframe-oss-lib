@@ -86,7 +86,7 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
 
     private Optional<JsonNode> parseJson(JsonNode rawNode) {
         return Optional.ofNullable(rawNode)
-                .map(JsonNode::asString)
+                .map(node -> node.asString(""))
                 .filter(StringUtils::isNotBlank)
                 .flatMap(json -> {
                     try {
@@ -106,7 +106,7 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
 
     private Optional<String> extractField(JsonNode event, String fieldName) {
         return Optional.ofNullable(event.get(fieldName))
-                .map(JsonNode::asString)
+                .map(node -> node.asString(""))
                 .filter(StringUtils::isNotBlank);
     }
 
@@ -115,9 +115,9 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
         if (idNode == null) return Optional.empty();
 
         return Optional.ofNullable(idNode.get(FIELD_OID))
-                .map(JsonNode::asString)
+                .map(node -> node.asString(""))
                 .filter(StringUtils::isNotBlank)
-                .or(() -> Optional.of(idNode.asString())
+                .or(() -> Optional.of(idNode.asString(""))
                         .filter(StringUtils::isNotBlank));
     }
 
@@ -127,7 +127,7 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
                 .flatMap(event -> {
                     JsonNode timeNode = event.get(FIELD_TIME);
                     if (timeNode != null && timeNode.has(FIELD_DATE)) {
-                        return Optional.of(timeNode.get(FIELD_DATE).asLong());
+                        return Optional.of(timeNode.get(FIELD_DATE).asLong(0L));
                     }
                     return Optional.empty();
                 });
