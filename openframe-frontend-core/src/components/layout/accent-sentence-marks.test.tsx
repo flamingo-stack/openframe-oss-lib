@@ -56,4 +56,26 @@ describe('accentSentenceMarks', () => {
       `Remote all year${mark('.')} Together once a year${mark('.')}`,
     );
   });
+
+  it('keeps the eyebrow outside the heading element unless asked', () => {
+    const out = html(
+      <SectionHeading level="page" eyebrow="Endpoint management software" title="Run by AI" punctuation={null} />,
+    );
+    expect(out).toContain('<span class="text-h5 text-ods-accent">Endpoint management software</span><h1');
+  });
+
+  it('puts the eyebrow inside the heading element when asked, with the same two boxes in the stack', () => {
+    const out = html(
+      <SectionHeading
+        level="page"
+        eyebrowInHeading
+        eyebrow="Endpoint management software"
+        title="Run by AI"
+        punctuation={null}
+      />,
+    );
+    expect(out).toContain(
+      '<h1 class="contents" data-section-heading="true"><span class="text-h5 text-ods-accent">Endpoint management software</span><span class="block text-h1 text-ods-text-primary">Run by AI</span></h1>',
+    );
+  });
 });
