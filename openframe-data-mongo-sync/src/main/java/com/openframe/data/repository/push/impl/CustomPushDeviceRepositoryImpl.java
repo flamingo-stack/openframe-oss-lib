@@ -57,9 +57,29 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
                 log.debug("Push token re-associated to user {} after losing an insert race", userId);
                 return false;
             }
-            return mongoTemplate.upsert(byToken,
+            return retryUpsertAfterLostRace(userId, token, platform, appVersion);
+        }
+    }
+
+    // A second race between updateFirst() finding nothing and this upsert is possible under high
+    // concurrency; handle it the same way as the first race instead of letting it propagate uncaught.
+    private boolean retryUpsertAfterLostRace(String userId, String token, PushPlatform platform, String appVersion) {
+        Query byToken = new Query(Criteria.where(FIELD_TOKEN).is(token));
+        Instant now = Instant.now();
+        try {
+            UpdateResult result = mongoTemplate.upsert(byToken,
                     getUpdateQuery(userId, platform, appVersion, now).setOnInsert(FIELD_CREATED_AT, now),
-                    PushDevice.class).getUpsertedId() != null;
+                    PushDevice.class);
+            return result.getUpsertedId() != null;
+        } catch (DuplicateKeyException ex) {
+            UpdateResult result = mongoTemplate.updateFirst(byToken,
+                    getUpdateQuery(userId, platform, appVersion, now),
+                    PushDevice.class);
+            if (result.getMatchedCount() > 0) {
+                log.debug("Push token re-associated to user {} after losing a second insert race", userId);
+                return false;
+            }
+            return retryUpsertAfterLostRace(userId, token, platform, appVersion);
         }
     }
 
