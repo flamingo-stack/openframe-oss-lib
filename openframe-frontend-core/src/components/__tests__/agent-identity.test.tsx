@@ -179,13 +179,11 @@ describe('with no copy from the host, the identities are read from the server', 
   });
 
   it('sends no identity read until the host says its session is in place, then reads once', async () => {
-    const served = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL } }] }), {
-          status: 200,
-        }),
-      );
+    const served = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL } }] }), {
+        status: 200,
+      }),
+    );
     vi.stubGlobal('fetch', served);
     const client = new QueryClient();
     const tree = (enabled: boolean) => (
@@ -205,7 +203,7 @@ describe('with no copy from the host, the identities are read from the server', 
     vi.unstubAllGlobals();
   });
 
-  it('draws a glyph mark in the colour its row asks for', async () => {
+  it('draws a glyph mark in the colour its row asks for', () => {
     const html = markup(
       <AgentIdentityProvider icons={{ mingo: { name: 'chart-pie', url: null } }}>
         <AgentMark agent="mingo" color="currentColor" />
