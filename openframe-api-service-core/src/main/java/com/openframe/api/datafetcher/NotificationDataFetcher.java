@@ -63,7 +63,7 @@ public class NotificationDataFetcher {
 
         Recipient r = currentRecipient();
         log.debug("Listing notifications for {} {} (filter={}, search={}, sort={})",
-                r.type(), r.id(), filter, search, sort);
+                r.getType(), r.getId(), filter, search, sort);
 
         ConnectionArgs args = ConnectionArgs.builder()
                 .first(first).after(after).last(last).before(before)
@@ -73,7 +73,7 @@ public class NotificationDataFetcher {
                 filter == null ? null : filter.getRead(), search);
 
         GenericQueryResult<NotificationView> result = notificationService.list(
-                r.id(), r.type(), serviceFilter, pagination, sort);
+                r.getId(), r.getType(), serviceFilter, pagination, sort);
         return notificationMapper.toConnection(result);
     }
 
@@ -81,15 +81,15 @@ public class NotificationDataFetcher {
     @DgsQuery
     public boolean hasUnreadNotifications() {
         Recipient r = currentRecipient();
-        return readStateService.hasUnread(r.id(), r.type());
+        return readStateService.hasUnread(r.getId(), r.getType());
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsQuery
     public List<UnreadCategoryCount> unreadCountsByCategory() {
         Recipient r = currentRecipient();
-        String recipientId = r.id();
-        RecipientType recipientType = r.type();
+        String recipientId = r.getId();
+        RecipientType recipientType = r.getType();
         Map<NotificationCategory, Long> counts = readStateService.unreadCountsByCategory(recipientId, recipientType);
         return notificationMapper.toCategoryCounts(counts);
     }
@@ -99,38 +99,43 @@ public class NotificationDataFetcher {
     public long markNotificationsReadForEntity(@InputArgument NotificationEntityType entityType,
                                                @InputArgument String entityId) {
         Recipient r = currentRecipient();
-        return readStateService.markEntityAsRead(r.id(), r.type(), entityType, entityId);
+        return readStateService.markEntityAsRead(r.getId(), r.getType(), entityType, entityId);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsMutation
     public boolean markNotificationAsRead(@InputArgument String notificationId) {
         Recipient r = currentRecipient();
-        return readStateService.markRead(r.id(), r.type(), decodeNotificationId(notificationId));
+        return readStateService.markRead(r.getId(), r.getType(), decodeNotificationId(notificationId));
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsMutation
     public long markAllNotificationsAsRead() {
         Recipient r = currentRecipient();
-        return readStateService.markAllAsRead(r.id(), r.type());
+        return readStateService.markAllAsRead(r.getId(), r.getType());
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsMutation
     public boolean deleteNotification(@InputArgument String notificationId) {
         Recipient r = currentRecipient();
-        return readStateService.deleteNotification(r.id(), r.type(), decodeNotificationId(notificationId));
+        return readStateService.deleteNotification(r.getId(), r.getType(), decodeNotificationId(notificationId));
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsMutation
     public long deleteAllReadNotifications() {
         Recipient r = currentRecipient();
-        return readStateService.deleteAllRead(r.id(), r.type());
+        return readStateService.deleteAllRead(r.getId(), r.getType());
     }
 
-    private record Recipient(String id, RecipientType type) {}
+    @lombok.Getter
+    @lombok.AllArgsConstructor
+    private static class Recipient {
+        private final String id;
+        private final RecipientType type;
+    }
 
     private Recipient currentRecipient() {
         AuthPrincipal principal = currentPrincipal();
