@@ -1,6 +1,5 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -22,7 +21,8 @@ import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.user.InvitationService;
 import com.openframe.api.service.user.UserService;
 import com.openframe.data.service.OrganizationService;
-import graphql.relay.Relay;
+import com.openframe.graphql.relay.NodeType;
+import com.openframe.graphql.relay.RelayIdCodec;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,40 +43,33 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Users and invitations as Relay nodes: global ids, node(id:) refetch, opaque edge cursors. */
+/** Users and invitations as Relay nodes: node(id:) refetch and opaque edge cursors. */
 @ExtendWith(MockitoExtension.class)
 class UserNodeTest {
 
-    private static final Relay RELAY = new Relay();
+    private static final RelayIdCodec CODEC = new RelayIdCodec();
 
     @Mock private UserService userService;
     @Mock private InvitationService invitationService;
-    @Mock private DgsDataFetchingEnvironment dfe;
 
     @Test
-    @DisplayName("User.id is the global id of the raw user id, and node() resolves it back")
-    void userIdIsGlobalAndRefetchable() {
+    @DisplayName("node(User) resolves the user by the raw id inside the global id")
+    void userNodeResolvesByRawId() {
         UserResponse user = UserResponse.builder().id("u-1").email("jane@acme.io").build();
-        when(dfe.<UserResponse>getSource()).thenReturn(user);
         when(userService.findUserById("u-1")).thenReturn(Optional.of(user));
 
-        String id = new UserDataFetcher(userService, new GraphQLUserMapper()).userNodeId(dfe);
-
-        assertThat(id).isEqualTo(RELAY.toGlobalId("User", "u-1"));
-        assertThat(nodeFetcher().node(id)).isSameAs(user);
+        assertThat(nodeFetcher().node(CODEC.encode(NodeType.USER, "u-1"))).isSameAs(user);
     }
 
     @Test
-    @DisplayName("Invitation.id is the global id of the raw invitation id, and node() resolves it back")
-    void invitationIdIsGlobalAndRefetchable() {
+    @DisplayName("node(Invitation) resolves only an open invitation")
+    void invitationNodeResolvesOpenInvitationsOnly() {
         InvitationResponse invitation = InvitationResponse.builder().id("inv-1").build();
-        when(dfe.<InvitationResponse>getSource()).thenReturn(invitation);
         when(invitationService.findOpenInvitation("inv-1")).thenReturn(Optional.of(invitation));
+        when(invitationService.findOpenInvitation("inv-revoked")).thenReturn(Optional.empty());
 
-        String id = new InvitationDataFetcher(invitationService, new GraphQLUserMapper()).invitationNodeId(dfe);
-
-        assertThat(id).isEqualTo(RELAY.toGlobalId("Invitation", "inv-1"));
-        assertThat(nodeFetcher().node(id)).isSameAs(invitation);
+        assertThat(nodeFetcher().node(CODEC.encode(NodeType.INVITATION, "inv-1"))).isSameAs(invitation);
+        assertThat(nodeFetcher().node(CODEC.encode(NodeType.INVITATION, "inv-revoked"))).isNull();
     }
 
     @Test
@@ -126,7 +119,7 @@ class UserNodeTest {
                 mock(TagService.class), mock(ToolConnectionService.class), mock(InstalledAgentService.class),
                 mock(ScriptService.class), mock(ScriptExecutionService.class), mock(ScheduleScriptService.class),
                 mock(ScheduleRunService.class), userService, invitationService,
-                emptyProvider(), emptyProvider());
+                emptyProvider(), emptyProvider(), CODEC);
     }
 
     @SuppressWarnings("unchecked")

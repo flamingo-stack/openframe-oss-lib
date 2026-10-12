@@ -1,5 +1,7 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.tag.Tag;
@@ -19,6 +21,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Service
 @Slf4j
@@ -83,6 +87,7 @@ public class KnowledgeBaseTagService {
     @Transactional
     public void addTagToItem(String itemId, String tagId) {
         log.info("Adding tag {} to KB item {}", tagId, itemId);
+        requireExistingTag(tagId);
         if (tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE).isPresent()) {
             return;
         }
@@ -94,6 +99,19 @@ public class KnowledgeBaseTagService {
         tagAssignmentRepository.save(assignment);
     }
 
+    public void requireExistingTags(List<String> tagIds) {
+        if (isEmpty(tagIds)) {
+            return;
+        }
+        tagIds.forEach(this::requireExistingTag);
+    }
+
+    private void requireExistingTag(String tagId) {
+        if (!tagRepository.existsById(tagId)) {
+            throw new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId);
+        }
+    }
+
     @Transactional
     public void removeTagFromItem(String itemId, String tagId) {
         log.info("Removing tag {} from KB item {}", tagId, itemId);
@@ -103,6 +121,8 @@ public class KnowledgeBaseTagService {
     /** Makes the item's tags exactly {@code tagIds}: adds the missing ones and removes the rest. */
     @Transactional
     public void replaceItemTags(String itemId, List<String> tagIds) {
+        // Validate first so an unknown tag cannot leave the item with its old tags half removed.
+        requireExistingTags(tagIds);
         Set<String> wanted = new LinkedHashSet<>(tagIds);
         Set<String> current = tagAssignmentRepository.findByEntityIdAndEntityType(itemId, ENTITY_TYPE).stream()
                 .map(TagAssignment::getTagId)
