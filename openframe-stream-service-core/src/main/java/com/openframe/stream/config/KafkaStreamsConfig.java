@@ -20,34 +20,26 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Configuration for Kafka Streams processing
- * Sets up stream processing properties, serializers, and application settings
- */
+// Configuration for Kafka Streams processing: stream processing properties, serializers, and application settings
 @Configuration
 @EnableKafkaStreams
 @ConditionalOnProperty(name = "kafka.stream.enabled", havingValue = "true", matchIfMissing = true)
 public class KafkaStreamsConfig {
 
-    /**
-     * Bootstrap servers for Kafka Streams.
-     * Tenant deployments set {@code spring.oss-tenant.kafka.bootstrap-servers};
-     * shared/SaaS deployments set {@code spring.saas.kafka.bootstrap-servers}.
-     * {@code openframe.stream.kafka-streams.bootstrap-servers} overrides both — needed when a
-     * deployment has BOTH clusters configured but the streams topology must run against a
-     * specific one (e.g. the shared cluster's Fleet activity join reads the Debezium raw topics
-     * on the shared Kafka while {@code spring.oss-tenant.kafka} points at the tenant cluster).
-     */
+    // Bootstrap servers for Kafka Streams. Tenant deployments set spring.oss-tenant.kafka.bootstrap-servers;
+    // shared/SaaS deployments set spring.saas.kafka.bootstrap-servers.
+    // openframe.stream.kafka-streams.bootstrap-servers overrides both — needed when a
+    // deployment has BOTH clusters configured but the streams topology must run against a
+    // specific one (e.g. the shared cluster's Fleet activity join reads the Debezium raw topics
+    // on the shared Kafka while spring.oss-tenant.kafka points at the tenant cluster).
     @Value("${openframe.stream.kafka-streams.bootstrap-servers:${spring.oss-tenant.kafka.bootstrap-servers:${spring.saas.kafka.bootstrap-servers:}}}")
     private String bootstrapServers;
 
     @Value("${spring.application.name}")
     private String applicationName;
 
-    /**
-     * Tenant/cluster identifier used to namespace Kafka Streams application.id.
-     * In SaaS deployments this is typically set to TENANT_ID (e.g. tenant-y0-1).
-     */
+    // Tenant/cluster identifier used to namespace Kafka Streams application.id.
+    // In SaaS deployments this is typically set to TENANT_ID (e.g. tenant-y0-1).
     @Value("${openframe.cluster-id:}")
     private String clusterId;
 
@@ -57,9 +49,7 @@ public class KafkaStreamsConfig {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * Serde for ActivityMessage (DebeziumMessage<Activity>)
-     */
+    // Serde for ActivityMessage (DebeziumMessage<Activity>)
     @Bean
     public Serde<ActivityMessage> activityMessageSerde() {
         return Serdes.serdeFrom(
@@ -68,9 +58,7 @@ public class KafkaStreamsConfig {
         );
     }
 
-    /**
-     * Serde for HostActivityMessage (DebeziumMessage<HostActivity>)
-     */
+    // Serde for HostActivityMessage (DebeziumMessage<HostActivity>)
     @Bean
     public Serde<HostActivityMessage> hostActivityMessageSerde() {
         return Serdes.serdeFrom(
