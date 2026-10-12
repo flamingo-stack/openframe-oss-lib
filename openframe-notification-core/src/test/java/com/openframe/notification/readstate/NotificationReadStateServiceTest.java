@@ -18,6 +18,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class NotificationReadStateServiceTest {
@@ -171,6 +173,34 @@ class NotificationReadStateServiceTest {
 
         assertThat(service.archiveEntityForAllRecipients(NotificationEntityType.TICKET, "ticket-1")).isZero();
 
+        assertThat(listener.events).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Given two notifications about one insight unread for two users, when markEntityAsReadForAllRecipients runs, then exactly the snapshotted ids flip and every recipient row gets a READ event")
+    void mark_entity_as_read_for_all_recipients_flips_the_snapshot_and_publishes_per_row() {
+        when(repository.findUnreadByEntity(NotificationEntityType.INSIGHT, "insight-1", null)).thenReturn(List.of(
+                row(ALICE, U, "n-1", ReadStatus.UNREAD),
+                row("user-bob", U, "n-1", ReadStatus.UNREAD),
+                row(ALICE, U, "n-2", ReadStatus.UNREAD)));
+        when(repository.markAllRecipientsReadByIds(null, List.of("n-1", "n-2"))).thenReturn(3L);
+
+        assertThat(service.markEntityAsReadForAllRecipients(NotificationEntityType.INSIGHT, "insight-1")).isEqualTo(3L);
+
+        assertThat(listener.events).extracting(NotificationReadEvent::recipientId)
+                .containsExactly(ALICE, "user-bob", ALICE);
+        assertThat(listener.events).extracting(NotificationReadEvent::transition)
+                .containsOnly(NotificationReadEvent.Transition.READ);
+    }
+
+    @Test
+    @DisplayName("Given nothing unread about the insight, when markEntityAsReadForAllRecipients runs, then nothing is flipped and no event fires")
+    void mark_entity_as_read_for_all_recipients_with_nothing_unread_stays_silent() {
+        when(repository.findUnreadByEntity(NotificationEntityType.INSIGHT, "insight-1", null)).thenReturn(List.of());
+
+        assertThat(service.markEntityAsReadForAllRecipients(NotificationEntityType.INSIGHT, "insight-1")).isZero();
+
+        verify(repository, never()).markAllRecipientsReadByIds(any(), anyCollection());
         assertThat(listener.events).isEmpty();
     }
 

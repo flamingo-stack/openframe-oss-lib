@@ -99,6 +99,12 @@ public interface NotificationReadStateRepository
     @Update(pipeline = "{ '$set': { 'status': 'ARCHIVED', 'readAt': '$$NOW' } }")
     long archiveUnreadByEntity(NotificationEntityType entityType, String entityId, String tenantId);
 
+    // Flips exactly the snapshotted notifications for every recipient, never "everything still unread
+    // on that entity": a notification arriving mid-call would otherwise turn read with no event published.
+    @Query("{ 'tenantId': ?0, 'notificationId': { '$in': ?1 }, 'status': 'UNREAD' }")
+    @Update(pipeline = "{ '$set': { 'status': 'READ', 'readAt': '$$NOW' } }")
+    long markAllRecipientsReadByIds(String tenantId, Collection<String> notificationIds);
+
     @Query("{ 'tenantId': ?5, 'recipientId': ?0, 'recipientType': ?1, 'entityType': ?2, 'entityId': ?3, 'status': { '$in': ?4 } }")
     List<NotificationReadState> findByRecipientIdAndRecipientTypeAndEntity(String recipientId,
                                                                           RecipientType recipientType,
