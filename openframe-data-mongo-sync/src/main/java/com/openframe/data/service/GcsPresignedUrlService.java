@@ -34,8 +34,8 @@ public class GcsPresignedUrlService {
 
     public GcsPresignedUrlService(
             @Value("${storage.s3.bucket}") String bucketName,
-            @Value("${storage.s3.prefix:}") String prefix,
-            @Value("${storage.s3.prefix-enabled:false}") boolean prefixEnabled) {
+            @Value("${storage.s3.prefix}") String prefix,
+            @Value("${storage.s3.prefix-enabled}") boolean prefixEnabled) {
         this.bucketName = bucketName;
         this.prefix = prefix;
         this.prefixEnabled = prefixEnabled;
