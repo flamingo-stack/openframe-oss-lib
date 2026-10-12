@@ -19,9 +19,7 @@ use tracing::{error, info, warn};
 
 use crate::models::{DownloadConfiguration, Installation, InstallationType, InstalledTool};
 use crate::platform::{binary_writer, DirectoryManager};
-use crate::services::{
-    GithubDownloadService, ToolCommandParamsResolver, ToolKillService, ToolRunManager,
-};
+use crate::services::{GithubDownloadService, ToolCommandParamsResolver, ToolKillService};
 
 #[derive(Debug, Clone)]
 pub struct UpdateContext {
@@ -58,7 +56,6 @@ pub trait ToolUpdater: Send + Sync {
 pub struct ToolUpdaterDeps {
     pub github_download_service: GithubDownloadService,
     pub tool_kill_service: ToolKillService,
-    pub tool_run_manager: ToolRunManager,
     pub directory_manager: DirectoryManager,
     pub command_params_resolver: ToolCommandParamsResolver,
 }

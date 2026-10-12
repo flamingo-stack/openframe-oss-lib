@@ -32,6 +32,7 @@ public class MachineDelivery implements TenantScoped {
     private int attempts;
     private int errors;
     private String dispatchId;
+    private int sequence;
     private String payloadJson;
 
     private Instant dispatchedAt;

@@ -1,7 +1,8 @@
 use crate::config::service_stop::TOOL_RESTART_TIMEOUT_SECS;
 use crate::models::{Installation, InstalledTool};
 use crate::platform::system_service;
-use crate::services::tool_run_manager::{ToolRunManager, UpdatingGuard};
+use crate::services::tool_ops::ToolOps;
+use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::InstalledToolsService;
 use crate::services::ToolKillService;
 use anyhow::{Context, Result};
@@ -21,6 +22,7 @@ pub struct ToolRestartService {
     installed_tools_service: InstalledToolsService,
     tool_kill_service: ToolKillService,
     tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
 }
 
 impl ToolRestartService {
@@ -28,23 +30,22 @@ impl ToolRestartService {
         installed_tools_service: InstalledToolsService,
         tool_kill_service: ToolKillService,
         tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
     ) -> Self {
         Self {
             installed_tools_service,
             tool_kill_service,
             tool_run_manager,
+            tool_ops,
         }
     }
 
     /// Restart under the tool lock with the updating flag held; the flag is cleared exactly once on return, panic, or cancellation, and the lock is held until then.
     pub async fn restart_guarded(&self, tool_agent_id: &str) -> Result<RestartOutcome> {
-        let tool_lock = self.tool_run_manager.tool_lock(tool_agent_id).await;
-        let lock_guard = match tool_lock.try_lock_owned() {
-            Ok(guard) => guard,
+        let _op = match self.tool_ops.try_lock(tool_agent_id) {
+            Ok(lock) => lock.mark_busy(),
             Err(_) => return Ok(RestartOutcome::Busy),
         };
-        let _updating =
-            UpdatingGuard::acquire(&self.tool_run_manager, tool_agent_id, Some(lock_guard)).await;
         // Hard cap so a wedged OS call can't hold the flag/lock forever and freeze callers (e.g. mesh self-heal).
         let outcome = tokio::time::timeout(
             Duration::from_secs(TOOL_RESTART_TIMEOUT_SECS),
@@ -129,3 +130,7 @@ impl ToolRestartService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tool_restart_service_tests.rs"]
+mod tests;

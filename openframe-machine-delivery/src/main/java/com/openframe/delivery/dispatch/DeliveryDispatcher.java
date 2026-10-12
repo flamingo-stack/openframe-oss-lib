@@ -27,11 +27,18 @@ public class DeliveryDispatcher {
         DeliveryType type = seed.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         DeliveryRequest<DeliveryPayload> request = spec.request(seed);
+        if (isWildcardOnASingleMachineType(request, spec)) {
+            throw new IllegalArgumentException("Delivery type delivers to one machine at a time: " + type);
+        }
         DeliveryPayload payload = request.getPayload();
         String dispatchId = UUID.randomUUID().toString();
         String targetId = request.getTargetId();
         DeliveryRef delivery = new DeliveryRef(type, targetId, dispatchId);
         payload.setDelivery(delivery);
         sink.getObject().accept(request);
+    }
+
+    private static boolean isWildcardOnASingleMachineType(DeliveryRequest<?> request, DeliverySpec<?, ?> spec) {
+        return request.isForEveryMachine() && !spec.canDeliverToEveryMachine();
     }
 }

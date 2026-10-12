@@ -1,6 +1,7 @@
 package com.openframe.delivery.dispatch;
 
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
@@ -78,5 +79,45 @@ class DeliveryDispatcherTest {
         // execution + verifications
         assertThatThrownBy(() -> dispatcher.dispatch(seed)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(sinkProvider);
+    }
+
+    @Test
+    void dispatch_everyMachineOnATypeThatDeliversToOneMachineAtATime_throwsWithoutHandOff() {
+        // setup
+        TestSeed everyMachine = new TestSeed(null);
+        DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
+                .type(DeliveryType.TOOL_INSTALLATION)
+                .targetId(TARGET_ID)
+                .audience(DeliveryAudience.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.request(everyMachine)).thenReturn(forEveryMachine);
+
+        // execution + verifications
+        assertThatThrownBy(() -> dispatcher.dispatch(everyMachine)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(sinkProvider);
+    }
+
+    @Test
+    void dispatch_everyMachineOnATypeThatMayBeRolledOut_handedToSink() {
+        // setup
+        TestSeed everyMachine = new TestSeed(null);
+        DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
+                .type(DeliveryType.TOOL_INSTALLATION)
+                .targetId(TARGET_ID)
+                .audience(DeliveryAudience.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.request(everyMachine)).thenReturn(forEveryMachine);
+        when(spec.canDeliverToEveryMachine()).thenReturn(true);
+        when(sinkProvider.getObject()).thenReturn(sink);
+
+        // execution
+        dispatcher.dispatch(everyMachine);
+
+        // verifications
+        verify(sink).accept(forEveryMachine);
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
@@ -24,17 +25,23 @@ public class KafkaDeliverySink implements DeliverySink {
     @Override
     public void accept(DeliveryRequest<?> request) {
         DeliveryType type = request.getType();
+        DeliveryAudience audience = request.getAudience();
         String machineId = request.getMachineId();
         DeliveryPayload payload = request.getPayload();
         JsonNode command = objectMapper.valueToTree(payload);
-        DeliveryDispatchMessage message = new DeliveryDispatchMessage(machineId, command);
+        DeliveryDispatchMessage message = new DeliveryDispatchMessage(audience, machineId, command);
         try {
-            producer.sendAndAwait(topic, machineId, message);
+            producer.sendAndAwait(topic, keyOf(request), message);
         } catch (RuntimeException kafkaDown) {
             metrics.recordDispatchFailed(type);
             throw kafkaDown;
         }
         metrics.recordDispatched(type, SINK);
-        log.info("Delivery handed to Kafka: type={} targetId={} machineId={}", type, request.getTargetId(), machineId);
+        log.info("Delivery handed to Kafka: type={} targetId={} audience={} machineId={}", type, request.getTargetId(), audience, machineId);
+    }
+
+    // the key keeps one machine's hand-offs in order; a rollout has no machine, its target does the same job
+    private static String keyOf(DeliveryRequest<?> request) {
+        return request.isForEveryMachine() ? request.getTargetId() : request.getMachineId();
     }
 }
