@@ -235,3 +235,155 @@ fn payload_limit_follows_live_max_payload() {
     // A pathologically small limit saturates to 0 rather than underflowing.
     assert_eq!(payload_limit(Some(1024)), 0);
 }
+
+fn delivery(dispatch_id: &str) -> DeliveryRef {
+    DeliveryRef {
+        delivery_type: "TOOL_INSTALLATION".to_string(),
+        target_id: "fleetmdm-agent".to_string(),
+        dispatch_id: dispatch_id.to_string(),
+        sequence: None,
+    }
+}
+
+fn settled(
+    dispatch_id: &str,
+    result: DeliveryResult,
+    error: Option<&str>,
+) -> DeliveryResultMessage {
+    DeliveryResultMessage {
+        delivery: delivery(dispatch_id),
+        result,
+        error: error.map(str::to_string),
+    }
+}
+
+const RESULT_SUBJECT: &str = "machine.m.delivery.result";
+
+async fn queued_result(s: &ResultStore, dispatch_id: &str) -> Option<DeliveryResultMessage> {
+    let bytes = s
+        .load_payload(format!("delivery:{}", dispatch_id))
+        .await
+        .unwrap()?;
+    Some(serde_json::from_slice(&bytes).unwrap())
+}
+
+#[tokio::test]
+async fn delivery_claim_is_exclusive_until_released() {
+    let (s, _d) = store();
+    let claim = |id| s.delivery_claim(RESULT_SUBJECT.to_string(), delivery(id));
+
+    assert_eq!(claim("d1").await.unwrap(), DeliveryClaim::Claimed);
+    assert_eq!(claim("d1").await.unwrap(), DeliveryClaim::InFlight);
+    assert_eq!(claim("d2").await.unwrap(), DeliveryClaim::Claimed);
+
+    s.delivery_release("d1".to_string()).await.unwrap();
+    assert_eq!(claim("d1").await.unwrap(), DeliveryClaim::Claimed);
+    assert!(s.pending_keys().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn delivery_settle_queues_result_and_resends_it_on_duplicate() {
+    let (s, _d) = store();
+    s.delivery_claim(RESULT_SUBJECT.to_string(), delivery("d1"))
+        .await
+        .unwrap();
+
+    let done = settled("d1", DeliveryResult::Done, None);
+    s.delivery_settle(RESULT_SUBJECT.to_string(), done.clone())
+        .await
+        .unwrap();
+    assert_eq!(
+        s.pending_keys().await.unwrap(),
+        vec![("delivery:d1".to_string(), RESULT_SUBJECT.to_string())]
+    );
+
+    s.remove("delivery:d1".to_string()).await.unwrap();
+    assert_eq!(
+        s.delivery_claim(RESULT_SUBJECT.to_string(), delivery("d1"))
+            .await
+            .unwrap(),
+        DeliveryClaim::Resent
+    );
+    assert_eq!(queued_result(&s, "d1").await, Some(done));
+}
+
+#[tokio::test]
+async fn recover_reports_in_flight_deliveries_as_failed() {
+    let (s, _d) = store();
+    s.delivery_claim(RESULT_SUBJECT.to_string(), delivery("d1"))
+        .await
+        .unwrap();
+
+    s.recover().await.unwrap();
+
+    let failed = settled(
+        "d1",
+        DeliveryResult::Failed,
+        Some("interrupted by agent restart"),
+    );
+    assert_eq!(queued_result(&s, "d1").await, Some(failed));
+    assert_eq!(
+        s.delivery_claim(RESULT_SUBJECT.to_string(), delivery("d1"))
+            .await
+            .unwrap(),
+        DeliveryClaim::Resent
+    );
+}
+
+#[tokio::test]
+async fn delivery_settle_forgets_results_past_ttl() {
+    let (s, _d) = store();
+    let stale = LedgerRecord {
+        subject: RESULT_SUBJECT.to_string(),
+        delivery: delivery("old"),
+        settled: Some(settled("old", DeliveryResult::Done, None)),
+        updated_at_secs: now_secs() - DELIVERY_LEDGER_TTL_SECS - 1,
+    };
+    s.with_db(move |db| {
+        let txn = db.begin_write()?;
+        txn.open_table(DELIVERY_LEDGER)?
+            .insert("old", serde_json::to_vec(&stale)?.as_slice())?;
+        txn.commit()?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+
+    s.delivery_settle(
+        RESULT_SUBJECT.to_string(),
+        settled("d1", DeliveryResult::Done, None),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        s.delivery_claim(RESULT_SUBJECT.to_string(), delivery("old"))
+            .await
+            .unwrap(),
+        DeliveryClaim::Claimed
+    );
+}
+
+#[test]
+fn delivery_result_wire_shape_matches_backend() {
+    let message = DeliveryResultMessage {
+        delivery: DeliveryRef {
+            sequence: Some(3),
+            ..delivery("d1")
+        },
+        result: DeliveryResult::Failed,
+        error: Some("boom".to_string()),
+    };
+    assert_eq!(
+        serde_json::to_value(&message).unwrap(),
+        serde_json::json!({
+            "delivery": {"type": "TOOL_INSTALLATION", "targetId": "fleetmdm-agent", "dispatchId": "d1", "sequence": 3},
+            "result": "FAILED",
+            "error": "boom"
+        })
+    );
+    let acked = serde_json::to_value(settled("d1", DeliveryResult::Acked, None)).unwrap();
+    assert_eq!(acked["result"], "ACKED");
+    assert!(acked.get("error").is_none());
+    assert!(acked["delivery"].get("sequence").is_none());
+}

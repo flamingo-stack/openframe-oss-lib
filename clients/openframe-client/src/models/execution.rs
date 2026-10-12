@@ -173,7 +173,7 @@ pub struct ExecutionAck {
 pub const EXECUTION_ACK_KIND: &str = "execution.acknowledge";
 
 pub fn is_ack_subject(subject: &str) -> bool {
-    subject.ends_with(EXECUTION_ACK_KIND)
+    subject.ends_with(EXECUTION_ACK_KIND) || subject.ends_with(super::DELIVERY_RESULT_KIND)
 }
 
 pub struct ExecutionRequest<'a> {

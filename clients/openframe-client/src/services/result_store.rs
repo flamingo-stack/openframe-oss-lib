@@ -10,17 +10,20 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use crate::config::update_config::{
-    NATS_PAYLOAD_FALLBACK_BYTES, NATS_PAYLOAD_HEADROOM_BYTES, OUTBOX_MAX_ENTRIES,
+    DELIVERY_LEDGER_TTL_SECS, NATS_PAYLOAD_FALLBACK_BYTES, NATS_PAYLOAD_HEADROOM_BYTES,
+    OUTBOX_MAX_ENTRIES,
 };
-use crate::models::RmmResult;
+use crate::models::{DeliveryRef, DeliveryResult, DeliveryResultMessage, RmmResult};
 
 const JOURNAL: TableDefinition<&str, &[u8]> = TableDefinition::new("journal");
 const OUTBOX_META: TableDefinition<&str, &[u8]> = TableDefinition::new("outbox_meta");
 const OUTBOX_PAYLOAD: TableDefinition<&str, &[u8]> = TableDefinition::new("outbox_payload");
+const DELIVERY_LEDGER: TableDefinition<&str, &[u8]> = TableDefinition::new("delivery_ledger_v1");
 
 const TRUNCATION_MARKER: &str = "output truncated: exceeded transport size limit";
 const ERROR_NOT_STARTED: &str = "not executed: agent restarted earlier in batch";
 const ERROR_INTERRUPTED: &str = "interrupted by agent restart; outcome unknown";
+const ERROR_DELIVERY_INTERRUPTED: &str = "interrupted by agent restart";
 
 pub trait ResultPublisher: Send + Sync {
     fn publish_raw(&self, subject: &str, bytes: &[u8]) -> impl Future<Output = Result<()>> + Send;
@@ -44,6 +47,21 @@ pub struct JournalRecord {
     pub script_id: Option<String>,
     pub started: bool,
     pub created_at_secs: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct LedgerRecord {
+    subject: String,
+    delivery: DeliveryRef,
+    settled: Option<DeliveryResultMessage>,
+    updated_at_secs: u64,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum DeliveryClaim {
+    Claimed,
+    InFlight,
+    Resent,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -105,6 +123,7 @@ impl ResultStore {
             txn.open_table(JOURNAL)?;
             txn.open_table(OUTBOX_META)?;
             txn.open_table(OUTBOX_PAYLOAD)?;
+            txn.open_table(DELIVERY_LEDGER)?;
         }
         txn.commit()?;
         Ok(db)
@@ -284,7 +303,170 @@ impl ResultStore {
                 "Recovered interrupted scheduled scripts into the outbox"
             );
         }
-        Ok(count)
+
+        let interrupted = self
+            .with_db(|db| {
+                let txn = db.begin_write()?;
+                let mut interrupted = 0;
+                {
+                    let mut ledger = txn.open_table(DELIVERY_LEDGER)?;
+                    let mut in_flight = Vec::new();
+                    for entry in ledger.iter()? {
+                        let (key, value) = entry?;
+                        let record: LedgerRecord = serde_json::from_slice(value.value())?;
+                        if record.settled.is_none() {
+                            in_flight.push((key.value().to_string(), record));
+                        }
+                    }
+                    for (dispatch_id, mut record) in in_flight {
+                        let message = DeliveryResultMessage {
+                            delivery: record.delivery.clone(),
+                            result: DeliveryResult::Failed,
+                            error: Some(ERROR_DELIVERY_INTERRUPTED.to_string()),
+                        };
+                        write_outbox_entry(
+                            &txn,
+                            &delivery_outbox_key(&dispatch_id),
+                            record.subject.clone(),
+                            &serde_json::to_vec(&message)?,
+                        )?;
+                        record.settled = Some(message);
+                        record.updated_at_secs = now_secs();
+                        ledger.insert(
+                            dispatch_id.as_str(),
+                            serde_json::to_vec(&record)?.as_slice(),
+                        )?;
+                        interrupted += 1;
+                    }
+                }
+                txn.commit()?;
+                Ok(interrupted)
+            })
+            .await?;
+        if interrupted > 0 {
+            info!(
+                interrupted,
+                "Reported deliveries interrupted by restart as failed"
+            );
+        }
+        Ok(count + interrupted)
+    }
+
+    pub async fn delivery_claim(
+        &self,
+        subject: String,
+        delivery: DeliveryRef,
+    ) -> Result<DeliveryClaim> {
+        let claim = self
+            .with_db(move |db| {
+                let txn = db.begin_write()?;
+                let claim;
+                {
+                    let mut ledger = txn.open_table(DELIVERY_LEDGER)?;
+                    let existing = ledger
+                        .get(delivery.dispatch_id.as_str())?
+                        .map(|v| serde_json::from_slice::<LedgerRecord>(v.value()))
+                        .transpose()?;
+                    claim = match existing {
+                        Some(LedgerRecord {
+                            subject,
+                            settled: Some(message),
+                            ..
+                        }) => {
+                            write_outbox_entry(
+                                &txn,
+                                &delivery_outbox_key(&delivery.dispatch_id),
+                                subject,
+                                &serde_json::to_vec(&message)?,
+                            )?;
+                            DeliveryClaim::Resent
+                        }
+                        Some(_) => DeliveryClaim::InFlight,
+                        None => {
+                            let record = LedgerRecord {
+                                subject,
+                                delivery: delivery.clone(),
+                                settled: None,
+                                updated_at_secs: now_secs(),
+                            };
+                            ledger.insert(
+                                delivery.dispatch_id.as_str(),
+                                serde_json::to_vec(&record)?.as_slice(),
+                            )?;
+                            DeliveryClaim::Claimed
+                        }
+                    };
+                }
+                txn.commit()?;
+                Ok(claim)
+            })
+            .await?;
+        if claim == DeliveryClaim::Resent {
+            self.prune_over_cap().await;
+        }
+        Ok(claim)
+    }
+
+    pub async fn delivery_release(&self, dispatch_id: String) -> Result<()> {
+        self.with_db(move |db| {
+            let txn = db.begin_write()?;
+            {
+                txn.open_table(DELIVERY_LEDGER)?
+                    .remove(dispatch_id.as_str())?;
+            }
+            txn.commit()?;
+            Ok(())
+        })
+        .await
+    }
+
+    pub async fn delivery_settle(
+        &self,
+        subject: String,
+        message: DeliveryResultMessage,
+    ) -> Result<()> {
+        self.with_db(move |db| {
+            let txn = db.begin_write()?;
+            {
+                let dispatch_id = message.delivery.dispatch_id.clone();
+                write_outbox_entry(
+                    &txn,
+                    &delivery_outbox_key(&dispatch_id),
+                    subject.clone(),
+                    &serde_json::to_vec(&message)?,
+                )?;
+                let now = now_secs();
+                let mut ledger = txn.open_table(DELIVERY_LEDGER)?;
+                let mut expired = Vec::new();
+                for entry in ledger.iter()? {
+                    let (key, value) = entry?;
+                    let record: LedgerRecord = serde_json::from_slice(value.value())?;
+                    if record.settled.is_some()
+                        && now.saturating_sub(record.updated_at_secs) > DELIVERY_LEDGER_TTL_SECS
+                    {
+                        expired.push(key.value().to_string());
+                    }
+                }
+                for key in expired {
+                    ledger.remove(key.as_str())?;
+                }
+                let record = LedgerRecord {
+                    subject,
+                    delivery: message.delivery.clone(),
+                    settled: Some(message),
+                    updated_at_secs: now,
+                };
+                ledger.insert(
+                    dispatch_id.as_str(),
+                    serde_json::to_vec(&record)?.as_slice(),
+                )?;
+            }
+            txn.commit()?;
+            Ok(())
+        })
+        .await?;
+        self.prune_over_cap().await;
+        Ok(())
     }
 
     pub async fn pending_keys(&self) -> Result<Vec<(String, String)>> {
@@ -402,6 +584,10 @@ fn write_outbox_entry(
         .insert(key, serde_json::to_vec(&meta)?.as_slice())?;
     txn.open_table(OUTBOX_PAYLOAD)?.insert(key, bytes)?;
     Ok(())
+}
+
+fn delivery_outbox_key(dispatch_id: &str) -> String {
+    format!("delivery:{}", dispatch_id)
 }
 
 fn journal_contains_batch(

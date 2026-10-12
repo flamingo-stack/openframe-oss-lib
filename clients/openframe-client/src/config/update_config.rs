@@ -16,11 +16,14 @@ pub const CONSUMER_CYCLE_PAUSE_MS: u64 = 30000; // 30 seconds pause between retr
 
 // Reconnection
 pub const RECONNECTION_DELAY_MS: u64 = 5000; // 5 seconds
+pub const RETIRED_CONSUMER_DELETE_TIMEOUT_SECS: u64 = 30;
 
 // Durable result outbox
 pub const OUTBOX_MAX_ENTRIES: usize = 500;
 pub const OUTBOX_FLUSH_INTERVAL_SECS: u64 = 30;
 pub const FLUSH_PUBLISH_TIMEOUT_SECS: u64 = 30;
+// Must outlive every backend retry of one dispatch, or a late retry re-runs the command.
+pub const DELIVERY_LEDGER_TTL_SECS: u64 = 7 * 24 * 60 * 60;
 // In-memory retry when the durable store is unavailable (redb failed to open).
 pub const FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS: u64 = 1000;
 pub const FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS: u64 = 30000;

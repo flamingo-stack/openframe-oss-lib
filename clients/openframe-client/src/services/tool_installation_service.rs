@@ -11,7 +11,7 @@ use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::tool_connection_processing_manager::ToolConnectionProcessingManager;
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_kill_service::ToolKillService;
-use crate::services::tool_ops::ToolOps;
+use crate::services::tool_ops::ToolLock;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
@@ -45,7 +45,6 @@ pub struct ToolInstallationService {
     installed_tools_service: InstalledToolsService,
     directory_manager: DirectoryManager,
     tool_run_manager: ToolRunManager,
-    tool_ops: ToolOps,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     config_service: AgentConfigurationService,
     installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -64,7 +63,6 @@ impl ToolInstallationService {
         installed_tools_service: InstalledToolsService,
         directory_manager: DirectoryManager,
         tool_run_manager: ToolRunManager,
-        tool_ops: ToolOps,
         tool_connection_processing_manager: ToolConnectionProcessingManager,
         config_service: AgentConfigurationService,
         installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -85,7 +83,6 @@ impl ToolInstallationService {
             installed_tools_service,
             directory_manager,
             tool_run_manager,
-            tool_ops,
             tool_connection_processing_manager,
             config_service,
             installed_agent_publisher,
@@ -95,9 +92,12 @@ impl ToolInstallationService {
     }
 
     #[tracing::instrument(skip_all, fields(tool_id = %tool_installation_message.tool_agent_id))]
-    pub async fn install(&self, tool_installation_message: ToolInstallationMessage) -> Result<()> {
-        let tool_agent_id = tool_installation_message.tool_agent_id.clone();
-        let _op = self.tool_ops.lock(&tool_agent_id).await.mark_busy();
+    pub async fn install(
+        &self,
+        tool_installation_message: ToolInstallationMessage,
+        tool_lock: ToolLock,
+    ) -> Result<()> {
+        let _op = tool_lock.mark_busy();
         self.install_inner(tool_installation_message).await
     }
 
