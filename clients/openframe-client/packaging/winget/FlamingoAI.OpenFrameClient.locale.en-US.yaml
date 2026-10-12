@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
 
 PackageIdentifier: FlamingoAI.OpenFrameClient
 PackageVersion: 1.5.49
@@ -30,4 +30,4 @@ Documentations:
   DocumentUrl: https://github.com/flamingo-stack/openframe-oss-lib/blob/main/clients/README.md#openframe-client-device-agent-install-enrol-remove
 ReleaseNotesUrl: https://www.flamingo.run/roadmap-and-releases?tab=product-releases
 ManifestType: defaultLocale
-ManifestVersion: 1.10.0
+ManifestVersion: 1.12.0
