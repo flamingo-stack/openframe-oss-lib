@@ -1,8 +1,9 @@
 'use client';
 
 import type React from 'react';
-import { ODS_STEM_CLASSES, type OdsColorStem } from '../../utils/platform-identity';
+import type { OdsColorStem } from '../../utils/platform-identity';
 import { Button } from './button';
+import { NumberedStep } from './numbered-step';
 
 export interface FeatureListItemData {
   /** Shown in the boxed slot. Not used by the `numbered` variant. */
@@ -50,41 +51,21 @@ export function FeatureList({
 }: FeatureListProps) {
   if (variant === 'numbered') {
     const dims = typeof activeIndex === 'number';
-    const lit = accent
-      ? { border: ODS_STEM_CLASSES[accent].border, text: ODS_STEM_CLASSES[accent].text }
-      : { border: 'border-ods-accent', text: 'text-ods-accent' };
     return (
       <ol className={`flex flex-col gap-[var(--spacing-system-lf)] ${className}`}>
         {items.map((item, index) => {
           const current = dims && index === activeIndex;
-          const row = (
-            <>
-              <span
-                className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 font-bold transition-colors duration-200 text-h6 motion-reduce:transition-none ${
-                  current ? `${lit.border} ${lit.text}` : 'border-ods-text-secondary text-ods-text-secondary'
-                }`}
-              >
-                {index + 1}
-              </span>
-              <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-                <h3
-                  className={`transition-colors duration-200 text-h3 motion-reduce:transition-none ${
-                    current ? lit.text : 'text-ods-text-primary'
-                  }`}
-                >
-                  {item.title}
-                </h3>
-                <p
-                  className={`transition-colors duration-200 text-h4 motion-reduce:transition-none ${
-                    current ? 'text-ods-text-primary' : 'text-ods-text-secondary'
-                  }`}
-                >
-                  {item.description}
-                </p>
-              </div>
-            </>
+          // Every numbered step on a page is the one `NumberedStep`.
+          const step = (
+            <NumberedStep
+              number={index + 1}
+              title={item.title}
+              description={item.description}
+              current={current}
+              accent={accent}
+              className={onSelect ? 'w-full' : undefined}
+            />
           );
-          const layout = 'flex items-start gap-[var(--spacing-system-xs)]';
           return (
             <li key={index} aria-current={current ? 'step' : undefined}>
               {onSelect ? (
@@ -95,12 +76,12 @@ export function FeatureList({
                   size="wrap"
                   fullWidth
                   onClick={() => onSelect(index)}
-                  className={`${layout} justify-start whitespace-normal text-left hover:bg-transparent active:bg-transparent`}
+                  className="items-start justify-start whitespace-normal text-left hover:bg-transparent active:bg-transparent"
                 >
-                  {row}
+                  {step}
                 </Button>
               ) : (
-                <div className={layout}>{row}</div>
+                step
               )}
             </li>
           );

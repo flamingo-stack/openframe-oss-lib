@@ -238,6 +238,7 @@ export * from './app-window-frame';
 export * from './product-screen-frame';
 export * from './phone-frame';
 export * from './notification-stack';
+export * from './numbered-step';
 export * from './device-wallpaper';
 export * from './analyzing-state';
 export * from './incident-feed';
