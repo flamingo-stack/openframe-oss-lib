@@ -367,18 +367,16 @@ export function VideoBiteCard({
       )}
       // Strip mode: fixed height + aspect drive the width (capped at 90vw,
       // same as the old single-box layout). Editor mode: width-driven.
-      style={
-        {
-          aspectRatio: cssAspect,
-          ...(height !== undefined
-            ? {
-                '--bite-height': `${height}px`,
-                '--bite-height-mobile': `${heightMobile ?? height}px`,
-                maxWidth: STRIP_CELL_MAX_WIDTH,
-              }
-            : {}),
-        } as React.CSSProperties
-      }
+      style={{
+        aspectRatio: cssAspect,
+        ...(height !== undefined
+          ? {
+              '--bite-height': `${height}px`,
+              '--bite-height-mobile': `${heightMobile ?? height}px`,
+              maxWidth: STRIP_CELL_MAX_WIDTH,
+            }
+          : {}),
+      }}
     >
       {/* THE shared hover-preview media zone (poster → facade → badge →
           controlled hover playback + near-viewport mount gate). The bite strip
