@@ -37,7 +37,9 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
-            // client feature flags stream: the whole set of switches a client runs with, one message per release
+            // client feature flags stream: the engine publishes to core NATS, the stream is for the agent still on JetStream
+            // consumers, which reads the very switch that moves it off JetStream from here; it goes with the other
+            // command streams once every agent is on the engine's subscription
             StreamConfiguration.builder()
                     .name("CLIENT_FEATURE_FLAGS")
                     .subjects(List.of("machine.*.feature-flags"))
