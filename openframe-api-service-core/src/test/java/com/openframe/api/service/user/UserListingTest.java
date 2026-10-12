@@ -5,9 +5,11 @@ import com.openframe.api.dto.invitation.InvitationFilterInput;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.user.UpdateUserRequest;
 import com.openframe.api.dto.user.UserFilterInput;
 import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.api.exception.OperationNotAllowedException;
 import com.openframe.api.mapper.InvitationMapper;
 import com.openframe.api.mapper.UserMapper;
 import com.openframe.api.service.processor.InvitationProcessor;
@@ -40,9 +42,11 @@ import java.util.Optional;
 import static com.openframe.api.dto.invitation.InvitationStatus.EXPIRED;
 import static com.openframe.api.dto.invitation.InvitationStatus.PENDING;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -165,6 +169,20 @@ class UserListingTest {
 
         assertThat(invitationService().findOpenInvitation("inv-1")).isEmpty();
         assertThat(invitationService().findOpenInvitation("inv-2")).isPresent();
+    }
+
+    @Test
+    @DisplayName("updateUser: a deleted account is not renamed, so a self-deleted one stays anonymized")
+    void updateRefusesDeletedUsers() {
+        User gone = user("u-1", "deleted-u-1@openframe.invalid");
+        gone.setStatus(UserStatus.SELF_DELETED);
+        when(userRepository.findById("u-1")).thenReturn(Optional.of(gone));
+        UpdateUserRequest request = new UpdateUserRequest();
+        request.setFirstName("Jane");
+
+        assertThatThrownBy(() -> userService().updateUser("u-1", request))
+                .isInstanceOf(OperationNotAllowedException.class);
+        verify(userRepository, never()).save(any());
     }
 
     private static InvitationFilterInput filter(com.openframe.api.dto.invitation.InvitationStatus... statuses) {

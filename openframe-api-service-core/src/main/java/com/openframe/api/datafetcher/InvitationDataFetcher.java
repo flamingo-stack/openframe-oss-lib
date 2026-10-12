@@ -20,6 +20,7 @@ import com.openframe.api.service.user.InvitationService;
 import com.openframe.api.service.user.InvitationService.InviteUsersResult;
 import com.openframe.graphql.relay.RelayIdCodec;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
@@ -32,6 +33,9 @@ import static com.openframe.graphql.relay.NodeType.INVITATION;
 @Validated
 public class InvitationDataFetcher {
 
+    /** A search is a few words typed into a box; anything longer is not one. */
+    private static final int MAX_SEARCH_LENGTH = 200;
+
     private final InvitationService invitationService;
     private final GraphQLUserMapper mapper;
     private final RelayIdCodec relayIdCodec;
@@ -39,7 +43,7 @@ public class InvitationDataFetcher {
     @DgsQuery
     public CountedGenericConnection<GenericEdge<InvitationResponse>> invitations(
             @InputArgument InvitationFilterInput filter,
-            @InputArgument String search,
+            @InputArgument @Size(max = MAX_SEARCH_LENGTH) String search,
             @InputArgument Integer first,
             @InputArgument String after) {
         log.debug("Fetching invitations: filter={}, search={}, first={}, after={}", filter, search, first, after);

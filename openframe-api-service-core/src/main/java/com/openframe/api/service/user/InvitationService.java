@@ -58,7 +58,14 @@ public class InvitationService {
 
         Invitation saved = invitationRepository.save(invitationMapper.toEntity(request));
 
-        emailService.sendInvitationEmail(saved.getEmail(), saved.getId());
+        try {
+            emailService.sendInvitationEmail(saved.getEmail(), saved.getId());
+        } catch (RuntimeException e) {
+            // Nobody got a link: a kept invitation would list as pending, refuse a re-invite of the
+            // address, and could not be resent until it expired.
+            invitationRepository.delete(saved);
+            throw e;
+        }
 
         invitationProcessor.postProcessInvitationCreated(saved);
 
@@ -86,6 +93,9 @@ public class InvitationService {
             } else if (!seen.add(email.toLowerCase(Locale.ROOT))) {
                 problem = "Listed twice";
             } else {
+                problem = openInvitationProblem(email);
+            }
+            if (problem == null) {
                 try {
                     invitations.add(createInvitation(CreateInvitationRequest.builder().email(email).build()));
                 } catch (IllegalArgumentException | IllegalStateException | BaseException e) {
@@ -100,6 +110,23 @@ public class InvitationService {
             }
         }
         return new InviteUsersResult(invitations, errors);
+    }
+
+    /**
+     * Why the address cannot be invited again, or null when it has no open invitation: a second one
+     * would be a second row in the list and a second email.
+     */
+    private String openInvitationProblem(String email) {
+        // Stored lowercased (InvitationMapper.toEntity).
+        List<Invitation> open = invitationRepository.findAllByEmailAndStatus(email.toLowerCase(Locale.ROOT),
+                InvitationStatus.PENDING);
+        if (open.isEmpty()) {
+            return null;
+        }
+        Instant now = Instant.now();
+        boolean live = open.stream().anyMatch(invitation -> invitation.getExpiresAt() == null
+                || invitation.getExpiresAt().isAfter(now));
+        return live ? "Already invited" : "Already invited and expired: resend that invitation";
     }
 
     /** Upper bound for a REST page; lower it once no client asks for every invitation in one page. */

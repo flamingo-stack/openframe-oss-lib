@@ -134,6 +134,10 @@ public class UserService {
     public UserResponse updateUser(String id, UpdateUserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
+        if (user.getStatus() != ACTIVE) {
+            // A self-deleted account is anonymized: naming it again would undo that.
+            throw new OperationNotAllowedException("Only an active user can be edited");
+        }
 
         if (request.getFirstName() != null) {
             user.setFirstName(request.getFirstName());

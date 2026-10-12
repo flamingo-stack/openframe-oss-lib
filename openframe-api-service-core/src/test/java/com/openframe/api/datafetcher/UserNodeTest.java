@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,6 +60,23 @@ class UserNodeTest {
         when(userService.findUserById("u-1")).thenReturn(Optional.of(user));
 
         assertThat(nodeFetcher().node(CODEC.encode(NodeType.USER, "u-1"))).isSameAs(user);
+    }
+
+    @Test
+    @DisplayName("nodes(ids:) loads every user in one query, in input order, null for an unknown one")
+    void nodesBatchesUsers() {
+        UserResponse jane = UserResponse.builder().id("u-1").email("jane@acme.io").build();
+        UserResponse john = UserResponse.builder().id("u-2").email("john@acme.io").build();
+        when(userService.getUsersByIds(List.of("u-2", "u-1", "u-gone"))).thenReturn(List.of(jane, john));
+
+        List<Object> nodes = nodeFetcher().nodes(List.of(
+                CODEC.encode(NodeType.USER, "u-2"),
+                CODEC.encode(NodeType.USER, "u-1"),
+                CODEC.encode(NodeType.USER, "u-gone"),
+                CODEC.encode(NodeType.USER, "u-2")));
+
+        assertThat(nodes).containsExactly(john, jane, null, john);
+        verify(userService, never()).findUserById(any());
     }
 
     @Test

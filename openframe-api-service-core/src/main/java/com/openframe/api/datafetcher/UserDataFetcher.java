@@ -21,6 +21,7 @@ import com.openframe.api.service.user.UserService;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,6 +36,9 @@ import static com.openframe.graphql.relay.NodeType.USER;
 @Validated
 public class UserDataFetcher {
 
+    /** A search is a few words typed into a box; anything longer is not one. */
+    private static final int MAX_SEARCH_LENGTH = 200;
+
     private final UserService userService;
     private final GraphQLUserMapper mapper;
     private final RelayIdCodec relayIdCodec;
@@ -42,7 +46,7 @@ public class UserDataFetcher {
     @DgsQuery
     public CountedGenericConnection<GenericEdge<UserResponse>> users(
             @InputArgument UserFilterInput filter,
-            @InputArgument String search,
+            @InputArgument @Size(max = MAX_SEARCH_LENGTH) String search,
             @InputArgument Integer first,
             @InputArgument String after) {
         log.debug("Fetching users: filter={}, search={}, first={}, after={}", filter, search, first, after);

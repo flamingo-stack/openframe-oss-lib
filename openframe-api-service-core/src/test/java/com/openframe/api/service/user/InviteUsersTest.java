@@ -9,6 +9,7 @@ import com.openframe.api.service.processor.UserProcessor;
 import com.openframe.api.service.user.InvitationService.InviteUsersResult;
 import com.openframe.core.email.EmailDomainPolicy;
 import com.openframe.data.document.user.Invitation;
+import com.openframe.data.document.user.InvitationStatus;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.auth.SsoIdentityRepository;
 import com.openframe.data.repository.user.InvitationRepository;
@@ -22,14 +23,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -87,6 +91,27 @@ class InviteUsersTest {
                 "User with email taken@acme.io already exists in tenant",
                 "Email domain blocked.io is not allowed",
                 "Could not send the invitation. Please try again.");
+        // The one whose email failed was saved first: it must not stay behind as a pending invitation.
+        verify(invitationRepository).delete(argThat((Invitation invitation) -> "boom@acme.io".equals(invitation.getEmail())));
+        verify(invitationRepository, times(1)).delete(any(Invitation.class));
+    }
+
+    @Test
+    @DisplayName("an address with an open invitation is refused, saying whether that invitation expired")
+    void openInvitationIsRefused() {
+        Instant now = Instant.now();
+        when(invitationRepository.findAllByEmailAndStatus("live@acme.io", InvitationStatus.PENDING))
+                .thenReturn(List.of(Invitation.builder().email("live@acme.io").expiresAt(now.plusSeconds(3600)).build()));
+        when(invitationRepository.findAllByEmailAndStatus("old@acme.io", InvitationStatus.PENDING))
+                .thenReturn(List.of(Invitation.builder().email("old@acme.io").expiresAt(now.minusSeconds(3600)).build()));
+
+        InviteUsersResult result = invitationService().inviteUsers(List.of("Live@acme.io", "old@acme.io"));
+
+        assertThat(result.invitations()).isEmpty();
+        assertThat(result.errors()).extracting(MutationError::getMessage)
+                .containsExactly("Already invited", "Already invited and expired: resend that invitation");
+        verify(invitationRepository, never()).save(any());
+        verify(emailService, never()).sendInvitationEmail(anyString(), anyString());
     }
 
     @Test
