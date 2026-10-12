@@ -26,8 +26,8 @@ const MAX_PILE_EDGES = 2;
 
 // Gentle on purpose: a notification eases into place and the ones under it
 // drift down with it. Soft springs with no overshoot; nothing snaps or bounces.
-const ARRIVE = { type: 'spring', stiffness: 150, damping: 26, mass: 1 } as const;
-const PUSH = { type: 'spring', stiffness: 130, damping: 26, mass: 1 } as const;
+const ARRIVE = { type: 'spring', stiffness: 90, damping: 22, mass: 1 } as const;
+const PUSH = { type: 'spring', stiffness: 60, damping: 20, mass: 1.1 } as const;
 const FOLD = { type: 'spring', stiffness: 140, damping: 28, mass: 1 } as const;
 
 /**
