@@ -171,15 +171,34 @@ function fromTable(table: () => Promise<LoaderTable>, name: string): IconLoader 
   return () => table().then(loaders => loaders[name]?.() ?? NO_ICON);
 }
 
-let setTable: Promise<LoaderTable> | undefined;
-const setLoaders = () =>
-  (setTable ??= import('../../icons-v2-generated/icon-loaders').then(module => module.ICON_LOADERS as LoaderTable));
+/**
+ * A loader table, fetched once and shared by every icon that reads it. A fetch
+ * that FAILS is forgotten, so the next icon asks again: kept, one dropped
+ * request would fail every icon of that table until the page is reloaded (an
+ * icon's own retry calls its loader again, which would get the same rejection).
+ * Exported for its test.
+ */
+export function sharedTable(fetchTable: () => Promise<LoaderTable>): () => Promise<LoaderTable> {
+  let table: Promise<LoaderTable> | undefined;
+  return () => {
+    if (!table) {
+      const attempt = fetchTable();
+      table = attempt;
+      attempt.catch(() => {
+        if (table === attempt) table = undefined;
+      });
+    }
+    return table;
+  };
+}
 
-let lucideTable: Promise<LoaderTable> | undefined;
-const lucideLoaders = () =>
-  (lucideTable ??= import('lucide-react/dynamicIconImports').then(
-    module => (module.default ?? module) as unknown as LoaderTable,
-  ));
+const setLoaders = sharedTable(() =>
+  import('../../icons-v2-generated/icon-loaders').then(module => module.ICON_LOADERS as LoaderTable),
+);
+
+const lucideLoaders = sharedTable(() =>
+  import('lucide-react/dynamicIconImports').then(module => (module.default ?? module) as unknown as LoaderTable),
+);
 
 /** An icon of the generated set by its EXPORT name (`ChartPieIcon`), or `undefined` when the set has none by that name. */
 export function iconFromSet(exportName: string): IconComponent | undefined {
