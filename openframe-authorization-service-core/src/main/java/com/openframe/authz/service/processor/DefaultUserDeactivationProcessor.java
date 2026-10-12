@@ -5,10 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
-/**
- * Default implementation of UserDeactivationProcessor for authorization service.
- * This bean will be used if no other implementation is provided.
- */
+// Default no-op deactivation processor used when no other implementation is provided
 @Slf4j
 @Component
 @ConditionalOnMissingBean(value = UserDeactivationProcessor.class, ignored = DefaultUserDeactivationProcessor.class)
