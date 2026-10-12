@@ -13,10 +13,11 @@
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { getProxiedImageUrl } from '../../../utils/image-proxy';
-import { FigmaIcon } from '../../icons/figma-icon';
-import { ImageIcon } from '../../icons/image-icon';
+import { ImageClassicIcon } from '../../icons-v2-generated/audio-and-visual/image-classic-icon';
+import { FigmaClassicIcon } from '../../icons-v2-generated/brand-logos/figma-classic-icon';
 import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
@@ -230,7 +231,7 @@ export function RoadmapCard({
             ) : null}
             {hasFigma ? (
               <span className="hidden shrink-0 items-center sm:flex" title="Has Figma prototype">
-                <FigmaIcon className="h-3 w-3" />
+                <FigmaClassicIcon className="h-3 w-3" />
               </span>
             ) : null}
             {hasScreenshots ? (
@@ -238,7 +239,7 @@ export function RoadmapCard({
                 className="hidden shrink-0 items-center gap-0.5 text-h6 sm:flex"
                 title={`${item.screenshots.length} screenshot${item.screenshots.length === 1 ? '' : 's'}`}
               >
-                <ImageIcon className="h-3 w-3" />
+                <ImageClassicIcon className="h-3 w-3" />
                 <span>{item.screenshots.length}</span>
               </span>
             ) : null}
@@ -260,9 +261,9 @@ export function RoadmapCard({
       );
     }
     return (
-      <a href={compactHref} target={target} rel={rel} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link href={compactHref} target={target} rel={rel} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {body}
-      </a>
+      </Link>
     );
   }
 
@@ -360,7 +361,7 @@ export function RoadmapCard({
               variant="outline"
               size="small-legacy"
               onClick={() => setShowScreenshots(true)}
-              leftIcon={<ImageIcon className="h-5 w-5" />}
+              leftIcon={<ImageClassicIcon className="h-5 w-5" />}
             />
           )}
           {(() => {
@@ -371,7 +372,7 @@ export function RoadmapCard({
                 size="small-legacy"
                 openInNewTab
                 href={figmaSafe}
-                leftIcon={<FigmaIcon className="h-5 w-5" />}
+                leftIcon={<FigmaClassicIcon className="h-5 w-5" />}
               />
             ) : null;
           })()}

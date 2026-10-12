@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 
 export interface StoreBadgeProps {
@@ -324,14 +325,14 @@ export function StoreBadgeLinks({ appStoreUrl, googlePlayUrl, openInNewTab = tru
           not — dropping it on the same-window branch sent the tenant's hostname to Apple
           and Google as a Referer. */}
       {appStoreUrl && (
-        <a href={appStoreUrl} target={openInNewTab ? '_blank' : undefined} rel="noopener noreferrer">
+        <Link href={appStoreUrl} target={openInNewTab ? '_blank' : undefined} rel="noopener noreferrer">
           <AppStoreBadge className="h-12 w-auto" />
-        </a>
+        </Link>
       )}
       {googlePlayUrl && (
-        <a href={googlePlayUrl} target={openInNewTab ? '_blank' : undefined} rel="noopener noreferrer">
+        <Link href={googlePlayUrl} target={openInNewTab ? '_blank' : undefined} rel="noopener noreferrer">
           <GooglePlayBadge className="h-12 w-auto" />
-        </a>
+        </Link>
       )}
     </div>
   );

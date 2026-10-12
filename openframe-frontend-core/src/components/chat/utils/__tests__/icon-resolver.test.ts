@@ -1,5 +1,5 @@
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { render, screen, waitFor } from '@testing-library/react';
+import { createElement, Fragment } from 'react';
 import { describe, it, expect } from 'vitest';
 import { resolveIcon, ICON_OPTIONS } from '../icon-library';
 import { getIconComponent } from '../icon-registry';
@@ -27,7 +27,6 @@ const BRAND_NAMES = [
   'youtube',
   'twitter',
   'instagram',
-  'discord',
   'rocket',
   // PascalCase social_platforms.icon_name values:
   'LinkedInIcon',
@@ -44,6 +43,11 @@ describe('unified resolveIcon — brand variant preserves getIconComponent exact
       expect(resolveIcon(name, { variant: 'brand' })).toBe(getIconComponent(name));
     });
   }
+
+  it('a name the brand set does not hold is drawn from the design set, never as the file fallback', () => {
+    expect(resolveIcon('discord', { variant: 'brand' })).toBe(resolveIcon('discord'));
+    expect(resolveIcon('discord', { variant: 'brand' })).not.toBe(getIconComponent('discord'));
+  });
 
   it('null/undefined brand → same fallback as getIconComponent, no throw', () => {
     expect(resolveIcon(null, { variant: 'brand' })).toBe(getIconComponent(null));
@@ -67,11 +71,42 @@ describe('unified resolveIcon — design variant (default) resolves every picker
   // The picker and the chat chips tint every glyph with the agent accent
   // through `currentColor`. A glyph that ships its own brand fill ignores that
   // tint — the colored OpenAI / Anthropic marks sat black and orange in a cyan
-  // grid until their keys were pointed at the grey variants.
-  it('every ICON_OPTIONS glyph takes the slot colour — no hardcoded fill or stroke', () => {
+  // grid until their keys were pointed at the grey variants. Icons load by
+  // name when drawn, so the glyphs are inspected once every module has arrived
+  // (a name the set has lost never fills its placeholder and fails the wait).
+  it('every ICON_OPTIONS glyph takes the slot colour — no hardcoded fill or stroke', async () => {
+    // Each glyph sits in its own labelled box: a mark with parts of its own
+    // (the OpenFrame glyph) takes size, class and colour and drops any other
+    // attribute, so the box carries the test id, not the icon.
+    const testId = (key: string) => `icon-${key}`;
+    render(
+      createElement(
+        Fragment,
+        null,
+        ...ICON_OPTIONS.map(opt =>
+          createElement(
+            'span',
+            { key: opt.key, 'data-testid': testId(opt.key) },
+            createElement(resolveIcon(opt.key), { size: 24 }),
+          ),
+        ),
+      ),
+    );
+    // A placeholder is an `<svg>` with nothing inside; a loaded glyph has its paths.
+    const drawn = /<svg\b[^>]*>(?!\s*<\/svg>)/;
+    await waitFor(
+      () => {
+        for (const opt of ICON_OPTIONS) {
+          expect(screen.getByTestId(testId(opt.key)).outerHTML, `design('${opt.key}') should have loaded`).toMatch(
+            drawn,
+          );
+        }
+      },
+      { timeout: 20_000 },
+    );
     for (const opt of ICON_OPTIONS) {
-      const markup = renderToStaticMarkup(createElement(resolveIcon(opt.key), { size: 24 }));
+      const markup = screen.getByTestId(testId(opt.key)).outerHTML;
       expect(markup, `design('${opt.key}') should not hardcode a colour`).not.toMatch(/(fill|stroke)="#/);
     }
-  });
+  }, 30_000);
 });

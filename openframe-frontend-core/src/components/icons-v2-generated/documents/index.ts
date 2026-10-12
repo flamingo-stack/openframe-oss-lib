@@ -53,6 +53,7 @@ export { FolderOffIcon } from './folder-off-icon';
 export { FolderOpenIcon } from './folder-open-icon';
 export { FolderPlusIcon } from './folder-plus-icon';
 export { FolderSearchIcon } from './folder-search-icon';
+export { FolderShieldClassicIcon } from './folder-shield-classic-icon';
 export { FolderShieldIcon } from './folder-shield-icon';
 export { FoldersIcon } from './folders-icon';
 export { FolderUserIcon } from './folder-user-icon';

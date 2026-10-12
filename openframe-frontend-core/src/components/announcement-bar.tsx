@@ -6,7 +6,7 @@ import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 import { usePathname } from '../embed-shims/next-navigation';
 import { useSelfFetch } from '../hooks/use-self-fetch';
 import type { Announcement, AnnouncementBarProps, AnnouncementResponse } from '../types/announcement';
-import { ANNOUNCEMENT_CTA_DEFAULTS } from '../types/announcement';
+import { ANNOUNCEMENT_CTA_DEFAULTS, ANNOUNCEMENT_DEFAULT_ICON } from '../types/announcement';
 import {
   clearLegacyAnnouncementCache,
   dismissAnnouncement,
@@ -268,7 +268,7 @@ export function AnnouncementBar({
                wins, else a library glyph by name (+ props), via <EntityIcon>. */
             <EntityIcon
               icon={{
-                name: displayAnnouncement.icon_name || 'openframe-logo',
+                name: displayAnnouncement.icon_name || ANNOUNCEMENT_DEFAULT_ICON,
                 url: displayAnnouncement.icon_url,
                 props: displayAnnouncement.icon_props,
               }}

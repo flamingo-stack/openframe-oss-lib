@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useId, useLayoutEffect, useSyncExternalStore } from 'react';
+import { useCallback, useId, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   useAssistantRuntime,
   type AssistantOpenRequest,
@@ -71,8 +71,10 @@ export function useAskPrompts({
   const assistant = useAssistantRuntime();
   const base = assistantAvailable(assistant) ? assistant.askPromptsUrl : undefined;
   const url = base && enabled ? buildAskPromptsUrl(base, { count, topic, exclude }) : null;
-  const { data, isLoading } = useSelfFetch<AskPromptsResponse>(url);
-  return { prompts: data?.prompts ?? [], isLoading: !!base && (!enabled || isLoading), supported: !!base };
+  const { data, dataUrl, error } = useSelfFetch<AskPromptsResponse>(url);
+  // Landed for THIS url (or failed): never the frame between a url appearing and its fetch starting.
+  const landed = url !== null && (dataUrl === url || error);
+  return { prompts: landed ? (data?.prompts ?? []) : [], isLoading: !!base && !landed, supported: !!base };
 }
 
 /**
@@ -99,90 +101,172 @@ export function useAssistantOpen(
   );
 }
 
-// ─── The questions the page already shows ────────────────────────────────────
-// Every surface that shows questions says which ones (`useShownAskPrompts`), so
-// a later surface (the FAQ's card) never repeats one, with no wiring by the
-// host. One list per QUESTIONS ENDPOINT (the runtime's `askPromptsUrl`): two
-// assistants on one page read different questions, and never leave out each
-// other's ids. A module store, read through React's external-store hook.
-// `null` for a surface = it is still picking.
+// ─── One pick at a time, and never a question twice ──────────────────────────
+// Every surface that offers questions (a row in a section, the FAQ's card)
+// takes a TURN before it picks, in the order the surfaces came to need one:
+// document order for the ones a page mounts together, later for one that waits
+// to be reached (the FAQ's card). A surface picks once every surface ahead of
+// it has settled, and leaves out every question the page already shows. So no
+// two surfaces of a page can show the same question, whatever their topics,
+// with no wiring by the host. One queue per QUESTIONS ENDPOINT (the runtime's
+// `askPromptsUrl`): two assistants on one page read different questions, and
+// never wait for or leave out each other's. A module store, read through
+// React's external-store hook.
 
-const NO_IDS: readonly string[] = [];
-
-/** One endpoint's list: which questions each surface shows, and who is listening. */
-interface ShownList {
-  set(surface: string, ids: readonly string[] | null): void;
-  remove(surface: string): void;
+/** One endpoint's queue: each surface's turn and the questions it settled on (`null`: not yet). */
+interface AskQueue {
+  enter(surface: string): void;
+  settle(surface: string, ids: readonly string[] | null): void;
+  leave(surface: string): void;
   subscribe(listener: () => void): () => void;
-  read(): readonly string[] | null;
+  /**
+   * What `surface` must leave out, as a comma-joined list ('' for nothing),
+   * once it may pick; `null` while it has no turn or a surface ahead of it is
+   * still picking. A string, so React can compare two readings.
+   */
+  turnOf(surface: string): string | null;
 }
 
-function createShownList(): ShownList {
-  const bySurface = new Map<string, readonly string[] | null>();
+function createAskQueue(): AskQueue {
+  const entries = new Map<string, { turn: number; ids: readonly string[] | null }>();
   const listeners = new Set<() => void>();
-  let snapshot: readonly string[] | null = NO_IDS;
+  let next = 0;
   const publish = (): void => {
-    const lists = [...bySurface.values()];
-    const next = lists.some(list => list === null) ? null : lists.flatMap(list => list ?? []);
-    const same = next === null ? snapshot === null : snapshot !== null && next.join(',') === snapshot.join(',');
-    if (same) return;
-    snapshot = next === null ? null : next.length > 0 ? next : NO_IDS;
     for (const listener of listeners) listener();
   };
   return {
-    set(surface, ids) {
-      bySurface.set(surface, ids);
+    enter(surface) {
+      if (entries.has(surface)) return;
+      entries.set(surface, { turn: next++, ids: null });
       publish();
     },
-    remove(surface) {
-      bySurface.delete(surface);
+    settle(surface, ids) {
+      const entry = entries.get(surface);
+      if (!entry || (entry.ids?.join(',') ?? null) === (ids?.join(',') ?? null)) return;
+      entry.ids = ids;
       publish();
+    },
+    leave(surface) {
+      if (entries.delete(surface)) publish();
     },
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    read: () => snapshot,
+    turnOf(surface) {
+      const own = entries.get(surface);
+      if (!own) return null;
+      const shown: string[] = [];
+      for (const [other, entry] of entries) {
+        if (other === surface) continue;
+        if (entry.ids === null) {
+          if (entry.turn < own.turn) return null;
+          continue;
+        }
+        shown.push(...entry.ids);
+      }
+      return shown.join(',');
+    },
   };
 }
 
-const shownLists = new Map<string, ShownList>();
+const askQueues = new Map<string, AskQueue>();
 
-/** The list a surface belongs to: the questions endpoint of its assistant runtime. */
-function useShownList(): ShownList {
+/** The queue a surface belongs to: the questions endpoint of its assistant runtime. */
+function useAskQueue(): AskQueue {
   const scope = useAssistantRuntime()?.askPromptsUrl ?? '';
-  let list = shownLists.get(scope);
-  if (!list) {
-    list = createShownList();
-    shownLists.set(scope, list);
+  let queue = askQueues.get(scope);
+  if (!queue) {
+    queue = createAskQueue();
+    askQueues.set(scope, queue);
   }
-  return list;
+  return queue;
+}
+
+export interface UseAskSurfaceOptions {
+  /** What the surface is about (see `UseAskPromptsOptions.topic`). */
+  topic?: string;
+  count?: number;
+  /**
+   * Ids of questions never to offer. Absent: the ones the page's other
+   * surfaces show, which this one waits for. A list: exactly those, picked at
+   * once with no wait (the surfaces after it still leave its questions out).
+   * `null`: the surface waits and never picks.
+   */
+  exclude?: readonly string[] | null;
+  /** False: the surface is not ready to pick yet (it takes its turn when it is). Default true. */
+  enabled?: boolean;
+  /** How the chat is opened from THIS surface. Absent: the assistant runtime's opener. */
+  onOpen?: (request: AssistantOpenRequest) => void;
+}
+
+export interface UseAskSurfaceResult extends UseAskPromptsResult {
+  /** The nearest assistant runtime; `null` with none mounted. */
+  assistant: AssistantRuntime | null;
+  /** The same runtime with THIS surface's opener: what the surface's launcher reads. */
+  scoped: AssistantRuntime | null;
+  /** Opens the chat (and asks, with a prompt), carrying the surface's topic. */
+  open: (request: { prompt?: string }) => void;
+  /** Reports a question that was asked (the runtime's `onAsk`, with the topic). */
+  reportAsk: (prompt: AskPrompt) => void;
 }
 
 /**
- * Say which questions this surface shows. `null`: it is still picking, so a
- * surface that must not repeat them waits. Pass `undefined` to say nothing
- * (the surface shows no questions here).
+ * THE wiring of an "ask" surface, whatever it looks like: the assistant
+ * runtime, the surface's questions (picked on its turn, never one the page
+ * already shows), the opener and the click report. `AssistantAskPrompts` is its
+ * one component; nothing else picks questions for a page.
  */
-export function useShownAskPrompts(ids: readonly string[] | null | undefined): void {
+export function useAskSurface({
+  topic,
+  count = ASK_PROMPTS_DEFAULT_COUNT,
+  exclude,
+  enabled = true,
+  onOpen,
+}: UseAskSurfaceOptions = {}): UseAskSurfaceResult {
+  const assistant = useAssistantRuntime();
   const surface = useId();
-  const list = useShownList();
-  const key = ids === undefined ? undefined : ids === null ? null : ids.join(',');
-  // A layout effect: the list holds this surface before any reader's own effects run.
-  useLayoutEffect(() => {
-    if (key === undefined) return undefined;
-    list.set(surface, key === null ? null : key ? key.split(',') : NO_IDS);
-    return () => list.remove(surface);
-  }, [list, surface, key]);
-}
+  const queue = useAskQueue();
+  const picks = assistantAvailable(assistant) && !!assistant.askPromptsUrl && enabled && exclude !== null;
 
-/** The ids of the questions the page's other surfaces of the same assistant show; `null` while one is still picking. */
-export function useShownAskPromptIds(): readonly string[] | null {
-  const list = useShownList();
-  return useSyncExternalStore(list.subscribe, list.read, () => NO_IDS);
+  // A layout effect: surfaces a page mounts together take their turns in document order.
+  useLayoutEffect(() => {
+    if (!picks) return undefined;
+    queue.enter(surface);
+    return () => queue.leave(surface);
+  }, [queue, surface, picks]);
+
+  const turn = useSyncExternalStore(
+    queue.subscribe,
+    () => queue.turnOf(surface),
+    () => null,
+  );
+  // ONE pick per mount: what the page showed when this surface's turn came is what it leaves out, for good.
+  const [shownAtTurn, setShownAtTurn] = useState<string | null>(null);
+  if (picks && turn !== null && shownAtTurn === null) setShownAtTurn(turn);
+  const leftOut = useMemo(() => exclude ?? (shownAtTurn ? shownAtTurn.split(',') : undefined), [exclude, shownAtTurn]);
+
+  const { prompts, isLoading, supported } = useAskPrompts({
+    topic,
+    count,
+    exclude: leftOut,
+    // Told exactly what to leave out, a surface needs nobody's pick: it never waits for a turn.
+    enabled: picks && (exclude !== undefined || shownAtTurn !== null),
+  });
+  const settled = picks && !isLoading ? prompts.map(prompt => prompt.id).join(',') : null;
+  useLayoutEffect(() => {
+    queue.settle(surface, settled === null ? null : settled ? settled.split(',') : []);
+  }, [queue, surface, settled]);
+
+  const open = useAssistantOpen(topic, onOpen);
+  const scoped = useMemo(() => (assistant ? { ...assistant, open } : null), [assistant, open]);
+  const onAsk = assistant?.onAsk;
+  const reportAsk = useCallback((prompt: AskPrompt) => onAsk?.({ promptId: prompt.id, topic }), [onAsk, topic]);
+  // A surface that waits (not reached, or told to) is loading wherever questions can exist.
+  return { assistant, scoped, prompts, isLoading: supported && (!picks || isLoading), supported, open, reportAsk };
 }
 
 /** Tests only: forget every surface. */
-export function resetShownAskPrompts(): void {
-  shownLists.clear();
+export function resetAskSurfaces(): void {
+  askQueues.clear();
 }

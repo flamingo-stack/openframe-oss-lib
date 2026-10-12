@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 
 const TONE_CLASS = {
@@ -24,7 +25,7 @@ export function PolicyLink({
   children: ReactNode;
 }) {
   return (
-    <a
+    <Link
       href={href}
       className={cn(TONE_CLASS[tone])}
       target="_blank"
@@ -32,6 +33,6 @@ export function PolicyLink({
       onClick={e => e.stopPropagation()}
     >
       {children}
-    </a>
+    </Link>
   );
 }

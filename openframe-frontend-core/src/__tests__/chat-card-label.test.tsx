@@ -24,7 +24,7 @@ describe('prospect_call source wiring', () => {
   it('maps the document type to its table id, label, icon and card route', () => {
     expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.prospect_call).toBe('prospect-calls');
     expect(getSourceLabel('prospect-calls')).toBe('Prospect calls');
-    expect(SOURCE_ICON_NAMES['prospect-calls']).toBe('phone');
+    expect(SOURCE_ICON_NAMES['prospect-calls']).toBe('call');
     expect(buildListUrl('prospect_call', ['1', '2'])).toBe('/api/prospect-calls?ids=1,2');
   });
 });
@@ -70,5 +70,17 @@ describe('trust_center source wiring', () => {
     expect(extractCardItems('trust_center', null)).toEqual([]);
     // Every other type is unchanged.
     expect(extractCardItems('faq', payload)).toEqual([TRUST_CENTER_FIXTURE_FAQ]);
+  });
+});
+
+describe('openframe_price source wiring', () => {
+  it('has a card label, a table, a chip label, an icon and a hydration URL', () => {
+    expect(chatCardLabel('openframe_price')).toBe('OpenFrame price');
+    expect(DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID.openframe_price).toBe('openframe-pricing');
+    expect(getSourceLabel('openframe-pricing')).toBe('OpenFrame pricing');
+    expect(SOURCE_ICON_NAMES['openframe-pricing']).toBe('money-bill-dollar');
+    expect(buildListUrl('openframe_price', ['plan', 'model-claude-opus-5-5'])).toBe(
+      '/api/openframe-pricing?ids=plan,model-claude-opus-5-5',
+    );
   });
 });

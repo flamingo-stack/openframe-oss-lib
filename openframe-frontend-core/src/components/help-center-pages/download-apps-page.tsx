@@ -8,8 +8,14 @@
  *     when a visitor looks for another system). In a card the installer is THE
  *     action (the other architecture is a quieter button) and each package
  *     manager is one line under it, with its copy button.
- *   - The mobile app: the store badges, and the install QR code beside them.
- *   - `footer`: the host's own last word (the website's "start on the web" card).
+ *   - The mobile app: the store badges, and the install QR code beside them. The
+ *     code and the address it encodes are the server's (`mobile.install`): the
+ *     website's install link, which the server answers with a redirect to the
+ *     phone's store. This page redirects nobody, and with no install link from
+ *     the server it draws no code.
+ *   - `web`: the way in for someone who installs nothing (the website's trial
+ *     signup). The host names the words and the button; the page draws the card,
+ *     in the frame of every other card on it.
  *
  * DATA: all of it is the server's answer (`DownloadsPublic`), read by
  * `useDownloads` against `endpoint` (default `DOWNLOADS_API_PATH`; embedders
@@ -26,7 +32,7 @@
  * The chrome is the canonical `PageShell` + frozen `PageLayout`.
  */
 
-import { useEffect, type ComponentType, type ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloads } from '../../hooks/use-downloads';
@@ -44,7 +50,7 @@ import {
   type MobileAppLinks,
 } from '../../types/downloads';
 import { cn } from '../../utils/cn';
-import { DOWNLOAD_PAGE_STORE_PARAM, MOBILE_APP_INSTALL_HOST_PATH, resolveMobileStoreUrl } from '../../utils/mobile-app';
+import { formatUrlForDisplay } from '../../utils/format';
 import { DESKTOP_OSES, type DesktopOs } from '../../utils/visitor-os';
 import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
@@ -78,8 +84,16 @@ export interface DownloadAppsPageProps {
   openStoresInNewTab?: boolean;
   /** Called when a visitor downloads an installer or copies an install command (the host's analytics). */
   onDownloadAction?: (event: DownloadActionEvent) => void;
-  /** The host's own closing block, under the mobile app. */
-  footer?: ReactNode;
+  /** The closing card, under the mobile app: using OpenFrame without installing anything. Default: none. */
+  web?: DownloadAppsWebOption;
+}
+
+/** The "no install" card: the host's words and its own button (the page holds no signup link). */
+export interface DownloadAppsWebOption {
+  title: string;
+  description: string;
+  /** The host's button (the website's trial signup). */
+  action: ReactNode;
 }
 
 const SECTIONS_CLASS = 'flex flex-col gap-[var(--spacing-system-xlf)]';
@@ -206,6 +220,24 @@ function SystemCard({
   );
 }
 
+/** The closing card: one line of what the web offers, and the host's button at the far end. */
+function WebCard({ web }: { web: DownloadAppsWebOption }) {
+  return (
+    <section
+      aria-labelledby="download-web"
+      className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-center content-md:justify-between')}
+    >
+      <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
+        <h2 id="download-web" className="m-0 text-ods-text-primary text-h3">
+          {web.title}
+        </h2>
+        <p className="m-0 text-ods-text-secondary text-h4">{web.description}</p>
+      </div>
+      <div className="shrink-0">{web.action}</div>
+    </section>
+  );
+}
+
 /** A section's cards while the server's answer loads: the same grid and card frame, a button's box in each. */
 function CardsSkeleton({ label }: { label: string }) {
   return (
@@ -248,7 +280,7 @@ export function DownloadAppsPage({
   showDesktop = true,
   openStoresInNewTab = true,
   onDownloadAction,
-  footer,
+  web,
 }: DownloadAppsPageProps) {
   const { data, isLoading, error, reload } = useDownloads({ endpoint, initialData });
   // The page adapts to the server's answer: a section exists only for what it names.
@@ -257,15 +289,6 @@ export function DownloadAppsPage({
   const hasMobile = !!mobile && (!!mobile.appStoreUrl || !!mobile.googlePlayUrl);
   // Until the answer lands, a host that offers the desktop app is titled for it.
   const offersDesktop = showDesktop && (!data || systems.length > 0);
-
-  useEffect(() => {
-    // The install QR code arrives with this parameter: a phone or a tablet goes
-    // straight on to its store. `replace`, so Back returns to whatever sent the
-    // visitor here. Anyone else who opens the page on a phone reads it.
-    if (!mobile || !new URLSearchParams(window.location.search).has(DOWNLOAD_PAGE_STORE_PARAM)) return;
-    const storeUrl = resolveMobileStoreUrl(mobile, navigator.userAgent, navigator.maxTouchPoints);
-    if (storeUrl) window.location.replace(storeUrl);
-  }, [mobile]);
 
   let body: ReactNode;
   if (error && !data) {
@@ -298,7 +321,7 @@ export function DownloadAppsPage({
 
         {mobile && hasMobile && (
           <Section id="download-mobile" title="Mobile app">
-            <div className={CARDS_GRID_CLASS}>
+            <div className={cardsGridClass(mobile.install ? 2 : 1)}>
               <div className={CARD_CLASS}>
                 <CardHeader title={storeCardTitle(mobile)} />
                 <p className="m-0 text-ods-text-secondary text-h4">Get alerts and respond to tickets on the go.</p>
@@ -308,18 +331,19 @@ export function DownloadAppsPage({
                   openInNewTab={openStoresInNewTab}
                 />
               </div>
-              <div className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-center content-md:justify-between')}>
-                <div className="flex flex-col gap-[var(--spacing-system-sf)]">
-                  <CardHeader title="Scan with your phone" />
-                  <p className="m-0 text-ods-text-secondary text-h4">
-                    Point your camera at the code, or open {MOBILE_APP_INSTALL_HOST_PATH} on your phone.
-                  </p>
+              {mobile.install && (
+                <div
+                  className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-center content-md:justify-between')}
+                >
+                  <div className="flex flex-col gap-[var(--spacing-system-sf)]">
+                    <CardHeader title="Scan with your phone" />
+                    <p className="m-0 text-ods-text-secondary text-h4">
+                      Point your camera at the code, or open {formatUrlForDisplay(mobile.install.url)} on your phone.
+                    </p>
+                  </div>
+                  <MobileAppQr install={mobile.install} className="h-[144px] w-[144px] shrink-0" />
                 </div>
-                {/* The plate is light on purpose: a QR code is read dark on light. */}
-                <div className="w-fit shrink-0 rounded-md bg-ods-bg-inverted p-[var(--spacing-system-sf)]">
-                  <MobileAppQr className="h-[120px] w-[120px]" />
-                </div>
-              </div>
+              )}
             </div>
           </Section>
         )}
@@ -336,7 +360,7 @@ export function DownloadAppsPage({
     >
       <div className={SECTIONS_CLASS}>
         {body}
-        {footer}
+        {web && <WebCard web={web} />}
       </div>
     </DownloadAppsChrome>
   );

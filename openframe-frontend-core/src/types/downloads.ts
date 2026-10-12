@@ -44,10 +44,27 @@ export interface AppDownload {
   label: string | null;
 }
 
+/**
+ * The install link a phone opens to reach its store, and the QR code that
+ * encodes it. Both are the server's: the link is an address on the website
+ * (answered there with a redirect by device), and the artwork is drawn from it
+ * on the server, so the two can never disagree and the lib names no host.
+ */
+export interface MobileAppInstallLink {
+  /** The absolute address the code encodes. */
+  url: string;
+  /** The side of the artwork's square viewBox, quiet zone included. */
+  qrViewBoxSize: number;
+  /** The dark modules as one SVG path of filled rectangles (`fill` draws them). */
+  qrPath: string;
+}
+
 /** Where the mobile app is installed from. A store the server names no listing for is null, and is not offered. */
 export interface MobileAppLinks {
   appStoreUrl: string | null;
   googlePlayUrl: string | null;
+  /** The install link and its QR code. Absent or null: no code is drawn. */
+  install?: MobileAppInstallLink | null;
 }
 
 /**

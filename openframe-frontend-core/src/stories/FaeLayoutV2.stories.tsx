@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-
 import { ChatInput } from '../components/chat/chat-input';
 import { ChatListEmptyState } from '../components/chat/chat-list-empty-state';
 import { ChatMessageList } from '../components/chat/chat-message-list';
@@ -8,7 +7,6 @@ import { ChatListItem, ChatNavSidebar } from '../components/chat/chat-nav-sideba
 import { ChatTopNavigation } from '../components/chat/chat-top-navigation';
 import { MspOrganizationCard } from '../components/chat/msp-organization-card';
 import type { Message } from '../components/chat/types/message.types';
-import { OpenFrameLogo } from '../components/icons';
 import {
   ChatPlusIcon,
   ChatQuestionIcon,
@@ -20,6 +18,7 @@ import {
   MessageIndicatorIcon,
   UserCheckIcon,
 } from '../components/icons-v2-generated';
+import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
 import { Button } from '../components/ui/button';
 import { withFaeBrand } from './fae-brand-decorator';
 
@@ -59,10 +58,10 @@ function Layout({ withChats, withThread }: { withChats: boolean; withThread: boo
         <ChatNavSidebar
           logo={
             <span className="flex items-center gap-[var(--spacing-system-xxs)] text-ods-text-primary">
-              <OpenFrameLogo
+              <OpenframeLogoIcon
+                secondaryColor="var(--ods-open-yellow-base)"
                 className="size-6"
-                lowerPathColor="var(--ods-open-yellow-base)"
-                upperPathColor="var(--color-text-primary)"
+                color="var(--color-text-primary)"
               />
               <span className="text-wordmark">OpenFrame</span>
             </span>

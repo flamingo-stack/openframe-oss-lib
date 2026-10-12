@@ -1,40 +1,35 @@
-import { MOBILE_APP_QR_PATH, MOBILE_APP_QR_VIEWBOX_SIZE } from '../../assets/mobile-app-qr';
+import type { MobileAppInstallLink } from '../../types/downloads';
 import { cn } from '../../utils/cn';
-import { MOBILE_APP_INSTALL_URL } from '../../utils/mobile-app';
 
 export interface MobileAppQrProps {
+  /** The server's install link: the address and the artwork that encodes it. */
+  install: MobileAppInstallLink;
   /** Sizes the code; the caller owns its footprint. */
   className?: string;
 }
 
 /**
- * The install QR code, drawn inline rather than loaded from `/public` so the
- * modules take their colour from the surface they sit on.
+ * The install QR code, drawn inline: the modules are the ODS accent colour and
+ * the background is transparent, so the code sits directly on whatever surface
+ * it is placed on. The artwork and the address it encodes are the server's
+ * (`MobileAppInstallLink`): this component holds neither.
  *
- * Dark modules, and the caller supplies a light plate. Decoders binarize the
- * image and expect dark-on-light; inverting that is one of the two things they
- * reliably fail on. The other is a missing quiet zone, which is why the 4-module
- * margin is baked into the viewBox — keep it even when the plate is larger.
- *
- * That polarity holds only under the dark theme, where `text-ods-bg` is the dark
- * value and `bg-ods-bg-inverted` the light one; both flip under `.theme-light`.
- * Do not render this inside a light-theme scope: an inverted code is silently
- * unscannable rather than visibly broken.
- *
- * The artwork is the asset `MOBILE_APP_QR_PATH` (`assets/mobile-app-qr`), which
- * encodes {@link MOBILE_APP_INSTALL_URL}; the regeneration note lives there.
+ * On a dark surface that is a light-on-dark code. Phone cameras read both
+ * polarities; what they need is contrast between the accent and the surface, and
+ * the quiet zone, which the server bakes into the viewBox as a transparent
+ * margin. Place it on a plain surface (a card, the page), never over an image
+ * or a surface close to the accent in brightness.
  */
-export function MobileAppQr({ className }: MobileAppQrProps) {
+export function MobileAppQr({ install, className }: MobileAppQrProps) {
   return (
     <svg
-      viewBox={`0 0 ${MOBILE_APP_QR_VIEWBOX_SIZE} ${MOBILE_APP_QR_VIEWBOX_SIZE}`}
-      fill="none"
+      viewBox={`0 0 ${install.qrViewBoxSize} ${install.qrViewBoxSize}`}
       shapeRendering="crispEdges"
       role="img"
-      aria-label={`QR code for ${MOBILE_APP_INSTALL_URL}`}
-      className={cn('h-[120px] w-[120px] text-ods-bg', className)}
+      aria-label={`QR code for ${install.url}`}
+      className={cn('h-[120px] w-[120px] text-ods-accent', className)}
     >
-      <path stroke="currentColor" d={MOBILE_APP_QR_PATH} />
+      <path fill="currentColor" d={install.qrPath} />
     </svg>
   );
 }

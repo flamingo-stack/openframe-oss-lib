@@ -10,6 +10,9 @@ module.exports = {
   replaceAttrValues: {
     '#888': '{color}',
     '#888888': '{color}',
+    // The other colours of a mark drawn in more than one (see icons-v2/icon-colors.json).
+    '#fe0001': '{secondaryColor}',
+    '#fe0002': '{tertiaryColor}',
   },
   svgProps: {
     width: '{size}',

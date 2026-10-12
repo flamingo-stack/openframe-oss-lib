@@ -9,9 +9,13 @@ import type React from 'react';
 import { type ShellType, ShellTypeValues } from '../../types/shell.types';
 import { cn } from '../../utils/cn';
 import { getShellLabel } from '../../utils/shell-utils';
-import { BashIcon, CmdIcon, DenoIcon, NushellIcon, ShellIcon } from '../icons';
+import { BashIcon } from '../icons-v2-generated/brand-logos/bash-icon';
+import { CmdIcon } from '../icons-v2-generated/brand-logos/cmd-icon';
+import { DenoIcon } from '../icons-v2-generated/brand-logos/deno-icon';
+import { NushellIcon } from '../icons-v2-generated/brand-logos/nushell-icon';
 import { PowershellLogoGreyIcon } from '../icons-v2-generated/brand-logos/powershell-logo-grey-icon';
 import { PythonLogoIcon } from '../icons-v2-generated/brand-logos/python-logo-icon';
+import { ShellIcon } from '../icons-v2-generated/brand-logos/shell-icon';
 
 /**
  * Shell icon configuration with typed mapping
