@@ -13,17 +13,9 @@ public class ScriptEnvVar {
 
     private String name;
 
-    /**
-     * <p>TODO: when {@link #secret} is {@code true} this will eventually be
-     * ciphertext. Until the secret-management story lands, secret values are
-     * stored in plaintext.
-     */
+    // TODO: value should be ciphertext when secret=true; plaintext until secret management lands
     private String value;
 
-    /**
-     * <p>TODO: until the secret-management story (encryption at rest +
-     * secure delivery to agents) lands, secret values are written to MongoDB
-     * in plaintext.
-     */
+    // TODO: secret values are written to MongoDB in plaintext until encryption-at-rest lands
     private boolean secret;
 }
