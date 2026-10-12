@@ -56,4 +56,25 @@ describe('accentSentenceMarks', () => {
       `Remote all year${mark('.')} Together once a year${mark('.')}`,
     );
   });
+
+  it('draws a heading with no eyebrow as the heading element itself', () => {
+    expect(html(<SectionHeading level="page" title="Run by AI" punctuation={null} />)).toBe(
+      '<div class="flex flex-col gap-[var(--spacing-system-lf)]"><h1 class="text-h1 text-ods-text-primary" data-section-heading="true">Run by AI</h1></div>',
+    );
+  });
+
+  it("keeps a section heading's eyebrow beside the heading, so the heading is named by its title alone", () => {
+    expect(html(<SectionHeading eyebrow="AI agents" title="Built in" punctuation={null} />)).toContain(
+      '<span class="text-h5 text-ods-accent">AI agents</span><h2 class="text-h2 text-ods-text-primary" data-section-heading="true">Built in</h2>',
+    );
+  });
+
+  it("makes a page heading's eyebrow part of the heading element, with the same two boxes in the stack", () => {
+    const out = html(
+      <SectionHeading level="page" eyebrow="Endpoint management software" title="Run by AI" punctuation={null} />,
+    );
+    expect(out).toContain(
+      '<h1 class="contents"><span class="text-h5 text-ods-accent">Endpoint management software</span><span class="block text-h1 text-ods-text-primary" data-section-heading="true">Run by AI</span></h1>',
+    );
+  });
 });
