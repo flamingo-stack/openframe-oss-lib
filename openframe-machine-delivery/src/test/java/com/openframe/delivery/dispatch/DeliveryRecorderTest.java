@@ -8,6 +8,7 @@ import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.TestPayload;
 import org.junit.jupiter.api.BeforeEach;
@@ -146,12 +147,12 @@ class DeliveryRecorderTest {
     }
 
     @Test
-    void record_wildcardMachine_rejectedNothingWritten() {
+    void record_everyMachine_rejectedNothingWritten() {
         // setup
         DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
                 .type(DeliveryType.CLIENT_UNINSTALL)
                 .targetId(MACHINE_ID)
-                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .audience(DeliveryAudience.EVERY_MACHINE)
                 .payload(payload)
                 .build();
 

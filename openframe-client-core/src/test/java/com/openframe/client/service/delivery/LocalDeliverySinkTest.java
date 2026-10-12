@@ -9,6 +9,7 @@ import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.rollout.DeliveryRolloutRecorder;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
@@ -66,7 +67,7 @@ class LocalDeliverySinkTest {
         DeliveryRequest<ToolInstallationMessage> forEveryMachine = DeliveryRequest.<ToolInstallationMessage>builder()
                 .type(DeliveryType.TOOL_INSTALLATION)
                 .targetId(TARGET_ID)
-                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .audience(DeliveryAudience.EVERY_MACHINE)
                 .payload(payload)
                 .build();
 
@@ -87,7 +88,7 @@ class LocalDeliverySinkTest {
         DeliveryRequest<ToolInstallationMessage> forEveryMachine = DeliveryRequest.<ToolInstallationMessage>builder()
                 .type(DeliveryType.TOOL_INSTALLATION)
                 .targetId(TARGET_ID)
-                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .audience(DeliveryAudience.EVERY_MACHINE)
                 .payload(payload)
                 .build();
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);

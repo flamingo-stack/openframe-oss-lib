@@ -9,13 +9,14 @@ import lombok.Getter;
 public class DeliveryRequest<P extends DeliveryPayload> {
     private final DeliveryType type;
     private final String targetId;
+    // the one machine, or none when the audience is every machine the type delivers to (client-service turns that
+    // into a rollout)
     private final String machineId;
+    @Builder.Default
+    private final DeliveryAudience audience = DeliveryAudience.MACHINE;
     private final P payload;
 
-    // the NATS wildcard as a machine: every machine the type delivers to; client-service turns it into a rollout
-    public static final String EVERY_MACHINE = "*";
-
     public boolean isForEveryMachine() {
-        return EVERY_MACHINE.equals(machineId);
+        return audience == DeliveryAudience.EVERY_MACHINE;
     }
 }

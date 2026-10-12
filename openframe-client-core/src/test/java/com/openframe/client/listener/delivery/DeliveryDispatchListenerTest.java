@@ -10,6 +10,7 @@ import com.openframe.delivery.dispatch.DeliveryDispatchMessage;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
@@ -62,7 +63,7 @@ class DeliveryDispatchListenerTest {
         doReturn(ToolInstallationMessage.class).when(spec).getPayloadClass();
 
         // execution
-        listener.onDispatch(new DeliveryDispatchMessage(DeliveryRequest.EVERY_MACHINE, command));
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.EVERY_MACHINE, null, command));
 
         // verifications
         verify(sink).accept(requestCaptor.capture());
@@ -75,7 +76,7 @@ class DeliveryDispatchListenerTest {
     @Test
     void onDispatch_noMachineId_rejectedAsIncomplete() {
         // execution
-        listener.onDispatch(new DeliveryDispatchMessage(null, command));
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.MACHINE, null, command));
 
         // verifications
         verify(metrics).recordDispatchRejected(DeliveryDispatchListener.REJECTED_INCOMPLETE);
@@ -89,7 +90,7 @@ class DeliveryDispatchListenerTest {
         doReturn(ToolInstallationMessage.class).when(spec).getPayloadClass();
 
         // execution
-        listener.onDispatch(new DeliveryDispatchMessage(MACHINE_ID, command));
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.MACHINE, MACHINE_ID, command));
 
         // verifications
         verify(sink).accept(requestCaptor.capture());
@@ -107,7 +108,7 @@ class DeliveryDispatchListenerTest {
         command.remove("delivery");
 
         // execution
-        listener.onDispatch(new DeliveryDispatchMessage(MACHINE_ID, command));
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.MACHINE, MACHINE_ID, command));
 
         // verifications
         verifyNoInteractions(sink);
@@ -120,7 +121,7 @@ class DeliveryDispatchListenerTest {
         ((ObjectNode) command.get("delivery")).put("type", "SOMETHING_NEW");
 
         // execution
-        listener.onDispatch(new DeliveryDispatchMessage(MACHINE_ID, command));
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.MACHINE, MACHINE_ID, command));
 
         // verifications
         verifyNoInteractions(sink);
@@ -136,7 +137,7 @@ class DeliveryDispatchListenerTest {
         command.set("toolAgentId", notAString);
 
         // execution
-        listener.onDispatch(new DeliveryDispatchMessage(MACHINE_ID, command));
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.MACHINE, MACHINE_ID, command));
 
         // verifications
         verifyNoInteractions(sink);

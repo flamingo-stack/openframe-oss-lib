@@ -1,6 +1,7 @@
 package com.openframe.delivery.dispatch;
 
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
@@ -81,13 +82,13 @@ class DeliveryDispatcherTest {
     }
 
     @Test
-    void dispatch_wildcardOnATypeThatDeliversToOneMachineAtATime_throwsWithoutHandOff() {
+    void dispatch_everyMachineOnATypeThatDeliversToOneMachineAtATime_throwsWithoutHandOff() {
         // setup
-        TestSeed everyMachine = new TestSeed(DeliveryRequest.EVERY_MACHINE);
+        TestSeed everyMachine = new TestSeed(null);
         DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
                 .type(DeliveryType.TOOL_INSTALLATION)
                 .targetId(TARGET_ID)
-                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .audience(DeliveryAudience.EVERY_MACHINE)
                 .payload(payload)
                 .build();
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
@@ -99,13 +100,13 @@ class DeliveryDispatcherTest {
     }
 
     @Test
-    void dispatch_wildcardOnATypeThatMayBeRolledOut_handedToSink() {
+    void dispatch_everyMachineOnATypeThatMayBeRolledOut_handedToSink() {
         // setup
-        TestSeed everyMachine = new TestSeed(DeliveryRequest.EVERY_MACHINE);
+        TestSeed everyMachine = new TestSeed(null);
         DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
                 .type(DeliveryType.TOOL_INSTALLATION)
                 .targetId(TARGET_ID)
-                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .audience(DeliveryAudience.EVERY_MACHINE)
                 .payload(payload)
                 .build();
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);

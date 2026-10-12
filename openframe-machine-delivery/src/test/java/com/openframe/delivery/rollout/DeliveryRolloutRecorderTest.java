@@ -8,6 +8,7 @@ import com.openframe.data.repository.delivery.MachineDeliveryRolloutRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
 import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.TestPayload;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +46,7 @@ class DeliveryRolloutRecorderTest {
         request = DeliveryRequest.<TestPayload>builder()
                 .type(DeliveryType.CLIENT_UPDATE)
                 .targetId(TARGET_ID)
-                .machineId(DeliveryRequest.EVERY_MACHINE)
+                .audience(DeliveryAudience.EVERY_MACHINE)
                 .payload(payload)
                 .build();
     }
