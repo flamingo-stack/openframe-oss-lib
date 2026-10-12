@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -62,9 +63,9 @@ public class MachineIdCacheService {
                     machine.getOrganizationId()
                 ))
                 .orElse(null);
-        } catch (Exception e) {
-            log.error("Error fetching machine info for agent: {}", agentId, e);
-            return null;
+        } catch (DataAccessException e) {
+            log.error("Data access error fetching machine info for agent: {}", agentId, e);
+            throw e;
         }
     }
 
@@ -83,9 +84,9 @@ public class MachineIdCacheService {
                     machine.getOrganizationId()
                 ))
                 .orElse(null);
-        } catch (Exception e) {
-            log.error("Error fetching machine info for agent: {} (tenant: {}, tool: {})", agentId, tenantId, toolType, e);
-            return null;
+        } catch (DataAccessException e) {
+            log.error("Data access error fetching machine info for agent: {} (tenant: {}, tool: {})", agentId, tenantId, toolType, e);
+            throw e;
         }
     }
 
@@ -108,9 +109,9 @@ public class MachineIdCacheService {
                     machine.getOrganizationId()
                 ))
                 .orElse(null);
-        } catch (Exception e) {
-            log.error("Error fetching machine info by machineId: {}", machineId, e);
-            return null;
+        } catch (DataAccessException e) {
+            log.error("Data access error fetching machine info by machineId: {}", machineId, e);
+            throw e;
         }
     }
 
@@ -131,9 +132,9 @@ public class MachineIdCacheService {
                     org.getName()
                 ))
                 .orElse(null);
-        } catch (Exception e) {
-            log.error("Error fetching organization info for ID: {}", organizationId, e);
-            return null;
+        } catch (DataAccessException e) {
+            log.error("Data access error fetching organization info for ID: {}", organizationId, e);
+            throw e;
         }
     }
 
