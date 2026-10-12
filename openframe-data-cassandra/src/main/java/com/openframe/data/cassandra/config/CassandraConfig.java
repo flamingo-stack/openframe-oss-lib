@@ -126,6 +126,16 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
             logger.info("Table '{}.command_results' is ready (default_time_to_live={}s)",
                     keyspaceName, commandResultTtlSeconds);
 
+            // CREATE TABLE IF NOT EXISTS is a no-op once the table already exists, so if
+            // commandResultTtlSeconds changes afterwards the live TTL would silently drift
+            // from configuration. Explicitly (re)apply the configured TTL on every startup.
+            String alterCommandResultsTableTtl = String.format(
+                    "ALTER TABLE %s.command_results WITH default_time_to_live = %d",
+                    keyspaceName, commandResultTtlSeconds);
+            session.execute(alterCommandResultsTableTtl);
+            logger.info("Table '{}.command_results' default_time_to_live synced to {}s",
+                    keyspaceName, commandResultTtlSeconds);
+
         } catch (Exception e) {
             logger.error("Failed to create keyspace '{}'", keyspaceName, e);
             throw new RuntimeException("Failed to ensure Cassandra keyspace exists", e);
@@ -145,3 +155,4 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
         return new CassandraTableColumnSync(session, mappingContext, schemaFactory, keyspaceName);
     }
 }
+
