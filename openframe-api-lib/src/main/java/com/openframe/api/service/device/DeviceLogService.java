@@ -9,12 +9,16 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.tenant.TenantDomainService;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.logs.AgentLogBucket;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.organization.Organization;
 import com.openframe.data.loki.client.LogQl;
 import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.model.LokiDirection;
 import com.openframe.data.loki.model.LokiLogEntry;
+import com.openframe.data.repository.organization.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,6 +30,7 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -35,8 +40,8 @@ import static java.util.stream.Collectors.toSet;
 
 /**
  * Device agent logs, read from Loki where {@code openframe-saas-logs-stream} writes them as
- * {@code {job="agent-logs", tenant_domain, level}} streams with {@code machine_id}, {@code hostname},
- * {@code agent_ts} and {@code count} as structured metadata.
+ * {@code {job="agent-logs", tenant_domain, level}} streams with {@code machine_id}, {@code organization_id},
+ * {@code hostname}, {@code agent_ts} and {@code count} as structured metadata.
  * <p>
  * The tenant domain that pins the stream selector comes from {@link TenantDomainService}, never from a caller, so no
  * argument reaching this service can widen the query past its own tenant. The same domain is declared as the Loki
@@ -56,6 +61,7 @@ public class DeviceLogService {
     static final Duration DEFAULT_TENANT_LOOKBACK = Duration.ofDays(1);
     static final Duration MAX_RANGE = Duration.ofDays(30);
     static final int MAX_DEVICES = 50;
+    static final int MAX_ORGANIZATIONS = 50;
     static final int MAX_SEARCH_LENGTH = 256;
     static final int MAX_SEARCH_TERMS = 5;
     static final int DEFAULT_PAGE_SIZE = 100;
@@ -71,6 +77,7 @@ public class DeviceLogService {
     private final DeviceService deviceService;
     private final TenantDomainService tenantDomainService;
     private final DeviceLogProperties properties;
+    private final OrganizationRepository organizationRepository;
 
     /**
      * Logs of one device, newest first. Shorthand for {@link #queryLogs(List, DeviceLogFilterCriteria,
@@ -94,8 +101,27 @@ public class DeviceLogService {
     public GenericQueryResult<DeviceLogEntry> queryLogs(List<String> machineIds,
                                                         DeviceLogFilterCriteria filter,
                                                         CursorPaginationCriteria pagination) {
+        return queryLogs(machineIds, null, filter, pagination);
+    }
+
+    /**
+     * Agent logs of this tenant, newest first, narrowed to {@code machineIds} and to devices of
+     * {@code organizationIds}; a null list leaves that dimension open, and both together keep the lines that match
+     * both (their intersection).
+     * <p>
+     * The organization filter relies on the {@code organization_id} metadata the agent sends with each batch, so it
+     * only matches lines written since agents started sending it. Organizations are checked against this tenant like
+     * devices are, so an id from another tenant is a 404 rather than an empty page; the stream selector keeps the
+     * query on this tenant either way.
+     */
+    public GenericQueryResult<DeviceLogEntry> queryLogs(List<String> machineIds,
+                                                        List<String> organizationIds,
+                                                        DeviceLogFilterCriteria filter,
+                                                        CursorPaginationCriteria pagination) {
         List<String> devices = validateDevices(machineIds);
+        List<String> organizations = validateOrganizations(organizationIds);
         verifyDevicesExist(devices);
+        verifyOrganizationsExist(organizations);
 
         DeviceLogFilterCriteria criteria = filter != null ? filter : new DeviceLogFilterCriteria();
         CursorPaginationCriteria page = pagination != null ? pagination : new CursorPaginationCriteria();
@@ -119,9 +145,10 @@ public class DeviceLogService {
         }
 
         String tenantDomain = tenantDomainService.getTenantDomain();
-        String query = buildQuery(tenantDomain, devices, criteria, bucketed(from));
+        String query = buildQuery(tenantDomain, devices, organizations, criteria, bucketed(from));
         int pageSize = pageSize(page.getLimit());
-        log.debug("Querying device logs for machineIds: {}, query: {}, start: {}, end: {}", devices, query, startNanos, endNanos);
+        log.debug("Querying device logs for machineIds: {}, organizationIds: {}, query: {}, start: {}, end: {}",
+                devices, organizations, query, startNanos, endNanos);
 
         // One extra line tells whether there is a next page
         int queryLimit = pageSize + 1;
@@ -148,6 +175,11 @@ public class DeviceLogService {
 
     static String buildQuery(String tenantDomain, List<String> machineIds, DeviceLogFilterCriteria criteria,
                              boolean bucketed) {
+        return buildQuery(tenantDomain, machineIds, List.of(), criteria, bucketed);
+    }
+
+    static String buildQuery(String tenantDomain, List<String> machineIds, List<String> organizationIds,
+                             DeviceLogFilterCriteria criteria, boolean bucketed) {
         StringBuilder query = new StringBuilder("{job=").append(LogQl.quote(AGENT_LOGS_JOB))
                 .append(", tenant_domain=").append(LogQl.quote(tenantDomain));
         List<DeviceLogLevel> levels = criteria.getLevels();
@@ -163,6 +195,7 @@ public class DeviceLogService {
         appendTermFilters(query, " |~ ", criteria.getContains());
         appendTermFilters(query, " !~ ", criteria.getExcludes());
         appendDeviceFilter(query, machineIds);
+        appendMetadataFilter(query, "organization_id", organizationIds);
         return query.toString();
     }
 
@@ -192,15 +225,23 @@ public class DeviceLogService {
      * dependence on how Loki anchors a label-filter regex.
      */
     private static void appendDeviceFilter(StringBuilder query, List<String> machineIds) {
-        if (machineIds.isEmpty()) {
+        appendMetadataFilter(query, "machine_id", machineIds);
+    }
+
+    /**
+     * One {@code |} stage per metadata key, its values chained with {@code or}. Separate stages AND together, so naming
+     * devices and organizations keeps only lines that match both.
+     */
+    private static void appendMetadataFilter(StringBuilder query, String key, List<String> values) {
+        if (values.isEmpty()) {
             return;
         }
         query.append(" | ");
-        for (int i = 0; i < machineIds.size(); i++) {
+        for (int i = 0; i < values.size(); i++) {
             if (i > 0) {
                 query.append(" or ");
             }
-            query.append("machine_id=").append(LogQl.quote(machineIds.get(i)));
+            query.append(key).append('=').append(LogQl.quote(values.get(i)));
         }
     }
 
@@ -220,6 +261,42 @@ public class DeviceLogService {
             throw new IllegalArgumentException("Cannot query more than " + MAX_DEVICES + " devices at once");
         }
         return devices;
+    }
+
+    /**
+     * Same rules as devices: null means no organization filter, a present list without a usable id is rejected.
+     */
+    private static List<String> validateOrganizations(List<String> organizationIds) {
+        if (organizationIds == null) {
+            return List.of();
+        }
+        List<String> organizations = organizationIds.stream().filter(StringUtils::hasText).distinct().toList();
+        if (organizations.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "organizationIds must name at least one organization; omit it to query every organization");
+        }
+        if (organizations.size() > MAX_ORGANIZATIONS) {
+            throw new IllegalArgumentException("Cannot query more than " + MAX_ORGANIZATIONS + " organizations at once");
+        }
+        return organizations;
+    }
+
+    /**
+     * {@link Organization} is tenant-scoped, so the lookup only sees this tenant's organizations: an id from another
+     * tenant is a 404 here, the same as a typo.
+     */
+    private void verifyOrganizationsExist(List<String> organizationIds) {
+        if (organizationIds.isEmpty()) {
+            return;
+        }
+        Set<String> found = organizationRepository.findByOrganizationIdIn(new LinkedHashSet<>(organizationIds)).stream()
+                .map(Organization::getOrganizationId)
+                .collect(toSet());
+        for (String organizationId : organizationIds) {
+            if (!found.contains(organizationId)) {
+                throw new NotFoundException(ErrorCode.ORGANIZATION_NOT_FOUND, "Organization not found: " + organizationId);
+            }
+        }
     }
 
     /**
@@ -285,6 +362,7 @@ public class DeviceLogService {
                     .level(entry.labels().get("level"))
                     .message(entry.line())
                     .machineId(entry.labels().get("machine_id"))
+                    .organizationId(entry.labels().get("organization_id"))
                     .hostname(entry.labels().get("hostname"))
                     .count(parseLong(entry.labels().get("count")))
                     .cursor(new DeviceLogCursor(entry.timestampNanos()).encode())

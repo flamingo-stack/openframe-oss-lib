@@ -140,6 +140,12 @@ export interface AutocompleteMultipleProps<T = string> extends AutocompleteBaseP
   limitTags?: number | 'auto';
   /** Custom render function for the "+N" overflow chip */
   getLimitTagsText?: (more: number) => ReactNode;
+  /**
+   * Show every tag in full, wrapping onto more lines: the field grows instead
+   * of truncating labels and collapsing the rest into "+N". `limitTags` is
+   * ignored. For short pickers whose picks must stay readable (ticket titles).
+   */
+  wrapTags?: boolean;
 }
 
 export type AutocompleteProps<T = string> = AutocompleteSingleProps<T> | AutocompleteMultipleProps<T>;
@@ -189,6 +195,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
   // Multiple-only props
   const maxItems = multiple ? (props as AutocompleteMultipleProps<T>).maxItems : undefined;
   const renderTag = multiple ? (props as AutocompleteMultipleProps<T>).renderTag : undefined;
+  const wrapTags = multiple && ((props as AutocompleteMultipleProps<T>).wrapTags ?? false);
   const limitTagsProp = multiple ? ((props as AutocompleteMultipleProps<T>).limitTags ?? 'auto') : 'auto';
   const getLimitTagsText = multiple
     ? ((props as AutocompleteMultipleProps<T>).getLimitTagsText ?? ((more: number) => `+${more}`))
@@ -252,7 +259,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
     inputRef,
   } = useAutoLimitTags({
     count: multiple ? selectedOptions.length : 0,
-    limitTags: multiple ? limitTagsProp : 0,
+    limitTags: multiple ? (wrapTags ? selectedOptions.length : limitTagsProp) : 0,
     placeholder: inputPlaceholder,
   });
 
@@ -506,15 +513,22 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
             </span>
           )}
 
-          {/* Middle zone: tags + input — single line with overflow */}
-          <div ref={middleRef} className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-2">
+          {/* Middle zone: tags + input — single line with overflow, or wrapped lines with `wrapTags` */}
+          <div
+            ref={middleRef}
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-2 px-2',
+              wrapTags ? 'flex-wrap py-[var(--spacing-system-xsf)]' : 'overflow-hidden',
+            )}
+          >
             {/* Tags (multiple mode only) */}
             {multiple &&
               visibleTags.map(option => (
                 <Tag
                   key={String(option.value)}
                   variant="outline"
-                  labelClassName="max-w-[90px] truncate"
+                  className={wrapTags ? 'max-w-full' : undefined}
+                  labelClassName={wrapTags ? 'truncate' : 'max-w-[90px] truncate'}
                   label={renderTag ? renderTag(option) : option.label}
                   onClose={
                     !disabled

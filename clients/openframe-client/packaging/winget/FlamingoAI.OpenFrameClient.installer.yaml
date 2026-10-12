@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+
+PackageIdentifier: FlamingoAI.OpenFrameClient
+PackageVersion: 1.5.36
+InstallerType: zip
+NestedInstallerType: exe
+NestedInstallerFiles:
+- RelativeFilePath: openframe-client.exe
+InstallModes:
+- silent
+InstallerSwitches:
+  Silent: install
+  SilentWithProgress: install
+Scope: machine
+ElevationRequirement: elevationRequired
+UpgradeBehavior: deny
+ProductCode: com.openframe.client
+AppsAndFeaturesEntries:
+- DisplayName: OpenFrame Client
+  Publisher: Flamingo AI, Inc.
+  ProductCode: com.openframe.client
+Installers:
+- Architecture: x64
+  InstallerUrl: https://openframe.ai/v0/api/assets/download?agent=client&platform=windows&version=1.5.36
+  InstallerSha256: 91103794CF3C32CA06EC766F5CCD929FA4906F22B114C026CF2700EB922E16FD
+ManifestType: installer
+ManifestVersion: 1.10.0

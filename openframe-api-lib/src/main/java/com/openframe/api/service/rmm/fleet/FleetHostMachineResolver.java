@@ -117,7 +117,7 @@ public class FleetHostMachineResolver {
 
     private static boolean isCountable(Machine machine) {
         DeviceStatus status = machine.getStatus();
-        return status == DeviceStatus.ONLINE || status == DeviceStatus.OFFLINE;
+        return DeviceStatus.CONNECTED.contains(status);
     }
 
     private static Machine lookup(Map<String, Machine> byKey, String key) {

@@ -1,29 +1,25 @@
 'use client';
 
-import type { ComponentType } from 'react';
-import { OpenFrameLogo } from '../../icons';
-import { AppleLogoIcon } from '../../icons-v2-generated/brand-logos/apple-logo-icon';
-import { GoogleLogoIcon } from '../../icons-v2-generated/brand-logos/google-logo-icon';
-import { MicrosoftLogoIcon } from '../../icons-v2-generated/brand-logos/microsoft-logo-icon';
+import { requireIcon, type IconComponent } from '../../chat/utils/icon-loading';
 import { Button } from '../../ui/button';
 
 /** SSO providers offered on the auth forms. */
 export type AuthSsoProvider = 'openframe' | 'google' | 'microsoft' | 'apple';
 
-export const PROVIDER_META: Record<AuthSsoProvider, { name: string; Icon: ComponentType<{ className?: string }> }> = {
+/** Each provider's name and its mark. The mark is named, not imported: it is loaded when a button draws it. */
+export const PROVIDER_META: Record<AuthSsoProvider, { name: string; Icon: IconComponent }> = {
   openframe: {
     name: 'OpenFrame',
-    Icon: ({ className }) => (
-      <OpenFrameLogo
-        className={className}
-        lowerPathColor="var(--color-accent-primary)"
-        upperPathColor="var(--color-text-primary)"
-      />
-    ),
+    Icon: requireIcon({
+      set: 'OpenframeLogoIcon',
+      color: 'var(--color-text-primary)',
+      secondaryColor: 'var(--color-accent-primary)',
+      ownColor: true,
+    }),
   },
-  google: { name: 'Google', Icon: GoogleLogoIcon },
-  microsoft: { name: 'Microsoft', Icon: MicrosoftLogoIcon },
-  apple: { name: 'Apple', Icon: AppleLogoIcon },
+  google: { name: 'Google', Icon: requireIcon({ set: 'GoogleLogoIcon' }) },
+  microsoft: { name: 'Microsoft', Icon: requireIcon({ set: 'MicrosoftLogoIcon' }) },
+  apple: { name: 'Apple', Icon: requireIcon({ set: 'AppleLogoIcon' }) },
 };
 
 export interface SsoProviderButtonsProps {

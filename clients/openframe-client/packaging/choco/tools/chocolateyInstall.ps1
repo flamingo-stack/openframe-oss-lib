@@ -12,8 +12,8 @@ $temp = Join-Path $env:TEMP ('openframe-install-' + [guid]::NewGuid().ToString()
 $packageArgs = @{
   packageName    = $env:ChocolateyPackageName
   unzipLocation  = $temp
-  url64bit       = 'https://openframe.ai/v0/api/assets/download?agent=client&platform=windows&version=1.5.10'
-  checksum64     = 'd9e7abf5a5606a3fc8e40b580491474ac531222ee585e09c59d5c434945580fd'
+  url64bit       = 'https://openframe.ai/v0/api/assets/download?agent=client&platform=windows&version=1.5.33'
+  checksum64     = '507d688a344d267d882e761b210c303359041d089a9bf4cc19d17ee8cc36d83d'
   checksumType64 = 'sha256'
 }
 

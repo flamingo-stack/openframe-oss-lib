@@ -24,7 +24,7 @@
  *
  * Companion to the docblocks on each individual shim file.
  */
-export { default as Image, registerImage } from './next-image';
+export { default as Image, registerImage, registerImageResizer, resizedImageUrl } from './next-image';
 export { default as Link, registerLink } from './next-link';
 export { default as dynamic, registerDynamic } from './next-dynamic';
 export {

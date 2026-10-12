@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { ShapeCircleDashIcon } from '../icons';
+import { ShapeCircleDashClassicIcon } from '../icons-v2-generated/design/shape-circle-dash-classic-icon';
 
 export interface BulletListItem {
   text: string;
@@ -28,7 +28,7 @@ const spacingMap = {
 export function BulletList({
   items,
   bulletColor = 'var(--color-text-primary)',
-  bulletIcon: BulletIcon = ShapeCircleDashIcon,
+  bulletIcon: BulletIcon = ShapeCircleDashClassicIcon,
   bulletSize = 16,
   textClassName = 'text-h4 text-ods-text-primary',
   itemClassName = 'flex items-start gap-3',

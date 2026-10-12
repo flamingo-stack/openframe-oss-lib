@@ -1,14 +1,15 @@
 'use client';
 
+import type React from 'react';
+import type { Components, ExtraProps } from 'react-markdown';
+import Image from '../../../embed-shims/next-image';
 /**
  * Default react-markdown component map for the unified markdown engine.
  * ONE implementation of code blocks, headings, links, lists, tables etc.
  * Compositions layer on top via `componentOverrides` (spread LAST by the
  * engine, so caller overrides always win).
  */
-import type React from 'react';
-import type { Components, ExtraProps } from 'react-markdown';
-import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { useAuthedImageSrc } from '../../../hooks/use-authed-image-src';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import { cn } from '../../../utils/cn';
@@ -334,7 +335,7 @@ export function buildBaseComponents({
       };
 
       return (
-        <a
+        <Link
           href={href}
           className={`relative text-ods-accent no-underline transition-colors duration-200 after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-0 after:bg-ods-accent after:transition-all after:duration-300 after:content-[''] hover:after:w-full ${linkClassName || ''}`}
           target={href?.startsWith('http') ? '_blank' : undefined}
@@ -342,7 +343,7 @@ export function buildBaseComponents({
           onClick={inPageAnchorId !== null ? handleAnchorClick : undefined}
         >
           {children}
-        </a>
+        </Link>
       );
     },
 

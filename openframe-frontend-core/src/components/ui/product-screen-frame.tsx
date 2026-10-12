@@ -3,6 +3,7 @@
 import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { LAYOUT_STEPS } from '../../styles/layout-steps';
 import { cn } from '../../utils/cn';
+import { PagePicture } from '../layout/page-picture';
 import { CollisionBoundaryContext, PortalContainerContext } from './portal-container';
 
 /** The widest content step: a product screen is drawn at this width and scaled to its frame. */
@@ -120,7 +121,9 @@ export function ProductScreenFrame({
             className={cn('ods-content-area', mode === 'pending' && 'invisible')}
             style={screenStyle}
           >
-            <div className="ods-content-scope">{children}</div>
+            <div className="ods-content-scope">
+              <PagePicture>{children}</PagePicture>
+            </div>
             <div ref={setPortalHost} style={{ display: 'contents' }} />
           </div>
         </CollisionBoundaryContext.Provider>

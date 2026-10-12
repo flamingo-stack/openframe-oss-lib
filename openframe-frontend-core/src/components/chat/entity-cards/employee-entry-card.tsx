@@ -1,5 +1,6 @@
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { getProxiedImageUrl } from '../../../utils/image-proxy-stub';
 import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
 import { AdminContentCard } from './admin-content-card';
@@ -127,9 +128,9 @@ export function EmployeeEntryCard({
     />
   );
   return anchorProps ? (
-    <a {...anchorProps} className="block h-full">
+    <Link {...anchorProps} className="block h-full">
       {card}
-    </a>
+    </Link>
   ) : (
     card
   );

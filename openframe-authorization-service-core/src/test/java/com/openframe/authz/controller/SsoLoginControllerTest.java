@@ -14,6 +14,7 @@ import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.core.constants.SsoFlowCookieNames;
 import com.openframe.data.document.auth.SsoIdentity;
+import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.document.tenant.TenantStatus;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
@@ -174,8 +175,9 @@ class SsoLoginControllerTest {
         when(signupTicketService.peek("tk")).thenReturn(Optional.of(
                 new SignupTicketPayload("Founder@NewCo.com", "Fo", null, "google", true, "g-1", null, null)));
         when(ssoIdentityService.findBySubject("google", "g-1")).thenReturn(Optional.empty());
-        when(registrationService.registerTenant(any())).thenReturn(tenant("newco", TenantStatus.ACTIVE));
-        when(ssoLoginService.ownerUserId("Founder@NewCo.com", "newco")).thenReturn("owner-1");
+        Tenant registered = tenant("newco", TenantStatus.ACTIVE);
+        registered.setOwnerId("owner-1");
+        when(registrationService.registerTenant(any())).thenReturn(registered);
 
         var result = controller.completeSsoRegistrationByTicket(
                 new SsoLoginController.SignupTicketCompleteRequest("tk", "NewCo", "NewCo", null));

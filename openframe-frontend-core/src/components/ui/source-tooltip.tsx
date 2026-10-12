@@ -2,6 +2,7 @@
 
 import { ExternalLink, Info } from 'lucide-react';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
+import Link from '../../embed-shims/next-link';
 import { Button } from './button';
 import { FloatingTooltip } from './floating-tooltip';
 
@@ -82,9 +83,15 @@ export function SourceTooltip({ intro, sources, note, iconClassName, triggerAnch
         </span>
       }
     >
-      <a href={sources[0].href} target="_blank" rel="noreferrer" aria-label="Source research" {...triggerAnchorProps}>
+      <Link
+        href={sources[0].href}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Source research"
+        {...triggerAnchorProps}
+      >
         <Info className={iconClassName} />
-      </a>
+      </Link>
     </FloatingTooltip>
   );
 }

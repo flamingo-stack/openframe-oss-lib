@@ -6,6 +6,7 @@ use crate::config::update_config::{
 use crate::listener::client_update_gate::park_or_dispatch;
 use crate::models::ToolUninstallMessage;
 use crate::services::nats_connection_manager::NatsConnectionManager;
+use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::tool_uninstall_service::ToolUninstallService;
 use crate::services::tool_uninstall_service::UninstallOutcome;
@@ -15,7 +16,7 @@ use async_nats::jetstream;
 use async_nats::jetstream::consumer::push;
 use async_nats::jetstream::consumer::PushConsumer;
 use async_nats::jetstream::Message;
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::time::Duration;
@@ -25,6 +26,7 @@ use tracing::{error, info, warn};
 pub struct ToolUninstallMessageListener {
     nats_connection_manager: NatsConnectionManager,
     tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
     tool_uninstall_service: ToolUninstallService,
     config_service: AgentConfigurationService,
 }
@@ -35,12 +37,14 @@ impl ToolUninstallMessageListener {
     pub fn new(
         nats_connection_manager: NatsConnectionManager,
         tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
         tool_uninstall_service: ToolUninstallService,
         config_service: AgentConfigurationService,
     ) -> Self {
         Self {
             nats_connection_manager,
             tool_run_manager,
+            tool_ops,
             tool_uninstall_service,
             config_service,
         }
@@ -170,46 +174,24 @@ impl ToolUninstallMessageListener {
     async fn dispatch(&self, message: Message, uninstall_message: ToolUninstallMessage) {
         let tool_agent_id = uninstall_message.tool_agent_id.clone();
 
-        let tool_lock = self.tool_run_manager.tool_lock(&tool_agent_id).await;
-        let _guard = match tool_lock.try_lock() {
-            Ok(guard) => guard,
-            Err(_) => {
+        let ack_message = match self
+            .tool_uninstall_service
+            .uninstall_guarded(&tool_agent_id, &self.tool_ops, &self.tool_run_manager)
+            .await
+        {
+            Ok(UninstallOutcome::Removed | UninstallOutcome::NotInstalled) => true,
+            Ok(UninstallOutcome::Busy) => {
                 info!(
                     "Tool {} busy with another operation, deferring uninstall for redelivery",
                     tool_agent_id
                 );
                 return;
             }
-        };
-
-        self.tool_run_manager.mark_updating(&tool_agent_id).await;
-
-        let outcome = std::panic::AssertUnwindSafe(
-            self.tool_uninstall_service
-                .uninstall_by_tool_agent_id(&tool_agent_id),
-        )
-        .catch_unwind()
-        .await;
-
-        let (ack_message, remove_supervision) = match outcome {
-            Ok(Ok(UninstallOutcome::Removed)) => (true, true),
-            Ok(Ok(UninstallOutcome::NotInstalled)) => (true, true),
-            Ok(Err(e)) => {
+            Err(e) => {
                 error!("Failed to uninstall tool {}: {:#}", tool_agent_id, e);
-                (false, false)
-            }
-            Err(_) => {
-                error!("Uninstall panicked for tool {}", tool_agent_id);
-                (false, false)
+                false
             }
         };
-
-        if remove_supervision {
-            self.tool_run_manager
-                .clear_running_tool(&tool_agent_id)
-                .await;
-        }
-        self.tool_run_manager.clear_updating(&tool_agent_id).await;
 
         if ack_message {
             match message.ack().await {

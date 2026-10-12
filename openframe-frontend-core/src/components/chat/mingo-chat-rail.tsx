@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
+import { AgentMark } from '../agent-mark';
 import {
   AlertCircleIcon,
   Arrow02LeftIcon,
@@ -18,7 +19,6 @@ import {
   UserIcon,
   UsersIcon,
 } from '../icons-v2-generated';
-import { MingoIcon } from '../icons/mingo-icon';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
@@ -256,13 +256,7 @@ export function MingoChatRail({
       aria-label="Mingo chats"
       logo={
         <div className="flex flex-1 items-center justify-between">
-          <MingoIcon
-            color="currentColor"
-            eyesColor="var(--ods-flamingo-cyan-base)"
-            cornerColor="var(--ods-flamingo-cyan-base)"
-            className="size-6 text-ods-text-primary"
-            aria-hidden
-          />
+          <AgentMark agent="mingo" className="size-6 text-ods-text-primary" />
           {onExpand && (
             <Button
               variant="transparent"

@@ -3,6 +3,7 @@ package com.openframe.delivery.config;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
+import com.openframe.delivery.config.DeliveryProperties.PolicyOverride;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +43,7 @@ class DeliveryPropertiesTest {
     @Test
     void resolve_typeOverridesOneField_otherFieldsFromDefaults() {
         // setup
-        Policy uninstall = new Policy();
+        PolicyOverride uninstall = new PolicyOverride();
         uninstall.setMaxAttempts(UNINSTALL_MAX_ATTEMPTS);
         properties.setTypes(Map.of(DeliveryType.CLIENT_UNINSTALL, uninstall));
 
@@ -63,7 +64,7 @@ class DeliveryPropertiesTest {
     @Test
     void resolve_typeOverridesOfflineBehavior_overrideWins() {
         // setup
-        Policy scripts = new Policy();
+        PolicyOverride scripts = new PolicyOverride();
         scripts.setOfflineBehavior(DeliveryOfflineBehavior.SKIP);
         properties.setTypes(Map.of(DeliveryType.SCRIPT_SCHEDULE, scripts));
 

@@ -4,6 +4,7 @@ import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { type ComponentRef, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
+import { booleanCheckedChange } from './checkbox';
 import { RequiredMark } from './required-mark';
 
 interface CheckboxBlockProps {
@@ -84,7 +85,7 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
           id={id}
           checked={checked}
           defaultChecked={defaultChecked}
-          onCheckedChange={onCheckedChange}
+          onCheckedChange={booleanCheckedChange(onCheckedChange)}
           disabled={disabled}
           aria-required={required || undefined}
           aria-invalid={error ? true : undefined}

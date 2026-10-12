@@ -19,6 +19,7 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
@@ -31,7 +32,6 @@ import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
-import graphql.relay.Relay;
 import graphql.schema.DataFetchingFieldSelectionSet;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -46,13 +46,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+
 @DgsComponent
 @Slf4j
 @Validated
 @RequiredArgsConstructor
 public class DeviceDataFetcher {
-
-    private static final Relay RELAY = new Relay();
 
     private final DeviceService deviceService;
     private final DeviceFilterService deviceFilterService;
@@ -60,6 +60,7 @@ public class DeviceDataFetcher {
     private final FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     private final GraphQLDeviceMapper mapper;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public CompletableFuture<DeviceFilters> deviceFilters(@InputArgument @Valid DeviceFilterInput filter,
@@ -117,7 +118,7 @@ public class DeviceDataFetcher {
 
     @DgsQuery
     public Machine deviceById(@InputArgument @NotBlank String id) {
-        String machineId = RELAY.fromGlobalId(id).getId();
+        String machineId = relayIdCodec.decode(id, MACHINE);
         log.debug("Fetching device by global ID: {}, machineId: {}", id, machineId);
         return deviceService.findByMachineId(machineId).orElse(null);
     }
@@ -135,18 +136,6 @@ public class DeviceDataFetcher {
         return deviceService.updateNickname(machineId, nickname);
     }
 
-    @DgsData(parentType = "Machine", field = "id")
-    public String machineNodeId(DgsDataFetchingEnvironment dfe) {
-        Machine machine = dfe.getSource();
-        return RELAY.toGlobalId("Machine", machine.getMachineId());
-    }
-
-    @DgsData(parentType = "ToolConnection", field = "id")
-    public String toolConnectionNodeId(DgsDataFetchingEnvironment dfe) {
-        ToolConnection tc = dfe.getSource();
-        return RELAY.toGlobalId("ToolConnection", tc.getId());
-    }
-
     @DgsData(parentType = "ToolConnection", field = "vulnerabilitiesUpdatedAt")
     public Instant toolConnectionVulnerabilitiesUpdatedAt(DgsDataFetchingEnvironment dfe) {
         ToolConnection tc = dfe.getSource();
@@ -154,12 +143,6 @@ public class DeviceDataFetcher {
             return null;
         }
         return fleetVulnerabilityStatusService.getLastCompletedVulnerabilityRunAt();
-    }
-
-    @DgsData(parentType = "InstalledAgent", field = "id")
-    public String installedAgentNodeId(DgsDataFetchingEnvironment dfe) {
-        InstalledAgent agent = dfe.getSource();
-        return RELAY.toGlobalId("InstalledAgent", agent.getId());
     }
 
     @DgsData(parentType = "Machine")

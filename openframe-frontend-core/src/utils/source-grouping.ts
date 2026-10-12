@@ -28,14 +28,23 @@ import { defaultDocumentTypeForTableId, getSourceLabel } from './source-icons';
 /**
  * Doc-table documentTypes: whole documents with their own viewer (markdown =
  * product docs, data_room_doc = data room). They carry an in-app `path`, an
- * embedder keys `docPlatformTargets` by them, and they NEVER group: one chip
- * per document. The hub's per-source contract test pins this list to its
+ * embedder keys `docPlatformTargets` by them, and a server never folds them
+ * into one citation (`groupsByTable`); the strip still draws them as one chip
+ * per table. The hub's per-source contract test pins this list to its
  * doc-table configs.
  */
 export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc'] as const;
 
-/** THE rule: rows of a knowledge table share one chip unless they are whole
- *  documents. Decided by `documentType`, the one fact every producer has. */
+/**
+ * Which tables a SERVER folds into one citation: rows of a knowledge table
+ * share one number (and reach the model as one table) unless they are whole
+ * documents, which each keep their own number and are read in full. Decided by
+ * `documentType`, the one fact every producer has.
+ *
+ * This is not the strip's rule. The strip (`groupSourcesByTable`) draws ONE chip
+ * per table for every source, documents included: a document keeps its own
+ * citation number inside its table's chip.
+ */
 export function groupsByTable(documentType: string | null | undefined): boolean {
   return !(DOC_TABLE_TYPES as readonly string[]).includes(documentType ?? '');
 }
@@ -98,16 +107,16 @@ function typeOf(source: TableSource): string {
   return source.documentType || defaultDocumentTypeForTableId(source.sourceRepo) || '';
 }
 
-/** A source that belongs to its table's chip: it names its table and is not a
- *  whole document. Both shapes qualify, a flat row AND a chip the server
- *  already grouped, so one table is never drawn twice. Naming the table is the
- *  ONLY requirement: a row with no `id`, or no `documentType`, still joins (as
- *  the hub's server-side chips do). Leaving it out would split one table
- *  across a group AND a stray chip. What it lacks only limits its dropdown
- *  row: no `id` or no type means Open-only, no Ask. */
+/** A source that belongs to its table's chip: it names its table. Whole
+ *  documents join their table's chip like every other record (each keeps its
+ *  own citation number as a dropdown row). Both shapes qualify, a flat row AND
+ *  a chip the server already grouped, so one table is never drawn twice.
+ *  Naming the table is the ONLY requirement: a row with no `id`, or no
+ *  `documentType`, still joins (as the hub's server-side chips do). Leaving it
+ *  out would split one table across a group AND a stray chip. What it lacks
+ *  only limits its dropdown row: no `id` or no type means Open-only, no Ask. */
 function joinsTableChip(source: ChatSource): source is TableSource {
-  if (!source.sourceRepo) return false;
-  return groupsByTable(typeOf({ ...source, sourceRepo: source.sourceRepo }));
+  return !!source.sourceRepo;
 }
 
 /** A source's dropdown rows: a grouped chip's own items, or the flat row itself. */
@@ -154,7 +163,8 @@ function uniqueRows(rows: GroupedSourceRow[]): GroupedSourceRow[] {
  * table's only source. When flat rows of the same table arrive beside it (a
  * hub-injected chip plus MCP-cited rows in one answer), they merge into it:
  * its rows first, its chip-level link kept, the count restated. Whole
- * documents and rows naming no table pass through as their own chips.
+ * documents group under their table too, each row keeping its own citation
+ * number; only a row naming no table passes through as its own chip.
  */
 export function groupSourcesByTable(sources: ChatSource[]): ChatSource[] {
   const membersByTable = new Map<string, TableSource[]>();

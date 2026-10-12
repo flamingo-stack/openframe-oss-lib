@@ -165,8 +165,7 @@ public class SsoLoginController {
                     .build();
 
             var tenant = registrationService.registerTenant(reg);
-            String userId = ssoLoginService.ownerUserId(payload.email(), tenant.getId());
-            signupTicketService.bind(body.ticket(), userId, tenant.getId());
+            signupTicketService.bind(body.ticket(), tenant.getOwnerId(), tenant.getId());
             return new SignupTicketCompleteResponse(tenant.getId());
         } catch (ResponseStatusException e) {
             throw e;
