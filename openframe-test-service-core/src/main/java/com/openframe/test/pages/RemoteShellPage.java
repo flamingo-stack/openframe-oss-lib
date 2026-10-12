@@ -106,7 +106,18 @@ public class RemoteShellPage {
      */
     public boolean isConnected() {
         String cls = page.locator(CONNECTION_STATUS).getAttribute("class");
-        return cls != null && cls.contains("text-ods-attention-green-success") && !getTerminalOutput().isEmpty();
+        return cls != null && cls.contains("text-ods-attention-green-success");
+    }
+
+    /**
+     * Returns {@code true} if the terminal currently has any non-empty
+     * output rendered. This is independent of connection status: a
+     * freshly-connected session may report {@link #isConnected()} true
+     * while {@code hasOutput()} is still false until the first output
+     * is produced.
+     */
+    public boolean hasOutput() {
+        return !getTerminalOutput().isEmpty();
     }
 
     /**
