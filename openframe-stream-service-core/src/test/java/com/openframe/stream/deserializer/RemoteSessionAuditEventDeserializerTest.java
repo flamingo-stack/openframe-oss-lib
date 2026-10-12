@@ -22,6 +22,7 @@ class RemoteSessionAuditEventDeserializerTest {
     private static final long PROCESSING_TIMESTAMP = 1791700000000L;
     private static final String SESSION_ID = "session-1";
     private static final String MESH_NODE_ID = "node//mesh-node-1";
+    private static final String MACHINE_ID = "machine-1";
     private static final String TECHNICIAN_ID = "technician-1";
     private static final String TECHNICIAN_NAME = "Jane Doe";
     private static final String TENANT_ID = "tenant-1";
@@ -75,6 +76,18 @@ class RemoteSessionAuditEventDeserializerTest {
         assertThat(result.getUserId()).isEqualTo(TECHNICIAN_ID);
         assertThat(result.getTenantId()).isEqualTo(TENANT_ID);
         assertThat(result.getIntegratedToolType()).isEqualTo(IntegratedToolType.MESHCENTRAL);
+    }
+
+    @Test
+    void deserialize_deletedEvent_carriesTheMachineIdForTheDeviceFallback() throws Exception {
+        // setup
+        CommonDebeziumMessage message = message(DELETED_EVENT_JSON);
+
+        // execution
+        DeserializedDebeziumMessage result = deserializer.deserialize(message, MessageType.REMOTE_SESSION_AUDIT_EVENT);
+
+        // verifications
+        assertThat(result.getMachineId()).isEqualTo(MACHINE_ID);
     }
 
     @Test
