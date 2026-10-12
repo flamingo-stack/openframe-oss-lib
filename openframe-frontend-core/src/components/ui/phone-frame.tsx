@@ -3,7 +3,9 @@
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { DEVICE_WALLPAPER_CLASS } from './device-wallpaper';
-import { LockCameraGlyph, LockFlashlightGlyph, StatusBarGlyphs } from './phone-frame-glyphs';
+import { LockCameraGlyph } from './phone-glyphs/lock-camera-glyph';
+import { LockFlashlightGlyph } from './phone-glyphs/lock-flashlight-glyph';
+import { StatusBarGlyphs } from './phone-glyphs/status-bar-glyphs';
 
 export interface PhoneFrameProps {
   /** A fixed lock-screen date line ("Thursday, October 1"). Omitted, it is today's, in the visitor's own locale. */
