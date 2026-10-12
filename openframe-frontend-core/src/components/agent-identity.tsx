@@ -38,8 +38,16 @@ function Provide({ icons, children }: { icons: AgentIdentityIcons | undefined; c
 }
 
 /** The identities read from the server (`useAgentIdentities`); it needs the host's react-query client. */
-function ProvideFromServer({ endpoint, children }: { endpoint: string; children: ReactNode }) {
-  return <Provide icons={useAgentIdentities(endpoint)}>{children}</Provide>;
+function ProvideFromServer({
+  endpoint,
+  enabled,
+  children,
+}: {
+  endpoint: string;
+  enabled: boolean;
+  children: ReactNode;
+}) {
+  return <Provide icons={useAgentIdentities(endpoint, enabled)}>{children}</Provide>;
 }
 
 /**
@@ -63,16 +71,27 @@ function ProvideFromServer({ endpoint, children }: { endpoint: string; children:
 export function AgentIdentityProvider({
   icons,
   endpoint = AGENT_IDENTITIES_API_PATH,
+  enabled = true,
   children,
 }: {
   /** The host's copy of each agent's identity icon. Omit it and the provider reads them from `endpoint`. */
   icons?: AgentIdentityIcons;
   /** GET endpoint for the identities, used when `icons` is not given. */
   endpoint?: string;
+  /**
+   * Whether the identities may be read yet. A host that signs its requests passes
+   * "the session is in place": until then no read is sent and every mark keeps its
+   * empty box. Default true (a public site, or a host whose proxy signs for it).
+   */
+  enabled?: boolean;
   children: ReactNode;
 }) {
   if (icons) return <Provide icons={icons}>{children}</Provide>;
-  return <ProvideFromServer endpoint={endpoint}>{children}</ProvideFromServer>;
+  return (
+    <ProvideFromServer endpoint={endpoint} enabled={enabled}>
+      {children}
+    </ProvideFromServer>
+  );
 }
 
 /** The icon the identity of the agent with this slug holds; undefined when none is known. */

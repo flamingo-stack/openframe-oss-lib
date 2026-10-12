@@ -178,27 +178,30 @@ describe('with no copy from the host, the identities are read from the server', 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("asks again when the first identity read is refused, so a mark does not stay blank for the page's life", async () => {
-    const refusedThenServed = vi
+  it('sends no identity read until the host says its session is in place, then reads once', async () => {
+    const served = vi
       .fn()
-      .mockResolvedValueOnce(new Response('', { status: 401 }))
       .mockResolvedValue(
         new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL } }] }), {
           status: 200,
         }),
       );
-    vi.stubGlobal('fetch', refusedThenServed);
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <AgentIdentityProvider>
-          <div data-testid="late">
+    vi.stubGlobal('fetch', served);
+    const client = new QueryClient();
+    const tree = (enabled: boolean) => (
+      <QueryClientProvider client={client}>
+        <AgentIdentityProvider enabled={enabled}>
+          <div data-testid="held">
             <AgentMark agent="fae" />
           </div>
         </AgentIdentityProvider>
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
-    await waitFor(() => expect(screen.getByTestId('late').innerHTML).toContain('fae.webp'), { timeout: 4000 });
-    expect(refusedThenServed.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const { rerender } = render(tree(false));
+    expect(served).not.toHaveBeenCalled();
+    rerender(tree(true));
+    await waitFor(() => expect(screen.getByTestId('held').innerHTML).toContain('fae.webp'));
+    expect(served).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
   });
 
