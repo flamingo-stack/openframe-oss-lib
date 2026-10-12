@@ -8,6 +8,7 @@ import { CheckIcon, SearchIcon } from '../icons-v2-generated';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { FieldWrapper } from './field-wrapper';
 import { Input } from './input';
+import { useRememberedSelection, useSettledOptions } from './server-search-options';
 
 export interface SearchableSelectOption {
   value: string;
@@ -69,6 +70,23 @@ export interface SearchableSelectProps {
   className?: string;
   /** Classes for the popover content (e.g. a fixed width for icon triggers). */
   contentClassName?: string;
+  /**
+   * Server search. When set, `options` is the server's answer to the query
+   * reported here, not a list to filter:
+   *
+   * - called with the raw query on every change of the search field (debounce
+   *   in the caller), and with `''` when the dropdown closes on a non-empty
+   *   query (a pick, Escape, a click outside) — the field clears on close, so
+   *   the caller goes back to its unfiltered first page with it.
+   * - nothing is filtered locally (`keywords` are moot).
+   * - while `isLoading`, the options stay listed, and an `options` emptied
+   *   mid-load falls back to the last list that settled; `loadingText` shows
+   *   only with nothing to list yet.
+   * - the default trigger keeps the label and icon of the last option seen
+   *   for `value` when the current answer does not include it. A custom
+   *   `trigger` renders its own selection.
+   */
+  onSearchChange?: (query: string) => void;
 }
 
 /**
@@ -99,7 +117,9 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
     align = 'start',
     className,
     contentClassName,
+    onSearchChange,
   } = allProps;
+  const serverSearch = onSearchChange !== undefined;
   // Wired for a message even while `error` is undefined — see `FieldWrapper.errorSlot`.
   const errorSlot = 'error' in allProps;
   const isInvalid = !!error;
@@ -119,22 +139,46 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
   // on `search`, so the extra render pass this schedules takes the early exit.
   if (!isOpen && search !== '') setSearch('');
 
+  // Server search: what to list (steady between keystrokes) and the last
+  // option seen for the selected value. Both pass through untouched otherwise.
+  const listedOptions = useSettledOptions(options, isLoading, serverSearch);
+  const rememberedSelection = useRememberedSelection(listedOptions, value != null ? [value] : [], serverSearch);
+
   const filtered = useMemo(() => {
+    // The server already filtered: its answer is the list.
+    if (serverSearch) return listedOptions;
     const q = search.trim().toLowerCase();
     if (!q) return options;
     return options.filter(
       o => o.label.toLowerCase().includes(q) || (o.keywords ?? []).some(k => k.toLowerCase().includes(q)),
     );
-  }, [options, search]);
+  }, [options, listedOptions, serverSearch, search]);
 
   const selectedOption = useMemo(
-    () => (value != null ? options.find(o => o.value === value) : undefined),
-    [options, value],
+    () => (value != null ? (listedOptions.find(o => o.value === value) ?? rememberedSelection.get(value)) : undefined),
+    [listedOptions, rememberedSelection, value],
   );
+
+  // The list gives way to `loadingText` while loading — except under server
+  // search with something to show, where the rows stay until the answer lands.
+  const showLoadingText = isLoading && (!serverSearch || filtered.length === 0);
+
+  const handleSearchChange = (query: string) => {
+    setSearch(query);
+    onSearchChange?.(query);
+  };
+
+  // Every close goes through here, so a server search hears that the query it
+  // filtered by is gone — the field itself is emptied by the render-time reset
+  // above. An already-empty field has nothing to report.
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open && search !== '') onSearchChange?.('');
+  };
 
   const handleSelect = (optionValue: string) => {
     onValueChange(optionValue);
-    setIsOpen(false);
+    handleOpenChange(false);
   };
 
   const defaultTrigger = (
@@ -181,7 +225,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
   );
 
   return (
-    <PopoverPrimitive.Root open={isOpen} onOpenChange={disabled ? undefined : setIsOpen} modal={false}>
+    <PopoverPrimitive.Root open={isOpen} onOpenChange={disabled ? undefined : handleOpenChange} modal={false}>
       {!trigger && (label !== undefined || errorSlot) ? (
         <FieldWrapper label={label} htmlFor={triggerId} labelVariant={labelVariant} error={error} errorSlot={errorSlot}>
           {triggerElement}
@@ -211,7 +255,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
             <Input
               autoFocus
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => handleSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
               startAdornment={<SearchIcon className="size-4 text-ods-text-secondary" />}
               className="rounded-none border-0"
@@ -229,7 +273,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
             )}
             role="listbox"
           >
-            {isLoading ? (
+            {showLoadingText ? (
               <div className={statusClass}>{loadingText}</div>
             ) : filtered.length === 0 ? (
               <div className={statusClass}>{emptyText}</div>
