@@ -7,10 +7,7 @@ public record UpdateOrganizationStatusRequest(
         OrganizationStatusAction status
 ) {
 
-    /**
-     * Allowed status transitions for organization.
-     * Only ARCHIVED and ACTIVE are allowed via API — DELETED is not supported.
-     */
+    // Only ARCHIVED and ACTIVE are allowed via API — DELETED is not supported.
     public enum OrganizationStatusAction {
         ARCHIVED,
         ACTIVE
