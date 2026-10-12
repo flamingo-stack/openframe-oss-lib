@@ -24,6 +24,7 @@ public class RemoteSessionAuditEventDeserializer implements KafkaMessageDeserial
     private static final String FIELD_EVENT_TYPE = "eventType";
     private static final String FIELD_SESSION_ID = "sessionId";
     private static final String FIELD_MESH_NODE_ID = "meshNodeId";
+    private static final String FIELD_MACHINE_ID = "machineId";
     private static final String FIELD_TECHNICIAN_ID = "technicianId";
     private static final String FIELD_TECHNICIAN_NAME = "technicianName";
     private static final String FIELD_TENANT_ID = "tenantId";
@@ -47,6 +48,7 @@ public class RemoteSessionAuditEventDeserializer implements KafkaMessageDeserial
         return DeserializedDebeziumMessage.builder()
                 .payload(message.getPayload())
                 .agentId(text(after, FIELD_MESH_NODE_ID))
+                .machineId(text(after, FIELD_MACHINE_ID))
                 .ingestDay(DAY_FORMATTER.format(occurredAt))
                 .sourceEventType(eventTypeName)
                 .toolEventId(sessionId + TOOL_EVENT_ID_SEPARATOR + eventTypeName)
