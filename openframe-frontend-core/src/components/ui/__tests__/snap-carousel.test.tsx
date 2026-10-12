@@ -140,15 +140,26 @@ describe('SnapCarousel', () => {
     expect(scrolledTo.length).toBe(2);
   });
 
-  it('stops and starts with its pause control', () => {
+  it('has no pause button: it waits while keyboard focus is inside it, and carries on after', () => {
     renderCarousel();
     setInView(true);
-    fireEvent.click(screen.getByLabelText('Pause'));
+    expect(screen.queryByLabelText('Pause')).toBeNull();
+    const next = screen.getByLabelText('Next');
+    // jsdom answers neither `:focus-visible` nor `:has()`: the keyboard being inside is stubbed on the element asked.
+    let keyboardInside = true;
+    const matches = vi.spyOn(Element.prototype, 'matches').mockImplementation(() => keyboardInside);
+    act(() => {
+      next.focus();
+    });
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
     expect(scrolledTo).toEqual([]);
-    fireEvent.click(screen.getByLabelText('Play'));
+    keyboardInside = false;
+    act(() => {
+      next.blur();
+    });
+    matches.mockRestore();
     act(() => {
       vi.advanceTimersByTime(5_000);
     });

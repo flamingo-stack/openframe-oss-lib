@@ -1017,6 +1017,9 @@ function WalkthroughVideo({
           // Mirrors the card's own responsive width above — a flat 320px hint
           // made every phone fetch a poster ~1.7x wider than the box.
           posterSizes="(max-width: 639px) 192px, 320px"
+          // Pinned to the screen (or laid out in the host's first view), so it
+          // is often the largest thing painted: never lazy.
+          posterInView
           preload="none"
           hideMutedBadge
           onMutedFallbackChange={onCardFallbackChange}

@@ -3,7 +3,7 @@
 import { ExternalLink } from 'lucide-react';
 import { useClaudeMirrorSrc } from '../../hooks/use-claude-mirror-src';
 import { toClaudeEmbedUrl } from '../../utils/embed-url-converters';
-import { ClaudeIcon } from '../icons/claude-icon';
+import { ClaudeIcon } from '../icons-v2-generated/brand-logos/claude-icon';
 import { Button } from '../ui/button/button';
 import { EmbedViewerFrame } from './embed-viewer-frame';
 

@@ -66,7 +66,6 @@ function toPlatformConfigs(payload: unknown): PlatformConfig[] | null {
       name: read('name') ?? value,
       display_name: read('display_name') ?? label,
       default_color: read('default_color') ?? '',
-      default_icon: read('default_icon') ?? '',
       description: read('description') ?? '',
     });
   }

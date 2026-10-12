@@ -1059,3 +1059,18 @@ export function formatWebinarTimeMeta(
   const time = formatProgramTimeRange(at, { startAt: opts.startAt, withZoneLabel: opts.withZoneLabel });
   return [time, duration].filter(Boolean).join(' · ');
 }
+
+/**
+ * A web address as it is shown to a person to read or type, not to follow: no
+ * scheme, no query or fragment, no trailing slash.
+ * `https://www.example.com/mobile?from=qr` reads `example.com/mobile`.
+ *
+ * `www` is dropped by default, because nobody types it; `keepWww` keeps it where
+ * the address is shown as the site's own name.
+ */
+export function formatUrlForDisplay(url: string, options: { keepWww?: boolean } = {}): string {
+  return url
+    .replace(options.keepWww ? /^https?:\/\//i : /^https?:\/\/(www\.)?/i, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/$/, '');
+}

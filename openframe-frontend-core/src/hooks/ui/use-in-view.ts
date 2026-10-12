@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface UseInViewOptions {
   /**
@@ -43,49 +43,42 @@ const STEPS = Array.from({ length: 21 }, (_, i) => i / 20);
  * `useNearViewport` is the fire-once sibling (mount a heavy thing when it gets
  * close, never unmount). This one is for things that should run only WHILE
  * visible, like an auto-advancing carousel or a looping demo.
+ *
+ * The observer LIVES IN AN EFFECT keyed on the element, never in the ref
+ * callback. An observer made in the callback and torn down by a separate
+ * effect is torn down every time React re-runs effects without re-attaching
+ * refs (a Fast Refresh, an Activity that hides and shows): nothing observed any
+ * more, and `inView` froze at its last value, so a demo that happened to be off
+ * screen at that moment never played again. An effect that owns it makes it
+ * again whenever it is torn down.
  */
 export function useInView<T extends Element = HTMLElement>({
   threshold = 0,
   rootMargin = '0px',
   initial = false,
 }: UseInViewOptions = {}): UseInViewResult<T> {
-  const [inView, setInView] = useState(initial);
-  const observerRef = useRef<IntersectionObserver | null>(null);
+  // The element, as state: the effect below is keyed on it. `setNode` is the ref (stable).
+  const [node, setNode] = useState<T | null>(null);
+  const [seen, setSeen] = useState<{ node: T; inView: boolean } | null>(null);
 
-  const disconnect = useCallback(() => {
-    observerRef.current?.disconnect();
-    observerRef.current = null;
-  }, []);
+  useEffect(() => {
+    if (!node || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(
+      entries => {
+        const entry = entries[entries.length - 1];
+        if (!entry) return;
+        const ofElement = entry.intersectionRatio >= threshold;
+        const viewportHeight = entry.rootBounds?.height ?? 0;
+        const ofViewport = viewportHeight > 0 && (entry.intersectionRect?.height ?? 0) >= viewportHeight * threshold;
+        setSeen({ node, inView: entry.isIntersecting && (ofElement || ofViewport) });
+      },
+      { threshold: STEPS, rootMargin },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [node, threshold, rootMargin]);
 
-  const ref = useCallback(
-    (node: T | null) => {
-      disconnect();
-      if (!node) {
-        setInView(false);
-        return;
-      }
-      if (typeof IntersectionObserver === 'undefined') {
-        setInView(initial);
-        return;
-      }
-      const observer = new IntersectionObserver(
-        entries => {
-          const entry = entries[entries.length - 1];
-          if (!entry) return;
-          const ofElement = entry.intersectionRatio >= threshold;
-          const viewportHeight = entry.rootBounds?.height ?? 0;
-          const ofViewport = viewportHeight > 0 && (entry.intersectionRect?.height ?? 0) >= viewportHeight * threshold;
-          setInView(entry.isIntersecting && (ofElement || ofViewport));
-        },
-        { threshold: STEPS, rootMargin },
-      );
-      observer.observe(node);
-      observerRef.current = observer;
-    },
-    [disconnect, threshold, rootMargin, initial],
-  );
-
-  useEffect(() => disconnect, [disconnect]);
-
-  return { ref, inView };
+  // No element: not in view. An element the observer has not reported on yet (or cannot be observed): `initial`.
+  const inView = !node ? false : seen?.node === node ? seen.inView : initial;
+  return { ref: setNode, inView };
 }

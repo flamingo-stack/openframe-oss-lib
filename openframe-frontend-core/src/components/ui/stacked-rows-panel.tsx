@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 
 /**
@@ -108,14 +109,14 @@ function CellValue({ column }: { column: PanelColumn }) {
       <div className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)]">
         {column.icon && <span className="shrink-0">{column.icon}</span>}
         {column.href ? (
-          <a
+          <Link
             href={column.href}
             target="_blank"
             rel="noreferrer"
             className="min-w-0 transition-opacity hover:opacity-80"
           >
             {valueNode}
-          </a>
+          </Link>
         ) : (
           valueNode
         )}

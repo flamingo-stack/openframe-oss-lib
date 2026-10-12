@@ -2,6 +2,7 @@
 
 import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
 import { formatDate, formatTime } from '../../utils/format-date';
@@ -450,9 +451,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             );
           }
           return (
-            <a href={href} className={linkClassName} {...rest}>
+            <Link href={href} className={linkClassName} {...rest}>
               {children}
-            </a>
+            </Link>
           );
         },
       };

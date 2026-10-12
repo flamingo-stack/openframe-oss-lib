@@ -1,5 +1,6 @@
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
-import { SlackIcon } from '../icons/slack-icon';
+import { SlackIcon } from '../icons-v2-generated/brand-logos/slack-icon';
 
 export interface SlackChannelChipProps {
   /** Channel display name, no '#' prefix. Falls back to plain "Slack" when null. */
@@ -24,8 +25,8 @@ export function SlackChannelChip({ name, href, className }: SlackChannelChipProp
   );
   if (!href) return inner;
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="hover:underline">
+    <Link href={href} target="_blank" rel="noopener noreferrer" className="hover:underline">
       {inner}
-    </a>
+    </Link>
   );
 }

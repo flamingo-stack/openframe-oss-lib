@@ -18,6 +18,7 @@
  */
 
 import type { ComponentType } from 'react';
+import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { formatLegalDate } from '../../../utils/format';
 import { PageShell, PageLayout } from '../../ui';
@@ -137,9 +138,9 @@ export function LegalDocumentPage({
                   </div>
                   <div className="text-ods-text-secondary">
                     <p>{errorContactPrompt}</p>
-                    <a href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
+                    <Link href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
                       {contactEmail}
-                    </a>
+                    </Link>
                   </div>
                 </div>
               ) : data ? (
@@ -149,9 +150,9 @@ export function LegalDocumentPage({
                   <p className="text-h4">{emptyStateMessage}</p>
                   <p className="mt-2">
                     Please contact{' '}
-                    <a href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
+                    <Link href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
                       {contactEmail}
-                    </a>{' '}
+                    </Link>{' '}
                     for more information.
                   </p>
                 </div>

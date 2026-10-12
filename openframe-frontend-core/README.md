@@ -15,7 +15,7 @@ npm install https://pkg.pr.new/flamingo-stack/openframe-oss-lib/@flamingo-stack/
 ```tsx
 import { Button, Card, Input, Modal, Tag } from '@flamingo-stack/openframe-frontend-core/components/ui'
 import { YouTubeEmbed, FigmaPrototypeViewer } from '@flamingo-stack/openframe-frontend-core/components/features'
-import { GitHubIcon, OpenFrameLogo } from '@flamingo-stack/openframe-frontend-core/components/icons'
+import { GithubIcon, OpenframeLogoIcon } from '@flamingo-stack/openframe-frontend-core/components/icons-v2'
 ```
 
 ### Hooks
@@ -60,7 +60,6 @@ export default {
 | `.` | Main entry (all components, hooks, utils) |
 | `./components/ui` | Base UI components (Button, Card, Input, Modal, Tag, etc.) |
 | `./components/features` | Complex components (YouTubeEmbed, FigmaPrototypeViewer, AuthProvidersList) |
-| `./components/icons` | Icon components (GitHubIcon, OpenFrameLogo, XLogo) |
 | `./components/icons-v2` | Generated icon set |
 | `./components/navigation` | Navigation components (Header, StickySectionNav) |
 | `./components/toast` | Toast notification system |

@@ -339,6 +339,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
           download={download}
           prefetch={false}
           className={cn(shellClasses, isDisabled && 'pointer-events-none')}
+          // The click still reaches the caller (a download is what analytics counts).
+          onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
           aria-label={props['aria-label']}
         >
           {splitContent}
@@ -423,6 +425,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
         download={download}
         prefetch={false}
         className={cn(classes, isDisabled && 'pointer-events-none')}
+        onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
         aria-label={props['aria-label']}
       >
         {content}

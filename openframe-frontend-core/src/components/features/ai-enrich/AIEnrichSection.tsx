@@ -3,7 +3,7 @@
 import { CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import type React from 'react';
 import { cn } from '../../../utils/cn';
-import { SparklesIcon } from '../../icons/sparkles-icon';
+import { SparklesIcon } from '../../icons-v2-generated/interface/sparkles-icon';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { Textarea } from '../../ui/textarea';
