@@ -26,6 +26,7 @@ import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryInput;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.api.exception.TimeEntryNotFoundException;
 import com.openframe.api.service.TimeEntryService;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.ticket.Ticket;
@@ -68,7 +69,8 @@ public class TimeEntryDataFetcher {
     @DgsQuery
     public TimeEntry timeEntry(@InputArgument @NotBlank String id) {
         String rawId = RELAY.fromGlobalId(id).getId();
-        return timeEntryService.getTimeEntry(rawId).orElse(null);
+        return timeEntryService.getTimeEntry(rawId)
+                .orElseThrow(() -> new TimeEntryNotFoundException(rawId));
     }
 
     @DgsQuery
