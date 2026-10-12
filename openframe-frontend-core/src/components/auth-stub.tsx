@@ -35,11 +35,12 @@ export function useAuth(): AuthContextType {
   if (realUseAuth) {
     try {
       const realAuth = realUseAuth();
-      if (realAuth && realAuth.user) {
+      if (realAuth) {
         return realAuth;
       }
     } catch {
-      // Fallback if real auth fails
+      // Fail closed if real auth fails: do not fall back to a mock user
+      return { user: null, isLoading: false };
     }
   }
 
