@@ -180,7 +180,9 @@ export interface VideoBiteCardProps {
    *  cell and the aspect-ratio derives the height (editor grids). */
   height?: number;
   /** With `height`: the height under the strip's 768px line. The switch is CSS's,
-   *  so the first paint is the card's final size on a phone too. */
+   *  so the first paint is the card's final size on a phone too. OPTIONAL and
+   *  additive: omitted, `height` applies at every width, exactly as before this
+   *  prop existed (a caller that resolves the height itself keeps working). */
   heightMobile?: number;
   /** Controlled hover-activation (strip). Omit → the card manages its own
    *  hover/focus state. */

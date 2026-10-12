@@ -56,7 +56,9 @@ export interface FadePreviewProps {
    * MEASURED to the bottom of item N (at every width). Implies `fixedHeight`, so
    * the block keeps that height loading or loaded, and "Show N more" counts the
    * items past N unless `hiddenCount` says otherwise. Until the list holds N
-   * items, `collapsedHeight` (or the height last measured) is kept.
+   * items, `collapsedHeight` (or the height last measured) is kept. The first
+   * paint (before any measure) is held for N up to 12; add rows to
+   * `UNMEASURED_ITEMS_CLASSES` for a longer preview.
    */
   visibleItems?: number;
   /**
@@ -84,8 +86,10 @@ const FILL_CLASSES: Record<string, string> = {
  * Item mode before the first measure (the server's markup, and the page until it
  * hydrates): the items past the first N are hidden by CSS, so the block is its
  * collapsed height in the very first paint. Without it the whole list showed and
- * the measure then cut it, which moved everything under it. Spelled out per N:
- * Tailwind only emits classes it can read.
+ * the measure then cut it, which moved everything under it. Spelled out per N
+ * (Tailwind only emits classes it can read, and a `<style>` element is not
+ * allowed here: each rewrite relayouts the document), so it covers N up to
+ * `FADE_PREVIEW_MAX_UNMEASURED_ITEMS`; a larger N is clipped at the measure, as before.
  */
 const UNMEASURED_ITEMS_CLASSES: Record<number, string> = {
   1: '[&>*>*:nth-child(n+2)]:hidden',
@@ -94,7 +98,15 @@ const UNMEASURED_ITEMS_CLASSES: Record<number, string> = {
   4: '[&>*>*:nth-child(n+5)]:hidden',
   5: '[&>*>*:nth-child(n+6)]:hidden',
   6: '[&>*>*:nth-child(n+7)]:hidden',
+  7: '[&>*>*:nth-child(n+8)]:hidden',
+  8: '[&>*>*:nth-child(n+9)]:hidden',
+  9: '[&>*>*:nth-child(n+10)]:hidden',
+  10: '[&>*>*:nth-child(n+11)]:hidden',
+  11: '[&>*>*:nth-child(n+12)]:hidden',
+  12: '[&>*>*:nth-child(n+13)]:hidden',
 };
+/** The largest `visibleItems` the first paint is held for (the table above). */
+export const FADE_PREVIEW_MAX_UNMEASURED_ITEMS = 12;
 
 const cssLength = (value: number | string) => (typeof value === 'number' ? `${value}px` : value);
 
