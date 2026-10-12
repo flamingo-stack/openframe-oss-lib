@@ -10,7 +10,7 @@ export interface PhoneFrameProps {
   dateLabel?: string;
   /** A fixed lock-screen clock ("5:09"). Omitted, it is the visitor's own time, kept current. */
   timeLabel?: string;
-  /** The notifications, at the foot of the screen where a phone keeps them (`NotificationStack`). */
+  /** The notifications, right under the clock, the newest first (`NotificationStack`). */
   children?: ReactNode;
   className?: string;
 }
@@ -50,7 +50,7 @@ function LockShortcut({ children }: { children: ReactNode }) {
 /**
  * A phone lock screen: the status bar and island, the date and clock on the
  * device wallpaper (`DEVICE_WALLPAPER_CLASS`, the one every drawn device
- * shares), the notifications stacked at the foot of the screen, then the two
+ * shares), the notifications stacked under the clock, then the two
  * shortcuts and the home indicator. Decorative chrome for showing what lands
  * on a phone.
  *
@@ -83,8 +83,8 @@ export function PhoneFrame({ dateLabel, timeLabel, children, className }: PhoneF
           <span className="min-h-[var(--font-line-space-h4-body)] text-h4">{date}</span>
           <span className="h-[68px] text-[64px] font-bold tabular-nums leading-[68px] tracking-tight">{time}</span>
         </div>
-        {/* Clipped at the top: a stack taller than the screen never runs over the clock. */}
-        <div className="flex min-h-0 w-full flex-1 flex-col justify-end overflow-hidden px-2.5 pb-3 pt-2">
+        {/* Right under the clock, growing down; clipped at the foot, so a tall stack never runs over the shortcuts. */}
+        <div className="flex min-h-0 w-full flex-1 flex-col justify-start overflow-hidden px-2.5 pb-3 pt-4">
           {children}
         </div>
         <div className="flex shrink-0 items-center justify-between px-8" aria-hidden>

@@ -28,10 +28,10 @@ const ARRIVE = { type: 'spring', stiffness: 420, damping: 36, mass: 0.9 } as con
 const FOLD = { type: 'spring', stiffness: 300, damping: 34, mass: 1 } as const;
 
 /**
- * Notifications as a phone's lock screen keeps them (the system's "Stack"
- * view): stacked at the foot of the screen, the most recent on top. A new one
- * ROLLS IN FROM THE BOTTOM edge and takes the top place; the ones still whole
- * settle under it. They stay
+ * Notifications as a phone keeps them: the most recent on top, the list
+ * starting where its host puts it (the lock screen: right under the clock). A
+ * new one DROPS IN FROM ABOVE into the top place and PUSHES the ones still
+ * whole DOWN. They stay
  * whole for a moment (`lingerMs`, long enough to see that one more joined
  * them), then fold away ONE AT A TIME, oldest first (`foldEveryMs` apart):
  * each slips behind the ones above it and leaves its edge under the newest,
@@ -89,10 +89,10 @@ export function NotificationStack({
           <motion.div
             key={item.key}
             layout={reducedMotion ? false : 'position'}
-            // It rolls in from the foot of the screen, as a lock screen brings one in.
-            initial={{ opacity: 0, y: reducedMotion ? 0 : 56, scale: reducedMotion ? 1 : 0.96 }}
+            // It drops in from above, into the top place.
+            initial={{ opacity: 0, y: reducedMotion ? 0 : -40, scale: reducedMotion ? 1 : 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1, transition: reducedMotion ? still : ARRIVE }}
-            // Folding: it slips up behind the one above it, which settles down over it.
+            // Folding: it slips up behind the one above it.
             exit={{
               opacity: 0,
               y: reducedMotion ? 0 : -44,
