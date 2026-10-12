@@ -8,9 +8,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Compliance reaper for App Store guideline 5.1.1(v): accounts are deleted in the API service,
@@ -26,6 +35,8 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(value = "openframe.sso.apple.revocation.enabled", havingValue = "true", matchIfMissing = true)
 public class AppleTokenRevocationScheduler {
 
+    private static final int PAGE_SIZE = 200;
+
     private final AppleUserTokenRepository tokenRepository;
     private final AuthUserRepository authUserRepository;
     private final AppleTokenService appleTokenService;
@@ -35,19 +46,35 @@ public class AppleTokenRevocationScheduler {
     public void revokeTokensOfDeletedUsers() {
         int revoked = 0;
         int failed = 0;
-        for (AppleUserToken token : tokenRepository.findAll()) {
-            boolean userGone = authUserRepository.findById(token.getUserId())
-                    .map(user -> user.getStatus() == UserStatus.DELETED)
-                    .orElse(true);
-            if (!userGone) {
-                continue;
+        Pageable pageable = PageRequest.of(0, PAGE_SIZE, Sort.by(Sort.Direction.ASC, "updatedAt"));
+        Page<AppleUserToken> page;
+        do {
+            page = tokenRepository.findAll(pageable);
+            List<AppleUserToken> tokens = page.getContent();
+            if (!tokens.isEmpty()) {
+                Set<String> userIds = tokens.stream()
+                        .map(AppleUserToken::getUserId)
+                        .collect(Collectors.toCollection(HashSet::new));
+                Set<String> activeUserIds = authUserRepository.findAllById(userIds).stream()
+                        .filter(user -> user.getStatus() != UserStatus.DELETED)
+                        .map(user -> user.getId())
+                        .collect(Collectors.toCollection(HashSet::new));
+
+                for (AppleUserToken token : tokens) {
+                    boolean userGone = !activeUserIds.contains(token.getUserId());
+                    if (!userGone) {
+                        continue;
+                    }
+                    if (appleTokenService.revokeAndForget(token)) {
+                        revoked++;
+                    } else {
+                        failed++;
+                    }
+                }
             }
-            if (appleTokenService.revokeAndForget(token)) {
-                revoked++;
-            } else {
-                failed++;
-            }
-        }
+            pageable = pageable.next();
+        } while (page.hasNext());
+
         if (revoked > 0 || failed > 0) {
             log.info("event=apple-token-revocation-sweep revoked={} failed={}", revoked, failed);
         }
