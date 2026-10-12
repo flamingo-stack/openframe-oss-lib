@@ -3,6 +3,7 @@
 import type React from 'react';
 import { useState, useRef, useCallback } from 'react';
 import Link from '../../embed-shims/next-link';
+import { Button } from '@flamingo-stack/openframe-frontend-core';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 
 // =============================================================================
@@ -209,7 +210,8 @@ export function HoverDropdown({
             // inside it — the local does.
             const secondaryAction = item.secondaryAction;
             const secondary = secondaryAction ? (
-              <button
+              <Button
+                variant="ghost"
                 onClick={e => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -220,7 +222,7 @@ export function HoverDropdown({
                 className="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-ods-text-secondary opacity-60 transition-opacity hover:bg-ods-accent/15 hover:text-ods-text-primary hover:opacity-100 [&_svg]:size-3"
               >
                 {secondaryAction.icon}
-              </button>
+              </Button>
             ) : null;
 
             if (item.href) {
@@ -257,9 +259,9 @@ export function HoverDropdown({
 
             return (
               <div key={i} className={rowClass}>
-                <button onClick={item.onClick} className={primaryClass}>
+                <Button variant="ghost" onClick={item.onClick} className={primaryClass}>
                   {content}
-                </button>
+                </Button>
                 {secondary}
               </div>
             );
