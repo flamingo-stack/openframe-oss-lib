@@ -57,25 +57,18 @@ describe('accentSentenceMarks', () => {
     );
   });
 
-  it('keeps the eyebrow outside the heading element unless asked', () => {
+  it('draws a heading with no eyebrow as the heading element itself', () => {
+    expect(html(<SectionHeading level="page" title="Run by AI" punctuation={null} />)).toBe(
+      '<div class="flex flex-col gap-[var(--spacing-system-lf)]"><h1 class="text-h1 text-ods-text-primary" data-section-heading="true">Run by AI</h1></div>',
+    );
+  });
+
+  it('makes an eyebrow part of the heading element, with the same two boxes in the stack', () => {
     const out = html(
       <SectionHeading level="page" eyebrow="Endpoint management software" title="Run by AI" punctuation={null} />,
     );
-    expect(out).toContain('<span class="text-h5 text-ods-accent">Endpoint management software</span><h1');
-  });
-
-  it('puts the eyebrow inside the heading element when asked, with the same two boxes in the stack', () => {
-    const out = html(
-      <SectionHeading
-        level="page"
-        eyebrowInHeading
-        eyebrow="Endpoint management software"
-        title="Run by AI"
-        punctuation={null}
-      />,
-    );
     expect(out).toContain(
-      '<h1 class="contents" data-section-heading="true"><span class="text-h5 text-ods-accent">Endpoint management software</span><span class="block text-h1 text-ods-text-primary">Run by AI</span></h1>',
+      '<h1 class="contents"><span class="text-h5 text-ods-accent">Endpoint management software</span><span class="block text-h1 text-ods-text-primary" data-section-heading="true">Run by AI</span></h1>',
     );
   });
 });

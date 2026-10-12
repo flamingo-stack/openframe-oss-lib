@@ -154,16 +154,14 @@ const SECTION_HEADING_LAYOUT = {
 } as const;
 
 export interface SectionHeadingProps {
-  /** The small label above the heading (Azeret Mono, uppercase, accent colour). */
-  eyebrow?: ReactNode;
   /**
-   * Make the eyebrow part of the heading element (`<h1>` / `<h2>`), for a hero
-   * whose eyebrow names what the page is about ("Endpoint management software")
-   * above its positioning line. Nothing moves on screen: the heading element
-   * takes no box of its own, and the eyebrow and the title keep their places in
-   * the stack.
+   * The small label above the heading (Azeret Mono, uppercase, accent colour).
+   * It is part of the heading element: a hero's eyebrow names what the page is
+   * about ("Endpoint management software") above its positioning line. The
+   * element takes no box of its own, so the eyebrow and the title keep their
+   * two places in the stack.
    */
-  eyebrowInHeading?: boolean;
+  eyebrow?: ReactNode;
   /** The heading text; a node when part of it is highlighted. Every sentence mark in it is drawn in the accent colour. */
   title: ReactNode;
   /** The accent mark that closes the heading (`.`, `:`, `?`). `null` for none. Default `.`. */
@@ -199,7 +197,6 @@ export interface SectionHeadingProps {
  */
 export function SectionHeading({
   eyebrow,
-  eyebrowInHeading = false,
   title,
   punctuation = '.',
   intro,
@@ -222,21 +219,24 @@ export function SectionHeading({
   );
   const stack = (
     <div className={layout.stack}>
-      {eyebrowNode && eyebrowInHeading ? (
+      {eyebrowNode ? (
         // `contents`: the element names the heading and draws no box, so the stack lays its two children out as before.
-        <Tag className="contents" data-section-heading>
+        <Tag className="contents">
           {eyebrowNode}
-          <span className={`block ${layout.heading}`}>{headingText}</span>
+          <span className={`block ${layout.heading}`} data-section-heading>
+            {headingText}
+          </span>
         </Tag>
       ) : (
-        <>
-          {eyebrowNode}
-          <Tag className={layout.heading} data-section-heading>
-            {headingText}
-          </Tag>
-        </>
+        <Tag className={layout.heading} data-section-heading>
+          {headingText}
+        </Tag>
       )}
-      {intro ? <div className={layout.intro}>{intro}</div> : null}
+      {intro ? (
+        <div className={layout.intro} data-section-intro>
+          {intro}
+        </div>
+      ) : null}
     </div>
   );
   if (!action) return className ? <div className={className}>{stack}</div> : stack;
