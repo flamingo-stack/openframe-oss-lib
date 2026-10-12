@@ -40,6 +40,7 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
 
         enrichFromTenant(message, enriched);
         enrichFromMachine(message, enriched);
+        enriched.setUserId(message.getUserId());
         return enriched;
     }
 

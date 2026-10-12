@@ -24,6 +24,8 @@ public enum MessageType {
     MICROSOFT_365_AUDIT_EVENT(IntegratedToolType.MICROSOFT_365, DataEnrichmentServiceType.PRE_ENRICHED,
             List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     GOOGLE_WORKSPACE_AUDIT_EVENT(IntegratedToolType.GOOGLE_WORKSPACE, DataEnrichmentServiceType.PRE_ENRICHED,
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+    REMOTE_SESSION_AUDIT_EVENT(IntegratedToolType.MESHCENTRAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE);
 
     private final IntegratedToolType integratedToolType;
