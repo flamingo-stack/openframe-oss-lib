@@ -15,8 +15,6 @@ import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
-import com.openframe.data.document.packagesearch.PackageManagerType;
-import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -94,27 +92,21 @@ public class ScriptExecutionService {
      * its scripts too), with {@code machineId}/{@code scriptId} keeping each row
      * distinct.
      */
-    public List<ScriptExecutionResponse> createBatch(String executionId,
-                                                     String scriptId,
-                                                     String scheduleId,
-                                                     List<String> machineIds,
-                                                     PrivilegeLevel privilegeLevel,
-                                                     Integer timeoutSeconds,
-                                                     String initiatedBy,
-                                                     ExecutionSource source) {
+    public List<ScriptExecutionResponse> createBatch(CreateBatchCommand command) {
         List<ScriptExecution> saved = scriptExecutionRepository.saveRunning(RunningExecutionRows.builder()
                 .tenantId(tenantIdProvider.getTenantId())
-                .executionId(executionId)
-                .scriptId(scriptId)
-                .scheduleId(scheduleId)
-                .machineIds(machineIds)
-                .privilegeLevel(privilegeLevel)
-                .timeoutSeconds(timeoutSeconds)
-                .initiatedBy(initiatedBy)
-                .source(source)
+                .executionId(command.getExecutionId())
+                .scriptId(command.getScriptId())
+                .scheduleId(command.getScheduleId())
+                .machineIds(command.getMachineIds())
+                .privilegeLevel(command.getPrivilegeLevel())
+                .timeoutSeconds(command.getTimeoutSeconds())
+                .initiatedBy(command.getInitiatedBy())
+                .source(command.getSource())
                 .build());
         log.info("Persisted batch execution rows: executionId={} scriptId={} scheduleId={} machineCount={} initiatedBy={} source={} status=RUNNING",
-                executionId, scriptId, scheduleId, machineIds.size(), initiatedBy, source);
+                command.getExecutionId(), command.getScriptId(), command.getScheduleId(), command.getMachineIds().size(),
+                command.getInitiatedBy(), command.getSource());
         return saved.stream().map(scriptExecutionMapper::toResponse).toList();
     }
 
@@ -130,31 +122,23 @@ public class ScriptExecutionService {
                 .toList();
     }
 
-    public List<ScriptExecutionResponse> createSoftwareBatch(String executionId,
-                                                             String scriptId,
-                                                             List<String> machineIds,
-                                                             PrivilegeLevel privilegeLevel,
-                                                             Integer timeoutSeconds,
-                                                             String initiatedBy,
-                                                             ExecutionSource source,
-                                                             PackageManagerType packageManager,
-                                                             String packageName,
-                                                             SoftwareAction softwareAction) {
+    public List<ScriptExecutionResponse> createSoftwareBatch(CreateSoftwareBatchCommand command) {
         List<ScriptExecution> saved = scriptExecutionRepository.saveRunning(RunningExecutionRows.builder()
                 .tenantId(tenantIdProvider.getTenantId())
-                .executionId(executionId)
-                .scriptId(scriptId)
-                .machineIds(machineIds)
-                .privilegeLevel(privilegeLevel)
-                .timeoutSeconds(timeoutSeconds)
-                .initiatedBy(initiatedBy)
-                .source(source)
-                .packageManager(packageManager)
-                .packageName(packageName)
-                .softwareAction(softwareAction)
+                .executionId(command.getExecutionId())
+                .scriptId(command.getScriptId())
+                .machineIds(command.getMachineIds())
+                .privilegeLevel(command.getPrivilegeLevel())
+                .timeoutSeconds(command.getTimeoutSeconds())
+                .initiatedBy(command.getInitiatedBy())
+                .source(command.getSource())
+                .packageManager(command.getPackageManager())
+                .packageName(command.getPackageName())
+                .softwareAction(command.getSoftwareAction())
                 .build());
         log.info("Persisted software batch rows: executionId={} scriptId={} packageManager={} packageName={} action={} machineCount={} initiatedBy={} source={} status=RUNNING",
-                executionId, scriptId, packageManager, packageName, softwareAction, machineIds.size(), initiatedBy, source);
+                command.getExecutionId(), command.getScriptId(), command.getPackageManager(), command.getPackageName(),
+                command.getSoftwareAction(), command.getMachineIds().size(), command.getInitiatedBy(), command.getSource());
         return saved.stream().map(scriptExecutionMapper::toResponse).toList();
     }
 
