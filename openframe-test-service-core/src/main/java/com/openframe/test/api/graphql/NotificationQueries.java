@@ -1,12 +1,6 @@
 package com.openframe.test.api.graphql;
 
-/**
- * GraphQL documents for the in-app notification API (openframe-api-service-core
- * {@code notification.graphqls}), served on {@code api/graphql}. Everything acts on the caller's own
- * inbox; notification ids are Relay global ids. The Relay {@code node} field does not resolve the
- * Notification type ("Unknown Node type: Notification"), so a single notification is found through the
- * list with a title search.
- */
+// The Relay node field does not resolve the Notification type ("Unknown Node type: Notification"), so a single notification is found through the list with a title search.
 public class NotificationQueries {
 
     private static final String NOTIFICATION_FIELDS = """
@@ -104,3 +98,4 @@ public class NotificationQueries {
             }
             """ + NOTIFICATION_SETTINGS_FIELDS;
 }
+
