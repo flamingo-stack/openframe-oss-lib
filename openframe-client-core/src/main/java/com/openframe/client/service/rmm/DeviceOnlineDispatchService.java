@@ -39,7 +39,7 @@ public class DeviceOnlineDispatchService {
 
     private static final String FIELD_FIRST_SEEN_AT = "firstSeenAt";
 
-    @Value("${openframe.rmm.device-online.dispatch.batch-size:500}")
+    @Value("${openframe.rmm.device-online.dispatch.batch-size}")
     private int batchSize;
 
     public void processDevicesBecameOnline() {
