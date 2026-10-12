@@ -10,6 +10,7 @@ import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.delivery.CustomMachineDeliveryRepository;
 import org.bson.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -29,6 +30,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_ATTEMPTS = "attempts";
     private static final String FIELD_ERRORS = "errors";
     private static final String FIELD_DISPATCH_ID = "dispatchId";
+    private static final String FIELD_SEQUENCE = "sequence";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_DUE_AT = "dueAt";
@@ -56,9 +58,10 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     }
 
     // $set per field, not a replacement document: a replacement is inserted without the tenant of the scoped filter;
-    // null fields are not written, so what a previous dispatch closed the row with has to be unset explicitly
+    // null fields are not written, so what a previous dispatch closed the row with has to be unset explicitly.
+    // false = a newer dispatch of the same key holds the row: a rollout reaching a machine after a force leaves it alone
     @Override
-    public void upsertPending(MachineDelivery delivery) {
+    public boolean upsertPending(MachineDelivery delivery) {
         Document document = new Document();
         mongoTemplate.getConverter().write(delivery, document);
         Update update = new Update().set(FIELD_TENANT_ID, tenantId())
@@ -67,9 +70,24 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
                 .unset(FIELD_FAILURE)
                 .unset(FIELD_ERROR);
         document.forEach((field, value) -> setField(update, field, value));
+        Query notOutranked = notOutranked(delivery);
+        try {
+            mongoTemplate.upsert(notOutranked, update, MachineDelivery.class);
+            return true;
+        } catch (DuplicateKeyException rowExists) {
+            // the filter missed an existing row: a newer decision holds it, or another pod inserted it a moment ago
+            UpdateResult result = mongoTemplate.updateFirst(notOutranked, update, MachineDelivery.class);
+            return result.getMatchedCount() > 0;
+        }
+    }
+
+    private static Query notOutranked(MachineDelivery delivery) {
         String id = delivery.getId();
-        Query byId = new Query(Criteria.where(FIELD_ID).is(id));
-        mongoTemplate.upsert(byId, update, MachineDelivery.class);
+        int sequence = delivery.getSequence();
+        Criteria noSequenceYet = Criteria.where(FIELD_SEQUENCE).exists(false);
+        Criteria older = Criteria.where(FIELD_SEQUENCE).lt(sequence);
+        Criteria notOutranked = Criteria.where(FIELD_ID).is(id).orOperator(noSequenceYet, older);
+        return new Query(notOutranked);
     }
 
     @Override

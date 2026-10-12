@@ -6,6 +6,7 @@ import com.openframe.client.service.delivery.LocalDeliverySink;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.dispatch.DeliveryDispatchMessage;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -71,6 +72,7 @@ public class DeliveryDispatchListener {
                 .type(type)
                 .targetId(delivery.getTargetId())
                 .machineId(message.getMachineId())
+                .audience(message.getAudience())
                 .payload(payload)
                 .build();
         sink.accept(request);
@@ -78,7 +80,11 @@ public class DeliveryDispatchListener {
 
     private static boolean isComplete(DeliveryDispatchMessage message) {
         JsonNode command = message.getPayload();
-        return hasText(message.getMachineId()) && command != null && command.has(DELIVERY_FIELD);
+        return message.getAudience() != null && hasMachine(message) && command != null && command.has(DELIVERY_FIELD);
+    }
+
+    private static boolean hasMachine(DeliveryDispatchMessage message) {
+        return message.getAudience() == DeliveryAudience.EVERY_MACHINE || hasText(message.getMachineId());
     }
 
     private static boolean isComplete(DeliveryRef delivery) {
