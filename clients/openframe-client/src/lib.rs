@@ -91,8 +91,8 @@ use crate::services::InstalledToolsService;
 use crate::services::MachineIdService;
 use crate::services::{
     AgentAuthService, AgentRegistrationService, InitialConfigurationService,
-    ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolRunManager,
-    ToolUrlParamsResolver,
+    ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolOps,
+    ToolRunManager, ToolUrlParamsResolver,
 };
 use crate::services::{
     InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
@@ -364,11 +364,14 @@ impl Client {
         // Initialize tool kill service
         let tool_kill_service = ToolKillService::new();
 
+        let tool_ops = ToolOps::default();
+
         // Initialize tool run manager
         let tool_run_manager = ToolRunManager::new(
             installed_tools_service.clone(),
             tool_command_params_resolver.clone(),
             tool_kill_service.clone(),
+            tool_ops.clone(),
         );
 
         // Initialize tool restart service
@@ -376,6 +379,7 @@ impl Client {
             installed_tools_service.clone(),
             tool_kill_service.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
         );
 
         // Initialize mesh self-heal service
@@ -386,7 +390,7 @@ impl Client {
             tool_restart_service.clone(),
             initial_configuration_service.clone(),
             config_service.clone(),
-            tool_run_manager.clone(),
+            tool_ops.clone(),
             deactivation_service.clone(),
             http_client.clone(),
         );
@@ -402,7 +406,7 @@ impl Client {
             tool_connection_message_publisher.clone(),
             config_service.clone(),
             tool_connection_service.clone(),
-            tool_run_manager.clone(),
+            tool_ops.clone(),
         );
 
         // Initialize OpenFrame client info service
@@ -443,6 +447,7 @@ impl Client {
             installed_tools_service.clone(),
             directory_manager.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
             tool_connection_processing_manager.clone(),
             config_service.clone(),
             installed_agent_message_publisher.clone(),
@@ -456,6 +461,7 @@ impl Client {
             update_state_service.clone(),
             last_known_good_service.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
             update_handler_service.clone(),
         );
 
@@ -466,6 +472,7 @@ impl Client {
             installed_tools_service.clone(),
             tool_kill_service.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
             directory_manager.clone(),
             config_service.clone(),
             installed_agent_message_publisher.clone(),
@@ -489,6 +496,7 @@ impl Client {
         let tool_uninstall_message_listener = ToolUninstallMessageListener::new(
             nats_connection_manager.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
             tool_uninstall_service,
             config_service.clone(),
         );
