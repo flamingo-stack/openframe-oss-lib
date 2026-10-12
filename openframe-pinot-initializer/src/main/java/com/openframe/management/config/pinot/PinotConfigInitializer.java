@@ -8,9 +8,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
@@ -30,14 +32,19 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
+
 @Slf4j
 @Configuration
+@RequiredArgsConstructor
 public class PinotConfigInitializer {
 
     private final ResourceLoader resourceLoader;
     private final Environment environment;
-    private final RestTemplate restTemplate;
+    private final RestTemplateBuilder restTemplateBuilder;
     private final ObjectMapper objectMapper;
+
+    private RestTemplate restTemplate;
 
     @Value("${pinot.controller.url}")
     private String pinotControllerUrl;
@@ -56,19 +63,17 @@ public class PinotConfigInitializer {
             new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null)
     );
 
-    public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
-        this.resourceLoader = resourceLoader;
-        this.environment = environment;
-        this.restTemplate = new RestTemplate();
-        this.objectMapper = new ObjectMapper();
-    }
-
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
         if (!pinotConfigEnabled) {
             log.info("Pinot configuration deployment is disabled");
             return;
         }
+
+        this.restTemplate = restTemplateBuilder
+                .setConnectTimeout(Duration.ofSeconds(10))
+                .setReadTimeout(Duration.ofSeconds(30))
+                .build();
 
         log.info("Starting Pinot configuration deployment to {}", pinotControllerUrl);
 
