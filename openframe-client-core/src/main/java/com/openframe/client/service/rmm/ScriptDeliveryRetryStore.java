@@ -27,8 +27,8 @@ public class ScriptDeliveryRetryStore {
         try {
             write(executionId, machineId, 0, channel, objectMapper.writeValueAsString(message));
         } catch (Exception e) {
-            log.warn("Failed to serialize retry-state executionId={} machineId={} channel={}: {}",
-                    executionId, machineId, channel, e.getMessage());
+            log.warn("Failed to serialize retry-state executionId={} machineId={} channel={}",
+                    executionId, machineId, channel, e);
         }
     }
 
@@ -58,7 +58,7 @@ public class ScriptDeliveryRetryStore {
                     .expiresAt(Instant.now().plusSeconds(ttlSeconds))
                     .build());
         } catch (Exception e) {
-            log.warn("Failed to write retry-state executionId={} machineId={}: {}", executionId, machineId, e.getMessage());
+            log.warn("Failed to write retry-state executionId={} machineId={}", executionId, machineId, e);
         }
     }
 
