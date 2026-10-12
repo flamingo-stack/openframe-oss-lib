@@ -80,7 +80,7 @@ class DeliveryRolloutServiceTest {
                 .payloadJson("{\"value\":\"1.5.11\",\"delivery\":{\"type\":\"CLIENT_UPDATE\",\"targetId\":\"openframe-client\",\"dispatchId\":\"d-rollout\"}}")
                 .sequence(SEQUENCE)
                 .status(DeliveryRolloutStatus.RUNNING)
-                .cursor("")
+                .cursor(DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE)
                 .build();
         when(repository.findByStatus(DeliveryRolloutStatus.RUNNING)).thenReturn(List.of(rollout));
         doReturn(spec).when(registry).require(DeliveryType.CLIENT_UPDATE);
@@ -91,7 +91,7 @@ class DeliveryRolloutServiceTest {
     @Test
     void advance_fullBatch_everyMachineDispatchedWithTheRolloutSequenceAndCursorMoved() {
         // setup
-        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
                 .thenReturn(List.of(machine("m-1"), machine("m-2")));
 
         // execution
@@ -114,7 +114,7 @@ class DeliveryRolloutServiceTest {
     @Test
     void advance_shortBatch_lastMachinesDispatchedAndRolloutFinished() {
         // setup
-        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
                 .thenReturn(List.of(machine("m-9")));
 
         // execution
@@ -129,7 +129,7 @@ class DeliveryRolloutServiceTest {
     @Test
     void advance_mongoAwayMidBatch_cursorKeptSoTheBatchIsRepeatedNextTick() {
         // setup
-        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
                 .thenReturn(List.of(machine("m-1"), machine("m-2")));
         doThrow(new DataAccessResourceFailureException("mongo down")).when(sink).accept(any());
 
@@ -146,7 +146,7 @@ class DeliveryRolloutServiceTest {
     @Test
     void advance_oneMachineFails_thatMachineSkippedAndCountedTheBatchGoesOn() {
         // setup
-        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, "", Limit.of(BATCH_SIZE)))
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
                 .thenReturn(List.of(machine("m-1"), machine("m-2")));
         doThrow(new IllegalStateException("bad machine")).doNothing().when(sink).accept(any());
 

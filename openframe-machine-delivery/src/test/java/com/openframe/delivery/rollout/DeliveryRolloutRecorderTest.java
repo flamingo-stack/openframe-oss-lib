@@ -67,7 +67,7 @@ class DeliveryRolloutRecorderTest {
         assertThat(rollout.getTargetId()).isEqualTo(TARGET_ID);
         assertThat(rollout.getSequence()).isEqualTo(SEQUENCE);
         assertThat(rollout.getStatus()).isEqualTo(DeliveryRolloutStatus.RUNNING);
-        assertThat(rollout.getCursor()).isEmpty();
+        assertThat(rollout.getCursor()).isEqualTo(DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE);
         assertThat(rollout.getDispatched()).isZero();
         assertThat(rollout.getStartedAt()).isNotNull();
         assertThat(rollout.getPayloadJson()).contains("1.5.11");
