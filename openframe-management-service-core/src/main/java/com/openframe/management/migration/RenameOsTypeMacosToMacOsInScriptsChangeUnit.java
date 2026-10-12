@@ -13,21 +13,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.List;
 
-/**
- * One-off rename of the {@code OsType} enum value {@code MACOS} → {@code MAC_OS} inside every
- * {@link Script}'s {@code supportedPlatforms} array. The enum was renamed to match the shape the
- * Rust agent already sends; existing documents keep the old {@code "MACOS"} string until this
- * migration rewrites them.
- *
- * <p>Runs on the raw collection (not through the {@link Script} mapper) because the entity's
- * {@code OsType} enum no longer contains {@code MACOS} — deserialising the legacy value would fail.
- * The positional array filter {@code supportedPlatforms.$[e]} replaces only the matching entries,
- * leaving {@code "WINDOWS"} and any future values untouched. Idempotent: a document without any
- * {@code MACOS} entries is skipped by the {@code $eq} pre-filter.
- *
- * <p>Rollback is intentionally empty — restoring {@code "MACOS"} would re-introduce a value the
- * enum has since dropped, breaking every downstream read.
- */
+// rollback is empty: restoring "MACOS" would reintroduce a value the enum has since dropped
 @Slf4j
 @ChangeUnit(id = "rename-os-type-macos-to-mac-os-in-scripts", order = "009", author = "openframe")
 public class RenameOsTypeMacosToMacOsInScriptsChangeUnit {
@@ -54,3 +40,4 @@ public class RenameOsTypeMacosToMacOsInScriptsChangeUnit {
     public void rollback() {
     }
 }
+
