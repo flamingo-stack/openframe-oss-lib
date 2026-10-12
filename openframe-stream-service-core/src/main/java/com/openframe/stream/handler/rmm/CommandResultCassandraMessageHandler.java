@@ -68,9 +68,16 @@ public class CommandResultCassandraMessageHandler
 
         log.debug("Handling command result (Cassandra write): executionId={} machineId={}", executionId, machineId);
 
+        String resultJson = buildResultJson(after);
+        if (resultJson == null) {
+            log.error("Skipping command_results write due to serialization failure executionId={} machineId={}",
+                    executionId, machineId);
+            return;
+        }
+
         CommandResult row = new CommandResult();
         row.setKey(new CommandResult.CommandResultKey(executionId, machineId));
-        row.setResult(buildResultJson(after));
+        row.setResult(resultJson);
 
         // The command_results table has a table-level default_time_to_live, so a
         // plain save self-expires — no per-write TTL needed.

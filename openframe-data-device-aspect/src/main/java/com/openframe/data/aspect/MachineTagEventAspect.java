@@ -136,34 +136,38 @@ public class MachineTagEventAspect {
 
     /**
      * Intercepts TagAssignment repository deleteByEntityIdAndTagIdAndEntityType operations.
-     * Uses @Around to capture affected entity BEFORE the delete, then re-syncs to Pinot.
+     * Uses @Around to let the delete execute first, then re-syncs to Pinot only after
+     * the delete has completed successfully, mirroring the MachineWriter post-write pattern.
      */
     @Around("execution(* com.openframe.data.repository.tag.TagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(..)) && args(entityId, tagId, entityType)")
     public Object aroundTagAssignmentDelete(ProceedingJoinPoint joinPoint, String entityId, String tagId, Object entityType) throws Throwable {
+        log.debug("TagAssignment delete operation detected for entityId={}, tagId={}, entityType={}", entityId, tagId, entityType);
+        Object result = joinPoint.proceed();
         try {
-            log.debug("TagAssignment delete operation detected for entityId={}, tagId={}, entityType={}", entityId, tagId, entityType);
             if (entityType != null && "DEVICE".equals(entityType.toString())) {
                 machineTagEventService.processTagAssignmentDelete(entityId, tagId);
             }
         } catch (Exception e) {
-            log.error("Error in pre-delete processing for entityId={}, tagId={}: {}", entityId, tagId, e.getMessage(), e);
+            log.error("Error in post-delete processing for entityId={}, tagId={}: {}", entityId, tagId, e.getMessage(), e);
         }
-        return joinPoint.proceed();
+        return result;
     }
 
     /**
      * Intercepts TagAssignment repository deleteByTagId operations.
-     * Uses @Around to capture all affected machineIds BEFORE the delete, then re-syncs to Pinot.
+     * Uses @Around to let the delete execute first, then re-syncs all affected machineIds to Pinot
+     * only after the delete has completed successfully.
      */
     @Around("execution(* com.openframe.data.repository.tag.TagAssignmentRepository.deleteByTagId(..)) && args(tagId)")
     public Object aroundTagAssignmentDeleteByTagId(ProceedingJoinPoint joinPoint, String tagId) throws Throwable {
+        log.debug("TagAssignment deleteByTagId operation detected for tagId={}", tagId);
+        Object result = joinPoint.proceed();
         try {
-            log.debug("TagAssignment deleteByTagId operation detected for tagId={}", tagId);
             machineTagEventService.processTagAssignmentDeleteByTagId(tagId);
         } catch (Exception e) {
-            log.error("Error in pre-delete processing for tagId={}: {}", tagId, e.getMessage(), e);
+            log.error("Error in post-delete processing for tagId={}: {}", tagId, e.getMessage(), e);
         }
-        return joinPoint.proceed();
+        return result;
     }
 
     /**

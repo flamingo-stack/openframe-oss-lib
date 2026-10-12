@@ -8,6 +8,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.util.StringUtils;
 
 @Slf4j
 @Configuration
@@ -22,8 +23,14 @@ public class DataInitializer {
             String clientId = env.getProperty("oauth.client.default.id");
             String clientSecret = env.getProperty("oauth.client.default.secret");
 
+            if (!StringUtils.hasText(clientId)) {
+                throw new IllegalStateException("Required property 'oauth.client.default.id' is missing or empty");
+            }
+            if (!StringUtils.hasText(clientSecret)) {
+                throw new IllegalStateException("Required property 'oauth.client.default.secret' is missing or empty");
+            }
+
             log.info("Initializing OAuth client - ID: {}", clientId);
-            log.debug("Client secret length: {}", clientSecret != null ? clientSecret.length() : 0);
 
             clientRepository.findByClientId(clientId)
                     .ifPresentOrElse(

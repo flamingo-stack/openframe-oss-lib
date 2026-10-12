@@ -413,7 +413,8 @@ function UnifiedUI({ state, handlers, config, iframeRef }: UnifiedUIProps) {
                   const mobileHeight = contentDimensions.mobile.height;
                   // Use content height + some padding, but respect viewport limits
                   const calculatedHeight = Math.max(mobileHeight + 100, 400); // minimum 400px
-                  return `${Math.min(calculatedHeight, window?.innerHeight * 0.85 || 650)}px`;
+                  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : null;
+                  return `${Math.min(calculatedHeight, viewportHeight ? viewportHeight * 0.85 : 650)}px`;
                 })(),
           minHeight:
             viewMode === 'DESKTOP'

@@ -13,14 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Pure entity &harr; DTO mapping for scripts. Lives in {@code openframe-api-lib}
- * so it can be reused by any service that talks to the script repository,
- * regardless of transport (GraphQL / REST / messaging).
- *
- * <p>GraphQL-specific concerns (cursor pagination, Relay Connection / Edge
- * envelope) live in {@code GraphQLScriptMapper} alongside the DGS resolver.
- */
+// GraphQL-specific concerns (cursor pagination, Connection/Edge envelope) live in GraphQLScriptMapper, not here.
 @Component
 public class ScriptMapper {
 

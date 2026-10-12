@@ -111,8 +111,8 @@ public class InvitationRegistrationService {
     private void markVerifiedQuietly(AuthUser user) {
         try {
             userService.markEmailVerified(user.getId());
-        } catch (Exception ignored) {
-            // Do not block invitation acceptance if verification update fails
+        } catch (Exception e) {
+            log.warn("Failed to mark email verified for user {}", user.getId(), e);
         }
     }
 }

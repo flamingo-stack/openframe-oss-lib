@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from './icons-v2';
 import { type ButtonHTMLAttributes, type HTMLAttributes, forwardRef } from 'react';
 import { cn } from '../utils/cn';
 import { Button } from './ui/button';
@@ -76,7 +76,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
             aria-label="Go to previous page"
             className="!h-10 !w-10 content-md:!h-10 content-md:!w-10"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeftIcon className="h-4 w-4" />
           </Button>
         </li>
 
@@ -86,7 +86,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
             return (
               <li key={`ellipsis-${index}`}>
                 <span className="flex h-9 w-9 items-center justify-center text-muted-foreground text-h6">
-                  <MoreHorizontal className="h-4 w-4" />
+                  <MoreHorizontalIcon className="h-4 w-4" />
                   <span className="sr-only">More pages</span>
                 </span>
               </li>
@@ -118,7 +118,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
             aria-label="Go to next page"
             className="!h-10 !w-10 content-md:!h-10 content-md:!w-10"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRightIcon className="h-4 w-4" />
             <span className="sr-only">Next page</span>
           </Button>
         </li>
@@ -163,7 +163,7 @@ const PaginationEllipsis = forwardRef<HTMLSpanElement, HTMLAttributes<HTMLSpanEl
         className={cn('flex h-10 w-10 items-center justify-center text-muted-foreground', className)}
         {...props}
       >
-        <MoreHorizontal className="h-4 w-4" />
+        <MoreHorizontalIcon className="h-4 w-4" />
         <span className="sr-only">More pages</span>
       </span>
     );
@@ -175,7 +175,7 @@ const PaginationPrevious = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HT
   ({ className, ...props }, ref) => {
     return (
       <Button ref={ref} variant="outline" size="icon" className={cn('h-10 w-10', className)} {...props}>
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeftIcon className="h-4 w-4" />
         <span className="sr-only">Previous page</span>
       </Button>
     );
@@ -187,7 +187,7 @@ const PaginationNext = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBu
   ({ className, ...props }, ref) => {
     return (
       <Button ref={ref} variant="outline" size="icon" className={cn('h-10 w-10', className)} {...props}>
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRightIcon className="h-4 w-4" />
         <span className="sr-only">Next page</span>
       </Button>
     );
@@ -204,3 +204,4 @@ export {
   PaginationNext,
   PaginationPrevious,
 };
+

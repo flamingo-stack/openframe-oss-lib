@@ -17,7 +17,7 @@
  *     ("Recoverable from the ClickUp Trash for 30 days")
  */
 
-import { Trash2 } from 'lucide-react';
+import { Trash2 } from '@/components/icons-v2';
 import {
   COMPACT_CARD_ICON_SLOT,
   COMPACT_CARD_META_ROW,

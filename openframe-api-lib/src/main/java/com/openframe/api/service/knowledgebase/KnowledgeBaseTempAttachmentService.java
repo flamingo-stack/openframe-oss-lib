@@ -12,8 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -101,15 +101,28 @@ public class KnowledgeBaseTempAttachmentService {
                     tempIds.size(), temps.size());
         }
 
-        List<KnowledgeBaseItemAttachment> attachments = temps.stream()
-                .map(temp -> moveToArticle(articleId, temp, uploadedBy))
-                .filter(Objects::nonNull)
-                .toList();
+        List<KnowledgeBaseItemAttachment> attachments = new ArrayList<>();
+        List<String> failedTempIds = new ArrayList<>();
+        for (TempAttachment temp : temps) {
+            try {
+                attachments.add(moveToArticle(articleId, temp, uploadedBy));
+            } catch (KnowledgeBaseAttachmentMoveException e) {
+                log.error("Failed to move temp attachment {} to article {}", temp.getId(), articleId, e);
+                failedTempIds.add(temp.getId());
+            }
+        }
 
         if (!attachments.isEmpty()) {
             attachmentRepository.saveAll(attachments);
         }
         log.info("Linked {} of {} attachments to article: {}", attachments.size(), temps.size(), articleId);
+
+        if (!failedTempIds.isEmpty()) {
+            throw new KnowledgeBaseAttachmentMoveException(
+                    "Failed to move %d of %d temp attachments to article %s: %s"
+                            .formatted(failedTempIds.size(), temps.size(), articleId, failedTempIds));
+        }
+
         return attachments;
     }
 
@@ -130,8 +143,8 @@ public class KnowledgeBaseTempAttachmentService {
                     .uploadedBy(uploadedBy)
                     .build();
         } catch (Exception e) {
-            log.error("Failed to move temp file to article: {}", temp.getId(), e);
-            return null;
+            throw new KnowledgeBaseAttachmentMoveException(
+                    "Failed to move temp file to article: " + temp.getId(), e);
         }
     }
 
@@ -142,4 +155,15 @@ public class KnowledgeBaseTempAttachmentService {
     private String buildAttachmentPath(String articleId, String fileName) {
         return "%s/%s/%s".formatted(KB_ATTACHMENTS_PREFIX, articleId, fileName);
     }
+
+    public static class KnowledgeBaseAttachmentMoveException extends RuntimeException {
+        public KnowledgeBaseAttachmentMoveException(String message) {
+            super(message);
+        }
+
+        public KnowledgeBaseAttachmentMoveException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
 }
+

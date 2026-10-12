@@ -164,8 +164,12 @@ public class IntegratedToolAgentService {
         List<ToolAgentAsset> existingAssets = existing.getAssets();
         List<ToolAgentAsset> newAssets = configuration.getAssets();
 
-        if (isEmpty(existingAssets) || isEmpty(newAssets)) {
+        if (isEmpty(existingAssets) && isEmpty(newAssets)) {
             return false;
+        }
+
+        if (isEmpty(existingAssets) || isEmpty(newAssets)) {
+            return true;
         }
 
         Map<String, String> existingVersionsById = new HashMap<>();
@@ -212,3 +216,4 @@ public class IntegratedToolAgentService {
         log.info("Updated release agent {} version {} -> {} and marked for publish", id, oldVersion, newVersion);
     }
 }
+

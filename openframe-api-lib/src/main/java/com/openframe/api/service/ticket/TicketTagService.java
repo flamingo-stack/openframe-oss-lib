@@ -42,7 +42,7 @@ public class TicketTagService {
         return tagRepository.findByEntityType(TagEntityType.TICKET);
     }
 
-    public List<Tag> getTags() {
+    public List<Tag> getTagsUnchecked() {
         return tagRepository.findByEntityType(TagEntityType.TICKET);
     }
 

@@ -125,19 +125,20 @@ where
 #[derive(Default)]
 struct MetricVisitor {
     metric: Option<(String, MetricValue, HashMap<String, String>)>,
+    metric_name: Option<String>,
 }
 
 impl tracing::field::Visit for MetricVisitor {
     fn record_f64(&mut self, field: &tracing::field::Field, value: f64) {
         if field.name() == "gauge" {
             self.metric = Some((
-                field.name().to_string(),
+                self.metric_name.clone().unwrap_or_else(|| field.name().to_string()),
                 MetricValue::Gauge(value),
                 HashMap::new(),
             ));
         } else if field.name() == "histogram" {
             self.metric = Some((
-                field.name().to_string(),
+                self.metric_name.clone().unwrap_or_else(|| field.name().to_string()),
                 MetricValue::Histogram(vec![value]),
                 HashMap::new(),
             ));
@@ -147,7 +148,7 @@ impl tracing::field::Visit for MetricVisitor {
     fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
         if field.name() == "counter" {
             self.metric = Some((
-                field.name().to_string(),
+                self.metric_name.clone().unwrap_or_else(|| field.name().to_string()),
                 MetricValue::Counter(value),
                 HashMap::new(),
             ));
@@ -155,7 +156,13 @@ impl tracing::field::Visit for MetricVisitor {
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-        if let Some((_, _, labels)) = &mut self.metric {
+        if field.name() == "name" {
+            let name_value = format!("{:?}", value).trim_matches('"').to_string();
+            self.metric_name = Some(name_value.clone());
+            if let Some((name, _, _)) = &mut self.metric {
+                *name = name_value;
+            }
+        } else if let Some((_, _, labels)) = &mut self.metric {
             labels.insert(field.name().to_string(), format!("{:?}", value));
         }
     }

@@ -89,7 +89,9 @@ public class SoftwareBundleDataFetcher {
     public SoftwareBundleResponse removeAllDevicesFromSoftwareBundle(@InputArgument String bundleId,
                                                                      @InputArgument @Valid DeviceFilterInput filter,
                                                                      @InputArgument String search) {
-        List<String> machineIds = deviceService.findAllDeviceIds(deviceMapper.toDeviceFilterCriteria(filter), search);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
+        List<String> machineIds = deviceService.findAllDeviceIds(filterOptions, search);
         return softwareBundleService.removeDevices(decodeId(bundleId), machineIds, getCurrentUserId());
     }
 

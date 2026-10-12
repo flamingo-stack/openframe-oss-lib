@@ -1,6 +1,6 @@
 'use client';
 
-import { Trash2, User } from 'lucide-react';
+import { TrashIcon, UserIcon } from '../icons-v2-generated';
 import { createElement } from 'react';
 import { normalizeSocialPlatform } from '../../utils/social-platforms';
 import { socialIcon } from '../social-icon-row';
@@ -128,7 +128,7 @@ export function SocialLinksManager({
               onClick={() => removeLink(index)}
               className="text-ods-error hover:bg-ods-error-secondary hover:text-ods-error-hover"
             >
-              <Trash2 className="h-4 w-4" />
+              <TrashIcon className="h-4 w-4" />
             </Button>
           </div>
         );
@@ -145,10 +145,11 @@ export function SocialLinksManager({
         onClick={addLink}
         className="w-full"
         type="button"
-        leftIcon={<User className="h-4 w-4" />}
+        leftIcon={<UserIcon className="h-4 w-4" />}
       >
         Add Social Link
       </Button>
     </div>
   );
 }
+

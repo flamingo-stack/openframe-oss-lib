@@ -1,7 +1,7 @@
 'use client';
 
-import { ExternalLink } from 'lucide-react';
 import React from 'react';
+import { ExternalLink } from '../icons-v2';
 import { useNavLinkViaRuntime } from '../chat/nav-link-anchor-via-runtime';
 import { Button } from './button';
 
