@@ -64,6 +64,7 @@ export * from './alert';
 export * from './badge';
 export * from './ai-generated-badge';
 export * from './fade-preview';
+export * from './layout-hold';
 export * from './progress';
 export * from './release-changelog-section';
 export * from './stacked-rows-panel';
