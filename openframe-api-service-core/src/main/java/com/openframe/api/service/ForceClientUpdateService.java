@@ -60,8 +60,19 @@ public class ForceClientUpdateService {
     }
 
     private List<ForceClientUpdateResponseItem> processMachines(List<String> machineIds) {
+        OpenFrameClientConfiguration configuration;
+        try {
+            configuration = clientConfigurationRepository.findFirstByOrderByCreatedAtDesc()
+                    .orElseThrow(() -> new IllegalStateException("Not found client configuration"));
+        } catch (Exception e) {
+            log.error("Failed to load client configuration for force client update", e);
+            return machineIds.stream()
+                    .map(machineId -> buildResponseItem(machineId, ForceAgentStatus.FAILED))
+                    .toList();
+        }
+
         return machineIds.stream()
-                .map(this::processMachine)
+                .map(machineId -> processMachine(machineId, configuration))
                 .toList();
     }
 
@@ -71,10 +82,8 @@ public class ForceClientUpdateService {
         }
     }
 
-    private ForceClientUpdateResponseItem processMachine(String machineId) {
+    private ForceClientUpdateResponseItem processMachine(String machineId, OpenFrameClientConfiguration configuration) {
         try {
-            OpenFrameClientConfiguration configuration = clientConfigurationRepository.findFirstByOrderByCreatedAtDesc()
-                    .orElseThrow(() -> new IllegalStateException("Not found client configuration"));
             clientUpdateService.send(configuration);
 
             return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
