@@ -1,6 +1,8 @@
 package com.openframe.management.scheduler;
 
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
+import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.nats.publisher.OpenFrameClientUpdatePublisher;
@@ -27,6 +29,7 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     private final OpenFrameClientUpdatePublisher openFrameClientUpdatePublisher;
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolAgentUpdateUpdatePublisher toolAgentUpdateUpdatePublisher;
+    private final DeliveryProperties deliveryProperties;
 
     @Value("${openframe.agent-version-update-publish-fallback.max-attempts:5}")
     private int maxPublishAttempts;
@@ -50,7 +53,11 @@ public class AgentVersionUpdatePublishFallbackScheduler {
         }
     }
 
+    // on the engine the release itself hands the update to every machine; the broadcast would send it twice
     private void processOpenframeClient() {
+        if (deliveryProperties.isEnabled(DeliveryType.CLIENT_UPDATE)) {
+            return;
+        }
         OpenFrameClientConfiguration config = openFrameClientConfigurationService.get();
         PublishState publishState = config.getPublishState();
         if (shouldRetryPublish(publishState)) {

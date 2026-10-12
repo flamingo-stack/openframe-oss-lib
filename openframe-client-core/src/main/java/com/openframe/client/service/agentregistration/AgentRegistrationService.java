@@ -52,6 +52,7 @@ public class AgentRegistrationService {
     private final RegistrationTagAssignmentService registrationTagAssignmentService;
     private final InstalledAgentService installedAgentService;
     private final ToolConnectionService toolConnectionService;
+    private final AgentRegistrationClientUpdateService agentRegistrationClientUpdateService;
 
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
@@ -143,6 +144,7 @@ public class AgentRegistrationService {
         saveInstalledAgent(machineId, request);
         registrationTagAssignmentService.assignTags(machineId, request.getTags());
         agentRegistrationToolInstallationService.process(machineId);
+        agentRegistrationClientUpdateService.process(machineId);
         agentRegistrationProcessor.postProcessAgentRegistration(machine, request);
     }
 

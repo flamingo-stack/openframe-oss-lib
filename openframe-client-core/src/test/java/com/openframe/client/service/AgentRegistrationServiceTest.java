@@ -77,6 +77,9 @@ class AgentRegistrationServiceTest {
     @Mock
     private ToolConnectionService toolConnectionService;
 
+    @Mock
+    private AgentRegistrationClientUpdateService agentRegistrationClientUpdateService;
+
     @Captor
     private ArgumentCaptor<OAuthClient> oauthClientCaptor;
 
@@ -105,7 +108,8 @@ class AgentRegistrationServiceTest {
                 agentRegistrationProcessor,
                 registrationTagAssignmentService,
                 installedAgentService,
-                toolConnectionService
+                toolConnectionService,
+                agentRegistrationClientUpdateService
         );
         request = createTestRequest();
     }

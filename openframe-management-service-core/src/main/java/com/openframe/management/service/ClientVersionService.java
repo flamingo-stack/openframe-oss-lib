@@ -1,11 +1,16 @@
 package com.openframe.management.service;
 
+import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.nats.delivery.ClientUpdateDeliverySeed;
 import com.openframe.data.document.version.ReleaseVersion;
 import com.openframe.data.repository.version.ReleaseVersionRepository;
 import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
+import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,6 +26,8 @@ public class ClientVersionService {
     private final ReleaseVersionRepository releaseVersionRepository;
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
     private final IntegratedToolAgentService integratedToolAgentService;
+    private final DeliveryProperties deliveryProperties;
+    private final DeliveryDispatcher deliveryDispatcher;
 
     @RetryOnOptimisticLockingFailure
     public void process(String releaseVersion) {
@@ -67,9 +74,24 @@ public class ClientVersionService {
         propagate(releaseVersion);
     }
 
+    // the rollout starts only when the version moved: propagate also runs on every management start
     private void propagate(String version) {
-        openFrameClientConfigurationService.updateVersion(version);
+        boolean versionMoved = openFrameClientConfigurationService.updateVersion(version);
+        if (versionMoved && isClientUpdateOnTheEngine()) {
+            rollOutClientUpdate();
+        }
         updateReleaseAgents(version);
+    }
+
+    private boolean isClientUpdateOnTheEngine() {
+        return deliveryProperties.isEnabled(DeliveryType.CLIENT_UPDATE);
+    }
+
+    private void rollOutClientUpdate() {
+        OpenFrameClientConfiguration configuration = openFrameClientConfigurationService.get();
+        ClientUpdateDeliverySeed everyMachine = ClientUpdateDeliverySeed.forEveryMachine(configuration);
+        deliveryDispatcher.dispatch(everyMachine);
+        log.info("Client update handed to the delivery engine for every machine: version={}", configuration.getVersion());
     }
 
     private void updateReleaseAgents(String version) {

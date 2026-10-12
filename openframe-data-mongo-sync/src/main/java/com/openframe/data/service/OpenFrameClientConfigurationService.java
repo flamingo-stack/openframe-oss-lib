@@ -47,17 +47,19 @@ public class OpenFrameClientConfigurationService {
         save(config);
     }
 
+    // true when the version moved: the caller decides what a new version sets in motion
     @RetryOnOptimisticLockingFailure
-    public void updateVersion(String newVersion) {
+    public boolean updateVersion(String newVersion) {
         OpenFrameClientConfiguration config = get();
         String oldVersion = config.getVersion();
         if (Objects.equals(oldVersion, newVersion)) {
-            return;
+            return false;
         }
         config.setVersion(newVersion);
         config.setPublishState(PublishState.pending());
         save(config);
         log.info("Updated client configuration version {} -> {} and marked for publish", oldVersion, newVersion);
+        return true;
     }
 
     @RetryOnOptimisticLockingFailure

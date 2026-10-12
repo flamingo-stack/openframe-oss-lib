@@ -7,6 +7,8 @@ import com.openframe.data.nats.publisher.OpenFrameClientUpdatePublisher;
 import com.openframe.data.nats.publisher.ToolAgentUpdateUpdatePublisher;
 import com.openframe.data.service.IntegratedToolAgentService;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
+import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.data.document.delivery.DeliveryType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +44,9 @@ class AgentVersionUpdatePublishFallbackSchedulerUnitTest {
     private IntegratedToolAgentService integratedToolAgentService;
     @Mock
     private ToolAgentUpdateUpdatePublisher toolAgentUpdateUpdatePublisher;
+
+    @Mock
+    private DeliveryProperties deliveryProperties;
 
     @InjectMocks
     private AgentVersionUpdatePublishFallbackScheduler scheduler;
@@ -152,5 +158,16 @@ class AgentVersionUpdatePublishFallbackSchedulerUnitTest {
         agent.setId(id);
         agent.setPublishState(publishState);
         return agent;
+    }
+    // on the engine the release itself hands the update to every machine; the broadcast would send it twice
+    @Test
+    void clientUpdateOnTheEngine_clientBroadcastLeftAlone() {
+        when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UPDATE)).thenReturn(true);
+        when(integratedToolAgentService.getAllEnabled()).thenReturn(java.util.List.of());
+
+        scheduler.publishUnpublishedEntities();
+
+        verify(openFrameClientConfigurationService, never()).get();
+        verifyNoInteractions(openFrameClientUpdatePublisher);
     }
 }

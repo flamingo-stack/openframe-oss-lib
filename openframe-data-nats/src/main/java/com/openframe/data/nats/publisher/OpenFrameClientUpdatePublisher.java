@@ -1,8 +1,7 @@
 package com.openframe.data.nats.publisher;
 
-import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
-import com.openframe.data.nats.mapper.DownloadConfigurationMapper;
+import com.openframe.data.nats.mapper.OpenFrameClientUpdateMessageMapper;
 import com.openframe.data.nats.model.OpenFrameClientUpdateMessage;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +10,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +20,7 @@ public class OpenFrameClientUpdatePublisher {
     private final static String TOPIC_NAME = "machine.all.client-update";
 
     private final NatsMessagePublisher natsMessagePublisher;
-    private final DownloadConfigurationMapper downloadConfigurationMapper;
+    private final OpenFrameClientUpdateMessageMapper messageMapper;
     private final OpenFrameClientConfigurationService openFrameClientConfigurationService;
 
     public void publish(OpenFrameClientConfiguration configuration) {
@@ -50,17 +48,8 @@ public class OpenFrameClientUpdatePublisher {
     }
 
     public void send(OpenFrameClientConfiguration configuration) {
-        OpenFrameClientUpdateMessage message = buildMessage(configuration);
+        OpenFrameClientUpdateMessage message = messageMapper.toMessage(configuration);
         natsMessagePublisher.publishPersistent(TOPIC_NAME, message);
     }
 
-    private OpenFrameClientUpdateMessage buildMessage(OpenFrameClientConfiguration configuration) {
-        String configurationVersion = configuration.getVersion();
-        List<DownloadConfiguration> downloadConfiguration = configuration.getDownloadConfiguration();
-
-        OpenFrameClientUpdateMessage message = new OpenFrameClientUpdateMessage();
-        message.setVersion(configurationVersion);
-        message.setDownloadConfigurations(downloadConfigurationMapper.map(downloadConfiguration, configurationVersion));
-        return message;
-    }
 }
