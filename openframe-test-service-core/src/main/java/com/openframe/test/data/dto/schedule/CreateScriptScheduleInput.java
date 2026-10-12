@@ -8,14 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/**
- * Payload for the {@code createScriptSchedule} mutation. Optional fields are omitted when null so
- * the server applies its defaults ({@code timeReference} SERVER, {@code offlineBehavior} SKIP).
- * <p>
- * Contract (schema docstrings): {@code startAt} is required when {@code trigger} is DATE_TIME, must
- * be null for DEVICE_ONLINE, and must fall on a 30-minute boundary (xx:00 or xx:30); {@code repeat}
- * is a whole number of 30-minute slots in seconds (1800, 3600, …) or null for a one-shot.
- */
+// startAt required for DATE_TIME (30-min boundary), null for DEVICE_ONLINE; repeat is whole 30-min slots in seconds or null for one-shot.
 @Data
 @Builder
 @NoArgsConstructor
