@@ -24,7 +24,7 @@ public class ClientCredentialsHandler {
     public AgentTokenResponse handle(String clientId, String clientSecret) {
         OAuthClient client = clientRepository.findByClientId(clientId)
                 .orElseThrow(() -> {
-                    log.error("Client not found: {}", clientId);
+                    log.warn("Client not found: {}", clientId);
                     return new IllegalArgumentException("Client not found");
                 });
 
