@@ -49,7 +49,7 @@ public class ScriptFilterService {
 
     private static ScriptQueryFilter toQueryFilter(ScriptFilterInput input) {
         if (input == null) {
-            return null;
+            return ScriptQueryFilter.builder().build();
         }
         return ScriptQueryFilter.builder()
                 .shells(input.getShells())
