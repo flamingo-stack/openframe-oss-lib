@@ -63,7 +63,13 @@ describe('accentSentenceMarks', () => {
     );
   });
 
-  it('makes an eyebrow part of the heading element, with the same two boxes in the stack', () => {
+  it("keeps a section heading's eyebrow beside the heading, so the heading is named by its title alone", () => {
+    expect(html(<SectionHeading eyebrow="AI agents" title="Built in" punctuation={null} />)).toContain(
+      '<span class="text-h5 text-ods-accent">AI agents</span><h2 class="text-h2 text-ods-text-primary" data-section-heading="true">Built in</h2>',
+    );
+  });
+
+  it("makes a page heading's eyebrow part of the heading element, with the same two boxes in the stack", () => {
     const out = html(
       <SectionHeading level="page" eyebrow="Endpoint management software" title="Run by AI" punctuation={null} />,
     );

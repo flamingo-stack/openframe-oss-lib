@@ -156,10 +156,12 @@ const SECTION_HEADING_LAYOUT = {
 export interface SectionHeadingProps {
   /**
    * The small label above the heading (Azeret Mono, uppercase, accent colour).
-   * It is part of the heading element: a hero's eyebrow names what the page is
-   * about ("Endpoint management software") above its positioning line. The
-   * element takes no box of its own, so the eyebrow and the title keep their
-   * two places in the stack.
+   * On a page heading (`level="page"`) it is part of the `<h1>`: a hero's
+   * eyebrow names what the page is about ("Endpoint management software") above
+   * its positioning line, so the page's heading, and its accessible name, say
+   * both. The element takes no box of its own, so the eyebrow and the title keep
+   * their two places in the stack. On a section heading it stays a label beside
+   * the `<h2>`, whose accessible name is its title alone.
    */
   eyebrow?: ReactNode;
   /** The heading text; a node when part of it is highlighted. Every sentence mark in it is drawn in the accent colour. */
@@ -219,7 +221,7 @@ export function SectionHeading({
   );
   const stack = (
     <div className={layout.stack}>
-      {eyebrowNode ? (
+      {eyebrowNode && level === 'page' ? (
         // `contents`: the element names the heading and draws no box, so the stack lays its two children out as before.
         <Tag className="contents">
           {eyebrowNode}
@@ -228,9 +230,12 @@ export function SectionHeading({
           </span>
         </Tag>
       ) : (
-        <Tag className={layout.heading} data-section-heading>
-          {headingText}
-        </Tag>
+        <>
+          {eyebrowNode}
+          <Tag className={layout.heading} data-section-heading>
+            {headingText}
+          </Tag>
+        </>
       )}
       {intro ? (
         <div className={layout.intro} data-section-intro>
