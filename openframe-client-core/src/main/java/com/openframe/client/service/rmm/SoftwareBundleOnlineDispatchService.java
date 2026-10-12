@@ -39,7 +39,7 @@ public class SoftwareBundleOnlineDispatchService {
     private final SoftwareBundleRepository bundleRepository;
     private final SoftwareBundleOnlineDispatcher bundleDispatcher;
 
-    @Value("${openframe.rmm.software.bundle.online-dispatch.batch-size:500}")
+    @Value("${openframe.rmm.software.bundle.online-dispatch.batch-size}")
     private int batchSize;
 
     public void processDevicesBecameOnline() {
