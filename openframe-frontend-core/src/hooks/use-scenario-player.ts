@@ -75,8 +75,8 @@ export interface UseScenarioPlayerResult {
  * rotation moved on, or a tab was chosen), its first step follows within
  * `START_MS`, not a whole step later; from there every step takes `stepMs`.
  *
- * A visitor's own choice (`go`, `setStep`) moves the clock there; the rotation
- * carries on from that point once they let go.
+ * A visitor's own choice (`go`, `setStep`) moves the clock there and lets go of
+ * any hold; the rotation carries on from that point.
  */
 export function useScenarioPlayer({
   scenarioCount,
@@ -89,7 +89,7 @@ export function useScenarioPlayer({
   emptyFirstStep = true,
 }: UseScenarioPlayerOptions): UseScenarioPlayerResult {
   const auto = useAutoplay(enabled);
-  const { reducedMotion, held, holdProps } = auto;
+  const { reducedMotion, held, holdProps, release } = auto;
 
   const [scenario, setScenario] = useState(initialScenario);
   const [rawStep, setRawStep] = useState(startAtEnd ? Number.MAX_SAFE_INTEGER : 0);
@@ -129,12 +129,23 @@ export function useScenarioPlayer({
     return () => clearTimeout(timer);
   }, [playing, rawStep, lastStep, stepMs, holdMs, scenario, scenarioCount, emptyFirstStep]);
 
-  const setStep = useCallback((next: number) => setRawStep(Math.max(0, Math.min(lastStep, next))), [lastStep]);
+  // A visitor's choice is an instruction to play from there: it lets go of any hold.
+  const setStep = useCallback(
+    (next: number) => {
+      setRawStep(Math.max(0, Math.min(lastStep, next)));
+      release();
+    },
+    [lastStep, release],
+  );
 
-  const go = useCallback((next: number) => {
-    setScenario(next);
-    setRawStep(0);
-  }, []);
+  const go = useCallback(
+    (next: number) => {
+      setScenario(next);
+      setRawStep(0);
+      release();
+    },
+    [release],
+  );
 
   return { scenario, step, held, holdProps, setStep, go, reducedMotion };
 }

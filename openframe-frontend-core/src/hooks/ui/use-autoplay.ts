@@ -17,6 +17,13 @@ export interface UseAutoplayResult {
   held: boolean;
   /** Spread on the element that moves: it is how a visitor stops it, with no control to find. */
   holdProps: AutoplayHoldProps;
+  /**
+   * Lets go of every hold at once. Called when the visitor CHOOSES something on
+   * the thing itself (a tab, a step, an arrow): a choice is an instruction to
+   * play from there, and it must never depend on the browser reporting the end
+   * of the press or the focus that made it.
+   */
+  release: () => void;
   /** True once the system preference is known to be reduced motion. */
   reducedMotion: boolean;
 }
@@ -75,6 +82,9 @@ const RELEASE_EVENTS = ['pointerup', 'pointercancel', 'mouseup', 'touchend', 'dr
  *     inside" alone is not the test: a browser turns the ring on for a control
  *     that was CLICKED as soon as any key is pressed, which held the demo for a
  *     visitor who clicked a tab and then scrolled with the space bar;
+ *   - a CHOICE made on the thing itself (`release`, called by whoever handles
+ *     the tab, the step or the arrow) lets go of everything: it plays from
+ *     there whatever the browser did or did not report;
  *   - the tab is read from the document (`useSyncExternalStore`), never copied
  *     into state.
  *
@@ -147,11 +157,20 @@ export function useAutoplay(onScreen: boolean): UseAutoplayResult {
     [],
   );
 
+  // Bumped by `release`, so the keyboard store re-reads after it lets go.
+  const [, setReleases] = useState(0);
+  const release = useCallback(() => {
+    keyboardCameIn.current = false;
+    setPressed(false);
+    setReleases(count => count + 1);
+  }, []);
+
   const held = pressed || focused;
   return {
     playing: onScreen && !held && !tabHidden && reducedState === false,
     held,
     holdProps,
+    release,
     reducedMotion: reducedState === true,
   };
 }

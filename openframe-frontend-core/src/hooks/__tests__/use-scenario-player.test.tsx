@@ -163,6 +163,24 @@ describe('useScenarioPlayer', () => {
     expect(result.current.step).toBe(1);
   });
 
+  it('plays on from a chosen tab even when the release of the press that chose it is never reported', () => {
+    stubReducedMotion(false);
+    const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
+    act(() => {
+      result.current.holdProps.onPointerDown({
+        currentTarget: document.body,
+      } as unknown as React.PointerEvent<HTMLElement>);
+    });
+    expect(result.current.held).toBe(true);
+    // No pointerup, no mouseup, no move: only the choice itself.
+    act(() => {
+      result.current.go(1);
+    });
+    expect(result.current).toMatchObject({ scenario: 1, step: 0, held: false });
+    beats(3);
+    expect(result.current).toMatchObject({ scenario: 1, step: 3 });
+  });
+
   it('picks up where it was every time it comes back on screen', () => {
     stubReducedMotion(false);
     const { result, rerender } = renderHook(({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled }), {
