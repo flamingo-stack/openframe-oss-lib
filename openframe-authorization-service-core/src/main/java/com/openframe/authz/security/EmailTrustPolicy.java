@@ -32,8 +32,7 @@ public class EmailTrustPolicy {
             }
             Object edov = claims.get("xms_edov");
             return Boolean.TRUE.equals(edov)
-                    || "true".equalsIgnoreCase(OidcUserUtils.stringClaim(edov))
-                    || Boolean.TRUE.equals(claims.get("email_verified"));
+                    || "true".equalsIgnoreCase(OidcUserUtils.stringClaim(edov));
         }
         return OidcUserUtils.emailVerifiedClaimAllows(claims);
     }
