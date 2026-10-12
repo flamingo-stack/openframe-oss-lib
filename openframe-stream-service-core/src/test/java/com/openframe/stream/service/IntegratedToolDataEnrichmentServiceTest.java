@@ -33,6 +33,7 @@ class IntegratedToolDataEnrichmentServiceTest {
     private static final String TENANT_ID = "tenant-1";
     private static final String HOSTNAME = "MBP-Oleksandr.lan";
     private static final String NICKNAME = "Reception iMac";
+    private static final String USER_ID = "technician-1";
 
     @Mock
     private MachineIdCacheService machineIdCacheService;
@@ -46,6 +47,59 @@ class IntegratedToolDataEnrichmentServiceTest {
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Tenant cluster mode — no ClusterTenantIdResolver bean.
         service = new IntegratedToolDataEnrichmentService(machineIdCacheService, null, tenantIdProvider);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: the actor the deserializer set travels to the enriched data")
+    void getExtraParams_messageCarriesUserId_userIdEnriched() {
+        // setup
+        when(machineIdCacheService.getMachine(AGENT_ID))
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, NICKNAME, ORG_ID));
+        when(machineIdCacheService.getOrganization(ORG_ID))
+                .thenReturn(new CachedOrganizationInfo(ORG_ID, "Default"));
+        DeserializedDebeziumMessage message = messageWithUser(AGENT_ID, USER_ID);
+
+        // execution
+        IntegratedToolEnrichedData enriched = service.getExtraParams(message);
+
+        // verifications
+        assertThat(enriched.getUserId()).isEqualTo(USER_ID);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: a message with an actor still resolves the device from its agent id")
+    void getExtraParams_messageCarriesUserId_machineStillResolved() {
+        // setup
+        when(machineIdCacheService.getMachine(AGENT_ID))
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, NICKNAME, ORG_ID));
+        when(machineIdCacheService.getOrganization(ORG_ID))
+                .thenReturn(new CachedOrganizationInfo(ORG_ID, "Default"));
+        DeserializedDebeziumMessage message = messageWithUser(AGENT_ID, USER_ID);
+
+        // execution
+        IntegratedToolEnrichedData enriched = service.getExtraParams(message);
+
+        // verifications
+        assertThat(enriched.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(enriched.getHostname()).isEqualTo(HOSTNAME);
+        assertThat(enriched.getOrganizationId()).isEqualTo(ORG_ID);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: a tool event without an actor keeps userId null")
+    void getExtraParams_messageWithoutUserId_userIdNull() {
+        // setup
+        when(machineIdCacheService.getMachine(AGENT_ID))
+                .thenReturn(new CachedMachineInfo(MACHINE_ID, HOSTNAME, NICKNAME, ORG_ID));
+        when(machineIdCacheService.getOrganization(ORG_ID))
+                .thenReturn(new CachedOrganizationInfo(ORG_ID, "Default"));
+        DeserializedDebeziumMessage message = message(AGENT_ID);
+
+        // execution
+        IntegratedToolEnrichedData enriched = service.getExtraParams(message);
+
+        // verifications
+        assertThat(enriched.getUserId()).isNull();
     }
 
     private static DeserializedDebeziumMessage message(String agentId) {
@@ -105,5 +159,11 @@ class IntegratedToolDataEnrichmentServiceTest {
         assertThat(enriched.getHostname()).isNull();
         assertThat(enriched.getNickname()).isNull();
         assertThat(enriched.getTenantId()).isEqualTo(TENANT_ID);
+    }
+
+    private static DeserializedDebeziumMessage messageWithUser(String agentId, String userId) {
+        DeserializedDebeziumMessage message = message(agentId);
+        message.setUserId(userId);
+        return message;
     }
 }
