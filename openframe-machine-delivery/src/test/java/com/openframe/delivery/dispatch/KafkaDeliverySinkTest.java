@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.TestPayload;
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
@@ -61,6 +62,7 @@ class KafkaDeliverySinkTest {
         verify(producer).sendAndAwait(eq(TOPIC), eq(MACHINE_ID), messageCaptor.capture());
         DeliveryDispatchMessage message = messageCaptor.getValue();
         assertThat(message.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(message.getAudience()).isEqualTo(DeliveryAudience.MACHINE);
         assertThat(message.getPayload().get("delivery").get("dispatchId").asText()).isEqualTo(DISPATCH_ID);
         assertThat(message.getPayload().get("value").asText()).isEqualTo("issued");
         verify(metrics).recordDispatched(DeliveryType.TOOL_INSTALLATION, "kafka");

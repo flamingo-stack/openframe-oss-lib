@@ -44,7 +44,7 @@ public class ScheduleDeviceTargetResolver {
             return machineIds;
         }
         Set<String> valid = machineRepository.findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
-                .filter(m -> DeviceStatus.DISPATCH_ELIGIBLE.contains(m.getStatus()))
+                .filter(m -> DeviceStatus.CONNECTED.contains(m.getStatus()))
                 .map(Machine::getMachineId)
                 .collect(Collectors.toSet());
         return machineIds.stream().filter(valid::contains).toList();
