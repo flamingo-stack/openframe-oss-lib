@@ -90,6 +90,13 @@ export const ICON_ALIASES: Readonly<Record<string, IconRef>> = {
   video: { set: 'VideoRecorderIcon' },
   headphones: { set: 'HeadphoneIcon' },
 
+  // The two LLM brands offered by `ICON_OPTIONS`. Their brand-colored glyphs
+  // are the only picker entries that hardcode a fill (#000 / #D97757), so they
+  // ignored the chip accent and sat black and orange in a cyan grid; the grey
+  // variants fill with `currentColor` like every other brand logo here.
+  'openai-logo': { set: 'OpenaiLogoGreyIcon' },
+  'anthropic-logo': { set: 'AnthropicLogoGreyIcon' },
+
   // Figma-canonical aliases (node 7363:205938) — kept for Storybook
   // fixtures and any older feed entries still using the long names.
   'clickup-logo': CLICKUP_GREY,
