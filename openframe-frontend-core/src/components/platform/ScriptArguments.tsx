@@ -9,6 +9,7 @@
 import { Trash2 } from 'lucide-react';
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { randomId } from '../../utils/random-id';
 import { LockIcon, PlusCircleIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -122,7 +123,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
   const handleAdd = (secret = false) => {
     if (!onArgumentsChange) return;
     const newArg: ScriptArgument = {
-      id: crypto.randomUUID(),
+      id: randomId(),
       key: '',
       value: '',
       // Only set on a secret, so a plain pair keeps the shape it always had.

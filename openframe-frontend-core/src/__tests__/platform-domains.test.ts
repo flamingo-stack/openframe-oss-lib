@@ -70,7 +70,7 @@ describe('🔒 cross-subdomain cookie sharing (the SSO invariant — must never 
   it('keeps flamingo.cx OUT of the cookie set (alias excluded) but IN the reverse map', () => {
     const bases = withProdWindow('www.flamingo.run', getAllPlatformBaseDomains);
     expect(bases).not.toContain('.flamingo.cx');
-    expect(getPlatformByHostname('flamingo.cx')).toBe('flamingo-teaser');
+    expect(getPlatformByHostname('flamingo.cx')).toBe('flamingo');
   });
   it('returns [] for localhost and .vercel.app (host-only cookies)', () => {
     expect(withProdWindow('localhost', getAllPlatformBaseDomains)).toEqual([]);
@@ -82,8 +82,8 @@ describe('reverse resolver (first-wins ordering + aliases)', () => {
   it.each([
     ['www.flamingo.run', 'flamingo'],
     ['flamingo.run', 'flamingo'],
-    ['flamingo.cx', 'flamingo-teaser'],
-    ['www.flamingo.cx', 'flamingo-teaser'],
+    ['flamingo.cx', 'flamingo'],
+    ['www.flamingo.cx', 'flamingo'],
     ['openframe.ai', 'openframe'],
     ['www.openframe.ai', 'openframe'],
     ['hub.openframe.ai', 'openframe'], // additive fix — was null in the old PLATFORM_DOMAIN_MAP
@@ -110,7 +110,7 @@ describe('host primitives', () => {
   it('toRegistrableBaseDomain + aliasHostsOf', () => {
     expect(toRegistrableBaseDomain('marketing-hub.flamingo.so')).toBe('flamingo.so');
     expect(toRegistrableBaseDomain('localhost')).toBeUndefined();
-    expect(aliasHostsOf('flamingo-teaser')).toEqual(['flamingo.cx', 'www.flamingo.cx']);
+    expect(aliasHostsOf('flamingo')).toEqual(['flamingo.cx', 'www.flamingo.cx']);
     expect(aliasHostsOf('openmsp')).toEqual([]);
   });
 });
@@ -131,11 +131,11 @@ describe('env override path', () => {
     // a non-sharing key is unaffected
     expect(mod.getPlatformProductionUrl('openmsp')).toBe('https://www.openmsp.ai');
   });
-  it('the shared NEXT_PUBLIC_FLAMINGO_URL drives all three of its keys', async () => {
+  it('the shared NEXT_PUBLIC_FLAMINGO_URL drives both of its keys', async () => {
     vi.stubEnv('NEXT_PUBLIC_FLAMINGO_URL', 'https://sentinel-flamingo.example');
     vi.resetModules();
     const mod = await import('@/platform-domains');
-    for (const k of ['flamingo', 'flamingo-teaser', 'universal']) {
+    for (const k of ['flamingo', 'universal']) {
       expect(mod.getPlatformProductionUrl(k)).toBe('https://sentinel-flamingo.example');
     }
   });

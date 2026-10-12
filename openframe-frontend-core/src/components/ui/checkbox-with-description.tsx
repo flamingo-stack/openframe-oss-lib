@@ -2,9 +2,9 @@
 
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { forwardRef } from 'react';
-
 import { cn } from '../../utils/cn';
 import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
+import { booleanCheckedChange } from './checkbox';
 import { Label } from './label';
 
 interface CheckboxWithDescriptionProps {
@@ -30,7 +30,7 @@ const CheckboxWithDescription = forwardRef<HTMLDivElement, CheckboxWithDescripti
       <CheckboxPrimitive.Root
         id={id}
         checked={checked}
-        onCheckedChange={onCheckedChange}
+        onCheckedChange={booleanCheckedChange(onCheckedChange)}
         disabled={disabled}
         className={cn(
           'peer mt-0.5 h-5 w-5 shrink-0 rounded-sm border border-ods-border bg-ods-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-ods-accent data-[state=checked]:bg-ods-accent',

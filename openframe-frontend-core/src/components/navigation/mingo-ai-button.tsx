@@ -1,11 +1,13 @@
 'use client';
 
 import type React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
-import { MingoIcon } from '../icons';
+import { AgentMark } from '../agent-mark';
+import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT } from '../chat/utils/ask-ai-events';
 import { Button } from '../ui/button';
 
 export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -32,10 +34,7 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
   variant?: 'inline' | 'button' | 'field';
 }
 
-const MINGO_ACCENT = 'var(--ods-flamingo-cyan-base)';
-
-/** The event the mounted chat panel (`EmbeddableChat`) opens on. */
-export const ASK_AI_OPEN_EVENT = 'ask-ai:open';
+export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT };
 
 /** What an `ask-ai:open` event carries. */
 export interface AskAiOpenDetail {
@@ -78,8 +77,8 @@ export function openAskAi(source?: string, options?: { prompt?: string }): void 
  */
 export function MingoAiButton({
   source,
-  icon,
-  label = 'Mingo AI',
+  icon: iconProp,
+  label: labelProp,
   shortcutHint = false,
   variant = 'inline',
   className,
@@ -93,6 +92,22 @@ export function MingoAiButton({
   const inPage = variant === 'button';
 
   const commandKey = visitor.known && usesCommandKey(visitor.os);
+  // The launcher is the assistant's: its name, glyph and the chat it opens are
+  // the assistant runtime's (the host's server-resolved identity and its own
+  // opener), so no launcher types a name or assumes which chat exists. A prop
+  // still wins (a header given its own). The lib holds no name of its own:
+  // with none from either, there is no launcher to render (below). With no
+  // runtime opener the open is the `ask-ai:open` event of `source`.
+  const assistant = useAssistantRuntime();
+  const label = labelProp ?? assistant?.name;
+  const icon = iconProp ?? assistant?.icon;
+  const runtimeOpen = assistant?.open;
+  const eventSource = source ?? assistant?.source;
+  // The latest opener, for the shortcut listener: a host's inline callback must not re-bind it every render.
+  const openRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    openRef.current = () => (runtimeOpen ? runtimeOpen({}) : openAskAi(eventSource));
+  });
 
   // The shortcut the key cap shows opens the same chat the click opens.
   useEffect(() => {
@@ -105,11 +120,14 @@ export function MingoAiButton({
       const modifier = commandKey ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
       if (event.key.toLowerCase() !== 'k' || !modifier) return;
       event.preventDefault();
-      openAskAi(source);
+      openRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [shortcutHint, source, commandKey]);
+  }, [shortcutHint, commandKey]);
+
+  // No name from the host or the runtime: nothing to launch under. The lib invents none.
+  if (!label) return null;
 
   return (
     <Button
@@ -118,10 +136,10 @@ export function MingoAiButton({
       variant={field ? 'glyph' : 'transparent'}
       size="wrap"
       font="regular"
-      aria-label={label}
       aria-keyshortcuts={shortcutHint && visitor.known ? (commandKey ? 'Meta+K' : 'Control+K') : undefined}
       onClick={e => {
-        openAskAi(source);
+        if (runtimeOpen) runtimeOpen({});
+        else openAskAi(eventSource);
         onClick?.(e);
       }}
       className={cn(
@@ -168,19 +186,20 @@ export function MingoAiButton({
           {icon}
         </span>
       ) : (
-        <MingoIcon
-          color="currentColor"
-          eyesColor={MINGO_ACCENT}
-          cornerColor={MINGO_ACCENT}
+        <AgentMark
+          agent="mingo"
           className={cn('relative shrink-0 text-ods-text-primary', field ? 'size-6' : 'size-5')}
         />
       )}
       {/* In the header the name collapses below lg, with the menus: on a phone
-          the launcher is its glyph alone (the name stays the accessible name). */}
+          the launcher is its glyph alone. The name stays in the button for
+          assistive tech (visually hidden, never `display: none`), so the
+          button is named by its own text at every width and needs no label
+          that could disagree with it. */}
       <span
         className={cn(
           'relative whitespace-nowrap',
-          field ? 'min-w-0 flex-1 truncate' : inPage ? 'text-h6' : 'hidden text-h6 lg:inline',
+          field ? 'min-w-0 flex-1 truncate' : inPage ? 'text-h6' : 'sr-only text-h6 lg:not-sr-only',
         )}
       >
         {label}
@@ -190,6 +209,7 @@ export function MingoAiButton({
         // read is decoration) and the label's colour, which clears 4.5:1 on
         // the bar. It keeps its width before the platform is known.
         <kbd
+          aria-hidden="true"
           className={cn(
             'relative h-6 min-w-9 items-center justify-center rounded border border-ods-border px-[var(--spacing-system-xxs)] text-h6',
             inPage ? 'inline-flex' : 'hidden lg:inline-flex',

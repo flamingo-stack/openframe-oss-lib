@@ -2,6 +2,7 @@
 
 import type { MouseEvent, ReactNode } from 'react';
 import Image from '../../embed-shims/next-image';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { Ellipsis01Icon } from '../icons-v2-generated';
@@ -194,9 +195,9 @@ export function MingoInfoCard({
       )}
     >
       {isAnchor ? (
-        <a {...anchorProps} className={cn(contentClass, 'no-underline')}>
+        <Link {...anchorProps} className={cn(contentClass, 'no-underline')}>
           {content}
-        </a>
+        </Link>
       ) : onClick ? (
         <button type="button" onClick={onClick} className={contentClass}>
           {content}

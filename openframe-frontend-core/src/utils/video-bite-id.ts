@@ -1,3 +1,5 @@
+import { randomId } from './random-id';
+
 // Video-bite element identity — SSOT for the stable per-element `id` on
 // `video_bites` / `teasers` jsonb elements (see types/video-processing.ts
 // `VideoTeaser.id`) and for the ONE element-matching predicate shared by the
@@ -19,7 +21,7 @@ export const BITE_ID_RE = /^[0-9a-f]{8}$/;
 
 /** Generate a new 8-hex bite element id. */
 export function generateBiteId(): string {
-  return crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+  return randomId().replace(/-/g, '').slice(0, 8);
 }
 
 /**

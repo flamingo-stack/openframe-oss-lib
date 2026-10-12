@@ -72,7 +72,7 @@ const BODY_TEXT = 'text-h6 text-ods-text-secondary';
  * beside the section rail.
  */
 export const TRUST_STATUS_ROW_CLASS =
-  'flex flex-col gap-[var(--spacing-system-xs)] content-md:flex-row content-md:items-center content-md:justify-between';
+  'flex flex-col gap-[var(--spacing-system-xsf)] content-md:flex-row content-md:items-center content-md:justify-between';
 export const TRUST_BODY_GRID_CLASS =
   'grid grid-cols-1 gap-[var(--spacing-system-xl)] content-lg:grid-cols-[minmax(0,1fr)_12rem]';
 export const TRUST_SECTIONS_COLUMN_CLASS = 'flex min-w-0 flex-col gap-[var(--spacing-system-xxl)]';
@@ -675,7 +675,7 @@ export function TrustCenterSkeleton() {
           <TextSkeleton.Body className="w-44" />
         </div>
         {/* `DataAttribution`'s own layout: two lines below `sm`, one row above it. */}
-        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] content-sm:flex-row content-sm:items-center content-sm:gap-[var(--spacing-system-sf)]">
+        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xsf)] content-sm:flex-row content-sm:items-center content-sm:gap-[var(--spacing-system-sf)]">
           <div className="flex items-center gap-[var(--spacing-system-xsf)]">
             <UnifiedSkeleton className="size-4 rounded" />
             <TextSkeleton.Body className="w-36" />

@@ -104,6 +104,7 @@ All client calls use `/content/api/...`. Per-surface retargeting:
 | Release detail | `/content/api/product-releases/:slug`, `/roadmap` | host-resolved `release` / `isLoading` / `error` + injected section |
 | Authors (`ArticleAuthorByline` + `RelatedContentSection authorId`) | `/content/api/related-content?authorId=…` + per-type list endpoints, `/content/api/image-proxy` (avatar) | `apiBaseUrl` prop + ambient `ChatRuntime` |
 | Trust center (`TrustCenterPage`) | `/content/api/trust-center` (+ `/content/api/contact` for document requests) | `endpoint` prop (`EP.trustCenter`) + `EndpointsRuntime.contactUrl` |
+| Download (`DownloadAppsPage`) | `/content/api/downloads` | `endpoint` prop (`EP.downloads`); the store links and the install QR code are lib constants |
 | Legal | `/content/api/legal/:docType` | `apiEndpoint` |
 | Contact | `/content/api/contact` | `EndpointsRuntime.contactUrl` |
 | Announcements | `/content/api/announcements/active` | `EndpointsRuntime.announcementsUrl` |

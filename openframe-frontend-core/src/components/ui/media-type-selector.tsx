@@ -49,7 +49,11 @@ export function MediaTypeSelector({
     <Select
       key={value ?? '__unset__'}
       value={value || undefined}
-      onValueChange={onValueChange}
+      onValueChange={next => {
+        // The select reports a plain string: pass on only a type it offers.
+        const option = mediaTypeOptions.find(candidate => candidate.value === next);
+        if (option) onValueChange?.(option.value);
+      }}
       disabled={disabled}
       defaultValue={value}
     >

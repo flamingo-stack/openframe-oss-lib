@@ -6,6 +6,7 @@ import type { ActionsMenuGroup } from '../ui/actions-menu';
 import { PageActions, type PageActionButton } from '../ui/page-actions';
 import { BackButton } from './back-button';
 import { accentSentenceMarks } from './page-heading';
+import { PageTitle } from './page-picture';
 
 // Legacy interface for backward compatibility (layout version)
 interface LegacyPageContainerProps {
@@ -244,7 +245,7 @@ function renderAdvancedPageContainer({
             )}
 
             {/* Title */}
-            {title && <h1 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>}
+            {title && <PageTitle className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</PageTitle>}
 
             {/* Subtitle */}
             {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
@@ -274,7 +275,7 @@ function renderAdvancedPageContainer({
               />
             )}
 
-            {title && <h1 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>}
+            {title && <PageTitle className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</PageTitle>}
             {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
           </div>
 
@@ -302,7 +303,7 @@ function renderAdvancedPageContainer({
               />
             )}
 
-            {title && <h1 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>}
+            {title && <PageTitle className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</PageTitle>}
           </div>
 
           {/* Header Actions */}
@@ -321,7 +322,7 @@ function renderAdvancedPageContainer({
       <div className="flex items-center justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-center content-lg:justify-between">
         {(title || subtitle) && (
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            {title && <h1 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>}
+            {title && <PageTitle className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</PageTitle>}
             {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
           </div>
         )}

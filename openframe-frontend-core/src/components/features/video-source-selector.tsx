@@ -3,7 +3,7 @@
 import { Upload, X, Video as VideoIcon } from 'lucide-react';
 import type React from 'react';
 import { useState, useCallback } from 'react';
-import { YouTubeIcon } from '../icons/youtube-icon';
+import { YoutubeClassicIcon } from '../icons-v2-generated/brand-logos/youtube-classic-icon';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -169,7 +169,7 @@ export function VideoSourceSelector({
           type="button"
           variant={videoSourceType === 'youtube' ? 'accent' : 'outline'}
           onClick={() => onVideoSourceTypeChange('youtube')}
-          leftIcon={<YouTubeIcon className="h-4 w-4" color="currentColor" />}
+          leftIcon={<YoutubeClassicIcon className="h-4 w-4" color="currentColor" />}
           disabled={disabled}
         >
           YouTube URL

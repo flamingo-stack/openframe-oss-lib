@@ -27,7 +27,6 @@ export const platformDisplayNames = {
   openmsp: 'OpenMSP',
   openframe: 'OpenFrame',
   flamingo: 'Flamingo',
-  'flamingo-teaser': 'Flamingo Teaser',
   'marketing-hub': 'Flamingo Marketing Hub',
   'product-hub': 'Flamingo Product Hub',
   'revenue-hub': 'Flamingo Revenue Hub',
@@ -52,7 +51,6 @@ export const platformDescriptions = {
   openframe: 'AI-driven open-source security operations center (SOC) and endpoint detection platform for MSPs.',
   flamingo:
     'AI-driven open-source OS for MSPs. Swap bloated vendor tools for open ones. Automate the boring crap. Take your margin back.',
-  'flamingo-teaser': 'Preview of Flamingo - the AI-driven open-source OS for MSPs.',
   tmcg: 'The Miami Cyber Gang - A cybersecurity community focused on education and collaboration.',
   mlg: 'Scouting report for US open-source talent. Rank GitHub contributors by programming language, city, state, region, and nearest Major League Soccer club.',
   universal: 'Cross-platform universal content.',
@@ -62,25 +60,9 @@ export const platformSlogans = {
   openmsp: 'Find Your Perfect MSP Partner',
   openframe: 'Open-Source Security Operations',
   flamingo: 'Open-Source OS for MSPs',
-  'flamingo-teaser': 'Coming Soon: Open-Source OS for MSPs',
   tmcg: 'Miami Cyber Community',
   mlg: 'GitHub Scouting Report: Major League Edition',
   universal: 'Universal Platform',
-};
-
-export const platformIconNames = {
-  openmsp: 'openmsp-logo',
-  openframe: 'openframe-logo',
-  flamingo: 'flamingo-logo',
-  universal: 'globe',
-  'flamingo-teaser': 'flamingo-logo',
-  'marketing-hub': 'flamingo-logo',
-  'product-hub': 'flamingo-logo',
-  'revenue-hub': 'flamingo-logo',
-  'people-hub': 'flamingo-logo',
-  'company-hub': 'flamingo-logo',
-  tmcg: 'tmcg-logo',
-  mlg: 'mlg-logo',
 };
 
 export function getPlatformDisplayName(platformName: string): string {
@@ -98,10 +80,6 @@ export function getPlatformDescription(platformName: string): string {
 
 export function getPlatformSlogan(platformName: string): string {
   return platformSlogans[platformName as keyof typeof platformSlogans] || platformName;
-}
-
-export function getDefaultIconForPlatform(platformName: string): string {
-  return platformIconNames[platformName as keyof typeof platformIconNames] || platformIconNames.universal;
 }
 
 // ── Colour stems ────────────────────────────────────────────────────────────
@@ -211,7 +189,6 @@ export const PLATFORM_BRAND: Record<PlatformName, PlatformBrand> = {
   openframe: { accentStem: 'open-yellow', secondaryStem: 'flamingo-cyan' },
   openmsp: { accentStem: 'open-yellow', secondaryStem: 'open-yellow' },
   flamingo: { accentStem: 'flamingo-pink', secondaryStem: 'flamingo-pink' },
-  'flamingo-teaser': { accentStem: 'flamingo-pink', secondaryStem: 'flamingo-pink' },
   tmcg: { accentStem: 'flamingo-pink', secondaryStem: 'flamingo-pink' },
   'marketing-hub': { accentStem: 'flamingo-pink', secondaryStem: 'flamingo-pink' },
   'product-hub': { accentStem: 'success', secondaryStem: 'success' },
@@ -295,7 +272,6 @@ export const platformHexColors: Record<PlatformName, string> = {
   openframe: '#ffc008',
   flamingo: '#f357bb',
   universal: '#888888',
-  'flamingo-teaser': '#f357bb',
   'marketing-hub': '#f357bb',
   'product-hub': '#5ea62e',
   'revenue-hub': '#e1b32f',
