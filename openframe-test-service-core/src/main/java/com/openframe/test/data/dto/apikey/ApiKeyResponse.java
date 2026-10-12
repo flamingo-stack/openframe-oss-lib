@@ -8,12 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-/**
- * An API key's metadata, without the secret. Mirrors {@code com.openframe.api.dto.ApiKeyResponse}.
- *
- * <p>{@link #id} is the {@code ak_*} key id — the same value the gateway reports in its rate-limit
- * buckets, and the path variable every {@code /api/api-keys/{keyId}} call takes.
- */
+// API key metadata without the secret; mirrors com.openframe.api.dto.ApiKeyResponse.
 @Data
 @Builder
 @NoArgsConstructor
