@@ -6,11 +6,10 @@
  * Includes an "Add Script Argument" button to add new entries.
  */
 
-import { Trash2 } from 'lucide-react';
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { randomId } from '../../utils/random-id';
-import { LockIcon, PlusCircleIcon } from '../icons-v2-generated';
+import { LockIcon, PlusCircleIcon, TrashIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -182,7 +181,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
                 onClick={() => handleDelete(arg.id)}
                 disabled={disabled}
                 aria-label="Delete argument"
-                leftIcon={<Trash2 className="size-4 content-md:size-6" color="var(--color-error)" />}
+                leftIcon={<TrashIcon className="size-4 content-md:size-6" color="var(--color-error)" />}
               />
             </div>
           </div>
