@@ -10,6 +10,7 @@ import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -228,7 +229,11 @@ public class TagService {
                 .createdAt(Instant.now())
                 .build();
 
-        return tagRepository.save(tag);
+        try {
+            return tagRepository.save(tag);
+        } catch (DuplicateKeyException e) {
+            throw new ConflictException("Tag with key '" + key + "' already exists");
+        }
     }
 
     @Transactional
