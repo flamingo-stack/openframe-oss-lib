@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon } from './icons-v2';
 import type { ComponentProps } from 'react';
 import { DayPicker } from 'react-day-picker';
 
@@ -73,10 +73,10 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         // v9 passes 'up'/'down' for dropdown captions too — branch all four.
         Chevron: ({ orientation, className: chevronClassName }) => {
           const cls = cn('h-4 w-4', chevronClassName);
-          if (orientation === 'right') return <ChevronRight className={cls} />;
-          if (orientation === 'up') return <ChevronUp className={cls} />;
-          if (orientation === 'down') return <ChevronDown className={cls} />;
-          return <ChevronLeft className={cls} />;
+          if (orientation === 'right') return <ChevronRightIcon className={cls} />;
+          if (orientation === 'up') return <ChevronUpIcon className={cls} />;
+          if (orientation === 'down') return <ChevronDownIcon className={cls} />;
+          return <ChevronLeftIcon className={cls} />;
         },
       }}
       {...props}
