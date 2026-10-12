@@ -16,5 +16,10 @@ export function randomId(): string {
       return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
     }
   }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  // No `crypto` at all: still a version 4 UUID in shape (callers validate ids
+  // as UUIDs, or take their first hex digits), from the weaker `Math.random`.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, slot => {
+    const nibble = Math.floor(Math.random() * 16);
+    return (slot === 'x' ? nibble : (nibble & 0x3) | 0x8).toString(16);
+  });
 }

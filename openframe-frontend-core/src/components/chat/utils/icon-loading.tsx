@@ -52,17 +52,27 @@ const iconLoads = new Map<string, Promise<void>>();
 /** Who redraws when an icon's module arrives. */
 const iconListeners = new Map<string, Set<() => void>>();
 
+/** When an icon's load last failed, so a host that re-renders does not ask again at once. */
+const iconFailures = new Map<string, number>();
+/** How long a failed icon waits before it is asked for again, in ms. */
+const ICON_RETRY_AFTER_MS = 30_000;
+
 function loadIcon(key: string, loader: IconLoader): void {
   if (loadedIcons.has(key) || iconLoads.has(key)) return;
+  const failedAt = iconFailures.get(key);
+  if (failedAt !== undefined && Date.now() - failedAt < ICON_RETRY_AFTER_MS) return;
   iconLoads.set(
     key,
     loader()
       .then(module => {
         loadedIcons.set(key, module.default);
+        iconFailures.delete(key);
         for (const listener of iconListeners.get(key) ?? []) listener();
       })
-      // A failed load is forgotten, so the next icon by that name asks again.
-      .catch(() => undefined)
+      // A failed load is asked for again, but not on every render of its host.
+      .catch(() => {
+        iconFailures.set(key, Date.now());
+      })
       .finally(() => {
         iconLoads.delete(key);
       }),
