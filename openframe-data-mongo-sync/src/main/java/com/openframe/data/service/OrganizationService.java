@@ -13,94 +13,85 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Service for managing Organization entities.
- * Provides business logic and operations for organizations.
- */
+// Service for managing Organization entities.
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrganizationService {
 
-    /**
-     * Name of the default organization created for each tenant.
-     * This organization is used as fallback for machines without specific organization.
-     */
+    // Name of the default organization created for each tenant; used as fallback for machines without a specific organization.
     public static final String DEFAULT_ORGANIZATION_NAME = "Default";
 
     private final OrganizationRepository organizationRepository;
     private final MachineRepository machineRepository;
 
-    /**
-     * Get organization by ID (excluding deleted)
-     * @param id organization document ID
-     * @return Optional containing the organization if found and not deleted
-     */
-    public Optional<Organization> getOrganizationById(String id) {
+    public boolean hasOrganization(String id) {
+        log.debug("Checking existence of organization by ID: {}", id);
+        return organizationRepository.findById(id)
+                .filter(org -> !org.isDeleted())
+                .isPresent();
+    }
+
+    public Organization organizationById(String id) {
         log.debug("Fetching organization by ID: {}", id);
         return organizationRepository.findById(id)
-                .filter(org -> !org.isDeleted());
+                .filter(org -> !org.isDeleted())
+                .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
     }
 
-    /**
-     * Get organization by organizationId (excluding deleted)
-     * @param organizationId unique organization identifier
-     * @return Optional containing the organization if found and not deleted
-     */
-    public Optional<Organization> getOrganizationByOrganizationId(String organizationId) {
+    public boolean hasOrganizationByOrganizationId(String organizationId) {
+        log.debug("Checking existence of organization by organizationId: {}", organizationId);
+        return organizationRepository.findByOrganizationId(organizationId)
+                .filter(org -> !org.isDeleted())
+                .isPresent();
+    }
+
+    public Organization organizationByOrganizationId(String organizationId) {
         log.debug("Fetching organization by organizationId: {}", organizationId);
         return organizationRepository.findByOrganizationId(organizationId)
-                .filter(org -> !org.isDeleted());
+                .filter(org -> !org.isDeleted())
+                .orElseThrow(() -> new IllegalArgumentException("Organization not found with organizationId: " + organizationId));
     }
 
-    /**
-     * Get organization by name (excluding deleted)
-     * @param name organization name
-     * @return Optional containing the organization if found and not deleted
-     */
-    public Optional<Organization> getOrganizationByName(String name) {
+    public boolean hasOrganizationByName(String name) {
+        log.debug("Checking existence of organization by name: {}", name);
+        return organizationRepository.findByName(name)
+                .filter(org -> !org.isDeleted())
+                .isPresent();
+    }
+
+    public Organization organizationByName(String name) {
         log.debug("Fetching organization by name: {}", name);
         return organizationRepository.findByName(name)
-                .filter(org -> !org.isDeleted());
+                .filter(org -> !org.isDeleted())
+                .orElseThrow(() -> new IllegalArgumentException("Organization not found with name: " + name));
     }
 
-    /**
-     * Get the default organization (excluding deleted and archived)
-     * @return Optional containing the default organization if found and active
-     */
-    public Optional<Organization> getDefaultOrganization() {
+    public boolean hasDefaultOrganization() {
+        log.debug("Checking existence of default organization");
+        return organizationRepository.findByIsDefaultTrue()
+                .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE)
+                .isPresent();
+    }
+
+    public Organization defaultOrganization() {
         log.debug("Fetching default organization");
         return organizationRepository.findByIsDefaultTrue()
-                .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE);
+                .filter(org -> org.getStatus() == OrganizationStatus.ACTIVE)
+                .orElseThrow(() -> new IllegalArgumentException("Default organization not found"));
     }
 
-    /**
-     * Create a new organization
-     * @param organization organization to create
-     * @return saved organization
-     */
     public Organization createOrganization(Organization organization) {
         log.info("Creating new organization with organizationId: {}", organization.getOrganizationId());
         return organizationRepository.save(organization);
     }
 
-    /**
-     * Update an existing organization
-     * @param organization organization with updated data
-     * @return updated organization
-     */
     public Organization updateOrganization(Organization organization) {
         log.info("Updating organization with ID: {}", organization.getId());
         return organizationRepository.save(organization);
     }
 
-    /**
-     * Check if an organization can be archived.
-     * Returns true if all associated devices are in ARCHIVED or DELETED status (or no devices exist).
-     *
-     * @param id organization document ID
-     * @return true if organization can be archived
-     */
+    // Can archive only if all associated devices are ARCHIVED/DELETED (or no devices exist)
     public boolean canArchiveOrganization(String id) {
         Organization organization = organizationRepository.findByOrganizationId(id)
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found with id: " + id));
@@ -109,14 +100,7 @@ public class OrganizationService {
         return !machineRepository.existsByOrganizationIdAndStatusNotIn(organization.getOrganizationId(), excludedStatuses);
     }
 
-    /**
-     * Update organization status.
-     * Supports transitions: ACTIVE → ARCHIVED (with device check) and ARCHIVED → ACTIVE.
-     *
-     * @param id organization document ID
-     * @param newStatus target status (ACTIVE or ARCHIVED)
-     * @throws OrganizationHasMachinesException if archiving and organization has active devices
-     */
+    // Supports transitions: ACTIVE -> ARCHIVED (with device check) and ARCHIVED -> ACTIVE
     public void updateOrganizationStatus(String id, OrganizationStatus newStatus) {
         log.info("Attempting to update organization {} status to {}", id, newStatus);
 
@@ -153,15 +137,7 @@ public class OrganizationService {
         log.info("Successfully updated organization {} status to {}", id, newStatus);
     }
 
-    /**
-     * Soft delete organization by ID.
-     * Checks if any machines are associated with this organization before deletion.
-     *
-     * @param id organization document ID
-     * @throws OrganizationHasMachinesException if machines are associated with this organization
-     * @deprecated Use {@link #archiveOrganization(String)} instead. Deletion is not supported — archived
-     * organizations must remain in the database because devices with DELETED status may come back online.
-     */
+    // Deprecated: deletion unsupported — archived organizations must remain since DELETED devices may come back online
     @Deprecated
     public void deleteOrganization(String id) {
         log.info("Attempting to soft delete organization with ID: {}", id);
@@ -193,15 +169,6 @@ public class OrganizationService {
         log.info("Successfully soft deleted organization with ID: {}", id);
     }
 
-    /**
-     * Create a default organization for a newly registered tenant.
-     * This organization will be used for machines that don't have a specific organization assigned.
-     *
-     * The default organization has:
-     * - name: {@link OrganizationService#DEFAULT_ORGANIZATION_NAME}
-     * - category: "General"
-     * - auto-generated organizationId (UUID)
-     */
     public void createDefaultOrganization() {
         log.info("Creating default organization");
 
