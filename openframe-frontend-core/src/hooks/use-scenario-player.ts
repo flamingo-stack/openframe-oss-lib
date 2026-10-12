@@ -47,6 +47,12 @@ export interface UseScenarioPlayerResult {
   scenario: number;
   /** Current step, 0..lastStep. */
   step: number;
+  /**
+   * False until it has been playable once (it has not been on screen yet).
+   * A progress line reads 0 until then, so it starts from empty when the
+   * visitor first reaches it, never part-way through a step nobody saw begin.
+   */
+  started: boolean;
   /** The visitor is holding it still (pressing on it, or the keyboard is inside it). */
   held: boolean;
   /** Spread on the stage's outer element: how a visitor stops it (`useAutoplay`). */
@@ -100,6 +106,9 @@ export function useScenarioPlayer({
   const step = reducedMotion ? lastStep : Math.min(rawStep, lastStep);
 
   const playing = auto.playing && scenarioCount > 0;
+  // Latched the first time it may play (state derived during render).
+  const [started, setStarted] = useState(false);
+  if (playing && !started) setStarted(true);
 
   // True from the moment it becomes playable until its first tick has been scheduled.
   const starting = useRef(false);
@@ -148,5 +157,5 @@ export function useScenarioPlayer({
     [release],
   );
 
-  return { scenario, step, held, holdProps, setStep, go, reducedMotion };
+  return { scenario, step, started: started || reducedMotion, held, holdProps, setStep, go, reducedMotion };
 }
