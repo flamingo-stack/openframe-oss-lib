@@ -1,7 +1,7 @@
 'use client';
 
 import * as PopoverPrimitive from '@radix-ui/react-popover';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useId, useMemo, useState } from 'react';
 import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
 import { cn } from '../../utils/cn';
 import { CheckIcon, SearchIcon } from '../icons-v2-generated';
@@ -42,6 +42,8 @@ export interface SearchableSelectProps {
    * is rendered.
    */
   trigger?: ReactNode;
+  /** `id` of the default trigger button, which `label` names through `htmlFor`; generated when omitted. */
+  id?: string;
   /**
    * Label above the default trigger — the same `FieldWrapper` treatment
    * `SelectTrigger` gives its `label`, so a searchable field lines up with the
@@ -88,6 +90,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
     isLoading = false,
     disabled = false,
     trigger,
+    id,
     label,
     labelVariant,
     error,
@@ -101,6 +104,10 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
   const errorSlot = 'error' in allProps;
   const isInvalid = !!error;
   const isGrid = layout === 'grid';
+  // The label names the trigger through `htmlFor`: clicking it focuses the
+  // button and assistive tech reads the field by it. A caller's `id` wins.
+  const generatedId = useId();
+  const triggerId = id ?? generatedId;
 
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -132,6 +139,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
 
   const defaultTrigger = (
     <button
+      id={triggerId}
       type="button"
       disabled={disabled}
       data-invalid={isInvalid || undefined}
@@ -175,7 +183,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
   return (
     <PopoverPrimitive.Root open={isOpen} onOpenChange={disabled ? undefined : setIsOpen} modal={false}>
       {!trigger && (label !== undefined || errorSlot) ? (
-        <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorSlot={errorSlot}>
+        <FieldWrapper label={label} htmlFor={triggerId} labelVariant={labelVariant} error={error} errorSlot={errorSlot}>
           {triggerElement}
         </FieldWrapper>
       ) : (
