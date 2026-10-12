@@ -43,7 +43,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
      */
     private static final int MAX_FILTER_OPTIONS = 10000;
 
-    @Value("${pinot.tables.logs.name:logs}")
+    @Value("${pinot.tables.logs.name}")
     private String logsTable;
 
     public PinotClientLogRepository(@Qualifier("pinotBrokerConnection") Connection pinotConnection) {
