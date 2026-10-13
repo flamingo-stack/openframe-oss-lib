@@ -9,6 +9,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
+import com.openframe.debezium.recovery.gap.ConnectorRecreator;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
@@ -41,7 +44,8 @@ class DebeziumServiceKafkaConnectIT {
     @BeforeEach
     void setUp() {
         name = "it-gap-recovery-" + UUID.randomUUID() + "_v2";
-        service = new DebeziumService(new VersionedConnectorNameStrategy(), null, new GapRecoveryProperties());
+        ObjectProvider<ConnectorRecreator> noRecreator = new StaticListableBeanFactory().getBeanProvider(ConnectorRecreator.class);
+        service = new DebeziumService(new VersionedConnectorNameStrategy(), null, new GapRecoveryProperties(), noRecreator);
         ReflectionTestUtils.setField(service, "debeziumUrl", CONNECT_URL);
         ReflectionTestUtils.setField(service, "connectTimeout", Duration.ofSeconds(5));
         ReflectionTestUtils.setField(service, "readTimeout", Duration.ofSeconds(30));

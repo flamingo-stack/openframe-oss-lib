@@ -30,6 +30,7 @@ public class BackfillDispatcher {
     private final SourceDialects sourceDialects;
     private final SnapshotSignalPublisher signalPublisher;
     private final GapRecoveryProperties properties;
+    private final UnfilledGapAlerts gapAlerts;
 
     public void dispatchPending() {
         List<ConnectorBackfill> pending = backfillRepository.findByStatus(ConnectorBackfillStatus.PENDING);
@@ -49,7 +50,7 @@ public class BackfillDispatcher {
 
     private void dispatch(ConnectorBackfill backfill, List<String> connectors) {
         if (isExpired(backfill)) {
-            markExpired(backfill);
+            markExpired(backfill, "Backfill not requested before expiry");
             return;
         }
         String baseName = backfill.getBaseName();
@@ -60,9 +61,7 @@ public class BackfillDispatcher {
         Map<String, Object> spec = toolConnectorSpecs.specOf(baseName);
         Map<String, Object> config = ConnectorSpecs.configOf(spec);
         if (!signalPublisher.hasSignalChannel(config)) {
-            log.error("{} Backfill impossible — no Kafka signal channel in connector config: base='{}'",
-                    DebeziumLog.PREFIX, baseName);
-            markExpired(backfill);
+            markExpired(backfill, "No Kafka signal channel in the connector config");
             return;
         }
         Map<String, String> backfillFilters = ConnectorSpecs.backfillOf(spec);
@@ -91,10 +90,9 @@ public class BackfillDispatcher {
                 DebeziumLog.PREFIX, backfill.getBaseName(), connectorName, backfill.getGapFrom());
     }
 
-    private void markExpired(ConnectorBackfill backfill) {
+    private void markExpired(ConnectorBackfill backfill, String reason) {
         backfill.setStatus(ConnectorBackfillStatus.EXPIRED);
         backfillRepository.save(backfill);
-        log.error("{} Backfill expired — gap left unfilled: base='{}' gap_from={}",
-                DebeziumLog.PREFIX, backfill.getBaseName(), backfill.getGapFrom());
+        gapAlerts.raise(backfill.getConnectorName(), backfill.getGapFrom(), reason);
     }
 }

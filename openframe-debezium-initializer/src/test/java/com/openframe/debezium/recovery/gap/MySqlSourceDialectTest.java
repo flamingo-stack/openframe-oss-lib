@@ -29,7 +29,7 @@ class MySqlSourceDialectTest {
         assertThat(conditions)
                 .extracting(SnapshotCondition::getDataCollection, SnapshotCondition::getFilter)
                 .containsExactly(
-                        tuple("fleet.activity_past", "created_at >= '2026-10-13 09:05:07'"),
+                        tuple("fleet.activity_past", "created_at >= FROM_UNIXTIME(1791882307)"),
                         tuple("fleet.teams", ""));
     }
 

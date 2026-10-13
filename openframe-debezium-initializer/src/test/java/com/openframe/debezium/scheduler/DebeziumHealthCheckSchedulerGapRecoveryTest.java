@@ -4,6 +4,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.debezium.naming.VersionedConnectorNameStrategy;
+import com.openframe.debezium.recovery.RecreationTracker;
 import com.openframe.debezium.recovery.gap.BackfillDispatcher;
 import com.openframe.debezium.recovery.gap.CheckpointRecorder;
 import com.openframe.debezium.recovery.gap.ConnectorRecreator;
@@ -39,6 +40,7 @@ class DebeziumHealthCheckSchedulerGapRecoveryTest {
     @Mock private ConnectorRecreator connectorRecreator;
     @Mock private CheckpointRecorder checkpointRecorder;
     @Mock private BackfillDispatcher backfillDispatcher;
+    @Mock private RecreationTracker recreationTracker;
 
     private DebeziumHealthCheckScheduler scheduler;
     private List<IntegratedTool> tools;
@@ -46,7 +48,8 @@ class DebeziumHealthCheckSchedulerGapRecoveryTest {
     @BeforeEach
     void setUp() {
         scheduler = new DebeziumHealthCheckScheduler(debeziumService, recoveryManager, integratedToolService,
-                tenantIdProvider, new VersionedConnectorNameStrategy(), connectorRecreator, checkpointRecorder, backfillDispatcher);
+                tenantIdProvider, new VersionedConnectorNameStrategy(), connectorRecreator, checkpointRecorder, backfillDispatcher,
+                recreationTracker);
         IntegratedTool mesh = IntegratedTool.builder().id("mesh").enabled(true).debeziumConnectors(new Object[]{MESH_SPEC}).build();
         IntegratedTool fleet = IntegratedTool.builder().id("fleet").enabled(true).debeziumConnectors(new Object[]{FLEET_SPEC}).build();
         tools = List.of(mesh, fleet);
@@ -58,11 +61,13 @@ class DebeziumHealthCheckSchedulerGapRecoveryTest {
         stubMissingBoth();
         when(connectorRecreator.hasFreshCheckpoint(MESH)).thenReturn(true);
         when(connectorRecreator.hasFreshCheckpoint(FLEET)).thenReturn(false);
+        when(recreationTracker.canRecreate(MESH)).thenReturn(true);
 
         // execution
         scheduler.checkAndRestartFailedTasks();
 
         // verifications
+        verify(recreationTracker).record(MESH);
         verify(connectorRecreator).restoreFromCheckpoint(MESH, MESH + "_v1", MESH_SPEC);
         verify(connectorRecreator, never()).restoreFromCheckpoint(FLEET, FLEET + "_v1", FLEET_SPEC);
         verify(debeziumService).reconcileMissingConnectors(tools, Set.of(FLEET));
@@ -74,6 +79,8 @@ class DebeziumHealthCheckSchedulerGapRecoveryTest {
         stubMissingBoth();
         when(connectorRecreator.hasFreshCheckpoint(MESH)).thenReturn(true);
         when(connectorRecreator.hasFreshCheckpoint(FLEET)).thenReturn(true);
+        when(recreationTracker.canRecreate(MESH)).thenReturn(true);
+        when(recreationTracker.canRecreate(FLEET)).thenReturn(true);
         doThrow(new IllegalStateException("connect down")).when(connectorRecreator).restoreFromCheckpoint(MESH, MESH + "_v1", MESH_SPEC);
 
         // execution
@@ -83,6 +90,40 @@ class DebeziumHealthCheckSchedulerGapRecoveryTest {
         verify(connectorRecreator).restoreFromCheckpoint(FLEET, FLEET + "_v1", FLEET_SPEC);
         verify(recoveryManager).checkAndRecoverAll();
         verify(checkpointRecorder).recordAll();
+    }
+
+    @Test
+    void checkAndRestartFailedTasks_restoreRateLimited_deferredWithoutFreshCreate() {
+        // setup
+        stubMissingBoth();
+        when(connectorRecreator.hasFreshCheckpoint(MESH)).thenReturn(true);
+        when(connectorRecreator.hasFreshCheckpoint(FLEET)).thenReturn(false);
+        when(recreationTracker.canRecreate(MESH)).thenReturn(false);
+
+        // execution
+        scheduler.checkAndRestartFailedTasks();
+
+        // verifications
+        verify(recreationTracker, never()).record(MESH);
+        verify(connectorRecreator, never()).restoreFromCheckpoint(MESH, MESH + "_v1", MESH_SPEC);
+        verify(debeziumService).reconcileMissingConnectors(tools, Set.of(FLEET));
+    }
+
+    @Test
+    void checkAndRestartFailedTasks_trackerRecordFails_restoreSkippedTickContinues() {
+        // setup
+        stubMissingBoth();
+        when(connectorRecreator.hasFreshCheckpoint(MESH)).thenReturn(true);
+        when(connectorRecreator.hasFreshCheckpoint(FLEET)).thenReturn(false);
+        when(recreationTracker.canRecreate(MESH)).thenReturn(true);
+        doThrow(new IllegalStateException("mongo down")).when(recreationTracker).record(MESH);
+
+        // execution
+        scheduler.checkAndRestartFailedTasks();
+
+        // verifications
+        verify(connectorRecreator, never()).restoreFromCheckpoint(MESH, MESH + "_v1", MESH_SPEC);
+        verify(recoveryManager).checkAndRecoverAll();
     }
 
     @Test
@@ -102,7 +143,7 @@ class DebeziumHealthCheckSchedulerGapRecoveryTest {
     void checkAndRestartFailedTasks_gapRecoveryDisabled_allMissingCreatedAsNew() {
         // setup
         DebeziumHealthCheckScheduler withoutGapRecovery = new DebeziumHealthCheckScheduler(debeziumService, recoveryManager,
-                integratedToolService, tenantIdProvider, new VersionedConnectorNameStrategy(), null, null, null);
+                integratedToolService, tenantIdProvider, new VersionedConnectorNameStrategy(), null, null, null, null);
         stubMissingBoth();
 
         // execution
