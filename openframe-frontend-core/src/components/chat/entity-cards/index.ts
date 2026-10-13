@@ -139,3 +139,4 @@ export {
 // PACKAGE-EXPORTED chat barrel so the hub can value-import them (deep paths
 // into chat/types/* are not in the package exports map and 404 at runtime).
 export { programItemToStripProfile, type ProgramAuthorRef } from '../types/entities/program-types';
+export { type MingoInfoCardAction, MingoInfoCardActionProvider } from '../mingo-info-card';
