@@ -22,7 +22,6 @@
 
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import Image from '../../embed-shims/next-image';
 import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { cn } from '../../utils/cn';
 import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
@@ -48,16 +47,6 @@ export interface VideoHoverPreviewSurfaceProps {
   badge?: 'play' | 'none';
   /** Object-fit for the hover player. */
   fit?: 'contain' | 'cover';
-  /** next/image sizes for the poster. Default '234px' (strip cell). */
-  posterSizes?: string;
-  /** The poster is in view from the first paint (a card pinned to the screen),
-   *  so it loads at once rather than lazily. Default false (a strip cell). */
-  posterInView?: boolean;
-  /** How the poster is drawn. 'canvas' is for a surface that appears late and
-   *  uninvited (the floating walkthrough card): nothing it paints while idle is
-   *  a Largest Contentful Paint candidate, so it can never become the page's
-   *  LCP (see CanvasPoster). Default 'image'. */
-  posterPaint?: 'image' | 'canvas';
   /** Preview-player preload override. When 'none' AND the poster resolves null,
    *  the network-fetching first-frame facade is SKIPPED (flat surface + badge)
    *  so a fixed always-near widget card fetches nothing until first hover. */
@@ -93,9 +82,6 @@ export function VideoHoverPreviewSurface({
   isClone = false,
   badge = 'play',
   fit,
-  posterSizes = '234px',
-  posterInView = false,
-  posterPaint = 'image',
   preload,
   hideMutedBadge,
   onMutedFallbackChange,
@@ -146,19 +132,10 @@ export function VideoHoverPreviewSurface({
     <div ref={rootElRef} className={cn('absolute inset-0', className)} inert={isClone || undefined}>
       {showMedia ? (
         <>
-          {posterSrc && posterPaint === 'canvas' ? (
+          {posterSrc ? (
+            // On a canvas, never an image: a preview poster must not be able to
+            // become the page's Largest Contentful Paint (see CanvasPoster).
             <CanvasPoster src={posterSrc} onError={onPosterError} />
-          ) : posterSrc ? (
-            <Image
-              src={posterSrc}
-              alt=""
-              fill
-              sizes={posterSizes}
-              loading={posterInView ? 'eager' : 'lazy'}
-              unoptimized
-              onError={onPosterError}
-              className="object-cover"
-            />
           ) : facadeSkipped ? (
             <div className="absolute inset-0 bg-ods-card" />
           ) : (
@@ -184,10 +161,10 @@ export function VideoHoverPreviewSurface({
               // seek; the explicit key handles that now, and a 320px mini
               // player should never pull the uncapped manifest.
               url={previewUrl}
-              // A canvas-painted surface hands the player no poster: its own
-              // poster (and its loading fallback's background) are LCP candidates,
-              // and the canvas beneath already shows the picture.
-              poster={posterPaint === 'canvas' ? null : posterUrl}
+              // No poster for the player: its own poster (and its loading
+              // fallback's background) are LCP candidates, and the canvas
+              // beneath already shows the picture.
+              poster={null}
               {...(continuation
                 ? {
                     startTime,

@@ -305,7 +305,6 @@ export function CaseStudyCard({
               active={hovered}
               playerMounted={mediaMounted}
               fit="cover"
-              posterSizes="360px"
             />
           ) : (
             <>

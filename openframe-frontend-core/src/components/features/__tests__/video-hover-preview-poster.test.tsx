@@ -1,10 +1,8 @@
 /**
- * How a preview surface draws its poster.
- *
- * A late, uninvited surface (the floating walkthrough card) must paint nothing
- * that Largest Contentful Paint reads: no image, and no poster on the player
- * (its own poster and its loading fallback's background are candidates too).
- * The default surface keeps the plain image and the player's poster.
+ * How a preview surface draws its poster: on a canvas, with no image and no
+ * poster on the player. An image, the player's own poster and its loading
+ * fallback's background are all Largest Contentful Paint candidates, and a
+ * preview poster must never become the page's LCP.
  */
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,38 +18,24 @@ vi.mock('../video', () => ({
   },
 }));
 
-const POSTER = 'https://example.com/poster.jpg';
-
-function renderSurface(posterPaint?: 'image' | 'canvas') {
-  // `playerMounted` skips the near-viewport observer: the media renders at once.
-  render(
-    <VideoHoverPreviewSurface
-      url="https://example.com/a.m3u8"
-      posterUrl={POSTER}
-      active={false}
-      playerMounted
-      posterPaint={posterPaint}
-    />,
-  );
-}
-
-describe('VideoHoverPreviewSurface: posterPaint', () => {
+describe('VideoHoverPreviewSurface: poster', () => {
   beforeEach(() => {
     playerPosters.length = 0;
   });
 
-  it('draws an image and hands the player its poster by default', () => {
-    renderSurface();
-    // A decorative image (`alt=""`) has the presentation role.
-    expect(screen.getByRole('presentation')).toBeInstanceOf(HTMLImageElement);
-    expect(screen.queryByTestId('canvas-poster')).toBeNull();
-    expect(playerPosters).toEqual([POSTER]);
-  });
-
-  it('draws a canvas, no image, and hands the player no poster when asked for a canvas', () => {
-    renderSurface('canvas');
+  it('draws the poster on a canvas, renders no image and hands the player no poster', () => {
+    // `playerMounted` skips the near-viewport observer: the media renders at once.
+    render(
+      <VideoHoverPreviewSurface
+        url="https://example.com/a.m3u8"
+        posterUrl="https://example.com/poster.jpg"
+        active={false}
+        playerMounted
+      />,
+    );
     expect(screen.getByTestId('canvas-poster')).toBeInstanceOf(HTMLCanvasElement);
     expect(screen.queryByRole('presentation')).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
     expect(playerPosters).toEqual([null]);
   });
 });

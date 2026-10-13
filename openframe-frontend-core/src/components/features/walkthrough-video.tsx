@@ -228,7 +228,7 @@ function WalkthroughVideo({
   // The delay alone does NOT keep the card out of Largest Contentful Paint: the
   // metric takes candidates until the first interaction, so a late card that is
   // the largest thing in a short window became the LCP. What keeps it out is
-  //  on the floating card's surface below.
+  // the surface below drawing its poster on a canvas (see CanvasPoster).
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const hasVideo = video != null;
@@ -1018,16 +1018,6 @@ function WalkthroughVideo({
           isClone={false}
           badge="play"
           fit="cover"
-          // Mirrors the card's own responsive width above — a flat 320px hint
-          // made every phone fetch a poster ~1.7x wider than the box.
-          posterSizes="(max-width: 639px) 192px, 320px"
-          // Pinned to the screen (or laid out in the host's first view), so it
-          // is often the largest thing painted: never lazy.
-          posterInView
-          // The FLOATING card arrives seconds after load, so its poster is drawn
-          // on a canvas and can never become the page's Largest Contentful Paint.
-          // An inline block is part of the page's own content: a plain image.
-          posterPaint={inline ? 'image' : 'canvas'}
           preload="none"
           hideMutedBadge
           onMutedFallbackChange={onCardFallbackChange}
