@@ -35,3 +35,4 @@ export * from './use-autoplay';
 export * from './use-active-section';
 export * from './use-nav-menus';
 export * from './use-visitor-os';
+export * from './use-resumable-timeout';
