@@ -28,6 +28,14 @@ public class TenantDiscoveryResponse {
 
     private String domain;
 
+    /**
+     * @deprecated Superseded by {@link #openframeLoginEnabled} and {@link #customProviders}: this
+     * list mixes the tenant's own apps, system defaults and the built-in login, so the login form
+     * can't tell which buttons are the tenant's. Kept while the web frontend and the app shell
+     * still read it.
+     * TODO(CU-17tkuw5x9mz): remove once both are migrated.
+     */
+    @Deprecated
     @JsonProperty("auth_providers")
     private List<String> authProviders;
 
