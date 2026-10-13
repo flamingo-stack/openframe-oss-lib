@@ -12,3 +12,4 @@
 export { FaqSection, type FaqSectionProps } from './faq-section';
 export { FaqDocumentPage, type FaqDocumentPageProps } from './faq-document-page';
 export { FaqAskCard, type FaqAskOptions } from './faq-ask-card';
+export { PageFaq, PageFaqInPage, PAGE_FAQ_SECTION_ID, type PageFaqProps, type PageFaqSlot } from './page-faq';

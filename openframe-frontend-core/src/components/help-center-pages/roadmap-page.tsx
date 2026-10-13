@@ -10,6 +10,7 @@
 
 import type { ReactNode } from 'react';
 import type { RoadmapItem } from '../chat/types/entities/roadmap-item';
+import type { PageFaqSlot } from '../faq/page-faq';
 import { DevSectionPage } from '../shared/dev-section';
 import { RoadmapView } from '../shared/roadmap';
 import type { UseRoadmapVotingOptions } from '../shared/roadmap';
@@ -35,6 +36,12 @@ export interface RoadmapPageProps {
   /** Optional slot rendered below the list, inside the page chrome — e.g. the
    *  hub's related-content rail. */
   belowContent?: ReactNode;
+  /**
+   * The page's own FAQ block: the topic the page is about (stated by the host,
+   * never read from its address) and where the host serves the FAQs. Rendered
+   * after the page's content, inside its container. Absent: no FAQ block.
+   */
+  faq?: PageFaqSlot;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container (forwarded to `DevSectionPage`). */
   shell?: boolean;
@@ -51,10 +58,18 @@ export function RoadmapPage({
   title,
   subtitle,
   belowContent,
+  faq,
   shell,
 }: RoadmapPageProps) {
   return (
-    <DevSectionPage sectionKey="roadmap" backButton={backButton} title={title} subtitle={subtitle} shell={shell}>
+    <DevSectionPage
+      sectionKey="roadmap"
+      backButton={backButton}
+      title={title}
+      subtitle={subtitle}
+      faq={faq}
+      shell={shell}
+    >
       <RoadmapView
         endpoint={roadmapEndpoint}
         initialItems={initialItems}

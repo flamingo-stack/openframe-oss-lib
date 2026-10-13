@@ -52,6 +52,8 @@ export interface FaqSectionProps {
   /** Overrides for the JSON-LD's name/description/url. */
   jsonLd?: FaqSchemaOptions;
   className?: string;
+  /** The `id` of the rendered section: what an in-page link to the FAQ points at. */
+  id?: string;
   /** Maps to /api/faqs `?count=` (the 5-tier fill target). Absent → param
    *  not sent (server default applies). */
   minResults?: number;
@@ -430,6 +432,7 @@ export function FaqSection({
   emitJsonLd = false,
   jsonLd,
   className,
+  id,
   minResults,
   apiBaseUrl = '',
   aside: asideProp,
@@ -482,7 +485,7 @@ export function FaqSection({
 
   return (
     <>
-      <section className={className ?? 'space-y-10'}>
+      <section id={id} className={className ?? 'space-y-10'}>
         {!aside && headingNode}
         <GroupedFaqList
           groups={groups}
