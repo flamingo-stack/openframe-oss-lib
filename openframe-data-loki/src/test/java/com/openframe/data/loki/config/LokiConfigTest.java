@@ -96,10 +96,11 @@ class LokiConfigTest {
 
     @Test
     @Timeout(value = 5, threadMode = SEPARATE_THREAD)
-    void lokiClient_lokiSlowerThanTheReadTimeout_failsTheLookup() {
+    void toolEventLogRepository_lokiSlowerThanTheToolEventReadTimeout_failsTheLookup() {
         loki.createContext("/loki/api/v1/query_range", exchange -> awaitRelease());
 
-        enabledContext().withPropertyValues("openframe.loki.read-timeout=200ms", "openframe.loki.connect-timeout=1m")
+        enabledContext().withPropertyValues("openframe.loki.tool-event-read-timeout=200ms",
+                        "openframe.loki.read-timeout=1m", "openframe.loki.connect-timeout=1m")
                 .run(context -> assertThatThrownBy(() -> context.getBean(ToolEventLogRepository.class)
                         .find("tenant-a", "FLEET", TIMESTAMP, "evt-1"))
                         .isExactlyInstanceOf(LokiQueryException.class)

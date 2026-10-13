@@ -42,4 +42,10 @@ public class LokiProperties {
      * query timeout.
      */
     private Duration readTimeout = Duration.ofSeconds(30);
+
+    /**
+     * Upper bound for one tool event request, a push or the lookup of one event: shorter than {@link #readTimeout},
+     * so opening an event does not hang while Loki is slow.
+     */
+    private Duration toolEventReadTimeout = Duration.ofSeconds(10);
 }
