@@ -84,6 +84,16 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- RestAssured's response.jsonPath() picks Jackson 2 over Jackson 3 whenever Jackson 2 is on the
+             classpath and offers no setting to change that. A Spring Boot 4 host (openframe-saas-test) still
+             carries Jackson 2 transitively but no longer its java.time module, so every DTO with an
+             Instant/LocalDate field failed "Java 8 date/time type not supported". Declared here so the
+             library does not depend on what the host happens to bring; RestAssured registers it on its own. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
         <!-- ========== Test Data Generation ========== -->
         
         <!-- Faker for generating test data -->
