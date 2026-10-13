@@ -19,6 +19,7 @@ import com.openframe.sdk.fleetmdm.model.OsquerySchemaSearchRequest;
 import com.openframe.sdk.fleetmdm.model.OsquerySchemaSearchResponse;
 import com.openframe.sdk.fleetmdm.model.RunLiveQueryRequest;
 import com.openframe.sdk.fleetmdm.model.Policy;
+import com.openframe.sdk.fleetmdm.model.ScheduledQueriesResponse;
 import com.openframe.sdk.fleetmdm.model.Query;
 import com.openframe.sdk.fleetmdm.model.CreatePolicyRequest;
 import com.openframe.sdk.fleetmdm.model.UpdatePolicyRequest;
@@ -807,13 +808,24 @@ public class FleetMdmClient {
     }
 
     /**
-     * One page of scheduled queries in id order.
+     * One page of scheduled queries in id order, by page number. Fleet's query list fails with
+     * {@code after}, so this list is not read after an id as the policy list is.
      *
-     * @param afterId the id the page starts after, or null for the first page
-     * @param perPage the most queries to return
+     * @param page the zero-based page number
+     * @param perPage the most queries one page holds
      */
-    public CompletableFuture<List<Query>> listScheduledQueriesAsync(Long afterId, int perPage) {
-        return listScheduledQueriesAsync(QUERIES_URL + pageAfterId(afterId, perPage));
+    public CompletableFuture<ScheduledQueriesResponse> listScheduledQueriesPageAsync(int page, int perPage) {
+        String path = QUERIES_URL + "?order_key=id&order_direction=asc&page=" + page + "&per_page=" + perPage;
+        HttpRequest httpRequest = buildRequest(path, "GET", null);
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkResponse(response, "list Fleet scheduled queries");
+                    try {
+                        return MAPPER.readValue(response.body(), ScheduledQueriesResponse.class);
+                    } catch (Exception e) {
+                        throw new FleetMdmException("Failed to parse list scheduled queries response", e);
+                    }
+                });
     }
 
     private CompletableFuture<List<Query>> listScheduledQueriesAsync(String path) {

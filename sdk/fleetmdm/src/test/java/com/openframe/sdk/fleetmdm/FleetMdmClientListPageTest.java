@@ -1,7 +1,7 @@
 package com.openframe.sdk.fleetmdm;
 
 import com.openframe.sdk.fleetmdm.model.Policy;
-import com.openframe.sdk.fleetmdm.model.Query;
+import com.openframe.sdk.fleetmdm.model.ScheduledQueriesResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,22 +54,25 @@ class FleetMdmClientListPageTest {
     }
 
     @Test
-    void listScheduledQueriesAsync_firstPage_asksForTheFirstQueriesById() throws Exception {
-        respondWith("{\"queries\": [{\"id\": 3, \"name\": \"os-version\"}]}");
+    void listScheduledQueriesPageAsync_firstPage_asksForPageZeroById() throws Exception {
+        respondWith("{\"queries\": [{\"id\": 3, \"name\": \"os-version\"}], \"meta\": {\"has_next_results\": true}}");
 
-        List<Query> queries = client.listScheduledQueriesAsync(null, 51).get();
+        ScheduledQueriesResponse page = client.listScheduledQueriesPageAsync(0, 50).get();
 
-        assertEquals(3L, queries.get(0).getId());
-        assertEquals("/api/v1/fleet/queries?order_key=id&order_direction=asc&per_page=51", requestedPath());
+        assertEquals(3L, page.getQueries().get(0).getId());
+        assertEquals(Boolean.TRUE, page.getMeta().getHasNextResults());
+        assertEquals("/api/v1/fleet/queries?order_key=id&order_direction=asc&page=0&per_page=50", requestedPath());
     }
 
+    // Fleet answers HTTP 500 for the query list with "after", so a later page is asked for by number.
     @Test
-    void listScheduledQueriesAsync_afterAnId_asksForTheQueriesAfterIt() throws Exception {
-        respondWith("{\"queries\": []}");
+    void listScheduledQueriesPageAsync_laterPage_asksByPageNumberAndNeverSendsAfter() throws Exception {
+        respondWith("{\"queries\": [], \"meta\": {\"has_next_results\": false}}");
 
-        client.listScheduledQueriesAsync(3L, 51).get();
+        ScheduledQueriesResponse page = client.listScheduledQueriesPageAsync(2, 50).get();
 
-        assertEquals("/api/v1/fleet/queries?order_key=id&order_direction=asc&per_page=51&after=3", requestedPath());
+        assertEquals(Boolean.FALSE, page.getMeta().getHasNextResults());
+        assertEquals("/api/v1/fleet/queries?order_key=id&order_direction=asc&page=2&per_page=50", requestedPath());
     }
 
     private void respondWith(String body) {
