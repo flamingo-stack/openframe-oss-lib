@@ -147,6 +147,16 @@ async fn run_to_completion(fx: &Fixture) {
         .unwrap();
 }
 
+async fn wait_until(condition: impl Fn() -> bool) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !condition() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("condition met within the deadline");
+}
+
 #[tokio::test]
 async fn no_pending_mode_makes_no_call() {
     let server = mock_server(&[200]).await;
@@ -217,10 +227,9 @@ async fn mode_stays_pending_while_the_backend_keeps_failing() {
     let fx = fixture(server.url.clone(), Some("SILENT_ACCESS")).await;
 
     let handle = fx.service.clone().start().unwrap();
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    wait_until(|| server.requests().len() >= 2).await;
     handle.abort();
 
-    assert!(server.requests().len() >= 2);
     assert_eq!(
         fx.initial.get_remote_access_mode().unwrap().as_deref(),
         Some("SILENT_ACCESS")
@@ -228,14 +237,21 @@ async fn mode_stays_pending_while_the_backend_keeps_failing() {
 }
 
 #[tokio::test]
-async fn unreachable_backend_keeps_the_mode_pending() {
+async fn dropped_connections_keep_the_mode_pending() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
-    drop(listener);
+    let accepts = Arc::new(Mutex::new(0usize));
+    let counter = accepts.clone();
+    tokio::spawn(async move {
+        while let Ok((socket, _)) = listener.accept().await {
+            *counter.lock().unwrap() += 1;
+            drop(socket);
+        }
+    });
     let fx = fixture(url, Some("SILENT_ACCESS")).await;
 
     let handle = fx.service.clone().start().unwrap();
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    wait_until(|| *accepts.lock().unwrap() >= 2).await;
     handle.abort();
 
     assert_eq!(
