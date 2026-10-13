@@ -1,6 +1,11 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
+import { useAgentTint } from '../agent-identity';
+import { ChatTurn } from '../chat/chat-turn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
+import { Tag } from '../ui/tag';
 
 export interface ConversationCardSpeaker {
   /** Rendered as given (an avatar, an agent mark). */
@@ -8,11 +13,13 @@ export interface ConversationCardSpeaker {
   name: string;
   /** A quieter word after the name ("on her laptop", "this computer"). */
   meta?: string;
+  /** When they spoke, as shown ("2:47 PM"). */
+  time?: string;
 }
 
 export interface ConversationCardProps {
   requester: ConversationCardSpeaker;
-  /** What they said, shown in quotation marks. */
+  /** What they said. */
   request: string;
   responder: ConversationCardSpeaker;
   /** What was done about it. */
@@ -25,22 +32,19 @@ export interface ConversationCardProps {
   footerValue: string;
   /** `attention` paints the answer in the warning colour: it needs a person. */
   footerTone?: 'default' | 'attention';
+  /**
+   * The slug of the agent that answered. The card takes that agent's tint from
+   * its identity, so it reads as that agent's at a glance. A card names its
+   * agent, never a colour.
+   */
+  agent?: string | null;
   className?: string;
-}
-
-function Who({ speaker }: { speaker: ConversationCardSpeaker }) {
-  return (
-    <div className="flex items-baseline gap-2 text-ods-text-primary text-h4">
-      {speaker.name}
-      {speaker.meta && <span className="text-ods-text-secondary text-h6">{speaker.meta}</span>}
-    </div>
-  );
 }
 
 /**
  * A request and what was done about it, as two turns and a footer: who asked
- * and what they said, who answered and the result, then one line that sums up
- * the reader's own part in it.
+ * and what they said, who answered and the result (a command block with its
+ * check), then one line that sums up the reader's own part in it.
  */
 export function ConversationCard({
   requester,
@@ -51,47 +55,45 @@ export function ConversationCard({
   footerLabel,
   footerValue,
   footerTone = 'default',
+  agent,
   className,
 }: ConversationCardProps) {
+  const tint = useAgentTint(agent);
   return (
     <div
-      className={cn('flex h-full flex-col gap-4 rounded-xl border border-ods-border bg-ods-card p-5 md:p-7', className)}
+      className={cn(
+        'flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]',
+        className,
+      )}
+      style={tint}
     >
-      <div className="flex items-start gap-3">
-        <span className="shrink-0">{requester.avatar}</span>
-        <div className="min-w-0 flex-1">
-          <Who speaker={requester} />
-          {/* Every part keeps a fixed number of lines, so cards in a row or a carousel line up part by part. */}
-          <p className="m-0 mt-1 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3" title={request}>
-            &ldquo;{request}&rdquo;
-          </p>
+      {/* Every part keeps a fixed number of lines, so cards in a row or a carousel line up part by part. */}
+      <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>
+        <p className="m-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3" title={request}>
+          &ldquo;{request}&rdquo;
+        </p>
+      </ChatTurn>
+      {/* The answer is a command block: who did it, what was done, and its check. */}
+      <ChatTurn
+        avatar={responder.avatar}
+        name={responder.name}
+        meta={responder.meta}
+        time={responder.time}
+        className="rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]"
+      >
+        <div className="flex items-start gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h4">
+          <span className="line-clamp-3 min-h-[3lh] min-w-0 flex-1" title={outcome}>
+            {outcome}
+          </span>
+          {outcomeAside}
+          <span className="flex h-[1lh] shrink-0 items-center">
+            <CheckCircleIcon size={16} className="text-ods-success" aria-hidden />
+          </span>
         </div>
-      </div>
-      <div className="flex items-start gap-3 rounded-md border border-ods-border bg-ods-bg p-3.5">
-        <span className="shrink-0">{responder.avatar}</span>
-        <div className="min-w-0 flex-1">
-          <Who speaker={responder} />
-          <div className="mt-1 flex items-start gap-2 text-ods-text-secondary text-h4">
-            <CheckCircleIcon size={16} className="mt-1 shrink-0 text-ods-success" aria-hidden />
-            <span className="line-clamp-3 min-h-[3lh] min-w-0 flex-1" title={outcome}>
-              {outcome}
-            </span>
-            {outcomeAside}
-          </div>
-        </div>
-      </div>
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-ods-border pt-3.5 text-ods-text-secondary text-h6">
+      </ChatTurn>
+      <div className="mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)] text-ods-text-secondary text-h6">
         <span>{footerLabel}</span>
-        <span
-          className={cn(
-            'inline-flex whitespace-nowrap rounded-full border px-3 py-1',
-            footerTone === 'attention'
-              ? 'border-ods-warning text-ods-warning'
-              : 'border-ods-border text-ods-text-secondary',
-          )}
-        >
-          {footerValue}
-        </span>
+        <Tag as="span" label={footerValue} variant={footerTone === 'attention' ? 'warning' : 'badge'} />
       </div>
     </div>
   );
