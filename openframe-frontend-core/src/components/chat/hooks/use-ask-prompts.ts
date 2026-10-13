@@ -24,7 +24,7 @@ export function buildAskPromptsUrl(
   { count, topic, exclude = [] }: { count: number; topic?: string; exclude?: readonly string[] },
 ): string {
   const params = new URLSearchParams({ count: String(count) });
-  if (topic) params.set('section', topic);
+  if (topic) params.set('topic', topic);
   if (exclude.length > 0) params.set('exclude', exclude.join(','));
   return `${base}${base.includes('?') ? '&' : '?'}${params.toString()}`;
 }
@@ -37,7 +37,7 @@ export function assistantAvailable(assistant: AssistantRuntime | null): assistan
 export interface UseAskPromptsOptions {
   /**
    * What the surface is about: ANY string the host's endpoint knows (sent as
-   * `section`). Questions written for it are picked first. Absent: general ones.
+   * `topic`). Questions written for it are picked first. Absent: general ones.
    */
   topic?: string;
   count?: number;

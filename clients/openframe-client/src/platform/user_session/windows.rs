@@ -188,7 +188,7 @@ fn launch_process_in_target_session(
         // Build command line with full path in quotes + arguments
         info!("Step 3: Building command line");
         let cmdline = build_command_line(command_path, args);
-        info!("Command line: {}", cmdline);
+        info!("Command: {}", command_path);
 
         info!("Step 4: Setting up STARTUPINFOW structure");
         // For GUI applications, set the desktop to winsta0\default
@@ -210,7 +210,6 @@ fn launch_process_in_target_session(
 
         info!("Step 5: Calling CreateProcessAsUserW");
         info!("  lpApplicationName: NULL (using command line parsing)");
-        info!("  lpCommandLine: {}", cmdline);
         info!("  Creation flags: CREATE_NEW_PROCESS_GROUP");
 
         // For GUI applications, use CREATE_NEW_PROCESS_GROUP for proper process isolation

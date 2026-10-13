@@ -209,7 +209,7 @@ describe('useScenarioPlayer', () => {
     expect(result.current.step).toBe(7);
   });
 
-  it('takes its first step within a third of a second of becoming playable, then keeps the beat', () => {
+  it('takes its first step within a third of a second, keeps the beat, and resumes a step where it stopped', () => {
     stubReducedMotion(false);
     const { result, rerender } = renderHook(({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled }), {
       initialProps: { enabled: false },
@@ -229,11 +229,23 @@ describe('useScenarioPlayer', () => {
     });
     expect(result.current.step).toBe(2);
 
-    // Coming back on screen is the same: it moves at once.
+    // 700 ms into the next step it leaves the screen, for a long time.
+    act(() => {
+      vi.advanceTimersByTime(700);
+    });
     rerender({ enabled: false });
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(result.current.step).toBe(2);
+    // Back: it resumes the step with the 1000 ms that were left, neither a whole new step nor a skipped one.
     rerender({ enabled: true });
     act(() => {
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(900);
+    });
+    expect(result.current.step).toBe(2);
+    act(() => {
+      vi.advanceTimersByTime(200);
     });
     expect(result.current.step).toBe(3);
   });
