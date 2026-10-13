@@ -52,7 +52,7 @@ import {
 import { cn } from '../../utils/cn';
 import { formatUrlForDisplay } from '../../utils/format';
 import { DESKTOP_OSES, type DesktopOs } from '../../utils/visitor-os';
-import { PageFaqInPage, type PageFaqSlot } from '../faq/page-faq';
+import { FaqSection, pageFaqProps, type PageFaqSlot } from '../faq/faq-section';
 import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
 import { WindowsLogoGreyIcon } from '../icons-v2-generated/brand-logos/windows-logo-grey-icon';
@@ -370,7 +370,7 @@ export function DownloadAppsPage({
         {body}
         {web && <WebCard web={web} />}
       </div>
-      <PageFaqInPage faq={faq} />
+      {faq && <FaqSection {...pageFaqProps(faq)} />}
     </DownloadAppsChrome>
   );
 }

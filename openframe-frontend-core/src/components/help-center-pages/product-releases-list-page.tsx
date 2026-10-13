@@ -10,7 +10,7 @@
 
 import type { ReactNode } from 'react';
 import type { ProductRelease, ProductReleaseListResponse } from '../../types/product-release';
-import type { PageFaqSlot } from '../faq/page-faq';
+import type { PageFaqSlot } from '../faq/faq-section';
 import { DevSectionPage } from '../shared/dev-section';
 import { ProductReleasesView, type ProductReleaseCardExtras } from '../shared/product-release';
 

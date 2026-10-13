@@ -10,7 +10,7 @@
 
 import type { ReactNode } from 'react';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
-import type { PageFaqSlot } from '../faq/page-faq';
+import type { PageFaqSlot } from '../faq/faq-section';
 import { OnboardingGuidesCatalogView } from '../onboarding-guides';
 import { DevSectionPage } from '../shared/dev-section';
 

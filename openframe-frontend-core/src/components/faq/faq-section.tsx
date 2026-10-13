@@ -52,8 +52,14 @@ export interface FaqSectionProps {
   /** Overrides for the JSON-LD's name/description/url. */
   jsonLd?: FaqSchemaOptions;
   className?: string;
-  /** The `id` of the rendered section: what an in-page link to the FAQ points at. */
+  /** The `id` of the rendered section: what an in-page link to the FAQ points at (`PAGE_FAQ_SECTION_ID` for a page's own block). */
   id?: string;
+  /**
+   * Print the topic's bare name in small muted text under the heading
+   * (`pricing`), so whoever edits the FAQs can see which topic a page asks
+   * for. Default off. The section always carries it as `data-faq-topic` too.
+   */
+  showTopic?: boolean;
   /** Maps to /api/faqs `?count=` (the 5-tier fill target). Absent → param
    *  not sent (server default applies). */
   minResults?: number;
@@ -82,6 +88,28 @@ export interface FaqSectionProps {
 }
 
 const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
+
+/** The id of a page's own FAQ block: what a page's "FAQ" link or section nav points at. */
+export const PAGE_FAQ_SECTION_ID = 'faq';
+
+/** A page's own FAQ block inside a page that already provides the container: vertical rhythm only. */
+const PAGE_FAQ_IN_PAGE_CLASS = 'space-y-10 pt-12 md:pt-20';
+
+/**
+ * What a shared page of the lib takes as its `faq` prop: the topic the page is
+ * about (REQUIRED, stated by the host, never read from the page's address) and
+ * where the host serves the FAQs. The page renders `FaqSection` with it, inside
+ * its own container, after its content (`pageFaqProps`).
+ */
+export type PageFaqSlot = Pick<
+  FaqSectionProps,
+  'apiBaseUrl' | 'initialFaqs' | 'heading' | 'ask' | 'emitJsonLd' | 'jsonLd' | 'showTopic'
+> & { topic: string };
+
+/** The `FaqSection` props of a shared page's own FAQ block: the host's slot, as the page's `#faq` section. */
+export function pageFaqProps(faq: PageFaqSlot): FaqSectionProps {
+  return { ...faq, id: PAGE_FAQ_SECTION_ID, className: PAGE_FAQ_IN_PAGE_CLASS };
+}
 
 /** URL composition shared with RelatedContentSection (`buildSuggestionUrl`)
  *  — byte-identical to the historical `buildFaqsUrl` output when
@@ -433,6 +461,7 @@ export function FaqSection({
   jsonLd,
   className,
   id,
+  showTopic = false,
   minResults,
   apiBaseUrl = '',
   aside: asideProp,
@@ -466,8 +495,16 @@ export function FaqSection({
   // `undefined` → default <h2> title; `null` → the host page owns the <h1>, so
   // no title renders here. `heading === null` also makes the category headings
   // <h2> (directly under the page <h1>); otherwise they nest as <h3>.
+  const titleNode = heading === undefined ? <h2 className={SECTION_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h2> : heading;
   const headingNode =
-    heading === undefined ? <h2 className={SECTION_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h2> : heading;
+    showTopic && topic ? (
+      <div className="space-y-1">
+        {titleNode}
+        <p className="text-ods-text-muted text-h6">{topic}</p>
+      </div>
+    ) : (
+      titleNode
+    );
 
   // Degrade silently — never show an error banner or an empty section shell
   // where FAQs would be (host pages and the standalone surface both rely on it).

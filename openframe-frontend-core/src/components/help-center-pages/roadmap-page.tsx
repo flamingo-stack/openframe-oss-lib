@@ -10,7 +10,7 @@
 
 import type { ReactNode } from 'react';
 import type { RoadmapItem } from '../chat/types/entities/roadmap-item';
-import type { PageFaqSlot } from '../faq/page-faq';
+import type { PageFaqSlot } from '../faq/faq-section';
 import { DevSectionPage } from '../shared/dev-section';
 import { RoadmapView } from '../shared/roadmap';
 import type { UseRoadmapVotingOptions } from '../shared/roadmap';

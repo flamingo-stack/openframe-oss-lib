@@ -8,7 +8,7 @@
  */
 
 import type { ReactNode } from 'react';
-import type { PageFaqSlot } from '../faq/page-faq';
+import type { PageFaqSlot } from '../faq/faq-section';
 import { DeliveryLists } from '../shared/delivery';
 import { DevSectionPage } from '../shared/dev-section';
 

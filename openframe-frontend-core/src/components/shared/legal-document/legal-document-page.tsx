@@ -21,7 +21,7 @@ import type { ComponentType } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { formatLegalDate } from '../../../utils/format';
-import { PageFaqInPage, type PageFaqSlot } from '../../faq/page-faq';
+import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
 import { PageShell, PageLayout } from '../../ui';
 import { RichMarkdownRenderer } from '../../ui/markdown';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
@@ -169,7 +169,7 @@ export function LegalDocumentPage({
           </div>
         </div>
       </div>
-      <PageFaqInPage faq={faq} />
+      {faq && <FaqSection {...pageFaqProps(faq)} />}
     </PageLayout>
   );
 

@@ -22,7 +22,7 @@ import {
   OPENFRAME_DEV_SECTIONS,
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
-import { PageFaqInPage, type PageFaqSlot } from '../../faq/page-faq';
+import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
 import { PageShell, PageLayout } from '../../ui';
 import { DevSectionView } from './dev-section-view';
 
@@ -103,7 +103,7 @@ export function DevSectionPage({
       <DevSectionView sectionKey={sectionKey} showHeading={false} preControls={preControls}>
         {children}
       </DevSectionView>
-      <PageFaqInPage faq={faq} />
+      {faq && <FaqSection {...pageFaqProps(faq)} />}
     </PageLayout>
   );
 
