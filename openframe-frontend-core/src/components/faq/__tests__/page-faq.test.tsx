@@ -57,14 +57,15 @@ describe('PageFaq', () => {
     expect(requestedFaqs()).toHaveLength(0);
   });
 
-  it('prints its topic under the heading only when asked, and always carries it as data', () => {
+  it('prints its bare topic under the heading only when asked, and always carries it as data', () => {
     const { unmount } = render(<PageFaq topic="pricing" initialFaqs={FAQS} />);
-    expect(screen.queryByText('Topic: pricing')).not.toBeInTheDocument();
+    expect(screen.queryByText('pricing')).not.toBeInTheDocument();
     expect(markup()).toContain('data-faq-topic="pricing"');
     unmount();
 
     render(<PageFaq topic="pricing" initialFaqs={FAQS} showTopic />);
-    expect(screen.getByText('Topic: pricing')).toBeInTheDocument();
+    expect(screen.getByText('pricing')).toBeInTheDocument();
+    expect(screen.queryByText(/Topic:/)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Frequently Asked Questions' })).toBeInTheDocument();
   });
 

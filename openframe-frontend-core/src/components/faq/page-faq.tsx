@@ -36,9 +36,9 @@ export interface PageFaqProps {
   /** True inside a page that already provides the container: no width or side padding of its own. */
   contained?: boolean;
   /**
-   * Print the topic in small text under the heading ("Topic: pricing"), so
-   * whoever edits the FAQs can see which topic a page asks for. Default off.
-   * The block always carries it as `data-faq-topic` too.
+   * Print the topic's bare name in small muted text under the heading
+   * (`pricing`), so whoever edits the FAQs can see which topic a page asks
+   * for. Default off. The block always carries it as `data-faq-topic` too.
    */
   showTopic?: boolean;
   /** Emit FAQPage JSON-LD for the page's own questions. Default true: they are this page's. */
@@ -94,9 +94,9 @@ export function PageFaq({
       apiBaseUrl={apiBaseUrl}
       heading={
         showTopic ? (
-          <div className="space-y-2">
+          <div className="space-y-1">
             {headingNode}
-            <p className="text-ods-text-secondary text-h6">Topic: {topic}</p>
+            <p className="text-ods-text-muted text-h6">{topic}</p>
           </div>
         ) : (
           headingNode
