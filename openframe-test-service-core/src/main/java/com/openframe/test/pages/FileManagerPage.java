@@ -3,6 +3,7 @@ package com.openframe.test.pages;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -223,7 +224,7 @@ public class FileManagerPage {
      * @param absoluteFilePath absolute path to the file to upload
      */
     public void uploadFile(String absoluteFilePath) {
-        page.locator(FILE_INPUT).setInputFiles(java.nio.file.Paths.get(absoluteFilePath));
+        page.locator(FILE_INPUT).setInputFiles(Path.of(absoluteFilePath));
     }
 
     /**

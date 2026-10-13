@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.annotation.ObjectPostProcessor;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -31,7 +31,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -69,7 +69,7 @@ public class SecurityConfig {
                 // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
                 // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
                 // cannot reach: it can't set application/json, and fetch preflights against disabled CORS.
-                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(new AntPathRequestMatcher("/login", "POST")))
+                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/login")))
                 .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

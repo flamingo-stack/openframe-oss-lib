@@ -1,7 +1,7 @@
 package com.openframe.client.service.rmm;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.nats.rmm.model.CommandResultMessage;
@@ -14,7 +14,6 @@ import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -56,7 +55,6 @@ public class RmmResultService {
         };
     }
 
-    @NotNull
     private RmmResultEvent getRmmResultEvent(String machineId, RmmResultMessage message, long now) {
         RmmResultEvent data = new RmmResultEvent();
         data.setTenantId(tenantIdProvider.getTenantId());
@@ -77,7 +75,6 @@ public class RmmResultService {
         return data;
     }
 
-    @NotNull
     private CommonDebeziumMessage toDebeziumMessage(RmmResultEvent data, long now) {
         DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(objectMapper.valueToTree(data));
