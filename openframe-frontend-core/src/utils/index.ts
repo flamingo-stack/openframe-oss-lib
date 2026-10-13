@@ -473,3 +473,5 @@ export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './
 export { copyrightLine } from './copyright-line';
 export * from './path-pattern';
 export * from './random-id';
+export * from './demo-clock';
+export * from './identity-tint';
