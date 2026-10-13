@@ -30,4 +30,14 @@ public class TenantDiscoveryResponse {
 
     @JsonProperty("auth_providers")
     private List<String> authProviders;
+
+    @JsonProperty("openframe_login_enabled")
+    private Boolean openframeLoginEnabled;
+
+    /**
+     * Providers the tenant configured with its own app (e.g. google, microsoft), without the
+     * system defaults that {@link #authProviders} also includes.
+     */
+    @JsonProperty("custom_providers")
+    private List<String> customProviders;
 }
