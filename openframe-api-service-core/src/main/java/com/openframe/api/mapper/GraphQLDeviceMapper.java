@@ -13,8 +13,13 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.tool.ConnectionStatus;
+import com.openframe.data.document.tool.ToolConnection;
+import com.openframe.data.document.tool.ToolType;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +60,31 @@ public class GraphQLDeviceMapper {
                 .winget(states.get(PackageManagerType.WINGET))
                 .choco(states.get(PackageManagerType.CHOCO))
                 .build();
+    }
+
+    public DeviceEnrollmentResponse toEnrollment(Machine machine, List<ToolConnection> toolConnections) {
+        Instant connectedAt = machine.getFirstConnectedAt();
+        Instant inventoryConnectedAt = fleetInventoryConnectedAt(toolConnections);
+        return DeviceEnrollmentResponse.builder()
+                .registeredAt(machine.getRegisteredAt())
+                .connectedAt(connectedAt)
+                .inventoryConnectedAt(inventoryConnectedAt)
+                .ready(connectedAt != null && inventoryConnectedAt != null)
+                .build();
+    }
+
+    // Fleet confirmed the host only when the registration transformer stored its numeric host id; the raw UUID means Fleet never answered.
+    private static Instant fleetInventoryConnectedAt(List<ToolConnection> toolConnections) {
+        if (toolConnections == null) {
+            return null;
+        }
+        return toolConnections.stream()
+                .filter(connection -> connection.getToolType() == ToolType.FLEET_MDM)
+                .filter(connection -> connection.getStatus() == ConnectionStatus.CONNECTED)
+                .filter(connection -> StringUtils.isNumeric(connection.getAgentToolId()))
+                .map(ToolConnection::getConnectedAt)
+                .findFirst()
+                .orElse(null);
     }
 
     public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {

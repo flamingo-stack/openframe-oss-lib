@@ -10,6 +10,7 @@ import java.util.Map;
 import static com.openframe.test.api.graphql.OnboardingQueries.COMPLETE_USER_ONBOARDING;
 import static com.openframe.test.api.graphql.OnboardingQueries.COMPLETE_USER_ONBOARDING_STEP;
 import static com.openframe.test.api.graphql.OnboardingQueries.RESET_USER_ONBOARDING;
+import static com.openframe.test.api.graphql.OnboardingQueries.SET_USER_ONBOARDING_TOUR_DIALOG;
 import static com.openframe.test.api.graphql.OnboardingQueries.SKIP_USER_ONBOARDING;
 import static com.openframe.test.api.graphql.OnboardingQueries.USER_ONBOARDING_PROGRESS;
 import static com.openframe.test.config.EnvironmentConfig.GRAPHQL;
@@ -40,6 +41,11 @@ public class OnboardingApi {
         return progress(RESET_USER_ONBOARDING, Map.of(), "resetUserOnboarding");
     }
 
+    // "Start with Mingo": remembers the dialog the Getting Started block lives in; a repeat overwrites it.
+    public static UserOnboardingProgress setUserOnboardingTourDialog(String dialogId) {
+        return progress(SET_USER_ONBOARDING_TOUR_DIALOG, Map.of("dialogId", dialogId), "setUserOnboardingTourDialog");
+    }
+
     // A step expected to be refused (a value outside UserOnboardingStep); returns the GraphQL errors.
     public static List<GraphqlError> attemptCompleteUserOnboardingStepErrors(String step) {
         Response response = send(COMPLETE_USER_ONBOARDING_STEP, Map.of("step", step));
@@ -67,6 +73,10 @@ public class OnboardingApi {
 
     public static int attemptSkipUserOnboarding() {
         return send(SKIP_USER_ONBOARDING, Map.of()).statusCode();
+    }
+
+    public static int attemptSetUserOnboardingTourDialog(String dialogId) {
+        return send(SET_USER_ONBOARDING_TOUR_DIALOG, Map.of("dialogId", dialogId)).statusCode();
     }
 
     private static UserOnboardingProgress progress(String document, Map<String, Object> variables, String field) {

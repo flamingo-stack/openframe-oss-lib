@@ -81,6 +81,19 @@ type Machine implements Node {
     """False when no enabled package manager can ever work on this device. Software Management then hides it
     from device pickers and skips it at dispatch; inventory and vulnerabilities still show it."""
     softwareManagementSupported: Boolean!
+    """Milestones of the agent install, for the setup wizard. A null timestamp means the stage is not reached."""
+    enrollment: DeviceEnrollment
+}
+
+type DeviceEnrollment {
+    """Machine record created: the initial key was accepted by /clients/api/agents/register. Same instant as Machine.registeredAt."""
+    registeredAt: Instant!
+    """First NATS connection of the agent (status left PENDING). From here Mingo can target the device."""
+    connectedAt: Instant
+    """Fleet confirmed the host and osquery is reporting (tool connection FLEET_MDM is CONNECTED with a Fleet host id). Inventory and vulnerabilities are queryable."""
+    inventoryConnectedAt: Instant
+    """connectedAt and inventoryConnectedAt are both set."""
+    ready: Boolean!
 }
 
 """Per-manager state reported by the agent. A manager of another OS reads as UNSUPPORTED."""
