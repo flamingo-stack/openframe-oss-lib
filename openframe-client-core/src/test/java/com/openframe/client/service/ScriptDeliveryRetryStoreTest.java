@@ -1,6 +1,7 @@
 package com.openframe.client.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore;
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore.RetryState;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
@@ -30,7 +31,7 @@ class ScriptDeliveryRetryStoreTest {
 
     @Mock private ScriptDeliveryRetryRepository repository;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new JsonMapper();
     private ScriptDeliveryRetryStore store;
 
     @BeforeEach

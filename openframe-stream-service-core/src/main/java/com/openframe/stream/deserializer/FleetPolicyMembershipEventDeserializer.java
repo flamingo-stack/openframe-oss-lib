@@ -1,8 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.sdk.fleetmdm.model.Policy;
@@ -51,7 +51,7 @@ public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventD
     @Override
     protected Optional<String> getAgentId(JsonNode afterField) {
         return Optional.ofNullable(afterField.get("host_id"))
-                .map(JsonNode::asText);
+                .map(JsonNode::asString);
     }
 
     @Override
@@ -75,7 +75,7 @@ public class FleetPolicyMembershipEventDeserializer extends IntegratedToolEventD
         JsonNode policyIdNode = afterField.get("policy_id");
         JsonNode hostIdNode = afterField.get("host_id");
         if (policyIdNode != null && hostIdNode != null) {
-            return Optional.of(policyIdNode.asText() + "_" + hostIdNode.asText());
+            return Optional.of(policyIdNode.asString() + "_" + hostIdNode.asString());
         }
         return Optional.empty();
     }

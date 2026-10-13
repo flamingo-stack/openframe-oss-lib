@@ -9,4 +9,9 @@ public interface DeliverySeed {
     String getTargetId();
 
     String getMachineId();
+
+    // the one machine by default; a seed for every machine the type delivers to carries no machine
+    default DeliveryAudience getAudience() {
+        return DeliveryAudience.MACHINE;
+    }
 }

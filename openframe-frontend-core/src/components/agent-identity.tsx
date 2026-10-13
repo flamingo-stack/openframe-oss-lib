@@ -1,12 +1,13 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, type CSSProperties, type ReactNode } from 'react';
 import {
   AGENT_IDENTITIES_API_PATH,
   useAgentIdentities,
   type AgentIdentityIcon,
   type AgentIdentityIcons,
 } from '../hooks/use-agent-identities';
+import { identityTint } from '../utils/identity-tint';
 import { HEX_PATTERN } from '../utils/ods-color-utils';
 
 export { AGENT_IDENTITIES_API_PATH, type AgentIdentityIcon, type AgentIdentityIcons };
@@ -125,4 +126,14 @@ export function useAgentAccents(): (slug: string | null | undefined) => string |
     },
     [identities],
   );
+}
+
+/**
+ * The tint of a surface that belongs to an agent (a card of its answer, the
+ * window it works in), from the agent's own identity colour. THE way a surface
+ * is tinted for an agent: a component names the agent, never a colour. With no
+ * agent, or one whose identity names no colour, there is no tint.
+ */
+export function useAgentTint(slug: string | null | undefined): CSSProperties | undefined {
+  return identityTint(useAgentAccents()(slug));
 }

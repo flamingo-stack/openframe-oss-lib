@@ -1,6 +1,7 @@
 package com.openframe.client.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.listener.rmm.SoftwareResultListener;
 import com.openframe.client.service.rmm.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
@@ -45,7 +46,7 @@ class SoftwareResultListenerTest {
     void setUp() {
         listener = new SoftwareResultListener(
                 natsConnection,
-                new RmmResultParser(new ObjectMapper()),
+                new RmmResultParser(new JsonMapper()),
                 rmmResultService,
                 new NatsTopicMachineIdExtractor());
     }

@@ -11,7 +11,7 @@ pub(crate) fn apply_env_vars(cmd: &mut Command, env_vars: &[String]) {
                 cmd.env(key, value);
             }
             _ => {
-                tracing::warn!(var = %var, "skipping malformed env var (empty name or missing '=')");
+                tracing::warn!("skipping malformed env var (empty name or missing '=')");
             }
         }
     }

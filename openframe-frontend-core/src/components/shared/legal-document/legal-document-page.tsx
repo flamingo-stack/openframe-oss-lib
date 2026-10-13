@@ -21,6 +21,7 @@ import type { ComponentType } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { formatLegalDate } from '../../../utils/format';
+import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
 import { PageShell, PageLayout } from '../../ui';
 import { RichMarkdownRenderer } from '../../ui/markdown';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
@@ -64,6 +65,12 @@ export interface LegalDocumentPageProps {
   /** Back-button config — same pattern as `DevSectionPage`. Pass `false`
    *  to hide. Default `{ label: 'Back to home', href: '/' }`. */
   backButton?: { label?: string; href?: string } | false;
+  /**
+   * The page's own FAQ block: the topic the page is about (stated by the host,
+   * never read from its address) and where the host serves the FAQs. Rendered
+   * after the page's content, inside its container. Absent: no FAQ block.
+   */
+  faq?: PageFaqSlot;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container — only the padding box renders,
    *  avoiding a nested `<main>`. */
@@ -83,6 +90,7 @@ export function LegalDocumentPage({
   apiEndpoint,
   MarkdownRenderer = RichMarkdownRenderer,
   backButton,
+  faq,
   shell = true,
 }: LegalDocumentPageProps) {
   const router = useRouter();
@@ -161,6 +169,7 @@ export function LegalDocumentPage({
           </div>
         </div>
       </div>
+      {faq && <FaqSection {...pageFaqProps(faq)} />}
     </PageLayout>
   );
 

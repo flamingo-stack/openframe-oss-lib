@@ -1,8 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
@@ -74,6 +74,6 @@ public class RemoteSessionAuditEventDeserializer implements KafkaMessageDeserial
     }
 
     private static String text(JsonNode node, String field) {
-        return node.path(field).asText(null);
+        return node.path(field).asString(null);
     }
 }

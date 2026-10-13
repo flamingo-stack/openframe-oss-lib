@@ -27,8 +27,7 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        if (msg instanceof HttpRequest) {
-            HttpRequest request = (HttpRequest) msg;
+        if (msg instanceof HttpRequest request) {
             isRequest = true;
             
             // Start building curl command
@@ -60,8 +59,7 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
             });
         }
 
-        if (isRequest && msg instanceof HttpContent) {
-            HttpContent content = (HttpContent) msg;
+        if (isRequest && msg instanceof HttpContent content) {
             ByteBuf buffer = content.content();
             if (buffer.isReadable()) {
                 String body = buffer.toString(io.netty.util.CharsetUtil.UTF_8);

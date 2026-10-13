@@ -4,9 +4,9 @@ import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.core.rest.PackageSearchRestClientFactory;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -134,8 +134,8 @@ public class BrewCatalogFetcher {
     private static Map<String, Integer> toInstallCounts(JsonNode root, String nameField) {
         Map<String, Integer> counts = new HashMap<>();
         for (JsonNode item : root.path("items")) {
-            String name = item.path(nameField).asText(null);
-            String count = item.path("count").asText(null);
+            String name = item.path(nameField).asString(null);
+            String count = item.path("count").asString(null);
             if (name == null || count == null) {
                 continue;
             }

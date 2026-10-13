@@ -105,7 +105,7 @@ pub(crate) fn register_autorun(
             .with_context(|| format!("Failed to set HKLM\\{}\\{}", AUTORUN_KEY_PATH, value_name))?;
         info!(
             "Wrote Run-key entry: HKLM\\{} :: {} = {}",
-            AUTORUN_KEY_PATH, value_name, cmdline
+            AUTORUN_KEY_PATH, value_name, command_path
         );
     }
 

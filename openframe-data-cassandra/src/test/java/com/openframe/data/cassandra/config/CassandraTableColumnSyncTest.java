@@ -70,13 +70,13 @@ class CassandraTableColumnSyncTest {
     }
 
     @Test
-    void afterSingletonsInstantiated_runOriginColumnsMissing_addsEachWithIfNotExists() {
+    void start_runOriginColumnsMissing_addsEachWithIfNotExists() {
         // setup
         stubKeyspace();
         stubUnifiedLogs(COLUMNS_BEFORE_RUN_ORIGIN);
 
         // execution
-        sync.afterSingletonsInstantiated();
+        sync.start();
 
         // verifications
         verify(session, times(2)).execute(statementCaptor.capture());
@@ -88,13 +88,13 @@ class CassandraTableColumnSyncTest {
     }
 
     @Test
-    void afterSingletonsInstantiated_columnAdded_usesSchemaChangeTimeout() {
+    void start_columnAdded_usesSchemaChangeTimeout() {
         // setup
         stubKeyspace();
         stubUnifiedLogs(COLUMNS_BEFORE_RUN_ORIGIN);
 
         // execution
-        sync.afterSingletonsInstantiated();
+        sync.start();
 
         // verifications
         verify(session, times(2)).execute(statementCaptor.capture());
@@ -104,13 +104,13 @@ class CassandraTableColumnSyncTest {
     }
 
     @Test
-    void afterSingletonsInstantiated_allColumnsPresent_altersNothing() {
+    void start_allColumnsPresent_altersNothing() {
         // setup
         stubKeyspace();
         stubUnifiedLogs(ALL_COLUMNS);
 
         // execution
-        sync.afterSingletonsInstantiated();
+        sync.start();
 
         // verifications
         verify(session).getMetadata();
@@ -118,13 +118,13 @@ class CassandraTableColumnSyncTest {
     }
 
     @Test
-    void afterSingletonsInstantiated_tableNotCreatedYet_skipsIt() {
+    void start_tableNotCreatedYet_skipsIt() {
         // setup
         stubKeyspace();
         when(keyspace.getTable(UNIFIED_LOGS)).thenReturn(Optional.empty());
 
         // execution
-        sync.afterSingletonsInstantiated();
+        sync.start();
 
         // verifications
         verify(session).getMetadata();
@@ -132,13 +132,13 @@ class CassandraTableColumnSyncTest {
     }
 
     @Test
-    void afterSingletonsInstantiated_keyspaceMissingFromMetadata_skipsWithoutFailing() {
+    void start_keyspaceMissingFromMetadata_skipsWithoutFailing() {
         // setup
         when(session.getMetadata()).thenReturn(metadata);
         when(metadata.getKeyspace(KEYSPACE)).thenReturn(Optional.empty());
 
         // execution
-        sync.afterSingletonsInstantiated();
+        sync.start();
 
         // verifications
         verify(session).getMetadata();
@@ -146,14 +146,14 @@ class CassandraTableColumnSyncTest {
     }
 
     @Test
-    void afterSingletonsInstantiated_alterTimesOut_startupSurvives() {
+    void start_alterTimesOut_startupSurvives() {
         // setup
         stubKeyspace();
         stubUnifiedLogs(COLUMNS_BEFORE_RUN_ORIGIN);
         when(session.execute(any(SimpleStatement.class))).thenThrow(new DriverTimeoutException("Query timed out after PT2S"));
 
         // execution & verifications
-        assertThatCode(() -> sync.afterSingletonsInstantiated()).doesNotThrowAnyException();
+        assertThatCode(() -> sync.start()).doesNotThrowAnyException();
     }
 
     private void stubKeyspace() {

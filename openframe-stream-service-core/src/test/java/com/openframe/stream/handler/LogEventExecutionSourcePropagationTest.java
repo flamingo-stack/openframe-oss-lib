@@ -1,7 +1,8 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
@@ -42,7 +43,7 @@ class LogEventExecutionSourcePropagationTest {
     void cassandraHandler_writesRunOriginFields() {
         // setup
         DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
 
         // execution
         handler.handle(message(), enriched("AI_ASSISTANT", "MANUAL"));
@@ -59,7 +60,7 @@ class LogEventExecutionSourcePropagationTest {
     void cassandraHandler_noOrigin_writesNulls() {
         // setup
         DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
 
         // execution
         handler.handle(message(), enriched(null, null));
@@ -76,7 +77,7 @@ class LogEventExecutionSourcePropagationTest {
     void kafkaHandler_publishesRunOriginFields() {
         // setup
         TenantDebeziumKafkaMessageHandler handler = new TenantDebeziumKafkaMessageHandler(
-                producer, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+                producer, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
 
         // execution
         handler.handle(message(), enriched("SCHEDULED", "AI_ASSISTANT"));

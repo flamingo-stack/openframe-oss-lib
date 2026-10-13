@@ -1,6 +1,7 @@
 package com.openframe.delivery.dispatch;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.TestPayload;
@@ -11,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DeliveryPayloadJsonTest {
 
-    private final DeliveryPayloadJson payloadJson = new DeliveryPayloadJson(new ObjectMapper());
+    private final DeliveryPayloadJson payloadJson = new DeliveryPayloadJson(new JsonMapper());
 
     @Test
     void writeThenRead_payload_sameFieldsAndDeliveryBlock() {

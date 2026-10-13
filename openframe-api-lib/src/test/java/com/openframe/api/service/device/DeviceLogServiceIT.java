@@ -1,6 +1,7 @@
 package com.openframe.api.service.device;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.api.config.DeviceLogProperties;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
@@ -69,7 +70,7 @@ class DeviceLogServiceIT {
     private static final long TIED_NANOS = BASE_NANOS + 300 * STEP_NANOS + 50;
     private static final Instant FROM = BASE.minus(Duration.ofMinutes(1));
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = new JsonMapper();
 
     private static LokiClient lokiClient;
     private static DeviceLogService service;
