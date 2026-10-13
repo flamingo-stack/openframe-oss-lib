@@ -66,7 +66,7 @@ public class DebeziumLokiMessageHandler extends DebeziumMessageHandler<ToolEvent
 
     @Override
     public Destination getDestination() {
-        return Destination.EVENT_LOG;
+        return Destination.LOKI_EVENT_LOG;
     }
 
     @Override

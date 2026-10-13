@@ -274,8 +274,8 @@ class DebeziumLokiMessageHandlerTest {
     }
 
     @Test
-    void getDestination_always_isTheEventLog() {
-        assertThat(handler().getDestination()).isEqualTo(Destination.EVENT_LOG);
+    void getDestination_always_isTheLokiEventLog() {
+        assertThat(handler().getDestination()).isEqualTo(Destination.LOKI_EVENT_LOG);
     }
 
     @Test

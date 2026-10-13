@@ -70,7 +70,7 @@ class GenericJsonMessageProcessorTest {
 
     private GenericJsonMessageProcessor processor() {
         when(eventLogHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
-        when(eventLogHandler.getDestination()).thenReturn(Destination.EVENT_LOG);
+        when(eventLogHandler.getDestination()).thenReturn(Destination.LOKI_EVENT_LOG);
         when(listHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
         when(listHandler.getDestination()).thenReturn(Destination.KAFKA_PINOT);
         when(deserializer.getType()).thenReturn(MessageType.FLEET_MDM_EVENT);

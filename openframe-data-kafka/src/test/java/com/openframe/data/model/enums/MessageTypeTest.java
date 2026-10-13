@@ -13,7 +13,7 @@ class MessageTypeTest {
     void getDestinationList_everyToolEventType_savesDetailsBeforePublishingToTheList(MessageType type) {
         assertThat(type.getDestinationList())
                 .extracting(Destination::name)
-                .startsWith("EVENT_LOG", "KAFKA_PINOT");
+                .startsWith("CASSANDRA_EVENT_LOG", "LOKI_EVENT_LOG", "KAFKA_PINOT");
     }
 
     @Test
@@ -27,7 +27,8 @@ class MessageTypeTest {
         // verifications
         assertThat(toolType).isEqualTo(IntegratedToolType.MESHCENTRAL);
         assertThat(type.getDataEnrichmentServiceType()).isEqualTo(DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS);
-        assertThat(type.getDestinationList()).containsExactly(Destination.EVENT_LOG, Destination.KAFKA_PINOT);
+        assertThat(type.getDestinationList())
+                .containsExactly(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
         assertThat(type.getEventHandlerType()).isEqualTo(EventHandlerType.COMMON_TYPE);
     }
 }
