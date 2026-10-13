@@ -41,7 +41,6 @@ public class OnboardingApi {
         return progress(RESET_USER_ONBOARDING, Map.of(), "resetUserOnboarding");
     }
 
-    // "Start with Mingo": remembers the dialog the Getting Started block lives in; a repeat overwrites it.
     public static UserOnboardingProgress setUserOnboardingTourDialog(String dialogId) {
         return progress(SET_USER_ONBOARDING_TOUR_DIALOG, Map.of("dialogId", dialogId), "setUserOnboardingTourDialog");
     }

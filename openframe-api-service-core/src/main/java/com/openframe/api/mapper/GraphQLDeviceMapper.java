@@ -73,7 +73,6 @@ public class GraphQLDeviceMapper {
                 .build();
     }
 
-    // Fleet confirmed the host only when the registration transformer stored its numeric host id; the raw UUID means Fleet never answered.
     private static Instant fleetInventoryConnectedAt(List<ToolConnection> toolConnections) {
         if (toolConnections == null) {
             return null;

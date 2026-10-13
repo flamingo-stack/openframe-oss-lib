@@ -34,7 +34,6 @@ public class Machine implements TenantScoped {
     @Indexed
     private TelemetryStatus telemetryStatus;
     private Instant lastSeen;
-    // first PENDING -> ONLINE/OFFLINE transition, never overwritten; null while the agent has never connected
     private Instant firstConnectedAt;
     @Indexed
     private String organizationId;
