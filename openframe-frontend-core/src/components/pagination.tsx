@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { type ButtonHTMLAttributes, type HTMLAttributes, type MouseEvent, type ReactNode, forwardRef } from 'react';
 import Link from '../embed-shims/next-link';
 import { cn } from '../utils/cn';
+import { isModifierClick } from './chat/utils/chat-nav-resolution';
 import { Button } from './ui/button';
 
 interface PaginationProps {
@@ -21,52 +22,88 @@ interface PaginationProps {
   getPageHref?: (page: number) => string;
 }
 
-/** A click the browser should handle itself: a new tab, a new window, a download. */
-function opensElsewhere(event: MouseEvent<HTMLAnchorElement>): boolean {
-  return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+interface PaginationControlProps {
+  /** The page this control goes to. */
+  page: number;
+  /** The control's accessible name ("Page 3", "Go to next page"). */
+  label: string;
+  variant: 'accent' | 'outline';
+  className: string;
+  /** The control marks the page being shown. */
+  current?: boolean;
+  /** There is no such page (previous on the first page, next on the last). */
+  disabled?: boolean;
+  /** Which neighbour the control leads to, stated to crawlers and assistive technology as `rel`. */
+  rel?: 'prev' | 'next';
+  onPageChange: (page: number) => void;
+  getPageHref?: (page: number) => string;
+  children: ReactNode;
 }
 
-const Pagination = ({ currentPage, totalPages, onPageChange, className, getPageHref }: PaginationProps) => {
-  /** One control: a link to its page when the list has addresses and the control is enabled, else a button. */
-  const control = (
-    page: number,
-    props: { variant: 'accent' | 'outline'; className: string; disabled?: boolean; label: string; current?: boolean },
-    children: ReactNode,
-  ) => {
-    if (getPageHref && !props.disabled) {
-      return (
-        <Button variant={props.variant} size="icon" className={props.className} asChild>
-          <Link
-            href={getPageHref(page)}
-            prefetch={false}
-            aria-label={props.label}
-            aria-current={props.current ? 'page' : undefined}
-            onClick={event => {
-              if (opensElsewhere(event)) return;
-              event.preventDefault();
-              onPageChange(page);
-            }}
-          >
-            {children}
-          </Link>
-        </Button>
-      );
-    }
+/**
+ * One control of the pager. With a page address it is a link: the href is the
+ * page's real URL, so it works with no script, in a new tab and for a crawler,
+ * and a plain click is taken over to change the page in place (the progressive
+ * enhancement every in-page link in this library uses). With no address, or
+ * when there is no such page, it is a button: a link must always lead somewhere.
+ */
+function PaginationControl({
+  page,
+  label,
+  variant,
+  className,
+  current,
+  disabled,
+  rel,
+  onPageChange,
+  getPageHref,
+  children,
+}: PaginationControlProps) {
+  const ariaCurrent = current ? ('page' as const) : undefined;
+
+  if (!getPageHref || disabled) {
     return (
       <Button
-        variant={props.variant}
+        variant={variant}
         size="icon"
+        className={className}
+        disabled={disabled}
+        aria-label={label}
+        aria-current={ariaCurrent}
         onClick={() => onPageChange(page)}
-        disabled={props.disabled}
-        aria-label={props.label}
-        aria-current={props.current ? 'page' : undefined}
-        className={props.className}
       >
         {children}
       </Button>
     );
+  }
+
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    // A new tab or window is the browser's to open, at the link's own address.
+    if (isModifierClick(event)) return;
+    event.preventDefault();
+    onPageChange(page);
   };
 
+  return (
+    <Button variant={variant} size="icon" className={className} asChild>
+      <Link
+        href={getPageHref(page)}
+        prefetch={false}
+        rel={rel}
+        aria-label={label}
+        aria-current={ariaCurrent}
+        onClick={handleClick}
+      >
+        {children}
+      </Link>
+    </Button>
+  );
+}
+
+const NEIGHBOUR_CLASS = '!h-10 !w-10 content-md:!h-10 content-md:!w-10';
+const PAGE_CLASS = '!h-9 !w-9 content-md:!h-9 content-md:!w-9';
+
+const Pagination = ({ currentPage, totalPages, onPageChange, className, getPageHref }: PaginationProps) => {
   // Generate page numbers to display
   const getPageNumbers = () => {
     const pages = [];
@@ -122,16 +159,18 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className, getPageH
     <nav role="navigation" aria-label="pagination" className={cn('mx-auto flex w-full justify-center', className)}>
       <ul className="flex flex-row items-center gap-1">
         <li>
-          {control(
-            currentPage - 1,
-            {
-              variant: 'outline',
-              className: '!h-10 !w-10 content-md:!h-10 content-md:!w-10',
-              disabled: currentPage === 1,
-              label: 'Go to previous page',
-            },
-            <ChevronLeft className="h-4 w-4" />,
-          )}
+          <PaginationControl
+            page={currentPage - 1}
+            label="Go to previous page"
+            variant="outline"
+            className={NEIGHBOUR_CLASS}
+            disabled={currentPage === 1}
+            rel="prev"
+            onPageChange={onPageChange}
+            getPageHref={getPageHref}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </PaginationControl>
         </li>
 
         {pageNumbers.map((page, index) => {
@@ -149,34 +188,35 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className, getPageH
 
           return (
             <li key={page}>
-              {control(
-                page,
-                {
-                  variant: currentPage === page ? 'accent' : 'outline',
-                  className: '!h-9 !w-9 content-md:!h-9 content-md:!w-9',
-                  label: `Page ${page}`,
-                  current: currentPage === page,
-                },
-                page,
-              )}
+              <PaginationControl
+                page={page}
+                label={`Page ${page}`}
+                variant={currentPage === page ? 'accent' : 'outline'}
+                className={PAGE_CLASS}
+                current={currentPage === page}
+                onPageChange={onPageChange}
+                getPageHref={getPageHref}
+              >
+                {page}
+              </PaginationControl>
             </li>
           );
         })}
 
         <li>
-          {control(
-            currentPage + 1,
-            {
-              variant: 'outline',
-              className: '!h-10 !w-10 content-md:!h-10 content-md:!w-10',
-              disabled: currentPage === totalPages,
-              label: 'Go to next page',
-            },
-            <>
-              <ChevronRight className="h-4 w-4" />
-              <span className="sr-only">Next page</span>
-            </>,
-          )}
+          <PaginationControl
+            page={currentPage + 1}
+            label="Go to next page"
+            variant="outline"
+            className={NEIGHBOUR_CLASS}
+            disabled={currentPage === totalPages}
+            rel="next"
+            onPageChange={onPageChange}
+            getPageHref={getPageHref}
+          >
+            <ChevronRight className="h-4 w-4" />
+            <span className="sr-only">Next page</span>
+          </PaginationControl>
         </li>
       </ul>
     </nav>

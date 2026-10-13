@@ -46,6 +46,10 @@ describe('Pagination with page addresses', () => {
       'Go to next page': '/blog?page=4',
     });
     expect(screen.getByRole('link', { name: 'Page 3' }).getAttribute('aria-current')).toBe('page');
+    // The neighbours say which way they lead; a numbered page states no relation.
+    expect(screen.getByRole('link', { name: 'Go to previous page' }).getAttribute('rel')).toBe('prev');
+    expect(screen.getByRole('link', { name: 'Go to next page' }).getAttribute('rel')).toBe('next');
+    expect(screen.getByRole('link', { name: 'Page 4' }).hasAttribute('rel')).toBe(false);
   });
 
   it('changes the page in place on a plain click and does not navigate', () => {
@@ -98,7 +102,11 @@ describe('UnifiedPagination', () => {
     expect(fireEvent.click(screen.getByRole('link', { name: 'Page 2' }))).toBe(false);
     expect(onPageChange).toHaveBeenCalledWith(2);
     // The address bar is rewritten in place, exactly as before the controls were links.
-    expect(replaceState).toHaveBeenCalledWith(null, '', '/blog?tags=guide&page=2');
+    expect(replaceState).toHaveBeenLastCalledWith(null, '', '/blog?tags=guide&page=2');
+
+    // Back to the first page: the address bar gets the SAME address the link shows (no `page`).
+    fireEvent.click(screen.getByRole('link', { name: 'Page 1' }));
+    expect(replaceState).toHaveBeenLastCalledWith(null, '', '/blog?tags=guide');
     replaceState.mockRestore();
   });
 
