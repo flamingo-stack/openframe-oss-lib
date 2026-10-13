@@ -5,9 +5,12 @@ import com.openframe.data.document.connector.ConnectorAlertType;
 import com.openframe.data.repository.connector.ConnectorAlertRepository;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.debezium.dto.ConnectorBackoffState;
+import com.openframe.debezium.dto.ConnectorOffsets;
 import com.openframe.debezium.dto.ConnectorStatus;
 import com.openframe.debezium.naming.ConnectorNameStrategy;
 import com.openframe.debezium.recovery.RecreationTracker;
+import com.openframe.debezium.recovery.gap.ConnectorRecreator;
+import com.openframe.debezium.recovery.gap.RecreationRequest;
 import com.openframe.debezium.util.ConnectorSpecs;
 import com.openframe.debezium.util.DebeziumLog;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +46,7 @@ public class ConnectorRecoveryManager {
     private static final String TRIGGER_NON_RECOVERABLE = "non-recoverable";
     private static final String TRIGGER_MAX_ATTEMPTS = "max-attempts";
     private static final String TRIGGER_NO_STATUS = "no-status";
+    private static final String TRIGGER_HISTORY_LOST = "history-lost";
     private static final String NO_STATUS_MSG = "Connector registered but Kafka Connect reports no status";
 
     private static final Set<String> NON_RECOVERABLE_ERROR_PATTERNS = Set.of(
@@ -59,18 +63,21 @@ public class ConnectorRecoveryManager {
     private final ConnectorNameStrategy nameStrategy;
     private final RecreationTracker recreationTracker;
     private final IntegratedToolService integratedToolService;
+    private final ConnectorRecreator connectorRecreator;
     private final ConcurrentHashMap<String, ConnectorBackoffState> backoffStates = new ConcurrentHashMap<>();
 
     public ConnectorRecoveryManager(DebeziumService debeziumService,
                                     ConnectorAlertRepository connectorAlertRepository,
                                     ConnectorNameStrategy nameStrategy,
                                     @Autowired(required = false) RecreationTracker recreationTracker,
-                                    @Autowired(required = false) IntegratedToolService integratedToolService) {
+                                    @Autowired(required = false) IntegratedToolService integratedToolService,
+                                    @Autowired(required = false) ConnectorRecreator connectorRecreator) {
         this.debeziumService = debeziumService;
         this.connectorAlertRepository = connectorAlertRepository;
         this.nameStrategy = nameStrategy;
         this.recreationTracker = recreationTracker;
         this.integratedToolService = integratedToolService;
+        this.connectorRecreator = connectorRecreator;
     }
 
     /**
@@ -110,6 +117,17 @@ public class ConnectorRecoveryManager {
             }
 
             logFailureDetails(connectorName, status);
+
+            if (isHistoryLost(status)) {
+                log.error("{} Source history lost: name='{}' trace={}",
+                        DebeziumLog.PREFIX, connectorName, status.getFirstFailureTrace());
+                if (tryRecreate(connectorName, status.getFirstFailureTrace(), TRIGGER_HISTORY_LOST)) {
+                    return;
+                }
+                createAlert(connectorName, ConnectorAlertType.NON_RECOVERABLE_ERROR,
+                        status.getFirstFailureTrace(), 0);
+                return;
+            }
 
             if (isNonRecoverable(status)) {
                 log.error("{} Non-recoverable error: name='{}' trace={}",
@@ -219,8 +237,8 @@ public class ConnectorRecoveryManager {
             log.error("{} Recreation limit reached: base='{}' trigger={}", DebeziumLog.PREFIX, base, trigger);
             return false;
         }
-        return lookupConfigForBase(base)
-                .map(cfg -> performRecreation(failedName, base, cfg, reason, trigger))
+        return lookupSpecForBase(base)
+                .map(spec -> performRecreation(failedName, base, spec, reason, trigger))
                 .orElseGet(() -> {
                     log.warn("{} Recreation skipped — no source config: base='{}'", DebeziumLog.PREFIX, base);
                     return false;
@@ -233,7 +251,7 @@ public class ConnectorRecoveryManager {
                 && nameStrategy.supportsRecreation();
     }
 
-    private boolean performRecreation(String failedName, String base, Map<String, Object> config,
+    private boolean performRecreation(String failedName, String base, Map<String, Object> spec,
                                       String reason, String trigger) {
         List<String> existingBefore = debeziumService.listConnectors();
         String newName = nameStrategy.resolveNextName(base, existingBefore);
@@ -250,7 +268,7 @@ public class ConnectorRecoveryManager {
         }
 
         try {
-            debeziumService.createConnector(newName, config);
+            createNextVersion(failedName, base, newName, spec, trigger);
         } catch (Exception e) {
             log.error("{} Recreation failed: base='{}' new='{}' trigger={}",
                     DebeziumLog.PREFIX, base, newName, trigger, e);
@@ -269,7 +287,29 @@ public class ConnectorRecoveryManager {
         return true;
     }
 
-    private Optional<Map<String, Object>> lookupConfigForBase(String baseName) {
+    private void createNextVersion(String failedName, String base, String newName,
+                                   Map<String, Object> spec, String trigger) {
+        if (connectorRecreator == null) {
+            Map<String, Object> config = ConnectorSpecs.configOf(spec);
+            debeziumService.createConnector(newName, config);
+            return;
+        }
+        ConnectorOffsets lastKnownOffsets = connectorRecreator.lastKnownOffsets(base, failedName);
+        RecreationRequest request = RecreationRequest.builder()
+                .baseName(base)
+                .newName(newName)
+                .spec(spec)
+                .lastKnownOffsets(lastKnownOffsets)
+                .historyLost(TRIGGER_HISTORY_LOST.equals(trigger))
+                .build();
+        connectorRecreator.recreate(request);
+    }
+
+    private boolean isHistoryLost(ConnectorStatus status) {
+        return connectorRecreator != null && connectorRecreator.isHistoryLost(status);
+    }
+
+    private Optional<Map<String, Object>> lookupSpecForBase(String baseName) {
         // Symmetric with DebeziumService.extractExpectedConnectorNames — disabled
         // tools must not drive recreation. If a tool is later disabled, the
         // operator is responsible for deleting the running connector.
@@ -278,7 +318,7 @@ public class ConnectorRecoveryManager {
                 .flatMap(ConnectorSpecs::specStreamOf)
                 .filter(spec -> baseName.equals(ConnectorSpecs.nameOf(spec)))
                 .findFirst()
-                .map(ConnectorSpecs::configOf);
+                .filter(spec -> ConnectorSpecs.configOf(spec) != null);
     }
 
     private long calculateBackoff(int consecutiveFailures) {
