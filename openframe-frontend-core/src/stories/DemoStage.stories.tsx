@@ -190,7 +190,7 @@ export const RequestCards: Story = {
               meta: 'this computer',
             }}
             outcome={ask.done}
-            accent="var(--ods-flamingo-pink-base)"
+            agent="fae"
             footerLabel="Your part"
             footerValue={ask.part}
             footerTone={ask.part === 'One tap' ? 'attention' : 'default'}

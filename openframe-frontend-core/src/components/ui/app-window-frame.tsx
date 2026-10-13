@@ -1,6 +1,8 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
-import { identityTint } from '../../utils/identity-tint';
+import { useAgentTint } from '../agent-identity';
 
 export interface AppWindowFrameProps {
   /** Centered in the title bar. */
@@ -9,10 +11,11 @@ export interface AppWindowFrameProps {
   /** A bar pinned under the body (a status line, an action). */
   footer?: ReactNode;
   /**
-   * The identity colour of the agent whose window this is (a CSS colour). The
-   * window takes that agent's tint, like every card of the agent's.
+   * The slug of the agent whose window this is. The window takes that agent's
+   * tint from its identity, like every card of the agent's. A window names its
+   * agent, never a colour.
    */
-  accent?: string;
+  agent?: string | null;
   className?: string;
   /** The scrolling body between the title bar and the footer. */
   bodyClassName?: string;
@@ -25,16 +28,17 @@ export interface AppWindowFrameProps {
  *
  * The frame is a column, so give it a height and the body fills what is left.
  */
-export function AppWindowFrame({ title, children, footer, accent, className, bodyClassName }: AppWindowFrameProps) {
+export function AppWindowFrame({ title, children, footer, agent, className, bodyClassName }: AppWindowFrameProps) {
+  const tint = useAgentTint(agent);
   return (
     <div
       className={cn(
         'flex min-w-0 flex-col overflow-hidden rounded-xl border border-ods-border',
         // An agent's window sits on the page surface under that agent's tint.
-        accent ? 'bg-ods-bg' : 'bg-ods-card',
+        tint ? 'bg-ods-bg' : 'bg-ods-card',
         className,
       )}
-      style={identityTint(accent)}
+      style={tint}
     >
       <div className="relative flex h-10 shrink-0 items-center gap-2 border-b border-ods-border px-4" aria-hidden>
         <span className="h-2.5 w-2.5 rounded-full bg-ods-border" />

@@ -1,6 +1,8 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
-import { identityTint } from '../../utils/identity-tint';
+import { useAgentTint } from '../agent-identity';
 import { ChatTurn } from '../chat/chat-turn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { Tag } from '../ui/tag';
@@ -31,11 +33,11 @@ export interface ConversationCardProps {
   /** `attention` paints the answer in the warning colour: it needs a person. */
   footerTone?: 'default' | 'attention';
   /**
-   * The responder's identity colour (a CSS colour, such as the hex an agent's
-   * identity stores). It tints the card's border and surface, so a card reads
-   * as that agent's at a glance.
+   * The slug of the agent that answered. The card takes that agent's tint from
+   * its identity, so it reads as that agent's at a glance. A card names its
+   * agent, never a colour.
    */
-  accent?: string;
+  agent?: string | null;
   className?: string;
 }
 
@@ -53,16 +55,17 @@ export function ConversationCard({
   footerLabel,
   footerValue,
   footerTone = 'default',
-  accent,
+  agent,
   className,
 }: ConversationCardProps) {
+  const tint = useAgentTint(agent);
   return (
     <div
       className={cn(
         'flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]',
         className,
       )}
-      style={identityTint(accent)}
+      style={tint}
     >
       {/* Every part keeps a fixed number of lines, so cards in a row or a carousel line up part by part. */}
       <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>

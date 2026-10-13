@@ -5,11 +5,27 @@ import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
 import { Button, type ButtonProps } from './button';
-import { SplitButton, type SplitButtonProps } from './button/split-button';
+
+/** The button's own action, when its label does something itself and the chevron holds the alternatives. */
+export interface DropdownButtonAction {
+  href?: string;
+  /** Fetch `href` as a file (an installer) instead of navigating to it. */
+  download?: boolean | string;
+  openInNewTab?: boolean;
+  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>;
+}
 
 export interface DropdownButtonProps {
   /** Button label rendered next to the chevron. */
   label: React.ReactNode;
+  /**
+   * Makes the label a button of its own (Figma `button-action`): it runs this
+   * action, and the chevron beside it opens the menu of alternatives. Two click
+   * targets on one surface. Without it the whole button opens the menu.
+   */
+  action?: DropdownButtonAction;
+  /** The chevron's accessible name when `action` is set (it has no text of its own). Default: "More options". */
+  menuAriaLabel?: string;
   /** Optional leading icon rendered before the label. */
   icon?: React.ReactNode;
   /**
@@ -56,7 +72,9 @@ export interface DropdownButtonProps {
  * `ActionsMenu`. One component, so the trigger styling, chevron, and menu
  * chrome cannot drift between surfaces.
  *
- * Two trigger looks — BOTH render through the unified `Button`:
+ * With `action`, the label is a button of its own and the chevron alone opens
+ * the menu (two targets, one surface). Otherwise, two trigger looks — BOTH
+ * render through the unified `Button`:
  * - default (no `variant`): the card-colored seam trigger — `Button
  *   variant="outline"` with the chevron in its `splitIcon` slot, so the label
  *   and chevron are separated by a divider, the whole surface is one click
@@ -71,6 +89,8 @@ export interface DropdownButtonProps {
  */
 export function DropdownButton({
   label,
+  action,
+  menuAriaLabel = 'More options',
   icon,
   items,
   groups,
@@ -107,6 +127,57 @@ export function DropdownButton({
   );
 
   const resolvedAriaLabel = ariaLabel || (typeof label === 'string' ? label : undefined);
+
+  // With its own action: two common `Button`s attached into one surface. The
+  // label runs the action, the chevron is the menu's trigger.
+  if (action) {
+    const skin = variant ?? 'outline';
+    return (
+      <div
+        role="group"
+        aria-label={resolvedAriaLabel}
+        className={cn('inline-flex items-stretch', fullWidth && 'w-full', className)}
+      >
+        <Button
+          variant={skin}
+          attach="start"
+          href={action.href}
+          download={action.download}
+          openInNewTab={action.openInNewTab}
+          onClick={action.onClick as React.MouseEventHandler<HTMLButtonElement> | undefined}
+          disabled={disabled}
+          loading={loading}
+          leftIcon={icon}
+          className={fullWidth ? 'flex-1' : undefined}
+        >
+          {label}
+        </Button>
+        <ActionsMenuDropdown
+          groups={groups ?? [{ items: items ?? [] }]}
+          open={open}
+          onOpenChange={handleOpenChange}
+          align={align}
+          side={side}
+          onCloseAutoFocus={onCloseAutoFocus}
+          triggerAriaLabel={menuAriaLabel}
+          customTrigger={
+            <Button
+              type="button"
+              variant={skin}
+              size="icon"
+              attach="end"
+              disabled={disabled || loading}
+              aria-label={menuAriaLabel}
+              className={cn(open && 'bg-ods-bg-hover')}
+              leftIcon={
+                <Chevron02DownIcon className={cn('transition-transform duration-fast', open && 'rotate-180')} />
+              }
+            />
+          }
+        />
+      </div>
+    );
+  }
 
   const trigger = variant ? (
     <Button
@@ -153,54 +224,6 @@ export function DropdownButton({
       onCloseAutoFocus={onCloseAutoFocus}
       triggerAriaLabel={resolvedAriaLabel}
       customTrigger={trigger}
-    />
-  );
-}
-
-export interface SplitDropdownButtonProps extends Omit<SplitButtonProps, 'iconAction'> {
-  /** Items of the chevron half's menu (one flat group). */
-  items?: ActionsMenuItem[];
-  /** Grouped items. Takes precedence over `items`. */
-  groups?: ActionsMenuGroup[];
-  /** The chevron half's accessible name ("More download options"). */
-  menuAriaLabel: string;
-  align?: 'start' | 'center' | 'end';
-  side?: 'top' | 'right' | 'bottom' | 'left';
-}
-
-/**
- * A button with its alternatives behind a chevron (Figma `button-action`): the
- * main half does the default action, the chevron half opens an `ActionsMenu` of
- * the others. Two click targets on one surface, built from `SplitButton` and
- * `ActionsMenuDropdown`, so its skin and its menu are the house ones.
- */
-export function SplitDropdownButton({
-  items,
-  groups,
-  menuAriaLabel,
-  align = 'end',
-  side = 'bottom',
-  ...button
-}: SplitDropdownButtonProps) {
-  const [open, setOpen] = React.useState(false);
-  return (
-    <SplitButton
-      {...button}
-      iconAction={{
-        'aria-label': menuAriaLabel,
-        icon: <Chevron02DownIcon className={cn('transition-transform duration-fast', open && 'rotate-180')} />,
-        wrap: half => (
-          <ActionsMenuDropdown
-            groups={groups ?? [{ items: items ?? [] }]}
-            open={open}
-            onOpenChange={setOpen}
-            align={align}
-            side={side}
-            triggerAriaLabel={menuAriaLabel}
-            customTrigger={half}
-          />
-        ),
-      }}
     />
   );
 }
