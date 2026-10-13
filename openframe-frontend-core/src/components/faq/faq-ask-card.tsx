@@ -10,7 +10,7 @@ import { assistantAvailable } from '../chat/hooks/use-ask-prompts';
 export interface FaqAskOptions {
   /**
    * What this FAQ is about: ANY string the host's questions endpoint knows (it
-   * is sent as `section`, and reported with every click). Questions written
+   * is sent as `topic`, and reported with every click). Questions written
    * for the topic are picked first. Absent: the FAQ's own topic
    * (`FaqSection`'s `topic`), else the entity the FAQ is attached to (its
    * `entityType`). With none, the FAQ has no card: the lib names no topic of
