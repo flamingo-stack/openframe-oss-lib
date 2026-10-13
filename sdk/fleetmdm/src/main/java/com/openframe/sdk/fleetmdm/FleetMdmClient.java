@@ -723,7 +723,21 @@ public class FleetMdmClient {
     }
 
     public CompletableFuture<List<Policy>> listPoliciesAsync() {
-        HttpRequest httpRequest = buildRequest(POLICIES_URL, "GET", null);
+        return listPoliciesAsync(POLICIES_URL);
+    }
+
+    /**
+     * One page of policies in id order.
+     *
+     * @param afterId the id the page starts after, or null for the first page
+     * @param perPage the most policies to return
+     */
+    public CompletableFuture<List<Policy>> listPoliciesAsync(Long afterId, int perPage) {
+        return listPoliciesAsync(POLICIES_URL + pageAfterId(afterId, perPage));
+    }
+
+    private CompletableFuture<List<Policy>> listPoliciesAsync(String path) {
+        HttpRequest httpRequest = buildRequest(path, "GET", null);
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkResponse(response, "list Fleet policies");
@@ -789,7 +803,21 @@ public class FleetMdmClient {
     }
 
     public CompletableFuture<List<Query>> listScheduledQueriesAsync() {
-        HttpRequest httpRequest = buildRequest(QUERIES_URL, "GET", null);
+        return listScheduledQueriesAsync(QUERIES_URL);
+    }
+
+    /**
+     * One page of scheduled queries in id order.
+     *
+     * @param afterId the id the page starts after, or null for the first page
+     * @param perPage the most queries to return
+     */
+    public CompletableFuture<List<Query>> listScheduledQueriesAsync(Long afterId, int perPage) {
+        return listScheduledQueriesAsync(QUERIES_URL + pageAfterId(afterId, perPage));
+    }
+
+    private CompletableFuture<List<Query>> listScheduledQueriesAsync(String path) {
+        HttpRequest httpRequest = buildRequest(path, "GET", null);
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkResponse(response, "list Fleet scheduled queries");
@@ -1087,6 +1115,12 @@ public class FleetMdmClient {
             throw new FleetMdmException("Fleet response missing field \"" + fieldName + "\". Body: " + responseBody);
         }
         return node;
+    }
+
+    // Fleet applies "after" only together with an order key.
+    private static String pageAfterId(Long afterId, int perPage) {
+        String page = "?order_key=id&order_direction=asc&per_page=" + perPage;
+        return afterId == null ? page : page + "&after=" + afterId;
     }
 
     private HttpRequest.Builder addHeaders(HttpRequest.Builder builder) {
