@@ -59,7 +59,10 @@ describe('PageFaq', () => {
 
   it('emits FAQPage JSON-LD for the page’s own questions', () => {
     render(<PageFaq topic="pricing" initialFaqs={FAQS} />);
-    const schema = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(markup())?.[1] ?? '{}');
+    const schema = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(markup())?.[1] ?? '{}') as {
+      '@type'?: string;
+      mainEntity?: unknown[];
+    };
     expect(schema['@type']).toBe('FAQPage');
     expect(schema.mainEntity).toHaveLength(1);
   });
