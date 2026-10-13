@@ -1,6 +1,7 @@
 package com.openframe.client.listener.delivery;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.service.delivery.LocalDeliverySink;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
@@ -94,7 +95,7 @@ class DeliveryDispatchListenerWiringTest {
 
         @Bean
         ObjectMapper objectMapper() {
-            return new ObjectMapper();
+            return new JsonMapper();
         }
     }
 }

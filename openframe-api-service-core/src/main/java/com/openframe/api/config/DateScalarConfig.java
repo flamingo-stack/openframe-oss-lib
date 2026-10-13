@@ -30,8 +30,8 @@ public class DateScalarConfig implements Coercing<LocalDate, String> {
     public String serialize(@NotNull Object dataFetcherResult,
                             @NotNull GraphQLContext graphQLContext,
                             @NotNull Locale locale) throws CoercingSerializeException {
-        if (dataFetcherResult instanceof LocalDate) {
-            return ((LocalDate) dataFetcherResult).format(DATE_FORMATTER);
+        if (dataFetcherResult instanceof LocalDate date) {
+            return date.format(DATE_FORMATTER);
         }
         throw new CoercingSerializeException("Expected a LocalDate object.");
     }
@@ -41,8 +41,8 @@ public class DateScalarConfig implements Coercing<LocalDate, String> {
                                 @NotNull GraphQLContext graphQLContext,
                                 @NotNull Locale locale) throws CoercingParseValueException {
         try {
-            if (input instanceof String) {
-                return LocalDate.parse((String) input, DATE_FORMATTER);
+            if (input instanceof String string) {
+                return LocalDate.parse(string, DATE_FORMATTER);
             }
             throw new CoercingParseValueException("Expected a String");
         } catch (DateTimeParseException e) {
@@ -55,9 +55,9 @@ public class DateScalarConfig implements Coercing<LocalDate, String> {
                                   @NotNull CoercedVariables variables,
                                   @NotNull GraphQLContext graphQLContext,
                                   @NotNull Locale locale) throws CoercingParseLiteralException {
-        if (input instanceof graphql.language.StringValue) {
+        if (input instanceof graphql.language.StringValue stringValue) {
             try {
-                String value = ((graphql.language.StringValue) input).getValue();
+                String value = stringValue.getValue();
                 return LocalDate.parse(value, DATE_FORMATTER);
             } catch (DateTimeParseException e) {
                 throw new CoercingParseLiteralException("Invalid Date format. Expected yyyy-MM-dd");

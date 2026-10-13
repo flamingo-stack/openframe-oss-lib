@@ -58,12 +58,12 @@ class CassandraTableColumnSyncIntegrationTest extends BaseCassandraIntegrationTe
     }
 
     @Test
-    void afterSingletonsInstantiated_tableProvisionedBeforeRunOriginColumns_addsThem() {
+    void start_tableProvisionedBeforeRunOriginColumns_addsThem() {
         // setup
         List<String> before = columnNames();
 
         // execution
-        sync.afterSingletonsInstantiated();
+        sync.start();
 
         // verifications
         assertThat(before).doesNotContain("execution_source", "script_creation_source");
@@ -71,13 +71,13 @@ class CassandraTableColumnSyncIntegrationTest extends BaseCassandraIntegrationTe
     }
 
     @Test
-    void afterSingletonsInstantiated_runTwice_secondRunIsNoOp() {
+    void start_runTwice_secondRunIsNoOp() {
         // setup
-        sync.afterSingletonsInstantiated();
+        sync.start();
         List<String> afterFirstRun = columnNames();
 
         // execution
-        sync.afterSingletonsInstantiated();
+        sync.start();
 
         // verifications
         assertThat(columnNames()).containsExactlyInAnyOrderElementsOf(afterFirstRun);

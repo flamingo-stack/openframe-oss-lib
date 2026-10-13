@@ -87,14 +87,14 @@ public class BaseGlobalExceptionHandler {
      * the generic {@link ResponseStatusException} handler and get mislabeled as INTERNAL_ERROR.
      * <p>
      * The message is built from {@link HandlerMethodValidationException#getAllErrors()} rather than
-     * from the field errors, because {@code getAllValidationResults()} omits cross-parameter
+     * from the field errors, because {@code getParameterValidationResults()} omits cross-parameter
      * violations — relying on it alone would yield an empty message for a cross-parameter-only
      * failure.
      */
     @ExceptionHandler(HandlerMethodValidationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleHandlerMethodValidation(HandlerMethodValidationException ex) {
-        List<ErrorResponse.FieldError> fieldErrors = ex.getAllValidationResults().stream()
+        List<ErrorResponse.FieldError> fieldErrors = ex.getParameterValidationResults().stream()
                 .flatMap(result -> result.getResolvableErrors().stream()
                         .map(error -> ErrorResponse.FieldError.builder()
                                 .field(resolveFieldName(result.getMethodParameter()))

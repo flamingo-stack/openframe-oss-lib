@@ -1,6 +1,6 @@
 package com.openframe.delivery.dispatch;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.openframe.delivery.spec.DeliveryAudience;
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -178,16 +178,19 @@ export const RequestCards: Story = {
           <ConversationCard
             requester={{
               avatar: <span className="block h-9 w-9 rounded-full bg-ods-border" />,
+              time: '2:47 PM',
               name: ask.who,
               meta: ask.where,
             }}
             request={ask.quote}
             responder={{
               avatar: <AgentMark agent="fae" className="h-7 w-7 rounded-full" />,
+              time: '2:47 PM',
               name: 'Fae',
               meta: 'this computer',
             }}
             outcome={ask.done}
+            agent="fae"
             footerLabel="Your part"
             footerValue={ask.part}
             footerTone={ask.part === 'One tap' ? 'attention' : 'default'}

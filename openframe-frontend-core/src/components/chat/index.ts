@@ -23,6 +23,7 @@ export * from './slash-command-suggestions';
 export * from './chat-message-enhanced';
 export * from './chat-message-list';
 export * from './chat-message-row';
+export * from './chat-turn';
 export * from './chat-message-skeleton';
 
 export * from './quick-action-chip';
