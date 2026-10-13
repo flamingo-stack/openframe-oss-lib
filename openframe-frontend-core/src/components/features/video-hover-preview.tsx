@@ -26,6 +26,7 @@ import Image from '../../embed-shims/next-image';
 import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { cn } from '../../utils/cn';
 import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
+import { CanvasPoster } from './canvas-poster';
 import { toMuxPreviewUrl } from './mux-origins';
 import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
 import { VideoPlayBadge } from './video-center-badge';
@@ -52,6 +53,11 @@ export interface VideoHoverPreviewSurfaceProps {
   /** The poster is in view from the first paint (a card pinned to the screen),
    *  so it loads at once rather than lazily. Default false (a strip cell). */
   posterInView?: boolean;
+  /** How the poster is drawn. 'canvas' is for a surface that appears late and
+   *  uninvited (the floating walkthrough card): nothing it paints while idle is
+   *  a Largest Contentful Paint candidate, so it can never become the page's
+   *  LCP (see CanvasPoster). Default 'image'. */
+  posterPaint?: 'image' | 'canvas';
   /** Preview-player preload override. When 'none' AND the poster resolves null,
    *  the network-fetching first-frame facade is SKIPPED (flat surface + badge)
    *  so a fixed always-near widget card fetches nothing until first hover. */
@@ -89,6 +95,7 @@ export function VideoHoverPreviewSurface({
   fit,
   posterSizes = '234px',
   posterInView = false,
+  posterPaint = 'image',
   preload,
   hideMutedBadge,
   onMutedFallbackChange,
@@ -139,7 +146,9 @@ export function VideoHoverPreviewSurface({
     <div ref={rootElRef} className={cn('absolute inset-0', className)} inert={isClone || undefined}>
       {showMedia ? (
         <>
-          {posterSrc ? (
+          {posterSrc && posterPaint === 'canvas' ? (
+            <CanvasPoster src={posterSrc} onError={onPosterError} />
+          ) : posterSrc ? (
             <Image
               src={posterSrc}
               alt=""
@@ -175,7 +184,10 @@ export function VideoHoverPreviewSurface({
               // seek; the explicit key handles that now, and a 320px mini
               // player should never pull the uncapped manifest.
               url={previewUrl}
-              poster={posterUrl}
+              // A canvas-painted surface hands the player no poster: its own
+              // poster (and its loading fallback's background) are LCP candidates,
+              // and the canvas beneath already shows the picture.
+              poster={posterPaint === 'canvas' ? null : posterUrl}
               {...(continuation
                 ? {
                     startTime,

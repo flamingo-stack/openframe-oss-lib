@@ -224,7 +224,11 @@ function WalkthroughVideo({
   // (embedder) → a stable presence marker so dismissal still works.
   const dismissalId = video?.id != null ? String(video.id) : 'dismissed';
 
-  // --- mount gate (never LCP; cookie read happens post-delay, no hydration mismatch) ---
+  // --- mount gate (cookie read happens post-delay, no hydration mismatch) ---
+  // The delay alone does NOT keep the card out of Largest Contentful Paint: the
+  // metric takes candidates until the first interaction, so a late card that is
+  // the largest thing in a short window became the LCP. What keeps it out is
+  //  on the floating card's surface below.
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const hasVideo = video != null;
@@ -1020,6 +1024,10 @@ function WalkthroughVideo({
           // Pinned to the screen (or laid out in the host's first view), so it
           // is often the largest thing painted: never lazy.
           posterInView
+          // The FLOATING card arrives seconds after load, so its poster is drawn
+          // on a canvas and can never become the page's Largest Contentful Paint.
+          // An inline block is part of the page's own content: a plain image.
+          posterPaint={inline ? 'image' : 'canvas'}
           preload="none"
           hideMutedBadge
           onMutedFallbackChange={onCardFallbackChange}
